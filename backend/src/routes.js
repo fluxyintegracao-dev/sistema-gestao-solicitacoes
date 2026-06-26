@@ -355,6 +355,7 @@ const TituloFinanceiroController = require('./controllers/TituloFinanceiroContro
 const FinanciamentoBancarioController = require('./controllers/FinanciamentoBancarioController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
+const ObraCustoHistoricoController = require('./controllers/ObraCustoHistoricoController');
 const CaixaFinanceiroController = require('./controllers/CaixaFinanceiroController');
 const TransferenciaFinanceiraController = require('./controllers/TransferenciaFinanceiraController');
 const TarifaBancariaConfigController = require('./controllers/TarifaBancariaConfigController');
@@ -1518,6 +1519,9 @@ router.get('/financeiro/relatorios/fluxo-caixa', allowFinanceiroRelatorio(['fina
 router.get('/financeiro/relatorios/fluxo-consolidado', allowFinanceiroRelatorio(['financeiro.relatorios.fluxo_consolidado']), validateRequest({ query: validateFinanceFluxoConsolidadoQuery }), RelatorioFinanceiroController.fluxoConsolidado);
 router.get('/financeiro/relatorios/analitico', allowFinanceiroRelatorio(['financeiro.relatorios.analitico']), validateRequest({ query: validateFinanceRelatorioAnaliticoQuery }), RelatorioFinanceiroController.analitico);
 router.get('/financeiro/relatorios/financeiro-obras', allowFinanceiroRelatorio(['financeiro.relatorios.financeiro_obras']), validateRequest({ query: validateFinanceiroObrasQuery }), RelatorioFinanceiroController.financeiroObras);
+router.get('/financeiro/relatorios/financeiro-obras/importacoes-historicas', allowFinanceiroRelatorio(['financeiro.relatorios.financeiro_obras']), ObraCustoHistoricoController.importacoes);
+router.post('/financeiro/relatorios/financeiro-obras/importacoes-historicas/preview', allowFinanceiroRelatorio(['financeiro.relatorios.financeiro_obras']), uploadRateLimit, uploadComprovantes.single('file'), ObraCustoHistoricoController.preview);
+router.post('/financeiro/relatorios/financeiro-obras/importacoes-historicas/confirmar', allowFinanceiroRelatorio(['financeiro.relatorios.financeiro_obras']), criticalRateLimit, ObraCustoHistoricoController.confirmar);
 router.get('/financeiro/relatorios/dre/comparativo', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreComparativoQuery }), RelatorioFinanceiroController.dreComparativo);
 router.get('/financeiro/relatorios/dre/empresas', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dreComparativoEmpresas);
 router.get('/financeiro/relatorios/dre', allowFinanceiroRelatorio(['financeiro.relatorios.dre']), validateRequest({ query: validateFinanceDreQuery }), RelatorioFinanceiroController.dre);

@@ -810,6 +810,7 @@ function validateFinanceiroObrasQuery(query = {}) {
       'tipo',
       'parceiro_id',
       'categoria_financeira_id',
+      'incluir_historico',
       'q',
       'limit'
     ],
@@ -835,6 +836,7 @@ function validateFinanceiroObrasQuery(query = {}) {
     tipo: parseEnum(query.tipo, 'Tipo', ['PAGAR', 'RECEBER']),
     parceiro_id: parseInteger(query.parceiro_id, 'Parceiro'),
     categoria_financeira_id: parseInteger(query.categoria_financeira_id, 'Categoria financeira'),
+    incluir_historico: parseBoolean(query.incluir_historico, 'Incluir historico legado'),
     q: parseOptionalText(query.q, 'Busca', 120),
     limit: limit ? Math.min(limit, 3000) : undefined
   };

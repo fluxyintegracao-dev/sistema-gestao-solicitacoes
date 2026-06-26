@@ -7,6 +7,7 @@ const {
   SolicitacaoCompra,
   TituloFinanceiro,
   MovimentoFinanceiro,
+  ObraCustoHistorico,
   Parceiro,
   TipoSolicitacao,
   Anexo,
@@ -185,6 +186,48 @@ function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
   };
 }
 
+function summarizeCustosHistoricosByBuckets({ custosHistoricos, bucketMap }) {
+  const custosExecutados = [];
+  let recebido = 0;
+
+  custosHistoricos.forEach((item) => {
+    const tipo = String(item.tipo || 'PAGAR').toUpperCase();
+    const valor = roundCurrency(item.valor);
+    const parceiroNome = item.parceiro?.nome || item.parceiro_nome || 'Parceiro nao informado';
+
+    if (valor <= 0) {
+      return;
+    }
+
+    if (tipo === 'RECEBER') {
+      recebido = roundCurrency(recebido + valor);
+      return;
+    }
+
+    const bucket = ensureBucket(bucketMap, null, bucketMap);
+    bucket.pago += valor;
+    custosExecutados.push({
+      id: `historico-${item.id}`,
+      custo_historico_id: item.id,
+      data_movimento: item.data_pagamento,
+      data_vencimento: item.data_vencimento,
+      parceiro_nome: parceiroNome,
+      origem: 'HISTORICO LEGADO',
+      codigo_referencia: item.documento || item.titulo_parcela || `HIST-${item.id}`,
+      descricao: item.descricao || item.plano_financeiro || '-',
+      total: valor,
+      apropriacao_codigo: bucket.codigo,
+      apropriacao_descricao: bucket.descricao
+    });
+  });
+
+  custosExecutados.sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0));
+  return {
+    custosExecutados,
+    recebido
+  };
+}
+
 function summarizePedidos({ solicitacoes, titulosBySolicitacaoId, bucketMap }) {
   const pedidos = [];
 
@@ -292,6 +335,7 @@ async function carregarDadosObra(obraId) {
     solicitacoes,
     solicitacoesCompra,
     titulos,
+    custosHistoricos,
     contratos
   ] = await Promise.all([
     Apropriacao.findAll({
@@ -320,6 +364,16 @@ async function carregarDadosObra(obraId) {
         }
       ],
       order: [['data_vencimento', 'ASC'], ['createdAt', 'DESC']]
+    }),
+    ObraCustoHistorico.findAll({
+      where: {
+        obra_id: obraId,
+        ativo: true
+      },
+      include: [
+        { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj'] }
+      ],
+      order: [['data_pagamento', 'DESC'], ['id', 'DESC']]
     }),
     Contrato.findAll({
       where: { obra_id: obraId },
@@ -379,6 +433,7 @@ async function carregarDadosObra(obraId) {
     solicitacoes,
     solicitacoesCompra,
     titulos,
+    custosHistoricos,
     anexos,
     comprovantes,
     contratos
@@ -391,7 +446,7 @@ async function obterGestaoObra(obraId) {
     return null;
   }
 
-  const { obra, apropriacoes, solicitacoes, solicitacoesCompra, titulos, anexos, comprovantes, contratos } = dados;
+  const { obra, apropriacoes, solicitacoes, solicitacoesCompra, titulos, custosHistoricos, anexos, comprovantes, contratos } = dados;
   const bucketMap = buildBuckets(apropriacoes);
   const solicitacoesMap = buildSolicitacaoIndex(solicitacoes);
   const titulosBySolicitacaoId = new Set(
@@ -400,11 +455,20 @@ async function obterGestaoObra(obraId) {
       .filter((id) => id > 0)
   );
 
-  const { custosExecutados, parcelas } = summarizeTitulosByBuckets({
+  const { custosExecutados: custosTitulos, parcelas } = summarizeTitulosByBuckets({
     titulos,
     solicitacoesMap,
     bucketMap
   });
+  const {
+    custosExecutados: custosHistoricosExecutados,
+    recebido: recebidoHistorico
+  } = summarizeCustosHistoricosByBuckets({
+    custosHistoricos,
+    bucketMap
+  });
+  const custosExecutados = [...custosTitulos, ...custosHistoricosExecutados]
+    .sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0));
   const pedidos = summarizePedidos({
     solicitacoes,
     titulosBySolicitacaoId,
@@ -412,6 +476,7 @@ async function obterGestaoObra(obraId) {
   });
   const buckets = finalizeBuckets(bucketMap);
   const kpis = buildKpis({ buckets, custosExecutados, pedidos });
+  kpis.recebido_historico = recebidoHistorico;
   const contratoAnexos = contratos.flatMap((contrato) =>
     (contrato.anexos || []).map((anexo) => ({
       ...anexo.get({ plain: true }),
@@ -517,6 +582,13 @@ async function listarObrasGestao() {
       }
     ]
   });
+  const custosHistoricos = await ObraCustoHistorico.findAll({
+    where: {
+      obra_id: { [Op.in]: obras.map((obra) => obra.id) },
+      ativo: true
+    },
+    attributes: ['id', 'obra_id', 'tipo', 'valor']
+  });
 
   const appropriationsByObra = new Map();
   apropriacoes.forEach((item) => {
@@ -536,6 +608,16 @@ async function listarObrasGestao() {
     titulosByObra.get(obraId).push(item);
   });
 
+  const custosHistoricosPagarByObra = new Map();
+  const custosHistoricosReceberByObra = new Map();
+  custosHistoricos.forEach((item) => {
+    const obraId = Number(item.obra_id);
+    const tipo = String(item.tipo || 'PAGAR').toUpperCase();
+    const map = tipo === 'RECEBER' ? custosHistoricosReceberByObra : custosHistoricosPagarByObra;
+    const atual = map.get(obraId) || 0;
+    map.set(obraId, roundCurrency(atual + asNumber(item.valor)));
+  });
+
   return obras.map((obra) => {
     const apropriacoesObra = appropriationsByObra.get(Number(obra.id)) || [];
     const titulosObra = titulosByObra.get(Number(obra.id)) || [];
@@ -546,9 +628,11 @@ async function listarObrasGestao() {
     );
     const executado = roundCurrency(
       titulosPagarObra.reduce((total, titulo) => total + sumMovimentosAtivos(titulo), 0)
+      + asNumber(custosHistoricosPagarByObra.get(Number(obra.id)))
     );
     const recebido = roundCurrency(
       titulosReceberObra.reduce((total, titulo) => total + asNumber(titulo.valor_baixado), 0)
+      + asNumber(custosHistoricosReceberByObra.get(Number(obra.id)))
     );
     const classificacao = String(obra.classificacao || '').trim().toUpperCase();
     const valorReferenciaResultado = classificacao === 'PRIVADA'

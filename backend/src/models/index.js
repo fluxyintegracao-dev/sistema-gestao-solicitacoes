@@ -112,6 +112,8 @@ db.CaixaConciliacaoConfirmacao = require('./CaixaConciliacaoConfirmacao')(sequel
 db.TransferenciaFinanceira = require('./TransferenciaFinanceira')(sequelize, Sequelize);
 db.ConciliacaoBancaria = require('./ConciliacaoBancaria')(sequelize, Sequelize);
 db.ConciliacaoBancariaImportacao = require('./ConciliacaoBancariaImportacao')(sequelize, Sequelize);
+db.ObraCustoHistoricoImportacao = require('./ObraCustoHistoricoImportacao')(sequelize, Sequelize);
+db.ObraCustoHistorico = require('./ObraCustoHistorico')(sequelize, Sequelize);
 db.PaymentProvider = require('./PaymentProvider')(sequelize, Sequelize);
 db.PaymentAccount = require('./PaymentAccount')(sequelize, Sequelize);
 db.PaymentBeneficiary = require('./PaymentBeneficiary')(sequelize, Sequelize);
@@ -2354,6 +2356,26 @@ db.TituloFinanceiro.belongsTo(db.Obra, {
   as: 'obra'
 });
 
+db.Obra.hasMany(db.ObraCustoHistorico, {
+  foreignKey: 'obra_id',
+  as: 'custosHistoricos'
+});
+
+db.ObraCustoHistorico.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.ObraCustoHistoricoImportacao.hasMany(db.ObraCustoHistorico, {
+  foreignKey: 'importacao_id',
+  as: 'itens'
+});
+
+db.ObraCustoHistorico.belongsTo(db.ObraCustoHistoricoImportacao, {
+  foreignKey: 'importacao_id',
+  as: 'importacao'
+});
+
 db.EmpresaGrupo.hasMany(db.Obra, {
   foreignKey: 'empresa_grupo_id',
   as: 'obrasCentrosCusto'
@@ -2384,12 +2406,32 @@ db.TituloFinanceiro.belongsTo(db.Parceiro, {
   as: 'parceiro'
 });
 
+db.Parceiro.hasMany(db.ObraCustoHistorico, {
+  foreignKey: 'parceiro_id',
+  as: 'custosHistoricosObra'
+});
+
+db.ObraCustoHistorico.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
+});
+
 db.CategoriaFinanceira.hasMany(db.TituloFinanceiro, {
   foreignKey: 'categoria_financeira_id',
   as: 'titulos'
 });
 
 db.TituloFinanceiro.belongsTo(db.CategoriaFinanceira, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'categoriaFinanceira'
+});
+
+db.CategoriaFinanceira.hasMany(db.ObraCustoHistorico, {
+  foreignKey: 'categoria_financeira_id',
+  as: 'custosHistoricosObra'
+});
+
+db.ObraCustoHistorico.belongsTo(db.CategoriaFinanceira, {
   foreignKey: 'categoria_financeira_id',
   as: 'categoriaFinanceira'
 });
@@ -2470,6 +2512,16 @@ db.EmpresaGrupo.hasMany(db.TituloFinanceiro, {
 });
 
 db.TituloFinanceiro.belongsTo(db.EmpresaGrupo, {
+  foreignKey: 'empresa_id',
+  as: 'empresa'
+});
+
+db.EmpresaGrupo.hasMany(db.ObraCustoHistorico, {
+  foreignKey: 'empresa_id',
+  as: 'custosHistoricosObra'
+});
+
+db.ObraCustoHistorico.belongsTo(db.EmpresaGrupo, {
   foreignKey: 'empresa_id',
   as: 'empresa'
 });

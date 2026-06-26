@@ -5,6 +5,7 @@ const {
   ContaBancaria,
   EmpresaGrupo,
   MovimentoFinanceiro,
+  ObraCustoHistorico,
   Obra,
   Parceiro,
   sequelize,
@@ -1414,6 +1415,96 @@ function buildFinanceiroObrasLinhaMovimento(movimento) {
   };
 }
 
+function isHistoricoLegadoEnabled(filters = {}, analise) {
+  if (analise !== 'REALIZADO') {
+    return false;
+  }
+
+  if (filters.incluir_historico === false) {
+    return false;
+  }
+
+  const value = String(filters.incluir_historico ?? '1').trim().toLowerCase();
+  return !['0', 'false', 'nao', 'não'].includes(value);
+}
+
+function buildFinanceiroObrasHistoricoWhere(filters, obraWhere, periodo) {
+  const where = {
+    ...obraWhere,
+    ativo: true,
+    data_pagamento: {
+      [Op.between]: [periodo.data_inicial, periodo.data_final]
+    }
+  };
+
+  if (filters.tipo) {
+    where.tipo = String(filters.tipo).toUpperCase();
+  }
+  if (filters.empresa_id) {
+    where.empresa_id = Number(filters.empresa_id);
+  }
+  if (filters.parceiro_id) {
+    where.parceiro_id = Number(filters.parceiro_id);
+  }
+  if (filters.categoria_financeira_id) {
+    where.categoria_financeira_id = Number(filters.categoria_financeira_id);
+  }
+
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    where[Op.or] = [
+      { parceiro_nome: { [Op.like]: `%${term}%` } },
+      { titulo_parcela: { [Op.like]: `%${term}%` } },
+      { documento: { [Op.like]: `%${term}%` } },
+      { plano_financeiro: { [Op.like]: `%${term}%` } },
+      { descricao: { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  return where;
+}
+
+function buildFinanceiroObrasLinhaHistorico(item) {
+  const valor = Number(item.valor || 0);
+  const tipo = String(item.tipo || 'PAGAR').toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR';
+  const credito = tipo === 'RECEBER' ? valor : 0;
+  const debito = tipo === 'PAGAR' ? valor : 0;
+  return {
+    id: `historico-${item.id}`,
+    titulo_id: null,
+    titulo_codigo: null,
+    titulo_parcela: item.titulo_parcela || `HIST-${item.id}`,
+    tipo,
+    status_titulo: 'HISTORICO',
+    documento: item.documento || null,
+    descricao: item.descricao || item.parceiro_nome || 'Historico legado',
+    parceiro_nome: item.parceiro?.nome || item.parceiro_nome || null,
+    parceiro_cpf_cnpj: item.parceiro?.cpf_cnpj || item.parceiro_documento || null,
+    obra_id: item.obra_id,
+    obra_nome: item.obra?.nome || null,
+    obra_codigo: item.obra?.codigo || null,
+    empresa_id: item.empresa_id,
+    empresa_nome: item.empresa?.nome || item.empresa?.razao_social || null,
+    empresa_cnpj: item.empresa?.cnpj || null,
+    categoria_nome: item.categoriaFinanceira?.nome || null,
+    plano_financeiro: item.categoriaFinanceira?.nome || item.plano_financeiro || 'Historico legado',
+    data_emissao: null,
+    data_vencimento: item.data_vencimento,
+    valor_original: valor,
+    valor_baixado: valor,
+    valor_saldo: 0,
+    analise: 'REALIZADO',
+    data_baixa: item.data_pagamento,
+    movimento_id: null,
+    status_movimento: 'HISTORICO_LEGADO',
+    conta_bancaria_nome: 'Historico legado',
+    credito,
+    debito,
+    saldo: 0,
+    origem_linha: 'HISTORICO_LEGADO'
+  };
+}
+
 function applyFinanceiroObrasSaldo(linhas = []) {
   let saldo = 0;
   return linhas.map((linha) => {
@@ -1431,12 +1522,14 @@ function summarizeFinanceiroObras(linhas = []) {
     titulosMap.set(linha.titulo_id, linha);
   });
   const movimentoIds = new Set(linhas.map((linha) => linha.movimento_id).filter(Boolean));
+  const historicos = linhas.filter((linha) => linha.origem_linha === 'HISTORICO_LEGADO').length;
   const titulosUnicos = Array.from(titulosMap.values());
 
   return {
     quantidade_linhas: linhas.length,
     titulos: titulosMap.size,
     movimentos: movimentoIds.size,
+    historicos,
     credito_total: credito,
     debito_total: debito,
     saldo_total: roundCurrency(credito - debito),
@@ -1502,6 +1595,52 @@ async function gerarRelatorioFinanceiroObras(req, filters = {}) {
       const movimento = typeof movimentoInstance.toJSON === 'function' ? movimentoInstance.toJSON() : movimentoInstance;
       return buildFinanceiroObrasLinhaMovimento(movimento);
     });
+
+    if (isHistoricoLegadoEnabled(filters, analise)) {
+      const historicos = await ObraCustoHistorico.findAll({
+        where: buildFinanceiroObrasHistoricoWhere(filters, obraWhere, periodo),
+        include: [
+          {
+            model: Obra,
+            as: 'obra',
+            attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
+          },
+          {
+            model: EmpresaGrupo,
+            as: 'empresa',
+            attributes: ['id', 'codigo', 'nome', 'razao_social', 'cnpj']
+          },
+          {
+            model: Parceiro,
+            as: 'parceiro',
+            attributes: ['id', 'nome', 'cpf_cnpj']
+          },
+          {
+            model: CategoriaFinanceira,
+            as: 'categoriaFinanceira',
+            attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo']
+          }
+        ],
+        order: [
+          ['data_pagamento', 'ASC'],
+          ['id', 'ASC']
+        ],
+        limit
+      });
+
+      linhas = [
+        ...linhas,
+        ...historicos.map((itemInstance) => {
+          const item = typeof itemInstance.toJSON === 'function' ? itemInstance.toJSON() : itemInstance;
+          return buildFinanceiroObrasLinhaHistorico(item);
+        })
+      ].sort((a, b) => {
+        const dateA = String(a.data_baixa || a.data_vencimento || '');
+        const dateB = String(b.data_baixa || b.data_vencimento || '');
+        if (dateA !== dateB) return dateA.localeCompare(dateB);
+        return String(a.id).localeCompare(String(b.id));
+      }).slice(0, limit);
+    }
   } else {
     const titulos = await TituloFinanceiro.findAll({
       where: tituloWhere,

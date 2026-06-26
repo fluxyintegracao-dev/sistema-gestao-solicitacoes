@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { HiOutlineArrowDownTray, HiOutlineBuildingOffice2 } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineBuildingOffice2, HiOutlineXMark } from 'react-icons/hi2';
 import {
+  confirmarImportacaoCustosHistoricosObra,
   getCategoriasFinanceiras,
-  getRelatorioFinanceiroObras
+  getRelatorioFinanceiroObras,
+  previewImportacaoCustosHistoricosObra
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getMinhasObras } from '../services/obras';
@@ -31,6 +33,7 @@ const DEFAULT_FILTERS = {
   tipo: '',
   parceiro_id: '',
   categoria_financeira_id: '',
+  incluir_historico: '1',
   q: '',
   limit: '1000'
 };
@@ -88,6 +91,7 @@ function formatDate(value) {
 function statusClass(value) {
   const normalized = String(value || '').toUpperCase();
   if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
+  if (normalized === 'HISTORICO') return 'app-status-pill bg-indigo-100 text-indigo-700';
   if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
   if (normalized === 'ABERTO') return 'app-status-pill bg-slate-100 text-slate-700';
@@ -124,6 +128,16 @@ export default function FinanceiroObras() {
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState('');
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importForm, setImportForm] = useState({
+    obra_id: '',
+    empresa_id: '',
+    categoria_financeira_id: '',
+    file: null
+  });
+  const [importPreview, setImportPreview] = useState(null);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -198,6 +212,76 @@ export default function FinanceiroObras() {
     setAppliedFilters(DEFAULT_FILTERS);
   }
 
+  function resetImportModal() {
+    setImportForm({
+      obra_id: '',
+      empresa_id: '',
+      categoria_financeira_id: '',
+      file: null
+    });
+    setImportPreview(null);
+    setImportError('');
+    setImportLoading(false);
+  }
+
+  function fecharImportModal() {
+    setImportModalOpen(false);
+    resetImportModal();
+  }
+
+  async function gerarPreviewImportacao(event) {
+    event.preventDefault();
+    setImportError('');
+    setImportPreview(null);
+
+    if (!importForm.obra_id) {
+      setImportError('Selecione a obra que recebera o historico.');
+      return;
+    }
+    if (!importForm.file) {
+      setImportError('Selecione a planilha para validar.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', importForm.file);
+    formData.append('obra_id', importForm.obra_id);
+    if (importForm.empresa_id) formData.append('empresa_id', importForm.empresa_id);
+    if (importForm.categoria_financeira_id) formData.append('categoria_financeira_id', importForm.categoria_financeira_id);
+
+    setImportLoading(true);
+    try {
+      const data = await previewImportacaoCustosHistoricosObra(formData);
+      setImportPreview(data);
+    } catch (err) {
+      setImportError(err?.message || 'Erro ao validar importacao');
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  async function confirmarImportacao() {
+    if (!importPreview?.linhas?.length) {
+      return;
+    }
+
+    setImportLoading(true);
+    setImportError('');
+    try {
+      await confirmarImportacaoCustosHistoricosObra({
+        arquivo_nome: importPreview.arquivo_nome,
+        arquivo_hash: importPreview.arquivo_hash,
+        linhas: importPreview.linhas
+      });
+      fecharImportModal();
+      setAppliedFilters((current) => ({ ...current }));
+    } catch (err) {
+      setImportError(err?.message || 'Erro ao confirmar importacao');
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
   function exportarCsv() {
     const header = [
       'Baixa',
@@ -250,6 +334,9 @@ export default function FinanceiroObras() {
             </p>
           </div>
           <div className="app-page-actions">
+            <button type="button" className="btn btn-outline" onClick={() => setImportModalOpen(true)}>
+              Importar historico
+            </button>
             <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
               <HiOutlineArrowDownTray /> Exportar CSV
             </button>
@@ -338,6 +425,16 @@ export default function FinanceiroObras() {
             <HiOutlineBuildingOffice2 className="mt-0.5" />
             <span>{analiseAtual.description}</span>
           </div>
+          {filters.analise === 'REALIZADO' ? (
+            <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
+              <input
+                type="checkbox"
+                checked={filters.incluir_historico !== '0'}
+                onChange={(event) => setFilter('incluir_historico', event.target.checked ? '1' : '0')}
+              />
+              Incluir historico legado no executado
+            </label>
+          ) : null}
           <div className="flex gap-2">
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
             <button type="submit" className="btn btn-primary btn-sm">Gerar relatorio</button>
@@ -356,7 +453,11 @@ export default function FinanceiroObras() {
           detail={`${relatorio.resumo.quantidade_linhas || 0} linha(s)`}
           tone={Number(relatorio.resumo.saldo_total || 0) >= 0 ? 'positive' : 'negative'}
         />
-        <Metric label="Titulos" value={String(relatorio.resumo.titulos || 0)} detail={`${relatorio.resumo.movimentos || 0} baixa(s) vinculada(s)`} />
+        <Metric
+          label="Titulos"
+          value={String(relatorio.resumo.titulos || 0)}
+          detail={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s)`}
+        />
       </div>
 
       <section className="card sol-surface-card app-dense-table-card financeiro-obras-detalhamento-card">
@@ -421,6 +522,146 @@ export default function FinanceiroObras() {
           </ResizableTable>
         </div>
       </section>
+
+      {importModalOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+          <div className="card sol-surface-card w-full max-w-5xl max-h-[90vh] overflow-y-auto">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar custos historicos</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  As linhas importadas entram somente no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE ou movimento bancario.
+                </p>
+              </div>
+              <button type="button" className="btn btn-icon btn-outline" onClick={fecharImportModal} disabled={importLoading} aria-label="Fechar">
+                <HiOutlineXMark />
+              </button>
+            </div>
+
+            {importError ? <div className="app-alert app-alert--error mb-3">{importError}</div> : null}
+
+            <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={gerarPreviewImportacao}>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Obra/Centro de custo</span>
+                <select
+                  className="input w-full input-sm"
+                  value={importForm.obra_id}
+                  onChange={(event) => setImportForm((current) => ({ ...current, obra_id: event.target.value }))}
+                  disabled={loadingOptions || importLoading}
+                >
+                  <option value="">Selecione</option>
+                  {obras.map((obra) => (
+                    <option key={obra.id} value={obra.id}>{obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Empresa padrao</span>
+                <select
+                  className="input w-full input-sm"
+                  value={importForm.empresa_id}
+                  onChange={(event) => setImportForm((current) => ({ ...current, empresa_id: event.target.value }))}
+                  disabled={loadingOptions || importLoading}
+                >
+                  <option value="">Usar empresa da obra/planilha</option>
+                  {empresas.map((empresa) => (
+                    <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Plano financeiro padrao</span>
+                <select
+                  className="input w-full input-sm"
+                  value={importForm.categoria_financeira_id}
+                  onChange={(event) => setImportForm((current) => ({ ...current, categoria_financeira_id: event.target.value }))}
+                  disabled={loadingOptions || importLoading}
+                >
+                  <option value="">Usar plano da planilha</option>
+                  {categorias.map((categoria) => (
+                    <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="app-filter-field">
+                <span className="app-filter-label">Planilha</span>
+                <input
+                  className="input w-full input-sm"
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={(event) => setImportForm((current) => ({ ...current, file: event.target.files?.[0] || null }))}
+                  disabled={importLoading}
+                />
+              </label>
+
+              <div className="md:col-span-2 xl:col-span-4 flex justify-end gap-2">
+                <button type="button" className="btn btn-outline btn-sm" onClick={resetImportModal} disabled={importLoading}>Limpar</button>
+                <button type="submit" className="btn btn-primary btn-sm" disabled={importLoading}>
+                  {importLoading ? 'Validando...' : 'Pre-visualizar'}
+                </button>
+              </div>
+            </form>
+
+            {importPreview ? (
+              <div className="mt-5 space-y-4">
+                <div className="app-summary-grid">
+                  <Metric label="Importaveis" value={String(importPreview.resumo?.importaveis || 0)} detail="Linhas validas" tone="positive" />
+                  <Metric label="Duplicadas" value={String(importPreview.resumo?.duplicados || 0)} detail="Ja importadas" />
+                  <Metric label="Erros" value={String(importPreview.resumo?.erros || 0)} detail="Linhas ignoradas" tone={importPreview.resumo?.erros ? 'negative' : 'default'} />
+                  <Metric label="Creditos" value={formatCurrency(importPreview.resumo?.credito_total)} detail="Recebido legado" tone="positive" />
+                  <Metric label="Debitos" value={formatCurrency(importPreview.resumo?.debito_total)} detail="Custo legado" tone="negative" />
+                  <Metric label="Valor" value={formatCurrency(importPreview.resumo?.valor_total)} detail="Total importavel" />
+                </div>
+
+                <div className="app-dense-table-wrapper">
+                  <table className="app-dense-data-table min-w-[980px]">
+                    <thead>
+                      <tr>
+                        <th>Linha</th>
+                        <th>Status</th>
+                        <th>Baixa</th>
+                        <th>Fornecedor</th>
+                        <th>Documento</th>
+                        <th>Plano financeiro</th>
+                        <th>Tipo</th>
+                        <th className="text-right">Valor</th>
+                        <th>Observacao</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.linhas.slice(0, 50).map((linha) => (
+                        <tr key={`${linha.row_number}-${linha.hash_linha}`}>
+                          <td>{linha.row_number}</td>
+                          <td><span className={statusClass(linha.status === 'VALIDA' ? 'QUITADO' : linha.status)}>{linha.status}</span></td>
+                          <td>{formatDate(linha.data_pagamento)}</td>
+                          <td>{linha.parceiro_nome || '-'}</td>
+                          <td>{linha.documento || '-'}</td>
+                          <td>{linha.plano_financeiro || '-'}</td>
+                          <td>{linha.tipo === 'RECEBER' ? 'Credito recebido' : 'Debito custo'}</td>
+                          <td className="text-right font-semibold">{formatCurrency(linha.valor)}</td>
+                          <td className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button type="button" className="btn btn-outline btn-sm" onClick={fecharImportModal} disabled={importLoading}>Cancelar</button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={confirmarImportacao}
+                    disabled={importLoading || !importPreview.resumo?.importaveis}
+                  >
+                    {importLoading ? 'Importando...' : 'Confirmar importacao'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

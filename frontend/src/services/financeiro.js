@@ -227,6 +227,41 @@ export async function getRelatorioFinanceiroObras(params = {}) {
   return parseJson(response, 'Erro ao buscar financeiro de obras');
 }
 
+export async function previewImportacaoCustosHistoricosObra(formData) {
+  const response = await fetch(`${API_URL}/financeiro/relatorios/financeiro-obras/importacoes-historicas/preview`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  return parseJson(response, 'Erro ao validar importacao de custos historicos');
+}
+
+export async function confirmarImportacaoCustosHistoricosObra(payload = {}) {
+  const response = await fetch(`${API_URL}/financeiro/relatorios/financeiro-obras/importacoes-historicas/confirmar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+
+  return parseJson(response, 'Erro ao importar custos historicos');
+}
+
+export async function getImportacoesCustosHistoricosObra(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/relatorios/financeiro-obras/importacoes-historicas?${query}`
+    : `${API_URL}/financeiro/relatorios/financeiro-obras/importacoes-historicas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao listar importacoes de custos historicos');
+}
+
 export async function getBaixasFinanceiras(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
