@@ -173,7 +173,8 @@ async function resolveObraScope(req, obraId) {
   };
 }
 
-function resolvePeriodo(filters = {}) {
+function resolvePeriodo(filters = {}, options = {}) {
+  const maxDays = options.maxDays === undefined ? 366 : options.maxDays;
   const hoje = parseDateOnly(getHoje());
   const preset = String(filters.periodo || '').trim().toUpperCase();
   const hasCustomDates = Boolean(filters.data_inicial && filters.data_final);
@@ -213,8 +214,8 @@ function resolvePeriodo(filters = {}) {
     throw createHttpError(400, 'Data inicial nao pode ser maior que a data final.');
   }
 
-  if (intervaloDias > 366) {
-    throw createHttpError(400, 'O periodo maximo do relatorio deve ser de ate 366 dias.');
+  if (maxDays && intervaloDias > maxDays) {
+    throw createHttpError(400, `O periodo maximo do relatorio deve ser de ate ${maxDays} dias.`);
   }
 
   const agrupamento = intervaloDias > 62 ? 'MES' : 'DIA';
@@ -1545,7 +1546,7 @@ async function gerarRelatorioFinanceiroObras(req, filters = {}) {
     data_inicial: filters.data_inicial,
     data_final: filters.data_final,
     periodo: filters.periodo || 'MES_ATUAL'
-  });
+  }, { maxDays: null });
   const obraWhere = await resolveObraScope(req, filters.obra_id);
 
   if (obraWhere === null) {
