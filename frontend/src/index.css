@@ -2503,6 +2503,14 @@ a:hover {
   padding: 0.5rem;
 }
 
+.sol-filter-multi-popover--portal {
+  position: fixed;
+  right: auto;
+  z-index: 1000;
+  max-height: min(72vh, 430px);
+  overflow: hidden;
+}
+
 .sol-filter-multi-actions {
   display: flex;
   align-items: center;

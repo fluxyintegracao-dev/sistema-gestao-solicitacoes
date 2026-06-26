@@ -146,16 +146,9 @@ function buildApuracaoWhere(filters = {}) {
   return where;
 }
 
-function addNullableRecorteFilter(where, field, value) {
+function addExactRecorteFilter(where, field, value) {
   if (!value) return;
-  if (!where[Op.and]) where[Op.and] = [];
-
-  where[Op.and].push({
-    [Op.or]: [
-      { [field]: value },
-      { [field]: null }
-    ]
-  });
+  where[field] = value;
 }
 
 function enrichApuracao(apuracao) {
@@ -236,9 +229,9 @@ async function buildAgrupamentoImportacoes(data, transaction) {
     status: 'CONFIRMADA',
     competencia: data.competencia
   };
-  addNullableRecorteFilter(importacaoWhere, 'empresa_grupo_id', data.empresa_grupo_id);
-  addNullableRecorteFilter(importacaoWhere, 'obra_id', data.obra_id);
-  addNullableRecorteFilter(importacaoWhere, 'tipo_vinculo', data.tipo_vinculo);
+  addExactRecorteFilter(importacaoWhere, 'empresa_grupo_id', data.empresa_grupo_id);
+  addExactRecorteFilter(importacaoWhere, 'obra_id', data.obra_id);
+  addExactRecorteFilter(importacaoWhere, 'tipo_vinculo', data.tipo_vinculo);
 
   const colaboradorWhere = {};
   if (data.empresa_grupo_id) colaboradorWhere.empresa_grupo_id = data.empresa_grupo_id;
@@ -359,6 +352,51 @@ async function buildAgrupamentoImportacoes(data, transaction) {
   });
 
   return Array.from(agrupados.values());
+}
+
+async function listarRecortesImportacoesConfirmadas(data, transaction) {
+  const where = {
+    status: 'CONFIRMADA',
+    competencia: data.competencia,
+    obra_id: { [Op.ne]: null }
+  };
+
+  addExactRecorteFilter(where, 'empresa_grupo_id', data.empresa_grupo_id);
+  addExactRecorteFilter(where, 'tipo_vinculo', data.tipo_vinculo);
+
+  const importacoes = await RhImportacao.findAll({
+    where,
+    attributes: ['empresa_grupo_id', 'obra_id', 'tipo_vinculo'],
+    order: [['obra_id', 'ASC'], ['id', 'ASC']],
+    transaction
+  });
+
+  const recortes = new Map();
+  importacoes.forEach((importacao) => {
+    const obraId = Number(importacao.obra_id || 0);
+    if (!Number.isInteger(obraId) || obraId <= 0) {
+      return;
+    }
+
+    const empresaGrupoId = importacao.empresa_grupo_id || null;
+    const tipoVinculo = data.tipo_vinculo || null;
+    const key = [empresaGrupoId || 'null', obraId, tipoVinculo || 'null'].join(':');
+    if (!recortes.has(key)) {
+      recortes.set(key, {
+        ...data,
+        empresa_grupo_id: empresaGrupoId,
+        obra_id: obraId,
+        tipo_vinculo: tipoVinculo
+      });
+    }
+  });
+
+  const result = Array.from(recortes.values());
+  if (!result.length) {
+    throw new ValidationError('Nao existem importacoes confirmadas com obra para gerar a apuracao nesta competencia.');
+  }
+
+  return result;
 }
 
 function calcularItemApuracao(agrupado, diasBase) {
@@ -508,64 +546,82 @@ async function detalharApuracaoRh(id) {
   return detalharApuracaoPorPk(id);
 }
 
+async function gerarApuracaoRecorteRh(data, user, transaction) {
+  if (data.empresa_grupo_id) {
+    await ensureEmpresaGrupoExists(data.empresa_grupo_id, transaction);
+  }
+  await ensureObraExists(data.obra_id, transaction);
+
+  const agrupados = await buildAgrupamentoImportacoes(data, transaction);
+  const draft = await resolveExistingDraft(data, transaction);
+  const diasBase = Number(data.dias_base || 30);
+
+  let apuracao;
+  if (draft) {
+    await RhApuracaoEvento.destroy({
+      where: { apuracao_id: draft.id },
+      transaction
+    });
+
+    await draft.update(
+      {
+        dias_base: diasBase,
+        observacoes: data.observacoes || draft.observacoes || null,
+        atualizado_por: user?.id || null
+      },
+      { transaction }
+    );
+
+    apuracao = draft;
+  } else {
+    apuracao = await RhApuracao.create(
+      {
+        competencia: data.competencia,
+        empresa_grupo_id: data.empresa_grupo_id || null,
+        obra_id: data.obra_id || null,
+        tipo_vinculo: data.tipo_vinculo || null,
+        status: 'RASCUNHO',
+        dias_base: diasBase,
+        observacoes: data.observacoes || null,
+        criado_por: user?.id || null,
+        atualizado_por: user?.id || null
+      },
+      { transaction }
+    );
+  }
+
+  const itens = agrupados.map((agrupado) => ({
+    apuracao_id: apuracao.id,
+    ...calcularItemApuracao(agrupado, diasBase)
+  }));
+
+  if (!itens.length) {
+    throw new ValidationError('Nao existem colaboradores elegiveis para gerar a apuracao neste recorte.');
+  }
+
+  await RhApuracaoEvento.bulkCreate(itens, { transaction });
+  await recalcularResumoApuracao(apuracao.id, transaction);
+
+  return detalharApuracaoPorPk(apuracao.id, transaction);
+}
+
 async function gerarApuracaoRh(data, user) {
   return sequelize.transaction(async (transaction) => {
-    if (data.empresa_grupo_id) {
-      await ensureEmpresaGrupoExists(data.empresa_grupo_id, transaction);
-    }
-    await ensureObraExists(data.obra_id, transaction);
-
-    const agrupados = await buildAgrupamentoImportacoes(data, transaction);
-    const draft = await resolveExistingDraft(data, transaction);
-    const diasBase = Number(data.dias_base || 30);
-
-    let apuracao;
-    if (draft) {
-      await RhApuracaoEvento.destroy({
-        where: { apuracao_id: draft.id },
-        transaction
-      });
-
-      await draft.update(
-        {
-          dias_base: diasBase,
-          observacoes: data.observacoes || draft.observacoes || null,
-          atualizado_por: user?.id || null
-        },
-        { transaction }
-      );
-
-      apuracao = draft;
-    } else {
-      apuracao = await RhApuracao.create(
-        {
-          competencia: data.competencia,
-          empresa_grupo_id: data.empresa_grupo_id || null,
-          obra_id: data.obra_id || null,
-          tipo_vinculo: data.tipo_vinculo || null,
-          status: 'RASCUNHO',
-          dias_base: diasBase,
-          observacoes: data.observacoes || null,
-          criado_por: user?.id || null,
-          atualizado_por: user?.id || null
-        },
-        { transaction }
-      );
+    if (data.obra_id) {
+      return gerarApuracaoRecorteRh(data, user, transaction);
     }
 
-    const itens = agrupados.map((agrupado) => ({
-      apuracao_id: apuracao.id,
-      ...calcularItemApuracao(agrupado, diasBase)
-    }));
+    const recortes = await listarRecortesImportacoesConfirmadas(data, transaction);
+    const apuracoes = [];
 
-    if (!itens.length) {
-      throw new ValidationError('Nao existem colaboradores elegiveis para gerar a apuracao neste recorte.');
+    for (const recorte of recortes) {
+      apuracoes.push(await gerarApuracaoRecorteRh(recorte, user, transaction));
     }
 
-    await RhApuracaoEvento.bulkCreate(itens, { transaction });
-    await recalcularResumoApuracao(apuracao.id, transaction);
-
-    return detalharApuracaoPorPk(apuracao.id, transaction);
+    return {
+      apuracoes,
+      total: apuracoes.length
+    };
   });
 }
 

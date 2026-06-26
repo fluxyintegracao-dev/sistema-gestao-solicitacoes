@@ -155,6 +155,7 @@ export default function RhDpImportacoes() {
   const [form, setForm] = useState({
     tipo: 'JORNADA',
     competencia: '',
+    obra_id: '',
     tipo_vinculo: '',
     observacoes: ''
   });
@@ -224,8 +225,8 @@ export default function RhDpImportacoes() {
     event.target.value = '';
 
     if (!file) return;
-    if (!form.competencia || !form.tipo) {
-      alert('Preencha tipo e competencia antes de subir a planilha.');
+    if (!form.competencia || !form.tipo || !form.obra_id) {
+      alert('Preencha tipo, competencia e obra antes de subir a planilha.');
       return;
     }
 
@@ -234,6 +235,7 @@ export default function RhDpImportacoes() {
       const data = await criarPreviewRhImportacao({
         tipo: form.tipo,
         competencia: form.competencia,
+        obra_id: form.obra_id,
         tipo_vinculo: form.tipo_vinculo || undefined,
         observacoes: form.observacoes || undefined,
         file
@@ -311,6 +313,18 @@ export default function RhDpImportacoes() {
             onChange={(e) => setForm((prev) => ({ ...prev, competencia: e.target.value }))}
             disabled={!podeEditar}
           />
+          <select
+            className="form-control"
+            value={form.obra_id}
+            onChange={(e) => setForm((prev) => ({ ...prev, obra_id: e.target.value }))}
+            disabled={!podeEditar}
+            required
+          >
+            <option value="">Selecione a obra obrigatoria</option>
+            {obras.map((item) => (
+              <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
+            ))}
+          </select>
           <select
             className="form-control"
             value={form.tipo_vinculo}
@@ -425,7 +439,7 @@ export default function RhDpImportacoes() {
                 <tr>
                   <th>Lote</th>
                   <th>Competencia</th>
-                  <th>Recorte</th>
+                  <th>Obra</th>
                   <th>Status</th>
                   <th>Acoes</th>
                 </tr>
@@ -441,7 +455,7 @@ export default function RhDpImportacoes() {
                       </div>
                     </td>
                     <td>{item.competencia}</td>
-                    <td>{item.empresaGrupo?.nome || 'Sem recorte operacional'}</td>
+                    <td>{item.obra?.codigo ? `${item.obra.codigo} - ${item.obra.nome}` : item.obra?.nome || '-'}</td>
                     <td>
                       <div className="font-semibold text-slate-900">{item.status}</div>
                       <div className="text-xs text-slate-500">
@@ -486,7 +500,7 @@ export default function RhDpImportacoes() {
                     Importacao #{detalhe.id} - {detalhe.tipo}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Competencia {detalhe.competencia} · sem recorte operacional · {detalhe.status}
+                    Competencia {detalhe.competencia} · {detalhe.obra?.codigo ? `${detalhe.obra.codigo} - ${detalhe.obra.nome}` : detalhe.obra?.nome || 'obra nao informada'} · {detalhe.status}
                   </p>
                 </div>
                 <div className="app-page-actions">

@@ -509,7 +509,7 @@ async function obterTokensSetorUsuario(req) {
   return Array.from(tokens).filter(Boolean);
 }
 
-async function usuarioPodeAcessarObraContrato(req, obraId) {
+async function usuarioPodeAcessarObraContrato(req, obraId, options = {}) {
   if (!obraId) {
     return false;
   }
@@ -522,10 +522,12 @@ async function usuarioPodeAcessarObraContrato(req, obraId) {
     return true;
   }
 
-  if (
-    !(await shouldRestrictContratosToObras(req.user)) &&
-    await canManageContratos(req.user)
-  ) {
+  const acao = String(options.acao || '').trim().toLowerCase();
+  const permissaoOperacional = acao === 'criar'
+    ? await canCreateContratos(req.user)
+    : await canManageContratos(req.user);
+
+  if (!(await shouldRestrictContratosToObras(req.user)) && permissaoOperacional) {
     return true;
   }
 
@@ -763,7 +765,7 @@ module.exports = {
         });
       }
 
-      if (!(await usuarioPodeAcessarObraContrato(req, obra_id))) {
+      if (!(await usuarioPodeAcessarObraContrato(req, obra_id, { acao: 'criar' }))) {
         await registrarNegacaoContrato(
           req,
           null,
@@ -1533,6 +1535,28 @@ module.exports = {
       }
 
       const obraFinalId = obra_id !== undefined && obra_id !== null ? obra_id : contrato.obra_id;
+      if (!(await usuarioPodeAcessarObraContrato(req, contrato.obra_id, { acao: 'editar' }))) {
+        await registrarNegacaoContrato(
+          req,
+          contrato.id,
+          contrato.obra_id,
+          'Usuario tentou editar contrato fora do seu escopo'
+        );
+        return res.status(403).json({ error: 'Acesso negado para esta obra' });
+      }
+      if (
+        Number(obraFinalId) !== Number(contrato.obra_id) &&
+        !(await usuarioPodeAcessarObraContrato(req, obraFinalId, { acao: 'editar' }))
+      ) {
+        await registrarNegacaoContrato(
+          req,
+          contrato.id,
+          obraFinalId,
+          'Usuario tentou mover contrato para obra fora do seu escopo'
+        );
+        return res.status(403).json({ error: 'Acesso negado para esta obra' });
+      }
+
       const apropriacoesNormalizadas = apropriacoes !== undefined
         ? await validarApropriacoesContrato(obraFinalId, apropriacoes)
         : null;

@@ -167,7 +167,7 @@ async function ensureEmpresaGrupoExists(empresaGrupoId, transaction) {
 
 async function ensureObraExists(obraId, transaction) {
   if (!obraId) {
-    return null;
+    throw new ValidationError('Obra e obrigatoria para importar planilhas RH/DP.');
   }
 
   const obra = await Obra.findByPk(obraId, {
@@ -250,6 +250,19 @@ function resolveColaborador(row, lookup) {
     matricula_ref: matricula || colaborador.matricula || null,
     nome_ref: colaborador.nome || null
   };
+}
+
+function ensureColaboradorPertenceObra(colaborador, obraId) {
+  const colaboradorObraId = Number(colaborador?.obra_id || 0);
+  const importacaoObraId = Number(obraId || 0);
+
+  if (!Number.isInteger(importacaoObraId) || importacaoObraId <= 0) {
+    throw new ValidationError('Obra e obrigatoria para importar planilhas RH/DP.');
+  }
+
+  if (colaboradorObraId !== importacaoObraId) {
+    throw new ValidationError('Colaborador nao pertence a obra selecionada para esta importacao.');
+  }
 }
 
 function parseLinhaJornada(row) {
@@ -338,8 +351,9 @@ function parseLinhaDesconto(row) {
   };
 }
 
-function parseLinhaImportacao(tipo, row, lookup) {
+function parseLinhaImportacao(tipo, row, lookup, obraId) {
   const referenciaColaborador = resolveColaborador(row, lookup);
+  ensureColaboradorPertenceObra(referenciaColaborador.colaborador, obraId);
 
   let payload;
   if (tipo === 'JORNADA') {
@@ -459,7 +473,7 @@ async function criarPreviewImportacaoRh(data, file, user) {
     const numeroLinha = index + 2;
 
     try {
-      const linha = parseLinhaImportacao(data.tipo, row, lookup);
+      const linha = parseLinhaImportacao(data.tipo, row, lookup, data.obra_id);
       linhasProcessadas.push({
         numero_linha: numeroLinha,
         colaborador_id: linha.colaborador.id,

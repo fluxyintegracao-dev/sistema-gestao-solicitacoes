@@ -569,7 +569,7 @@ export default function GestaoContratos() {
       alert('Contrato criado com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao criar contrato.');
+      alert(error?.message || 'Erro ao criar contrato.');
     } finally {
       setSalvando(false);
     }

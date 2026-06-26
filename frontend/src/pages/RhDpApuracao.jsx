@@ -63,7 +63,6 @@ function statusClass(status) {
 function initialForm() {
   return {
     competencia: '',
-    obra_id: '',
     tipo_vinculo: '',
     observacoes: ''
   };
@@ -82,19 +81,6 @@ function getPixOptions(item) {
 
 function getDefaultPixValue(item) {
   return getPixOptions(item)[0]?.value || '';
-}
-
-function normalizeSearchText(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
-function getObraLabel(obra) {
-  if (!obra) return '';
-  return obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome;
 }
 
 function toEditState(item) {
@@ -135,8 +121,6 @@ export default function RhDpApuracao() {
     status: ''
   });
   const [form, setForm] = useState(initialForm());
-  const [formObraSearch, setFormObraSearch] = useState('');
-  const [formObraSuggestionsOpen, setFormObraSuggestionsOpen] = useState(false);
   const [fechamentoForm, setFechamentoForm] = useState({
     data_fechamento: new Date().toISOString().slice(0, 10),
     data_vencimento: '',
@@ -236,9 +220,8 @@ export default function RhDpApuracao() {
     event.preventDefault();
     if (!podeEditar) return;
 
-    const obraId = Number(form.obra_id);
-    if (!form.competencia || !Number.isInteger(obraId) || obraId <= 0) {
-      alert('Informe a competencia e selecione a obra antes de gerar a apuracao.');
+    if (!form.competencia) {
+      alert('Informe a competencia antes de gerar a apuracao.');
       return;
     }
 
@@ -246,13 +229,16 @@ export default function RhDpApuracao() {
       setGerando(true);
       const data = await gerarRhApuracao({
         competencia: form.competencia,
-        obra_id: obraId,
         tipo_vinculo: form.tipo_vinculo || undefined,
         observacoes: form.observacoes || undefined
       });
 
-      setDetalhe(data);
+      const apuracoesGeradas = Array.isArray(data?.apuracoes) ? data.apuracoes : [data].filter(Boolean);
+      setDetalhe(apuracoesGeradas[0] || null);
       await carregarApuracoes();
+      if (apuracoesGeradas.length > 1) {
+        alert(`${apuracoesGeradas.length} apuracoes foram geradas, uma para cada obra confirmada na importacao.`);
+      }
     } catch (error) {
       console.error(error);
       alert(error?.message || 'Erro ao gerar apuracao RH/DP');
@@ -386,15 +372,6 @@ export default function RhDpApuracao() {
     );
   }, [apuracoes]);
 
-  const formObraSuggestions = useMemo(() => {
-    const search = normalizeSearchText(formObraSearch);
-    if (!search) return [];
-
-    return obras
-      .filter((obra) => normalizeSearchText(`${obra.codigo || ''} ${obra.nome || ''}`).includes(search))
-      .slice(0, 12);
-  }, [formObraSearch, obras]);
-
   return (
     <div className="page solicitacoes-page rhdp-page rhdp-apuracao-page space-y-6">
       <div className="app-page-header">
@@ -402,7 +379,7 @@ export default function RhDpApuracao() {
           <div>
             <h1 className="text-xl font-semibold md:text-2xl">RH/DP - Apuracao</h1>
             <p className="page-subtitle">
-              Gere a pre-folha por competencia a partir de importacoes confirmadas, revise por colaborador e registre ajustes auditados.
+              Gere a pre-folha por competencia a partir das obras informadas nas importacoes confirmadas, revise por colaborador e registre ajustes auditados.
             </p>
           </div>
           <div className="app-page-actions">
@@ -427,46 +404,6 @@ export default function RhDpApuracao() {
               onChange={(event) => setForm((current) => ({ ...current, competencia: event.target.value }))}
               disabled={!podeEditar}
             />
-          </label>
-          <label className="rhdp-apuracao-field rhdp-autocomplete-field">
-            <span>Obra de prestacao do servico</span>
-            <input
-              type="text"
-              className="form-control"
-              value={formObraSearch}
-              placeholder="Digite para buscar a obra obrigatoria"
-              autoComplete="off"
-              onFocus={() => setFormObraSuggestionsOpen(true)}
-              onChange={(event) => {
-                setFormObraSearch(event.target.value);
-                setForm((current) => ({ ...current, obra_id: '' }));
-                setFormObraSuggestionsOpen(true);
-              }}
-              onBlur={() => window.setTimeout(() => setFormObraSuggestionsOpen(false), 120)}
-              disabled={!podeEditar}
-            />
-            {formObraSuggestionsOpen && formObraSuggestions.length > 0 ? (
-              <div className="rhdp-autocomplete-list">
-                {formObraSuggestions.map((obra) => (
-                  <button
-                    key={obra.id}
-                    type="button"
-                    className="rhdp-autocomplete-option"
-                    onMouseDown={(event) => {
-                      event.preventDefault();
-                      setForm((current) => ({ ...current, obra_id: String(obra.id) }));
-                      setFormObraSearch(getObraLabel(obra));
-                      setFormObraSuggestionsOpen(false);
-                    }}
-                  >
-                    <strong>{getObraLabel(obra)}</strong>
-                    {obra.cidade || obra.uf ? (
-                      <span>{[obra.cidade, obra.uf].filter(Boolean).join(' - ')}</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
           </label>
         </div>
 
@@ -499,7 +436,7 @@ export default function RhDpApuracao() {
         {podeEditar ? (
           <div className="app-page-actions">
             <button type="submit" className="btn btn-primary" disabled={gerando}>
-              {gerando ? 'Gerando apuracao...' : 'Gerar apuracao'}
+              {gerando ? 'Gerando apuracoes...' : 'Gerar apuracoes das obras importadas'}
             </button>
           </div>
         ) : null}

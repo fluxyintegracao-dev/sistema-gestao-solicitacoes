@@ -40,6 +40,8 @@ export default function Filtros({
   const tipoDropdownRef = useRef(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef(null);
+  const statusPopoverRef = useRef(null);
+  const [statusDropdownPosition, setStatusDropdownPosition] = useState({ left: 16, top: 16, width: 240 });
   const [seletorFiltrosOpen, setSeletorFiltrosOpen] = useState(false);
   const seletorFiltrosRef = useRef(null);
   const botaoSeletorFiltrosRef = useRef(null);
@@ -91,7 +93,11 @@ export default function Filtros({
       if (setorDropdownOpen && !setorDropdownRef.current?.contains(event.target)) {
         setSetorDropdownOpen(false);
       }
-      if (statusDropdownOpen && !statusDropdownRef.current?.contains(event.target)) {
+      if (
+        statusDropdownOpen &&
+        !statusDropdownRef.current?.contains(event.target) &&
+        !statusPopoverRef.current?.contains(event.target)
+      ) {
         setStatusDropdownOpen(false);
       }
       if (seletorFiltrosOpen && seletorFiltrosRef.current?.contains(event.target)) {
@@ -128,6 +134,26 @@ export default function Filtros({
       window.removeEventListener('scroll', reposicionarSeletor, true);
     };
   }, [seletorFiltrosOpen]);
+
+  useEffect(() => {
+    if (!statusDropdownOpen) return undefined;
+
+    const frameId = window.requestAnimationFrame(() => {
+      posicionarStatusDropdown();
+    });
+
+    function reposicionarStatus() {
+      posicionarStatusDropdown();
+    }
+
+    window.addEventListener('resize', reposicionarStatus);
+    window.addEventListener('scroll', reposicionarStatus, true);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', reposicionarStatus);
+      window.removeEventListener('scroll', reposicionarStatus, true);
+    };
+  }, [statusDropdownOpen, statusOptions.length]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -193,6 +219,33 @@ export default function Filtros({
   function alternarSeletorFiltros() {
     if (!seletorFiltrosOpen) posicionarSeletorFiltros();
     setSeletorFiltrosOpen(prev => !prev);
+  }
+
+  function posicionarStatusDropdown() {
+    if (!statusDropdownRef.current || typeof window === 'undefined') return;
+
+    const margem = 16;
+    const fieldRect = statusDropdownRef.current.getBoundingClientRect();
+    const painelRect = statusPopoverRef.current?.getBoundingClientRect();
+    const larguraPainel = Math.min(fieldRect.width, window.innerWidth - margem * 2);
+    const alturaPainel = Math.min(painelRect?.height || 250, window.innerHeight - margem * 2);
+    const maxLeft = Math.max(margem, window.innerWidth - larguraPainel - margem);
+    const espacoAbaixo = window.innerHeight - fieldRect.bottom - margem;
+    const espacoAcima = fieldRect.top - margem;
+    const abreAcima = alturaPainel > espacoAbaixo && espacoAcima > espacoAbaixo;
+
+    setStatusDropdownPosition({
+      left: Math.round(Math.min(Math.max(margem, fieldRect.left), maxLeft)),
+      top: Math.round(abreAcima
+        ? Math.max(margem, fieldRect.top - alturaPainel - 8)
+        : Math.min(window.innerHeight - alturaPainel - margem, fieldRect.bottom + 8)),
+      width: Math.round(larguraPainel)
+    });
+  }
+
+  function alternarStatusDropdown() {
+    if (!statusDropdownOpen) posicionarStatusDropdown();
+    setStatusDropdownOpen(prev => !prev);
   }
 
   // Dados de obras
@@ -661,16 +714,24 @@ export default function Filtros({
               <button
                 type="button"
                 className={`sol-filter-multi-trigger ${statusDropdownOpen ? 'open' : ''}`}
-                onClick={() => setStatusDropdownOpen(prev => !prev)}
                 aria-expanded={statusDropdownOpen}
                 aria-label="Selecionar status"
+                onClick={alternarStatusDropdown}
               >
                 <span className="truncate">{resumoStatusSelecionados}</span>
                 {statusDropdownOpen ? <HiChevronUp className="w-4 h-4" /> : <HiChevronDown className="w-4 h-4" />}
               </button>
 
-              {statusDropdownOpen && (
-                <div className="sol-filter-multi-popover">
+              {statusDropdownOpen && typeof document !== 'undefined' && createPortal((
+                <div
+                  ref={statusPopoverRef}
+                  className="sol-filter-multi-popover sol-filter-multi-popover--portal"
+                  style={{
+                    left: `${statusDropdownPosition.left}px`,
+                    top: `${statusDropdownPosition.top}px`,
+                    width: `${statusDropdownPosition.width}px`
+                  }}
+                >
                   <div className="sol-filter-multi-actions">
                     <button type="button" className="sol-filter-link-btn" onClick={selecionarTodosStatus}>
                       Selecionar todos
@@ -700,7 +761,7 @@ export default function Filtros({
                     )}
                   </div>
                 </div>
-              )}
+              ), document.body)}
             </div>
           )}
 

@@ -55,8 +55,9 @@ export async function criarContrato(data) {
     headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(data)
   });
-  if (!res.ok) throw new Error('Erro ao criar contrato');
-  return res.json();
+  const responseData = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(responseData?.error || 'Erro ao criar contrato');
+  return responseData;
 }
 
 export async function atualizarContrato(id, data) {
