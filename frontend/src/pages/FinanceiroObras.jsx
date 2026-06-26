@@ -13,6 +13,8 @@ import { buscarParceiros } from '../services/parceiros';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 
 const STORAGE_KEY = 'fluxy.financeiro.financeiroObras.columnWidths';
+const IMPORT_PREVIEW_STORAGE_KEY = 'fluxy.financeiro.financeiroObras.importPreview.columnWidths';
+const IMPORT_PREVIEW_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -71,6 +73,18 @@ const TABLE_COLUMNS = [
   { key: 'status_titulo', width: 130, minWidth: 110 }
 ];
 
+const IMPORT_PREVIEW_COLUMNS = [
+  { key: 'row_number', width: 82, minWidth: 72 },
+  { key: 'status', width: 112, minWidth: 96 },
+  { key: 'data_pagamento', width: 112, minWidth: 96 },
+  { key: 'parceiro_nome', width: 250, minWidth: 160 },
+  { key: 'documento', width: 160, minWidth: 120 },
+  { key: 'plano_financeiro', width: 260, minWidth: 160 },
+  { key: 'credito', width: 150, minWidth: 124 },
+  { key: 'debito', width: 150, minWidth: 124 },
+  { key: 'observacao', width: 260, minWidth: 160 }
+];
+
 function compact(params = {}) {
   return Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
@@ -117,6 +131,25 @@ function Metric({ label, value, detail, tone = 'default' }) {
   );
 }
 
+function ImportMetric({ label, value, detail, tone = 'default' }) {
+  const toneClass =
+    tone === 'positive'
+      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+      : tone === 'negative'
+        ? 'border-rose-200 bg-rose-50 text-rose-900'
+        : tone === 'warning'
+          ? 'border-amber-200 bg-amber-50 text-amber-900'
+          : 'border-slate-200 bg-slate-50 text-slate-900';
+
+  return (
+    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
+      <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">{label}</span>
+      <strong className="mt-1 block text-lg leading-tight">{value}</strong>
+      <small className="mt-1 block text-xs opacity-75">{detail}</small>
+    </div>
+  );
+}
+
 export default function FinanceiroObras() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
@@ -138,6 +171,8 @@ export default function FinanceiroObras() {
   const [importPreview, setImportPreview] = useState(null);
   const [importLoading, setImportLoading] = useState(false);
   const [importError, setImportError] = useState('');
+  const [importPreviewPage, setImportPreviewPage] = useState(1);
+  const [importPreviewPageSize, setImportPreviewPageSize] = useState(25);
 
   useEffect(() => {
     let active = true;
@@ -198,6 +233,19 @@ export default function FinanceiroObras() {
     [filters.analise]
   );
 
+  const importPreviewRows = useMemo(
+    () => (Array.isArray(importPreview?.linhas) ? importPreview.linhas : []),
+    [importPreview]
+  );
+
+  const importPreviewTotalPages = Math.max(1, Math.ceil(importPreviewRows.length / importPreviewPageSize));
+
+  const importPreviewPagedRows = useMemo(() => {
+    const safePage = Math.min(Math.max(1, importPreviewPage), importPreviewTotalPages);
+    const start = (safePage - 1) * importPreviewPageSize;
+    return importPreviewRows.slice(start, start + importPreviewPageSize);
+  }, [importPreviewPage, importPreviewPageSize, importPreviewRows, importPreviewTotalPages]);
+
   function setFilter(name, value) {
     setFilters((current) => ({ ...current, [name]: value }));
   }
@@ -220,6 +268,7 @@ export default function FinanceiroObras() {
       file: null
     });
     setImportPreview(null);
+    setImportPreviewPage(1);
     setImportError('');
     setImportLoading(false);
   }
@@ -253,6 +302,7 @@ export default function FinanceiroObras() {
     try {
       const data = await previewImportacaoCustosHistoricosObra(formData);
       setImportPreview(data);
+      setImportPreviewPage(1);
     } catch (err) {
       setImportError(err?.message || 'Erro ao validar importacao');
     } finally {
@@ -604,32 +654,76 @@ export default function FinanceiroObras() {
 
             {importPreview ? (
               <div className="mt-5 space-y-4">
-                <div className="app-summary-grid">
-                  <Metric label="Importaveis" value={String(importPreview.resumo?.importaveis || 0)} detail="Linhas validas" tone="positive" />
-                  <Metric label="Duplicadas" value={String(importPreview.resumo?.duplicados || 0)} detail="Ja importadas" />
-                  <Metric label="Erros" value={String(importPreview.resumo?.erros || 0)} detail="Linhas ignoradas" tone={importPreview.resumo?.erros ? 'negative' : 'default'} />
-                  <Metric label="Creditos" value={formatCurrency(importPreview.resumo?.credito_total)} detail="Recebido legado" tone="positive" />
-                  <Metric label="Debitos" value={formatCurrency(importPreview.resumo?.debito_total)} detail="Custo legado" tone="negative" />
-                  <Metric label="Valor" value={formatCurrency(importPreview.resumo?.valor_total)} detail="Total importavel" />
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                  <ImportMetric label="Importaveis" value={String(importPreview.resumo?.importaveis || 0)} detail="Linhas validas" tone="positive" />
+                  <ImportMetric label="Duplicadas" value={String(importPreview.resumo?.duplicados || 0)} detail="Ja importadas" />
+                  <ImportMetric label="Erros" value={String(importPreview.resumo?.erros || 0)} detail="Linhas ignoradas" tone={importPreview.resumo?.erros ? 'negative' : 'default'} />
+                  <ImportMetric label="Creditos" value={formatCurrency(importPreview.resumo?.credito_total)} detail="Recebido legado" tone="positive" />
+                  <ImportMetric label="Debitos" value={formatCurrency(importPreview.resumo?.debito_total)} detail="Custo legado" tone="negative" />
+                  <ImportMetric label="Total" value={formatCurrency(importPreview.resumo?.valor_total)} detail="Total importavel" />
                 </div>
 
-                <div className="app-dense-table-wrapper">
-                  <table className="app-dense-data-table min-w-[980px]">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2">
+                  <span className="text-sm text-[var(--c-muted)]">
+                    Exibindo {importPreviewPagedRows.length} de {importPreviewRows.length} linha(s) da pre-visualizacao.
+                  </span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
+                      Por pagina
+                      <select
+                        className="input input-sm w-24"
+                        value={importPreviewPageSize}
+                        onChange={(event) => {
+                          setImportPreviewPageSize(Number(event.target.value) || 25);
+                          setImportPreviewPage(1);
+                        }}
+                      >
+                        {IMPORT_PREVIEW_PAGE_SIZE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setImportPreviewPage((page) => Math.max(1, page - 1))}
+                      disabled={importPreviewPage <= 1}
+                    >
+                      Anterior
+                    </button>
+                    <span className="text-sm text-[var(--c-muted)]">{Math.min(importPreviewPage, importPreviewTotalPages)}/{importPreviewTotalPages}</span>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setImportPreviewPage((page) => Math.min(importPreviewTotalPages, page + 1))}
+                      disabled={importPreviewPage >= importPreviewTotalPages}
+                    >
+                      Proxima
+                    </button>
+                  </div>
+                </div>
+
+                <div className="app-dense-table-wrapper max-h-[52vh] overflow-auto">
+                  <ResizableTable
+                    columns={IMPORT_PREVIEW_COLUMNS}
+                    storageKey={IMPORT_PREVIEW_STORAGE_KEY}
+                    className="app-dense-data-table"
+                  >
                     <thead>
                       <tr>
-                        <th>Linha</th>
-                        <th>Status</th>
-                        <th>Baixa</th>
-                        <th>Fornecedor</th>
-                        <th>Documento</th>
-                        <th>Plano financeiro</th>
-                        <th>Tipo</th>
-                        <th className="text-right">Valor</th>
-                        <th>Observacao</th>
+                        <ResizableTh columnKey="row_number">Linha</ResizableTh>
+                        <ResizableTh columnKey="status">Status</ResizableTh>
+                        <ResizableTh columnKey="data_pagamento">Baixa</ResizableTh>
+                        <ResizableTh columnKey="parceiro_nome">Fornecedor</ResizableTh>
+                        <ResizableTh columnKey="documento">Documento</ResizableTh>
+                        <ResizableTh columnKey="plano_financeiro">Plano financeiro</ResizableTh>
+                        <ResizableTh columnKey="credito" className="text-right">Credito</ResizableTh>
+                        <ResizableTh columnKey="debito" className="text-right">Debito</ResizableTh>
+                        <ResizableTh columnKey="observacao">Observacao</ResizableTh>
                       </tr>
                     </thead>
                     <tbody>
-                      {importPreview.linhas.slice(0, 50).map((linha) => (
+                      {importPreviewPagedRows.map((linha) => (
                         <tr key={`${linha.row_number}-${linha.hash_linha}`}>
                           <td>{linha.row_number}</td>
                           <td><span className={statusClass(linha.status === 'VALIDA' ? 'QUITADO' : linha.status)}>{linha.status}</span></td>
@@ -637,13 +731,17 @@ export default function FinanceiroObras() {
                           <td>{linha.parceiro_nome || '-'}</td>
                           <td>{linha.documento || '-'}</td>
                           <td>{linha.plano_financeiro || '-'}</td>
-                          <td>{linha.tipo === 'RECEBER' ? 'Credito recebido' : 'Debito custo'}</td>
-                          <td className="text-right font-semibold">{formatCurrency(linha.valor)}</td>
+                          <td className="text-right font-semibold text-emerald-700">
+                            {linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}
+                          </td>
+                          <td className="text-right font-semibold text-rose-700">
+                            {linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}
+                          </td>
                           <td className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
-                  </table>
+                  </ResizableTable>
                 </div>
 
                 <div className="flex justify-end gap-2">
