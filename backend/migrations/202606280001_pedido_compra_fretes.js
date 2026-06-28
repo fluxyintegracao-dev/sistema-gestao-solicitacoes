@@ -1,4 +1,4 @@
-const { indexExists, tableExists } = require('../src/database/schemaUtils');
+const { indexExists, resolveTableName, tableExists } = require('../src/database/schemaUtils');
 
 async function addIndexIfMissing(queryInterface, sequelize, tableName, fields, name, options = {}) {
   if (!(await tableExists(sequelize, tableName))) return;
@@ -8,6 +8,8 @@ async function addIndexIfMissing(queryInterface, sequelize, tableName, fields, n
 
 module.exports = {
   async up({ DataTypes, queryInterface, sequelize }) {
+    const obrasTableName = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+
     if (!(await tableExists(sequelize, 'pedido_compra_fretes'))) {
       await queryInterface.createTable('pedido_compra_fretes', {
         id: {
@@ -40,7 +42,7 @@ module.exports = {
         obra_id: {
           type: DataTypes.INTEGER,
           allowNull: true,
-          references: { model: 'obras', key: 'id' },
+          references: { model: obrasTableName, key: 'id' },
           onDelete: 'SET NULL',
           onUpdate: 'CASCADE'
         },
@@ -168,7 +170,7 @@ module.exports = {
         obra_id: {
           type: DataTypes.INTEGER,
           allowNull: true,
-          references: { model: 'obras', key: 'id' },
+          references: { model: obrasTableName, key: 'id' },
           onDelete: 'SET NULL',
           onUpdate: 'CASCADE'
         },
