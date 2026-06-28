@@ -665,7 +665,7 @@ module.exports = {
   async index(req, res) {
     try {
       const { obra_id, ref, codigo, modo } = req.query;
-      const where = {};
+      const where = { ativo: true };
       const podeVisualizarContratos = await canAccessContratos(req.user);
       const restringirPorObra = await shouldRestrictContratosToObras(req.user);
       const acessoGlobalContratos = !restringirPorObra && await canAccessContratosGlobal(req.user);
@@ -1086,7 +1086,7 @@ module.exports = {
         return res.status(403).json({ error: 'Acesso negado' });
       }
 
-      const where = {};
+      const where = { ativo: true };
       const { obra_id, ref, codigo } = req.query;
 
       if (!acessoGlobalContratos && obrasPermitidas && obrasPermitidas.length > 0) {
@@ -1195,7 +1195,7 @@ module.exports = {
         });
       }
 
-      const where = {};
+      const where = { ativo: true };
 
       const { obra_id, ref, codigo } = req.query;
 

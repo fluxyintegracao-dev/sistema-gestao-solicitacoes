@@ -689,6 +689,8 @@ export default function GestaoContratos() {
     if (!confirm(`Excluir o contrato ${contrato.codigo}?`)) return;
     try {
       await excluirContrato(contrato.id);
+      setContratos((current) => current.filter((item) => String(item.id) !== String(contrato.id)));
+      setContratoSelecionadoId(null);
       await carregar();
       alert('Contrato excluído com sucesso.');
     } catch (error) {
