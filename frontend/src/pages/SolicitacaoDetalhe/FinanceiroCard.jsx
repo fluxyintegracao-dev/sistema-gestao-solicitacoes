@@ -5,6 +5,7 @@ import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../servi
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
+import { textMatchesSearchTerms } from '../../utils/search';
 import {
   gerarContaPorSolicitacao,
   getCartoesFinanceiros,
@@ -770,20 +771,23 @@ export default function FinanceiroCard({
   }, [titulos]);
 
   const categoriasFiltradas = useMemo(() => {
-    const search = normalizeSearchText(categoriaSearch);
-
     return categorias.filter((categoria) => {
       if (!isCategoriaCompativel(categoria, form.tipo)) {
         return false;
       }
 
-      if (!search) {
+      if (!categoriaSearch.trim()) {
         return true;
       }
 
-      const nome = normalizeSearchText(categoria.nome);
-      const descricao = normalizeSearchText(categoria.descricao);
-      return nome.includes(search) || descricao.includes(search);
+      return textMatchesSearchTerms([
+        categoria.nome,
+        categoria.descricao,
+        categoria.tipo,
+        categoria.dre_grupo,
+        categoria.dre_subgrupo,
+        categoria.classificacao_gerencial
+      ], categoriaSearch);
     });
   }, [categoriaSearch, categorias, form.tipo]);
 

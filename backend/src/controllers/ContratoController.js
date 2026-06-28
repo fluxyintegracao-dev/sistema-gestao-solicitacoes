@@ -94,17 +94,51 @@ function parseCsv(content) {
   return { headers, rows };
 }
 
+function decodeCsvBuffer(buffer) {
+  const utf8 = buffer.toString('utf8');
+  if (!utf8.includes('\uFFFD')) return utf8;
+  return buffer.toString('latin1');
+}
+
 function parseValorMonetario(valor) {
   if (valor === null || valor === undefined) return null;
-  const texto = String(valor).trim();
+  const texto = String(valor)
+    .trim()
+    .replace(/\u00A0/g, ' ')
+    .replace(/[R$\s]/gi, '');
   if (!texto) return null;
-  const numero = Number(
-    texto
-      .replace(/[R$\s]/gi, '')
-      .replace(/\./g, '')
-      .replace(',', '.')
-  );
+
+  const somenteNumero = texto.replace(/[^\d,.-]/g, '');
+  if (!somenteNumero) return null;
+
+  const temVirgula = somenteNumero.includes(',');
+  const temPonto = somenteNumero.includes('.');
+  let normalizado = somenteNumero;
+
+  if (temVirgula && temPonto) {
+    normalizado = somenteNumero.replace(/\./g, '').replace(',', '.');
+  } else if (temVirgula) {
+    normalizado = somenteNumero.replace(/\./g, '').replace(',', '.');
+  } else if (temPonto) {
+    const partes = somenteNumero.split('.');
+    const ultimaParte = partes[partes.length - 1] || '';
+    normalizado = ultimaParte.length === 2
+      ? somenteNumero
+      : somenteNumero.replace(/\./g, '');
+  }
+
+  const numero = Number(normalizado);
   return Number.isNaN(numero) ? null : numero;
+}
+
+function formatValorMonetarioCsv(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  const numero = Number(valor);
+  if (!Number.isFinite(numero)) return '';
+  return numero.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  });
 }
 
 function parseDecimalOpcional(valor) {
@@ -853,7 +887,7 @@ module.exports = {
         return res.status(400).json({ error: 'Formato invalido. Utilize a planilha modelo em CSV.' });
       }
 
-      const conteudo = file.buffer.toString('utf8');
+      const conteudo = decodeCsvBuffer(file.buffer);
       const { headers, rows } = parseCsv(conteudo);
       if (rows.length > env.csvImportMaxRows) {
         return res.status(400).json({
@@ -1011,7 +1045,9 @@ module.exports = {
               ref_contrato: refContrato,
               descricao: descricao || existente.descricao || null,
               itens_apropriacao: itensApropriacao || existente.itens_apropriacao || null,
-              valor_total: valorTotal
+              valor_total: valorTotal,
+              ajuste_solicitado: 0,
+              ajuste_pago: 0
             }, { transaction });
 
             if (apropriacaoRegistro) {
@@ -1123,6 +1159,8 @@ module.exports = {
         'Credores',
         'Itens de Apropriacao',
         'Solicitado',
+        'Ajuste Solicitado',
+        'Ajuste Pago',
         'Apropriacao Codigo',
         'Apropriacao Descricao',
         'Apropriacao Percentual',
@@ -1140,7 +1178,9 @@ module.exports = {
             contrato.descricao || '',
             resumoCredoresContrato(contrato),
             contrato.itens_apropriacao || '',
-            contrato.valor_total || '',
+            formatValorMonetarioCsv(contrato.valor_total),
+            formatValorMonetarioCsv(contrato.ajuste_solicitado),
+            formatValorMonetarioCsv(contrato.ajuste_pago),
             '',
             '',
             '',
@@ -1158,7 +1198,9 @@ module.exports = {
             contrato.descricao || '',
             resumoCredoresContrato(contrato),
             contrato.itens_apropriacao || '',
-            contrato.valor_total || '',
+            formatValorMonetarioCsv(contrato.valor_total),
+            formatValorMonetarioCsv(contrato.ajuste_solicitado),
+            formatValorMonetarioCsv(contrato.ajuste_pago),
             item.apropriacao?.codigo || '',
             item.apropriacao?.descricao || '',
             item.percentual ?? '',

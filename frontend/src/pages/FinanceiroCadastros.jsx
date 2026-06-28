@@ -28,6 +28,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { maskCpfCnpj } from '../utils/formatters';
+import { textMatchesSearchTerms } from '../utils/search';
 
 function defaultContaForm() {
   return {
@@ -399,11 +400,14 @@ export default function FinanceiroCadastros() {
           return true;
         }
 
-        const nome = normalizeSearchText(categoria.nome);
-        const descricao = normalizeSearchText(categoria.descricao);
-        const tipo = normalizeSearchText(tipoCategoria);
-        const classificacao = normalizeSearchText(categoria.classificacao_gerencial);
-        return nome.includes(search) || descricao.includes(search) || tipo.includes(search) || classificacao.includes(search);
+        return textMatchesSearchTerms([
+          categoria.nome,
+          categoria.descricao,
+          tipoCategoria,
+          categoria.classificacao_gerencial,
+          categoria.dre_grupo,
+          categoria.dre_subgrupo
+        ], search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [categoriaFiltroNormalizado, categoriaTipoFiltro, categorias]);
@@ -421,15 +425,14 @@ export default function FinanceiroCadastros() {
         if (!search) {
           return true;
         }
-        const texto = normalizeSearchText([
+        return textMatchesSearchTerms([
           categoria.nome,
           categoria.descricao,
           categoria.classificacao_gerencial,
           categoria.dre_grupo,
           categoria.dre_subgrupo,
           tipoCategoria
-        ].filter(Boolean).join(' '));
-        return texto.includes(search);
+        ], search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [categorias, categoriasModalAba, categoriasModalBusca]);

@@ -17,6 +17,7 @@ import { listarApropriacoes } from '../services/apropriacoes';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import { textMatchesSearchTerms } from '../utils/search';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -601,50 +602,37 @@ export default function FinanceiroTituloNovo() {
   }, [categorias, form.categoria_financeira_id]);
 
   const categoriasAutocomplete = useMemo(() => {
-    const termos = normalizeSearchText(categoriaBusca)
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (!termos.length || form.categoria_financeira_id) {
+    if (!categoriaBusca.trim() || form.categoria_financeira_id) {
       return [];
     }
 
     return categoriasFiltradas
-      .filter((categoria) => {
-        const texto = normalizeSearchText([
+      .filter((categoria) => textMatchesSearchTerms([
           categoria.nome,
+          categoria.descricao,
           categoria.tipo,
           categoria.dre_grupo,
           categoria.dre_subgrupo,
           categoria.classificacao_gerencial
-        ].filter(Boolean).join(' '));
-        return termos.every((termo) => texto.includes(termo));
-      })
+        ], categoriaBusca))
       .slice(0, 8);
   }, [categoriaBusca, categoriasFiltradas, form.categoria_financeira_id]);
 
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form.categoria_financeira_id;
 
   const categoriasModalFiltradas = useMemo(() => {
-    const termos = normalizeSearchText(categoriaModalBusca)
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (!termos.length) {
+    if (!categoriaModalBusca.trim()) {
       return categoriasFiltradas;
     }
 
-    return categoriasFiltradas.filter((categoria) => {
-      const texto = normalizeSearchText([
+    return categoriasFiltradas.filter((categoria) => textMatchesSearchTerms([
         categoria.nome,
         categoria.descricao,
         categoria.tipo,
         categoria.dre_grupo,
         categoria.dre_subgrupo,
         categoria.classificacao_gerencial
-      ].filter(Boolean).join(' '));
-      return termos.every((termo) => texto.includes(termo));
-    });
+      ], categoriaModalBusca));
   }, [categoriaModalBusca, categoriasFiltradas]);
 
   const parceiroSelecionado = useMemo(() => {

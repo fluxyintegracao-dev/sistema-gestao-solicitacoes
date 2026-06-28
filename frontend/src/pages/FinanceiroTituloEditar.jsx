@@ -13,6 +13,7 @@ import {
 } from '../services/financeiro';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import { textMatchesSearchTerms } from '../utils/search';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -379,39 +380,31 @@ export default function FinanceiroTituloEditar() {
   );
   const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
   const categoriasAutocomplete = useMemo(() => {
-    const termos = normalizarBusca(categoriaBusca).split(/\s+/).filter(Boolean);
-    if (!termos.length || form?.categoria_financeira_id) return [];
+    if (!categoriaBusca.trim() || form?.categoria_financeira_id) return [];
 
     return categoriasFiltradas
-      .filter((categoria) => {
-        const texto = normalizarBusca([
+      .filter((categoria) => textMatchesSearchTerms([
           categoria.nome,
           categoria.descricao,
           categoria.tipo,
           categoria.dre_grupo,
           categoria.dre_subgrupo,
           categoria.classificacao_gerencial
-        ].filter(Boolean).join(' '));
-        return termos.every((termo) => texto.includes(termo));
-      })
+        ], categoriaBusca))
       .slice(0, 8);
   }, [categoriaBusca, categoriasFiltradas, form?.categoria_financeira_id]);
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form?.categoria_financeira_id && !bloqueio;
   const categoriasModalFiltradas = useMemo(() => {
-    const termos = normalizarBusca(categoriaModalBusca).split(/\s+/).filter(Boolean);
-    if (!termos.length) return categoriasFiltradas;
+    if (!categoriaModalBusca.trim()) return categoriasFiltradas;
 
-    return categoriasFiltradas.filter((categoria) => {
-      const texto = normalizarBusca([
+    return categoriasFiltradas.filter((categoria) => textMatchesSearchTerms([
         categoria.nome,
         categoria.descricao,
         categoria.tipo,
         categoria.dre_grupo,
         categoria.dre_subgrupo,
         categoria.classificacao_gerencial
-      ].filter(Boolean).join(' '));
-      return termos.every((termo) => texto.includes(termo));
-    });
+      ], categoriaModalBusca));
   }, [categoriaModalBusca, categoriasFiltradas]);
   const parceirosAutocomplete = useMemo(
     () => parceiros.filter((parceiro) => parceiroMatchesSearch(parceiro, parceiroBusca)).slice(0, 8),
