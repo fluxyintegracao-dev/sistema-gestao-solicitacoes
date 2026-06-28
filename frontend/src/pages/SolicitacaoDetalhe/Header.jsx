@@ -110,8 +110,8 @@ export default function Header({
 
   const historicos = Array.isArray(solicitacao?.historicos) ? solicitacao.historicos : [];
   const comportamentoTipo = getTipoSolicitacaoBehavior(solicitacao?.tipo);
-  const exibirSubtipoAdmLocal = comportamentoTipo.mostrar_subtipo;
   const subtipoSolicitacao = solicitacao?.tipoSubSolicitacao?.nome || '-';
+  const exibirSubtipo = comportamentoTipo.mostrar_subtipo || Boolean(solicitacao?.tipoSubSolicitacao?.nome);
   const ultimoHistoricoStatus = [...historicos]
     .filter(item => item?.acao === 'STATUS_ALTERADO')
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
@@ -163,7 +163,7 @@ export default function Header({
             value={solicitacao?.apropriacao?.codigo || solicitacao?.apropriacao?.descricao || '-'}
           />
         )}
-        {exibirSubtipoAdmLocal && (
+        {exibirSubtipo && (
           <InfoItem label="Subtipo" value={subtipoSolicitacao} />
         )}
       </div>

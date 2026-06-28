@@ -247,7 +247,7 @@ export default function NovaSolicitacao() {
       const data = await getTiposSubContrato({
         tipo_macro_id: form.tipo_solicitacao_id
       });
-      setTiposSub(Array.isArray(data) ? data : []);
+      setTiposSub(Array.isArray(data) ? data.filter(item => item?.ativo !== false) : []);
     }
 
     loadSub();
@@ -475,7 +475,6 @@ export default function NovaSolicitacao() {
     if (!exibirCamposContrato) {
       setForm(prev => ({
         ...prev,
-        tipo_sub_id: '',
         contrato_id: '',
         codigo_contrato: '',
         ref_contrato_abertura: ''
@@ -484,6 +483,9 @@ export default function NovaSolicitacao() {
       setRefResultados([]);
       setApropriacoesContratoRateio([]);
       setContratosRef([]);
+    }
+    if (!exibirCampoSubtipo) {
+      setForm(prev => ({ ...prev, tipo_sub_id: '' }));
     }
     if (tipoSemValor) {
       setForm(prev => ({ ...prev, valor: '' }));
@@ -518,6 +520,7 @@ export default function NovaSolicitacao() {
     }
   }, [
     exibirCamposContrato,
+    exibirCampoSubtipo,
     tipoSemValor,
     exibirCampoApropriacao,
     exigeApropriacaoPrincipal,
@@ -1707,32 +1710,34 @@ export default function NovaSolicitacao() {
           )}
         </div>
 
+        {exibirCampoSubtipo && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
+            <label className="grid gap-1 text-sm">
+              Subtipo
+              <select
+                name="tipo_sub_id"
+                onChange={handleChange}
+                className="input input-sm"
+                required={subtipoObrigatorio}
+                disabled={!form.tipo_solicitacao_id}
+                value={form.tipo_sub_id}
+              >
+                <option value="">Selecione</option>
+                {tiposSub.map(t => (
+                  <option key={t.id} value={t.id}>{t.nome}</option>
+                ))}
+              </select>
+              {subtipoObrigatorio && (
+                <span className="text-xs text-gray-500">
+                  Obrigatório para este tipo de solicitação.
+                </span>
+              )}
+            </label>
+          </div>
+        )}
+
         {exibirCamposContrato && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
-            {exibirCampoSubtipo && (
-              <label className="grid gap-1 text-sm">
-                Subtipo
-                <select
-                  name="tipo_sub_id"
-                  onChange={handleChange}
-                  className="input input-sm"
-                  required={subtipoObrigatorio}
-                  disabled={!form.tipo_solicitacao_id}
-                  value={form.tipo_sub_id}
-                >
-                  <option value="">Selecione</option>
-                  {tiposSub.map(t => (
-                    <option key={t.id} value={t.id}>{t.nome}</option>
-                  ))}
-                </select>
-                {subtipoObrigatorio && (
-                  <span className="text-xs text-gray-500">
-                    Obrigatório para Adm Local de Obra.
-                  </span>
-                )}
-              </label>
-            )}
-
             <label className="grid gap-1 text-sm">
               Contrato
               <select

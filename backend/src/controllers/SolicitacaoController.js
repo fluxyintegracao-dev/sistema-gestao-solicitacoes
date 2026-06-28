@@ -1941,6 +1941,20 @@ module.exports = {
           error: 'Para continuar, selecione o subtipo.'
         });
       }
+      if (campoVisivel('subtipo') && tipo_sub_id) {
+        const subtipoSelecionado = await TipoSubContrato.findOne({
+          where: {
+            id: tipo_sub_id,
+            tipo_macro_id: tipo_solicitacao_id,
+            ativo: true
+          }
+        });
+        if (!subtipoSelecionado) {
+          return res.status(400).json({
+            error: 'Subtipo invalido para o tipo de solicitacao selecionado.'
+          });
+        }
+      }
       if (campoObrigatorio('periodo_medicao') && (!data_inicio_medicao || !data_fim_medicao)) {
         return res.status(400).json({
           error: 'Para Medicao, informe data inicial e data final.'
