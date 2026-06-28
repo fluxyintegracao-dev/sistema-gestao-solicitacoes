@@ -10288,6 +10288,8 @@ body {
 /* Gestão de Contratos */
 .layout-shell .contratos-page {
   overflow-x: clip;
+  width: min(100%, 1480px);
+  max-width: min(1480px, calc(100vw - 2rem));
 }
 
 .layout-shell .contratos-page .sol-surface-card,
@@ -10298,6 +10300,7 @@ body {
 .layout-shell .contratos-table-card {
   padding: 0.85rem;
   overflow: hidden;
+  width: 100%;
 }
 
 .layout-shell .contratos-table-wrapper {
@@ -10326,6 +10329,56 @@ body {
   white-space: normal;
   position: relative;
   min-width: 0;
+}
+
+.layout-shell .contratos-sort-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.layout-shell .contratos-data-table th.text-right .contratos-sort-button {
+  justify-content: flex-end;
+}
+
+.layout-shell .contratos-sort-button span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.layout-shell .contratos-sort-button.is-active {
+  color: var(--shell-primary, #2563eb);
+}
+
+.layout-shell .contratos-sort-indicator {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.layout-shell .contratos-sort-button:hover .contratos-sort-indicator,
+.layout-shell .contratos-sort-button:focus-visible .contratos-sort-indicator {
+  opacity: 1;
+}
+
+.layout-shell .contratos-sort-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--shell-primary, #2563eb) 62%, transparent);
+  outline-offset: 3px;
+  border-radius: 0.35rem;
 }
 
 .layout-shell .contratos-data-table td {

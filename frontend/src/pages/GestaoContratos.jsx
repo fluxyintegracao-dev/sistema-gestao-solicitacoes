@@ -37,19 +37,28 @@ import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 
 const CONTRATOS_TABLE_COLUMNS = [
   { key: 'selecionar', width: 56, minWidth: 48 },
-  { key: 'contrato', width: 122, minWidth: 104 },
-  { key: 'obra', width: 190, minWidth: 150 },
-  { key: 'ref_contrato', width: 160, minWidth: 125 },
-  { key: 'descricao', width: 220, minWidth: 150 },
-  { key: 'credores', width: 190, minWidth: 145 },
-  { key: 'apropriacao', width: 230, minWidth: 160 },
-  { key: 'solicitado', width: 150, minWidth: 130 },
-  { key: 'pago', width: 130, minWidth: 115 },
-  { key: 'a_pagar', width: 145, minWidth: 125 },
-  { key: 'ajuste_solicitado', width: 155, minWidth: 130 },
-  { key: 'ajuste_pago', width: 135, minWidth: 120 },
+  { key: 'contrato', width: 150, minWidth: 120 },
+  { key: 'obra', width: 220, minWidth: 170 },
+  { key: 'ref_contrato', width: 210, minWidth: 155 },
+  { key: 'descricao', width: 260, minWidth: 170 },
+  { key: 'credores', width: 235, minWidth: 160 },
+  { key: 'apropriacao', width: 310, minWidth: 210 },
+  { key: 'solicitado', width: 170, minWidth: 145 },
+  { key: 'pago', width: 145, minWidth: 125 },
+  { key: 'a_pagar', width: 165, minWidth: 140 },
+  { key: 'ajuste_solicitado', width: 175, minWidth: 145 },
+  { key: 'ajuste_pago', width: 150, minWidth: 130 },
   { key: 'qtd_solicitacoes', width: 128, minWidth: 112 }
 ];
+
+const CONTRATOS_SORT_LABELS = {
+  contrato: 'Contrato',
+  solicitado: 'Solicitado',
+  pago: 'Pago',
+  a_pagar: 'A pagar',
+  ajuste_solicitado: 'Ajuste Solicitado',
+  ajuste_pago: 'Ajuste Pago'
+};
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -99,6 +108,10 @@ export default function GestaoContratos() {
   const [resultadosCredor, setResultadosCredor] = useState([]);
   const [buscaCredorEdicao, setBuscaCredorEdicao] = useState('');
   const [resultadosCredorEdicao, setResultadosCredorEdicao] = useState([]);
+  const [ordenacaoContratos, setOrdenacaoContratos] = useState({
+    key: 'contrato',
+    direction: 'asc'
+  });
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -111,6 +124,42 @@ export default function GestaoContratos() {
   const contratoSelecionado = contratos.find(item => String(item.id) === String(contratoSelecionadoId)) || null;
   const contratoEmEdicao = contratos.find(item => String(item.id) === String(editandoId)) || null;
   const contratosTableColumns = useMemo(() => CONTRATOS_TABLE_COLUMNS, []);
+  const contratosOrdenados = useMemo(() => {
+    const lista = Array.isArray(contratos) ? [...contratos] : [];
+    const { key, direction } = ordenacaoContratos;
+    const multiplicador = direction === 'desc' ? -1 : 1;
+
+    function valorOrdenacao(contrato) {
+      switch (key) {
+        case 'solicitado':
+          return Number(contrato?.total_solicitado || 0);
+        case 'pago':
+          return Number(contrato?.total_pago || 0);
+        case 'a_pagar':
+          return Number(contrato?.total_a_pagar || 0);
+        case 'ajuste_solicitado':
+          return Number(contrato?.ajuste_solicitado || 0);
+        case 'ajuste_pago':
+          return Number(contrato?.ajuste_pago || 0);
+        case 'contrato':
+        default:
+          return String(contrato?.codigo || '');
+      }
+    }
+
+    return lista.sort((a, b) => {
+      const valorA = valorOrdenacao(a);
+      const valorB = valorOrdenacao(b);
+      if (typeof valorA === 'number' && typeof valorB === 'number') {
+        return (valorA - valorB) * multiplicador;
+      }
+      const comparacao = String(valorA).localeCompare(String(valorB), 'pt-BR', {
+        numeric: true,
+        sensitivity: 'base'
+      });
+      return comparacao * multiplicador;
+    });
+  }, [contratos, ordenacaoContratos]);
 
   useEffect(() => {
     if (podeAcessar) {
@@ -518,6 +567,41 @@ export default function GestaoContratos() {
       style: 'currency',
       currency: 'BRL'
     });
+  }
+
+  function alternarOrdenacaoContratos(key) {
+    setOrdenacaoContratos((atual) => {
+      if (atual.key !== key) {
+        return { key, direction: key === 'contrato' ? 'asc' : 'desc' };
+      }
+      return {
+        key,
+        direction: atual.direction === 'asc' ? 'desc' : 'asc'
+      };
+    });
+  }
+
+  function renderSortableHeader(columnKey, children, className = 'text-left p-3') {
+    const ativo = ordenacaoContratos.key === columnKey;
+    const direction = ativo ? ordenacaoContratos.direction : null;
+    const label = CONTRATOS_SORT_LABELS[columnKey] || children;
+
+    return (
+      <ResizableTh columnKey={columnKey} className={className}>
+        <button
+          type="button"
+          className={`contratos-sort-button ${ativo ? 'is-active' : ''}`}
+          onClick={() => alternarOrdenacaoContratos(columnKey)}
+          aria-label={`Ordenar por ${label}`}
+          aria-pressed={ativo}
+        >
+          <span>{children}</span>
+          <span className="contratos-sort-indicator" aria-hidden="true">
+            {ativo ? (direction === 'asc' ? '↑' : '↓') : '↕'}
+          </span>
+        </button>
+      </ResizableTh>
+    );
   }
 
   async function handleCriarContrato(e) {
@@ -999,7 +1083,7 @@ export default function GestaoContratos() {
               </tr>
             </thead>
             <tbody>
-              {contratos.length === 0 && (
+              {contratosOrdenados.length === 0 && (
                 <tr>
                   <td colSpan="8" className="p-4 text-center text-gray-500">
                     Nenhum contrato encontrado.
@@ -1254,17 +1338,17 @@ export default function GestaoContratos() {
             <thead>
               <tr>
                 <ResizableTh columnKey="selecionar" className="text-left p-3 contratos-select-col">Sel.</ResizableTh>
-                <ResizableTh columnKey="contrato" className="text-left p-3">Contrato</ResizableTh>
+                {renderSortableHeader('contrato', 'Contrato')}
                 <ResizableTh columnKey="obra" className="text-left p-3">Obra</ResizableTh>
                 <ResizableTh columnKey="ref_contrato" className="text-left p-3">Ref. do Contrato</ResizableTh>
                 <ResizableTh columnKey="descricao" className="text-left p-3">Descrição</ResizableTh>
                 <ResizableTh columnKey="credores" className="text-left p-3">Credores</ResizableTh>
                 <ResizableTh columnKey="apropriacao" className="text-left p-3">Itens de Apropriação</ResizableTh>
-                <ResizableTh columnKey="solicitado" className="text-right p-3">Solicitado</ResizableTh>
-                <ResizableTh columnKey="pago" className="text-right p-3">Pago</ResizableTh>
-                <ResizableTh columnKey="a_pagar" className="text-right p-3">A pagar</ResizableTh>
-                <ResizableTh columnKey="ajuste_solicitado" className="text-right p-3">Ajuste Solicitado</ResizableTh>
-                <ResizableTh columnKey="ajuste_pago" className="text-right p-3">Ajuste Pago</ResizableTh>
+                {renderSortableHeader('solicitado', 'Solicitado', 'text-right p-3')}
+                {renderSortableHeader('pago', 'Pago', 'text-right p-3')}
+                {renderSortableHeader('a_pagar', 'A pagar', 'text-right p-3')}
+                {renderSortableHeader('ajuste_solicitado', 'Ajuste Solicitado', 'text-right p-3')}
+                {renderSortableHeader('ajuste_pago', 'Ajuste Pago', 'text-right p-3')}
                 <ResizableTh columnKey="qtd_solicitacoes" className="text-right p-3">Qtd. Solicitações</ResizableTh>
               </tr>
             </thead>
@@ -1276,7 +1360,7 @@ export default function GestaoContratos() {
                   </td>
                 </tr>
               )}
-              {contratos.map(c => {
+              {contratosOrdenados.map(c => {
                 const selecionado = String(contratoSelecionadoId) === String(c.id);
                 return (
                   <tr
