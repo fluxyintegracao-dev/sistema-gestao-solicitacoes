@@ -871,6 +871,71 @@ function validateCompraPedidoEspelhoBody(body = {}) {
   };
 }
 
+function validateCompraPedidoFreteBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'tipo',
+      'momento',
+      'criterio_rateio',
+      'valor_total',
+      'fornecedor_compra_id',
+      'novo_fornecedor',
+      'dados_pagamento',
+      'observacoes'
+    ],
+    'Frete do pedido'
+  );
+
+  const tipo = parseOptionalText(body.tipo, 'Tipo de frete', 30, { required: true })?.toUpperCase();
+  const momento = parseOptionalText(body.momento, 'Momento do frete', 30)?.toUpperCase() || 'FECHAMENTO';
+  const criterioRateio = parseOptionalText(body.criterio_rateio, 'Criterio de rateio', 30)?.toUpperCase() || 'VALOR_ITENS';
+  const novoFornecedor = body.novo_fornecedor && typeof body.novo_fornecedor === 'object'
+    ? {
+        nome: parseOptionalText(body.novo_fornecedor.nome, 'Nome do fornecedor', 160),
+        cpf_cnpj: parseOptionalText(body.novo_fornecedor.cpf_cnpj, 'CPF/CNPJ do fornecedor', 32),
+        whatsapp: parseOptionalText(body.novo_fornecedor.whatsapp, 'WhatsApp do fornecedor', 32),
+        telefone: parseOptionalText(body.novo_fornecedor.telefone, 'Telefone do fornecedor', 32),
+        email: parseOptionalText(body.novo_fornecedor.email, 'Email do fornecedor', 160),
+        contato: parseOptionalText(body.novo_fornecedor.contato, 'Contato do fornecedor', 160),
+        observacoes: parseOptionalText(body.novo_fornecedor.observacoes, 'Observacoes do fornecedor', 1000)
+      }
+    : undefined;
+
+  if (!['EMBUTIDO', 'TERCEIRO'].includes(tipo)) {
+    throw new ValidationError('Tipo de frete invalido.');
+  }
+  if (!['FECHAMENTO', 'POSTERIOR'].includes(momento)) {
+    throw new ValidationError('Momento do frete invalido.');
+  }
+  if (!['VALOR_ITENS'].includes(criterioRateio)) {
+    throw new ValidationError('Criterio de rateio invalido.');
+  }
+
+  const dadosPagamento = body.dados_pagamento && typeof body.dados_pagamento === 'object'
+    ? {
+        pix: parseOptionalText(body.dados_pagamento.pix, 'PIX', 180),
+        banco: parseOptionalText(body.dados_pagamento.banco, 'Banco', 120),
+        agencia: parseOptionalText(body.dados_pagamento.agencia, 'Agencia', 60),
+        conta: parseOptionalText(body.dados_pagamento.conta, 'Conta', 80),
+        favorecido: parseOptionalText(body.dados_pagamento.favorecido, 'Favorecido', 160),
+        documento: parseOptionalText(body.dados_pagamento.documento, 'Documento', 60),
+        observacoes: parseOptionalText(body.dados_pagamento.observacoes, 'Observacoes de pagamento', 1000)
+      }
+    : parseOptionalText(body.dados_pagamento, 'Dados de pagamento', 1000);
+
+  return {
+    tipo,
+    momento,
+    criterio_rateio: criterioRateio,
+    valor_total: parseDecimal(body.valor_total, 'Valor do frete', { required: true, min: 0.01 }),
+    fornecedor_compra_id: parseInteger(body.fornecedor_compra_id, 'Fornecedor'),
+    novo_fornecedor: novoFornecedor,
+    dados_pagamento: dadosPagamento,
+    observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000)
+  };
+}
+
 function validateCompraDelegacaoBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1115,6 +1180,7 @@ module.exports = {
   validateCompraPedidoComentarioBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoEspelhoBody,
+  validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,

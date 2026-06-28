@@ -4,6 +4,8 @@ const {
   Historico,
   Obra,
   PedidoCompra,
+  PedidoCompraFrete,
+  PedidoCompraFreteRateio,
   PedidoCompraItem,
   PedidoCompraItemLog,
   Solicitacao,
@@ -48,6 +50,16 @@ function roundQty(value) {
 
 function roundPedidoQty(value) {
   return Number(asNumber(value).toFixed(2));
+}
+
+function safeJsonParse(value, fallback = null) {
+  if (!value) return fallback;
+  if (typeof value === 'object') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
 }
 
 function buildRespostaKey(itemTipo, itemReferenciaId) {
@@ -1312,6 +1324,19 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
             include: [{ model: User, as: 'usuario', attributes: ['id', 'nome'] }]
           }
         ]
+      },
+      {
+        model: PedidoCompraFrete,
+        as: 'fretes',
+        include: [
+          { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
+          { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] },
+          {
+            model: PedidoCompraFreteRateio,
+            as: 'rateios',
+            include: [{ model: PedidoCompraItem, as: 'item', attributes: ['id', 'descricao', 'unidade', 'quantidade_pedido', 'valor_total'] }]
+          }
+        ]
       }
     ]
   });
@@ -1398,10 +1423,26 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
       }
     };
   });
+  const fretes = (pedido.fretes || []).map((frete) => {
+    const data = typeof frete.toJSON === 'function' ? frete.toJSON() : frete;
+    return {
+      ...data,
+      valor_total: roundMoney(data.valor_total),
+      dados_pagamento: safeJsonParse(data.dados_pagamento, data.dados_pagamento || null),
+      pendente_financeiro: normalizeText(data.status_financeiro) === 'PENDENTE_TITULO',
+      rateios: (data.rateios || []).map((rateio) => ({
+        ...rateio,
+        valor_item_base: roundMoney(rateio.valor_item_base),
+        valor_rateado: roundMoney(rateio.valor_rateado),
+        percentual_rateio: Number(rateio.percentual_rateio || 0)
+      }))
+    };
+  });
 
   return {
     ...pedido.toJSON(),
     itens,
+    fretes,
     status_configuracao: statusConfig,
     edicao_bloqueada: Boolean(statusConfig?.bloqueia_edicao),
     candidatos_adicao: candidatos,

@@ -521,6 +521,22 @@ export async function anexarEspelhoPedidoCompra(id, data = {}) {
   return handleJsonResponse(response, 'Erro ao anexar espelho do fornecedor');
 }
 
+export async function registrarFretePedidoCompra(id, data = {}) {
+  const idempotencyKey = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/fretes`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao registrar frete do pedido');
+}
+
 export async function criarPedidoCompraDaSolicitacao(id, data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/pedidos`, {
     method: 'POST',

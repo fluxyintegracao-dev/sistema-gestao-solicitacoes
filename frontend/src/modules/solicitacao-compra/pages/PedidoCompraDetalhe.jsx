@@ -9,7 +9,9 @@ import {
   cancelarItensPedidoCompra,
   cancelarPedidoCompra,
   comentarPedidoCompra,
+  listarFornecedoresCompra,
   obterPedidoCompra,
+  registrarFretePedidoCompra,
   removerItemPedidoCompra,
   remanejarItemPedidoCompra,
   uploadAnexoTemporarioCompra
@@ -236,6 +238,30 @@ function triggerBlobDownload(blob, fileName) {
   window.URL.revokeObjectURL(url);
 }
 
+const FRETE_FORM_INICIAL = {
+  tipo: 'EMBUTIDO',
+  momento: 'FECHAMENTO',
+  valor_total: '',
+  fornecedor_compra_id: '',
+  novo_fornecedor: {
+    nome: '',
+    cpf_cnpj: '',
+    whatsapp: '',
+    email: '',
+    contato: ''
+  },
+  dados_pagamento: {
+    pix: '',
+    banco: '',
+    agencia: '',
+    conta: '',
+    favorecido: '',
+    documento: '',
+    observacoes: ''
+  },
+  observacoes: ''
+};
+
 function normalizeBrazilianQuantityOnBlur(value) {
   if (!value) {
     return '';
@@ -307,6 +333,12 @@ export default function PedidoCompraDetalhe() {
   const [remanejoSelecionado, setRemanejoSelecionado] = useState('');
   const [remanejoQuantidade, setRemanejoQuantidade] = useState('');
   const [remanejandoItem, setRemanejandoItem] = useState(false);
+  const [modalFreteAberto, setModalFreteAberto] = useState(false);
+  const [salvandoFrete, setSalvandoFrete] = useState(false);
+  const [freteForm, setFreteForm] = useState(FRETE_FORM_INICIAL);
+  const [buscaFornecedorFrete, setBuscaFornecedorFrete] = useState('');
+  const [fornecedoresFrete, setFornecedoresFrete] = useState([]);
+  const [buscandoFornecedoresFrete, setBuscandoFornecedoresFrete] = useState(false);
   const itemSelecionadoId = itemEditandoId;
   const buscaItensDeferred = useDeferredValue(buscaItens);
 
@@ -410,6 +442,15 @@ export default function PedidoCompraDetalhe() {
 
     return statusAtual ? [...ativos, statusAtual] : ativos;
   }, [pedido?.status, statusAtual, statusOptions]);
+  const fretesPedido = useMemo(() => (pedido?.fretes || []), [pedido]);
+  const totalFretesPedido = useMemo(
+    () => fretesPedido.reduce((total, frete) => total + Number(frete.valor_total || 0), 0),
+    [fretesPedido]
+  );
+  const fretesPendentesFinanceiro = useMemo(
+    () => fretesPedido.filter((frete) => String(frete.status_financeiro || '').toUpperCase() === 'PENDENTE_TITULO'),
+    [fretesPedido]
+  );
 
   useEffect(() => {
     if (!itemEditandoId) {
@@ -454,6 +495,115 @@ export default function PedidoCompraDetalhe() {
     }
 
     navigate(`/relatorios/administrativos?${params.toString()}`);
+  }
+
+  function abrirModalFrete(momento = 'FECHAMENTO') {
+    setFreteForm({
+      ...FRETE_FORM_INICIAL,
+      momento
+    });
+    setBuscaFornecedorFrete('');
+    setFornecedoresFrete([]);
+    setModalFreteAberto(true);
+  }
+
+  function fecharModalFrete(force = false) {
+    if (salvandoFrete && !force) return;
+    setModalFreteAberto(false);
+    setFreteForm(FRETE_FORM_INICIAL);
+    setBuscaFornecedorFrete('');
+    setFornecedoresFrete([]);
+  }
+
+  function atualizarFreteForm(changes) {
+    setFreteForm((current) => ({
+      ...current,
+      ...changes
+    }));
+  }
+
+  function atualizarNovoFornecedorFrete(changes) {
+    setFreteForm((current) => ({
+      ...current,
+      novo_fornecedor: {
+        ...current.novo_fornecedor,
+        ...changes
+      }
+    }));
+  }
+
+  function atualizarDadosPagamentoFrete(changes) {
+    setFreteForm((current) => ({
+      ...current,
+      dados_pagamento: {
+        ...current.dados_pagamento,
+        ...changes
+      }
+    }));
+  }
+
+  async function handleBuscarFornecedorFrete() {
+    try {
+      setBuscandoFornecedoresFrete(true);
+      const data = await listarFornecedoresCompra({
+        q: buscaFornecedorFrete,
+        incluir_inativos: '0'
+      });
+      setFornecedoresFrete(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao buscar fornecedores de frete');
+    } finally {
+      setBuscandoFornecedoresFrete(false);
+    }
+  }
+
+  async function handleRegistrarFrete() {
+    const valorTotal = parseBrazilianMoney(freteForm.valor_total);
+    if (!valorTotal || valorTotal <= 0) {
+      alert('Informe o valor do frete.');
+      return;
+    }
+
+    const tipo = String(freteForm.tipo || '').toUpperCase();
+    const payload = {
+      tipo,
+      momento: freteForm.momento,
+      criterio_rateio: 'VALOR_ITENS',
+      valor_total: valorTotal,
+      observacoes: freteForm.observacoes
+    };
+
+    if (tipo === 'TERCEIRO') {
+      const fornecedorId = Number(freteForm.fornecedor_compra_id || 0);
+      const novoFornecedor = freteForm.novo_fornecedor || {};
+
+      if (fornecedorId) {
+        payload.fornecedor_compra_id = fornecedorId;
+      } else if (novoFornecedor.nome || novoFornecedor.cpf_cnpj) {
+        payload.novo_fornecedor = novoFornecedor;
+      } else {
+        alert('Selecione ou cadastre o fornecedor/transportador do frete.');
+        return;
+      }
+
+      payload.dados_pagamento = freteForm.dados_pagamento;
+    }
+
+    try {
+      setSalvandoFrete(true);
+      const data = await registrarFretePedidoCompra(id, payload);
+      setPedido(data || null);
+      fecharModalFrete(true);
+      alert(tipo === 'TERCEIRO'
+        ? 'Frete registrado e pendencia criada para o financeiro.'
+        : 'Frete embutido registrado para rateio de custo.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao registrar frete do pedido');
+    } finally {
+      setSalvandoFrete(false);
+    }
   }
 
   async function handleSalvarItem(itemId) {
@@ -906,6 +1056,69 @@ export default function PedidoCompraDetalhe() {
                 <div className="text-[var(--c-muted)]">Criado por</div>
                 <div className="font-semibold">{pedido.criador?.nome || '-'}</div>
               </div>
+            </div>
+          </div>
+
+          <div className="card sol-surface-card">
+            <div className="card-header flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="font-semibold">Fretes do pedido</h2>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Custo rateado nos itens para acompanhamento da obra.
+                </p>
+              </div>
+              {podeGerenciarPedido ? (
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => abrirModalFrete('FECHAMENTO')}
+                  disabled={salvandoFrete}
+                >
+                  Registrar frete
+                </button>
+              ) : null}
+            </div>
+
+            <div className="grid gap-3 text-sm">
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                <div className="text-[var(--c-muted)]">Total de frete rateado</div>
+                <div className="mt-1 text-lg font-semibold">{formatMoney(totalFretesPedido)}</div>
+                {fretesPendentesFinanceiro.length ? (
+                  <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    {fretesPendentesFinanceiro.length} frete(s) aguardando geracao de titulo pelo financeiro.
+                  </div>
+                ) : null}
+              </div>
+
+              {fretesPedido.length ? (
+                <div className="app-list-stack">
+                  {fretesPedido.map((frete) => (
+                    <div key={frete.id} className="app-list-card">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="font-semibold">
+                          {String(frete.tipo || '').replace(/_/g, ' ')}
+                        </div>
+                        <span className={`app-status-pill ${
+                          String(frete.status_financeiro || '').toUpperCase() === 'PENDENTE_TITULO'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}>
+                          {String(frete.status_financeiro || 'REGISTRADO').replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-semibold">{formatMoney(frete.valor_total)}</div>
+                      <div className="mt-1 text-xs text-[var(--c-muted)]">
+                        {frete.fornecedor?.nome ? `${frete.fornecedor.nome} - ` : ''}
+                        {frete.rateios?.length || 0} rateio(s) por valor dos itens
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="app-empty-card py-5 text-sm">
+                  Nenhum frete registrado para este pedido.
+                </div>
+              )}
             </div>
           </div>
 
@@ -1438,6 +1651,252 @@ export default function PedidoCompraDetalhe() {
                 ) : null}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {modalFreteAberto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: 'rgba(0, 0, 0, 0.45)' }}>
+          <div
+            className="flex w-full flex-col rounded-2xl border"
+            style={{
+              background: 'var(--ui-surface)',
+              borderColor: 'var(--ui-border)',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.2)',
+              maxHeight: 'calc(100vh - 32px)',
+              maxWidth: '880px',
+              overflow: 'hidden'
+            }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>
+                  Registrar frete do pedido
+                </h2>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--c-muted)' }}>
+                  O frete sera rateado por valor dos itens. Frete de terceiro cria pendencia para o financeiro.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={() => fecharModalFrete()} disabled={salvandoFrete}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-4 py-4 sm:px-5">
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="grid gap-2 text-sm font-medium">
+                  Tipo de frete
+                  <select
+                    className="input"
+                    value={freteForm.tipo}
+                    onChange={(event) => atualizarFreteForm({ tipo: event.target.value })}
+                    disabled={salvandoFrete}
+                  >
+                    <option value="EMBUTIDO">Embutido no pedido</option>
+                    <option value="TERCEIRO">Pago a terceiro</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium">
+                  Momento
+                  <select
+                    className="input"
+                    value={freteForm.momento}
+                    onChange={(event) => atualizarFreteForm({ momento: event.target.value })}
+                    disabled={salvandoFrete}
+                  >
+                    <option value="FECHAMENTO">No fechamento</option>
+                    <option value="POSTERIOR">Informado depois</option>
+                  </select>
+                </label>
+
+                <label className="grid gap-2 text-sm font-medium">
+                  Valor total do frete
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    value={freteForm.valor_total}
+                    onChange={(event) => atualizarFreteForm({ valor_total: sanitizeMoneyInput(event.target.value) })}
+                    onBlur={(event) => atualizarFreteForm({ valor_total: formatMoneyInput(event.target.value) })}
+                    placeholder="R$ 0,00"
+                    disabled={salvandoFrete}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <div className="font-semibold">Rateio do frete</div>
+                    <p className="mt-1 text-xs text-[var(--c-muted)]">
+                      Nesta etapa o sistema distribui o valor proporcionalmente ao valor dos itens ativos do pedido.
+                    </p>
+                  </div>
+                  <span className="app-status-pill bg-blue-50 text-blue-700">Por valor dos itens</span>
+                </div>
+              </div>
+
+              {freteForm.tipo === 'TERCEIRO' ? (
+                <div className="mt-4 grid gap-4">
+                  <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                    <div className="font-semibold">Fornecedor/transportador</div>
+                    <p className="mt-1 text-xs text-[var(--c-muted)]">
+                      Selecione um fornecedor existente ou informe os dados para cadastro rapido.
+                    </p>
+
+                    <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <input
+                        className="input"
+                        value={buscaFornecedorFrete}
+                        onChange={(event) => setBuscaFornecedorFrete(event.target.value)}
+                        placeholder="Buscar por nome, CPF/CNPJ, email ou contato"
+                        disabled={salvandoFrete}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={handleBuscarFornecedorFrete}
+                        disabled={buscandoFornecedoresFrete || salvandoFrete}
+                      >
+                        {buscandoFornecedoresFrete ? 'Buscando...' : 'Buscar'}
+                      </button>
+                    </div>
+
+                    <select
+                      className="input mt-3"
+                      value={freteForm.fornecedor_compra_id}
+                      onChange={(event) => atualizarFreteForm({ fornecedor_compra_id: event.target.value })}
+                      disabled={salvandoFrete}
+                    >
+                      <option value="">Sem fornecedor selecionado</option>
+                      {fornecedoresFrete.map((fornecedor) => (
+                        <option key={fornecedor.id} value={fornecedor.id}>
+                          {fornecedor.nome} {fornecedor.cnpj ? `- ${fornecedor.cnpj}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {!freteForm.fornecedor_compra_id ? (
+                    <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                      <div className="font-semibold">Cadastro rapido do transportador</div>
+                      <div className="mt-3 grid gap-3 md:grid-cols-2">
+                        <input
+                          className="input"
+                          value={freteForm.novo_fornecedor.nome}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ nome: event.target.value })}
+                          placeholder="Nome do fornecedor"
+                          disabled={salvandoFrete}
+                        />
+                        <input
+                          className="input"
+                          value={freteForm.novo_fornecedor.cpf_cnpj}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ cpf_cnpj: event.target.value })}
+                          placeholder="CPF/CNPJ"
+                          disabled={salvandoFrete}
+                        />
+                        <input
+                          className="input"
+                          value={freteForm.novo_fornecedor.whatsapp}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ whatsapp: event.target.value })}
+                          placeholder="WhatsApp/telefone"
+                          disabled={salvandoFrete}
+                        />
+                        <input
+                          className="input"
+                          value={freteForm.novo_fornecedor.email}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ email: event.target.value })}
+                          placeholder="Email"
+                          disabled={salvandoFrete}
+                        />
+                        <input
+                          className="input md:col-span-2"
+                          value={freteForm.novo_fornecedor.contato}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ contato: event.target.value })}
+                          placeholder="Contato"
+                          disabled={salvandoFrete}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                    <div className="font-semibold">Dados para pagamento do frete</div>
+                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.pix}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ pix: event.target.value })}
+                        placeholder="Chave PIX"
+                        disabled={salvandoFrete}
+                      />
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.favorecido}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ favorecido: event.target.value })}
+                        placeholder="Favorecido"
+                        disabled={salvandoFrete}
+                      />
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.documento}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ documento: event.target.value })}
+                        placeholder="CPF/CNPJ do favorecido"
+                        disabled={salvandoFrete}
+                      />
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.banco}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ banco: event.target.value })}
+                        placeholder="Banco"
+                        disabled={salvandoFrete}
+                      />
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.agencia}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ agencia: event.target.value })}
+                        placeholder="Agencia"
+                        disabled={salvandoFrete}
+                      />
+                      <input
+                        className="input"
+                        value={freteForm.dados_pagamento.conta}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ conta: event.target.value })}
+                        placeholder="Conta"
+                        disabled={salvandoFrete}
+                      />
+                      <textarea
+                        className="input min-h-[80px] md:col-span-2"
+                        value={freteForm.dados_pagamento.observacoes}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ observacoes: event.target.value })}
+                        placeholder="Observacoes para o financeiro"
+                        disabled={salvandoFrete}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              <label className="mt-4 grid gap-2 text-sm font-medium">
+                Observacoes do frete
+                <textarea
+                  className="input min-h-[90px]"
+                  value={freteForm.observacoes}
+                  onChange={(event) => atualizarFreteForm({ observacoes: event.target.value })}
+                  placeholder="Ex.: frete embutido na negociacao ou frete pago diretamente a transportador."
+                  disabled={salvandoFrete}
+                />
+              </label>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[var(--c-border)] px-4 py-3 sm:px-5">
+              <button type="button" className="btn btn-outline" onClick={() => fecharModalFrete()} disabled={salvandoFrete}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleRegistrarFrete} disabled={salvandoFrete}>
+                {salvandoFrete ? 'Registrando...' : 'Registrar frete'}
+              </button>
             </div>
           </div>
         </div>

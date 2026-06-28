@@ -16,6 +16,7 @@ const {
   remanejarPedidoItem,
   removerPedidoItem
 } = require('../services/pedidoCompraService');
+const { registrarFretePedido } = require('../services/pedidoCompraFreteService');
 const {
   getUserObraScopeIds,
   canAccessSolicitacaoCompraByScope,
@@ -631,6 +632,41 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return responderErroController(res, error, 'Erro ao anexar espelho do fornecedor', { status: 400 });
+    }
+  },
+
+  async registrarFrete(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
+      await registrarFretePedido({
+        pedidoId: req.params.id,
+        payload: req.body || {},
+        usuarioId: usuario.id,
+        idempotencyKey: req.get('Idempotency-Key'),
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.status(201).json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao registrar frete do pedido', { status: 400 });
     }
   },
 

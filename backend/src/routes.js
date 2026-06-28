@@ -56,6 +56,7 @@ const {
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoComentarioBody,
   validateCompraPedidoEspelhoBody,
+  validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
@@ -1658,6 +1659,7 @@ router.patch('/compras/pedidos/:id/cancelar', allowComprasPedidosManage, critica
 router.patch('/compras/pedidos/:id/itens-cancelar', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancelItems);
 router.post('/compras/pedidos/:id/comentarios', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoComentarioBody }), requirePedidoCompraAccess, PedidoCompraController.comentar);
 router.patch('/compras/pedidos/:id/espelho', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoEspelhoBody }), requirePedidoCompraAccess, PedidoCompraController.anexarEspelho);
+router.post('/compras/pedidos/:id/fretes', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoFreteBody }), requirePedidoCompraAccess, PedidoCompraController.registrarFrete);
 router.patch('/compras/pedidos/:id/itens/:itemId', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoItemUpdateBody }), requirePedidoCompraAccess, PedidoCompraController.updateItem);
 router.patch('/compras/pedidos/:id/itens/:itemId/remanejar', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoRemanejarBody }), requirePedidoCompraAccess, PedidoCompraController.remanejarItem);
 router.delete('/compras/pedidos/:id/itens/:itemId', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams }), requirePedidoCompraAccess, PedidoCompraController.removeItem);

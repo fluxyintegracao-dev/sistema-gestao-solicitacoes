@@ -144,6 +144,8 @@ db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize
 db.PedidoCompra = require('./PedidoCompra')(sequelize, Sequelize);
 db.PedidoCompraItem = require('./PedidoCompraItem')(sequelize, Sequelize);
 db.PedidoCompraItemLog = require('./PedidoCompraItemLog')(sequelize, Sequelize);
+db.PedidoCompraFrete = require('./PedidoCompraFrete')(sequelize, Sequelize);
+db.PedidoCompraFreteRateio = require('./PedidoCompraFreteRateio')(sequelize, Sequelize);
 
 /* =====================
    CRM
@@ -2283,6 +2285,123 @@ db.User.hasMany(db.PedidoCompraItemLog, {
 db.PedidoCompraItemLog.belongsTo(db.User, {
   foreignKey: 'usuario_id',
   as: 'usuario'
+});
+
+db.PedidoCompra.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'pedido_compra_id',
+  as: 'fretes',
+  onDelete: 'CASCADE'
+});
+
+db.PedidoCompraFrete.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.SolicitacaoCompra.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'fretesPedido'
+});
+
+db.PedidoCompraFrete.belongsTo(db.SolicitacaoCompra, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'solicitacaoCompra'
+});
+
+db.Solicitacao.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'solicitacao_id',
+  as: 'fretesCompra'
+});
+
+db.PedidoCompraFrete.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacaoPrincipal'
+});
+
+db.Obra.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'obra_id',
+  as: 'fretesCompra'
+});
+
+db.PedidoCompraFrete.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.FornecedorCompra.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'fretesCompra'
+});
+
+db.PedidoCompraFrete.belongsTo(db.FornecedorCompra, {
+  foreignKey: 'fornecedor_compra_id',
+  as: 'fornecedor'
+});
+
+db.Parceiro.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'parceiro_id',
+  as: 'fretesCompra'
+});
+
+db.PedidoCompraFrete.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
+});
+
+db.User.hasMany(db.PedidoCompraFrete, {
+  foreignKey: 'registrado_por',
+  as: 'fretesCompraRegistrados'
+});
+
+db.PedidoCompraFrete.belongsTo(db.User, {
+  foreignKey: 'registrado_por',
+  as: 'registradoPor'
+});
+
+db.PedidoCompraFrete.hasMany(db.PedidoCompraFreteRateio, {
+  foreignKey: 'frete_id',
+  as: 'rateios',
+  onDelete: 'CASCADE'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.PedidoCompraFrete, {
+  foreignKey: 'frete_id',
+  as: 'frete'
+});
+
+db.PedidoCompra.hasMany(db.PedidoCompraFreteRateio, {
+  foreignKey: 'pedido_compra_id',
+  as: 'rateiosFrete'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.PedidoCompra, {
+  foreignKey: 'pedido_compra_id',
+  as: 'pedido'
+});
+
+db.PedidoCompraItem.hasMany(db.PedidoCompraFreteRateio, {
+  foreignKey: 'pedido_compra_item_id',
+  as: 'rateiosFrete'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.PedidoCompraItem, {
+  foreignKey: 'pedido_compra_item_id',
+  as: 'item'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.SolicitacaoCompraItem, {
+  foreignKey: 'solicitacao_compra_item_id',
+  as: 'itemCadastrado'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'solicitacao_compra_item_manual_id',
+  as: 'itemManual'
+});
+
+db.PedidoCompraFreteRateio.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
 });
 
 // =====================
