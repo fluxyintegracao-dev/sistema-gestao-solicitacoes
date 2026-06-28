@@ -1430,6 +1430,60 @@ function buildMovimentoIntercompanyFields(titulo = {}) {
   };
 }
 
+function normalizeNaturezaIntercompanyBaixa(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  if (!normalized) return null;
+  if ([
+    'OPERACIONAL_TERCEIRO',
+    'TRANSFERENCIA_INTERNA',
+    'REEMBOLSO_COMPENSACAO'
+  ].includes(normalized)) {
+    return normalized;
+  }
+  return null;
+}
+
+function buildIntercompanyBaixaPorNatureza(payload = {}) {
+  const natureza = normalizeNaturezaIntercompanyBaixa(payload.natureza_intercompany_baixa);
+  if (!natureza) return null;
+
+  if (natureza === 'TRANSFERENCIA_INTERNA') {
+    return {
+      tipo_intercompany: 'COBERTURA_CAIXA',
+      elimina_consolidado: true,
+      transferencia_interna: true
+    };
+  }
+
+  if (natureza === 'REEMBOLSO_COMPENSACAO') {
+    return {
+      tipo_intercompany: 'REEMBOLSO',
+      elimina_consolidado: true,
+      transferencia_interna: false
+    };
+  }
+
+  return {
+    tipo_intercompany: 'TRANSFERENCIA_OPERACIONAL',
+    elimina_consolidado: false,
+    transferencia_interna: false
+  };
+}
+
+function buildTituloIntercompanyUpdateFromBaixa(fields = {}) {
+  if (!fields.intercompany_group_id || !fields.tipo_intercompany) return {};
+  return {
+    intercompany: true,
+    intercompany_group_id: fields.intercompany_group_id,
+    empresa_origem_id: fields.empresa_origem_id || null,
+    empresa_destino_id: fields.empresa_destino_id || null,
+    tipo_intercompany: fields.tipo_intercompany,
+    motivo_intercompany: fields.motivo_intercompany || null,
+    elimina_consolidado: fields.elimina_consolidado === true,
+    transferencia_interna: fields.transferencia_interna === true
+  };
+}
+
 async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaixaId }) {
   const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
 
@@ -1456,7 +1510,8 @@ async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaix
     );
   }
 
-  const tipoIntercompany = normalizeTipoIntercompany(payload.tipo_intercompany);
+  const naturezaFields = buildIntercompanyBaixaPorNatureza(payload);
+  const tipoIntercompany = normalizeTipoIntercompany(naturezaFields?.tipo_intercompany || payload.tipo_intercompany);
   if (!tipoIntercompany) {
     throw createHttpError(400, 'Tipo e obrigatorio quando outra empresa paga ou recebe a baixa.');
   }
@@ -1468,8 +1523,12 @@ async function validarIntercompanyBaixa({ payload = {}, titulo = {}, empresaBaix
     empresa_destino_id: isPagar ? Number(empresaTituloId) : Number(empresaBaixaId),
     tipo_intercompany: tipoIntercompany,
     motivo_intercompany: payload.motivo_intercompany || null,
-    elimina_consolidado: payload.elimina_consolidado !== false,
-    transferencia_interna: payload.transferencia_interna !== false
+    elimina_consolidado: naturezaFields
+      ? naturezaFields.elimina_consolidado
+      : payload.elimina_consolidado !== false,
+    transferencia_interna: naturezaFields
+      ? naturezaFields.transferencia_interna
+      : payload.transferencia_interna !== false
   };
 }
 
@@ -1478,6 +1537,29 @@ async function carregarTituloPorId(req, tituloId, { includeMovimentos = false } 
 
   const titulo = await TituloFinanceiro.findByPk(tituloId, {
     include: buildTituloInclude({ includeMovimentos })
+  });
+
+  if (!titulo) {
+    throw createHttpError(404, 'Titulo financeiro nao encontrado');
+  }
+
+  await assertObraScope(
+    req,
+    titulo.obra_id,
+    'TITULO_FINANCEIRO',
+    titulo.id,
+    'Usuario tentou acessar titulo financeiro fora do seu escopo de obra'
+  );
+
+  return titulo;
+}
+
+async function carregarTituloParaBaixaComLock(req, tituloId, transaction) {
+  await assertFinanceAccess(req);
+
+  const titulo = await TituloFinanceiro.findByPk(tituloId, {
+    transaction,
+    lock: transaction.LOCK.UPDATE
   });
 
   if (!titulo) {
@@ -2870,26 +2952,14 @@ async function sincronizarRealizacaoCompraPorTitulo({
 }
 
 async function baixarTitulo(req, tituloId, payload = {}) {
-  const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
-  const statusAtual = String(titulo.status || '').trim().toUpperCase();
-
-  if (!['ABERTO', 'PARCIAL'].includes(statusAtual)) {
-    throw createHttpError(400, 'Somente titulos em aberto ou parcial podem receber baixa.');
-  }
-
   const valorBaixa = roundCurrency(payload.valor);
   const juros = roundCurrency(payload.juros || 0);
   const multa = roundCurrency(payload.multa || 0);
   const desconto = roundCurrency(payload.desconto || 0);
   const valorQuitacao = roundCurrency(valorBaixa + juros + multa - desconto);
-  const saldoAtual = roundCurrency(titulo.valor_saldo);
 
   if (valorBaixa <= 0) {
     throw createHttpError(400, 'Valor da baixa deve ser maior que zero.');
-  }
-
-  if (valorBaixa > saldoAtual) {
-    throw createHttpError(400, 'Valor da baixa nao pode ser maior que o saldo do titulo.');
   }
 
   if (valorQuitacao <= 0) {
@@ -2902,21 +2972,34 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     empresaId: payload.empresa_id,
     conta
   });
-  const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
-  const movimentoIntercompanyFields = await validarIntercompanyBaixa({
-    payload,
-    titulo,
-    empresaBaixaId
-  });
-
-  const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
-  const novoEstado = calcularStatusTitulo({
-    valorOriginal: Number(titulo.valor_original || 0),
-    valorBaixado: novoValorBaixado
-  });
 
   const transaction = await sequelize.transaction();
   try {
+    const titulo = await carregarTituloParaBaixaComLock(req, tituloId, transaction);
+    const statusAtual = String(titulo.status || '').trim().toUpperCase();
+
+    if (!['ABERTO', 'PARCIAL'].includes(statusAtual)) {
+      throw createHttpError(400, 'Somente titulos em aberto ou parcial podem receber baixa.');
+    }
+
+    const saldoAtual = roundCurrency(titulo.valor_saldo);
+    if (valorBaixa > saldoAtual) {
+      throw createHttpError(400, 'Valor da baixa nao pode ser maior que o saldo do titulo.');
+    }
+
+    const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
+    const movimentoIntercompanyFields = await validarIntercompanyBaixa({
+      payload,
+      titulo,
+      empresaBaixaId
+    });
+
+    const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) + valorBaixa);
+    const novoEstado = calcularStatusTitulo({
+      valorOriginal: Number(titulo.valor_original || 0),
+      valorBaixado: novoValorBaixado
+    });
+
     const cartaoBaixa = await resolverCartaoBaixa({
       formaRecebimento,
       cartaoId: payload.cartao_id,
@@ -2985,6 +3068,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       empresa_id: empresaTituloId,
       cartao_id: cartaoBaixa.cartao?.id || titulo.cartao_id || null,
       fatura_cartao_id: cartaoBaixa.fatura?.id || titulo.fatura_cartao_id || null,
+      ...buildTituloIntercompanyUpdateFromBaixa(movimentoIntercompanyFields),
       valor_baixado: novoValorBaixado,
       valor_saldo: novoEstado.valor_saldo,
       status: novoEstado.status,

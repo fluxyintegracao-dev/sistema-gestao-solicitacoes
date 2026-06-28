@@ -14,6 +14,7 @@ const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
 const STATUS_TITULO = ['PREVISAO', 'ABERTO', 'PARCIAL', 'QUITADO', 'CANCELADO', 'ESTORNADO'];
 const STATUS_TITULO_INICIAL = ['PREVISAO', 'ABERTO'];
+const NATUREZAS_INTERCOMPANY_BAIXA = ['OPERACIONAL_TERCEIRO', 'TRANSFERENCIA_INTERNA', 'REEMBOLSO_COMPENSACAO'];
 const CAMPOS_INTERCOMPANY_TITULO = [
   'intercompany_group_id',
   'empresa_origem_id',
@@ -1402,6 +1403,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
       'data_emissao',
       'data_vencimento',
       'intercompany',
+      'natureza_intercompany_baixa',
       'tipo_intercompany',
       'motivo_intercompany',
       'elimina_consolidado',
@@ -1462,6 +1464,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao do cheque'),
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento do cheque'),
     intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    natureza_intercompany_baixa: parseEnum(body.natureza_intercompany_baixa, 'Natureza da baixa entre empresas', NATUREZAS_INTERCOMPANY_BAIXA),
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
@@ -1482,6 +1485,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
       'observacoes',
       'parcelas',
       'intercompany',
+      'natureza_intercompany_baixa',
       'tipo_intercompany',
       'motivo_intercompany',
       'elimina_consolidado',
@@ -1584,6 +1588,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     parcelas,
     intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    natureza_intercompany_baixa: parseEnum(body.natureza_intercompany_baixa, 'Natureza da baixa entre empresas', NATUREZAS_INTERCOMPANY_BAIXA),
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),
@@ -1600,6 +1605,7 @@ function validateFinanceTituloBaixaConciliacoesBody(body = {}) {
       'documento_referencia',
       'observacoes',
       'intercompany',
+      'natureza_intercompany_baixa',
       'tipo_intercompany',
       'motivo_intercompany',
       'elimina_consolidado',
@@ -1629,6 +1635,7 @@ function validateFinanceTituloBaixaConciliacoesBody(body = {}) {
     documento_referencia: parseOptionalText(body.documento_referencia, 'Documento de referencia', 120),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
+    natureza_intercompany_baixa: parseEnum(body.natureza_intercompany_baixa, 'Natureza da baixa entre empresas', NATUREZAS_INTERCOMPANY_BAIXA),
     tipo_intercompany: parseEnum(body.tipo_intercompany, 'Tipo', TIPOS_INTERCOMPANY),
     motivo_intercompany: parseOptionalText(body.motivo_intercompany, 'Motivo', 255),
     elimina_consolidado: parseBoolean(body.elimina_consolidado, 'Eliminar no consolidado'),

@@ -30,6 +30,54 @@ const TIPOS_INTERCOMPANY_LABEL = {
   IMPOSTO: 'Imposto',
   TRANSFERENCIA_OPERACIONAL: 'Transferencia operacional'
 };
+const NATUREZAS_INTERCOMPANY_BAIXA = [
+  {
+    value: 'OPERACIONAL_TERCEIRO',
+    label: 'Despesa/receita operacional paga por outra empresa',
+    description: 'Entra nos relatorios operacionais, DRE e custo da obra. Registra que outra empresa fez a baixa.',
+    tipo_intercompany: 'TRANSFERENCIA_OPERACIONAL',
+    elimina_consolidado: false,
+    transferencia_interna: false
+  },
+  {
+    value: 'TRANSFERENCIA_INTERNA',
+    label: 'Transferencia interna entre empresas',
+    description: 'Use para cobertura de caixa ou envio de recurso entre empresas. Nao entra na DRE consolidada.',
+    tipo_intercompany: 'COBERTURA_CAIXA',
+    elimina_consolidado: true,
+    transferencia_interna: true
+  },
+  {
+    value: 'REEMBOLSO_COMPENSACAO',
+    label: 'Reembolso ou compensacao entre empresas',
+    description: 'Use para acerto/reembolso interno. Mantem o rastro sem tratar como despesa operacional da obra.',
+    tipo_intercompany: 'REEMBOLSO',
+    elimina_consolidado: true,
+    transferencia_interna: false
+  }
+];
+
+function getNaturezaBaixaIntercompany(value) {
+  return NATUREZAS_INTERCOMPANY_BAIXA.find((item) => item.value === value) || NATUREZAS_INTERCOMPANY_BAIXA[0];
+}
+
+function inferNaturezaBaixaIntercompany(data = {}) {
+  const tipo = String(data.tipo_intercompany || '').toUpperCase();
+  if (tipo === 'REEMBOLSO') return 'REEMBOLSO_COMPENSACAO';
+  if (data.transferencia_interna !== false && data.elimina_consolidado !== false) return 'TRANSFERENCIA_INTERNA';
+  return 'OPERACIONAL_TERCEIRO';
+}
+
+function applyNaturezaBaixaIntercompany(form, naturezaValue) {
+  const natureza = getNaturezaBaixaIntercompany(naturezaValue);
+  return {
+    ...form,
+    natureza_intercompany_baixa: natureza.value,
+    tipo_intercompany: natureza.tipo_intercompany,
+    elimina_consolidado: natureza.elimina_consolidado,
+    transferencia_interna: natureza.transferencia_interna
+  };
+}
 
 function formatCurrency(value) {
   const number = Number(value || 0);
@@ -138,6 +186,7 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
       data_movimento: movimento?.data_movimento || today(),
       observacoes: movimento?.observacoes || '',
       intercompany: Boolean(movimento?.intercompany_group_id || movimento?.tipo_intercompany),
+      natureza_intercompany_baixa: inferNaturezaBaixaIntercompany(movimento),
       tipo_intercompany: movimento?.tipo_intercompany || '',
       motivo_intercompany: movimento?.motivo_intercompany || '',
       elimina_consolidado: movimento?.elimina_consolidado !== false,
@@ -172,10 +221,11 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
     data_movimento: today(),
     observacoes: '',
     intercompany: false,
+    natureza_intercompany_baixa: 'OPERACIONAL_TERCEIRO',
     tipo_intercompany: '',
     motivo_intercompany: '',
-    elimina_consolidado: true,
-    transferencia_interna: true
+    elimina_consolidado: false,
+    transferencia_interna: false
   };
 }
 
@@ -415,11 +465,11 @@ export default function FinanceiroTituloDetalhe() {
       return;
     }
     if (baixaEmpresaDiferente && !baixaForm.intercompany) {
-      setError('A empresa da baixa e diferente da empresa do titulo. Marque a baixa como Entre Empresas e informe o tipo.');
+      setError('A empresa da baixa e diferente da empresa do titulo. A baixa precisa ser marcada como Entre Empresas.');
       return;
     }
     if (baixaForm.intercompany && !baixaForm.tipo_intercompany) {
-      setError('Informe o tipo da baixa Entre Empresas.');
+      setError('Informe a natureza da baixa Entre Empresas.');
       return;
     }
     if (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) {
@@ -1165,13 +1215,19 @@ export default function FinanceiroTituloDetalhe() {
                     value={baixaForm.empresa_id}
                     onChange={(event) => {
                       const empresaSelecionada = event.target.value;
-                      setBaixaForm((current) => ({
-                        ...current,
-                        empresa_id: empresaSelecionada,
-                        conta_bancaria_id: '',
-                        cartao_id: '',
-                        intercompany: Boolean(empresaTituloId && empresaSelecionada && empresaSelecionada !== empresaTituloId) || current.intercompany
-                      }));
+                      setBaixaForm((current) => {
+                        const empresaDiferente = Boolean(empresaTituloId && empresaSelecionada && empresaSelecionada !== empresaTituloId);
+                        const base = {
+                          ...current,
+                          empresa_id: empresaSelecionada,
+                          conta_bancaria_id: '',
+                          cartao_id: '',
+                          intercompany: empresaDiferente || current.intercompany
+                        };
+                        return empresaDiferente
+                          ? applyNaturezaBaixaIntercompany(base, current.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO')
+                          : base;
+                      });
                     }}
                     required
                   >
@@ -1386,12 +1442,23 @@ export default function FinanceiroTituloDetalhe() {
                     className="mt-1"
                     checked={Boolean(baixaForm.intercompany)}
                     disabled={baixaEmpresaDiferente}
-                    onChange={(event) => setBaixaForm((current) => ({
-                      ...current,
-                      intercompany: event.target.checked,
-                      tipo_intercompany: event.target.checked ? current.tipo_intercompany : '',
-                      motivo_intercompany: event.target.checked ? current.motivo_intercompany : ''
-                    }))}
+                    onChange={(event) => setBaixaForm((current) => {
+                      if (event.target.checked) {
+                        return applyNaturezaBaixaIntercompany(
+                          { ...current, intercompany: true },
+                          current.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO'
+                        );
+                      }
+                      return {
+                        ...current,
+                        intercompany: false,
+                        natureza_intercompany_baixa: 'OPERACIONAL_TERCEIRO',
+                        tipo_intercompany: '',
+                        motivo_intercompany: '',
+                        elimina_consolidado: false,
+                        transferencia_interna: false
+                      };
+                    })}
                   />
                   <span>
                     <span className="block font-semibold">Baixa Entre Empresas</span>
@@ -1403,21 +1470,23 @@ export default function FinanceiroTituloDetalhe() {
 
                 {mostrarIntercompanyBaixa && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
-                    <label className="text-sm">
-                      <span className="mb-1 block text-slate-500">Tipo</span>
+                    <label className="text-sm md:col-span-2">
+                      <span className="mb-1 block text-slate-500">Natureza da baixa</span>
                       <select
                         className="input w-full"
-                        value={baixaForm.tipo_intercompany}
-                        onChange={(event) => setBaixaForm((current) => ({ ...current, tipo_intercompany: event.target.value }))}
+                        value={baixaForm.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO'}
+                        onChange={(event) => setBaixaForm((current) => applyNaturezaBaixaIntercompany(current, event.target.value))}
                         required={Boolean(baixaForm.intercompany)}
                       >
-                        <option value="">Selecione</option>
-                        {Object.entries(TIPOS_INTERCOMPANY_LABEL).map(([value, label]) => (
-                          <option key={value} value={value}>{label}</option>
+                        {NATUREZAS_INTERCOMPANY_BAIXA.map((item) => (
+                          <option key={item.value} value={item.value}>{item.label}</option>
                         ))}
                       </select>
+                      <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                        {getNaturezaBaixaIntercompany(baixaForm.natureza_intercompany_baixa).description}
+                      </span>
                     </label>
-                    <label className="text-sm">
+                    <label className="text-sm md:col-span-2">
                       <span className="mb-1 block text-slate-500">Motivo</span>
                       <input
                         className="input w-full"
@@ -1426,27 +1495,18 @@ export default function FinanceiroTituloDetalhe() {
                         placeholder="Ex.: pagamento feito pela tesouraria"
                       />
                     </label>
-                    <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
-                      <input
-                        type="checkbox"
-                        checked={baixaForm.elimina_consolidado !== false}
-                        onChange={(event) => setBaixaForm((current) => ({ ...current, elimina_consolidado: event.target.checked }))}
-                      />
-                      Eliminar relacao interna no consolidado
-                    </label>
-                    <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
-                      <input
-                        type="checkbox"
-                        checked={baixaForm.transferencia_interna !== false}
-                        onChange={(event) => setBaixaForm((current) => ({ ...current, transferencia_interna: event.target.checked }))}
-                      />
-                      Tratar como transferencia interna
-                    </label>
-                    {baixaEmpresaDiferente && (
-                      <div className="md:col-span-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-[var(--c-muted)]">
-                        O sistema registrara a relacao entre a empresa do titulo e a empresa da baixa de forma explicita.
+                    <div className="md:col-span-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-[var(--c-muted)]">
+                      <div className="font-semibold text-[var(--c-text)]">Impacto financeiro</div>
+                      <div>
+                        Tipo interno: {labelTipoIntercompany(baixaForm.tipo_intercompany)}.
+                        {baixaForm.elimina_consolidado === false
+                          ? ' Mantem o valor nos relatorios operacionais e na DRE.'
+                          : ' Elimina a relacao interna no consolidado.'}
+                        {baixaForm.transferencia_interna === true
+                          ? ' Sera tratado como transferencia interna.'
+                          : ' Nao sera tratado como transferencia interna.'}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )}
               </div>

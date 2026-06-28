@@ -16,7 +16,8 @@ const {
   SolicitacaoCompraItemManualApropriacao,
   SolicitacaoCompraRespostaItem,
   Unidade,
-  User
+  User,
+  sequelize
 } = require('../models');
 const { env } = require('../config/env');
 const {
@@ -421,42 +422,67 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     });
   }
 
-  await SolicitacaoCompraRespostaItem.update(
-    { deleted_at: new Date() },
-    { where: { solicitacao_compra_fornecedor_id: cotacaoFornecedor.id, deleted_at: null } }
-  );
-
-  if (respostasPreparadas.length) {
-    await SolicitacaoCompraRespostaItem.bulkCreate(respostasPreparadas);
-  }
-
-  await cotacaoFornecedor.update({
-    status: 'RESPONDIDO',
-    respondido_em: new Date(),
-    visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
-    valor_minimo_pedido: valorMinimoPedido,
-    condicao_pagamento: condicaoPagamento,
-    prazo_entrega: prazoEntrega,
-    observacao_resposta: observacaoResposta
-  });
-
   const usuarioInterno = options.usuario_interno || null;
-  await registrarLogSolicitacaoCompra({
-    solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
-    usuarioId: usuarioInterno?.id || null,
-    fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-    tipoAcao: usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR',
-    descricao: usuarioInterno
-      ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} preencheu a cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
-      : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`,
-    metadados: {
-      cotacao_fornecedor_id: cotacaoFornecedor.id,
-      quantidade_itens: respostasPreparadas.length,
-      origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
-      usuario_interno_id: usuarioInterno?.id || null,
-      usuario_interno_nome: usuarioInterno?.nome || null
+  const transaction = await sequelize.transaction();
+  try {
+    const cotacaoTravada = await SolicitacaoCompraFornecedor.findByPk(cotacaoFornecedor.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!cotacaoTravada) {
+      throw new Error('Cotacao nao encontrada.');
     }
-  });
+
+    if (normalizeText(cotacaoTravada.status) === 'RESPONDIDO' && !usuarioInterno) {
+      throw new Error('Esta cotacao ja foi respondida. Para alterar a resposta, fale com a equipe de compras.');
+    }
+
+    await SolicitacaoCompraRespostaItem.update(
+      { deleted_at: new Date() },
+      {
+        where: { solicitacao_compra_fornecedor_id: cotacaoFornecedor.id, deleted_at: null },
+        transaction
+      }
+    );
+
+    if (respostasPreparadas.length) {
+      await SolicitacaoCompraRespostaItem.bulkCreate(respostasPreparadas, { transaction });
+    }
+
+    await cotacaoTravada.update({
+      status: 'RESPONDIDO',
+      respondido_em: new Date(),
+      visualizado_em: cotacaoTravada.visualizado_em || new Date(),
+      valor_minimo_pedido: valorMinimoPedido,
+      condicao_pagamento: condicaoPagamento,
+      prazo_entrega: prazoEntrega,
+      observacao_resposta: observacaoResposta
+    }, { transaction });
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+      usuarioId: usuarioInterno?.id || null,
+      fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
+      tipoAcao: usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR',
+      descricao: usuarioInterno
+        ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} preencheu a cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+        : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`,
+      metadados: {
+        cotacao_fornecedor_id: cotacaoFornecedor.id,
+        quantidade_itens: respostasPreparadas.length,
+        origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
+        usuario_interno_id: usuarioInterno?.id || null,
+        usuario_interno_nome: usuarioInterno?.nome || null
+      },
+      transaction
+    });
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  }
 }
 
 async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo = 'ARQUIVO', options = {}) {
