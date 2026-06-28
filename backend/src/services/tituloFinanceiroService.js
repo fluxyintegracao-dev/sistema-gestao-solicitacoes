@@ -77,6 +77,33 @@ function normalizarStatusTituloInicial(status) {
   return STATUS_TITULO_INICIAL.includes(normalized) ? normalized : 'ABERTO';
 }
 
+function buildTituloCodigoSearchTerms(value) {
+  const term = String(value || '').trim();
+  if (!term) return [];
+
+  const terms = new Set([term]);
+  const digits = term.replace(/\D/g, '');
+
+  if (digits) {
+    const unpadded = String(Number(digits));
+    const normalizedDigits = unpadded === '0' ? digits.replace(/^0+/, '') || '0' : unpadded;
+    const padded = normalizedDigits.padStart(6, '0');
+
+    terms.add(normalizedDigits);
+    terms.add(padded);
+    terms.add(`TIT-${padded}`);
+    terms.add(`TIT-${normalizedDigits}`);
+  }
+
+  return Array.from(terms).filter(Boolean);
+}
+
+function buildTituloCodigoSearchConditions(value) {
+  return buildTituloCodigoSearchTerms(value).map((term) => ({
+    codigo: { [Op.like]: `%${term}%` }
+  }));
+}
+
 function addMonths(dateString, amount) {
   const date = new Date(`${dateString}T00:00:00`);
   if (Number.isNaN(date.getTime())) return dateString;
@@ -297,6 +324,17 @@ function normalizarTipoTitulo(value) {
 
 function normalizarFormaRecebimento(value) {
   return value ? String(value || '').trim().toUpperCase() : null;
+}
+
+function exigirFormaRecebimentoBaixa(value) {
+  const formaRecebimento = normalizarFormaRecebimento(value);
+  if (!formaRecebimento) {
+    throw createHttpError(
+      400,
+      'Forma de pagamento e obrigatoria para registrar a baixa do titulo.'
+    );
+  }
+  return formaRecebimento;
 }
 
 async function resolverCartaoBaixa({ formaRecebimento, cartaoId, conta, empresaBaixaId, dataMovimento, usuarioId, transaction }) {
@@ -999,15 +1037,15 @@ async function validarCategoriaFinanceira(categoriaId, tipoTitulo) {
 }
 
 function validarCategoriaDreTitulo(categoria, payload = {}) {
-  if (payload.considera_dre === false) {
-    return;
-  }
-
   if (!categoria) {
     throw createHttpError(
       400,
-      'Categoria financeira e obrigatoria para titulos considerados na DRE. Informe uma categoria classificada ou desmarque Considerar na DRE.'
+      'Categoria financeira e obrigatoria para todos os titulos financeiros. Informe a classificacao correta antes de salvar.'
     );
+  }
+
+  if (payload.considera_dre === false) {
+    return;
   }
 
   if (categoria.considera_dre === false) {
@@ -1027,7 +1065,10 @@ function validarCategoriaDreTitulo(categoria, payload = {}) {
 
 async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   if (!formaPagamentoId) {
-    return null;
+    throw createHttpError(
+      400,
+      'Forma de pagamento e obrigatoria para todos os titulos financeiros. Informe a forma correta antes de salvar.'
+    );
   }
 
   const forma = await FormaPagamentoFinanceira.findByPk(formaPagamentoId);
@@ -1829,7 +1870,10 @@ async function listarTitulos(req, filters = {}) {
     where.status = filters.status;
   }
   if (filters.codigo) {
-    where.codigo = { [Op.like]: `%${filters.codigo}%` };
+    where[Op.and] = [
+      ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+      { [Op.or]: buildTituloCodigoSearchConditions(filters.codigo) }
+    ];
   }
   if (filters.empresa_id) {
     where.empresa_id = Number(filters.empresa_id);
@@ -1873,7 +1917,7 @@ async function listarTitulos(req, filters = {}) {
   if (filters.q) {
     const term = String(filters.q).trim();
     where[Op.or] = [
-      { codigo: { [Op.like]: `%${term}%` } },
+      ...buildTituloCodigoSearchConditions(term),
       { descricao: { [Op.like]: `%${term}%` } },
       { numero_documento: { [Op.like]: `%${term}%` } },
       { '$parceiro.nome$': { [Op.like]: `%${term}%` } },
@@ -2729,7 +2773,7 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
     throw createHttpError(400, 'Valor final da quitacao deve ser maior que zero.');
   }
 
-  const formaRecebimento = normalizarFormaRecebimento(payload.forma_recebimento);
+  const formaRecebimento = exigirFormaRecebimentoBaixa(payload.forma_recebimento);
   const ownTransaction = !externalTransaction;
   const transaction = externalTransaction || await sequelize.transaction();
 
@@ -2966,7 +3010,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     throw createHttpError(400, 'Valor final da quitacao deve ser maior que zero.');
   }
 
-  const formaRecebimento = normalizarFormaRecebimento(payload.forma_recebimento);
+  const formaRecebimento = exigirFormaRecebimentoBaixa(payload.forma_recebimento);
   const conta = await validarContaBancaria(payload.conta_bancaria_id);
   const empresaBaixaId = await validarEmpresaBaixa({
     empresaId: payload.empresa_id,

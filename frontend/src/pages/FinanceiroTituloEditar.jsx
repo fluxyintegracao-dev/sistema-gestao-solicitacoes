@@ -653,6 +653,7 @@ export default function FinanceiroTituloEditar() {
         if (toCurrencyNumber(imposto.valor) <= 0) return 'Informe o valor dos impostos/descontos.';
       }
     }
+    if (!form.categoria_financeira_id) return 'Selecione a categoria financeira do titulo.';
     if (!form.competencia_data) return 'Informe a competencia DRE.';
     if (form.intercompany) {
       if (!form.empresa_origem_id) return 'Informe a empresa origem.';

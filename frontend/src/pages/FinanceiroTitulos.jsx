@@ -1351,7 +1351,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               className="input w-full input-sm"
               value={draftFilters.codigo}
               onChange={(event) => setFilter('codigo', event.target.value)}
-              placeholder="TIT-000001"
+              placeholder="TIT-000001 ou 399"
             />
           </label>
         );

@@ -452,6 +452,10 @@ export default function FinanceiroTituloDetalhe() {
       setError('Informe a empresa pagadora da baixa.');
       return;
     }
+    if (!baixaForm.forma_recebimento) {
+      setError(`Informe a ${baixaFormaLabel.toLowerCase()} da baixa.`);
+      return;
+    }
     if (baixaUsaCartao && !baixaForm.cartao_id) {
       setError('Informe o cartao utilizado na baixa.');
       return;
@@ -1637,6 +1641,7 @@ export default function FinanceiroTituloDetalhe() {
                   disabled={
                     savingBaixa ||
                     !baixaForm.empresa_id ||
+                    !baixaForm.forma_recebimento ||
                     (baixaUsaCartao && !baixaForm.cartao_id) ||
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
                     (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||

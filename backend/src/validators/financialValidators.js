@@ -240,7 +240,7 @@ function parsePagamentosTitulo(value) {
       codigo_barras: parseOptionalText(item?.codigo_barras, `Codigo de barras do pagamento ${index + 1}`, 255),
       observacoes: parseOptionalText(item?.observacoes, `Observacoes do pagamento ${index + 1}`, 1000),
       parceiro_id: parseInteger(item?.parceiro_id, `Parceiro do pagamento ${index + 1}`),
-      forma_pagamento_id: parseInteger(item?.forma_pagamento_id, `Forma de pagamento ${index + 1}`),
+      forma_pagamento_id: parseInteger(item?.forma_pagamento_id, `Forma de pagamento ${index + 1}`, { required: true }),
       cartao_id: parseInteger(item?.cartao_id, `Cartao ${index + 1}`),
       quantidade_parcelas: parseInteger(item?.quantidade_parcelas, `Quantidade de parcelas ${index + 1}`),
       data_compra: parseDateOnly(item?.data_compra, `Data da compra ${index + 1}`),
@@ -987,7 +987,8 @@ function validateFinanceConciliacaoCriarTituloBody(body = {}) {
   const formaRecebimento = parseEnum(
     body.forma_recebimento,
     'Forma de recebimento',
-    COMERCIAL_FORMA_RECEBIMENTO
+    COMERCIAL_FORMA_RECEBIMENTO,
+    { required: true }
   );
 
   return {
@@ -999,7 +1000,7 @@ function validateFinanceConciliacaoCriarTituloBody(body = {}) {
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
     empresa_id: parseInteger(body.empresa_id, 'Empresa pagadora', { required: true }),
-    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     competencia_data: parseDateOnly(body.competencia_data, 'Data de competencia', { required: true }),
@@ -1127,7 +1128,7 @@ function validateFinanceTituloCreateFromSolicitacaoBody(body = {}) {
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255),
-    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
@@ -1219,7 +1220,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento'),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
-    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
@@ -1305,7 +1306,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento', { required: true }),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao'),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255, { required: true }),
-    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
+    categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     numero_documento: parseOptionalText(body.numero_documento, 'Numero do documento', 120),
     forma_cobranca: parseEnum(body.forma_cobranca, 'Forma de cobranca', FORMAS_COBRANCA),
@@ -1415,7 +1416,8 @@ function validateFinanceTituloBaixaBody(body = {}) {
   const formaRecebimento = parseEnum(
     body.forma_recebimento,
     'Forma de recebimento',
-    COMERCIAL_FORMA_RECEBIMENTO
+    COMERCIAL_FORMA_RECEBIMENTO,
+    { required: true }
   );
 
   const contaBancariaId = parseInteger(body.conta_bancaria_id, 'Conta bancaria');
@@ -1509,7 +1511,8 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
   const formaRecebimento = parseEnum(
     body.forma_recebimento,
     'Forma de recebimento',
-    COMERCIAL_FORMA_RECEBIMENTO
+    COMERCIAL_FORMA_RECEBIMENTO,
+    { required: true }
   );
 
   if (!['CHEQUE', 'CARTAO'].includes(formaRecebimento)) {
@@ -1628,9 +1631,10 @@ function validateFinanceTituloBaixaConciliacoesBody(body = {}) {
   return {
     conciliacao_ids: conciliacaoIds,
     forma_recebimento: parseEnum(
-      body.forma_recebimento || 'TRANSFERENCIA',
+      body.forma_recebimento,
       'Forma de recebimento',
-      COMERCIAL_FORMA_RECEBIMENTO
+      COMERCIAL_FORMA_RECEBIMENTO,
+      { required: true }
     ),
     documento_referencia: parseOptionalText(body.documento_referencia, 'Documento de referencia', 120),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),

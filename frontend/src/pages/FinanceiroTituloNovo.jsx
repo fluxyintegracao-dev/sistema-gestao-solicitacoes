@@ -1040,6 +1040,10 @@ export default function FinanceiroTituloNovo() {
       return 'Informe o valor total do titulo.';
     }
 
+    if (!form.categoria_financeira_id) {
+      return 'Selecione a categoria financeira do titulo.';
+    }
+
     if (!form.competencia_data) {
       return 'Informe a competencia DRE real do titulo.';
     }
@@ -1055,6 +1059,10 @@ export default function FinanceiroTituloNovo() {
       const usaCartao = isFormaCartao(forma);
       const valorPagamento = getValorPagamento(pagamento);
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (!pagamento.forma_pagamento_id) {
+        return `Selecione a ${labelForma}.`;
+      }
 
       if (pagamentos.length > 1 && !pagamento.parceiro_id) {
         return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} da ${labelForma}.`;

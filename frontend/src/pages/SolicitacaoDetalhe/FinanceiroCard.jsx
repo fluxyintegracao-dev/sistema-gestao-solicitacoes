@@ -1038,6 +1038,10 @@ export default function FinanceiroCard({
       return `Selecione o ${parceiroRoleLabel} antes de gerar a conta.`;
     }
 
+    if (!form.categoria_financeira_id) {
+      return 'Selecione a categoria financeira do titulo.';
+    }
+
     if (!form.competencia_data) {
       return 'Informe a competencia DRE real do titulo.';
     }
@@ -1057,6 +1061,10 @@ export default function FinanceiroCard({
       const usaCartao = isFormaCartao(forma);
       const valorPagamento = getValorPagamento(pagamento);
       const labelForma = `forma de pagamento ${pagamentoIndex + 1}`;
+
+      if (!pagamento.forma_pagamento_id) {
+        return `Selecione a ${labelForma}.`;
+      }
 
       if (geracaoMultiplaTitulos && !pagamento.parceiro_id) {
         return `Selecione o ${parceiroRoleLabel} do titulo ${pagamentoIndex + 1}.`;

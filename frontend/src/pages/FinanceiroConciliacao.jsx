@@ -521,6 +521,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     if (!form.empresa_id) { setErro('A conta bancaria precisa estar vinculada a uma empresa pagadora.'); return; }
     if (!form.obra_id) { setErro('Selecione a obra.'); return; }
     if (!form.parceiro_id) { setErro('Selecione um parceiro (obrigatório).'); return; }
+    if (!form.categoria_financeira_id) { setErro('Selecione a categoria financeira do titulo.'); return; }
     if (!form.competencia_data) { setErro('Informe a competencia DRE real do titulo.'); return; }
     if (form.considera_dre && !categoriaClassificadaDre) { setErro('Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.'); return; }
 
@@ -993,6 +994,10 @@ function BaixaExtratosTituloModal({ itens, onClose, onConfirmar }) {
     }
     if (!tituloId) {
       setError('Selecione o titulo financeiro que recebera as baixas.');
+      return;
+    }
+    if (!formaRecebimento) {
+      setError('Selecione a forma de pagamento/recebimento da baixa.');
       return;
     }
     if (entreEmpresas && !tipoIntercompany) {

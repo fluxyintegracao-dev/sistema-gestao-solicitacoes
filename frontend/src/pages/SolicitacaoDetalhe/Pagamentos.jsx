@@ -177,6 +177,10 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
       alert('Selecione a conta bancaria usada no pagamento.');
       return;
     }
+    if (!formaRecebimento) {
+      alert(`Selecione a ${formaBaixaLabel.toLowerCase()} usada na baixa.`);
+      return;
+    }
     if (!dataPagamento) {
       alert('Informe a data do pagamento.');
       return;
@@ -395,7 +399,7 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
 
             <div className="flex justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
               <button type="button" className="btn btn-outline" onClick={() => setModalBaixaAberto(false)}>Cancelar</button>
-              <button type="button" className="btn btn-primary" onClick={salvarBaixasTitulos} disabled={loading}>
+              <button type="button" className="btn btn-primary" onClick={salvarBaixasTitulos} disabled={loading || !formaRecebimento}>
                 {loading ? 'Salvando...' : 'Registrar baixa'}
               </button>
             </div>
