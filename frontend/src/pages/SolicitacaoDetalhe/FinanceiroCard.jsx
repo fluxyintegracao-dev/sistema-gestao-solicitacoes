@@ -1038,9 +1038,7 @@ export default function FinanceiroCard({
       return `Selecione o ${parceiroRoleLabel} antes de gerar a conta.`;
     }
 
-    const categoriaEntraDre = isCategoriaClassificadaParaDre(selectedCategory);
-
-    if (categoriaEntraDre && !form.competencia_data) {
+    if (!form.competencia_data) {
       return 'Informe a competencia DRE real do titulo.';
     }
 

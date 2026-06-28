@@ -521,7 +521,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
     if (!form.empresa_id) { setErro('A conta bancaria precisa estar vinculada a uma empresa pagadora.'); return; }
     if (!form.obra_id) { setErro('Selecione a obra.'); return; }
     if (!form.parceiro_id) { setErro('Selecione um parceiro (obrigatório).'); return; }
-    if (form.considera_dre && !form.competencia_data) { setErro('Informe a competencia DRE real do titulo.'); return; }
+    if (!form.competencia_data) { setErro('Informe a competencia DRE real do titulo.'); return; }
     if (form.considera_dre && !categoriaClassificadaDre) { setErro('Para considerar na DRE, selecione uma categoria financeira com grupo DRE classificado.'); return; }
 
     try {

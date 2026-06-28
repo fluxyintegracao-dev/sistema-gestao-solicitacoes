@@ -653,9 +653,7 @@ export default function FinanceiroTituloEditar() {
         if (toCurrencyNumber(imposto.valor) <= 0) return 'Informe o valor dos impostos/descontos.';
       }
     }
-    if (categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()) {
-      if (!form.competencia_data) return 'Informe a competencia DRE.';
-    }
+    if (!form.competencia_data) return 'Informe a competencia DRE.';
     if (form.intercompany) {
       if (!form.empresa_origem_id) return 'Informe a empresa origem.';
       if (!form.empresa_destino_id) return 'Informe a empresa destino.';
@@ -688,9 +686,7 @@ export default function FinanceiroTituloEditar() {
         observacoes: form.observacoes || null,
         data_emissao: form.data_emissao || null,
         considera_dre: Boolean(categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()),
-        competencia_data: categoriaSelecionada && categoriaSelecionada.considera_dre !== false && String(categoriaSelecionada.dre_grupo || '').trim()
-          ? form.competencia_data
-          : null,
+        competencia_data: form.competencia_data,
         forma_cobranca: form.tipo === 'RECEBER' ? form.forma_cobranca || null : null,
         status_cobranca: form.tipo === 'RECEBER' && form.forma_cobranca ? form.status_cobranca : null,
         banco_cobranca: form.banco_cobranca || null,

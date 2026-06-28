@@ -1357,10 +1357,10 @@ async function resolverEmpresaTituloParaBaixa(titulo = {}) {
 
 function resolverCompetenciaTitulo(payload = {}) {
   const competenciaData = payload.competencia_data || null;
-  if (payload.considera_dre !== false && !competenciaData) {
+  if (!competenciaData) {
     throw createHttpError(
       400,
-      'Competencia DRE e obrigatoria para titulos considerados na DRE. Informe a competencia economica real ou desmarque Considerar na DRE.'
+      'Competencia DRE e obrigatoria para todos os titulos financeiros. Informe a competencia economica real do lancamento.'
     );
   }
 

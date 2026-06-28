@@ -1028,8 +1028,6 @@ export default function FinanceiroTituloNovo() {
   }
 
   function validarCadastroTitulo() {
-    const categoriaEntraDre = isCategoriaClassificadaParaDre(categoriaSelecionada);
-
     if (!form.empresa_id) {
       return 'Selecione uma obra/centro de custo com empresa vinculada.';
     }
@@ -1042,7 +1040,7 @@ export default function FinanceiroTituloNovo() {
       return 'Informe o valor total do titulo.';
     }
 
-    if (categoriaEntraDre && !form.competencia_data) {
+    if (!form.competencia_data) {
       return 'Informe a competencia DRE real do titulo.';
     }
 
