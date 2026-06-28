@@ -3225,7 +3225,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
     conta
   });
 
-  const titulos = [];
+  let titulos = [];
   for (const tituloId of tituloIds) {
     const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
     const statusAtual = String(titulo.status || '').trim().toUpperCase();
@@ -3240,7 +3240,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
     titulos.push(titulo);
   }
 
-  const tipoTitulo = String(titulos[0]?.tipo || '').toUpperCase();
+  let tipoTitulo = String(titulos[0]?.tipo || '').toUpperCase();
   if (!['PAGAR', 'RECEBER'].includes(tipoTitulo)) {
     throw createHttpError(400, 'Tipo dos titulos selecionados invalido para baixa parcelada.');
   }
@@ -3254,7 +3254,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
     throw createHttpError(400, 'Informe as parcelas da baixa agrupada.');
   }
 
-  const totalTitulos = somarValores(titulos.map((titulo) => Number(titulo.valor_saldo || 0)));
+  let totalTitulos = somarValores(titulos.map((titulo) => Number(titulo.valor_saldo || 0)));
   const totalParcelas = somarValores(parcelas.map((parcela) => Number(parcela.valor || 0)));
   assertValoresIguais({
     atual: totalParcelas,
@@ -3263,8 +3263,8 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
   });
 
   const grupoParcelamentoId = `BAIXA-${crypto.randomUUID()}`;
-  const referenciaTitulo = titulos[0];
-  const codigosOriginais = titulos.map((titulo) => titulo.codigo || `#${titulo.id}`).join(', ');
+  let referenciaTitulo = titulos[0];
+  let codigosOriginais = titulos.map((titulo) => titulo.codigo || `#${titulo.id}`).join(', ');
   const transaction = await sequelize.transaction();
   let transactionCommitted = false;
 
@@ -3276,11 +3276,47 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
       transaction
     });
 
+    const titulosBloqueados = [];
+    for (const tituloId of tituloIds) {
+      const titulo = await carregarTituloParaBaixaComLock(req, tituloId, transaction);
+      const statusAtual = String(titulo.status || '').trim().toUpperCase();
+      if (!['ABERTO', 'PARCIAL'].includes(statusAtual)) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao esta aberto ou parcial.`);
+      }
+      const saldo = roundCurrency(titulo.valor_saldo);
+      if (saldo <= 0) {
+        throw createHttpError(400, `Titulo ${titulo.codigo || titulo.id} nao possui saldo em aberto.`);
+      }
+      await resolverEmpresaTituloParaBaixa(titulo);
+      titulosBloqueados.push(titulo);
+    }
+
+    tipoTitulo = String(titulosBloqueados[0]?.tipo || '').toUpperCase();
+    if (!['PAGAR', 'RECEBER'].includes(tipoTitulo)) {
+      throw createHttpError(400, 'Tipo dos titulos selecionados invalido para baixa parcelada.');
+    }
+    const tituloTipoDiferenteBloqueado = titulosBloqueados.find((titulo) => String(titulo.tipo || '').toUpperCase() !== tipoTitulo);
+    if (tituloTipoDiferenteBloqueado) {
+      throw createHttpError(400, 'Selecione apenas titulos do mesmo tipo para baixa agrupada.');
+    }
+
+    totalTitulos = somarValores(titulosBloqueados.map((titulo) => Number(titulo.valor_saldo || 0)));
+    assertValoresIguais({
+      atual: totalParcelas,
+      esperado: totalTitulos,
+      mensagem: 'A soma das parcelas precisa ser igual ao saldo total dos titulos selecionados.'
+    });
+
+    titulos = titulosBloqueados;
+    referenciaTitulo = titulos[0];
+    codigosOriginais = titulos.map((titulo) => titulo.codigo || `#${titulo.id}`).join(', ');
+
     const movimentosOriginais = [];
     for (const titulo of titulos) {
       const saldo = roundCurrency(titulo.valor_saldo);
+      const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
       const movimentoIntercompanyFields = await validarIntercompanyBaixa({
-        payload: Number(titulo.empresa_id) === Number(empresaBaixaId)
+        payload: Number(empresaTituloId) === Number(empresaBaixaId)
           ? { ...payload, intercompany: false }
           : payload,
         titulo,
@@ -3310,7 +3346,8 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
       movimentosOriginais.push(movimentoOriginal);
 
       await titulo.update({
-        empresa_id: Number(titulo.empresa_id),
+        empresa_id: Number(empresaTituloId),
+        ...buildTituloIntercompanyUpdateFromBaixa(movimentoIntercompanyFields),
         valor_baixado: roundCurrency(Number(titulo.valor_baixado || 0) + saldo),
         valor_saldo: 0,
         status: 'QUITADO',
