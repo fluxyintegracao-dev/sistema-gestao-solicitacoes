@@ -109,6 +109,14 @@ function parceiroMatchesSearch(parceiro, termo) {
   return haystack.includes(search);
 }
 
+function getCategoriaDreResumo(categoria) {
+  if (!categoria) return 'Sem categoria financeira';
+  if (categoria.considera_dre === false) return 'Categoria fora da DRE';
+  const grupo = categoria.dre_grupo || 'Grupo DRE nao classificado';
+  const subgrupo = categoria.dre_subgrupo ? ` / ${categoria.dre_subgrupo}` : '';
+  return `${grupo}${subgrupo}`;
+}
+
 function SearchIcon() {
   return (
     <svg
@@ -253,6 +261,9 @@ export default function FinanceiroTituloEditar() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [parceiroBusca, setParceiroBusca] = useState('');
+  const [categoriaBusca, setCategoriaBusca] = useState('');
+  const [categoriaModalOpen, setCategoriaModalOpen] = useState(false);
+  const [categoriaModalBusca, setCategoriaModalBusca] = useState('');
   const [parceiroModalOpen, setParceiroModalOpen] = useState(false);
   const [parceiroModalNomeBusca, setParceiroModalNomeBusca] = useState('');
   const [parceiroModalDocumentoBusca, setParceiroModalDocumentoBusca] = useState('');
@@ -292,6 +303,7 @@ export default function FinanceiroTituloEditar() {
         setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
         setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
         setParceiroBusca(tituloData?.parceiro?.nome || '');
+        setCategoriaBusca(tituloData?.categoriaFinanceira?.nome || '');
       } catch (err) {
         if (active) setError(err?.message || 'Erro ao carregar titulo financeiro');
       } finally {
@@ -365,6 +377,42 @@ export default function FinanceiroTituloEditar() {
     () => categorias.filter((categoria) => categoriaCompativel(categoria, form?.tipo)),
     [categorias, form?.tipo]
   );
+  const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
+  const categoriasAutocomplete = useMemo(() => {
+    const termos = normalizarBusca(categoriaBusca).split(/\s+/).filter(Boolean);
+    if (!termos.length || form?.categoria_financeira_id) return [];
+
+    return categoriasFiltradas
+      .filter((categoria) => {
+        const texto = normalizarBusca([
+          categoria.nome,
+          categoria.descricao,
+          categoria.tipo,
+          categoria.dre_grupo,
+          categoria.dre_subgrupo,
+          categoria.classificacao_gerencial
+        ].filter(Boolean).join(' '));
+        return termos.every((termo) => texto.includes(termo));
+      })
+      .slice(0, 8);
+  }, [categoriaBusca, categoriasFiltradas, form?.categoria_financeira_id]);
+  const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form?.categoria_financeira_id && !bloqueio;
+  const categoriasModalFiltradas = useMemo(() => {
+    const termos = normalizarBusca(categoriaModalBusca).split(/\s+/).filter(Boolean);
+    if (!termos.length) return categoriasFiltradas;
+
+    return categoriasFiltradas.filter((categoria) => {
+      const texto = normalizarBusca([
+        categoria.nome,
+        categoria.descricao,
+        categoria.tipo,
+        categoria.dre_grupo,
+        categoria.dre_subgrupo,
+        categoria.classificacao_gerencial
+      ].filter(Boolean).join(' '));
+      return termos.every((termo) => texto.includes(termo));
+    });
+  }, [categoriaModalBusca, categoriasFiltradas]);
   const parceirosAutocomplete = useMemo(
     () => parceiros.filter((parceiro) => parceiroMatchesSearch(parceiro, parceiroBusca)).slice(0, 8),
     [parceiros, parceiroBusca]
@@ -379,7 +427,6 @@ export default function FinanceiroTituloEditar() {
     () => categorias.find((categoria) => String(categoria.id) === String(form?.categoria_financeira_id)) || null,
     [categorias, form?.categoria_financeira_id]
   );
-  const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
   const parceiroSelecionado = useMemo(
     () => parceiros.find((item) => String(item.id) === String(form?.parceiro_id)) || null,
     [form?.parceiro_id, parceiros]
@@ -489,6 +536,7 @@ export default function FinanceiroTituloEditar() {
       if (field === 'tipo') {
         next.parceiro_id = '';
         next.categoria_financeira_id = '';
+        setCategoriaBusca('');
         next.forma_cobranca = value === 'RECEBER' ? next.forma_cobranca : '';
       }
       if (field === 'intercompany' && !value) {
@@ -583,6 +631,12 @@ export default function FinanceiroTituloEditar() {
       };
     });
     setParceiroModalOpen(false);
+  }
+
+  function selecionarCategoriaFinanceira(categoria) {
+    setCategoriaBusca(categoria?.nome || '');
+    updateField('categoria_financeira_id', categoria?.id ? String(categoria.id) : '');
+    setCategoriaModalOpen(false);
   }
 
   function preencherFavorecidoComParceiro(parceiro) {
@@ -871,14 +925,75 @@ export default function FinanceiroTituloEditar() {
 
           <label className="form-field xl:col-span-2">
             <span>Categoria financeira</span>
-            <select value={form.categoria_financeira_id} onChange={(event) => updateField('categoria_financeira_id', event.target.value)} disabled={Boolean(bloqueio)}>
-              <option value="">Selecione</option>
-              {categoriasFiltradas.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nome}{categoria.dre_grupo ? ` - ${categoria.dre_grupo}` : ''}
-                </option>
-              ))}
-            </select>
+            <div className="relative space-y-2">
+              <div className="flex gap-2">
+                <input
+                  value={categoriaBusca}
+                  onChange={(event) => {
+                    setCategoriaBusca(event.target.value);
+                    updateField('categoria_financeira_id', '');
+                  }}
+                  placeholder="Digite para buscar a categoria"
+                  disabled={Boolean(bloqueio)}
+                  required={!form.categoria_financeira_id}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline shrink-0 px-3"
+                  title="Pesquisar categorias"
+                  aria-label="Pesquisar categorias financeiras"
+                  onClick={() => {
+                    setCategoriaModalBusca('');
+                    setCategoriaModalOpen(true);
+                  }}
+                  disabled={Boolean(bloqueio)}
+                >
+                  <SearchIcon />
+                </button>
+                {categoriaSelecionada && !bloqueio && (
+                  <button
+                    type="button"
+                    className="btn btn-outline shrink-0"
+                    onClick={() => {
+                      setCategoriaBusca('');
+                      updateField('categoria_financeira_id', '');
+                    }}
+                  >
+                    Limpar
+                  </button>
+                )}
+              </div>
+              <input type="hidden" value={form.categoria_financeira_id} required />
+              {categoriaSelecionada && (
+                <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                  Selecionada: <span className="font-semibold text-[var(--c-text)]">{categoriaSelecionada.nome}</span>
+                </div>
+              )}
+              {mostrarListaCategorias && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                  {categoriasAutocomplete.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
+                      Nenhuma categoria encontrada.
+                    </div>
+                  ) : categoriasAutocomplete.map((categoria) => (
+                    <button
+                      key={categoria.id}
+                      type="button"
+                      className="w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface-muted)]"
+                      onClick={() => selecionarCategoriaFinanceira(categoria)}
+                    >
+                      <span className="block font-medium text-[var(--c-text)]">{categoria.nome}</span>
+                      <span className="block text-xs text-[var(--c-muted)]">{getCategoriaDreResumo(categoria)}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <small className="text-xs text-[var(--c-muted)]">
+              {categoriaSelecionada
+                ? getCategoriaDreResumo(categoriaSelecionada)
+                : 'A categoria financeira define se o titulo entra na DRE.'}
+            </small>
           </label>
 
           <label className="form-field">
@@ -1318,6 +1433,74 @@ export default function FinanceiroTituloEditar() {
           </button>
         </div>
       </form>
+
+      {categoriaModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
+          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Veja categorias compativeis com o tipo do titulo ou filtre por nome, grupo e descricao.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="rounded-lg px-3 py-1.5 text-sm font-semibold text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                onClick={() => setCategoriaModalOpen(false)}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 p-5">
+              <input
+                className="input w-full"
+                placeholder="Filtrar categoria por nome, grupo, subgrupo ou descricao"
+                value={categoriaModalBusca}
+                onChange={(event) => setCategoriaModalBusca(event.target.value)}
+                autoFocus
+              />
+
+              <div className="text-xs text-[var(--c-muted)]">
+                {categoriasModalFiltradas.length} categoria(s) disponivel(is) para {form.tipo === 'RECEBER' ? 'conta a receber' : 'conta a pagar'}.
+              </div>
+
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-2">
+                {categoriasModalFiltradas.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
+                    Nenhuma categoria encontrada para esse filtro.
+                  </div>
+                ) : categoriasModalFiltradas.map((categoria) => (
+                  <button
+                    key={categoria.id}
+                    type="button"
+                    className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+                      String(form.categoria_financeira_id) === String(categoria.id)
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-transparent hover:border-[var(--c-border)] hover:bg-[var(--c-surface)]'
+                    }`}
+                    onClick={() => selecionarCategoriaFinanceira(categoria)}
+                  >
+                    <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="font-semibold text-[var(--c-text)]">{categoria.nome}</div>
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
+                        </div>
+                        <div className="text-xs text-[var(--c-muted)]">{getCategoriaDreResumo(categoria)}</div>
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                        #{categoria.id}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {parceiroModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
