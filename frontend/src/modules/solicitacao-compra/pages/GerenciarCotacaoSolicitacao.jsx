@@ -4,7 +4,8 @@ import {
   HiOutlineArrowTopRightOnSquare,
   HiOutlineArrowDownTray,
   HiOutlineChatBubbleLeftRight,
-  HiOutlineClipboardDocument
+  HiOutlineClipboardDocument,
+  HiOutlineArrowPath
 } from 'react-icons/hi2';
 import {
   baixarPdfSolicitacaoCompra,
@@ -17,7 +18,8 @@ import {
   obterSolicitacaoCompra,
   obterUrlAssinadaCompra,
   obterUrlPdfCotacaoPublica,
-  recusarSolicitacaoCompra
+  recusarSolicitacaoCompra,
+  reabrirCotacaoCompra
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -66,6 +68,8 @@ function clsStatus(status) {
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
   if (v === 'RECUSADO') return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
+  if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
+  if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
 
@@ -79,7 +83,7 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'email', width: 250, minWidth: 160 },
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 150, minWidth: 136 }
+  { key: 'acoes', width: 190, minWidth: 170 }
 ];
 
 function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
@@ -1205,6 +1209,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [baixando, setBaixando] = useState(false);
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
+  const [reabrindoCotacaoId, setReabrindoCotacaoId] = useState(null);
   const [encerrando, setEncerrando] = useState(false);
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
@@ -1474,6 +1479,25 @@ export default function GerenciarCotacaoSolicitacao() {
       alert(error.message || 'Erro ao enviar para fornecedores');
     } finally {
       setEnviandoFornecedores(false);
+    }
+  }
+
+  async function handleReabrirCotacao(cotacaoFornecedor) {
+    const fornecedorNome = cotacaoFornecedor?.fornecedor?.nome || 'fornecedor';
+    const motivo = window.prompt(`Informe o motivo para reabrir a cotacao de ${fornecedorNome}:`);
+    if (motivo === null) return;
+
+    try {
+      setReabrindoCotacaoId(cotacaoFornecedor.id);
+      await reabrirCotacaoCompra(cotacaoFornecedor.id, { motivo });
+      await carregar();
+      await carregarComparativo();
+      alert('Cotacao reaberta. O fornecedor pode responder novamente pelo mesmo link.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao reabrir cotacao');
+    } finally {
+      setReabrindoCotacaoId(null);
     }
   }
 
@@ -1844,6 +1868,9 @@ export default function GerenciarCotacaoSolicitacao() {
                         const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
                         const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
+                        const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
+                        const podeReabrirCotacao = ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
+                          && String(solicitacao.status || '').toUpperCase() !== 'ENCERRADO';
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                           ? whatsappLink(
                               cotacaoFornecedor.fornecedor.whatsapp,
@@ -1886,7 +1913,7 @@ export default function GerenciarCotacaoSolicitacao() {
                             </span>
                           </td>
                           <td className="whitespace-nowrap align-middle">
-                            <span className="app-status-pill bg-slate-100 px-2 py-1 text-[10px] text-slate-700">
+                            <span className={`${clsStatus(cotacaoFornecedor.status)} px-2 py-1 text-[10px]`}>
                               {fmtStatus(cotacaoFornecedor.status)}
                             </span>
                           </td>
@@ -1936,6 +1963,15 @@ export default function GerenciarCotacaoSolicitacao() {
                                   <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
                                 </CotacaoActionButton>
                               )}
+                              <CotacaoActionButton
+                                type="button"
+                                onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
+                                disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
+                                title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
+                                aria-label="Reabrir cotacao"
+                              >
+                                <HiOutlineArrowPath className={`h-3.5 w-3.5 ${reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : ''}`} />
+                              </CotacaoActionButton>
                             </div>
                           </td>
                           </tr>

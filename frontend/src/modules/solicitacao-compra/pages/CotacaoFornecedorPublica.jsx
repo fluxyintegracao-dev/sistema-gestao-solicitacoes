@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import {
   obterCotacaoPublica,
   responderCotacaoPublica,
+  salvarRascunhoCotacaoPublica,
   uploadPlanilhaCotacaoPublica
 } from '../../../services/compras';
 
@@ -175,6 +176,7 @@ export default function CotacaoFornecedorPublica() {
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [salvandoRascunho, setSalvandoRascunho] = useState(false);
   const [enviandoPlanilha, setEnviandoPlanilha] = useState(false);
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
   const [condicoesPagamento, setCondicoesPagamento] = useState(() => criarCondicoesPagamentoVazias());
@@ -248,11 +250,7 @@ export default function CotacaoFornecedorPublica() {
     return true;
   }
 
-  async function handleSalvarOnline() {
-    if (!validarCabecalhoResposta()) {
-      return;
-    }
-
+  function montarPayloadResposta({ finalizar = false } = {}) {
     const normalizarNumeroResposta = (value) => {
       if (value === '' || value === null || value === undefined) return null;
       const raw = String(value).trim();
@@ -265,7 +263,7 @@ export default function CotacaoFornecedorPublica() {
       const preco = normalizarNumeroResposta(item.preco);
       const quantidadeMinima = normalizarNumeroResposta(item.quantidade_minima_item);
       const deveMarcarIndisponivel =
-        statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0 || quantidadeMinima === null);
+        finalizar && statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0 || quantidadeMinima === null);
       const statusEfetivo = deveMarcarIndisponivel ? 'NAO_TEM' : statusDisp;
 
       return {
@@ -281,15 +279,37 @@ export default function CotacaoFornecedorPublica() {
       };
     });
 
+    return {
+      itens: itensPayload,
+      valor_minimo_pedido: valorMinimoPedido,
+      condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
+      prazo_entrega: prazoEntrega,
+      observacao_resposta: observacaoResposta
+    };
+  }
+
+  async function handleSalvarRascunho() {
+    try {
+      setSalvandoRascunho(true);
+      await salvarRascunhoCotacaoPublica(token, montarPayloadResposta({ finalizar: false }));
+      await carregar();
+      alert('Rascunho salvo com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao salvar rascunho');
+    } finally {
+      setSalvandoRascunho(false);
+    }
+  }
+
+  async function handleSalvarOnline() {
+    if (!validarCabecalhoResposta()) {
+      return;
+    }
+
     try {
       setSalvando(true);
-      await responderCotacaoPublica(token, {
-        itens: itensPayload,
-        valor_minimo_pedido: valorMinimoPedido,
-        condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
-        prazo_entrega: prazoEntrega,
-        observacao_resposta: observacaoResposta
-      });
+      await responderCotacaoPublica(token, montarPayloadResposta({ finalizar: true }));
       await carregar();
       alert('Resposta enviada com sucesso.');
     } catch (error) {
@@ -509,15 +529,26 @@ export default function CotacaoFornecedorPublica() {
             </label>
             <span className="text-[10px] text-[var(--sol-text-soft)]">PDF ou imagem</span>
             {!dados.somente_leitura && (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm text-xs h-7 px-3 ml-auto"
-                onClick={handleSalvarOnline}
-                disabled={salvando || respostaFinalizada}
-                title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
-              >
-                {respostaFinalizada ? 'Resposta enviada' : salvando ? 'Enviando...' : 'Enviar resposta'}
-              </button>
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm text-xs h-7 px-3 ml-auto"
+                  onClick={handleSalvarRascunho}
+                  disabled={salvandoRascunho || salvando || respostaFinalizada}
+                  title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
+                >
+                  {salvandoRascunho ? 'Salvando...' : 'Salvar rascunho'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm text-xs h-7 px-3"
+                  onClick={handleSalvarOnline}
+                  disabled={salvando || salvandoRascunho || respostaFinalizada}
+                  title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
+                >
+                  {respostaFinalizada ? 'Resposta enviada' : salvando ? 'Enviando...' : 'Enviar resposta'}
+                </button>
+              </>
             )}
           </div>
         </div>

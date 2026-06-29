@@ -725,6 +725,24 @@ export async function responderCotacaoPublica(token, data) {
   return handleJsonResponse(response, 'Erro ao enviar resposta da cotacao');
 }
 
+export async function salvarRascunhoCotacaoPublica(token, data) {
+  const response = await fetch(`${API_URL}/cotacoes/${token}/rascunho`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao salvar rascunho da cotacao');
+}
+
+export async function reabrirCotacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/cotacoes/${id}/reabrir`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao reabrir cotacao');
+}
+
 export async function uploadPlanilhaCotacaoPublica(token, file, data = {}) {
   const formData = new FormData();
   formData.append('token', token);

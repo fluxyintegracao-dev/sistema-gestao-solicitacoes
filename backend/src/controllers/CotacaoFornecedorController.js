@@ -355,9 +355,14 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   );
 
   const respostasPreparadas = [];
+  const isRascunho = options.rascunho === true;
   const valorMinimoPedido = normalizarValorMinimoPedido(options.valor_minimo_pedido);
-  const condicaoPagamento = normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
-  const prazoEntrega = normalizarCampoObrigatorio(options.prazo_entrega, 'o prazo de entrega');
+  const condicaoPagamento = isRascunho
+    ? String(options.condicao_pagamento || '').trim() || null
+    : normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
+  const prazoEntrega = isRascunho
+    ? String(options.prazo_entrega || '').trim() || null
+    : normalizarCampoObrigatorio(options.prazo_entrega, 'o prazo de entrega');
   const observacaoResposta = String(options.observacao_resposta || '').trim() || null;
 
   for (const itemResposta of itensResposta) {
@@ -396,10 +401,14 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       throw new Error(`Quantidade minima invalida para o item ${itemBase.nome}`);
     }
 
-    const statusEfetivo =
-      statusDisponibilidade !== 'NAO_TEM' && (precoNormalizado === null || precoNormalizado <= 0 || quantidadeMinima === null)
-        ? 'NAO_TEM'
-        : statusDisponibilidade;
+    const statusEfetivo = isRascunho
+      ? statusDisponibilidade
+      : (
+          statusDisponibilidade !== 'NAO_TEM'
+            && (precoNormalizado === null || precoNormalizado <= 0 || quantidadeMinima === null)
+            ? 'NAO_TEM'
+            : statusDisponibilidade
+        );
     const disponivel = statusEfetivo !== 'NAO_TEM';
 
     respostasPreparadas.push({
@@ -451,8 +460,8 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     }
 
     await cotacaoTravada.update({
-      status: 'RESPONDIDO',
-      respondido_em: new Date(),
+      status: isRascunho ? 'RASCUNHO' : 'RESPONDIDO',
+      respondido_em: isRascunho ? cotacaoTravada.respondido_em : new Date(),
       visualizado_em: cotacaoTravada.visualizado_em || new Date(),
       valor_minimo_pedido: valorMinimoPedido,
       condicao_pagamento: condicaoPagamento,
@@ -464,13 +473,20 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
       usuarioId: usuarioInterno?.id || null,
       fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-      tipoAcao: usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR',
-      descricao: usuarioInterno
-        ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} preencheu a cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
-        : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`,
+      tipoAcao: isRascunho
+        ? (usuarioInterno ? 'RASCUNHO_RESPOSTA_INTERNA' : 'RASCUNHO_RESPOSTA_FORNECEDOR')
+        : (usuarioInterno ? 'RESPOSTA_INTERNA_COMPRAS' : 'RESPOSTA_FORNECEDOR'),
+      descricao: isRascunho
+        ? (usuarioInterno
+            ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} salvou rascunho da cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+            : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} salvou rascunho da cotacao`)
+        : (usuarioInterno
+            ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} preencheu a cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+            : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} respondeu a cotacao`),
       metadados: {
         cotacao_fornecedor_id: cotacaoFornecedor.id,
         quantidade_itens: respostasPreparadas.length,
+        rascunho: isRascunho,
         origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
         usuario_interno_id: usuarioInterno?.id || null,
         usuario_interno_nome: usuarioInterno?.nome || null
@@ -921,6 +937,110 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao registrar resposta da cotacao', {
+        status: 400
+      });
+    }
+  },
+
+  async salvarRascunho(req, res) {
+    try {
+      const cotacaoFornecedor = await carregarCotacaoPorToken(req.params.token);
+      if (!cotacaoFornecedor) {
+        return res.status(404).json({ error: 'Cotacao nao encontrada' });
+      }
+
+      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
+        return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel salvar rascunho.' });
+      }
+
+      const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
+      if (!itens.length && !cotacaoFornecedor.pdf_resposta_url) {
+        return res.status(400).json({ error: 'Informe ao menos um item ou anexe um arquivo de cotacao.' });
+      }
+
+      const usuarioInterno = await identificarUsuarioInternoOpcional(req);
+      await salvarRespostasCotacao(cotacaoFornecedor, itens, {
+        valor_minimo_pedido: req.body?.valor_minimo_pedido,
+        condicao_pagamento: req.body?.condicao_pagamento,
+        prazo_entrega: req.body?.prazo_entrega,
+        observacao_resposta: req.body?.observacao_resposta,
+        usuario_interno: usuarioInterno,
+        rascunho: true
+      });
+      const atualizada = await carregarCotacaoPorToken(req.params.token);
+      return res.status(200).json(await serializarCotacaoPublica(atualizada, req));
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao salvar rascunho da cotacao', {
+        status: 400
+      });
+    }
+  },
+
+  async reabrir(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const cotacaoFornecedor = await SolicitacaoCompraFornecedor.findByPk(req.params.id, {
+        include: [
+          {
+            model: FornecedorCompra,
+            as: 'fornecedor',
+            attributes: ['id', 'nome']
+          },
+          {
+            model: SolicitacaoCompra,
+            as: 'solicitacao',
+            attributes: ['id', 'status']
+          }
+        ],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!cotacaoFornecedor) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Cotacao nao encontrada.' });
+      }
+
+      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Cotacao encerrada. Nao e possivel reabrir.' });
+      }
+
+      const statusAtual = normalizeText(cotacaoFornecedor.status);
+      if (!['RESPONDIDO', 'RASCUNHO'].includes(statusAtual)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Apenas cotacoes respondidas ou em rascunho podem ser reabertas.' });
+      }
+
+      const motivo = String(req.body?.motivo || '').trim() || null;
+      await cotacaoFornecedor.update({
+        status: 'REABERTA',
+        respondido_em: null
+      }, { transaction });
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+        usuarioId: req.user?.id || null,
+        fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
+        tipoAcao: 'COTACAO_REABERTA',
+        descricao: `Cotacao do fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} reaberta para nova resposta`,
+        metadados: {
+          cotacao_fornecedor_id: cotacaoFornecedor.id,
+          status_anterior: statusAtual,
+          motivo,
+          usuario_id: req.user?.id || null,
+          usuario_nome: req.user?.nome || null
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      return res.json({ ok: true, status: 'REABERTA' });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao reabrir cotacao', {
         status: 400
       });
     }

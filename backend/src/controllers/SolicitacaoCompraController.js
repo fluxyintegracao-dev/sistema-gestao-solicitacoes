@@ -997,6 +997,7 @@ function montarComparativoSolicitacao(solicitacao) {
 
   const itensComparativo = itens.map((item) => {
     const respostas = (solicitacao.fornecedores || [])
+      .filter((cotacaoFornecedor) => normalizeText(cotacaoFornecedor.status) === 'RESPONDIDO')
       .filter((cotacaoFornecedor) => cotacaoFornecedorIncluiItem(cotacaoFornecedor, item))
       .map((cotacaoFornecedor) => {
       const resposta = (cotacaoFornecedor.respostas || []).find((entry) => {
