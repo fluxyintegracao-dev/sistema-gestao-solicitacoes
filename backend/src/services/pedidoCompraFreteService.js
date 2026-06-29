@@ -67,8 +67,24 @@ async function listarFretesPedido(pedidoId, options = {}) {
   const fretes = await PedidoCompraFrete.findAll({
     where: { pedido_compra_id: Number(pedidoId) },
     include: [
-      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
-      { model: TituloFinanceiro, as: 'tituloFinanceiro', attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'] },
+      {
+        model: FornecedorCompra,
+        as: 'fornecedor',
+        attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'],
+        required: false
+      },
+      {
+        model: Parceiro,
+        as: 'parceiro',
+        attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo'],
+        required: false
+      },
+      {
+        model: TituloFinanceiro,
+        as: 'tituloFinanceiro',
+        attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'],
+        required: false
+      },
       { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] },
       {
         model: PedidoCompraFreteRateio,
@@ -97,9 +113,24 @@ async function listarFretesPendentesFinanceiro(options = {}) {
       { model: SolicitacaoCompra, as: 'solicitacaoCompra', attributes: ['id', 'status', 'origem'] },
       { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'status_global', 'area_responsavel'] },
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id'] },
-      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
-      { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo'] },
-      { model: TituloFinanceiro, as: 'tituloFinanceiro', attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'] },
+      {
+        model: FornecedorCompra,
+        as: 'fornecedor',
+        attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'],
+        required: false
+      },
+      {
+        model: Parceiro,
+        as: 'parceiro',
+        attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo'],
+        required: false
+      },
+      {
+        model: TituloFinanceiro,
+        as: 'tituloFinanceiro',
+        attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'],
+        required: false
+      },
       { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] }
     ],
     order: [

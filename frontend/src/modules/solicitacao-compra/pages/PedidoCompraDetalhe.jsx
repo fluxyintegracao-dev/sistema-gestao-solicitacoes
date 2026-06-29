@@ -591,6 +591,12 @@ export default function PedidoCompraDetalhe() {
           parceiro_id: frete.fornecedor.parceiro_id || frete.parceiro_id || '',
           cpf_cnpj: frete.fornecedor.cnpj || ''
         }
+      : frete.parceiro
+      ? {
+          ...frete.parceiro,
+          parceiro_id: frete.parceiro.id,
+          cpf_cnpj: frete.parceiro.cpf_cnpj || ''
+        }
       : null;
 
     setFreteEditandoId(frete.id);
@@ -1374,7 +1380,7 @@ export default function PedidoCompraDetalhe() {
                       </div>
                       <div className="mt-1 font-semibold">{formatMoney(frete.valor_total)}</div>
                       <div className="mt-1 text-xs text-[var(--c-muted)]">
-                        {frete.fornecedor?.nome ? `${frete.fornecedor.nome} - ` : ''}
+                        {frete.fornecedor?.nome || frete.parceiro?.nome ? `${frete.fornecedor?.nome || frete.parceiro?.nome} - ` : ''}
                         {frete.rateios?.length || 0} rateio(s) por valor dos itens
                         {frete.data_vencimento ? ` - vence em ${formatDate(frete.data_vencimento)}` : ''}
                       </div>
