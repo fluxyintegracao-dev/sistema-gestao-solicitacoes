@@ -479,6 +479,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [importandoCodigos, setImportandoCodigos] = useState(false);
   const [fretesPendentes, setFretesPendentes] = useState([]);
   const [loadingFretesPendentes, setLoadingFretesPendentes] = useState(false);
+  const [erroFretesPendentes, setErroFretesPendentes] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -745,11 +746,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     if (!mostrarFretesPendentes) {
       setFretesPendentes([]);
       setLoadingFretesPendentes(false);
+      setErroFretesPendentes('');
       return undefined;
     }
 
     let active = true;
     setLoadingFretesPendentes(true);
+    setErroFretesPendentes('');
 
     getFretesPedidosPendentesFinanceiro({ limit: 20 })
       .then((data) => {
@@ -757,9 +760,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           setFretesPendentes(Array.isArray(data) ? data : []);
         }
       })
-      .catch(() => {
+      .catch((fetchError) => {
+        console.error(fetchError);
         if (active) {
           setFretesPendentes([]);
+          setErroFretesPendentes(fetchError.message || 'Erro ao buscar fretes pendentes de pedidos.');
         }
       })
       .finally(() => {
@@ -772,6 +777,25 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       active = false;
     };
   }, [mostrarFretesPendentes]);
+
+  async function carregarFretesPendentesFinanceiro() {
+    if (!mostrarFretesPendentes) {
+      return;
+    }
+
+    try {
+      setLoadingFretesPendentes(true);
+      setErroFretesPendentes('');
+      const data = await getFretesPedidosPendentesFinanceiro({ limit: 20 });
+      setFretesPendentes(Array.isArray(data) ? data : []);
+    } catch (fetchError) {
+      console.error(fetchError);
+      setFretesPendentes([]);
+      setErroFretesPendentes(fetchError.message || 'Erro ao buscar fretes pendentes de pedidos.');
+    } finally {
+      setLoadingFretesPendentes(false);
+    }
+  }
 
   function buildFreteTituloUrl(frete) {
     const params = new URLSearchParams({
@@ -1785,10 +1809,26 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 Fretes pagos a terceiro registrados em compras e ainda sem titulo financeiro vinculado.
               </p>
             </div>
-            <span className="badge badge-info">
-              {loadingFretesPendentes ? 'Atualizando' : `${fretesPendentes.length} pendente(s)`}
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="badge badge-info">
+                {loadingFretesPendentes ? 'Atualizando' : `${fretesPendentes.length} pendente(s)`}
+              </span>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={carregarFretesPendentesFinanceiro}
+                disabled={loadingFretesPendentes}
+              >
+                Atualizar fretes
+              </button>
+            </div>
           </div>
+
+          {erroFretesPendentes ? (
+            <div className="mx-3 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {erroFretesPendentes}
+            </div>
+          ) : null}
 
           {fretesPendentes.length > 0 ? (
             <div className="overflow-x-auto">

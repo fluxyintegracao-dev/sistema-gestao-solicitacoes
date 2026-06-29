@@ -830,6 +830,7 @@ export default function PedidoCompraDetalhe() {
         ? await atualizarFretePedidoCompra(id, freteEditandoId, payload)
         : await registrarFretePedidoCompra(id, payload);
       setPedido(data || null);
+      await carregar();
       fecharModalFrete(true);
       alert(freteEditandoId
         ? 'Frete atualizado com auditoria registrada.'
@@ -859,6 +860,7 @@ export default function PedidoCompraDetalhe() {
       setSalvandoFrete(true);
       const data = await cancelarFretePedidoCompra(id, frete.id, { motivo: motivo.trim() });
       setPedido(data || null);
+      await carregar();
       alert('Frete cancelado com auditoria registrada.');
     } catch (error) {
       console.error(error);

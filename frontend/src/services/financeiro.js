@@ -43,6 +43,7 @@ export async function getFretesPedidosPendentesFinanceiro(params = {}) {
     : `${API_URL}/financeiro/fretes-pedidos/pendentes`;
 
   const response = await fetch(url, {
+    cache: 'no-store',
     headers: authHeaders()
   });
 

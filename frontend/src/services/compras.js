@@ -333,6 +333,7 @@ export async function listarPedidosCompra(params = {}) {
 
 export async function obterPedidoCompra(id) {
   const response = await fetch(`${API_URL}/compras/pedidos/${id}`, {
+    cache: 'no-store',
     headers: authHeaders()
   });
   return handleJsonResponse(response, 'Erro ao buscar pedido de compra');
