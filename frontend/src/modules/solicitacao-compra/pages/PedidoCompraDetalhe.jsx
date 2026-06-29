@@ -1294,6 +1294,19 @@ export default function PedidoCompraDetalhe() {
                         {frete.rateios?.length || 0} rateio(s) por valor dos itens
                         {frete.data_vencimento ? ` - vence em ${formatDate(frete.data_vencimento)}` : ''}
                       </div>
+                      {frete.tituloFinanceiro?.id ? (
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold text-emerald-700">
+                            Titulo gerado
+                          </span>
+                          <Link
+                            className="font-semibold text-[var(--c-primary)] hover:underline"
+                            to={`/financeiro/titulos/${frete.tituloFinanceiro.id}`}
+                          >
+                            {frete.tituloFinanceiro.codigo || `Titulo #${frete.tituloFinanceiro.id}`}
+                          </Link>
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>

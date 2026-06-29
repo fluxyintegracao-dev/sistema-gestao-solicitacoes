@@ -2643,10 +2643,33 @@ async function criarTituloManual(req, payload = {}) {
         throw createHttpError(400, 'Valor do titulo precisa ser igual ao valor do frete do pedido.');
       }
 
+      const tituloFrete = titulosCriados[0] || null;
       await frete.update({
-        titulo_financeiro_id: titulosCriados[0]?.id || null,
+        titulo_financeiro_id: tituloFrete?.id || null,
         status_financeiro: 'TITULO_GERADO'
       }, { transaction });
+
+      if (Number(frete.solicitacao_id || 0) > 0 && tituloFrete) {
+        const codigoTitulo = tituloFrete.codigo || `#${tituloFrete.id}`;
+        const codigoPedido = `PC-${String(frete.pedido_compra_id || '').padStart(5, '0')}`;
+        await Historico.create({
+          solicitacao_id: frete.solicitacao_id,
+          usuario_responsavel_id: req.user?.id || null,
+          setor: 'FINANCEIRO',
+          acao: 'TITULO_FRETE_GERADO',
+          observacao: `Titulo financeiro ${codigoTitulo} gerado para frete do pedido ${codigoPedido}.`,
+          descricao: `${codigoTitulo} vinculado ao frete de terceiro no valor de ${formatCurrency(frete.valor_total)}.`,
+          metadata: JSON.stringify({
+            tipo: 'FRETE_PEDIDO_COMPRA',
+            pedido_compra_id: frete.pedido_compra_id,
+            solicitacao_compra_id: frete.solicitacao_compra_id,
+            frete_id: frete.id,
+            titulo_financeiro_id: tituloFrete.id,
+            titulo_codigo: tituloFrete.codigo || null,
+            valor_total: roundCurrency(frete.valor_total)
+          })
+        }, { transaction });
+      }
     }
 
     await transaction.commit();

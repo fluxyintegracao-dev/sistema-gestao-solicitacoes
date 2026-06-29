@@ -2358,6 +2358,11 @@ db.PedidoCompraFrete.belongsTo(db.User, {
   as: 'registradoPor'
 });
 
+db.PedidoCompraFrete.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'tituloFinanceiro'
+});
+
 db.PedidoCompraFrete.hasMany(db.PedidoCompraFreteRateio, {
   foreignKey: 'frete_id',
   as: 'rateios',

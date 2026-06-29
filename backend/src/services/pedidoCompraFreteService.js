@@ -9,6 +9,7 @@ const {
   PedidoCompraItem,
   Solicitacao,
   SolicitacaoCompra,
+  TituloFinanceiro,
   User
 } = require('../models');
 const { registrarLogSolicitacaoCompra } = require('./comprasCotacao');
@@ -67,6 +68,7 @@ async function listarFretesPedido(pedidoId, options = {}) {
     where: { pedido_compra_id: Number(pedidoId) },
     include: [
       { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
+      { model: TituloFinanceiro, as: 'tituloFinanceiro', attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'] },
       { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] },
       {
         model: PedidoCompraFreteRateio,
@@ -97,6 +99,7 @@ async function listarFretesPendentesFinanceiro(options = {}) {
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id'] },
       { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
       { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo'] },
+      { model: TituloFinanceiro, as: 'tituloFinanceiro', attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'] },
       { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] }
     ],
     order: [

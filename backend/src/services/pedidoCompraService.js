@@ -16,6 +16,7 @@ const {
   SolicitacaoCompraItem,
   SolicitacaoCompraItemManual,
   SolicitacaoCompraRespostaItem,
+  TituloFinanceiro,
   Unidade,
   User
 } = require('../models');
@@ -1330,6 +1331,7 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
         as: 'fretes',
         include: [
           { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
+          { model: TituloFinanceiro, as: 'tituloFinanceiro', attributes: ['id', 'codigo', 'status', 'valor_original', 'data_vencimento'] },
           { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] },
           {
             model: PedidoCompraFreteRateio,
