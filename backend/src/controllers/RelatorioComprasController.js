@@ -3,6 +3,7 @@ const { canViewComprasCotacoes } = require('../services/authorizationService');
 const {
   relatorioCategoriasInsumosCompras,
   relatorioCicloCompras,
+  relatorioComprasDiretas,
   relatorioComprasPorFornecedor,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,
@@ -77,6 +78,33 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar relatorio de compras por fornecedor' });
+    }
+  },
+
+  async comprasDiretas(req, res) {
+    try {
+      const usuario = await validarAcessoRelatorioCompras(req, res);
+      if (!usuario) {
+        return;
+      }
+
+      const relatorio = await relatorioComprasDiretas({
+        obraId: req.query?.obra_id,
+        dataInicio: req.query?.data_inicio,
+        dataFim: req.query?.data_fim,
+        solicitanteId: req.query?.solicitante_id,
+        parceiroId: req.query?.parceiro_id,
+        status: req.query?.status,
+        q: req.query?.q,
+        item: req.query?.item,
+        limit: req.query?.limit,
+        obraIds: req.compraScopeObraIds
+      });
+
+      return res.json(relatorio);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar relatorio de compras diretas' });
     }
   },
 

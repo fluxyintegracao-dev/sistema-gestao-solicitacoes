@@ -5,14 +5,18 @@ const {
   FornecedorCompra,
   Insumo,
   Obra,
+  Parceiro,
   PedidoCompra,
   PedidoCompraItem,
+  Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraItem,
   SolicitacaoCompraItemManual,
   SolicitacaoCompraRespostaItem,
-  Unidade
+  Unidade,
+  User,
+  Apropriacao
 } = require('../models');
 
 function toNumber(value) {
@@ -160,6 +164,87 @@ function buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }) 
   }
 
   return where;
+}
+
+function buildCompraDiretaCriacaoWhere({
+  obraId,
+  obraIds,
+  dataInicio,
+  dataFim,
+  solicitanteId,
+  status
+}) {
+  const where = buildSolicitacaoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim });
+  where.origem = 'COMPRA_DIRETA';
+
+  if (solicitanteId) {
+    where.solicitante_id = Number(solicitanteId);
+  }
+
+  if (status) {
+    where.status = String(status).trim();
+  }
+
+  return where;
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase();
+}
+
+function includesSearch(value, search) {
+  if (!search) {
+    return true;
+  }
+  return normalizeSearchText(value).includes(search);
+}
+
+function addCompraDiretaRanking(map, key, label, compraId, quantidade, valor, extra = {}) {
+  const mapKey = key || 'SEM_INFORMACAO';
+  if (!map.has(mapKey)) {
+    map.set(mapKey, {
+      key: mapKey,
+      label: label || 'Sem informacao',
+      compras_ids: new Set(),
+      itens: 0,
+      quantidade_total: 0,
+      valor_total: 0,
+      ...extra
+    });
+  }
+
+  const item = map.get(mapKey);
+  if (compraId) {
+    item.compras_ids.add(Number(compraId));
+  }
+  item.itens += 1;
+  item.quantidade_total += toNumber(quantidade);
+  item.valor_total = roundMoney(item.valor_total + toNumber(valor));
+  return item;
+}
+
+function finalizeCompraDiretaRanking(map, labelKey = 'label') {
+  return Array.from(map.values())
+    .map((item) => ({
+      ...item,
+      compras: item.compras_ids?.size || 0,
+      compras_ids: undefined,
+      quantidade_total: Number(item.quantidade_total.toFixed(3)),
+      valor_total: roundMoney(item.valor_total),
+      ticket_medio: item.compras_ids?.size > 0
+        ? roundMoney(item.valor_total / item.compras_ids.size)
+        : 0
+    }))
+    .sort((a, b) => {
+      if (Number(b.valor_total || 0) !== Number(a.valor_total || 0)) {
+        return Number(b.valor_total || 0) - Number(a.valor_total || 0);
+      }
+      return String(a[labelKey] || a.label || '').localeCompare(String(b[labelKey] || b.label || ''), 'pt-BR');
+    });
 }
 
 function buildPedidoCriacaoWhere({ obraId, obraIds, dataInicio, dataFim }) {
@@ -806,6 +891,293 @@ async function relatorioComprasPorFornecedor({ obraId, dataInicio, dataFim, obra
     obras,
     status: finalizeResumoMap(statusMap),
     pedidos: linhasPedidos.slice(0, 100)
+  };
+}
+
+async function relatorioComprasDiretas({
+  obraId,
+  dataInicio,
+  dataFim,
+  obraIds,
+  solicitanteId,
+  parceiroId,
+  status,
+  q,
+  item,
+  limit
+} = {}) {
+  const compras = await SolicitacaoCompra.findAll({
+    where: buildCompraDiretaCriacaoWhere({
+      obraId,
+      obraIds,
+      dataInicio,
+      dataFim,
+      solicitanteId,
+      status
+    }),
+    attributes: [
+      'id',
+      'obra_id',
+      'solicitante_id',
+      'solicitacao_principal_id',
+      'status',
+      'observacoes',
+      'necessario_para',
+      'valor_fechado',
+      'createdAt'
+    ],
+    include: [
+      { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
+      { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
+      {
+        model: Solicitacao,
+        as: 'solicitacaoPrincipal',
+        attributes: ['id', 'codigo', 'status_global', 'area_responsavel', 'parceiro_id', 'valor', 'data_vencimento'],
+        include: [
+          { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'documento'] }
+        ]
+      },
+      {
+        model: SolicitacaoCompraItem,
+        as: 'itens',
+        attributes: [
+          'id',
+          'insumo_id',
+          'unidade_id',
+          'unidade_sigla_manual',
+          'apropriacao_id',
+          'quantidade',
+          'valor_unitario',
+          'valor_total',
+          'especificacao'
+        ],
+        include: [
+          { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo', 'categoria_id'] },
+          { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
+          { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] }
+        ]
+      },
+      {
+        model: SolicitacaoCompraItemManual,
+        as: 'itensManuais',
+        attributes: [
+          'id',
+          'nome_manual',
+          'unidade_sigla_manual',
+          'apropriacao_id',
+          'quantidade',
+          'valor_unitario',
+          'valor_total',
+          'especificacao'
+        ],
+        include: [
+          { model: Apropriacao, as: 'apropriacao', attributes: ['id', 'codigo', 'descricao'] }
+        ]
+      }
+    ],
+    order: [['createdAt', 'DESC'], ['id', 'DESC']]
+  });
+
+  const search = normalizeSearchText(q);
+  const itemSearch = normalizeSearchText(item);
+  const parceiroFiltro = parceiroId ? Number(parceiroId) : null;
+  const limite = Math.min(Math.max(Number(limit) || 1000, 1), 5000);
+
+  const solicitantesMap = new Map();
+  const credoresMap = new Map();
+  const itensMap = new Map();
+  const obrasMap = new Map();
+  const statusMap = new Map();
+  const comprasIds = new Set();
+  const linhas = [];
+
+  compras.forEach((compra) => {
+    const plain = compra.toJSON ? compra.toJSON() : compra;
+    const solicitacao = plain.solicitacaoPrincipal || {};
+    const credor = solicitacao.parceiro || null;
+    const solicitante = plain.solicitante || null;
+    const obra = plain.obra || null;
+    const statusCompra = normalizeStatus(plain.status || solicitacao.status_global);
+    const codigoCompra = `SC-${String(plain.id).padStart(5, '0')}`;
+    const codigoSolicitacao = solicitacao.codigo || null;
+
+    if (parceiroFiltro && Number(credor?.id || 0) !== parceiroFiltro) {
+      return;
+    }
+
+    const itensNormais = (plain.itens || []).map((entry) => ({
+      id: entry.id,
+      tipo: 'INSUMO',
+      descricao: entry.insumo?.nome || 'Insumo sem nome',
+      codigo: entry.insumo?.codigo || null,
+      unidade: entry.unidade?.sigla || entry.unidade_sigla_manual || entry.unidade?.nome || null,
+      quantidade: toNumber(entry.quantidade),
+      valor_unitario: roundMoney(entry.valor_unitario),
+      valor_total: roundMoney(entry.valor_total),
+      especificacao: entry.especificacao || null,
+      apropriacao: entry.apropriacao ? {
+        id: entry.apropriacao.id,
+        codigo: entry.apropriacao.codigo,
+        descricao: entry.apropriacao.descricao || null
+      } : null
+    }));
+
+    const itensManuais = (plain.itensManuais || []).map((entry) => ({
+      id: entry.id,
+      tipo: 'MANUAL',
+      descricao: entry.nome_manual || 'Item manual sem nome',
+      codigo: null,
+      unidade: entry.unidade_sigla_manual || null,
+      quantidade: toNumber(entry.quantidade),
+      valor_unitario: roundMoney(entry.valor_unitario),
+      valor_total: roundMoney(entry.valor_total),
+      especificacao: entry.especificacao || null,
+      apropriacao: entry.apropriacao ? {
+        id: entry.apropriacao.id,
+        codigo: entry.apropriacao.codigo,
+        descricao: entry.apropriacao.descricao || null
+      } : null
+    }));
+
+    [...itensNormais, ...itensManuais].forEach((compraItem) => {
+      const haystack = [
+        codigoCompra,
+        codigoSolicitacao,
+        solicitante?.nome,
+        solicitante?.email,
+        obra?.nome,
+        obra?.codigo,
+        credor?.nome,
+        credor?.documento,
+        statusCompra,
+        compraItem.descricao,
+        compraItem.codigo,
+        compraItem.especificacao,
+        compraItem.apropriacao?.codigo,
+        compraItem.apropriacao?.descricao
+      ].join(' ');
+
+      if (!includesSearch(haystack, search) || !includesSearch(compraItem.descricao, itemSearch)) {
+        return;
+      }
+
+      comprasIds.add(Number(plain.id));
+
+      const valor = roundMoney(compraItem.valor_total);
+      addCompraDiretaRanking(
+        solicitantesMap,
+        solicitante?.id ? String(solicitante.id) : 'SEM_SOLICITANTE',
+        solicitante?.nome || 'Sem solicitante',
+        plain.id,
+        compraItem.quantidade,
+        valor,
+        { solicitante_id: solicitante?.id || null, email: solicitante?.email || null }
+      );
+      addCompraDiretaRanking(
+        credoresMap,
+        credor?.id ? String(credor.id) : 'SEM_CREDOR',
+        credor?.nome || 'Sem credor informado',
+        plain.id,
+        compraItem.quantidade,
+        valor,
+        { parceiro_id: credor?.id || null, documento: credor?.documento || null }
+      );
+      addCompraDiretaRanking(
+        obrasMap,
+        obra?.id ? String(obra.id) : 'SEM_OBRA',
+        obra?.nome || 'Sem obra/centro',
+        plain.id,
+        compraItem.quantidade,
+        valor,
+        { obra_id: obra?.id || null, obra_codigo: obra?.codigo || null }
+      );
+
+      const itemKey = `${compraItem.tipo}:${normalizeSearchText(compraItem.codigo || compraItem.descricao)}:${normalizeSearchText(compraItem.unidade)}`;
+      addCompraDiretaRanking(
+        itensMap,
+        itemKey,
+        compraItem.descricao,
+        plain.id,
+        compraItem.quantidade,
+        valor,
+        { tipo: compraItem.tipo, codigo: compraItem.codigo || null, unidade: compraItem.unidade || null }
+      );
+
+      const statusResumo = incrementResumoMap(statusMap, statusCompra, formatStatusLabel(statusCompra));
+      statusResumo.valor_total = roundMoney(statusResumo.valor_total + valor);
+
+      linhas.push({
+        compra_id: plain.id,
+        compra_codigo: codigoCompra,
+        solicitacao_id: solicitacao.id || null,
+        solicitacao_codigo: codigoSolicitacao,
+        status: statusCompra,
+        status_label: formatStatusLabel(statusCompra),
+        criado_em: plain.createdAt || null,
+        vencimento: solicitacao.data_vencimento || plain.necessario_para || null,
+        solicitante: solicitante ? {
+          id: solicitante.id,
+          nome: solicitante.nome,
+          email: solicitante.email || null
+        } : null,
+        obra: obra ? {
+          id: obra.id,
+          nome: obra.nome,
+          codigo: obra.codigo || null
+        } : null,
+        credor: credor ? {
+          id: credor.id,
+          nome: credor.nome,
+          documento: credor.documento || null
+        } : null,
+        item: compraItem,
+        quantidade: compraItem.quantidade,
+        valor_unitario: compraItem.valor_unitario,
+        valor_total: valor
+      });
+    });
+  });
+
+  linhas.sort((a, b) => {
+    const dateDiff = new Date(b.criado_em || 0).getTime() - new Date(a.criado_em || 0).getTime();
+    if (dateDiff !== 0) {
+      return dateDiff;
+    }
+    return String(a.compra_codigo || '').localeCompare(String(b.compra_codigo || ''), 'pt-BR');
+  });
+
+  const valorTotal = roundMoney(linhas.reduce((sum, row) => sum + toNumber(row.valor_total), 0));
+  const quantidadeTotal = Number(linhas.reduce((sum, row) => sum + toNumber(row.quantidade), 0).toFixed(3));
+
+  return {
+    filtros: {
+      obra_id: obraId || null,
+      data_inicio: dataInicio || null,
+      data_fim: dataFim || null,
+      solicitante_id: solicitanteId || null,
+      parceiro_id: parceiroId || null,
+      status: status || null,
+      q: q || null,
+      item: item || null,
+      limit: limite
+    },
+    resumo: {
+      compras: comprasIds.size,
+      itens: linhas.length,
+      solicitantes: solicitantesMap.size,
+      credores: credoresMap.size,
+      obras: obrasMap.size,
+      quantidade_total: quantidadeTotal,
+      valor_total: valorTotal,
+      ticket_medio_compra: comprasIds.size > 0 ? roundMoney(valorTotal / comprasIds.size) : 0,
+      ticket_medio_item: linhas.length > 0 ? roundMoney(valorTotal / linhas.length) : 0
+    },
+    solicitantes: finalizeCompraDiretaRanking(solicitantesMap),
+    credores: finalizeCompraDiretaRanking(credoresMap),
+    itens_ranking: finalizeCompraDiretaRanking(itensMap),
+    obras: finalizeCompraDiretaRanking(obrasMap),
+    status: finalizeResumoMap(statusMap),
+    itens: linhas.slice(0, limite)
   };
 }
 
@@ -1883,6 +2255,7 @@ async function relatorioCicloCompras({ obraId, dataInicio, dataFim, obraIds } = 
 module.exports = {
   relatorioCicloCompras,
   relatorioCategoriasInsumosCompras,
+  relatorioComprasDiretas,
   relatorioComprasPorFornecedor,
   relatorioDemandaPedidosCompras,
   relatorioEconomiaCotacoes,

@@ -596,6 +596,38 @@ function validateCompraRelatorioComprasFornecedorQuery(query = {}) {
   };
 }
 
+function validateCompraRelatorioComprasDiretasQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['obra_id', 'data_inicio', 'data_fim', 'solicitante_id', 'parceiro_id', 'status', 'q', 'item', 'limit'],
+    'Consulta do relatorio de compras diretas'
+  );
+
+  const dataInicio = parseDateOnly(query.data_inicio, 'Data inicial');
+  const dataFim = parseDateOnly(query.data_fim, 'Data final');
+
+  if (dataInicio && dataFim && dataInicio > dataFim) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  const limit = parseInteger(query.limit, 'Limite');
+  if (limit && (limit < 1 || limit > 5000)) {
+    throw new ValidationError('Limite deve estar entre 1 e 5000.');
+  }
+
+  return {
+    obra_id: parseInteger(query.obra_id, 'Obra'),
+    data_inicio: dataInicio,
+    data_fim: dataFim,
+    solicitante_id: parseInteger(query.solicitante_id, 'Solicitante'),
+    parceiro_id: parseInteger(query.parceiro_id, 'Credor'),
+    status: parseOptionalText(query.status, 'Status', 80),
+    q: parseOptionalText(query.q, 'Busca geral', 160),
+    item: parseOptionalText(query.item, 'Item', 160),
+    limit
+  };
+}
+
 function validateCompraRelatorioPrecosInsumosQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -1217,6 +1249,7 @@ module.exports = {
   validateCompraQuery,
   validateCompraRelatorioCategoriasInsumosQuery,
   validateCompraRelatorioCicloQuery,
+  validateCompraRelatorioComprasDiretasQuery,
   validateCompraRelatorioComprasFornecedorQuery,
   validateCompraRelatorioDemandaPedidosQuery,
   validateCompraRelatorioEconomiaCotacoesQuery,

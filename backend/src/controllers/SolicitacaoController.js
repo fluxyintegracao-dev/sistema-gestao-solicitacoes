@@ -3427,6 +3427,8 @@ module.exports = {
       }
 
       const destino = solicitacao.setor_destino_pos_aprovacao;
+      const destinoNormalizado = normalizarTokenComparacao(destino);
+      const liberarCompraParaCompras = destinoNormalizado === 'COMPRAS';
       await solicitacao.update({
         area_responsavel: destino,
         aprovada_diretoria_por: usuarioId,
@@ -3434,7 +3436,10 @@ module.exports = {
       });
 
       await SolicitacaoCompra.update(
-        { status: 'ENVIADO' },
+        {
+          status: liberarCompraParaCompras ? 'LIBERADO_PARA_COMPRA' : 'ENVIADO',
+          ...(liberarCompraParaCompras ? { liberado_para_compra_em: new Date() } : {})
+        },
         {
           where: {
             solicitacao_principal_id: solicitacao.id,
@@ -3451,7 +3456,8 @@ module.exports = {
         observacao: `Aprovada pela diretoria e enviada para ${destino}`,
         metadata: JSON.stringify({
           diretoria_fluxo_codigo: solicitacao.diretoria_fluxo_codigo,
-          setor_destino_pos_aprovacao: destino
+          setor_destino_pos_aprovacao: destino,
+          solicitacao_compra_status: liberarCompraParaCompras ? 'LIBERADO_PARA_COMPRA' : 'ENVIADO'
         })
       });
 

@@ -109,6 +109,7 @@ const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoO
 const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroResultadoCentrosCusto'));
   const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
   const ComprasRelatorioCategoriasInsumos = lazy(() => import('./pages/ComprasRelatorioCategoriasInsumos'));
+  const ComprasRelatorioComprasDiretas = lazy(() => import('./pages/ComprasRelatorioComprasDiretas'));
   const ComprasRelatorioComprasFornecedor = lazy(() => import('./pages/ComprasRelatorioComprasFornecedor'));
   const ComprasRelatorioDemandaPedidos = lazy(() => import('./pages/ComprasRelatorioDemandaPedidos'));
   const ComprasRelatorioEvolucao = lazy(() => import('./pages/ComprasRelatorioEvolucao'));
@@ -964,6 +965,7 @@ export default function App() {
         <Route path="compras/relatorios" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ModuloRelatorios modulo="compras" /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><ComprasRelatoriosRoute><RelatoriosAdministrativos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioCategoriasInsumos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
+        <Route path="compras/relatorios/compras-diretas" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioComprasDiretas /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/compras-fornecedor" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioComprasFornecedor /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/demanda-pedidos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioDemandaPedidos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/evolucao" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioEvolucao /></ComprasRelatoriosRoute></ModuloComprasRoute>} />

@@ -470,6 +470,18 @@ export async function obterRelatorioComprasPorFornecedor(params = {}) {
   return handleJsonResponse(response, 'Erro ao buscar relatorio de compras por fornecedor');
 }
 
+export async function obterRelatorioComprasDiretas(params = {}) {
+  const query = buildQueryString(params);
+  const url = query
+    ? `${API_URL}/compras/relatorios/compras-diretas?${query}`
+    : `${API_URL}/compras/relatorios/compras-diretas`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar relatorio de compras diretas');
+}
+
 export async function obterRelatorioPrecosInsumosFornecedores(params = {}) {
   const query = buildQueryString(params);
   const url = query

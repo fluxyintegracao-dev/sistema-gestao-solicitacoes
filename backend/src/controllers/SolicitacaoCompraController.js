@@ -2348,6 +2348,9 @@ module.exports = {
             obra,
             transaction
           });
+      const statusInicialCompra = fluxoCompra.usaFluxoDiretoria
+        ? 'AGUARDANDO_DIRETORIA'
+        : (compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA');
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
@@ -2355,7 +2358,8 @@ module.exports = {
           titulo: compraDireta ? 'Compra Direta' : null,
           obra_id,
           solicitante_id: usuario.id,
-          status: fluxoCompra.usaFluxoDiretoria ? 'AGUARDANDO_DIRETORIA' : 'ENVIADO',
+          status: statusInicialCompra,
+          liberado_para_compra_em: statusInicialCompra === 'LIBERADO_PARA_COMPRA' ? new Date() : null,
           integrado_sienge: false,
           observacoes: observacoes || null,
           necessario_para: necessario_para || null,
