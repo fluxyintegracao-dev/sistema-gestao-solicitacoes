@@ -480,6 +480,9 @@ export default function FinanceiroTituloNovo() {
     const numeroDocumento = searchParams.get('numero_documento') || '';
     const observacoes = searchParams.get('observacoes') || '';
     const obraSelecionadaPrefill = obras.find((obra) => String(obra.id) === String(obraId));
+    if (obraId && !obraSelecionadaPrefill) {
+      return;
+    }
 
     if (parceiroId && parceiroNome) {
       setParceiros((current) => {
@@ -1081,7 +1084,8 @@ export default function FinanceiroTituloNovo() {
   }
 
   function validarCadastroTitulo() {
-    if (!form.empresa_id) {
+    const empresaSelecionadaId = form.empresa_id || getEmpresaObraId(obraSelecionada);
+    if (!empresaSelecionadaId) {
       return 'Selecione uma obra/centro de custo com empresa vinculada.';
     }
 
@@ -1206,7 +1210,7 @@ export default function FinanceiroTituloNovo() {
       const payload = {
         ...form,
         obra_id: Number(form.obra_id),
-        empresa_id: Number(form.empresa_id),
+        empresa_id: Number(form.empresa_id || getEmpresaObraId(obraSelecionada)),
         parceiro_id: Number(form.parceiro_id),
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
