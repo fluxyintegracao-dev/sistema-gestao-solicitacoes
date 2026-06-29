@@ -1490,8 +1490,7 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       setReabrindoCotacaoId(cotacaoFornecedor.id);
       await reabrirCotacaoCompra(cotacaoFornecedor.id, { motivo });
-      await carregar();
-      await carregarComparativo();
+      await carregarTudo();
       alert('Cotacao reaberta. O fornecedor pode responder novamente pelo mesmo link.');
     } catch (error) {
       console.error(error);
