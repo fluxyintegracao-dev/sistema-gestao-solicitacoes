@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
+const XLSX = require('xlsx');
 const {
   Anexo,
   Apropriacao,
@@ -76,6 +77,14 @@ const PDF_PAGE = {
 const PDF_OBSERVACOES_FIXAS =
   'Solicitacoes de insumos com informacoes incompletas, incorretas ou sem a devida clareza para viabilizar a compra nao serao processadas. Leia atentamente as orientacoes destacadas em vermelho nas celulas de preenchimento. Em caso de duvida, solicite apoio antes de enviar e nao encaminhe solicitacoes com erros ou omissoes, pois isso compromete o fluxo de trabalho dos demais setores da empresa. Lembre-se: os outros setores nao estao presentes na obra e dependem exclusivamente da precisao das informacoes fornecidas. Seja claro, objetivo e tecnicamente preciso no preenchimento.';
 const APROPRIACAO_ATTRIBUTES = ['id', 'codigo', 'descricao', 'obra_id', 'somadora'];
+const COMPRA_DIRETA_IMPORT_MAX_ITEMS = 300;
+const COMPRA_DIRETA_IMPORT_HEADERS = [
+  'Insumo',
+  'Unidade',
+  'Quantidade',
+  'Valor unitario',
+  'Apropriacao codigo'
+];
 
 function buildIncludeRateiosItem() {
   return {
@@ -689,6 +698,61 @@ function parseValorMonetario(value) {
 
 function arredondarMoeda(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
+}
+
+function normalizeHeaderCompraDireta(value) {
+  return normalizeTextCompra(value)
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function getCompraDiretaCell(row, aliases) {
+  for (const alias of aliases) {
+    const value = row[alias];
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return value;
+    }
+  }
+
+  return '';
+}
+
+function buildCompraDiretaImportMap(items, getKey, fallback = null) {
+  const map = new Map();
+  items.forEach((item) => {
+    const keys = Array.isArray(getKey(item)) ? getKey(item) : [getKey(item)];
+    keys.forEach((key) => {
+      const normalized = normalizeTextCompra(key);
+      if (normalized && !map.has(normalized)) {
+        map.set(normalized, item);
+      }
+    });
+  });
+  return fallback || map;
+}
+
+function normalizeCompraDiretaImportedRows(buffer) {
+  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
+  const sheetName = workbook.SheetNames[0];
+  const sheet = workbook.Sheets[sheetName];
+  if (!sheet) {
+    return [];
+  }
+
+  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+  return rawRows.map((raw) => {
+    const normalized = {};
+    Object.entries(raw || {}).forEach(([key, value]) => {
+      normalized[normalizeHeaderCompraDireta(key)] = value;
+    });
+    return normalized;
+  });
+}
+
+function responderXlsx(res, buffer, filename) {
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  return res.send(buffer);
 }
 
 function prepararItemCompraPayload({
@@ -1648,6 +1712,181 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao enviar arquivo do item' });
+    }
+  },
+
+  async modeloCompraDiretaXlsx(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const linhasModelo = [
+        COMPRA_DIRETA_IMPORT_HEADERS,
+        ['Cimento CP II', 'sc', '10', '32,50', '00.001'],
+        ['Areia media', 'm3', '2,5', '120,00', '00.002']
+      ];
+      const instrucoes = [
+        ['Campo', 'Orientacao'],
+        ['Insumo', 'Nome ou codigo do insumo. Se nao localizar, sera importado como item manual.'],
+        ['Unidade', 'Sigla ou nome da unidade cadastrada.'],
+        ['Quantidade', 'Numero maior que zero. Aceita virgula ou ponto decimal.'],
+        ['Valor unitario', 'Valor em moeda. O total sera calculado pelo sistema.'],
+        ['Apropriacao codigo', 'Opcional. Codigo da apropriacao analitica da obra selecionada.'],
+        ['Limite', `A importacao aceita no maximo ${COMPRA_DIRETA_IMPORT_MAX_ITEMS} itens por arquivo.`]
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhasModelo), 'Itens');
+      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
+      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+      return responderXlsx(res, buffer, 'modelo-itens-compra-direta.xlsx');
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar modelo de compra direta' });
+    }
+  },
+
+  async importarCompraDiretaXlsx(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+
+      const obraId = Number(req.body?.obra_id || req.query?.obra_id || 0);
+      if (!obraId) {
+        return res.status(400).json({ error: 'Selecione a obra antes de importar os itens.' });
+      }
+
+      const rows = normalizeCompraDiretaImportedRows(req.file.buffer)
+        .filter((row) => Object.values(row).some((value) => String(value || '').trim()));
+
+      if (!rows.length) {
+        return res.status(400).json({ error: 'A planilha nao possui itens para importar.' });
+      }
+
+      if (rows.length > COMPRA_DIRETA_IMPORT_MAX_ITEMS) {
+        return res.status(400).json({
+          error: `A planilha possui ${rows.length} itens. O limite e ${COMPRA_DIRETA_IMPORT_MAX_ITEMS} itens por arquivo.`
+        });
+      }
+
+      const [insumos, unidades, apropriacoes] = await Promise.all([
+        Insumo.findAll({ include: [{ model: Unidade, as: 'unidade' }] }),
+        Unidade.findAll(),
+        Apropriacao.findAll({
+          where: { obra_id: obraId },
+          attributes: APROPRIACAO_ATTRIBUTES
+        })
+      ]);
+
+      const insumosMap = buildCompraDiretaImportMap(insumos, (insumo) => [
+        insumo.nome,
+        insumo.codigo,
+        insumo.id ? String(insumo.id) : ''
+      ]);
+      const unidadesMap = buildCompraDiretaImportMap(unidades, (unidade) => [
+        unidade.sigla,
+        unidade.nome,
+        unidade.id ? String(unidade.id) : ''
+      ]);
+      const apropriacoesMap = buildCompraDiretaImportMap(
+        apropriacoes.filter((apropriacao) => apropriacao.somadora !== true),
+        (apropriacao) => [
+          apropriacao.codigo,
+          apropriacao.descricao,
+          apropriacao.id ? String(apropriacao.id) : ''
+        ]
+      );
+
+      const itens = [];
+      const erros = [];
+
+      rows.forEach((row, index) => {
+        const linha = index + 2;
+        const nomeInsumo = String(getCompraDiretaCell(row, ['INSUMO', 'ITEM', 'DESCRICAO', 'NOME']) || '').trim();
+        const unidadeTexto = String(getCompraDiretaCell(row, ['UNIDADE', 'UN', 'UND']) || '').trim();
+        const quantidade = parseQuantidade(getCompraDiretaCell(row, ['QUANTIDADE', 'QTD', 'QTDE']));
+        const valorUnitario = parseValorMonetario(getCompraDiretaCell(row, ['VALOR_UNITARIO', 'VALOR_UNITARIO_R', 'PRECO_UNITARIO', 'VALOR']));
+        const codigoApropriacao = String(getCompraDiretaCell(row, ['APROPRIACAO_CODIGO', 'APROPRIACAO', 'CODIGO_APROPRIACAO']) || '').trim();
+
+        if (!nomeInsumo) {
+          erros.push(`Linha ${linha}: informe o insumo.`);
+          return;
+        }
+        if (!unidadeTexto) {
+          erros.push(`Linha ${linha}: informe a unidade.`);
+          return;
+        }
+        if (quantidade <= 0) {
+          erros.push(`Linha ${linha}: informe quantidade maior que zero.`);
+          return;
+        }
+        if (valorUnitario <= 0) {
+          erros.push(`Linha ${linha}: informe valor unitario maior que zero.`);
+          return;
+        }
+
+        const insumo = insumosMap.get(normalizeTextCompra(nomeInsumo));
+        const unidade = unidadesMap.get(normalizeTextCompra(unidadeTexto));
+        const apropriacao = codigoApropriacao ? apropriacoesMap.get(normalizeTextCompra(codigoApropriacao)) : null;
+
+        if (!unidade && !insumo) {
+          erros.push(`Linha ${linha}: unidade nao localizada.`);
+          return;
+        }
+        if (codigoApropriacao && !apropriacao) {
+          erros.push(`Linha ${linha}: apropriacao nao localizada para a obra selecionada.`);
+          return;
+        }
+
+        const unidadeFinal = unidade || insumo?.unidade;
+        const item = {
+          insumo_id: insumo?.id || null,
+          insumo_nome: insumo?.nome || nomeInsumo,
+          unidade_id: unidadeFinal?.id || null,
+          unidade_sigla: unidadeFinal?.sigla || unidadeFinal?.nome || unidadeTexto,
+          quantidade: String(quantidade),
+          valor_unitario: String(arredondarMoeda(valorUnitario)),
+          valor_total: String(arredondarMoeda(quantidade * valorUnitario)),
+          especificacao: '',
+          apropriacao_id: apropriacao?.id || '',
+          apropriacoes: apropriacao
+            ? [{
+                apropriacao_id: apropriacao.id,
+                quantidade_apropriada: String(quantidade)
+              }]
+            : [],
+          necessario_para: '',
+          link_produto: '',
+          arquivo_url: '',
+          arquivo_nome_original: '',
+          manual: !insumo,
+          nome_manual: insumo ? undefined : nomeInsumo,
+          unidade_sigla_manual: insumo ? undefined : (unidadeFinal?.sigla || unidadeFinal?.nome || unidadeTexto)
+        };
+
+        itens.push(item);
+      });
+
+      if (erros.length) {
+        return res.status(400).json({
+          error: `A importacao possui ${erros.length} erro(s). Corrija a planilha e tente novamente.`,
+          erros: erros.slice(0, 20)
+        });
+      }
+
+      return res.json({
+        itens,
+        total: itens.length,
+        limite: COMPRA_DIRETA_IMPORT_MAX_ITEMS
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao importar itens da compra direta' });
     }
   },
 

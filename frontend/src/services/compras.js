@@ -10,19 +10,44 @@ function handleJsonResponse(response, fallbackMessage) {
   return response.text().then((text) => {
     if (!response.ok) {
       let message = text;
+      let parsed = null;
 
       try {
-        const parsed = text ? JSON.parse(text) : null;
+        parsed = text ? JSON.parse(text) : null;
         message = parsed?.error || parsed?.message || text;
       } catch {
         // Mantem o texto original quando a resposta nao for JSON.
       }
 
-      throw new Error(message || fallbackMessage);
+      const error = new Error(message || fallbackMessage);
+      if (parsed?.erros) {
+        error.erros = parsed.erros;
+      }
+      throw error;
     }
 
     return text ? JSON.parse(text) : null;
   });
+}
+
+async function downloadResponse(response, fallbackName, fallbackMessage) {
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || fallbackMessage);
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('Content-Disposition') || '';
+  const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i);
+  const filename = filenameMatch?.[1] || fallbackName;
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 function buildQueryString(params = {}) {
@@ -265,6 +290,28 @@ export async function criarSolicitacaoCompraDireta(data) {
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao criar compra direta');
+}
+
+export async function baixarModeloItensCompraDireta() {
+  const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/modelo-itens-xlsx`, {
+    headers: authHeaders()
+  });
+  return downloadResponse(response, 'modelo-itens-compra-direta.xlsx', 'Erro ao baixar modelo de itens');
+}
+
+export async function importarItensCompraDireta(file, obraId) {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (obraId) {
+    formData.append('obra_id', obraId);
+  }
+
+  const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/importar-itens-xlsx`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return handleJsonResponse(response, 'Erro ao importar itens da compra direta');
 }
 
 export async function delegarSolicitacaoCompra(id, data = {}) {
