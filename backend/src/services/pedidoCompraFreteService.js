@@ -183,6 +183,7 @@ async function registrarFretePedido({
   const momento = normalizeToken(payload.momento || 'FECHAMENTO');
   const criterioRateio = normalizeToken(payload.criterio_rateio || 'VALOR_ITENS');
   const valorTotal = roundMoney(payload.valor_total);
+  const dataVencimento = payload.data_vencimento || null;
 
   if (!['EMBUTIDO', 'TERCEIRO'].includes(tipo)) {
     throw new Error('Tipo de frete invalido.');
@@ -200,6 +201,12 @@ async function registrarFretePedido({
   const edicaoBloqueadaPorStatus = await isPedidoCompraStatusLocked(pedido.status);
   if (tipo === 'EMBUTIDO' && edicaoBloqueadaPorStatus) {
     throw new Error('Pedido fechado aceita apenas frete pago a terceiro.');
+  }
+  if (momento === 'FECHAMENTO' && edicaoBloqueadaPorStatus) {
+    throw new Error('Pedido fechado aceita apenas frete informado depois.');
+  }
+  if (tipo === 'TERCEIRO' && !dataVencimento) {
+    throw new Error('Informe a data de vencimento do frete pago a terceiro.');
   }
 
   const fornecedor = tipo === 'TERCEIRO'
@@ -226,6 +233,7 @@ async function registrarFretePedido({
       criterio_rateio: criterioRateio,
       status_financeiro: statusFinanceiro,
       valor_total: valorTotal,
+      data_vencimento: tipo === 'TERCEIRO' ? dataVencimento : null,
       fornecedor_compra_id: fornecedor?.id || null,
       parceiro_id: fornecedor?.parceiro_id || null,
       dados_pagamento: dadosPagamento,

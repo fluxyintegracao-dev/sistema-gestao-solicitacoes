@@ -68,6 +68,13 @@ function sanitizeMoneyInput(value) {
   return String(value ?? '').replace(/[^\d,.\sR$-]/g, '');
 }
 
+function formatDate(value) {
+  if (!value) return '-';
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  if (!year || !month || !day) return String(value);
+  return `${day}/${month}/${year}`;
+}
+
 function isValidEmail(value) {
   const text = String(value || '').trim();
   if (!text) return true;
@@ -283,6 +290,7 @@ const FRETE_FORM_INICIAL = {
   tipo: 'EMBUTIDO',
   momento: 'FECHAMENTO',
   valor_total: '',
+  data_vencimento: '',
   fornecedor_compra_id: '',
   parceiro_id: '',
   novo_fornecedor: {
@@ -693,13 +701,17 @@ export default function PedidoCompraDetalhe() {
 
     const payload = {
       tipo,
-      momento: freteForm.momento,
+      momento: permiteFreteEmbutido ? freteForm.momento : 'POSTERIOR',
       criterio_rateio: 'VALOR_ITENS',
       valor_total: valorTotal,
       observacoes: freteForm.observacoes
     };
 
     if (tipo === 'TERCEIRO') {
+      if (!freteForm.data_vencimento) {
+        alert('Informe a data de vencimento do frete pago a terceiro.');
+        return;
+      }
       const fornecedorId = Number(freteForm.fornecedor_compra_id || 0);
       const parceiroId = Number(freteForm.parceiro_id || 0);
       const novoFornecedor = freteForm.novo_fornecedor || {};
@@ -757,6 +769,7 @@ export default function PedidoCompraDetalhe() {
           ? onlyDigits(dadosPagamento.pix)
           : dadosPagamento.pix
       };
+      payload.data_vencimento = freteForm.data_vencimento;
     }
 
     try {
@@ -1279,6 +1292,7 @@ export default function PedidoCompraDetalhe() {
                       <div className="mt-1 text-xs text-[var(--c-muted)]">
                         {frete.fornecedor?.nome ? `${frete.fornecedor.nome} - ` : ''}
                         {frete.rateios?.length || 0} rateio(s) por valor dos itens
+                        {frete.data_vencimento ? ` - vence em ${formatDate(frete.data_vencimento)}` : ''}
                       </div>
                     </div>
                   ))}
@@ -1878,11 +1892,16 @@ export default function PedidoCompraDetalhe() {
                     className="input"
                     value={freteForm.momento}
                     onChange={(event) => atualizarFreteForm({ momento: event.target.value })}
-                    disabled={salvandoFrete}
+                    disabled={salvandoFrete || !permiteFreteEmbutido}
                   >
-                    <option value="FECHAMENTO">No fechamento</option>
+                    {permiteFreteEmbutido ? <option value="FECHAMENTO">No fechamento</option> : null}
                     <option value="POSTERIOR">Informado depois</option>
                   </select>
+                  {!permiteFreteEmbutido ? (
+                    <span className="text-xs font-normal text-[var(--c-muted)]">
+                      Frete de pedido fechado fica registrado como informado depois.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium">
@@ -1897,6 +1916,20 @@ export default function PedidoCompraDetalhe() {
                     disabled={salvandoFrete}
                   />
                 </label>
+
+                {freteForm.tipo === 'TERCEIRO' ? (
+                  <label className="grid gap-2 text-sm font-medium">
+                    Data de vencimento
+                    <input
+                      className="input"
+                      type="date"
+                      value={freteForm.data_vencimento}
+                      onChange={(event) => atualizarFreteForm({ data_vencimento: event.target.value })}
+                      disabled={salvandoFrete}
+                      required
+                    />
+                  </label>
+                ) : null}
               </div>
 
               <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">

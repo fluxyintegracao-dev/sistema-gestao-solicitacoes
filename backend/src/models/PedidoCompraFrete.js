@@ -48,6 +48,10 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      data_vencimento: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
       fornecedor_compra_id: {
         type: DataTypes.INTEGER,
         allowNull: true
