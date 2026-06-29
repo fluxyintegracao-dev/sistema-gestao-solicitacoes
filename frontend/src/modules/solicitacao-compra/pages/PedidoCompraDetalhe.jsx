@@ -5,7 +5,9 @@ import {
   atualizarStatusPedidoCompra,
   atualizarItemPedidoCompra,
   anexarEspelhoPedidoCompra,
+  atualizarFretePedidoCompra,
   baixarPdfPedidoCompra,
+  cancelarFretePedidoCompra,
   cancelarItensPedidoCompra,
   cancelarPedidoCompra,
   comentarPedidoCompra,
@@ -386,6 +388,7 @@ export default function PedidoCompraDetalhe() {
   const [remanejandoItem, setRemanejandoItem] = useState(false);
   const [modalFreteAberto, setModalFreteAberto] = useState(false);
   const [salvandoFrete, setSalvandoFrete] = useState(false);
+  const [freteEditandoId, setFreteEditandoId] = useState(null);
   const [freteForm, setFreteForm] = useState(FRETE_FORM_INICIAL);
   const [buscaFornecedorFrete, setBuscaFornecedorFrete] = useState('');
   const [fornecedoresFrete, setFornecedoresFrete] = useState([]);
@@ -497,13 +500,24 @@ export default function PedidoCompraDetalhe() {
   }, [pedido?.status, statusAtual, statusOptions]);
   const fretesPedido = useMemo(() => (pedido?.fretes || []), [pedido]);
   const totalFretesPedido = useMemo(
-    () => fretesPedido.reduce((total, frete) => total + Number(frete.valor_total || 0), 0),
+    () => fretesPedido
+      .filter((frete) => String(frete.status_financeiro || '').toUpperCase() !== 'CANCELADO')
+      .reduce((total, frete) => total + Number(frete.valor_total || 0), 0),
     [fretesPedido]
   );
   const fretesPendentesFinanceiro = useMemo(
     () => fretesPedido.filter((frete) => String(frete.status_financeiro || '').toUpperCase() === 'PENDENTE_TITULO'),
     [fretesPedido]
   );
+
+  function getFreteStatus(frete) {
+    return String(frete?.status_financeiro || '').toUpperCase();
+  }
+
+  function fretePermiteControle(frete) {
+    const status = getFreteStatus(frete);
+    return podeGerenciarPedido && !frete?.tituloFinanceiro?.id && !frete?.titulo_financeiro_id && !['TITULO_GERADO', 'CANCELADO'].includes(status);
+  }
 
   useEffect(() => {
     if (!itemEditandoId) {
@@ -552,6 +566,7 @@ export default function PedidoCompraDetalhe() {
 
   function abrirModalFrete(momento = 'FECHAMENTO') {
     const tipoInicial = permiteFreteEmbutido ? 'EMBUTIDO' : 'TERCEIRO';
+    setFreteEditandoId(null);
     setFreteForm({
       ...FRETE_FORM_INICIAL,
       tipo: tipoInicial,
@@ -563,9 +578,46 @@ export default function PedidoCompraDetalhe() {
     setModalFreteAberto(true);
   }
 
+  function abrirEdicaoFrete(frete) {
+    if (!fretePermiteControle(frete)) {
+      alert('Este frete nao pode ser editado porque ja foi cancelado ou possui titulo financeiro vinculado.');
+      return;
+    }
+
+    const credor = frete.fornecedor
+      ? {
+          ...frete.fornecedor,
+          fornecedor_compra_id: frete.fornecedor.id,
+          parceiro_id: frete.fornecedor.parceiro_id || frete.parceiro_id || '',
+          cpf_cnpj: frete.fornecedor.cnpj || ''
+        }
+      : null;
+
+    setFreteEditandoId(frete.id);
+    setFreteForm({
+      ...FRETE_FORM_INICIAL,
+      tipo: String(frete.tipo || 'EMBUTIDO').toUpperCase(),
+      momento: String(frete.momento || 'FECHAMENTO').toUpperCase(),
+      valor_total: formatMoneyInput(frete.valor_total),
+      data_vencimento: frete.data_vencimento ? String(frete.data_vencimento).slice(0, 10) : '',
+      fornecedor_compra_id: credor?.fornecedor_compra_id ? String(credor.fornecedor_compra_id) : '',
+      parceiro_id: credor?.parceiro_id ? String(credor.parceiro_id) : '',
+      dados_pagamento: {
+        ...FRETE_FORM_INICIAL.dados_pagamento,
+        ...(frete.dados_pagamento || {})
+      },
+      observacoes: frete.observacoes || ''
+    });
+    setBuscaFornecedorFrete(credor ? formatarCredorFrete(credor) : '');
+    setFornecedoresFrete([]);
+    setCredorFreteSelecionado(credor);
+    setModalFreteAberto(true);
+  }
+
   function fecharModalFrete(force = false) {
     if (salvandoFrete && !force) return;
     setModalFreteAberto(false);
+    setFreteEditandoId(null);
     setFreteForm(FRETE_FORM_INICIAL);
     setBuscaFornecedorFrete('');
     setFornecedoresFrete([]);
@@ -774,15 +826,43 @@ export default function PedidoCompraDetalhe() {
 
     try {
       setSalvandoFrete(true);
-      const data = await registrarFretePedidoCompra(id, payload);
+      const data = freteEditandoId
+        ? await atualizarFretePedidoCompra(id, freteEditandoId, payload)
+        : await registrarFretePedidoCompra(id, payload);
       setPedido(data || null);
       fecharModalFrete(true);
-      alert(tipo === 'TERCEIRO'
+      alert(freteEditandoId
+        ? 'Frete atualizado com auditoria registrada.'
+        : tipo === 'TERCEIRO'
         ? 'Frete registrado e pendencia criada para o financeiro.'
         : 'Frete embutido registrado para rateio de custo.');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao registrar frete do pedido');
+    } finally {
+      setSalvandoFrete(false);
+    }
+  }
+
+  async function handleCancelarFrete(frete) {
+    if (!fretePermiteControle(frete)) {
+      alert('Este frete nao pode ser cancelado porque ja foi cancelado ou possui titulo financeiro vinculado.');
+      return;
+    }
+
+    const motivo = window.prompt('Informe o motivo do cancelamento do frete:');
+    if (!motivo || !motivo.trim()) {
+      return;
+    }
+
+    try {
+      setSalvandoFrete(true);
+      const data = await cancelarFretePedidoCompra(id, frete.id, { motivo: motivo.trim() });
+      setPedido(data || null);
+      alert('Frete cancelado com auditoria registrada.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar frete do pedido');
     } finally {
       setSalvandoFrete(false);
     }
@@ -1281,7 +1361,9 @@ export default function PedidoCompraDetalhe() {
                           {String(frete.tipo || '').replace(/_/g, ' ')}
                         </div>
                         <span className={`app-status-pill ${
-                          String(frete.status_financeiro || '').toUpperCase() === 'PENDENTE_TITULO'
+                          String(frete.status_financeiro || '').toUpperCase() === 'CANCELADO'
+                            ? 'bg-slate-100 text-slate-600'
+                            : String(frete.status_financeiro || '').toUpperCase() === 'PENDENTE_TITULO'
                             ? 'bg-amber-100 text-amber-700'
                             : 'bg-emerald-100 text-emerald-700'
                         }`}>
@@ -1305,6 +1387,26 @@ export default function PedidoCompraDetalhe() {
                           >
                             {frete.tituloFinanceiro.codigo || `Titulo #${frete.tituloFinanceiro.id}`}
                           </Link>
+                        </div>
+                      ) : null}
+                      {fretePermiteControle(frete) ? (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            className="btn btn-outline !py-1 text-xs"
+                            onClick={() => abrirEdicaoFrete(frete)}
+                            disabled={salvandoFrete}
+                          >
+                            Editar frete
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline !py-1 text-xs text-red-600"
+                            onClick={() => handleCancelarFrete(frete)}
+                            disabled={salvandoFrete}
+                          >
+                            Cancelar frete
+                          </button>
                         </div>
                       ) : null}
                     </div>
@@ -1868,10 +1970,12 @@ export default function PedidoCompraDetalhe() {
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>
-                  Registrar frete do pedido
+                  {freteEditandoId ? 'Editar frete do pedido' : 'Registrar frete do pedido'}
                 </h2>
                 <p className="mt-0.5 text-xs" style={{ color: 'var(--c-muted)' }}>
-                  O frete sera rateado por valor dos itens. Frete de terceiro cria pendencia para o financeiro.
+                  {freteEditandoId
+                    ? 'A correcao recalcula o rateio e registra auditoria no historico.'
+                    : 'O frete sera rateado por valor dos itens. Frete de terceiro cria pendencia para o financeiro.'}
                 </p>
               </div>
               <button type="button" className="btn btn-outline" onClick={() => fecharModalFrete()} disabled={salvandoFrete}>
@@ -1887,7 +1991,7 @@ export default function PedidoCompraDetalhe() {
                     className="input"
                     value={freteForm.tipo}
                     onChange={(event) => atualizarFreteForm({ tipo: event.target.value })}
-                    disabled={salvandoFrete}
+                    disabled={salvandoFrete || Boolean(freteEditandoId)}
                   >
                     {permiteFreteEmbutido ? <option value="EMBUTIDO">Embutido no pedido</option> : null}
                     <option value="TERCEIRO">Pago a terceiro</option>
@@ -1905,7 +2009,7 @@ export default function PedidoCompraDetalhe() {
                     className="input"
                     value={freteForm.momento}
                     onChange={(event) => atualizarFreteForm({ momento: event.target.value })}
-                    disabled={salvandoFrete || !permiteFreteEmbutido}
+                    disabled={salvandoFrete || !permiteFreteEmbutido || Boolean(freteEditandoId)}
                   >
                     {permiteFreteEmbutido ? <option value="FECHAMENTO">No fechamento</option> : null}
                     <option value="POSTERIOR">Informado depois</option>
@@ -2171,7 +2275,7 @@ export default function PedidoCompraDetalhe() {
                 Cancelar
               </button>
               <button type="button" className="btn btn-primary" onClick={handleRegistrarFrete} disabled={salvandoFrete}>
-                {salvandoFrete ? 'Registrando...' : 'Registrar frete'}
+                {salvandoFrete ? 'Salvando...' : freteEditandoId ? 'Salvar correcao' : 'Registrar frete'}
               </button>
             </div>
           </div>

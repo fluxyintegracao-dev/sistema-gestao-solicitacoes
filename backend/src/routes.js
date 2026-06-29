@@ -49,6 +49,7 @@ const {
   validateCompraEnviarBody,
   validateCompraIntegrarBody,
   validateCompraPedidoCreateBody,
+  validateCompraPedidoFreteParams,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
   validateSolicitacaoPedidoCompraPdfParams,
@@ -56,6 +57,7 @@ const {
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoComentarioBody,
   validateCompraPedidoEspelhoBody,
+  validateCompraPedidoFreteCancelBody,
   validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,
@@ -1661,6 +1663,8 @@ router.patch('/compras/pedidos/:id/itens-cancelar', allowComprasPedidosManage, c
 router.post('/compras/pedidos/:id/comentarios', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoComentarioBody }), requirePedidoCompraAccess, PedidoCompraController.comentar);
 router.patch('/compras/pedidos/:id/espelho', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoEspelhoBody }), requirePedidoCompraAccess, PedidoCompraController.anexarEspelho);
 router.post('/compras/pedidos/:id/fretes', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Pedido de compra'), body: validateCompraPedidoFreteBody }), requirePedidoCompraAccess, PedidoCompraController.registrarFrete);
+router.patch('/compras/pedidos/:id/fretes/:freteId', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoFreteParams, body: validateCompraPedidoFreteBody }), requirePedidoCompraAccess, PedidoCompraController.atualizarFrete);
+router.post('/compras/pedidos/:id/fretes/:freteId/cancelar', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoFreteParams, body: validateCompraPedidoFreteCancelBody }), requirePedidoCompraAccess, PedidoCompraController.cancelarFrete);
 router.patch('/compras/pedidos/:id/itens/:itemId', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoItemUpdateBody }), requirePedidoCompraAccess, PedidoCompraController.updateItem);
 router.patch('/compras/pedidos/:id/itens/:itemId/remanejar', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams, body: validateCompraPedidoRemanejarBody }), requirePedidoCompraAccess, PedidoCompraController.remanejarItem);
 router.delete('/compras/pedidos/:id/itens/:itemId', allowComprasPedidosManage, criticalRateLimit, validateRequest({ params: validateCompraPedidoItemParams }), requirePedidoCompraAccess, PedidoCompraController.removeItem);

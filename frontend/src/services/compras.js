@@ -537,6 +537,24 @@ export async function registrarFretePedidoCompra(id, data = {}) {
   return handleJsonResponse(response, 'Erro ao registrar frete do pedido');
 }
 
+export async function atualizarFretePedidoCompra(id, freteId, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/fretes/${freteId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar frete do pedido');
+}
+
+export async function cancelarFretePedidoCompra(id, freteId, data = {}) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/fretes/${freteId}/cancelar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar frete do pedido');
+}
+
 export async function criarPedidoCompraDaSolicitacao(id, data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/pedidos`, {
     method: 'POST',

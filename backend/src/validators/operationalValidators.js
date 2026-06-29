@@ -941,6 +941,14 @@ function validateCompraPedidoFreteBody(body = {}) {
   };
 }
 
+function validateCompraPedidoFreteCancelBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo'], 'Cancelamento do frete do pedido');
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo do cancelamento', 1000, { required: true })
+  };
+}
+
 function validateCompraDelegacaoBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -987,6 +995,15 @@ function validateCompraPedidoItemParams(params = {}) {
   return {
     id: parseInteger(params.id, 'Pedido', { required: true }),
     itemId: parseInteger(params.itemId, 'Item do pedido', { required: true })
+  };
+}
+
+function validateCompraPedidoFreteParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'freteId'], 'Parametros do frete do pedido');
+
+  return {
+    id: parseInteger(params.id, 'Pedido', { required: true }),
+    freteId: parseInteger(params.freteId, 'Frete do pedido', { required: true })
   };
 }
 
@@ -1178,6 +1195,7 @@ module.exports = {
   validateCompraEnviarBody,
   validateCompraIntegrarBody,
   validateCompraPedidoCreateBody,
+  validateCompraPedidoFreteParams,
   validateCompraPedidoItemAddBody,
   validateCompraPedidoItemParams,
   validateSolicitacaoPedidoCompraPdfParams,
@@ -1185,6 +1203,7 @@ module.exports = {
   validateCompraPedidoComentarioBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoEspelhoBody,
+  validateCompraPedidoFreteCancelBody,
   validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
   validateCompraPedidoStatusBody,

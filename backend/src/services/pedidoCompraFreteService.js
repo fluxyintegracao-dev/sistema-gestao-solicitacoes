@@ -329,7 +329,223 @@ async function registrarFretePedido({
   return fretes.find((item) => Number(item.id) === Number(frete.id)) || serializeFrete(frete);
 }
 
+async function carregarPedidoFreteParaControle({ pedidoId, freteId, transaction }) {
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    include: [
+      { model: PedidoCompraItem, as: 'itens' },
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome'] },
+      { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'solicitacao_principal_id', 'status'] }
+    ],
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined
+  });
+
+  if (!pedido) {
+    throw new Error('Pedido de compra nao encontrado.');
+  }
+
+  const frete = await PedidoCompraFrete.findOne({
+    where: {
+      id: Number(freteId),
+      pedido_compra_id: pedido.id
+    },
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined
+  });
+
+  if (!frete) {
+    throw new Error('Frete do pedido nao encontrado.');
+  }
+
+  return { pedido, frete };
+}
+
+function assertFretePodeSerAlterado(frete) {
+  const status = normalizeToken(frete.status_financeiro);
+  if (status === 'CANCELADO') {
+    throw new Error('Frete cancelado nao pode ser alterado.');
+  }
+  if (frete.titulo_financeiro_id || status === 'TITULO_GERADO') {
+    throw new Error('Frete com titulo financeiro gerado nao pode ser alterado. Estorne ou cancele o titulo antes de corrigir o frete.');
+  }
+}
+
+async function registrarHistoricoControleFrete({
+  pedido,
+  frete,
+  usuarioId,
+  tipoAcao,
+  descricao,
+  observacao,
+  metadados = {},
+  transaction
+}) {
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: pedido.solicitacao_compra_id,
+    usuarioId,
+    fornecedorCompraId: frete.fornecedor_compra_id || null,
+    tipoAcao,
+    descricao,
+    metadados: {
+      pedido_compra_id: pedido.id,
+      frete_id: frete.id,
+      tipo: frete.tipo,
+      status_financeiro: frete.status_financeiro,
+      ...metadados
+    },
+    transaction
+  });
+
+  if (Number(pedido.solicitacao?.solicitacao_principal_id || 0) > 0) {
+    await Historico.create(
+      {
+        solicitacao_id: pedido.solicitacao.solicitacao_principal_id,
+        usuario_responsavel_id: usuarioId || null,
+        setor: 'COMPRAS',
+        acao: tipoAcao,
+        observacao,
+        descricao,
+        metadata: JSON.stringify({
+          tipo: 'FRETE_PEDIDO_COMPRA',
+          pedido_compra_id: pedido.id,
+          frete_id: frete.id,
+          solicitacao_compra_id: pedido.solicitacao_compra_id,
+          ...metadados
+        })
+      },
+      { transaction }
+    );
+  }
+}
+
+async function recalcularRateiosFrete({ pedido, frete, valorTotal, transaction }) {
+  const rateios = calcularRateiosProporcionais({
+    itens: pedido.itens || [],
+    valorTotal,
+    pedido
+  });
+
+  await PedidoCompraFreteRateio.destroy({
+    where: { frete_id: frete.id },
+    transaction
+  });
+
+  await PedidoCompraFreteRateio.bulkCreate(
+    rateios.map((rateio) => ({ ...rateio, frete_id: frete.id })),
+    { transaction }
+  );
+}
+
+async function atualizarFretePedido({
+  pedidoId,
+  freteId,
+  payload = {},
+  usuarioId = null,
+  transaction
+}) {
+  const { pedido, frete } = await carregarPedidoFreteParaControle({ pedidoId, freteId, transaction });
+  assertFretePodeSerAlterado(frete);
+
+  const tipo = normalizeToken(frete.tipo);
+  const valorAnterior = roundMoney(frete.valor_total);
+  const valorTotal = roundMoney(payload.valor_total);
+  const dataVencimento = payload.data_vencimento || null;
+  let fornecedor = null;
+
+  if (valorTotal <= 0) {
+    throw new Error('Informe um valor de frete maior que zero.');
+  }
+
+  if (tipo === 'TERCEIRO') {
+    if (!dataVencimento) {
+      throw new Error('Informe a data de vencimento do frete pago a terceiro.');
+    }
+    fornecedor = await resolverFornecedorFrete(payload, transaction);
+  }
+
+  const dadosPagamento = payload.dados_pagamento && typeof payload.dados_pagamento === 'object'
+    ? JSON.stringify(payload.dados_pagamento)
+    : (payload.dados_pagamento ? JSON.stringify({ observacoes: String(payload.dados_pagamento) }) : null);
+
+  await frete.update(
+    {
+      valor_total: valorTotal,
+      data_vencimento: tipo === 'TERCEIRO' ? dataVencimento : null,
+      fornecedor_compra_id: tipo === 'TERCEIRO' ? fornecedor?.id || null : null,
+      parceiro_id: tipo === 'TERCEIRO' ? fornecedor?.parceiro_id || null : null,
+      dados_pagamento: tipo === 'TERCEIRO' ? dadosPagamento : null,
+      observacoes: payload.observacoes || null
+    },
+    { transaction }
+  );
+
+  await recalcularRateiosFrete({ pedido, frete, valorTotal, transaction });
+
+  await registrarHistoricoControleFrete({
+    pedido,
+    frete,
+    usuarioId,
+    tipoAcao: 'FRETE_PEDIDO_ATUALIZADO',
+    descricao: `Frete do pedido PC-${String(pedido.id).padStart(5, '0')} atualizado`,
+    observacao: `Frete do pedido atualizado de R$ ${valorAnterior.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} para R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
+    metadados: {
+      valor_anterior: valorAnterior,
+      valor_total: valorTotal,
+      data_vencimento: tipo === 'TERCEIRO' ? dataVencimento : null,
+      fornecedor_compra_id: tipo === 'TERCEIRO' ? fornecedor?.id || null : null,
+      parceiro_id: tipo === 'TERCEIRO' ? fornecedor?.parceiro_id || null : null
+    },
+    transaction
+  });
+
+  const fretes = await listarFretesPedido(pedido.id, { transaction });
+  return fretes.find((item) => Number(item.id) === Number(frete.id)) || serializeFrete(frete);
+}
+
+async function cancelarFretePedido({
+  pedidoId,
+  freteId,
+  motivo,
+  usuarioId = null,
+  transaction
+}) {
+  const textoMotivo = String(motivo || '').trim();
+  if (!textoMotivo) {
+    throw new Error('Informe o motivo do cancelamento do frete.');
+  }
+
+  const { pedido, frete } = await carregarPedidoFreteParaControle({ pedidoId, freteId, transaction });
+  assertFretePodeSerAlterado(frete);
+
+  const valorAnterior = roundMoney(frete.valor_total);
+  await frete.update(
+    {
+      status_financeiro: 'CANCELADO'
+    },
+    { transaction }
+  );
+
+  await registrarHistoricoControleFrete({
+    pedido,
+    frete,
+    usuarioId,
+    tipoAcao: 'FRETE_PEDIDO_CANCELADO',
+    descricao: `Frete do pedido PC-${String(pedido.id).padStart(5, '0')} cancelado`,
+    observacao: `Frete do pedido cancelado. Motivo: ${textoMotivo}`,
+    metadados: {
+      valor_total: valorAnterior,
+      motivo: textoMotivo
+    },
+    transaction
+  });
+
+  const fretes = await listarFretesPedido(pedido.id, { transaction });
+  return fretes.find((item) => Number(item.id) === Number(frete.id)) || serializeFrete(frete);
+}
+
 module.exports = {
+  atualizarFretePedido,
+  cancelarFretePedido,
   listarFretesPendentesFinanceiro,
   listarFretesPedido,
   registrarFretePedido

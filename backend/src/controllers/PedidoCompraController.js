@@ -17,6 +17,8 @@ const {
   removerPedidoItem
 } = require('../services/pedidoCompraService');
 const {
+  atualizarFretePedido,
+  cancelarFretePedido,
   listarFretesPendentesFinanceiro,
   registrarFretePedido
 } = require('../services/pedidoCompraFreteService');
@@ -670,6 +672,76 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return responderErroController(res, error, 'Erro ao registrar frete do pedido', { status: 400 });
+    }
+  },
+
+  async atualizarFrete(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
+      await atualizarFretePedido({
+        pedidoId: req.params.id,
+        freteId: req.params.freteId,
+        payload: req.body || {},
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao atualizar frete do pedido', { status: 400 });
+    }
+  },
+
+  async cancelarFrete(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
+      await cancelarFretePedido({
+        pedidoId: req.params.id,
+        freteId: req.params.freteId,
+        motivo: req.body?.motivo,
+        usuarioId: usuario.id,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao cancelar frete do pedido', { status: 400 });
     }
   },
 
