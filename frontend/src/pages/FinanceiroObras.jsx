@@ -106,10 +106,18 @@ function statusClass(value) {
   const normalized = String(value || '').toUpperCase();
   if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
   if (normalized === 'HISTORICO') return 'app-status-pill bg-indigo-100 text-indigo-700';
+  if (normalized.startsWith('FRETE_')) return 'app-status-pill bg-cyan-100 text-cyan-800';
   if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
   if (normalized === 'ABERTO') return 'app-status-pill bg-slate-100 text-slate-700';
   return 'app-status-pill bg-slate-100 text-slate-600';
+}
+
+function formatStatus(value) {
+  const normalized = String(value || '').toUpperCase();
+  if (normalized === 'FRETE_EMBUTIDO') return 'Frete embutido';
+  if (normalized === 'FRETE_PENDENTE') return 'Frete pendente';
+  return value || '-';
 }
 
 function csvValue(value) {
@@ -506,7 +514,7 @@ export default function FinanceiroObras() {
         <Metric
           label="Titulos"
           value={String(relatorio.resumo.titulos || 0)}
-          detail={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s)`}
+          detail={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s) / ${relatorio.resumo.fretes || 0} frete(s)`}
         />
       </div>
 
@@ -564,7 +572,7 @@ export default function FinanceiroObras() {
                     <td className="text-right font-semibold">{formatCurrency(linha.saldo)}</td>
                     <td>{linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')}</td>
                     <td>{linha.empresa_nome || '-'}</td>
-                    <td><span className={statusClass(linha.status_titulo)}>{linha.status_titulo || '-'}</span></td>
+                    <td><span className={statusClass(linha.status_titulo)}>{formatStatus(linha.status_titulo)}</span></td>
                   </tr>
                 ))
               )}

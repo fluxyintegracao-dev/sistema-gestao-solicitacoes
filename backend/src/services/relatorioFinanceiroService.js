@@ -8,6 +8,9 @@ const {
   ObraCustoHistorico,
   Obra,
   Parceiro,
+  PedidoCompra,
+  PedidoCompraFrete,
+  PedidoCompraFreteRateio,
   sequelize,
   TransferenciaFinanceira,
   User,
@@ -1506,6 +1509,146 @@ function buildFinanceiroObrasLinhaHistorico(item) {
   };
 }
 
+function getFinanceiroObrasFretePeriodoWhere(periodo) {
+  const dataInicial = parseDateOnly(periodo.data_inicial);
+  const dataFinal = parseDateOnly(periodo.data_final);
+  dataFinal.setHours(23, 59, 59, 999);
+
+  return {
+    [Op.between]: [dataInicial, dataFinal]
+  };
+}
+
+function buildFinanceiroObrasFreteWhere(filters, obraWhere, periodo, analise) {
+  if (String(filters.tipo || '').toUpperCase() === 'RECEBER') {
+    return null;
+  }
+
+  if (filters.categoria_financeira_id) {
+    return null;
+  }
+
+  const where = {
+    ...obraWhere
+  };
+
+  if (filters.parceiro_id) {
+    where.parceiro_id = Number(filters.parceiro_id);
+  }
+
+  if (analise === 'REALIZADO') {
+    where.tipo = 'EMBUTIDO';
+    where.status_financeiro = 'NAO_GERA_TITULO';
+    where.createdAt = getFinanceiroObrasFretePeriodoWhere(periodo);
+  } else {
+    where.tipo = 'TERCEIRO';
+    where.status_financeiro = 'PENDENTE_TITULO';
+    where.titulo_financeiro_id = null;
+    where.data_vencimento = {
+      [Op.between]: [periodo.data_inicial, periodo.data_final]
+    };
+  }
+
+  if (filters.q) {
+    const term = String(filters.q).trim();
+    where[Op.or] = [
+      { observacoes: { [Op.like]: `%${term}%` } },
+      { '$pedido.id$': { [Op.like]: `%${term}%` } },
+      { '$parceiro.nome$': { [Op.like]: `%${term}%` } },
+      { '$parceiro.cpf_cnpj$': { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  return where;
+}
+
+function getFinanceiroObrasFreteIncludes(filters = {}) {
+  const obraInclude = {
+    model: Obra,
+    as: 'obra',
+    attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
+  };
+
+  if (filters.empresa_id) {
+    obraInclude.where = { empresa_grupo_id: Number(filters.empresa_id) };
+    obraInclude.required = true;
+  }
+
+  return [
+    obraInclude,
+    {
+      model: PedidoCompra,
+      as: 'pedido',
+      attributes: ['id', 'status']
+    },
+    {
+      model: Parceiro,
+      as: 'parceiro',
+      attributes: ['id', 'nome', 'cpf_cnpj']
+    },
+    {
+      model: PedidoCompraFreteRateio,
+      as: 'rateios',
+      required: false,
+      separate: true,
+      attributes: ['id', 'valor_rateado']
+    }
+  ];
+}
+
+function getFinanceiroObrasFreteValor(frete) {
+  const totalRateios = (frete.rateios || []).reduce(
+    (sum, rateio) => roundCurrency(sum + Number(rateio.valor_rateado || 0)),
+    0
+  );
+  return totalRateios > 0 ? totalRateios : roundCurrency(frete.valor_total || 0);
+}
+
+function buildFinanceiroObrasLinhaFrete(frete, analise) {
+  const valor = getFinanceiroObrasFreteValor(frete);
+  const pedidoCodigo = frete.pedido?.id ? `PC-${String(frete.pedido.id).padStart(5, '0')}` : null;
+  const tipo = String(frete.tipo || '').toUpperCase();
+  const freteLabel = tipo === 'EMBUTIDO' ? 'Frete embutido' : 'Frete de terceiro pendente';
+  const dataBase = tipo === 'EMBUTIDO'
+    ? toDateOnly(new Date(frete.createdAt || Date.now()))
+    : frete.data_vencimento;
+
+  return {
+    id: `frete-${frete.id}-${analise}`,
+    titulo_id: null,
+    titulo_codigo: null,
+    titulo_parcela: pedidoCodigo ? `${pedidoCodigo} / Frete` : `Frete #${frete.id}`,
+    tipo: 'PAGAR',
+    status_titulo: tipo === 'EMBUTIDO' ? 'FRETE_EMBUTIDO' : 'FRETE_PENDENTE',
+    documento: pedidoCodigo,
+    descricao: frete.observacoes || freteLabel,
+    parceiro_nome: frete.parceiro?.nome || (tipo === 'EMBUTIDO' ? 'Fornecedor do pedido' : 'Transportador nao informado'),
+    parceiro_cpf_cnpj: frete.parceiro?.cpf_cnpj || null,
+    obra_id: frete.obra_id,
+    obra_nome: frete.obra?.nome || null,
+    obra_codigo: frete.obra?.codigo || null,
+    empresa_id: frete.obra?.empresa_grupo_id || null,
+    empresa_nome: null,
+    empresa_cnpj: null,
+    categoria_nome: null,
+    plano_financeiro: freteLabel,
+    data_emissao: dataBase,
+    data_vencimento: tipo === 'EMBUTIDO' ? null : frete.data_vencimento,
+    valor_original: valor,
+    valor_baixado: tipo === 'EMBUTIDO' ? valor : 0,
+    valor_saldo: tipo === 'EMBUTIDO' ? 0 : valor,
+    analise,
+    data_baixa: tipo === 'EMBUTIDO' ? dataBase : null,
+    movimento_id: null,
+    status_movimento: tipo === 'EMBUTIDO' ? 'FRETE_EMBUTIDO' : 'PENDENTE_TITULO',
+    conta_bancaria_nome: null,
+    credito: 0,
+    debito: valor,
+    saldo: 0,
+    origem_linha: 'FRETE_PEDIDO'
+  };
+}
+
 function applyFinanceiroObrasSaldo(linhas = []) {
   let saldo = 0;
   return linhas.map((linha) => {
@@ -1524,6 +1667,7 @@ function summarizeFinanceiroObras(linhas = []) {
   });
   const movimentoIds = new Set(linhas.map((linha) => linha.movimento_id).filter(Boolean));
   const historicos = linhas.filter((linha) => linha.origem_linha === 'HISTORICO_LEGADO').length;
+  const fretes = linhas.filter((linha) => linha.origem_linha === 'FRETE_PEDIDO').length;
   const titulosUnicos = Array.from(titulosMap.values());
 
   return {
@@ -1531,6 +1675,7 @@ function summarizeFinanceiroObras(linhas = []) {
     titulos: titulosMap.size,
     movimentos: movimentoIds.size,
     historicos,
+    fretes,
     credito_total: credito,
     debito_total: debito,
     saldo_total: roundCurrency(credito - debito),
@@ -1538,6 +1683,29 @@ function summarizeFinanceiroObras(linhas = []) {
     valor_baixado_total: titulosUnicos.reduce((sum, linha) => roundCurrency(sum + Number(linha.valor_baixado || 0)), 0),
     valor_saldo_total: titulosUnicos.reduce((sum, linha) => roundCurrency(sum + Number(linha.valor_saldo || 0)), 0)
   };
+}
+
+async function listarLinhasFreteFinanceiroObras(filters, obraWhere, periodo, analise, limit) {
+  const freteWhere = buildFinanceiroObrasFreteWhere(filters, obraWhere, periodo, analise);
+  if (!freteWhere) {
+    return [];
+  }
+
+  const fretes = await PedidoCompraFrete.findAll({
+    where: freteWhere,
+    include: getFinanceiroObrasFreteIncludes(filters),
+    order: [
+      [analise === 'REALIZADO' ? 'createdAt' : 'data_vencimento', 'ASC'],
+      ['id', 'ASC']
+    ],
+    limit,
+    subQuery: false
+  });
+
+  return fretes.map((freteInstance) => {
+    const frete = typeof freteInstance.toJSON === 'function' ? freteInstance.toJSON() : freteInstance;
+    return buildFinanceiroObrasLinhaFrete(frete, analise);
+  });
 }
 
 async function gerarRelatorioFinanceiroObras(req, filters = {}) {
@@ -1635,13 +1803,19 @@ async function gerarRelatorioFinanceiroObras(req, filters = {}) {
           const item = typeof itemInstance.toJSON === 'function' ? itemInstance.toJSON() : itemInstance;
           return buildFinanceiroObrasLinhaHistorico(item);
         })
-      ].sort((a, b) => {
-        const dateA = String(a.data_baixa || a.data_vencimento || '');
-        const dateB = String(b.data_baixa || b.data_vencimento || '');
-        if (dateA !== dateB) return dateA.localeCompare(dateB);
-        return String(a.id).localeCompare(String(b.id));
-      }).slice(0, limit);
+      ];
     }
+
+    const linhasFrete = await listarLinhasFreteFinanceiroObras(filters, obraWhere, periodo, analise, limit);
+    linhas = [
+      ...linhas,
+      ...linhasFrete
+    ].sort((a, b) => {
+      const dateA = String(a.data_baixa || a.data_vencimento || '');
+      const dateB = String(b.data_baixa || b.data_vencimento || '');
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.id).localeCompare(String(b.id));
+    }).slice(0, limit);
   } else {
     const titulos = await TituloFinanceiro.findAll({
       where: tituloWhere,
@@ -1658,6 +1832,17 @@ async function gerarRelatorioFinanceiroObras(req, filters = {}) {
       const titulo = typeof tituloInstance.toJSON === 'function' ? tituloInstance.toJSON() : tituloInstance;
       return buildFinanceiroObrasLinhaTitulo(titulo, analise);
     });
+
+    const linhasFrete = await listarLinhasFreteFinanceiroObras(filters, obraWhere, periodo, analise, limit);
+    linhas = [
+      ...linhas,
+      ...linhasFrete
+    ].sort((a, b) => {
+      const dateA = String(a.data_vencimento || a.data_baixa || '');
+      const dateB = String(b.data_vencimento || b.data_baixa || '');
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.id).localeCompare(String(b.id));
+    }).slice(0, limit);
   }
 
   const linhasComSaldo = applyFinanceiroObrasSaldo(linhas);
