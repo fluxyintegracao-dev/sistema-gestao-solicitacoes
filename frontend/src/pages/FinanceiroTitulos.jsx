@@ -19,6 +19,7 @@ import {
   getCartoesFinanceiros,
   getChequesTerceirosDisponiveis,
   getContasBancarias,
+  getFretesPedidosPendentesFinanceiro,
   getFormasPagamentoFinanceiras,
   getTitulosFinanceiros,
   excluirTitulosFinanceirosEmMassa,
@@ -476,6 +477,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [baixaMassaForm, setBaixaMassaForm] = useState(() => buildBaixaMassaForm([]));
   const [savingBaixaMassa, setSavingBaixaMassa] = useState(false);
   const [importandoCodigos, setImportandoCodigos] = useState(false);
+  const [fretesPendentes, setFretesPendentes] = useState([]);
+  const [loadingFretesPendentes, setLoadingFretesPendentes] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -648,6 +651,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   );
   const tipoAtual = fixedTipo || draftFilters.tipo;
   const tipoReferencia = fixedTipo || appliedFilters?.tipo || draftFilters.tipo;
+  const mostrarFretesPendentes = String(tipoReferencia || '').toUpperCase() === 'PAGAR';
   const tipoLabel = tipoReferencia === 'PAGAR' ? 'a pagar' : 'a receber';
   const parceiroLabel = tipoAtual === 'PAGAR' ? 'Credor' : 'Cliente';
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
@@ -736,6 +740,59 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   ), [baixaMassaForm.parcelas]);
   const baixaMassaDiferencaParcelas = roundValue(selectedSaldo - baixaMassaTotalParcelas);
   const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
+
+  useEffect(() => {
+    if (!mostrarFretesPendentes) {
+      setFretesPendentes([]);
+      setLoadingFretesPendentes(false);
+      return undefined;
+    }
+
+    let active = true;
+    setLoadingFretesPendentes(true);
+
+    getFretesPedidosPendentesFinanceiro({ limit: 20 })
+      .then((data) => {
+        if (active) {
+          setFretesPendentes(Array.isArray(data) ? data : []);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setFretesPendentes([]);
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setLoadingFretesPendentes(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [mostrarFretesPendentes]);
+
+  function buildFreteTituloUrl(frete) {
+    const params = new URLSearchParams({
+      tipo: 'PAGAR',
+      origem_frete_id: String(frete.id || ''),
+      valor: String(frete.valor_total || ''),
+      data_vencimento: frete.data_vencimento || '',
+      obra_id: String(frete.obra_id || frete.obra?.id || ''),
+      descricao: `Frete do pedido PC-${String(frete.pedido_compra_id || frete.pedido?.id || '').padStart(5, '0')}`,
+      numero_documento: `FRETE-PC-${String(frete.pedido_compra_id || frete.pedido?.id || '').padStart(5, '0')}`,
+      observacoes: `Frete vinculado ao pedido PC-${String(frete.pedido_compra_id || frete.pedido?.id || '').padStart(5, '0')}${frete.solicitacaoPrincipal?.codigo ? ` e solicitacao ${frete.solicitacaoPrincipal.codigo}` : ''}.`
+    });
+
+    const parceiroId = frete.parceiro_id || frete.parceiro?.id || frete.fornecedor?.parceiro_id;
+    if (parceiroId) {
+      params.set('parceiro_id', String(parceiroId));
+      params.set('parceiro_nome', frete.parceiro?.nome || frete.fornecedor?.nome || '');
+    }
+
+    return `/financeiro/titulos/novo?${params.toString()}`;
+  }
 
   useEffect(() => {
     setColumnOrder((current) => {
@@ -1718,6 +1775,80 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       </div>
 
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
+
+      {mostrarFretesPendentes ? (
+        <div className="sol-surface-card card">
+          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--c-text)]">Fretes de pedidos pendentes</h2>
+              <p className="text-xs text-[var(--c-muted)]">
+                Fretes pagos a terceiro registrados em compras e ainda sem titulo financeiro vinculado.
+              </p>
+            </div>
+            <span className="badge badge-info">
+              {loadingFretesPendentes ? 'Atualizando' : `${fretesPendentes.length} pendente(s)`}
+            </span>
+          </div>
+
+          {fretesPendentes.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)] text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">
+                    <th className="px-3 py-2">Pedido</th>
+                    <th className="px-3 py-2">Solicitacao</th>
+                    <th className="px-3 py-2">Obra</th>
+                    <th className="px-3 py-2">Transportador</th>
+                    <th className="px-3 py-2">Vencimento</th>
+                    <th className="px-3 py-2 text-right">Valor</th>
+                    <th className="px-3 py-2 text-right">Acao</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--c-border)]">
+                  {fretesPendentes.map((frete) => {
+                    const pedidoCodigo = `PC-${String(frete.pedido_compra_id || frete.pedido?.id || '').padStart(5, '0')}`;
+                    return (
+                      <tr key={frete.id} className="align-top hover:bg-[var(--c-bg)]">
+                        <td className="px-3 py-2 font-semibold text-[var(--c-text)]">{pedidoCodigo}</td>
+                        <td className="px-3 py-2">
+                          {frete.solicitacaoPrincipal?.id ? (
+                            <Link
+                              className="font-medium text-[var(--c-primary)] hover:underline"
+                              to={`/solicitacoes/${frete.solicitacaoPrincipal.id}`}
+                            >
+                              {frete.solicitacaoPrincipal.codigo || `#${frete.solicitacaoPrincipal.id}`}
+                            </Link>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-[var(--c-muted)]">{frete.obra?.nome || '-'}</td>
+                        <td className="px-3 py-2">
+                          <div className="font-medium text-[var(--c-text)]">{frete.parceiro?.nome || frete.fornecedor?.nome || '-'}</div>
+                          <div className="text-[10px] text-[var(--c-muted)]">{frete.parceiro?.cpf_cnpj || frete.fornecedor?.cnpj || ''}</div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap text-[var(--c-text)]">{formatDate(frete.data_vencimento)}</td>
+                        <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--c-text)]">
+                          {formatCurrency(frete.valor_total)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <Link className="btn btn-primary btn-sm" to={buildFreteTituloUrl(frete)}>
+                            Gerar titulo
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="px-3 py-5 text-sm text-[var(--c-muted)]">
+              {loadingFretesPendentes ? 'Carregando fretes pendentes...' : 'Nenhum frete de terceiro pendente de titulo.'}
+            </div>
+          )}
+        </div>
+      ) : null}
 
       <div className="sol-surface-card card overflow-hidden">
         <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">

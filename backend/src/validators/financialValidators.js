@@ -1204,7 +1204,8 @@ function validateFinanceTituloCreateBody(body = {}) {
       'rateios',
       'impostos',
       'valor_bruto',
-      'valor_liquido'
+      'valor_liquido',
+      'origem_frete_id'
     ],
     'Criacao manual de titulo financeiro'
   );
@@ -1252,7 +1253,8 @@ function validateFinanceTituloCreateBody(body = {}) {
     rateios: parseRateiosTitulo(body.rateios),
     impostos: parseImpostosTitulo(body.impostos),
     valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
-    valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 })
+    valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 }),
+    origem_frete_id: parseInteger(body.origem_frete_id, 'Frete do pedido')
   };
 }
 

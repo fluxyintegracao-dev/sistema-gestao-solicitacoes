@@ -34,6 +34,21 @@ export async function getTitulosFinanceiros(params = {}) {
   return parseJson(response, 'Erro ao buscar titulos financeiros');
 }
 
+export async function getFretesPedidosPendentesFinanceiro(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/fretes-pedidos/pendentes?${query}`
+    : `${API_URL}/financeiro/fretes-pedidos/pendentes`;
+
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  return parseJson(response, 'Erro ao buscar fretes pendentes de pedidos');
+}
+
 export async function getBankingDashboard() {
   const response = await fetch(`${API_URL}/financeiro/bancos/dashboard`, {
     headers: authHeaders()

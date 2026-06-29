@@ -1,11 +1,13 @@
 const {
   FornecedorCompra,
   Historico,
+  Obra,
   Parceiro,
   PedidoCompra,
   PedidoCompraFrete,
   PedidoCompraFreteRateio,
   PedidoCompraItem,
+  Solicitacao,
   SolicitacaoCompra,
   User
 } = require('../models');
@@ -74,6 +76,34 @@ async function listarFretesPedido(pedidoId, options = {}) {
     ],
     order: [['createdAt', 'DESC'], [{ model: PedidoCompraFreteRateio, as: 'rateios' }, 'id', 'ASC']],
     transaction: options.transaction
+  });
+
+  return fretes.map(serializeFrete);
+}
+
+async function listarFretesPendentesFinanceiro(options = {}) {
+  const limit = Math.min(Math.max(Number(options.limit || 20), 1), 100);
+
+  const fretes = await PedidoCompraFrete.findAll({
+    where: {
+      tipo: 'TERCEIRO',
+      status_financeiro: 'PENDENTE_TITULO',
+      titulo_financeiro_id: null
+    },
+    include: [
+      { model: PedidoCompra, as: 'pedido', attributes: ['id', 'status', 'valor_total'] },
+      { model: SolicitacaoCompra, as: 'solicitacaoCompra', attributes: ['id', 'status', 'origem'] },
+      { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'status_global', 'area_responsavel'] },
+      { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo', 'empresa_grupo_id'] },
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'cnpj', 'email', 'whatsapp', 'contato', 'parceiro_id'] },
+      { model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj', 'fornecedor', 'ativo'] },
+      { model: User, as: 'registradoPor', attributes: ['id', 'nome', 'email'] }
+    ],
+    order: [
+      ['data_vencimento', 'ASC'],
+      ['createdAt', 'ASC']
+    ],
+    limit
   });
 
   return fretes.map(serializeFrete);
@@ -297,6 +327,7 @@ async function registrarFretePedido({
 }
 
 module.exports = {
+  listarFretesPendentesFinanceiro,
   listarFretesPedido,
   registrarFretePedido
 };

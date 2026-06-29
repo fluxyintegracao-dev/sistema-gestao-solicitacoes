@@ -407,6 +407,7 @@ export default function FinanceiroTituloNovo() {
     payment_account_id: '',
     data_pagamento: today()
   });
+  const [prefillAplicado, setPrefillAplicado] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -460,6 +461,70 @@ export default function FinanceiroTituloNovo() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (prefillAplicado || loadingBase) return;
+
+    const origemFreteId = searchParams.get('origem_frete_id');
+    if (!origemFreteId) {
+      setPrefillAplicado(true);
+      return;
+    }
+
+    const parceiroId = searchParams.get('parceiro_id') || '';
+    const parceiroNome = searchParams.get('parceiro_nome') || '';
+    const obraId = searchParams.get('obra_id') || '';
+    const valor = searchParams.get('valor') || '';
+    const vencimento = searchParams.get('data_vencimento') || today();
+    const descricao = searchParams.get('descricao') || 'Frete de pedido de compra';
+    const numeroDocumento = searchParams.get('numero_documento') || '';
+    const observacoes = searchParams.get('observacoes') || '';
+    const obraSelecionadaPrefill = obras.find((obra) => String(obra.id) === String(obraId));
+
+    if (parceiroId && parceiroNome) {
+      setParceiros((current) => {
+        if (current.some((parceiro) => String(parceiro.id) === String(parceiroId))) {
+          return current;
+        }
+        return [
+          {
+            id: parceiroId,
+            nome: parceiroNome,
+            fornecedor: true,
+            ativo: true
+          },
+          ...current
+        ];
+      });
+      setParceiroBusca(parceiroNome);
+    }
+
+    setForm((current) => ({
+      ...current,
+      tipo: 'PAGAR',
+      status: 'ABERTO',
+      obra_id: obraId || current.obra_id,
+      empresa_id: getEmpresaObraId(obraSelecionadaPrefill) || current.empresa_id,
+      parceiro_id: parceiroId || current.parceiro_id,
+      valor: valor ? formatCurrencyInput(Number(valor)) : current.valor,
+      data_vencimento: vencimento,
+      data_emissao: current.data_emissao || today(),
+      competencia_data: current.competencia_data || vencimento,
+      descricao,
+      numero_documento: numeroDocumento,
+      observacoes,
+      pagamentos: (current.pagamentos || [createPagamento('')]).map((pagamento, index) => index === 0
+        ? {
+          ...pagamento,
+          valor: valor ? formatCurrencyInput(Number(valor)) : pagamento.valor,
+          parceiro_id: parceiroId || pagamento.parceiro_id,
+          parceiro_nome: parceiroNome || pagamento.parceiro_nome,
+          data_vencimento: vencimento
+        }
+        : pagamento)
+    }));
+    setPrefillAplicado(true);
+  }, [loadingBase, obras, prefillAplicado, searchParams]);
 
   useEffect(() => {
     let active = true;
@@ -1146,6 +1211,10 @@ export default function FinanceiroTituloNovo() {
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
+      const origemFreteId = searchParams.get('origem_frete_id');
+      if (origemFreteId) {
+        payload.origem_frete_id = Number(origemFreteId);
+      }
       payload.empresa_contraparte_id = form.intercompany && form.empresa_contraparte_id
         ? Number(form.empresa_contraparte_id)
         : form.intercompany && form.empresa_destino_id

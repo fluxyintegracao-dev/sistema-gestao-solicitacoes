@@ -20,6 +20,7 @@ const {
   PaymentBatchItem,
   PaymentBeneficiary,
   PaymentIntent,
+  PedidoCompraFrete,
   SecurityEventLog,
   Solicitacao,
   SolicitacaoCompra,
@@ -2513,6 +2514,7 @@ async function criarTituloManual(req, payload = {}) {
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
   const baixasCartaoDebito = [];
+  const origemFreteId = Number(payload.origem_frete_id || 0);
 
   try {
     for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
@@ -2617,6 +2619,36 @@ async function criarTituloManual(req, payload = {}) {
       }
     }
 
+    if (origemFreteId) {
+      const frete = await PedidoCompraFrete.findOne({
+        where: {
+          id: origemFreteId,
+          tipo: 'TERCEIRO',
+          status_financeiro: 'PENDENTE_TITULO',
+          titulo_financeiro_id: null
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!frete) {
+        throw createHttpError(400, 'Frete do pedido nao encontrado ou ja vinculado a um titulo financeiro.');
+      }
+
+      if (tipo !== 'PAGAR') {
+        throw createHttpError(400, 'Frete de pedido so pode gerar titulo a pagar.');
+      }
+
+      if (roundCurrency(frete.valor_total) !== roundCurrency(valorOriginal)) {
+        throw createHttpError(400, 'Valor do titulo precisa ser igual ao valor do frete do pedido.');
+      }
+
+      await frete.update({
+        titulo_financeiro_id: titulosCriados[0]?.id || null,
+        status_financeiro: 'TITULO_GERADO'
+      }, { transaction });
+    }
+
     await transaction.commit();
   } catch (error) {
     await transaction.rollback();
@@ -2633,6 +2665,7 @@ async function criarTituloManual(req, payload = {}) {
     descricao: titulosCriados.length > 1 ? 'Titulos financeiros criados manualmente' : 'Titulo financeiro criado manualmente',
     metadata: {
       origem: 'MANUAL',
+      origem_frete_id: origemFreteId || null,
       obra_id: obra.id,
       parceiro_id: titulosCriados[0]?.parceiro_id || parceiro.id,
       tipo,

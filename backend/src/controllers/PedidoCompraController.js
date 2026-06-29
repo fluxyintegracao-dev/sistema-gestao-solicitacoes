@@ -16,7 +16,10 @@ const {
   remanejarPedidoItem,
   removerPedidoItem
 } = require('../services/pedidoCompraService');
-const { registrarFretePedido } = require('../services/pedidoCompraFreteService');
+const {
+  listarFretesPendentesFinanceiro,
+  registrarFretePedido
+} = require('../services/pedidoCompraFreteService');
 const {
   getUserObraScopeIds,
   canAccessSolicitacaoCompraByScope,
@@ -667,6 +670,18 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return responderErroController(res, error, 'Erro ao registrar frete do pedido', { status: 400 });
+    }
+  },
+
+  async fretesPendentesFinanceiro(req, res) {
+    try {
+      const fretes = await listarFretesPendentesFinanceiro({
+        limit: req.query?.limit
+      });
+      return res.json(fretes);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao listar fretes pendentes do financeiro');
     }
   },
 

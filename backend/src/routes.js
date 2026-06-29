@@ -1544,6 +1544,7 @@ router.post('/financeiro/financiamentos-bancarios/:id/gerar-titulos', allowFinan
 router.patch('/financeiro/financiamentos-bancarios/parcelas/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Parcela do financiamento bancario') }), FinanciamentoBancarioController.atualizarParcela);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
+router.get('/financeiro/fretes-pedidos/pendentes', allowFinanceiro, PedidoCompraController.fretesPendentesFinanceiro);
 router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
 router.post('/financeiro/titulos/excluir-em-massa', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.excluirEmMassa);
 router.post('/financeiro/titulos/baixas/parceladas', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloBaixaParceladaBody }), TituloFinanceiroController.baixarParcelado);
