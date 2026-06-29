@@ -1,6 +1,7 @@
 const {
   FornecedorCompra,
   Historico,
+  Parceiro,
   PedidoCompra,
   PedidoCompraFrete,
   PedidoCompraFreteRateio,
@@ -9,7 +10,11 @@ const {
   User
 } = require('../models');
 const { registrarLogSolicitacaoCompra } = require('./comprasCotacao');
-const { criarOuAtualizarFornecedorCentralizado } = require('./comprasFornecedorService');
+const {
+  criarOuAtualizarFornecedorCentralizado,
+  sincronizarFornecedorCompraComParceiro
+} = require('./comprasFornecedorService');
+const { isPedidoCompraStatusLocked } = require('./pedidoCompraStatusConfig');
 
 function asNumber(value) {
   const parsed = Number(value || 0);
@@ -114,6 +119,17 @@ async function resolverFornecedorFrete(payload, transaction) {
     return fornecedor;
   }
 
+  if (Number(payload.parceiro_id || 0) > 0) {
+    const parceiro = await Parceiro.findByPk(Number(payload.parceiro_id), { transaction });
+    if (!parceiro || parceiro.ativo === false) {
+      throw new Error('Credor/transportador do frete nao encontrado ou inativo.');
+    }
+
+    return sincronizarFornecedorCompraComParceiro(parceiro, {
+      contato: payload.contato || null
+    }, { transaction });
+  }
+
   const novoFornecedor = payload.novo_fornecedor || null;
   if (!novoFornecedor || typeof novoFornecedor !== 'object') {
     throw new Error('Informe o credor/transportador do frete.');
@@ -179,6 +195,11 @@ async function registrarFretePedido({
   }
   if (valorTotal <= 0) {
     throw new Error('Informe um valor de frete maior que zero.');
+  }
+
+  const edicaoBloqueadaPorStatus = await isPedidoCompraStatusLocked(pedido.status);
+  if (tipo === 'EMBUTIDO' && edicaoBloqueadaPorStatus) {
+    throw new Error('Pedido fechado aceita apenas frete pago a terceiro.');
   }
 
   const fornecedor = tipo === 'TERCEIRO'

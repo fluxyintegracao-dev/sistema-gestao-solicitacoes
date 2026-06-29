@@ -880,6 +880,7 @@ function validateCompraPedidoFreteBody(body = {}) {
       'criterio_rateio',
       'valor_total',
       'fornecedor_compra_id',
+      'parceiro_id',
       'novo_fornecedor',
       'dados_pagamento',
       'observacoes'
@@ -915,6 +916,7 @@ function validateCompraPedidoFreteBody(body = {}) {
   const dadosPagamento = body.dados_pagamento && typeof body.dados_pagamento === 'object'
     ? {
         pix: parseOptionalText(body.dados_pagamento.pix, 'PIX', 180),
+        tipo_chave_pix: parseOptionalText(body.dados_pagamento.tipo_chave_pix, 'Tipo da chave PIX', 30),
         banco: parseOptionalText(body.dados_pagamento.banco, 'Banco', 120),
         agencia: parseOptionalText(body.dados_pagamento.agencia, 'Agencia', 60),
         conta: parseOptionalText(body.dados_pagamento.conta, 'Conta', 80),
@@ -930,6 +932,7 @@ function validateCompraPedidoFreteBody(body = {}) {
     criterio_rateio: criterioRateio,
     valor_total: parseDecimal(body.valor_total, 'Valor do frete', { required: true, min: 0.01 }),
     fornecedor_compra_id: parseInteger(body.fornecedor_compra_id, 'Fornecedor'),
+    parceiro_id: parseInteger(body.parceiro_id, 'Credor'),
     novo_fornecedor: novoFornecedor,
     dados_pagamento: dadosPagamento,
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000)

@@ -17,9 +17,11 @@ import {
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
+import { buscarParceiros } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasPedidos, isBusinessAdmin } from '../../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../../utils/navigation';
+import { isValidCpfCnpj, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 
 function formatMoney(value) {
@@ -64,6 +66,45 @@ function formatMoneyInput(value) {
 
 function sanitizeMoneyInput(value) {
   return String(value ?? '').replace(/[^\d,.\sR$-]/g, '');
+}
+
+function isValidEmail(value) {
+  const text = String(value || '').trim();
+  if (!text) return true;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(text);
+}
+
+function maskCpf(value) {
+  return onlyDigits(value)
+    .slice(0, 11)
+    .replace(/^(\d{3})(\d)/, '$1.$2')
+    .replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3-$4');
+}
+
+function maskCnpj(value) {
+  return onlyDigits(value)
+    .slice(0, 14)
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, '$1.$2.$3/$4')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, '$1.$2.$3/$4-$5');
+}
+
+function maskPixKey(value, type) {
+  const kind = String(type || '').toUpperCase();
+  if (kind === 'CPF') return maskCpf(value);
+  if (kind === 'CNPJ') return maskCnpj(value);
+  if (kind === 'TELEFONE') return maskPhone(value);
+  if (kind === 'EMAIL') return String(value || '').trim().toLowerCase().slice(0, 160);
+  return String(value || '').trim().slice(0, 180);
+}
+
+function formatarCredorFrete(credor) {
+  if (!credor) return '';
+  const nome = String(credor.nome || '').trim();
+  const documento = maskCpfCnpj(credor.cpf_cnpj || credor.cnpj || '');
+  return [nome, documento].filter(Boolean).join(' - ') || `Credor ${credor.id}`;
 }
 
 function toNullableNumber(value) {
@@ -243,6 +284,7 @@ const FRETE_FORM_INICIAL = {
   momento: 'FECHAMENTO',
   valor_total: '',
   fornecedor_compra_id: '',
+  parceiro_id: '',
   novo_fornecedor: {
     nome: '',
     cpf_cnpj: '',
@@ -251,6 +293,7 @@ const FRETE_FORM_INICIAL = {
     contato: ''
   },
   dados_pagamento: {
+    tipo_chave_pix: 'CPF',
     pix: '',
     banco: '',
     agencia: '',
@@ -338,6 +381,7 @@ export default function PedidoCompraDetalhe() {
   const [freteForm, setFreteForm] = useState(FRETE_FORM_INICIAL);
   const [buscaFornecedorFrete, setBuscaFornecedorFrete] = useState('');
   const [fornecedoresFrete, setFornecedoresFrete] = useState([]);
+  const [credorFreteSelecionado, setCredorFreteSelecionado] = useState(null);
   const [buscandoFornecedoresFrete, setBuscandoFornecedoresFrete] = useState(false);
   const itemSelecionadoId = itemEditandoId;
   const buscaItensDeferred = useDeferredValue(buscaItens);
@@ -429,6 +473,7 @@ export default function PedidoCompraDetalhe() {
   const statusAtual = statusMap[String(pedido?.status || '').toUpperCase()] || pedido?.status_configuracao || null;
   const edicaoBloqueadaPorStatus = Boolean(statusAtual?.bloqueia_edicao || pedido?.edicao_bloqueada);
   const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeGerenciarPedido);
+  const permiteFreteEmbutido = !edicaoBloqueadaPorStatus;
   const statusSelectOptions = useMemo(() => {
     const ativos = (statusOptions || []).filter((item) => item?.ativo !== false);
     if (!pedido?.status) {
@@ -498,12 +543,15 @@ export default function PedidoCompraDetalhe() {
   }
 
   function abrirModalFrete(momento = 'FECHAMENTO') {
+    const tipoInicial = permiteFreteEmbutido ? 'EMBUTIDO' : 'TERCEIRO';
     setFreteForm({
       ...FRETE_FORM_INICIAL,
-      momento
+      tipo: tipoInicial,
+      momento: permiteFreteEmbutido ? momento : 'POSTERIOR'
     });
     setBuscaFornecedorFrete('');
     setFornecedoresFrete([]);
+    setCredorFreteSelecionado(null);
     setModalFreteAberto(true);
   }
 
@@ -513,6 +561,7 @@ export default function PedidoCompraDetalhe() {
     setFreteForm(FRETE_FORM_INICIAL);
     setBuscaFornecedorFrete('');
     setFornecedoresFrete([]);
+    setCredorFreteSelecionado(null);
   }
 
   function atualizarFreteForm(changes) {
@@ -542,21 +591,92 @@ export default function PedidoCompraDetalhe() {
     }));
   }
 
-  async function handleBuscarFornecedorFrete() {
+  function selecionarCredorFrete(credor) {
+    setCredorFreteSelecionado(credor || null);
+    setBuscaFornecedorFrete(formatarCredorFrete(credor));
+    setFornecedoresFrete([]);
+    setFreteForm((current) => ({
+      ...current,
+      fornecedor_compra_id: credor?.fornecedor_compra_id ? String(credor.fornecedor_compra_id) : '',
+      parceiro_id: credor?.parceiro_id ? String(credor.parceiro_id) : String(credor?.id || ''),
+      novo_fornecedor: FRETE_FORM_INICIAL.novo_fornecedor,
+      dados_pagamento: {
+        ...current.dados_pagamento,
+        favorecido: current.dados_pagamento.favorecido || credor?.nome || '',
+        documento: current.dados_pagamento.documento || maskCpfCnpj(credor?.cpf_cnpj || credor?.cnpj || '')
+      }
+    }));
+  }
+
+  function limparCredorFrete() {
+    setCredorFreteSelecionado(null);
+    setBuscaFornecedorFrete('');
+    setFornecedoresFrete([]);
+    setFreteForm((current) => ({
+      ...current,
+      fornecedor_compra_id: '',
+      parceiro_id: ''
+    }));
+  }
+
+  async function handleBuscarFornecedorFrete(termoBusca = buscaFornecedorFrete) {
     try {
+      const termo = String(termoBusca || '').trim();
+      if (termo.length < 2) {
+        setFornecedoresFrete([]);
+        return;
+      }
       setBuscandoFornecedoresFrete(true);
-      const data = await listarFornecedoresCompra({
-        q: buscaFornecedorFrete,
-        incluir_inativos: '0'
-      });
-      setFornecedoresFrete(Array.isArray(data) ? data : []);
+      const [parceirosData, fornecedoresData] = await Promise.all([
+        buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 }),
+        listarFornecedoresCompra({ q: termo, incluir_inativos: '0' })
+      ]);
+      const parceiros = (Array.isArray(parceirosData) ? parceirosData : []).map((parceiro) => ({
+        ...parceiro,
+        parceiro_id: parceiro.id,
+        origem_frete: 'PARCEIRO'
+      }));
+      const parceiroIds = new Set(parceiros.map((item) => Number(item.id)));
+      const fornecedores = (Array.isArray(fornecedoresData) ? fornecedoresData : [])
+        .filter((fornecedor) => !fornecedor.parceiro_id || !parceiroIds.has(Number(fornecedor.parceiro_id)))
+        .map((fornecedor) => ({
+          id: `fornecedor:${fornecedor.id}`,
+          fornecedor_compra_id: fornecedor.id,
+          parceiro_id: fornecedor.parceiro_id || '',
+          origem_frete: 'FORNECEDOR_COMPRA',
+          nome: fornecedor.nome,
+          cpf_cnpj: fornecedor.cnpj,
+          cnpj: fornecedor.cnpj,
+          email: fornecedor.email || '',
+          telefone: fornecedor.whatsapp || '',
+          contato: fornecedor.contato || ''
+        }));
+      setFornecedoresFrete([...parceiros, ...fornecedores].slice(0, 12));
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao buscar fornecedores de frete');
+      alert(error.message || 'Erro ao buscar credores de frete');
     } finally {
       setBuscandoFornecedoresFrete(false);
     }
   }
+
+  useEffect(() => {
+    if (!modalFreteAberto || freteForm.tipo !== 'TERCEIRO' || credorFreteSelecionado) {
+      return undefined;
+    }
+
+    const termo = String(buscaFornecedorFrete || '').trim();
+    if (termo.length < 2) {
+      setFornecedoresFrete([]);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      handleBuscarFornecedorFrete(termo);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [buscaFornecedorFrete, credorFreteSelecionado, freteForm.tipo, modalFreteAberto]);
 
   async function handleRegistrarFrete() {
     const valorTotal = parseBrazilianMoney(freteForm.valor_total);
@@ -566,6 +686,11 @@ export default function PedidoCompraDetalhe() {
     }
 
     const tipo = String(freteForm.tipo || '').toUpperCase();
+    if (tipo === 'EMBUTIDO' && !permiteFreteEmbutido) {
+      alert('Pedido fechado aceita apenas frete pago a terceiro.');
+      return;
+    }
+
     const payload = {
       tipo,
       momento: freteForm.momento,
@@ -576,18 +701,62 @@ export default function PedidoCompraDetalhe() {
 
     if (tipo === 'TERCEIRO') {
       const fornecedorId = Number(freteForm.fornecedor_compra_id || 0);
+      const parceiroId = Number(freteForm.parceiro_id || 0);
       const novoFornecedor = freteForm.novo_fornecedor || {};
+      const dadosPagamento = freteForm.dados_pagamento || {};
 
       if (fornecedorId) {
         payload.fornecedor_compra_id = fornecedorId;
+      } else if (parceiroId) {
+        payload.parceiro_id = parceiroId;
       } else if (novoFornecedor.nome || novoFornecedor.cpf_cnpj) {
-        payload.novo_fornecedor = novoFornecedor;
+        if (!String(novoFornecedor.nome || '').trim()) {
+          alert('Informe o nome do credor/transportador.');
+          return;
+        }
+        if (!isValidCpfCnpj(novoFornecedor.cpf_cnpj)) {
+          alert('Informe um CPF/CNPJ valido para o credor/transportador.');
+          return;
+        }
+        if (!String(novoFornecedor.whatsapp || '').trim()) {
+          alert('Informe o telefone do credor/transportador.');
+          return;
+        }
+        if (!isValidEmail(novoFornecedor.email)) {
+          alert('Informe um e-mail valido para o credor/transportador.');
+          return;
+        }
+        payload.novo_fornecedor = {
+          ...novoFornecedor,
+          cpf_cnpj: onlyDigits(novoFornecedor.cpf_cnpj),
+          whatsapp: onlyDigits(novoFornecedor.whatsapp),
+          telefone: onlyDigits(novoFornecedor.whatsapp)
+        };
       } else {
         alert('Selecione ou cadastre o fornecedor/transportador do frete.');
         return;
       }
 
-      payload.dados_pagamento = freteForm.dados_pagamento;
+      if (dadosPagamento.documento && !isValidCpfCnpj(dadosPagamento.documento)) {
+        alert('Informe um CPF/CNPJ valido para o favorecido.');
+        return;
+      }
+      if (String(dadosPagamento.tipo_chave_pix || '').toUpperCase() === 'EMAIL' && dadosPagamento.pix && !isValidEmail(dadosPagamento.pix)) {
+        alert('Informe uma chave PIX de e-mail valida.');
+        return;
+      }
+      if (['CPF', 'CNPJ'].includes(String(dadosPagamento.tipo_chave_pix || '').toUpperCase()) && dadosPagamento.pix && !isValidCpfCnpj(dadosPagamento.pix)) {
+        alert('Informe uma chave PIX CPF/CNPJ valida.');
+        return;
+      }
+
+      payload.dados_pagamento = {
+        ...dadosPagamento,
+        documento: onlyDigits(dadosPagamento.documento),
+        pix: ['CPF', 'CNPJ', 'TELEFONE'].includes(String(dadosPagamento.tipo_chave_pix || '').toUpperCase())
+          ? onlyDigits(dadosPagamento.pix)
+          : dadosPagamento.pix
+      };
     }
 
     try {
@@ -1693,9 +1862,14 @@ export default function PedidoCompraDetalhe() {
                     onChange={(event) => atualizarFreteForm({ tipo: event.target.value })}
                     disabled={salvandoFrete}
                   >
-                    <option value="EMBUTIDO">Embutido no pedido</option>
+                    {permiteFreteEmbutido ? <option value="EMBUTIDO">Embutido no pedido</option> : null}
                     <option value="TERCEIRO">Pago a terceiro</option>
                   </select>
+                  {!permiteFreteEmbutido ? (
+                    <span className="text-xs font-normal text-[var(--c-muted)]">
+                      Pedido fechado aceita somente frete pago a terceiro.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium">
@@ -1740,47 +1914,70 @@ export default function PedidoCompraDetalhe() {
               {freteForm.tipo === 'TERCEIRO' ? (
                 <div className="mt-4 grid gap-4">
                   <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-                    <div className="font-semibold">Fornecedor/transportador</div>
+                    <div className="font-semibold">Credor/transportador</div>
                     <p className="mt-1 text-xs text-[var(--c-muted)]">
-                      Selecione um fornecedor existente ou informe os dados para cadastro rapido.
+                      Pesquise no cadastro de credores ou informe os dados para cadastro rapido.
                     </p>
 
-                    <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
-                      <input
-                        className="input"
-                        value={buscaFornecedorFrete}
-                        onChange={(event) => setBuscaFornecedorFrete(event.target.value)}
-                        placeholder="Buscar por nome, CPF/CNPJ, email ou contato"
-                        disabled={salvandoFrete}
-                      />
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={handleBuscarFornecedorFrete}
-                        disabled={buscandoFornecedoresFrete || salvandoFrete}
-                      >
-                        {buscandoFornecedoresFrete ? 'Buscando...' : 'Buscar'}
-                      </button>
-                    </div>
+                    <div className="relative mt-3">
+                      <div className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]">
+                        <input
+                          className="input"
+                          value={buscaFornecedorFrete}
+                          onChange={(event) => {
+                            setBuscaFornecedorFrete(event.target.value);
+                            if (credorFreteSelecionado) {
+                              limparCredorFrete();
+                              setBuscaFornecedorFrete(event.target.value);
+                            }
+                          }}
+                          placeholder="Buscar credor por nome, CPF/CNPJ, email ou telefone"
+                          disabled={salvandoFrete}
+                          autoComplete="off"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => handleBuscarFornecedorFrete()}
+                          disabled={buscandoFornecedoresFrete || salvandoFrete}
+                        >
+                          {buscandoFornecedoresFrete ? 'Buscando...' : 'Buscar'}
+                        </button>
+                      </div>
 
-                    <select
-                      className="input mt-3"
-                      value={freteForm.fornecedor_compra_id}
-                      onChange={(event) => atualizarFreteForm({ fornecedor_compra_id: event.target.value })}
-                      disabled={salvandoFrete}
-                    >
-                      <option value="">Sem fornecedor selecionado</option>
-                      {fornecedoresFrete.map((fornecedor) => (
-                        <option key={fornecedor.id} value={fornecedor.id}>
-                          {fornecedor.nome} {fornecedor.cnpj ? `- ${fornecedor.cnpj}` : ''}
-                        </option>
-                      ))}
-                    </select>
+                      {credorFreteSelecionado ? (
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                          <span className="font-semibold">{formatarCredorFrete(credorFreteSelecionado)}</span>
+                          <button type="button" className="btn btn-outline !py-1 text-xs" onClick={limparCredorFrete} disabled={salvandoFrete}>
+                            Trocar
+                          </button>
+                        </div>
+                      ) : null}
+
+                      {!credorFreteSelecionado && fornecedoresFrete.length ? (
+                        <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface)] shadow-xl">
+                          {fornecedoresFrete.map((credor) => (
+                            <button
+                              key={`${credor.origem_frete || 'credor'}:${credor.id}`}
+                              type="button"
+                              className="block w-full border-b border-[var(--c-border)] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-[var(--c-surface)]"
+                              onClick={() => selecionarCredorFrete(credor)}
+                              disabled={salvandoFrete}
+                            >
+                              <span className="block font-semibold text-[var(--c-text)]">{formatarCredorFrete(credor)}</span>
+                              <span className="block text-xs text-[var(--c-muted)]">
+                                {credor.email || 'Sem e-mail'} {credor.telefone ? `- ${maskPhone(credor.telefone)}` : ''}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
 
-                  {!freteForm.fornecedor_compra_id ? (
+                  {!freteForm.fornecedor_compra_id && !freteForm.parceiro_id ? (
                     <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
-                      <div className="font-semibold">Cadastro rapido do transportador</div>
+                      <div className="font-semibold">Cadastro rapido do credor/transportador</div>
                       <div className="mt-3 grid gap-3 md:grid-cols-2">
                         <input
                           className="input"
@@ -1792,21 +1989,32 @@ export default function PedidoCompraDetalhe() {
                         <input
                           className="input"
                           value={freteForm.novo_fornecedor.cpf_cnpj}
-                          onChange={(event) => atualizarNovoFornecedorFrete({ cpf_cnpj: event.target.value })}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ cpf_cnpj: maskCpfCnpj(event.target.value) })}
+                          onBlur={(event) => {
+                            if (event.target.value && !isValidCpfCnpj(event.target.value)) {
+                              alert('CPF/CNPJ invalido para o credor/transportador.');
+                            }
+                          }}
                           placeholder="CPF/CNPJ"
                           disabled={salvandoFrete}
                         />
                         <input
                           className="input"
                           value={freteForm.novo_fornecedor.whatsapp}
-                          onChange={(event) => atualizarNovoFornecedorFrete({ whatsapp: event.target.value })}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ whatsapp: maskPhone(event.target.value) })}
                           placeholder="WhatsApp/telefone"
                           disabled={salvandoFrete}
                         />
                         <input
                           className="input"
+                          type="email"
                           value={freteForm.novo_fornecedor.email}
-                          onChange={(event) => atualizarNovoFornecedorFrete({ email: event.target.value })}
+                          onChange={(event) => atualizarNovoFornecedorFrete({ email: event.target.value.trim().toLowerCase() })}
+                          onBlur={(event) => {
+                            if (event.target.value && !isValidEmail(event.target.value)) {
+                              alert('E-mail invalido para o credor/transportador.');
+                            }
+                          }}
                           placeholder="Email"
                           disabled={salvandoFrete}
                         />
@@ -1824,10 +2032,27 @@ export default function PedidoCompraDetalhe() {
                   <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                     <div className="font-semibold">Dados para pagamento do frete</div>
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
+                      <select
+                        className="input"
+                        value={freteForm.dados_pagamento.tipo_chave_pix}
+                        onChange={(event) => atualizarDadosPagamentoFrete({
+                          tipo_chave_pix: event.target.value,
+                          pix: maskPixKey(freteForm.dados_pagamento.pix, event.target.value)
+                        })}
+                        disabled={salvandoFrete}
+                      >
+                        <option value="CPF">Chave CPF</option>
+                        <option value="CNPJ">Chave CNPJ</option>
+                        <option value="TELEFONE">Chave telefone</option>
+                        <option value="EMAIL">Chave e-mail</option>
+                        <option value="ALEATORIA">Chave aleatoria</option>
+                      </select>
                       <input
                         className="input"
                         value={freteForm.dados_pagamento.pix}
-                        onChange={(event) => atualizarDadosPagamentoFrete({ pix: event.target.value })}
+                        onChange={(event) => atualizarDadosPagamentoFrete({
+                          pix: maskPixKey(event.target.value, freteForm.dados_pagamento.tipo_chave_pix)
+                        })}
                         placeholder="Chave PIX"
                         disabled={salvandoFrete}
                       />
@@ -1841,7 +2066,12 @@ export default function PedidoCompraDetalhe() {
                       <input
                         className="input"
                         value={freteForm.dados_pagamento.documento}
-                        onChange={(event) => atualizarDadosPagamentoFrete({ documento: event.target.value })}
+                        onChange={(event) => atualizarDadosPagamentoFrete({ documento: maskCpfCnpj(event.target.value) })}
+                        onBlur={(event) => {
+                          if (event.target.value && !isValidCpfCnpj(event.target.value)) {
+                            alert('CPF/CNPJ invalido para o favorecido.');
+                          }
+                        }}
                         placeholder="CPF/CNPJ do favorecido"
                         disabled={salvandoFrete}
                       />
