@@ -72,6 +72,19 @@ function buildPedidoCodigo(id) {
   return `PC-${String(id).padStart(5, '0')}`;
 }
 
+function isDateOnlyPast(value) {
+  if (!value) return false;
+  const text = String(value).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return false;
+  const today = new Date();
+  const todayText = [
+    today.getFullYear(),
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0')
+  ].join('-');
+  return text < todayText;
+}
+
 async function registrarHistoricoPedidoNaSolicitacaoPrincipal({
   solicitacao,
   pedido,
@@ -1927,6 +1940,7 @@ async function delegarSolicitacaoCompra({
   responsavelId,
   prazoCompra,
   motivoAtraso,
+  motivoDelegacaoVencida,
   usuarioId,
   somenteMotivo = false,
   transaction
@@ -1940,6 +1954,7 @@ async function delegarSolicitacaoCompra({
   }
 
   const motivoNormalizado = motivoAtraso ? String(motivoAtraso).trim() : '';
+  const motivoDelegacaoVencidaNormalizado = motivoDelegacaoVencida ? String(motivoDelegacaoVencida).trim() : '';
 
   if (somenteMotivo) {
     if (!motivoNormalizado) {
@@ -1976,6 +1991,10 @@ async function delegarSolicitacaoCompra({
     return solicitacao;
   }
 
+  if (isDateOnlyPast(prazoCompra) && !motivoDelegacaoVencidaNormalizado) {
+    throw new Error('Informe o motivo para delegar uma solicitacao com prazo ja vencido.');
+  }
+
   await solicitacao.update(
     {
       comprador_responsavel_id: responsavelId ? Number(responsavelId) : null,
@@ -1983,7 +2002,11 @@ async function delegarSolicitacaoCompra({
       delegado_por: usuarioId || null,
       delegado_em: new Date(),
       motivo_atraso: motivoNormalizado || solicitacao.motivo_atraso,
-      motivo_atraso_em: motivoNormalizado ? new Date() : solicitacao.motivo_atraso_em
+      motivo_atraso_em: motivoNormalizado ? new Date() : solicitacao.motivo_atraso_em,
+      motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || solicitacao.motivo_delegacao_vencida,
+      motivo_delegacao_vencida_em: motivoDelegacaoVencidaNormalizado
+        ? new Date()
+        : solicitacao.motivo_delegacao_vencida_em
     },
     { transaction }
   );
@@ -1998,6 +2021,10 @@ async function delegarSolicitacaoCompra({
     pedidoUpdate.motivo_atraso = motivoNormalizado;
     pedidoUpdate.motivo_atraso_em = new Date();
   }
+  if (motivoDelegacaoVencidaNormalizado) {
+    pedidoUpdate.motivo_delegacao_vencida = motivoDelegacaoVencidaNormalizado;
+    pedidoUpdate.motivo_delegacao_vencida_em = new Date();
+  }
 
   await PedidoCompra.update(pedidoUpdate, { where: { solicitacao_compra_id: solicitacao.id }, transaction });
 
@@ -2011,7 +2038,8 @@ async function delegarSolicitacaoCompra({
     metadados: {
       responsavel_id: responsavelId || null,
       prazo_compra: prazoCompra || null,
-      motivo_atraso: motivoNormalizado || null
+      motivo_atraso: motivoNormalizado || null,
+      motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || null
     },
     transaction
   });
@@ -2026,7 +2054,8 @@ async function delegarSolicitacaoCompra({
     metadados: {
       responsavel_id: responsavelId || null,
       prazo_compra: prazoCompra || null,
-      motivo_atraso: motivoNormalizado || null
+      motivo_atraso: motivoNormalizado || null,
+      motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || null
     },
     transaction
   });

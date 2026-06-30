@@ -75,6 +75,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true
       },
+      motivo_delegacao_vencida: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      motivo_delegacao_vencida_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       cancelado_por: {
         type: DataTypes.INTEGER,
         allowNull: true

@@ -90,6 +90,14 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DATE,
         allowNull: true
       },
+      motivo_delegacao_vencida: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      motivo_delegacao_vencida_em: {
+        type: DataTypes.DATE,
+        allowNull: true
+      },
       valor_fechado: {
         type: DataTypes.DECIMAL(14, 2),
         allowNull: false,

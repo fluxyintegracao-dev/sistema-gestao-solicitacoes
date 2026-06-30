@@ -793,6 +793,7 @@ module.exports = {
         responsavelId: req.body?.responsavel_id,
         prazoCompra: req.body?.prazo_compra,
         motivoAtraso: req.body?.motivo_atraso,
+        motivoDelegacaoVencida: req.body?.motivo_delegacao_vencida,
         usuarioId: usuario.id,
         somenteMotivo: !podeGerenciar,
         transaction

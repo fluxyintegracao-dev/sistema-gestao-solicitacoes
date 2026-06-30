@@ -993,14 +993,19 @@ function validateCompraPedidoFreteCancelBody(body = {}) {
 function validateCompraDelegacaoBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['responsavel_id', 'prazo_compra', 'motivo_atraso'],
+    ['responsavel_id', 'prazo_compra', 'motivo_atraso', 'motivo_delegacao_vencida'],
     'Delegacao da solicitacao de compra'
   );
 
   return {
     responsavel_id: parseInteger(body.responsavel_id, 'Responsavel'),
     prazo_compra: parseDateOnly(body.prazo_compra, 'Prazo de compra'),
-    motivo_atraso: parseOptionalText(body.motivo_atraso, 'Motivo do atraso', 5000)
+    motivo_atraso: parseOptionalText(body.motivo_atraso, 'Motivo do atraso', 5000),
+    motivo_delegacao_vencida: parseOptionalText(
+      body.motivo_delegacao_vencida,
+      'Motivo da delegacao com prazo vencido',
+      5000
+    )
   };
 }
 

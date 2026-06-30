@@ -113,10 +113,12 @@ export default function ComprasDelegacao() {
   }, [solicitacoesFiltradas]);
 
   function getEdicao(solicitacao) {
-    return edicoes[solicitacao.id] || {
+    return {
       responsavel_id: solicitacao.comprador_responsavel_id || '',
       prazo_compra: solicitacao.prazo_compra || '',
-      motivo_atraso: solicitacao.motivo_atraso || ''
+      motivo_atraso: solicitacao.motivo_atraso || '',
+      motivo_delegacao_vencida: solicitacao.motivo_delegacao_vencida || '',
+      ...(edicoes[solicitacao.id] || {})
     };
   }
 
@@ -151,9 +153,14 @@ export default function ComprasDelegacao() {
 
     const payload = getEdicao(solicitacao);
     const prazoInfo = getPrazoInfo({ ...solicitacao, prazo_compra: payload.prazo_compra });
+    const motivoObrigatorio = podeGerenciarDelegacao
+      ? payload.motivo_delegacao_vencida
+      : payload.motivo_atraso;
 
-    if (prazoInfo.atrasado && !String(payload.motivo_atraso || '').trim()) {
-      alert('Informe o motivo do atraso antes de salvar uma delegacao vencida.');
+    if (prazoInfo.atrasado && !String(motivoObrigatorio || '').trim()) {
+      alert(podeGerenciarDelegacao
+        ? 'Informe o motivo para delegar com prazo ja vencido.'
+        : 'Informe o motivo do atraso antes de salvar.');
       return;
     }
 
@@ -162,7 +169,11 @@ export default function ComprasDelegacao() {
       await delegarSolicitacaoCompra(
         solicitacao.id,
         podeGerenciarDelegacao
-          ? payload
+          ? {
+            responsavel_id: payload.responsavel_id,
+            prazo_compra: payload.prazo_compra,
+            motivo_delegacao_vencida: payload.motivo_delegacao_vencida
+          }
           : { motivo_atraso: payload.motivo_atraso }
       );
       await carregar();
@@ -269,12 +280,21 @@ export default function ComprasDelegacao() {
 
               {prazoInfo.atrasado ? (
                 <label className="mt-3 grid gap-2 text-sm font-medium">
-                  Motivo do atraso
+                  {podeGerenciarDelegacao ? 'Motivo para delegar com prazo vencido' : 'Motivo do atraso'}
                   <textarea
                     className="input min-h-[90px]"
-                    value={edicao.motivo_atraso || ''}
-                    onChange={(event) => updateEdicao(solicitacao.id, { motivo_atraso: event.target.value })}
-                    placeholder="Explique o motivo do atraso antes de salvar."
+                    value={podeGerenciarDelegacao
+                      ? (edicao.motivo_delegacao_vencida || '')
+                      : (edicao.motivo_atraso || '')}
+                    onChange={(event) => updateEdicao(
+                      solicitacao.id,
+                      podeGerenciarDelegacao
+                        ? { motivo_delegacao_vencida: event.target.value }
+                        : { motivo_atraso: event.target.value }
+                    )}
+                    placeholder={podeGerenciarDelegacao
+                      ? 'Explique por que esta solicitacao esta sendo delegada com prazo ja vencido.'
+                      : 'Explique o motivo do atraso antes de salvar.'}
                   />
                 </label>
               ) : null}
