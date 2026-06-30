@@ -100,6 +100,7 @@ function getDisplayStatus(item, intent) {
 
 function getPaymentDate(item, transaction, intent) {
   return (
+    item?.confirmado_banco_em ||
     intent?.confirmado_banco_em ||
     transaction?.finished_at ||
     item?.updatedAt ||
@@ -107,8 +108,9 @@ function getPaymentDate(item, transaction, intent) {
   );
 }
 
-function getTransactionProtocol(transaction, batch) {
+function getTransactionProtocol(item, transaction, batch) {
   return (
+    item?.protocolo_banco ||
     findDeepValue(transaction?.response_snapshot, [
       'numeroRequisicao',
       'numeroRequisicaoPagamento',
@@ -125,8 +127,8 @@ function getTransactionProtocol(transaction, batch) {
   );
 }
 
-function getTransactionEndToEnd(transaction) {
-  return findDeepValue(transaction?.response_snapshot, [
+function getTransactionEndToEnd(item, transaction) {
+  return item?.end_to_end_id || findDeepValue(transaction?.response_snapshot, [
     'endToEndId',
     'endToEnd',
     'e2eId',
@@ -157,8 +159,8 @@ function buildReceiptData(item, transaction) {
     pix_chave: normalizeText(beneficiary?.pix_chave || '-'),
     valor: Number(item.valor || intent?.valor || 0),
     forma_pagamento: 'PIX',
-    protocolo_banco: getTransactionProtocol(transaction, batch),
-    end_to_end_id: getTransactionEndToEnd(transaction)
+    protocolo_banco: getTransactionProtocol(item, transaction, batch),
+    end_to_end_id: getTransactionEndToEnd(item, transaction)
   };
 }
 
@@ -263,7 +265,7 @@ function createReceiptPdfBuffer(receiptData, hash) {
     drawKeyValue(doc, 'Valor', formatCurrency(receiptData.valor), 56, 520, 160);
     drawKeyValue(doc, 'Forma de pagamento', receiptData.forma_pagamento, 232, 520, 160);
     drawKeyValue(doc, 'Protocolo Banco do Brasil', receiptData.protocolo_banco, 56, 568, 230);
-    drawKeyValue(doc, 'EndToEndId', receiptData.end_to_end_id, 322, 568, 210);
+    drawKeyValue(doc, 'ID da Transação', receiptData.end_to_end_id, 322, 568, 210);
 
     doc
       .roundedRect(56, 636, 483, 66, 8)

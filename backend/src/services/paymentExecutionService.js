@@ -250,7 +250,10 @@ async function reprocessBatch(req, id, payload = {}) {
       {
         status: 'APROVADO',
         erro_codigo: null,
-        erro_mensagem: null
+        erro_mensagem: null,
+        protocolo_banco: null,
+        end_to_end_id: null,
+        confirmado_banco_em: null
       },
       {
         where: {
@@ -412,6 +415,126 @@ function mapProviderResultToIntentStatus(providerStatus) {
   return 'PROCESSANDO_BANCO';
 }
 
+function findDeepValue(source, candidates = []) {
+  const keys = new Set(candidates.map((key) => String(key).toLowerCase()));
+  let found = null;
+
+  function walk(value) {
+    if (found !== null || value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item);
+      return;
+    }
+    if (typeof value !== 'object') return;
+
+    for (const [key, itemValue] of Object.entries(value)) {
+      if (found !== null) return;
+      if (keys.has(String(key).toLowerCase()) && itemValue !== null && itemValue !== undefined && String(itemValue).trim() !== '') {
+        found = String(itemValue);
+        return;
+      }
+      walk(itemValue);
+    }
+  }
+
+  walk(source);
+  return found;
+}
+
+function asNumberOrNull(value) {
+  const normalized = String(value ?? '').replace(/\D/g, '');
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getProviderResultBody(providerResult = {}) {
+  return providerResult.data || providerResult.response_snapshot?.body || {};
+}
+
+function getBankProtocolFromBody(body, providerResult) {
+  return (
+    findDeepValue(body, [
+      'numeroRequisicao',
+      'numeroRequisicaoPagamento',
+      'codigoPagamento',
+      'protocolo',
+      'protocoloPagamento',
+      'idRequisicao',
+      'requestNumber'
+    ]) ||
+    providerResult?.provider_transaction_id ||
+    providerResult?.provider_batch_id ||
+    null
+  );
+}
+
+function getBankEndToEndFromPayment(payment) {
+  return findDeepValue(payment, [
+    'endToEndId',
+    'endToEnd',
+    'e2eId',
+    'idFimAFim',
+    'codigoEndToEnd'
+  ]);
+}
+
+function getBankPaymentReference(payment) {
+  const candidates = [
+    'documentoDebito',
+    'numeroDocumentoDebito',
+    'documentoPagamento',
+    'idPagamento',
+    'identificadorPagamento',
+    'sequencialPagamento',
+    'sequencia'
+  ];
+  for (const key of candidates) {
+    const value = findDeepValue(payment, [key]);
+    const parsed = asNumberOrNull(value);
+    if (parsed !== null) return parsed;
+  }
+  return null;
+}
+
+function getBankPaymentsFromResult(providerResult = {}) {
+  const body = getProviderResultBody(providerResult);
+  const payments = body?.pagamentos || body?.listaPagamentos || body?.listaTransferencias || body?.transferencias;
+  return Array.isArray(payments) ? payments : [];
+}
+
+async function persistBankReturnOnItems(batch, providerResult, now, intentStatus, transaction) {
+  const confirmed = intentStatus === 'AGUARDANDO_CONFIRMACAO_BAIXA';
+  const rejected = ['REJEITADO_BANCO', 'CANCELADO', 'FALHA_INTEGRACAO'].includes(intentStatus);
+  if (!confirmed && !rejected) return;
+
+  const body = getProviderResultBody(providerResult);
+  const batchProtocol = getBankProtocolFromBody(body, providerResult);
+  const payments = getBankPaymentsFromResult(providerResult);
+  const paymentsByReference = new Map();
+
+  for (const payment of payments) {
+    const reference = getBankPaymentReference(payment);
+    if (reference !== null && !paymentsByReference.has(reference)) {
+      paymentsByReference.set(reference, payment);
+    }
+  }
+
+  for (const item of batch.items || []) {
+    const payment = paymentsByReference.get(Number(item.payment_intent_id))
+      || paymentsByReference.get(Number(item.sequencia))
+      || null;
+    const itemProtocol = payment ? getBankProtocolFromBody(payment, providerResult) : null;
+    const endToEndId = payment ? getBankEndToEndFromPayment(payment) : null;
+
+    await item.update({
+      protocolo_banco: confirmed ? (itemProtocol || batchProtocol || item.protocolo_banco || null) : null,
+      end_to_end_id: confirmed ? (endToEndId || item.end_to_end_id || null) : null,
+      confirmado_banco_em: confirmed ? (item.confirmado_banco_em || now) : null
+    }, { transaction });
+  }
+}
+
 async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
 
@@ -497,6 +620,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
         { status: intentStatus },
         { where: { payment_batch_id: batch.id }, transaction }
       );
+      await persistBankReturnOnItems(batch, providerResult, now, intentStatus, transaction);
       await PaymentTransaction.create({
         payment_batch_id: batch.id,
         provider_id: batch.provider_id,
@@ -567,7 +691,10 @@ async function processBbSubmitPixBatchJob(req, jobId) {
         {
           status: 'FALHA_INTEGRACAO',
           erro_codigo: normalized.code,
-          erro_mensagem: normalized.message
+          erro_mensagem: normalized.message,
+          protocolo_banco: null,
+          end_to_end_id: null,
+          confirmado_banco_em: null
         },
         { where: { payment_batch_id: batch.id }, transaction }
       );
@@ -728,10 +855,14 @@ async function sincronizarStatusBb(req, id) {
       {
         status: intentStatus,
         erro_codigo: intentStatus === 'REJEITADO_BANCO' ? 'BB_REJEITADO' : null,
-        erro_mensagem: intentStatus === 'REJEITADO_BANCO' ? 'Pagamento rejeitado pelo Banco do Brasil.' : null
+        erro_mensagem: intentStatus === 'REJEITADO_BANCO' ? 'Pagamento rejeitado pelo Banco do Brasil.' : null,
+        ...(intentStatus === 'REJEITADO_BANCO'
+          ? { protocolo_banco: null, end_to_end_id: null, confirmado_banco_em: null }
+          : {})
       },
       { where: { payment_batch_id: batch.id }, transaction }
     );
+    await persistBankReturnOnItems(batch, providerResult, now, intentStatus, transaction);
     await PaymentTransaction.create({
       payment_batch_id: batch.id,
       provider_id: batch.provider_id,
@@ -968,12 +1099,18 @@ async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
       },
       { where: { id: { [Op.in]: intentIds } }, transaction }
     );
+    const itemUpdate = {
+      status: intentStatus,
+      erro_codigo: failed ? 'MOCK_FALHA_INTEGRACAO' : rejected ? 'MOCK_REJEITADO' : null,
+      erro_mensagem: failed ? 'Falha mockada de integracao.' : rejected ? 'Retorno mockado rejeitado.' : null,
+      confirmado_banco_em: rejected || failed ? null : now
+    };
+    if (rejected || failed) {
+      itemUpdate.protocolo_banco = null;
+      itemUpdate.end_to_end_id = null;
+    }
     await PaymentBatchItem.update(
-      {
-        status: intentStatus,
-        erro_codigo: failed ? 'MOCK_FALHA_INTEGRACAO' : rejected ? 'MOCK_REJEITADO' : null,
-        erro_mensagem: failed ? 'Falha mockada de integracao.' : rejected ? 'Retorno mockado rejeitado.' : null
-      },
+      itemUpdate,
       { where: { payment_batch_id: batch.id }, transaction }
     );
   });

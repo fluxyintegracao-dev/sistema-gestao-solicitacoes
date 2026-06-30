@@ -46,6 +46,18 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     comprovante_gerado_em: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+    end_to_end_id: {
+      type: DataTypes.STRING(160),
+      allowNull: true
+    },
+    protocolo_banco: {
+      type: DataTypes.STRING(160),
+      allowNull: true
+    },
+    confirmado_banco_em: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   },
   {
