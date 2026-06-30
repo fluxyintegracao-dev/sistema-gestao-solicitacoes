@@ -30,6 +30,8 @@ const DEFAULT_FILTERS = {
   limit: '200'
 };
 
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200];
+
 function compact(params = {}) {
   return Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
@@ -88,6 +90,8 @@ export default function FinanceiroBaixas() {
   const [error, setError] = useState('');
   const [actionMessage, setActionMessage] = useState('');
   const [processingId, setProcessingId] = useState(null);
+  const [pageSize, setPageSize] = useState(25);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     let active = true;
@@ -139,6 +143,10 @@ export default function FinanceiroBaixas() {
     };
   }, [appliedFilters]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [appliedFilters, pageSize]);
+
   const resumo = useMemo(() => baixas.reduce((acc, baixa) => {
     acc.quantidade += 1;
     acc.valor += Number(baixa.valor || 0);
@@ -153,6 +161,22 @@ export default function FinanceiroBaixas() {
     valor_quitacao: 0,
     estornadas: 0
   }), [baixas]);
+
+  const totalPages = Math.max(1, Math.ceil(baixas.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const visibleStart = baixas.length === 0 ? 0 : ((safeCurrentPage - 1) * pageSize) + 1;
+  const visibleEnd = Math.min(safeCurrentPage * pageSize, baixas.length);
+
+  const baixasPaginadas = useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return baixas.slice(start, start + pageSize);
+  }, [baixas, pageSize, safeCurrentPage]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   function setFilter(name, value) {
     setFilters((current) => ({
@@ -353,9 +377,45 @@ export default function FinanceiroBaixas() {
       {actionMessage ? <div className="app-alert border border-emerald-200 bg-emerald-50 text-emerald-800">{actionMessage}</div> : null}
 
       <section className="card sol-surface-card overflow-hidden">
-        <div className="border-b border-[var(--c-border)] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[var(--c-text)]">Movimentos de baixa</h2>
-          <p className="text-xs text-[var(--c-muted)]">Estornar libera o titulo para nova baixa, mantendo historico e auditoria.</p>
+        <div className="flex flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-[var(--c-text)]">Movimentos de baixa</h2>
+            <p className="text-xs text-[var(--c-muted)]">Estornar libera o titulo para nova baixa, mantendo historico e auditoria.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
+            <span className="whitespace-nowrap">
+              {loading ? 'Carregando...' : `Exibindo ${visibleStart}-${visibleEnd} de ${baixas.length}`}
+            </span>
+            <label className="flex items-center gap-2 whitespace-nowrap">
+              <span>Por pagina</span>
+              <select
+                className="input input-sm h-9 w-20"
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value))}
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+              disabled={loading || safeCurrentPage <= 1}
+            >
+              Anterior
+            </button>
+            <span className="min-w-12 text-center tabular-nums text-[var(--c-text)]">{safeCurrentPage}/{totalPages}</span>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+              disabled={loading || safeCurrentPage >= totalPages}
+            >
+              Proxima
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -373,7 +433,7 @@ export default function FinanceiroBaixas() {
               {!loading && baixas.length === 0 ? (
                 <tr><td colSpan={10} className="px-3 py-8 text-center text-[var(--c-muted)]">Nenhuma baixa encontrada.</td></tr>
               ) : null}
-              {!loading && baixas.map((baixa) => (
+              {!loading && baixasPaginadas.map((baixa) => (
                 <tr key={baixa.id} className="align-top hover:bg-[var(--c-bg)]">
                   <td className="px-3 py-2 whitespace-nowrap">{formatDate(baixa.data_movimento)}</td>
                   <td className="px-3 py-2">
