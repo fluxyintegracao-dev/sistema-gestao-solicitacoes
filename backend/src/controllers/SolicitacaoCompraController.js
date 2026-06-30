@@ -10,6 +10,7 @@ const {
   Obra,
   Parceiro,
   FornecedorCompra,
+  FormaPagamentoFinanceira,
   PedidoCompra,
   PedidoCompraItem,
   Solicitacao,
@@ -550,7 +551,7 @@ async function carregarSolicitacaoCompra(id) {
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
       { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
       { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
-      { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] },
+      { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'descricao', 'valor', 'area_responsavel', 'status_global'] },
       {
         model: SolicitacaoCompraItem,
         as: 'itens',
@@ -914,6 +915,52 @@ function formatCurrencyPdf(value) {
   });
 }
 
+function extrairLinhaDescricaoSolicitacao(descricao, prefixo) {
+  const texto = String(descricao || '');
+  const linha = texto
+    .split(/\r?\n/)
+    .find((item) => item.trim().toLowerCase().startsWith(prefixo.toLowerCase()));
+
+  if (!linha) {
+    return '';
+  }
+
+  return linha.slice(prefixo.length).trim();
+}
+
+function limitarTextoPdf(texto, limite = 160) {
+  const normalizado = String(texto || '-').replace(/\s+/g, ' ').trim() || '-';
+  if (normalizado.length <= limite) {
+    return normalizado;
+  }
+
+  return `${normalizado.slice(0, Math.max(0, limite - 3)).trim()}...`;
+}
+
+function obterDadosCabecalhoCompraDireta(solicitacao) {
+  const descricaoPrincipal = solicitacao?.solicitacaoPrincipal?.descricao || '';
+  const valor = Number(solicitacao?.valor_fechado || solicitacao?.solicitacaoPrincipal?.valor || 0);
+
+  return {
+    valorTotal: `R$ ${formatCurrencyPdf(valor)}`,
+    formasPagamento: extrairLinhaDescricaoSolicitacao(descricaoPrincipal, 'Formas de pagamento:') || '-',
+    dadosPagamento: extrairLinhaDescricaoSolicitacao(descricaoPrincipal, 'Dados para pagamento:') || '-'
+  };
+}
+
+function isFormaPagamentoBoleto(forma) {
+  const texto = normalizeTextCompra(`${forma?.codigo || ''} ${forma?.nome || ''} ${forma?.tipo || ''}`);
+  return Boolean(forma?.gera_boleto) || texto.includes('BOLETO');
+}
+
+function formatarFormaPagamentoResumo(forma) {
+  return forma?.nome || forma?.codigo || `Forma ${forma?.id}`;
+}
+
+function isAnexoBoletoCompraDireta(anexo) {
+  return normalizeTextCompra(anexo?.tipo_documento || '') === 'BOLETO';
+}
+
 function buildRespostaItemKey(itemTipo, itemReferenciaId) {
   return `${normalizeTextCompra(itemTipo)}:${Number(itemReferenciaId)}`;
 }
@@ -1065,6 +1112,8 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   const installationConfig = getRuntimeInstallationConfig();
   const pdfLogoPath = getPdfLogoPath();
   const codigoSolicitacaoPrincipal = getCodigoSolicitacaoPrincipal(solicitacao);
+  const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+  const dadosCompraDireta = compraDireta ? obterDadosCabecalhoCompraDireta(solicitacao) : null;
   const companyName =
     installationConfig?.pdf_company_name ||
     installationConfig?.company_legal_name ||
@@ -1076,10 +1125,11 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   const logoWidth = 58;
   const titleHeight = 20;
   const infoHeight = 18;
+  const paymentInfoHeight = compraDireta ? 24 : 0;
   const metaLabelWidth = 92;
   const metaValueWidth = 110;
   const leftInfoWidth = PDF_PAGE.width - logoWidth - metaLabelWidth - metaValueWidth;
-  const totalHeaderHeight = titleHeight + infoHeight * 2;
+  const totalHeaderHeight = titleHeight + infoHeight * (compraDireta ? 3 : 2) + paymentInfoHeight;
 
   doc.lineWidth(0.8);
   doc.rect(x, y, logoWidth, totalHeaderHeight).stroke('#000000');
@@ -1110,7 +1160,7 @@ function desenharCabecalhoFicha(doc, solicitacao) {
     .font('Helvetica-Bold')
     .fontSize(13)
     .fillColor('#000000')
-      .text(isSolicitacaoCompraDireta(solicitacao) ? 'FICHA DE COMPRA DIRETA' : 'FICHA PARA PEDIDO DE COMPRA', x + logoWidth, y + 5, {
+      .text(compraDireta ? 'FICHA DE COMPRA DIRETA' : 'FICHA PARA PEDIDO DE COMPRA', x + logoWidth, y + 5, {
       width: PDF_PAGE.width - logoWidth,
       align: 'center'
     });
@@ -1164,6 +1214,54 @@ function desenharCabecalhoFicha(doc, solicitacao) {
     .text(formatDate(solicitacao.createdAt) || '-', x + logoWidth + leftInfoWidth + metaLabelWidth + 4, y + titleHeight + infoHeight + 5, {
       width: metaValueWidth - 8
     });
+
+  if (compraDireta) {
+    const contentX = x + logoWidth;
+    const contentWidth = PDF_PAGE.width - logoWidth;
+    const valorWidth = 178;
+    const formaLabelWidth = 126;
+    const formaValueWidth = contentWidth - valorWidth - formaLabelWidth;
+    const rowFormaY = y + titleHeight + infoHeight * 2;
+    const rowDadosY = rowFormaY + infoHeight;
+    const dadosLabelWidth = 126;
+
+    doc.rect(contentX, rowFormaY, valorWidth, infoHeight).stroke('#000000');
+    doc.rect(contentX + valorWidth, rowFormaY, formaLabelWidth, infoHeight).stroke('#000000');
+    doc.rect(contentX + valorWidth + formaLabelWidth, rowFormaY, formaValueWidth, infoHeight).stroke('#000000');
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text(`VALOR TOTAL: ${dadosCompraDireta.valorTotal}`, contentX + 4, rowFormaY + 5, {
+        width: valorWidth - 8
+      });
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('FORMA DE PAGAMENTO', contentX + valorWidth + 4, rowFormaY + 5, {
+        width: formaLabelWidth - 8
+      });
+    doc
+      .font('Helvetica')
+      .fontSize(7)
+      .text(limitarTextoPdf(dadosCompraDireta.formasPagamento, 95), contentX + valorWidth + formaLabelWidth + 4, rowFormaY + 5, {
+        width: formaValueWidth - 8
+      });
+
+    doc.rect(contentX, rowDadosY, dadosLabelWidth, paymentInfoHeight).stroke('#000000');
+    doc.rect(contentX + dadosLabelWidth, rowDadosY, contentWidth - dadosLabelWidth, paymentInfoHeight).stroke('#000000');
+    doc
+      .font('Helvetica-Bold')
+      .fontSize(7)
+      .text('DADOS PARA PAGAMENTO', contentX + 4, rowDadosY + 7, {
+        width: dadosLabelWidth - 8
+      });
+    doc
+      .font('Helvetica')
+      .fontSize(6.8)
+      .text(limitarTextoPdf(dadosCompraDireta.dadosPagamento, 220), contentX + dadosLabelWidth + 4, rowDadosY + 5, {
+        width: contentWidth - dadosLabelWidth - 8
+      });
+  }
 
   return y + totalHeaderHeight + 8;
 }
@@ -1401,7 +1499,9 @@ async function renderPdfSolicitacaoCompra(doc, solicitacao) {
     y = desenharCabecalhoFicha(doc, solicitacao);
   }
 
-  desenharBlocoObservacoes(doc, y + 6, solicitacao);
+  if (!compraDireta) {
+    desenharBlocoObservacoes(doc, y + 6, solicitacao);
+  }
 }
 
 async function gerarPdfBuffer(solicitacao) {
@@ -1481,7 +1581,8 @@ async function anexarArquivosCabecalhoSolicitacao({ anexos = [], solicitacaoPrin
     ? anexos
         .map((anexo) => ({
           arquivo_url: String(anexo?.arquivo_url || '').trim(),
-          arquivo_nome_original: normalizeOriginalName(anexo?.arquivo_nome_original || anexo?.nome_original || 'anexo-compra-direta')
+          arquivo_nome_original: normalizeOriginalName(anexo?.arquivo_nome_original || anexo?.nome_original || 'anexo-compra-direta'),
+          tipo_documento: isAnexoBoletoCompraDireta(anexo) ? 'BOLETO' : 'NOTA_FISCAL_GUIA'
         }))
         .filter((anexo) => anexo.arquivo_url)
         .slice(0, 20)
@@ -1512,7 +1613,8 @@ async function anexarArquivosCabecalhoSolicitacao({ anexos = [], solicitacaoPrin
         metadata: JSON.stringify({
           anexo_id: anexo.id,
           caminho: anexoPayload.arquivo_url,
-          origem: 'COMPRA_DIRETA_NOTA_FISCAL'
+          origem: anexoPayload.tipo_documento === 'BOLETO' ? 'COMPRA_DIRETA_BOLETO' : 'COMPRA_DIRETA_NOTA_FISCAL',
+          tipo_documento: anexoPayload.tipo_documento
         })
       });
 
@@ -2263,11 +2365,13 @@ module.exports = {
         obra_id,
         necessario_para,
         observacoes,
+        dados_pagamento,
         link_geral,
         itens,
         origem,
         tipo_solicitacao_id,
         parceiro_id,
+        forma_pagamento_ids,
         anexos_cabecalho
       } = req.body;
       const compraDireta = normalizeTextCompra(origem) === 'COMPRA_DIRETA';
@@ -2322,6 +2426,38 @@ module.exports = {
       if (compraDireta && valorTotalCompraDireta <= 0) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Informe o valor dos itens da compra direta.' });
+      }
+
+      let formasPagamentoCompraDireta = [];
+      if (compraDireta) {
+        const formaPagamentoIds = Array.isArray(forma_pagamento_ids)
+          ? forma_pagamento_ids.map((id) => Number(id)).filter((id) => id > 0)
+          : [];
+
+        formasPagamentoCompraDireta = await FormaPagamentoFinanceira.findAll({
+          where: {
+            id: { [Op.in]: formaPagamentoIds }
+          },
+          attributes: ['id', 'nome', 'codigo', 'tipo', 'gera_boleto', 'ativo'],
+          transaction
+        });
+
+        if (
+          !formasPagamentoCompraDireta.length ||
+          formasPagamentoCompraDireta.length !== formaPagamentoIds.length ||
+          formasPagamentoCompraDireta.some((forma) => forma.ativo === false)
+        ) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Selecione ao menos uma forma de pagamento ativa para a compra direta.' });
+        }
+
+        if (formasPagamentoCompraDireta.some(isFormaPagamentoBoleto)) {
+          const anexosBoleto = Array.isArray(anexos_cabecalho) ? anexos_cabecalho.filter(isAnexoBoletoCompraDireta) : [];
+          if (!anexosBoleto.length) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'Anexe o boleto para criar a compra direta com forma de pagamento boleto.' });
+          }
+        }
       }
 
       let parceiroCompraDireta = null;
@@ -2429,11 +2565,20 @@ module.exports = {
       });
       const resumoItensManuais = itensManuaisPreparados.map((entry) => `${entry.item.quantidade}x ${entry.item.nome_manual} [manual]`);
       const resumoItens = '';
+      const resumoFormasPagamento = formasPagamentoCompraDireta.map(formatarFormaPagamentoResumo).join('; ');
+      const formasPagamentoMetadata = formasPagamentoCompraDireta.map((forma) => ({
+        id: forma.id,
+        nome: formatarFormaPagamentoResumo(forma),
+        codigo: forma.codigo || null,
+        gera_boleto: Boolean(forma.gera_boleto) || isFormaPagamentoBoleto(forma)
+      }));
 
       const descricao = [
         compraDireta ? 'Compra Direta' : 'Solicitação de Compra',
         resumoItens ? `Itens: ${resumoItens}` : null,
         compraDireta && parceiroCompraDireta ? `Credor: ${parceiroCompraDireta.nome || parceiroCompraDireta.cpf_cnpj || parceiroCompraDireta.id}` : null,
+        compraDireta && resumoFormasPagamento ? `Formas de pagamento: ${resumoFormasPagamento}` : null,
+        compraDireta && dados_pagamento ? `Dados para pagamento: ${dados_pagamento}` : null,
         compraDireta ? `Valor total: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
         observacoes ? `Observações: ${observacoes}` : null
       ]
@@ -2481,6 +2626,8 @@ module.exports = {
             origem: compraDireta ? 'COMPRA_DIRETA' : 'MODULO_COMPRAS',
             solicitacao_compra_origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
             parceiro_id: compraDireta ? parceiroCompraDireta?.id || null : null,
+            formas_pagamento: compraDireta ? formasPagamentoMetadata : undefined,
+            dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
             valor_total: compraDireta ? valorTotalCompraDireta : null,
             fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
             diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
@@ -2512,6 +2659,8 @@ module.exports = {
           solicitacao_principal_id: solicitacaoPrincipal.id,
           quantidade_itens: itensPreparados.length + itensManuaisPreparados.length,
           origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+          formas_pagamento: compraDireta ? formasPagamentoMetadata : undefined,
+          dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
           valor_total: compraDireta ? valorTotalCompraDireta : null
         },
         transaction
@@ -2542,6 +2691,8 @@ module.exports = {
         pdf_anexado: pdfAnexado,
         anexos_cabecalho_anexados: anexosCabecalhoAnexados,
         origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
+        formas_pagamento: compraDireta ? formasPagamentoMetadata : [],
+        dados_pagamento: compraDireta ? dados_pagamento || null : null,
         valor_total: compraDireta ? valorTotalCompraDireta : null
       });
     } catch (error) {

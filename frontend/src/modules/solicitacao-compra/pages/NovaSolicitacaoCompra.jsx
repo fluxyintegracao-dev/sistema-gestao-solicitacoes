@@ -11,6 +11,7 @@ import {
 import { buscarParceiros, criarCredorNovaSolicitacao } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
+import { getFormasPagamentoFinanceiras } from '../../../services/financeiro';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
@@ -65,6 +66,23 @@ function formatarCredor(credor) {
   const nome = String(credor.nome || credor.razao_social || '').trim();
   const documento = String(credor.cpf_cnpj || '').trim();
   return [nome, documento].filter(Boolean).join(' - ') || `Credor ${credor.id}`;
+}
+
+function normalizarTexto(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function formaPagamentoEhBoleto(forma) {
+  const texto = normalizarTexto(`${forma?.codigo || ''} ${forma?.nome || ''} ${forma?.tipo || ''}`);
+  return Boolean(forma?.gera_boleto) || texto.includes('BOLETO');
+}
+
+function formatarFormaPagamento(forma) {
+  if (!forma) return '';
+  return forma.nome || forma.codigo || `Forma ${forma.id}`;
 }
 
 function criarNovoCredorPadrao() {
@@ -160,7 +178,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [obraId, setObraId] = useState('');
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [dadosPagamento, setDadosPagamento] = useState('');
   const [anexosCabecalho, setAnexosCabecalho] = useState([]);
+  const [formasPagamento, setFormasPagamento] = useState([]);
+  const [formaPagamentoIds, setFormaPagamentoIds] = useState([]);
   const [parceiroId, setParceiroId] = useState('');
   const [parceiroBusca, setParceiroBusca] = useState('');
   const [parceiros, setParceiros] = useState([]);
@@ -216,6 +237,17 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
+  async function carregarFormasPagamento() {
+    try {
+      const data = await getFormasPagamentoFinanceiras();
+      const lista = Array.isArray(data) ? data : [];
+      setFormasPagamento(lista.filter((item) => item?.ativo !== false));
+    } catch (error) {
+      console.error(error);
+      setFormasPagamento([]);
+    }
+  }
+
   async function carregarApropriacoes(obraSelecionada) {
     try {
       if (!obraSelecionada) {
@@ -235,9 +267,24 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     carregarObras();
     carregarInsumos();
     carregarUnidades();
+    if (modoCompraDireta) {
+      carregarFormasPagamento();
+    }
   }, []);
 
   const itemModalAtual = modalApropriacaoIndex !== null ? itens[modalApropriacaoIndex] || null : null;
+  const formasPagamentoSelecionadas = useMemo(
+    () => formasPagamento.filter((forma) => formaPagamentoIds.includes(String(forma.id))),
+    [formasPagamento, formaPagamentoIds]
+  );
+  const compraDiretaTemBoleto = useMemo(
+    () => formasPagamentoSelecionadas.some((forma) => formaPagamentoEhBoleto(forma)),
+    [formasPagamentoSelecionadas]
+  );
+  const anexosBoletoCabecalho = useMemo(
+    () => anexosCabecalho.filter((anexo) => anexo?.tipo_documento === 'BOLETO'),
+    [anexosCabecalho]
+  );
 
   const resumoModalApropriacao = useMemo(() => {
     const total = parseQuantidade(itemModalAtual?.quantidade);
@@ -284,7 +331,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setObraId(String(payload.obra_id || ''));
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
+      setDadosPagamento(payload.dados_pagamento || '');
       setAnexosCabecalho(Array.isArray(payload.anexos_cabecalho) ? payload.anexos_cabecalho : []);
+      setFormaPagamentoIds(
+        Array.isArray(payload.forma_pagamento_ids)
+          ? payload.forma_pagamento_ids.map((item) => String(item)).filter(Boolean)
+          : []
+      );
       setParceiroId(payload.parceiro_id ? String(payload.parceiro_id) : '');
       if (dados?.resumo?.credor_nome) {
         setParceiroBusca(dados.resumo.credor_nome);
@@ -706,7 +759,14 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
-  async function handleSelecionarAnexoCabecalho(file) {
+  function alternarFormaPagamento(formaId) {
+    const id = String(formaId);
+    setFormaPagamentoIds((atual) =>
+      atual.includes(id) ? atual.filter((item) => item !== id) : [...atual, id]
+    );
+  }
+
+  async function handleSelecionarAnexoCabecalho(file, tipoDocumento = 'NOTA_FISCAL_GUIA') {
     if (!file) {
       return;
     }
@@ -718,7 +778,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         ...atual,
         {
           arquivo_url: data?.arquivo_url || '',
-          arquivo_nome_original: data?.arquivo_nome_original || file.name || ''
+          arquivo_nome_original: data?.arquivo_nome_original || file.name || '',
+          tipo_documento: tipoDocumento
         }
       ]);
     } catch (error) {
@@ -762,6 +823,16 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   async function handleSalvar() {
     if (!obraId) {
       alert('Selecione a obra.');
+      return;
+    }
+
+    if (modoCompraDireta && formaPagamentoIds.length === 0) {
+      alert('Selecione ao menos uma forma de pagamento.');
+      return;
+    }
+
+    if (modoCompraDireta && compraDiretaTemBoleto && anexosBoletoCabecalho.length === 0) {
+      alert('Anexe o boleto para continuar com forma de pagamento Boleto.');
       return;
     }
 
@@ -826,6 +897,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         parceiro_id: modoCompraDireta ? parceiroId || null : undefined,
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
+        dados_pagamento: modoCompraDireta ? dadosPagamento || null : undefined,
+        forma_pagamento_ids: modoCompraDireta ? formaPagamentoIds.map((id) => Number(id)).filter((id) => id > 0) : undefined,
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : undefined,
         itens: itensNormalizados.map((item) => ({
           manual: Boolean(item.manual),
@@ -851,7 +924,16 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         obra_codigo: obraSelecionada?.codigo || '',
         solicitante_nome: user?.nome || '',
         credor_nome: parceiroSelecionado ? formatarCredor(parceiroSelecionado) : parceiroBusca || '',
+        formas_pagamento: modoCompraDireta
+          ? formasPagamentoSelecionadas.map((forma) => ({
+              id: forma.id,
+              nome: formatarFormaPagamento(forma),
+              codigo: forma.codigo || '',
+              gera_boleto: Boolean(forma.gera_boleto)
+            }))
+          : [],
         valor_total: modoCompraDireta ? valorTotalCompraDireta : null,
+        dados_pagamento: modoCompraDireta ? dadosPagamento || '' : '',
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : [],
         itens: itensNormalizados.map((item) => ({
           ...item,
@@ -909,6 +991,50 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           </div>
 
           {modoCompraDireta && (
+            <div className="grid gap-2 md:col-span-2 xl:col-span-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label className="text-sm font-medium">Formas de pagamento *</label>
+                <span className="text-xs text-[var(--c-muted)]">Selecione ao menos uma opcao para orientar o financeiro.</span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {formasPagamento.map((forma) => {
+                  const selecionada = formaPagamentoIds.includes(String(forma.id));
+                  const boleto = formaPagamentoEhBoleto(forma);
+                  return (
+                    <button
+                      key={forma.id}
+                      type="button"
+                      className={`rounded-xl border px-3 py-2 text-left text-sm transition ${
+                        selecionada
+                          ? 'border-blue-300 bg-blue-50 text-blue-900'
+                          : 'border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'
+                      }`}
+                      onClick={() => alternarFormaPagamento(forma.id)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={selecionada}
+                          onChange={() => alternarFormaPagamento(forma.id)}
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                        <span className="font-semibold">{formatarFormaPagamento(forma)}</span>
+                      </span>
+                      {boleto && <span className="mt-1 block text-xs text-amber-700">Exige boleto anexado</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {formasPagamento.length === 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                  Nenhuma forma de pagamento ativa foi encontrada. Verifique os cadastros financeiros.
+                </div>
+              )}
+            </div>
+          )}
+
+          {modoCompraDireta && (
             <div className="grid gap-2 md:col-span-2">
               <label className="text-sm font-medium">Credor</label>
               <div className="flex flex-wrap gap-2">
@@ -957,6 +1083,20 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             <label className="text-sm font-medium">Observações</label>
             <textarea className="input min-h-[96px]" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} placeholder="Informações adicionais para a compra" />
           </div>
+          {modoCompraDireta && (
+            <div className="grid gap-2 md:col-span-2">
+              <label className="text-sm font-medium">Dados para pagamento</label>
+              <textarea
+                className="input min-h-[96px]"
+                value={dadosPagamento}
+                onChange={(event) => setDadosPagamento(event.target.value)}
+                placeholder="Informe linha digitavel, PIX, banco/agencia/conta ou orientacoes para o financeiro."
+              />
+              <span className="text-xs text-[var(--c-muted)]">
+                Essa informacao sera exibida no cabecalho da ficha de Compra Direta.
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -983,12 +1123,28 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 accept={HEADER_ATTACHMENT_ACCEPT}
                 onChange={(event) => {
                   const [file] = Array.from(event.target.files || []);
-                  void handleSelecionarAnexoCabecalho(file);
+                  void handleSelecionarAnexoCabecalho(file, 'NOTA_FISCAL_GUIA');
                   event.target.value = '';
                 }}
               />
               {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar nota fiscal ou guia'}
             </label>
+
+            {compraDiretaTemBoleto && (
+              <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept={HEADER_ATTACHMENT_ACCEPT}
+                  onChange={(event) => {
+                    const [file] = Array.from(event.target.files || []);
+                    void handleSelecionarAnexoCabecalho(file, 'BOLETO');
+                    event.target.value = '';
+                  }}
+                />
+                {uploadingAnexoCabecalho ? 'Enviando...' : 'Anexar boleto *'}
+              </label>
+            )}
 
             {anexosCabecalho.length > 0 ? (
               <div className="grid gap-2">
@@ -997,7 +1153,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     key={`${anexo.arquivo_url}-${index}`}
                     className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm"
                   >
-                    <span className="truncate">{anexo.arquivo_nome_original || 'Anexo da compra direta'}</span>
+                    <span className="truncate">
+                      {anexo.tipo_documento === 'BOLETO' ? 'Boleto: ' : ''}
+                      {anexo.arquivo_nome_original || 'Anexo da compra direta'}
+                    </span>
                     <button type="button" className="text-red-600 hover:underline" onClick={() => removerAnexoCabecalho(index)}>
                       Remover
                     </button>

@@ -347,9 +347,11 @@ function validateCompraQuery(query = {}) {
         'parceiro_id',
         'necessario_para',
         'observacoes',
+        'dados_pagamento',
         'link_geral',
         'itens',
         'origem',
+        'forma_pagamento_ids',
         'anexos_cabecalho'
       ],
       'Compra direta'
@@ -373,14 +375,21 @@ function validateCompraQuery(query = {}) {
       throw new ValidationError('Anexos da compra direta invalidos.');
     }
 
+    const formaPagamentoIds = parseIdArray(body.forma_pagamento_ids, 'Forma de pagamento', {
+      required: true,
+      maxItems: 20
+    });
+
     return {
       obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
       tipo_solicitacao_id: parseInteger(body.tipo_solicitacao_id, 'Tipo de solicitacao', { positiveOnly: true }),
       parceiro_id: parseInteger(body.parceiro_id, 'Credor', { positiveOnly: true }),
       necessario_para: parseDateOnly(body.necessario_para, 'Necessario para'),
       observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000),
+      dados_pagamento: parseOptionalText(body.dados_pagamento, 'Dados para pagamento', 1500),
       link_geral: parseOptionalUrl(body.link_geral, 'Link geral'),
       origem: 'COMPRA_DIRETA',
+      forma_pagamento_ids: formaPagamentoIds,
       anexos_cabecalho: body.anexos_cabecalho || [],
       itens: body.itens
     };

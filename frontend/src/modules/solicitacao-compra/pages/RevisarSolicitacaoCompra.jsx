@@ -47,6 +47,11 @@ function formatarMoeda(valor) {
   });
 }
 
+function formatarFormasPagamento(formas) {
+  const lista = Array.isArray(formas) ? formas : [];
+  return lista.map((forma) => forma?.nome || forma?.codigo).filter(Boolean).join('; ') || '-';
+}
+
 function StatusChecklist({ ativo, titulo, descricao }) {
   return (
     <div
@@ -188,6 +193,8 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <div class="meta"><strong>Solicitante:</strong> ${escapeHtml(draft.resumo?.solicitante_nome || '-')}</div>
           ${modoCompraDireta ? `<div class="meta"><strong>Valor total:</strong> ${escapeHtml(formatarMoeda(draft.resumo?.valor_total))}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Credor:</strong> ${escapeHtml(draft.resumo?.credor_nome || '-')}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Formas de pagamento:</strong> ${escapeHtml(formatarFormasPagamento(draft.resumo?.formas_pagamento))}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Dados para pagamento:</strong> ${escapeHtml(draft.payload?.dados_pagamento || '-')}</div>` : ''}
           <div class="meta"><strong>${modoCompraDireta ? 'Data de vencimento' : 'Necessario para'}:</strong> ${escapeHtml(
             formatarData(draft.payload?.necessario_para)
           )}</div>
@@ -419,6 +426,19 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
             <LinhaResumo titulo="Obra" valor={textoOuPadrao(draft.resumo?.obra_nome)} />
             <LinhaResumo titulo="Solicitante" valor={textoOuPadrao(draft.resumo?.solicitante_nome)} />
             {modoCompraDireta && <LinhaResumo titulo="Credor" valor={textoOuPadrao(draft.resumo?.credor_nome)} />}
+            {modoCompraDireta && (
+              <LinhaResumo
+                titulo="Formas de pagamento"
+                valor={textoOuPadrao(formatarFormasPagamento(draft.resumo?.formas_pagamento))}
+              />
+            )}
+            {modoCompraDireta && (
+              <LinhaResumo
+                titulo="Dados para pagamento"
+                valor={textoOuPadrao(draft.payload?.dados_pagamento)}
+                className="whitespace-pre-wrap"
+              />
+            )}
             <LinhaResumo
               titulo={modoCompraDireta ? 'Data de vencimento' : 'Necessario para'}
               valor={textoOuPadrao(formatarData(draft.payload?.necessario_para))}
