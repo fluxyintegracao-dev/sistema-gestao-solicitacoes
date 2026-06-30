@@ -115,6 +115,136 @@ function compactFilters(filters = {}) {
   );
 }
 
+function normalizeOptionList(data) {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.data)) return data.data;
+  if (Array.isArray(data?.items)) return data.items;
+  if (Array.isArray(data?.rows)) return data.rows;
+  if (Array.isArray(data?.result)) return data.result;
+  return [];
+}
+
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function FinanceiroFilterAutocomplete({
+  className = '',
+  inputClassName = 'input w-full input-sm',
+  label,
+  value,
+  options = [],
+  onChange,
+  disabled = false,
+  placeholder = 'Digite para pesquisar',
+  allLabel = 'Todos',
+  emptyLabel = 'Nenhum registro encontrado',
+  getLabel = (item) => item?.nome || '',
+  getDescription = () => ''
+}) {
+  const selected = useMemo(
+    () => options.find((item) => String(item?.id) === String(value || '')) || null,
+    [options, value]
+  );
+  const selectedLabel = selected ? getLabel(selected) : '';
+  const [query, setQuery] = useState(selectedLabel);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setQuery(selectedLabel);
+    }
+  }, [open, selectedLabel]);
+
+  const filteredOptions = useMemo(() => {
+    const terms = normalizeSearchText(query).split(/\s+/).filter(Boolean);
+    if (terms.length === 0) {
+      return options.slice(0, 40);
+    }
+
+    return options
+      .filter((item) => {
+        const searchable = normalizeSearchText(`${getLabel(item)} ${getDescription(item)}`);
+        return terms.every((term) => searchable.includes(term));
+      })
+      .slice(0, 40);
+  }, [getDescription, getLabel, options, query]);
+
+  const handleSelect = (nextValue, nextLabel = '') => {
+    onChange(nextValue);
+    setQuery(nextLabel);
+    setOpen(false);
+  };
+
+  return (
+    <div key={label} className={`${className} relative`}>
+      <span className="app-filter-label">{label}</span>
+      <input
+        className={inputClassName}
+        value={open ? query : selectedLabel}
+        onFocus={() => {
+          setQuery(selectedLabel);
+          setOpen(true);
+        }}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          if (value) {
+            onChange('');
+          }
+          setOpen(true);
+        }}
+        onBlur={() => {
+          window.setTimeout(() => setOpen(false), 120);
+        }}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+      />
+      {open && !disabled && (
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950">
+          <button
+            type="button"
+            className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
+            onMouseDown={(event) => {
+              event.preventDefault();
+              handleSelect('', '');
+            }}
+          >
+            {allLabel}
+          </button>
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">{emptyLabel}</div>
+          ) : (
+            filteredOptions.map((item) => {
+              const itemLabel = getLabel(item);
+              const description = getDescription(item);
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    handleSelect(String(item.id), itemLabel);
+                  }}
+                >
+                  <span className="block font-semibold">{itemLabel}</span>
+                  {description ? (
+                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{description}</span>
+                  ) : null}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function getNaturezaBaixaIntercompany(value) {
   return NATUREZAS_INTERCOMPANY_BAIXA.find((item) => item.value === value) || NATUREZAS_INTERCOMPANY_BAIXA[0];
 }
@@ -497,15 +627,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     ])
       .then(([obrasData, parceirosData, categoriasData, formasData, contasData, cartoesData, chequesData, empresasData]) => {
         if (!active) return;
-        setObras(Array.isArray(obrasData) ? obrasData : []);
-        setParceiros(Array.isArray(parceirosData) ? parceirosData : []);
-        setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
-        setFormasPagamento(Array.isArray(formasData) ? formasData : []);
-        const contasNormalizadas = Array.isArray(contasData) ? contasData : [];
+        setObras(normalizeOptionList(obrasData));
+        setParceiros(normalizeOptionList(parceirosData));
+        setCategorias(normalizeOptionList(categoriasData));
+        setFormasPagamento(normalizeOptionList(formasData));
+        const contasNormalizadas = normalizeOptionList(contasData);
         setContasBancarias(contasNormalizadas);
-        setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
-        setChequesTerceiros(Array.isArray(chequesData) ? chequesData : []);
-        setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
+        setCartoes(normalizeOptionList(cartoesData));
+        setChequesTerceiros(normalizeOptionList(chequesData));
+        setEmpresasGrupo(normalizeOptionList(empresasData));
       })
       .finally(() => {
         if (active) {
@@ -1496,20 +1626,21 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         );
       case 'obra_id':
         return (
-          <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Obra</span>
-            <select
-              className="input w-full input-sm"
-              value={draftFilters.obra_id}
-              onChange={(event) => setFilter('obra_id', event.target.value)}
-              disabled={loadingOptions}
-            >
-              <option value="">Todas as obras</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>{obra.nome}</option>
-              ))}
-            </select>
-          </label>
+          <FinanceiroFilterAutocomplete
+            key={filter.id}
+            className={commonClass}
+            inputClassName="input w-full input-sm"
+            label="Obra"
+            value={draftFilters.obra_id}
+            options={obras}
+            onChange={(nextValue) => setFilter('obra_id', nextValue)}
+            disabled={loadingOptions}
+            placeholder="Digite nome ou codigo da obra"
+            allLabel="Todas as obras"
+            emptyLabel="Nenhuma obra encontrada"
+            getLabel={(obra) => [obra?.codigo, obra?.nome].filter(Boolean).join(' - ') || obra?.nome || ''}
+            getDescription={(obra) => [obra?.cidade, obra?.uf].filter(Boolean).join(' - ')}
+          />
         );
       case 'data_emissao_inicial':
         return (
@@ -1537,20 +1668,23 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         );
       case 'categoria_financeira_id':
         return (
-          <label key={filter.id} className={commonClass}>
-            <span className="app-filter-label">Categoria financeira</span>
-            <select
-              className="input w-full input-sm"
-              value={draftFilters.categoria_financeira_id}
-              onChange={(event) => setFilter('categoria_financeira_id', event.target.value)}
-              disabled={loadingOptions}
-            >
-              <option value="">Todas as categorias de {categoriasLabel}</option>
-              {categoriasFiltradas.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>
-              ))}
-            </select>
-          </label>
+          <FinanceiroFilterAutocomplete
+            key={filter.id}
+            className={commonClass}
+            inputClassName="input w-full input-sm"
+            label="Categoria financeira"
+            value={draftFilters.categoria_financeira_id}
+            options={categoriasFiltradas}
+            onChange={(nextValue) => setFilter('categoria_financeira_id', nextValue)}
+            disabled={loadingOptions}
+            placeholder="Digite codigo, nome ou grupo DRE"
+            allLabel={`Todas as categorias de ${categoriasLabel}`}
+            emptyLabel="Nenhuma categoria encontrada"
+            getLabel={(categoria) => (
+              categoria?.codigo ? `${categoria.codigo} - ${categoria.nome}` : categoria?.nome || ''
+            )}
+            getDescription={(categoria) => [categoria?.dre_grupo, categoria?.dre_subgrupo].filter(Boolean).join(' / ')}
+          />
         );
       case 'forma_pagamento_id':
         return (
