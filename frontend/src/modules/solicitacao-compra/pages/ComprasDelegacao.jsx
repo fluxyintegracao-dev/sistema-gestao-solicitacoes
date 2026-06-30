@@ -34,6 +34,21 @@ function isCompraAberta(status) {
   return !['ENCERRADA', 'RECUSADA', 'CANCELADA'].includes(normalized);
 }
 
+function renderMotivoRegistrado(label, motivo) {
+  if (!String(motivo || '').trim()) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-[var(--c-text)]">
+      <span className="block text-[11px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">
+        {label}
+      </span>
+      <p className="mt-1 whitespace-pre-wrap break-words leading-relaxed">{motivo}</p>
+    </div>
+  );
+}
+
 async function listarUsuariosParaDelegacao() {
   const res = await fetch(`${API_URL}/usuarios-lista`, {
     headers: authHeaders()
@@ -277,6 +292,19 @@ export default function ComprasDelegacao() {
                   />
                 </label>
               </div>
+
+              {(solicitacao.motivo_delegacao_vencida || solicitacao.motivo_atraso) ? (
+                <div className="mt-3 grid gap-2">
+                  {renderMotivoRegistrado(
+                    'Motivo da delegacao com prazo vencido',
+                    solicitacao.motivo_delegacao_vencida
+                  )}
+                  {renderMotivoRegistrado(
+                    'Motivo informado pelo responsavel',
+                    solicitacao.motivo_atraso
+                  )}
+                </div>
+              ) : null}
 
               {prazoInfo.atrasado ? (
                 <label className="mt-3 grid gap-2 text-sm font-medium">
