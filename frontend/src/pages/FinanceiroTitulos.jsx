@@ -736,13 +736,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }, [categorias, draftFilters.tipo]);
 
   const formasPagamentoFiltradas = useMemo(() => {
-    const tipo = String(draftFilters.tipo || '').toUpperCase();
-    return formasPagamento.filter((forma) => {
-      if (forma?.ativo === false) return false;
-      const formaTipo = String(forma?.tipo || '').toUpperCase();
-      return !formaTipo || formaTipo === tipo || formaTipo === 'AMBOS';
-    });
-  }, [formasPagamento, draftFilters.tipo]);
+    return formasPagamento.filter((forma) => forma?.ativo !== false);
+  }, [formasPagamento]);
 
   const parceirosFiltrados = useMemo(() => {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
