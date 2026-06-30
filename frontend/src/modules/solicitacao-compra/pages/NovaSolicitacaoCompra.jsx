@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   baixarModeloItensCompraDireta,
   importarItensCompraDireta,
+  listarFormasPagamentoCompraDireta,
   listarInsumos,
   listarUnidades,
   obterUrlAssinadaCompra,
@@ -11,7 +12,6 @@ import {
 import { buscarParceiros, criarCredorNovaSolicitacao } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
-import { getFormasPagamentoFinanceiras } from '../../../services/financeiro';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
@@ -239,7 +239,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   async function carregarFormasPagamento() {
     try {
-      const data = await getFormasPagamentoFinanceiras();
+      const data = await listarFormasPagamentoCompraDireta();
       const lista = Array.isArray(data) ? data : [];
       setFormasPagamento(lista.filter((item) => item?.ativo !== false));
     } catch (error) {

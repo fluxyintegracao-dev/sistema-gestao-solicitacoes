@@ -292,6 +292,13 @@ export async function criarSolicitacaoCompraDireta(data) {
   return handleJsonResponse(response, 'Erro ao criar compra direta');
 }
 
+export async function listarFormasPagamentoCompraDireta() {
+  const response = await fetch(`${API_URL}/compras/formas-pagamento-ativas`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar formas de pagamento da compra direta');
+}
+
 export async function baixarModeloItensCompraDireta() {
   const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/modelo-itens-xlsx`, {
     headers: authHeaders()

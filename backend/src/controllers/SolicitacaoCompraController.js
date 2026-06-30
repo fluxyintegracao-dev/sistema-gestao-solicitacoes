@@ -1818,6 +1818,24 @@ module.exports = {
     }
   },
 
+  async formasPagamentoAtivas(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const formas = await FormaPagamentoFinanceira.findAll({
+        where: { ativo: true },
+        attributes: ['id', 'nome', 'codigo', 'tipo', 'gera_boleto', 'ativo', 'ordem'],
+        order: [['ordem', 'ASC'], ['nome', 'ASC']]
+      });
+
+      return res.json(formas);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao listar formas de pagamento ativas' });
+    }
+  },
+
   async modeloCompraDiretaXlsx(req, res) {
     try {
       const usuario = await validarAcesso(req, res);
