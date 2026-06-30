@@ -1422,6 +1422,16 @@ export async function getPaymentBatchBbTransactions(id) {
   return parseJson(response, 'Erro ao buscar transacoes BB');
 }
 
+export async function gerarComprovantePaymentBatchItem(batchId, itemId) {
+  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${batchId}/itens/${itemId}/comprovante`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({})
+  });
+
+  return parseJson(response, 'Erro ao gerar comprovante de pagamento');
+}
+
 export async function getPaymentEvents(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

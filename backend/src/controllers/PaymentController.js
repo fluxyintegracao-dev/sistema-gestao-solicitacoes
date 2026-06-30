@@ -31,6 +31,7 @@ const {
   createPaymentAccount,
   updatePaymentAccount
 } = require('../services/paymentAccountService');
+const { gerarComprovantePagamentoBb } = require('../services/paymentReceiptService');
 const { responderErroController } = require('../utils/controllerError');
 
 function responderErro(res, error, fallbackMessage) {
@@ -155,6 +156,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao listar transacoes BB');
+    }
+  },
+
+  async comprovanteItemBb(req, res) {
+    try {
+      const data = await gerarComprovantePagamentoBb(req, req.params.id, req.params.itemId);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar comprovante de pagamento');
     }
   },
 

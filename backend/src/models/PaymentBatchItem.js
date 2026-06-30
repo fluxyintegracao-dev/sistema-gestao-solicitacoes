@@ -34,6 +34,18 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     erro_mensagem: {
       type: DataTypes.TEXT,
       allowNull: true
+    },
+    comprovante_pdf_url: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    comprovante_hash: {
+      type: DataTypes.STRING(128),
+      allowNull: true
+    },
+    comprovante_gerado_em: {
+      type: DataTypes.DATE,
+      allowNull: true
     }
   },
   {

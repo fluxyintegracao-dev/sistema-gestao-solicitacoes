@@ -5,6 +5,7 @@ import {
   HiOutlineBanknotes,
   HiOutlineCheckCircle,
   HiOutlineClock,
+  HiOutlineDocumentArrowDown,
   HiOutlinePaperAirplane,
   HiOutlineShieldCheck,
   HiOutlineXCircle
@@ -16,6 +17,7 @@ import {
   criarPaymentBatch,
   enviarPaymentBatchBanco,
   enviarPaymentBatchBbSandbox,
+  gerarComprovantePaymentBatchItem,
   getBbPaymentsHealth,
   getPaymentAccounts,
   getPaymentBatch,
@@ -137,6 +139,11 @@ function sumBy(list, fieldName) {
 
 function normalizeStatus(value) {
   return String(value || '').toUpperCase();
+}
+
+function canGeneratePaymentReceipt(item) {
+  const status = normalizeStatus(item?.status || item?.intent?.status);
+  return ['AGUARDANDO_CONFIRMACAO_BAIXA', 'BAIXADO', 'CONFIRMADO_BANCO', 'PAGO', 'QUITADO'].includes(status);
 }
 
 function getTituloCodigo(titulo) {
@@ -321,6 +328,7 @@ export default function FinanceiroPagamentos() {
   });
   const [mfaCode, setMfaCode] = useState('');
   const [actionLoading, setActionLoading] = useState('');
+  const [receiptLoading, setReceiptLoading] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -688,6 +696,24 @@ export default function FinanceiroPagamentos() {
       setError(err?.message || 'Erro ao confirmar baixa');
     } finally {
       setActionLoading('');
+    }
+  }
+
+  async function handleGerarComprovanteItem(item) {
+    if (!selectedBatch?.id || !item?.id) return;
+    try {
+      setReceiptLoading(String(item.id));
+      setError('');
+      const data = await gerarComprovantePaymentBatchItem(selectedBatch.id, item.id);
+      const url = data?.signed_url || data?.comprovante_pdf_url;
+      if (url) {
+        window.open(url, '_blank', 'noopener,noreferrer');
+      }
+      await refreshAfterAction(selectedBatch.id);
+    } catch (err) {
+      setError(err?.message || 'Erro ao gerar comprovante de pagamento');
+    } finally {
+      setReceiptLoading('');
     }
   }
 
@@ -1263,6 +1289,7 @@ export default function FinanceiroPagamentos() {
                             <th className="px-3 py-2">Favorecido</th>
                             <th className="px-3 py-2 text-right">Valor</th>
                             <th className="px-3 py-2">Status</th>
+                            {canAudit && <th className="px-3 py-2 text-right">Comprovante</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1276,6 +1303,24 @@ export default function FinanceiroPagamentos() {
                               </td>
                               <td className="px-3 py-3 text-right font-medium">{formatCurrency(item.valor)}</td>
                               <td className="px-3 py-3"><span className={statusClass(item.status)}>{item.status}</span></td>
+                              {canAudit && (
+                                <td className="px-3 py-3 text-right">
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    onClick={() => handleGerarComprovanteItem(item)}
+                                    disabled={!canGeneratePaymentReceipt(item) || receiptLoading === String(item.id)}
+                                    title={canGeneratePaymentReceipt(item) ? 'Gerar ou abrir comprovante do pagamento' : 'Disponivel apos confirmacao do banco'}
+                                  >
+                                    <HiOutlineDocumentArrowDown className="h-4 w-4" />
+                                    {receiptLoading === String(item.id)
+                                      ? 'Gerando...'
+                                      : item.comprovante_pdf_url
+                                        ? 'Abrir'
+                                        : 'Gerar'}
+                                  </button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>

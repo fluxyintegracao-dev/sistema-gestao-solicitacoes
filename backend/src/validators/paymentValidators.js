@@ -143,6 +143,14 @@ function validatePaymentMockReturnBody(payload = {}) {
   });
 }
 
+function validatePaymentBatchItemParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'itemId'], 'Parametros do item do lote de pagamento');
+  return {
+    id: String(parseInteger(params.id, 'Lote de pagamento', { required: true })),
+    itemId: String(parseInteger(params.itemId, 'Item do lote de pagamento', { required: true }))
+  };
+}
+
 function validatePaymentAccountBody(payload = {}) {
   ensureAllowedKeys(payload, [
     'conta_bancaria_id',
@@ -174,6 +182,7 @@ function validatePaymentAccountBody(payload = {}) {
 
 module.exports = {
   validatePaymentAccountBody,
+  validatePaymentBatchItemParams,
   validatePaymentBatchCreateBody,
   validatePaymentBeneficiaryCreateBody,
   validatePaymentBeneficiaryUpdateBody,
