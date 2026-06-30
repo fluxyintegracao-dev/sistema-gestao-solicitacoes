@@ -1101,30 +1101,91 @@ async function listarConciliacoes(req, filters = {}) {
 
   const totalRegistros = await ConciliacaoBancaria.count({ where });
 
-  const idRows = await ConciliacaoBancaria.findAll({
+  const itens = await ConciliacaoBancaria.findAll({
     where,
-    attributes: ['id'],
     order: [['data_movimento', 'ASC'], ['createdAt', 'ASC']],
     limit: pageSize,
-    offset,
-    raw: true
+    offset
   });
 
-  const itemIds = idRows.map((item) => Number(item.id)).filter(Boolean);
-  const itens = itemIds.length
-    ? await ConciliacaoBancaria.findAll({
-        where: {
-          id: {
-            [Op.in]: itemIds
-          }
-        },
-        include: buildConciliacaoInclude(),
-        order: [['data_movimento', 'ASC'], ['createdAt', 'ASC']]
-      })
-    : [];
+  const contaIds = [...new Set(itens.map((item) => Number(item.conta_bancaria_id || 0)).filter(Boolean))];
+  const tituloIds = [...new Set(itens.map((item) => Number(item.titulo_financeiro_id || 0)).filter(Boolean))];
+  const movimentoIds = [...new Set(itens.map((item) => Number(item.movimento_financeiro_id || 0)).filter(Boolean))];
+  const faturaIds = [...new Set(itens.map((item) => Number(item.fatura_cartao_id || 0)).filter(Boolean))];
+  const usuarioIds = [...new Set(itens.map((item) => Number(item.confirmado_por || 0)).filter(Boolean))];
+
+  const [
+    contas,
+    titulos,
+    movimentos,
+    faturas,
+    usuarios
+  ] = await Promise.all([
+    contaIds.length
+      ? ContaBancaria.findAll({
+          where: { id: { [Op.in]: contaIds } },
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional']
+        })
+      : [],
+    tituloIds.length
+      ? TituloFinanceiro.findAll({
+          where: { id: { [Op.in]: tituloIds } },
+          attributes: ['id', 'tipo', 'descricao', 'numero_documento', 'obra_id'],
+          include: [
+            {
+              model: Parceiro,
+              as: 'parceiro',
+              attributes: ['id', 'nome', 'cpf_cnpj']
+            }
+          ]
+        })
+      : [],
+    movimentoIds.length
+      ? MovimentoFinanceiro.findAll({
+          where: { id: { [Op.in]: movimentoIds } },
+          attributes: ['id', 'tipo_movimento', 'valor', 'valor_quitacao', 'data_movimento', 'status', 'observacoes', 'documento_referencia', 'conta_bancaria_id'],
+          include: [
+            {
+              model: ContaBancaria,
+              as: 'contaBancaria',
+              attributes: ['id', 'nome']
+            }
+          ]
+        })
+      : [],
+    faturaIds.length
+      ? FaturaCartaoFinanceiro.findAll({
+          where: { id: { [Op.in]: faturaIds } },
+          include: [
+            {
+              model: CartaoFinanceiro,
+              as: 'cartao',
+              attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos']
+            }
+          ]
+        })
+      : [],
+    usuarioIds.length
+      ? User.findAll({
+          where: { id: { [Op.in]: usuarioIds } },
+          attributes: ['id', 'nome', 'email']
+        })
+      : []
+  ]);
+
+  const contaMap = new Map(contas.map((item) => [Number(item.id), item.toJSON()]));
+  const tituloMap = new Map(titulos.map((item) => [Number(item.id), item.toJSON()]));
+  const movimentoMap = new Map(movimentos.map((item) => [Number(item.id), item.toJSON()]));
+  const faturaMap = new Map(faturas.map((item) => [Number(item.id), item.toJSON()]));
+  const usuarioMap = new Map(usuarios.map((item) => [Number(item.id), item.toJSON()]));
 
   const rows = await Promise.all(itens.map(async (item) => {
     const json = item.toJSON();
+    const contaBancaria = contaMap.get(Number(json.conta_bancaria_id || 0));
+    const titulo = tituloMap.get(Number(json.titulo_financeiro_id || 0));
+    const movimento = movimentoMap.get(Number(json.movimento_financeiro_id || 0));
+    const faturaCartao = faturaMap.get(Number(json.fatura_cartao_id || 0));
+    const confirmadoPor = usuarioMap.get(Number(json.confirmado_por || 0));
     const analise = String(item.status || '').toUpperCase() === 'PENDENTE'
       ? await analyzeSuggestions(req, item)
       : {
@@ -1139,7 +1200,7 @@ async function listarConciliacoes(req, filters = {}) {
     return {
       id: json.id,
       conta_bancaria_id: json.conta_bancaria_id,
-      conta_bancaria_nome: json.contaBancaria?.nome || '-',
+      conta_bancaria_nome: contaBancaria?.nome || '-',
       ofx_uid: json.ofx_uid,
       documento: json.documento,
       descricao_banco: json.descricao_banco,
@@ -1147,43 +1208,43 @@ async function listarConciliacoes(req, filters = {}) {
       data_movimento: json.data_movimento,
       status: json.status,
       confirmado_em: json.confirmado_em,
-      confirmado_por: json.confirmadoPor
+      confirmado_por: confirmadoPor
         ? {
-            id: json.confirmadoPor.id,
-            nome: json.confirmadoPor.nome,
-            email: json.confirmadoPor.email
+            id: confirmadoPor.id,
+            nome: confirmadoPor.nome,
+            email: confirmadoPor.email
           }
         : null,
-      titulo: json.titulo
+      titulo: titulo
         ? {
-            id: json.titulo.id,
-            tipo: json.titulo.tipo,
-            descricao: json.titulo.descricao,
-            numero_documento: json.titulo.numero_documento,
-            parceiro_nome: json.titulo.parceiro?.nome || '-'
+            id: titulo.id,
+            tipo: titulo.tipo,
+            descricao: titulo.descricao,
+            numero_documento: titulo.numero_documento,
+            parceiro_nome: titulo.parceiro?.nome || '-'
           }
         : null,
-      movimento: json.movimento
+      movimento: movimento
         ? {
-            id: json.movimento.id,
-            tipo_movimento: json.movimento.tipo_movimento,
-            valor: Number(json.movimento.valor || 0),
-            valor_quitacao: Number(json.movimento.valor_quitacao || 0),
-            data_movimento: json.movimento.data_movimento,
-            status: json.movimento.status,
-            observacoes: json.movimento.observacoes || null,
-            documento_referencia: json.movimento.documento_referencia || null
+            id: movimento.id,
+            tipo_movimento: movimento.tipo_movimento,
+            valor: Number(movimento.valor || 0),
+            valor_quitacao: Number(movimento.valor_quitacao || 0),
+            data_movimento: movimento.data_movimento,
+            status: movimento.status,
+            observacoes: movimento.observacoes || null,
+            documento_referencia: movimento.documento_referencia || null
           }
         : null,
-      fatura_cartao: json.faturaCartao
+      fatura_cartao: faturaCartao
         ? {
-            id: json.faturaCartao.id,
-            competencia: json.faturaCartao.competencia,
-            status: json.faturaCartao.status,
-            valor_total: Number(json.faturaCartao.valor_total || 0),
-            data_vencimento: json.faturaCartao.data_vencimento,
-            cartao_nome: json.faturaCartao.cartao?.nome || '-',
-            cartao_final: json.faturaCartao.cartao?.ultimos_digitos || null
+            id: faturaCartao.id,
+            competencia: faturaCartao.competencia,
+            status: faturaCartao.status,
+            valor_total: Number(faturaCartao.valor_total || 0),
+            data_vencimento: faturaCartao.data_vencimento,
+            cartao_nome: faturaCartao.cartao?.nome || '-',
+            cartao_final: faturaCartao.cartao?.ultimos_digitos || null
           }
         : null,
       sugestoes: analise.sugestoes,
