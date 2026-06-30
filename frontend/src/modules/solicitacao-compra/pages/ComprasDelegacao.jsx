@@ -130,7 +130,25 @@ export default function ComprasDelegacao() {
     }));
   }
 
-  async function salvarDelegacao(solicitacao) {
+  function abrirSolicitacao(event, solicitacao) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (salvandoId === solicitacao.id) {
+      return;
+    }
+
+    navigate(`/solicitacoes-compra/${solicitacao.id}`);
+  }
+
+  async function salvarDelegacao(event, solicitacao) {
+    event?.preventDefault?.();
+    event?.stopPropagation?.();
+
+    if (salvandoId === solicitacao.id) {
+      return;
+    }
+
     const payload = getEdicao(solicitacao);
     const prazoInfo = getPrazoInfo({ ...solicitacao, prazo_compra: payload.prazo_compra });
 
@@ -262,14 +280,19 @@ export default function ComprasDelegacao() {
               ) : null}
 
               <div className="mt-4 flex flex-wrap justify-end gap-2">
-                <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={(event) => abrirSolicitacao(event, solicitacao)}
+                  disabled={salvandoId === solicitacao.id}
+                >
                   Abrir
                 </button>
                 {podeGerenciarDelegacao || prazoInfo.atrasado ? (
                   <button
                     type="button"
                     className="btn btn-primary"
-                    onClick={() => salvarDelegacao(solicitacao)}
+                    onClick={(event) => salvarDelegacao(event, solicitacao)}
                     disabled={salvandoId === solicitacao.id}
                   >
                     {salvandoId === solicitacao.id
