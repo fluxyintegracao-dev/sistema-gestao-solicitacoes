@@ -20,6 +20,7 @@ const {
 } = require('../services/aprovacaoDiretoriaConfig');
 const { obterTokensSetoresUsuario } = require('../services/usuariosSetores');
 const { criarNotificacao } = require('../services/notificacoes');
+const { notificacaoEventoAtivo } = require('../services/notificacaoConfigService');
 const {
   canCancelPrioridadeDiretoriaLote,
   canCreatePrioridadeDiretoriaLote,
@@ -122,6 +123,8 @@ function montarMetadataNotificacaoLote(lote) {
 }
 
 async function notificarLotePrioridadeDiretoria({ lote, tipo, mensagem, createdBy }) {
+  const tipoNormalizado = String(tipo || '').trim().toUpperCase();
+  if (!(await notificacaoEventoAtivo(tipoNormalizado))) return null;
   if (!loteCriadoPorDiretoriaObras(lote)) return null;
 
   const destinatarios = await obterDestinatariosPrioridadeDiretoria();
@@ -130,7 +133,7 @@ async function notificarLotePrioridadeDiretoria({ lote, tipo, mensagem, createdB
 
   const notificacao = await Notificacao.create({
     solicitacao_id: null,
-    tipo,
+    tipo: tipoNormalizado,
     mensagem,
     metadata: JSON.stringify(montarMetadataNotificacaoLote(lote)),
     created_by: createdBy || null
@@ -147,13 +150,16 @@ async function notificarLotePrioridadeDiretoria({ lote, tipo, mensagem, createdB
 }
 
 async function notificarLotePrioridadeParaSetor({ lote, setorToken, tipo, mensagem, createdBy }) {
+  const tipoNormalizado = String(tipo || '').trim().toUpperCase();
+  if (!(await notificacaoEventoAtivo(tipoNormalizado))) return null;
+
   const destinatarios = await obterDestinatariosSetor(setorToken);
   const destinatariosFiltrados = destinatarios.filter((usuarioId) => Number(usuarioId) !== Number(createdBy));
   if (destinatariosFiltrados.length === 0) return null;
 
   const notificacao = await Notificacao.create({
     solicitacao_id: null,
-    tipo,
+    tipo: tipoNormalizado,
     mensagem,
     metadata: JSON.stringify(montarMetadataNotificacaoLote(lote)),
     created_by: createdBy || null

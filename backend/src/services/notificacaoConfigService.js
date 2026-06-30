@@ -108,7 +108,7 @@ async function notificacaoEventoAtivo(tipo) {
 
   const config = await obterConfigBruta();
   if (!NOTIFICACAO_EVENTOS_MAP.has(chave)) {
-    return true;
+    return false;
   }
 
   return config.eventos[chave]?.ativo !== false;
