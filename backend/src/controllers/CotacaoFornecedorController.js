@@ -149,7 +149,7 @@ function normalizarNumeroCotacao(value) {
     return null;
   }
 
-  const raw = String(value).trim();
+  const raw = String(value).trim().replace(/[^\d,.-]/g, '');
   const normalized = raw.includes(',')
     ? Number(raw.replace(/\./g, '').replace(',', '.'))
     : Number(raw);
@@ -405,7 +405,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       ? statusDisponibilidade
       : (
           statusDisponibilidade !== 'NAO_TEM'
-            && (precoNormalizado === null || precoNormalizado <= 0 || quantidadeMinima === null)
+            && (precoNormalizado === null || precoNormalizado <= 0)
             ? 'NAO_TEM'
             : statusDisponibilidade
         );

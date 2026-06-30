@@ -254,7 +254,8 @@ export default function CotacaoFornecedorPublica() {
     const normalizarNumeroResposta = (value) => {
       if (value === '' || value === null || value === undefined) return null;
       const raw = String(value).trim();
-      const parsed = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
+      const cleaned = raw.replace(/[^\d,.-]/g, '');
+      const parsed = Number(cleaned.includes(',') ? cleaned.replace(/\./g, '').replace(',', '.') : cleaned);
       return Number.isFinite(parsed) ? parsed : null;
     };
 
@@ -263,7 +264,7 @@ export default function CotacaoFornecedorPublica() {
       const preco = normalizarNumeroResposta(item.preco);
       const quantidadeMinima = normalizarNumeroResposta(item.quantidade_minima_item);
       const deveMarcarIndisponivel =
-        finalizar && statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0 || quantidadeMinima === null);
+        finalizar && statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0);
       const statusEfetivo = deveMarcarIndisponivel ? 'NAO_TEM' : statusDisp;
 
       return {
@@ -271,11 +272,11 @@ export default function CotacaoFornecedorPublica() {
         item_referencia_id: item.item_referencia_id,
         status_disponibilidade: statusEfetivo,
         disponivel: statusEfetivo !== 'NAO_TEM',
-        preco: statusEfetivo === 'NAO_TEM' ? null : item.preco,
+        preco: statusEfetivo === 'NAO_TEM' ? null : preco,
         prazo: item.prazo,
         data_chegada: statusEfetivo === 'PARA_CHEGAR' ? item.data_chegada : null,
         observacao: item.observacao,
-        quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : item.quantidade_minima_item
+        quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : quantidadeMinima
       };
     });
 
