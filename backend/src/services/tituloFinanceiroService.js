@@ -1097,6 +1097,10 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
   }
 
+  if (forma.exige_cartao && !payload.cartao_id) {
+    throw createHttpError(400, 'Informe o cartao utilizado nesta forma de pagamento.');
+  }
+
   if (forma.exige_cartao && payload.cartao_id) {
     const cartao = await CartaoFinanceiro.findByPk(payload.cartao_id);
     if (!cartao || cartao.ativo === false) {
@@ -1128,7 +1132,7 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   return forma;
 }
 
-async function baixarTituloCartaoDebitoNoAto({
+async function baixarTituloCartaoNoAto({
   req,
   titulo,
   formaPagamento,
@@ -1136,7 +1140,7 @@ async function baixarTituloCartaoDebitoNoAto({
   dataMovimento,
   transaction
 }) {
-  if (!formaPagamento?.exige_cartao || !pagamentoPayload.cartao_id) {
+  if (!isFormaCartao(formaPagamento) || !pagamentoPayload.cartao_id) {
     return null;
   }
 
@@ -1150,7 +1154,8 @@ async function baixarTituloCartaoDebitoNoAto({
   }
 
   const tipoCartao = String(cartao.tipo || 'CREDITO').trim().toUpperCase();
-  if (tipoCartao !== 'DEBITO') {
+  const isCartaoCreditoComFatura = tipoCartao === 'CREDITO' && Boolean(formaPagamento?.gera_fatura);
+  if (tipoCartao !== 'DEBITO' && !isCartaoCreditoComFatura) {
     return null;
   }
 
@@ -1158,14 +1163,16 @@ async function baixarTituloCartaoDebitoNoAto({
   if (!conta || conta.ativo === false) {
     throw createHttpError(
       400,
-      'Cartao de debito precisa ter uma conta bancaria ativa vinculada para baixar no ato do registro.'
+      tipoCartao === 'CREDITO'
+        ? 'Cartao de credito precisa ter uma conta bancaria ativa vinculada para baixar no ato do registro.'
+        : 'Cartao de debito precisa ter uma conta bancaria ativa vinculada para baixar no ato do registro.'
     );
   }
 
   if (!titulo.empresa_id) {
     throw createHttpError(
       400,
-      `Titulo ${titulo.codigo || titulo.id} sem empresa vinculada. Corrija a empresa antes de usar cartao de debito.`
+      `Titulo ${titulo.codigo || titulo.id} sem empresa vinculada. Corrija a empresa antes de usar cartao.`
     );
   }
 
@@ -1194,11 +1201,13 @@ async function baixarTituloCartaoDebitoNoAto({
   const caixaSessao = await obterSessaoAbertaParaConta(conta, dataBaixa, { transaction });
   const movimento = await MovimentoFinanceiro.create({
     titulo_financeiro_id: titulo.id,
+    fatura_cartao_id: tipoCartao === 'CREDITO' ? titulo.fatura_cartao_id || null : null,
+    cartao_id: cartao.id,
     conta_bancaria_id: conta.id,
     empresa_id: empresaBaixaId,
     ...movimentoIntercompanyFields,
     caixa_sessao_id: caixaSessao?.id || null,
-    forma_recebimento: 'CARTAO_DEBITO',
+    forma_recebimento: tipoCartao === 'CREDITO' ? 'CARTAO_CREDITO' : 'CARTAO_DEBITO',
     tipo_movimento: 'BAIXA',
     status: 'ATIVO',
     valor: valorBaixa,
@@ -1207,7 +1216,7 @@ async function baixarTituloCartaoDebitoNoAto({
     desconto: 0,
     valor_quitacao: valorBaixa,
     data_movimento: dataBaixa,
-    observacoes: `Baixa automatica por cartao de debito ${cartao.nome || cartao.id}`,
+    observacoes: `Baixa automatica por cartao de ${tipoCartao === 'CREDITO' ? 'credito' : 'debito'} ${cartao.nome || cartao.id}`,
     criado_por: req.user?.id || null
   }, { transaction });
 
@@ -1230,10 +1239,10 @@ async function baixarTituloCartaoDebitoNoAto({
     usuarioId: req.user?.id || null,
     setor: getSetorUsuario(req),
     transaction,
-    observacao: 'Status atualizado automaticamente apos baixa por cartao de debito.'
+    observacao: `Status atualizado automaticamente apos baixa por cartao de ${tipoCartao === 'CREDITO' ? 'credito' : 'debito'}.`
   });
 
-  return { movimento, cartao, conta, valorBaixa, dataBaixa };
+  return { movimento, cartao, conta, valorBaixa, dataBaixa, tipoCartao };
 }
 
 async function validarParceiro(parceiroId) {
@@ -2233,7 +2242,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
-  const baixasCartaoDebito = [];
+  const baixasCartaoNoAto = [];
   try {
     for (const [pagamentoIndex, pagamento] of pagamentos.entries()) {
       for (let index = 0; index < pagamento.quantidadeParcelas; index += 1) {
@@ -2320,9 +2329,9 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
-        const baixaCartaoDebito = statusTitulo === 'PREVISAO'
+        const baixaCartaoNoAto = statusTitulo === 'PREVISAO'
           ? null
-          : await baixarTituloCartaoDebitoNoAto({
+          : await baixarTituloCartaoNoAto({
             req,
             titulo,
             formaPagamento: pagamento.formaPagamento,
@@ -2330,8 +2339,8 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
             dataMovimento: pagamento.dataCompra,
             transaction
           });
-        if (baixaCartaoDebito) {
-          baixasCartaoDebito.push(baixaCartaoDebito);
+        if (baixaCartaoNoAto) {
+          baixasCartaoNoAto.push(baixaCartaoNoAto);
         }
 
         titulosCriados.push(titulo);
@@ -2386,21 +2395,22 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       }
     });
 
-    if (baixasCartaoDebito.length > 0) {
+    if (baixasCartaoNoAto.length > 0) {
       await registrarEventoSeguranca({
         req,
         usuarioId: req.user?.id || null,
-        tipoEvento: 'FINANCIAL_DEBIT_CARD_SETTLED',
+        tipoEvento: 'FINANCIAL_CARD_SETTLED_ON_CREATE',
         recursoTipo: 'TITULO_FINANCEIRO',
         recursoId: titulosCriados[0]?.id || null,
         status: 'SUCCESS',
-        descricao: 'Titulo financeiro baixado automaticamente por cartao de debito',
+        descricao: 'Titulo financeiro baixado automaticamente por cartao no ato da criacao',
         metadata: {
           origem: 'SOLICITACAO',
-          quantidade_movimentos: baixasCartaoDebito.length,
-          movimentos: baixasCartaoDebito.map((baixa) => ({
+          quantidade_movimentos: baixasCartaoNoAto.length,
+          movimentos: baixasCartaoNoAto.map((baixa) => ({
             movimento_id: baixa.movimento.id,
             cartao_id: baixa.cartao.id,
+            tipo_cartao: baixa.tipoCartao,
             conta_bancaria_id: baixa.conta.id,
             valor: baixa.valorBaixa,
             data_movimento: baixa.dataBaixa
@@ -2528,7 +2538,7 @@ async function criarTituloManual(req, payload = {}) {
   const rateiosTitulo = await normalizarRateiosTitulo(req, payload, obra, apropriacao, valorOriginal);
   const transaction = await sequelize.transaction();
   const titulosCriados = [];
-  const baixasCartaoDebito = [];
+  const baixasCartaoNoAto = [];
   const origemFreteId = Number(payload.origem_frete_id || 0);
 
   try {
@@ -2616,9 +2626,9 @@ async function criarTituloManual(req, payload = {}) {
           await vincularTituloAFatura({ titulo, fatura, transaction });
         }
 
-        const baixaCartaoDebito = statusTitulo === 'PREVISAO'
+        const baixaCartaoNoAto = statusTitulo === 'PREVISAO'
           ? null
-          : await baixarTituloCartaoDebitoNoAto({
+          : await baixarTituloCartaoNoAto({
             req,
             titulo,
             formaPagamento: pagamento.formaPagamento,
@@ -2626,8 +2636,8 @@ async function criarTituloManual(req, payload = {}) {
             dataMovimento: pagamento.dataCompra,
             transaction
           });
-        if (baixaCartaoDebito) {
-          baixasCartaoDebito.push(baixaCartaoDebito);
+        if (baixaCartaoNoAto) {
+          baixasCartaoNoAto.push(baixaCartaoNoAto);
         }
 
         titulosCriados.push(titulo);
@@ -2720,21 +2730,22 @@ async function criarTituloManual(req, payload = {}) {
     }
   });
 
-  if (baixasCartaoDebito.length > 0) {
+  if (baixasCartaoNoAto.length > 0) {
     await registrarEventoSeguranca({
       req,
       usuarioId: req.user?.id || null,
-      tipoEvento: 'FINANCIAL_DEBIT_CARD_SETTLED',
+      tipoEvento: 'FINANCIAL_CARD_SETTLED_ON_CREATE',
       recursoTipo: 'TITULO_FINANCEIRO',
       recursoId: titulosCriados[0]?.id || null,
       status: 'SUCCESS',
-      descricao: 'Titulo financeiro baixado automaticamente por cartao de debito',
+      descricao: 'Titulo financeiro baixado automaticamente por cartao no ato da criacao',
       metadata: {
         origem: 'MANUAL',
-        quantidade_movimentos: baixasCartaoDebito.length,
-        movimentos: baixasCartaoDebito.map((baixa) => ({
+        quantidade_movimentos: baixasCartaoNoAto.length,
+        movimentos: baixasCartaoNoAto.map((baixa) => ({
           movimento_id: baixa.movimento.id,
           cartao_id: baixa.cartao.id,
+          tipo_cartao: baixa.tipoCartao,
           conta_bancaria_id: baixa.conta.id,
           valor: baixa.valorBaixa,
           data_movimento: baixa.dataBaixa
