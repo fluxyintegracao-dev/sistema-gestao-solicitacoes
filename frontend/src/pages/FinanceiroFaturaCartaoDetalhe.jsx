@@ -92,7 +92,9 @@ export default function FinanceiroFaturaCartaoDetalhe() {
         setFatura(data);
         setBaixaForm((current) => ({
           ...current,
-          conta_bancaria_id: data.conta_bancaria_id || data.cartao?.conta_bancaria_id || ''
+          conta_bancaria_id: String(data.status || '').toUpperCase() === 'PAGA'
+            ? data.conta_bancaria_id || ''
+            : ''
         }));
       })
       .catch((err) => {
@@ -144,7 +146,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
       setMessage('');
       const data = await baixarFaturaCartaoFinanceiro(fatura.id, baixaForm);
       setFatura(data);
-      setMessage('Fatura baixada. Os titulos abertos foram quitados com movimentos na conta bancaria informada.');
+      setMessage('Pagamento da fatura registrado. A conta real recebeu a saida e a conta do cartao recebeu o credito de compensacao.');
     } catch (err) {
       setError(err?.message || 'Erro ao baixar fatura de cartao');
     } finally {
@@ -153,7 +155,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
   }
 
   const status = String(fatura?.status || '').toUpperCase();
-  const canBaixar = fatura && ['ABERTA', 'FECHADA', 'PARCIAL'].includes(status) && resumo.titulosAbertos > 0;
+  const canBaixar = fatura && ['ABERTA', 'FECHADA', 'PARCIAL'].includes(status) && resumo.total > 0;
 
   return (
     <div className="page solicitacoes-page">
@@ -163,7 +165,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
             <HiOutlineArrowLeft className="h-4 w-4" /> Voltar
           </button>
           <h1 className="page-title">Detalhes da Fatura</h1>
-          <p className="page-subtitle">Confira todos os titulos vinculados antes de registrar a baixa da fatura.</p>
+          <p className="page-subtitle">Confira os titulos vinculados e registre o pagamento da fatura na conta bancaria real.</p>
         </div>
         <div className="app-page-actions">
           <Link to="/financeiro/faturas-cartao" className="btn btn-outline btn-sm">Faturas</Link>
@@ -275,7 +277,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
                   <div>
                     <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixar fatura</h2>
                     <p className="text-sm text-[var(--c-muted)]">
-                      A baixa quita os titulos abertos e gera movimentos na conta bancaria real.
+                      A baixa registra a saida na conta real e credita a conta de controle do cartao.
                     </p>
                   </div>
                   <label className="app-filter-field">
@@ -318,7 +320,7 @@ export default function FinanceiroFaturaCartaoDetalhe() {
                 </form>
               ) : (
                 <div className="app-note">
-                  Esta fatura nao possui titulos abertos para baixa.
+                  Esta fatura nao possui valor aberto para pagamento ou ja foi baixada.
                 </div>
               )}
             </aside>

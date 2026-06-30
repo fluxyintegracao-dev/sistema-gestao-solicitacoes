@@ -398,10 +398,25 @@ async function resolverCartaoBaixa({ formaRecebimento, cartaoId, conta, empresaB
     usuarioId,
     transaction
   });
+  const contaCartao = cartao.contaBancaria || (cartao.conta_bancaria_id
+    ? await ContaBancaria.findByPk(cartao.conta_bancaria_id, { transaction })
+    : null);
+
+  if (!contaCartao || contaCartao.ativo === false) {
+    throw createHttpError(400, 'Cartao de credito precisa ter uma conta bancaria ativa vinculada.');
+  }
+
+  if (conta && Number(conta.id) !== Number(contaCartao.id)) {
+    throw createHttpError(400, 'A conta bancaria informada deve ser a mesma vinculada ao cartao de credito.');
+  }
+
+  if (Number(contaCartao.empresa_id || 0) !== Number(empresaBaixaId || 0)) {
+    throw createHttpError(400, 'A conta bancaria vinculada ao cartao de credito deve pertencer a empresa pagadora.');
+  }
 
   return {
     cartao,
-    conta: null,
+    conta: contaCartao,
     fatura,
     formaRecebimento: 'CARTAO_CREDITO'
   };

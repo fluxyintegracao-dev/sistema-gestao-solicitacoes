@@ -251,6 +251,24 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
     const dataMovimento = payload.data_movimento || payload.data_pagamento || fatura.data_vencimento;
     if (!dataMovimento) throw createHttpError(400, 'Data de pagamento da fatura e obrigatoria.');
     const caixaSessao = await obterSessaoAbertaParaConta(conta, dataMovimento, { transaction });
+    const contaCartaoId = Number(fatura.cartao?.conta_bancaria_id || 0);
+    if (!Number.isInteger(contaCartaoId) || contaCartaoId <= 0) {
+      throw createHttpError(
+        400,
+        'Cartao da fatura precisa ter uma conta bancaria vinculada para controlar o saldo do cartao.'
+      );
+    }
+    const contaCartao = await ContaBancaria.findByPk(contaCartaoId, { transaction });
+    if (!contaCartao || contaCartao.ativo === false) {
+      throw createHttpError(400, 'Conta bancaria vinculada ao cartao esta invalida ou inativa.');
+    }
+    if (!contaCartao.empresa_id) {
+      throw createHttpError(400, 'Conta bancaria vinculada ao cartao nao possui empresa vinculada.');
+    }
+    if (Number(contaCartao.id) === Number(conta.id)) {
+      throw createHttpError(400, 'A conta que paga a fatura precisa ser diferente da conta de controle do cartao.');
+    }
+    const caixaSessaoCartao = await obterSessaoAbertaParaConta(contaCartao, dataMovimento, { transaction });
 
     const movimentos = [];
     const solicitacaoIdsSincronizar = new Set();
@@ -266,16 +284,17 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
       const intercompanyFields = buildIntercompanyBaixaFatura({
         payload,
         titulo,
-        empresaBaixaId: conta.empresa_id
+        empresaBaixaId: contaCartao.empresa_id
       });
 
       const movimento = await MovimentoFinanceiro.create({
         titulo_financeiro_id: titulo.id,
         fatura_cartao_id: fatura.id,
-        conta_bancaria_id: conta.id,
-        empresa_id: conta.empresa_id,
+        cartao_id: fatura.cartao_id,
+        conta_bancaria_id: contaCartao.id,
+        empresa_id: contaCartao.empresa_id,
         ...intercompanyFields,
-        caixa_sessao_id: caixaSessao?.id || null,
+        caixa_sessao_id: caixaSessaoCartao?.id || null,
         forma_recebimento: 'CARTAO_CREDITO',
         tipo_movimento: 'BAIXA',
         status: 'ATIVO',
@@ -310,9 +329,70 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
         usuarioId: req.user?.id || null,
         setor: 'FINANCEIRO',
         transaction,
-        observacao: 'Status atualizado automaticamente apos baixa de fatura de cartao.'
+        observacao: 'Status atualizado automaticamente apos baixa de titulo no cartao de credito.'
       });
     }
+
+    const valorFatura = roundCurrency(await recalcularFaturaCartao(fatura.id, { transaction }));
+    if (valorFatura <= 0) {
+      throw createHttpError(400, 'Fatura de cartao sem valor para pagamento.');
+    }
+
+    const movimentoExistente = await MovimentoFinanceiro.findOne({
+      where: {
+        fatura_cartao_id: fatura.id,
+        status: 'ATIVO',
+        tipo_movimento: 'PAGAMENTO_FATURA'
+      },
+      transaction
+    });
+    if (movimentoExistente) {
+      throw createHttpError(409, 'Pagamento desta fatura ja foi registrado.');
+    }
+
+    const documentoReferencia = `FATURA-CARTAO-${fatura.id}`;
+    const observacoesPagamento = payload.observacoes || `Pagamento da fatura do cartao ${fatura.competencia}`;
+    const movimentoContaReal = await MovimentoFinanceiro.create({
+      titulo_financeiro_id: null,
+      fatura_cartao_id: fatura.id,
+      cartao_id: fatura.cartao_id,
+      conta_bancaria_id: conta.id,
+      empresa_id: conta.empresa_id,
+      caixa_sessao_id: caixaSessao?.id || null,
+      forma_recebimento: 'PAGAMENTO_FATURA_CARTAO',
+      tipo_movimento: 'PAGAMENTO_FATURA',
+      status: 'ATIVO',
+      valor: -valorFatura,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      valor_quitacao: -valorFatura,
+      data_movimento: dataMovimento,
+      documento_referencia: documentoReferencia,
+      observacoes: observacoesPagamento,
+      criado_por: req.user?.id || null
+    }, { transaction });
+
+    const movimentoContaCartao = await MovimentoFinanceiro.create({
+      titulo_financeiro_id: null,
+      fatura_cartao_id: fatura.id,
+      cartao_id: fatura.cartao_id,
+      conta_bancaria_id: contaCartao.id,
+      empresa_id: contaCartao.empresa_id,
+      caixa_sessao_id: caixaSessaoCartao?.id || null,
+      forma_recebimento: 'CREDITO_FATURA_CARTAO',
+      tipo_movimento: 'AJUSTE_CARTAO',
+      status: 'ATIVO',
+      valor: valorFatura,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      valor_quitacao: valorFatura,
+      data_movimento: dataMovimento,
+      documento_referencia: documentoReferencia,
+      observacoes: `Credito para zerar fatura do cartao ${fatura.competencia}`,
+      criado_por: req.user?.id || null
+    }, { transaction });
 
     await fatura.update({
       status: 'PAGA',
@@ -334,11 +414,15 @@ async function baixarFaturaCartao(req, faturaId, payload = {}, { transaction: ex
       recursoTipo: 'FATURA_CARTAO',
       recursoId: fatura.id,
       status: 'SUCCESS',
-      descricao: 'Fatura de cartao baixada com movimentos individuais nos titulos',
+      descricao: 'Pagamento de fatura de cartao registrado com saida na conta real e credito na conta do cartao',
       metadata: {
         fatura_id: fatura.id,
-        total_movimentos: movimentos.length,
-        conta_bancaria_id: conta.id
+        total_movimentos_baixa_titulos: movimentos.length,
+        movimento_conta_real_id: movimentoContaReal.id,
+        movimento_conta_cartao_id: movimentoContaCartao.id,
+        conta_bancaria_id: conta.id,
+        conta_cartao_id: contaCartao.id,
+        valor_fatura: valorFatura
       }
     });
 
