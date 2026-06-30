@@ -1101,13 +1101,27 @@ async function listarConciliacoes(req, filters = {}) {
 
   const totalRegistros = await ConciliacaoBancaria.count({ where });
 
-  const itens = await ConciliacaoBancaria.findAll({
+  const idRows = await ConciliacaoBancaria.findAll({
     where,
-    include: buildConciliacaoInclude(),
+    attributes: ['id'],
     order: [['data_movimento', 'ASC'], ['createdAt', 'ASC']],
     limit: pageSize,
-    offset
+    offset,
+    raw: true
   });
+
+  const itemIds = idRows.map((item) => Number(item.id)).filter(Boolean);
+  const itens = itemIds.length
+    ? await ConciliacaoBancaria.findAll({
+        where: {
+          id: {
+            [Op.in]: itemIds
+          }
+        },
+        include: buildConciliacaoInclude(),
+        order: [['data_movimento', 'ASC'], ['createdAt', 'ASC']]
+      })
+    : [];
 
   const rows = await Promise.all(itens.map(async (item) => {
     const json = item.toJSON();
