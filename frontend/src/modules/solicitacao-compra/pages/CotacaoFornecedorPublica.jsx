@@ -17,26 +17,65 @@ function formatarData(data) {
   return valor.toLocaleDateString('pt-BR');
 }
 
-function formatarMoeda(valor) {
+function contarCasasDecimaisSignificativas(valor, limite = 2) {
+  const texto = String(valor ?? '').trim();
+  const parteDecimal = texto.split(/[,.]/)[1] || '';
+  return Math.min(parteDecimal.length, limite);
+}
+
+function normalizarDecimalEditavel(valor, limiteDecimais = 2) {
+  if (valor === '' || valor === null || valor === undefined) return '';
+  const texto = String(valor).trim().replace('.', ',');
+  const [inteiroRaw = '', decimalRaw = ''] = texto.split(',');
+  const inteiro = inteiroRaw.replace(/\D/g, '');
+  const decimal = decimalRaw.replace(/\D/g, '').slice(0, limiteDecimais);
+  return decimal ? `${inteiro || '0'},${decimal}` : inteiro;
+}
+
+function normalizarDecimalDaApi(valor, limiteDecimais = 10) {
+  const editavel = normalizarDecimalEditavel(valor, limiteDecimais);
+  if (!editavel.includes(',')) return editavel;
+  const [inteiro, decimal] = editavel.split(',');
+  const decimalSemZerosArtificiais = decimal.replace(/0+$/, '');
+  return decimalSemZerosArtificiais ? `${inteiro},${decimalSemZerosArtificiais}` : inteiro;
+}
+
+function sanitizarDecimalInput(valor, limiteDecimais = 2) {
+  let raw = String(valor || '').replace(/[^\d.,]/g, '').replace(/\./g, ',');
+  const partes = raw.split(',');
+  const inteiro = partes.shift().replace(/\D/g, '');
+  const decimal = partes.join('').replace(/\D/g, '').slice(0, limiteDecimais);
+  if (raw.includes(',')) return `${inteiro || '0'},${decimal}`;
+  return inteiro;
+}
+
+function formatarMoeda(valor, { casasDecimaisMaximas = 2, preservarEscala = false } = {}) {
   if (valor === '' || valor === null || valor === undefined) return '';
   const num = parseFloat(String(valor).replace(',', '.'));
   if (isNaN(num)) return valor;
+  const casas = preservarEscala
+    ? contarCasasDecimaisSignificativas(valor, casasDecimaisMaximas)
+    : casasDecimaisMaximas;
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-    minimumFractionDigits: 2
+    minimumFractionDigits: casas,
+    maximumFractionDigits: casas
   }).format(num);
 }
 
-function CurrencyInput({ value, onChange, disabled, className }) {
+function CurrencyInput({
+  value,
+  onChange,
+  disabled,
+  className,
+  casasDecimais = 2,
+  preservarEscala = false
+}) {
   const [focused, setFocused] = useState(false);
 
   function handleChange(e) {
-    let raw = e.target.value.replace(/[^\d.,]/g, '');
-    raw = raw.replace(',', '.');
-    const parts = raw.split('.');
-    if (parts.length > 2) raw = `${parts[0]}.${parts.slice(1).join('')}`;
-    onChange(raw);
+    onChange(sanitizarDecimalInput(e.target.value, casasDecimais));
   }
 
   return (
@@ -44,7 +83,11 @@ function CurrencyInput({ value, onChange, disabled, className }) {
       className={className}
       type="text"
       inputMode="decimal"
-      value={focused ? value : formatarMoeda(value)}
+      value={
+        focused
+          ? normalizarDecimalEditavel(value, casasDecimais)
+          : formatarMoeda(value, { casasDecimaisMaximas: casasDecimais, preservarEscala })
+      }
       disabled={disabled}
       placeholder={focused ? '0,00' : 'R$ 0,00'}
       onFocus={() => setFocused(true)}
@@ -190,11 +233,12 @@ export default function CotacaoFornecedorPublica() {
       setDados(data || null);
       setItens(
         Array.isArray(data?.itens)
-          ? data.itens.map((item) => ({
-              ...item,
-              status_disponibilidade: item.status_disponibilidade || 'DISPONIVEL',
-              data_chegada: item.data_chegada || ''
-            }))
+            ? data.itens.map((item) => ({
+                ...item,
+                preco: normalizarDecimalDaApi(item.preco, 10),
+                status_disponibilidade: item.status_disponibilidade || 'DISPONIVEL',
+                data_chegada: item.data_chegada || ''
+              }))
           : []
       );
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
@@ -620,6 +664,8 @@ export default function CotacaoFornecedorPublica() {
                           className={`input cotacao-publica-table-input h-6 text-[11px] px-1.5${isNaoTem ? ' pointer-events-none' : ''}`}
                           value={isNaoTem ? '' : item.preco}
                           disabled={formularioBloqueado || isNaoTem}
+                          casasDecimais={10}
+                          preservarEscala
                           onChange={(val) => atualizarItem(index, 'preco', val)}
                         />
                       </td>

@@ -29,7 +29,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: false
       },
       preco: {
-        type: DataTypes.DECIMAL(12, 2),
+        type: DataTypes.DECIMAL(22, 10),
         allowNull: true
       },
       prazo: {
