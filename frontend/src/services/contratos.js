@@ -124,6 +124,27 @@ export async function importarContratosEmMassa(file) {
   return data;
 }
 
+export async function importarApropriacoesContratos(file, { substituir = true } = {}) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('substituir', substituir ? 'true' : 'false');
+
+  const res = await fetch(`${API_URL}/contratos/importar-apropriacoes`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    const error = new Error(data?.error || 'Erro ao importar apropriacoes dos contratos');
+    error.details = data;
+    throw error;
+  }
+
+  return data;
+}
+
 export async function exportarContratosCsv({ obra_id, ref, codigo } = {}) {
   const search = new URLSearchParams();
   if (obra_id) search.set('obra_id', obra_id);
