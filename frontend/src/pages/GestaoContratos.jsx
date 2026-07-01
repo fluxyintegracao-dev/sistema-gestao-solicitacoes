@@ -811,7 +811,7 @@ export default function GestaoContratos() {
     const linhas = [
       [
         'Contrato',
-        'Codigo',
+        'Codigo Obra',
         'Apropriacao Codigo',
         'Apropriacao Percentual',
         'Apropriacao Quantidade',
