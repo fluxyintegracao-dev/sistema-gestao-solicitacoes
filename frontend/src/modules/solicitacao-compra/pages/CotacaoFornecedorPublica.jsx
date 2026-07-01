@@ -258,7 +258,22 @@ export default function CotacaoFornecedorPublica() {
 
   function atualizarItem(index, campo, valor) {
     setItens((atual) =>
-      atual.map((item, i) => (i === index ? { ...item, [campo]: valor } : item))
+      atual.map((item, i) => {
+        if (i !== index) return item;
+        const cotacaoReaberta = String(dados?.cotacao?.status || '').toUpperCase() === 'REABERTA';
+        const camposQueReativam = ['preco', 'prazo', 'quantidade_minima_item', 'observacao'];
+        const deveReativarItem =
+          cotacaoReaberta
+          && String(item.status_disponibilidade || '').toUpperCase() === 'NAO_TEM'
+          && camposQueReativam.includes(campo)
+          && String(valor ?? '').trim() !== '';
+
+        return {
+          ...item,
+          [campo]: valor,
+          ...(deveReativarItem ? { status_disponibilidade: 'DISPONIVEL' } : {})
+        };
+      })
     );
   }
 
@@ -406,6 +421,7 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
   const respostaFinalizada = String(statusCotacao).toUpperCase() === 'RESPONDIDO';
+  const cotacaoReaberta = String(statusCotacao).toUpperCase() === 'REABERTA';
   const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(
     (item) => (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM'
@@ -636,11 +652,12 @@ export default function CotacaoFornecedorPublica() {
                   const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
                   const isParaChegar = statusDisp === 'PARA_CHEGAR';
                   const isNaoTem = statusDisp === 'NAO_TEM';
+                  const bloqueiaPorIndisponivel = isNaoTem && !cotacaoReaberta;
 
                   return (
                     <tr
                       key={`${item.item_tipo}-${item.item_referencia_id}`}
-                      className={`cotacao-publica-table-row${isNaoTem ? ' opacity-50' : ''}`}
+                      className={`cotacao-publica-table-row${bloqueiaPorIndisponivel ? ' opacity-50' : ''}`}
                     >
                       <td>
                         <div className="cotacao-publica-cell-description">
@@ -662,9 +679,9 @@ export default function CotacaoFornecedorPublica() {
                       </td>
                       <td>
                         <CurrencyInput
-                          className={`input cotacao-publica-table-input h-6 text-[11px] px-1.5${isNaoTem ? ' pointer-events-none' : ''}`}
-                          value={isNaoTem ? '' : item.preco}
-                          disabled={formularioBloqueado || isNaoTem}
+                          className={`input cotacao-publica-table-input h-6 text-[11px] px-1.5${bloqueiaPorIndisponivel ? ' pointer-events-none' : ''}`}
+                          value={bloqueiaPorIndisponivel ? '' : item.preco}
+                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
                           casasDecimais={10}
                           preservarEscala
                           onChange={(val) => atualizarItem(index, 'preco', val)}
@@ -674,7 +691,7 @@ export default function CotacaoFornecedorPublica() {
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
                           value={item.prazo}
-                          disabled={formularioBloqueado || isNaoTem}
+                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
                           onChange={(e) => atualizarItem(index, 'prazo', e.target.value)}
                           placeholder="Ex.: 7 dias"
                         />
@@ -687,8 +704,8 @@ export default function CotacaoFornecedorPublica() {
                           min="0"
                           step="1"
                           inputMode="decimal"
-                          value={isNaoTem ? '' : item.quantidade_minima_item}
-                          disabled={formularioBloqueado || isNaoTem}
+                          value={bloqueiaPorIndisponivel ? '' : item.quantidade_minima_item}
+                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
                           onChange={(e) => atualizarItem(index, 'quantidade_minima_item', e.target.value)}
                           placeholder="Opcional"
                         />
