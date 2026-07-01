@@ -430,6 +430,10 @@ function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
 
+function empresaIntercompanySelecionavel(empresa) {
+  return empresa?.ativo !== false && String(empresa?.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING';
+}
+
 function getCategoriaDreResumo(categoria) {
   if (!categoria) return 'Sem categoria financeira';
   if (categoria.considera_dre === false) return 'Categoria fora da DRE';
@@ -1910,11 +1914,17 @@ export default function FinanceiroCard({
                     <select
                       className="input w-full"
                       value={form.empresa_origem_id}
-                      onChange={(event) => setForm((current) => ({ ...current, empresa_origem_id: event.target.value }))}
+                      onChange={(event) => setForm((current) => ({
+                        ...current,
+                        empresa_origem_id: event.target.value,
+                        empresa_destino_id: String(current.empresa_destino_id) === String(event.target.value)
+                          ? ''
+                          : current.empresa_destino_id
+                      }))}
                     >
                       <option value="">Empresa origem</option>
                       {empresasGrupo
-                        .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                        .filter(empresaIntercompanySelecionavel)
                         .map((empresa) => (
                           <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                         ))}
@@ -1926,7 +1936,10 @@ export default function FinanceiroCard({
                     >
                       <option value="">Empresa destino</option>
                       {empresasGrupo
-                        .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                        .filter((empresa) => (
+                          empresaIntercompanySelecionavel(empresa)
+                          && String(empresa.id) !== String(form.empresa_origem_id)
+                        ))
                         .map((empresa) => (
                           <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                         ))}
