@@ -118,8 +118,9 @@ module.exports = {
 
   async marcarTodasLidas(req, res) {
     try {
-      await NotificacaoDestinatario.update(
-        { lida_em: new Date() },
+      const agora = new Date();
+      const [marcadas] = await NotificacaoDestinatario.update(
+        { lida_em: agora },
         {
           where: {
             usuario_id: req.user.id,
@@ -128,7 +129,17 @@ module.exports = {
         }
       );
 
-      return res.sendStatus(204);
+      const totalNaoLidas = await NotificacaoDestinatario.count({
+        where: {
+          usuario_id: req.user.id,
+          lida_em: null
+        }
+      });
+
+      return res.json({
+        marcadas,
+        total_nao_lidas: totalNaoLidas
+      });
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao marcar todas como lidas' });

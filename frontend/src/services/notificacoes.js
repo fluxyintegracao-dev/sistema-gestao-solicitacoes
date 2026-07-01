@@ -21,15 +21,26 @@ export async function getNotificacoes({ nao_lidas = false, limit = 50, page = 1,
 }
 
 export async function marcarNotificacaoLida(destinatarioId) {
-  await fetch(`${API_URL}/notificacoes/${destinatarioId}/lida`, {
+  const res = await fetch(`${API_URL}/notificacoes/${destinatarioId}/lida`, {
     method: 'PATCH',
     headers: authHeaders()
   });
+
+  if (!res.ok) {
+    throw new Error('Erro ao marcar notificacao como lida');
+  }
 }
 
 export async function marcarTodasNotificacoesLidas() {
-  await fetch(`${API_URL}/notificacoes/lidas`, {
+  const res = await fetch(`${API_URL}/notificacoes/lidas`, {
     method: 'PATCH',
     headers: authHeaders()
   });
+
+  const data = await res.json().catch(() => null);
+  if (!res.ok) {
+    throw new Error(data?.error || 'Erro ao marcar notificacoes como lidas');
+  }
+
+  return data;
 }
