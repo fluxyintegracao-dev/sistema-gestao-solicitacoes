@@ -28,7 +28,7 @@ import {
   getContratoAnexos,
   getContratos,
   getContratosResumo,
-  importarContratosEmMassa,
+  importarApropriacoesContratos,
   uploadContratoAnexos
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
@@ -812,17 +812,13 @@ export default function GestaoContratos() {
       [
         'Contrato',
         'Codigo',
-        'Ref. do Contrato',
-        'Descricao',
-        'Itens de Apropriacao',
-        'Solicitado',
         'Apropriacao Codigo',
         'Apropriacao Percentual',
         'Apropriacao Quantidade',
         'Apropriacao Observacao'
       ],
-      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', 'Contrato exemplo', '', '15000,00', '001', '60', '', 'Linha 1'],
-      ['CT/PE001-7', '7', 'EXEMPLO REF CONTRATO', 'Contrato exemplo', '', '15000,00', '002', '40', '', 'Linha 2']
+      ['CT/PE001-7', '7', '001', '60', '', 'Linha 1'],
+      ['CT/PE001-7', '7', '002', '40', '', 'Linha 2']
     ];
 
     const csv = linhas
@@ -833,7 +829,7 @@ export default function GestaoContratos() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'modelo-importacao-contratos.csv';
+    a.download = 'modelo-importacao-apropriacoes-contratos.csv';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -846,21 +842,25 @@ export default function GestaoContratos() {
     if (!file) return;
 
     if (!String(file.name || '').toLowerCase().endsWith('.csv')) {
-      alert('Utilize o arquivo modelo em CSV para importar os contratos.');
+      alert('Utilize o arquivo modelo em CSV para importar as apropriações dos contratos.');
       return;
     }
 
-    if (!confirm(`Importar contratos em massa usando o arquivo "${file.name}"?`)) {
+    if (!confirm(`Importar apropriações usando o arquivo "${file.name}"?\n\nEsta rotina altera somente os vínculos de apropriação dos contratos encontrados na planilha. Valores solicitados, pagos, ajustes, saldo, credores e descrições não serão alterados.`)) {
+      return;
+    }
+
+    const substituir = confirm('Deseja substituir as apropriações atuais dos contratos presentes na planilha?\n\nOK = substituir as apropriações atuais desses contratos.\nCancelar = apenas adicionar/atualizar as apropriações da planilha.');
+    if (substituir && !confirm('Confirme a substituição das apropriações atuais dos contratos listados no arquivo. Os valores financeiros dos contratos serão preservados.')) {
       return;
     }
 
     try {
       setImportandoContratos(true);
-      const resultado = await importarContratosEmMassa(file);
+      const resultado = await importarApropriacoesContratos(file, { substituir });
       await carregar();
 
-      const importados = Number(resultado?.importados || 0);
-      const atualizados = Number(resultado?.atualizados || 0);
+      const contratosAfetados = Number(resultado?.contratos_afetados || 0);
       const apropriacoesVinculadas = Number(resultado?.apropriacoes_vinculadas || 0);
       const ignorados = Number(resultado?.ignorados || 0);
       const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
@@ -870,13 +870,22 @@ export default function GestaoContratos() {
           .slice(0, 5)
           .map(item => `Linha ${item.linha}: ${item.error}`)
           .join('\n');
-        alert(`Importados: ${importados}. Atualizados: ${atualizados}. Apropriacoes vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
+        alert(`Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumoErros}${erros.length > 5 ? '\n...' : ''}`);
       } else {
-        alert(`Importacao concluida. Importados: ${importados}. Atualizados: ${atualizados}. Apropriacoes vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}.`);
+        alert(`Importação concluída. Contratos afetados: ${contratosAfetados}. Apropriações vinculadas: ${apropriacoesVinculadas}. Ignorados: ${ignorados}.`);
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao importar contratos em massa.');
+      const erros = Array.isArray(error?.details?.erros) ? error.details.erros : [];
+      if (erros.length > 0) {
+        const resumoErros = erros
+          .slice(0, 8)
+          .map(item => `Linha ${item.linha}: ${item.error}`)
+          .join('\n');
+        alert(`${error?.message || 'Erro ao importar apropriações dos contratos.'}\n${resumoErros}${erros.length > 8 ? '\n...' : ''}`);
+      } else {
+        alert(error?.message || 'Erro ao importar apropriações dos contratos.');
+      }
     } finally {
       setImportandoContratos(false);
     }
@@ -1136,10 +1145,11 @@ export default function GestaoContratos() {
             type="button"
             className="btn btn-outline px-3"
             onClick={baixarModeloImportacaoContratos}
-            title="Baixar planilha modelo de importação"
-            aria-label="Baixar planilha modelo de importação"
+            title="Baixar modelo de apropriacoes dos contratos"
+            aria-label="Baixar modelo de apropriacoes dos contratos"
           >
             <HiArrowDownTray className="w-4 h-4" />
+            Modelo apropriacoes
           </button>
 
           <button
@@ -1154,10 +1164,11 @@ export default function GestaoContratos() {
 
           <label
             className={`btn btn-outline px-3 cursor-pointer ${importandoContratos ? 'opacity-60 pointer-events-none' : ''}`}
-            title="Importar contratos em massa (.csv)"
-            aria-label="Importar contratos em massa"
+            title="Importar apenas apropriacoes dos contratos (.csv)"
+            aria-label="Importar apenas apropriacoes dos contratos"
           >
             <HiArrowUpTray className="w-4 h-4" />
+            Importar apropriacoes
             <input
               type="file"
               accept=".csv,text/csv"
@@ -1168,7 +1179,7 @@ export default function GestaoContratos() {
           </label>
 
           <span className="app-note">
-            Modelo CSV (abre no Excel): repita o contrato em varias linhas para vincular varias apropriacoes.
+            Importacao segura: altera somente os vinculos de apropriacao dos contratos listados.
           </span>
         </div>
       )}

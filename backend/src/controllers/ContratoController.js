@@ -1111,6 +1111,240 @@ module.exports = {
     }
   },
 
+  async importarApropriacoes(req, res) {
+    try {
+      const podeAcessar = await isAdminGEO(req);
+      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+      if (!podeAcessar || perfil !== 'SUPERADMIN') {
+        return res.status(403).json({ error: 'Apenas SUPERADMIN pode importar apropriacoes de contratos.' });
+      }
+
+      const file = req.file;
+      if (!file) {
+        return res.status(400).json({ error: 'Envie um arquivo CSV no campo "file".' });
+      }
+
+      const nomeArquivo = normalizeOriginalName(file.originalname).toLowerCase();
+      if (!nomeArquivo.endsWith('.csv')) {
+        return res.status(400).json({ error: 'Formato invalido. Utilize arquivo CSV.' });
+      }
+
+      const substituir = String(req.body?.substituir || 'true').toLowerCase() !== 'false';
+      const conteudo = decodeCsvBuffer(file.buffer);
+      const { headers, rows } = parseCsv(conteudo);
+      if (rows.length > env.csvImportMaxRows) {
+        return res.status(400).json({
+          error: `O arquivo excede o limite de ${env.csvImportMaxRows} linhas para importacao.`
+        });
+      }
+      if (!headers.length) {
+        return res.status(400).json({ error: 'Arquivo CSV vazio ou sem cabecalho.' });
+      }
+
+      const headerMap = headers.map(normalizarCabecalho);
+      const idxContrato = headerMap.findIndex(h => ['contrato'].includes(h));
+      const idxCodigoObra = headerMap.findIndex(h => ['codigo', 'codigo_obra'].includes(h));
+      const idxApropriacaoCodigo = headerMap.findIndex(h => ['apropriacao_codigo', 'codigo_apropriacao', 'apropriacao'].includes(h));
+      const idxApropriacaoPercentual = headerMap.findIndex(h => ['apropriacao_percentual', 'percentual', 'percentual_apropriacao'].includes(h));
+      const idxApropriacaoQuantidade = headerMap.findIndex(h => ['apropriacao_quantidade', 'quantidade', 'quantidade_apropriacao'].includes(h));
+      const idxApropriacaoObservacao = headerMap.findIndex(h => ['apropriacao_observacao', 'observacao_apropriacao'].includes(h));
+
+      const camposObrigatorios = [
+        ['Contrato', idxContrato],
+        ['Codigo', idxCodigoObra],
+        ['Apropriacao Codigo', idxApropriacaoCodigo]
+      ];
+      const faltando = camposObrigatorios.filter(([, idx]) => idx < 0).map(([nome]) => nome);
+      if (faltando.length > 0) {
+        return res.status(400).json({
+          error: `Cabecalhos obrigatorios ausentes: ${faltando.join(', ')}.`
+        });
+      }
+
+      const [obras, apropriacoes, contratos] = await Promise.all([
+        Obra.findAll({ attributes: ['id', 'codigo', 'nome'] }),
+        Apropriacao.findAll({ attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo', 'somadora'] }),
+        Contrato.findAll({ attributes: ['id', 'obra_id', 'codigo'] })
+      ]);
+
+      const obraMap = new Map();
+      obras.forEach((obra) => {
+        const codigo = String(obra.codigo || '').trim().toUpperCase();
+        if (codigo) obraMap.set(codigo, obra);
+      });
+
+      const apropriacaoMap = new Map();
+      apropriacoes.forEach((apropriacao) => {
+        const codigo = String(apropriacao.codigo || '').trim().toUpperCase();
+        if (codigo) apropriacaoMap.set(`${Number(apropriacao.obra_id)}:${codigo}`, apropriacao);
+      });
+
+      const contratoMap = new Map();
+      contratos.forEach((contrato) => {
+        const codigo = String(contrato.codigo || '').trim().toUpperCase();
+        if (codigo) contratoMap.set(`${Number(contrato.obra_id)}:${codigo}`, contrato);
+      });
+
+      const resultado = {
+        total_linhas: rows.length,
+        contratos_afetados: 0,
+        apropriacoes_vinculadas: 0,
+        apropriacoes_substituidas: substituir,
+        ignorados: 0,
+        erros: []
+      };
+      const importacaoPorContrato = new Map();
+
+      for (let i = 0; i < rows.length; i += 1) {
+        const row = rows[i];
+        const linhaPlanilha = i + 2;
+        const linhaVazia = row.join('').trim() === '';
+        if (linhaVazia) {
+          resultado.ignorados += 1;
+          continue;
+        }
+
+        const codigoContrato = String(row[idxContrato] ?? '').trim();
+        const codigoObra = String(row[idxCodigoObra] ?? '').trim();
+        const apropriacaoCodigo = String(row[idxApropriacaoCodigo] ?? '').trim();
+
+        if (!codigoContrato || !codigoObra || !apropriacaoCodigo) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: 'Informe Contrato, Codigo da obra e Apropriacao Codigo.'
+          });
+          continue;
+        }
+
+        const obra = obraMap.get(codigoObra.toUpperCase());
+        if (!obra) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Obra nao encontrada para o codigo "${codigoObra}".`
+          });
+          continue;
+        }
+
+        const contrato = contratoMap.get(`${Number(obra.id)}:${codigoContrato.toUpperCase()}`);
+        if (!contrato) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Contrato "${codigoContrato}" nao encontrado para a obra "${obra.nome}".`
+          });
+          continue;
+        }
+
+        const apropriacao = apropriacaoMap.get(`${Number(obra.id)}:${apropriacaoCodigo.toUpperCase()}`);
+        if (!apropriacao) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" nao encontrada para a obra "${obra.nome}".`
+          });
+          continue;
+        }
+        if (apropriacao.ativo === false) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" esta inativa.`
+          });
+          continue;
+        }
+        if (apropriacao.somadora === true) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" e somadora. Use uma apropriacao analitica.`
+          });
+          continue;
+        }
+
+        const contratoKey = String(contrato.id);
+        if (!importacaoPorContrato.has(contratoKey)) {
+          importacaoPorContrato.set(contratoKey, {
+            contrato,
+            apropriacoes: new Map()
+          });
+        }
+
+        const grupo = importacaoPorContrato.get(contratoKey);
+        const apropriacaoKey = String(apropriacao.id);
+        if (grupo.apropriacoes.has(apropriacaoKey)) {
+          resultado.erros.push({
+            linha: linhaPlanilha,
+            error: `Apropriacao "${apropriacaoCodigo}" repetida para o contrato "${codigoContrato}".`
+          });
+          continue;
+        }
+
+        grupo.apropriacoes.set(apropriacaoKey, {
+          apropriacao_id: apropriacao.id,
+          percentual: idxApropriacaoPercentual >= 0 ? parseDecimalOpcional(row[idxApropriacaoPercentual]) : null,
+          quantidade: idxApropriacaoQuantidade >= 0 ? parseDecimalOpcional(row[idxApropriacaoQuantidade]) : null,
+          observacao: idxApropriacaoObservacao >= 0
+            ? (String(row[idxApropriacaoObservacao] ?? '').trim() || null)
+            : null
+        });
+      }
+
+      if (resultado.erros.length > 0) {
+        return res.status(400).json({
+          error: 'Arquivo possui inconsistencias. Nenhuma apropriacao foi importada.',
+          ...resultado
+        });
+      }
+
+      if (importacaoPorContrato.size === 0) {
+        return res.status(400).json({
+          error: 'Nenhuma apropriacao valida encontrada para importar.',
+          ...resultado
+        });
+      }
+
+      await sequelize.transaction(async (transaction) => {
+        for (const grupo of importacaoPorContrato.values()) {
+          if (substituir) {
+            await ContratoApropriacao.destroy({
+              where: { contrato_id: grupo.contrato.id },
+              transaction
+            });
+          }
+
+          for (const item of grupo.apropriacoes.values()) {
+            await ContratoApropriacao.upsert({
+              contrato_id: grupo.contrato.id,
+              apropriacao_id: item.apropriacao_id,
+              percentual: item.percentual,
+              quantidade: item.quantidade,
+              observacao: item.observacao
+            }, { transaction });
+            resultado.apropriacoes_vinculadas += 1;
+          }
+        }
+      });
+
+      resultado.contratos_afetados = importacaoPorContrato.size;
+
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'CONTRACT_APPROPRIATIONS_IMPORTED',
+        recursoTipo: 'CONTRATO',
+        recursoId: null,
+        status: 'SUCCESS',
+        descricao: 'Apropriacoes de contratos importadas',
+        metadata: {
+          contratos_afetados: resultado.contratos_afetados,
+          apropriacoes_vinculadas: resultado.apropriacoes_vinculadas,
+          substituir
+        }
+      });
+
+      return res.json(resultado);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao importar apropriacoes de contratos' });
+    }
+  },
+
   async exportarCsv(req, res) {
     try {
       const podeVisualizarContratos = await canAccessContratos(req.user);
