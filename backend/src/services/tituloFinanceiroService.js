@@ -1918,6 +1918,9 @@ async function listarTitulos(req, filters = {}) {
   if (filters.forma_pagamento_id) {
     where.forma_pagamento_id = Number(filters.forma_pagamento_id);
   }
+  if (filters.cartao_id) {
+    where.cartao_id = Number(filters.cartao_id);
+  }
   if (filters.solicitacao_id) {
     where.solicitacao_id = Number(filters.solicitacao_id);
   }

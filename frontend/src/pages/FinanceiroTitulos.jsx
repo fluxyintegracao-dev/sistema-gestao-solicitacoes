@@ -75,6 +75,7 @@ const FILTER_DEFINITIONS = [
   { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
   { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
   { id: 'forma_pagamento_id', label: 'Forma de pagamento', group: 'advanced', span: 'xl:col-span-3', defaultVisibleWhenMissing: true },
+  { id: 'cartao_id', label: 'Cartao', group: 'advanced', span: 'xl:col-span-3', defaultVisibleWhenMissing: true },
   { id: 'vencimento_inicial', label: 'Vencimento inicio', group: 'advanced', span: 'xl:col-span-2' },
   { id: 'vencimento_final', label: 'Vencimento fim', group: 'advanced', span: 'xl:col-span-2' }
 ];
@@ -91,6 +92,7 @@ function getDefaultFilters(tipo = 'RECEBER') {
     parceiro_id: '',
     categoria_financeira_id: '',
     forma_pagamento_id: '',
+    cartao_id: '',
     numero_documento: '',
     data_emissao_inicial: '',
     data_emissao_final: '',
@@ -453,6 +455,37 @@ function isCartaoDebito(cartao) {
   return String(cartao?.tipo || '').toUpperCase() === 'DEBITO';
 }
 
+function normalizeFormaPagamentoText(forma) {
+  return [forma?.codigo, forma?.nome]
+    .filter(Boolean)
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+}
+
+function isFormaPagamentoCartao(forma) {
+  if (!forma) return false;
+  const text = normalizeFormaPagamentoText(forma);
+  return Boolean(forma.exige_cartao) ||
+    Boolean(forma.gera_fatura) ||
+    text.includes('CARTAO') ||
+    text.includes('CREDITO') ||
+    text.includes('DEBITO');
+}
+
+function isFormaPagamentoCartaoDebito(forma) {
+  if (!forma) return false;
+  const text = normalizeFormaPagamentoText(forma);
+  return text.includes('DEBITO');
+}
+
+function isFormaPagamentoCartaoCredito(forma) {
+  if (!forma) return false;
+  const text = normalizeFormaPagamentoText(forma);
+  return Boolean(forma.gera_fatura) || text.includes('CREDITO');
+}
+
 function getCartaoLabel(cartao) {
   const tipo = isCartaoDebito(cartao) ? 'Debito' : 'Credito';
   const bandeira = cartao?.bandeira ? `${cartao.bandeira} ` : '';
@@ -738,6 +771,38 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const formasPagamentoFiltradas = useMemo(() => {
     return formasPagamento.filter((forma) => forma?.ativo !== false);
   }, [formasPagamento]);
+
+  const formaPagamentoFiltroSelecionada = useMemo(() => (
+    formasPagamentoFiltradas.find((forma) => String(forma.id) === String(draftFilters.forma_pagamento_id)) || null
+  ), [formasPagamentoFiltradas, draftFilters.forma_pagamento_id]);
+
+  const filtroFormaPagamentoUsaCartao = isFormaPagamentoCartao(formaPagamentoFiltroSelecionada);
+
+  const cartoesFiltro = useMemo(() => {
+    if (!filtroFormaPagamentoUsaCartao) return [];
+    return cartoes.filter((cartao) => {
+      if (cartao.ativo === false) return false;
+      if (isFormaPagamentoCartaoDebito(formaPagamentoFiltroSelecionada)) {
+        return isCartaoDebito(cartao);
+      }
+      if (isFormaPagamentoCartaoCredito(formaPagamentoFiltroSelecionada)) {
+        return !isCartaoDebito(cartao);
+      }
+      return true;
+    });
+  }, [cartoes, filtroFormaPagamentoUsaCartao, formaPagamentoFiltroSelecionada]);
+
+  useEffect(() => {
+    if (!draftFilters.cartao_id) return;
+    if (!filtroFormaPagamentoUsaCartao) {
+      setDraftFilters((current) => ({ ...current, cartao_id: '' }));
+      return;
+    }
+    const exists = cartoesFiltro.some((cartao) => String(cartao.id) === String(draftFilters.cartao_id));
+    if (!exists) {
+      setDraftFilters((current) => ({ ...current, cartao_id: '' }));
+    }
+  }, [cartoesFiltro, draftFilters.cartao_id, filtroFormaPagamentoUsaCartao]);
 
   const parceirosFiltrados = useMemo(() => {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
@@ -1100,10 +1165,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }
 
   function setFilter(name, value) {
-    setDraftFilters((current) => ({
-      ...current,
-      [name]: value
-    }));
+    setDraftFilters((current) => {
+      const next = {
+        ...current,
+        [name]: value
+      };
+      if (name === 'forma_pagamento_id') {
+        next.cartao_id = '';
+      }
+      return next;
+    });
   }
 
   function setTipoFiltro(tipo) {
@@ -1695,6 +1766,26 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               {formasPagamentoFiltradas.map((forma) => (
                 <option key={forma.id} value={forma.id}>
                   {forma.codigo ? `${forma.codigo} - ${forma.nome}` : forma.nome}
+                </option>
+              ))}
+            </select>
+          </label>
+        );
+      case 'cartao_id':
+        if (!filtroFormaPagamentoUsaCartao) return null;
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Cartao</span>
+            <select
+              className="input w-full input-sm"
+              value={draftFilters.cartao_id}
+              onChange={(event) => setFilter('cartao_id', event.target.value)}
+              disabled={loadingOptions}
+            >
+              <option value="">Todos os cartoes</option>
+              {cartoesFiltro.map((cartao) => (
+                <option key={cartao.id} value={cartao.id}>
+                  {getCartaoLabel(cartao)}
                 </option>
               ))}
             </select>
