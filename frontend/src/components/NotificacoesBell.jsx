@@ -17,6 +17,7 @@ export default function NotificacoesBell() {
   const [itens, setItens] = useState([]);
   const [totalNaoLidas, setTotalNaoLidas] = useState(0);
   const [carregando, setCarregando] = useState(false);
+  const [marcandoLidas, setMarcandoLidas] = useState(false);
   const [meta, setMeta] = useState({ page: 1, has_more: false });
   const navigate = useNavigate();
   const painelRef = useRef(null);
@@ -92,13 +93,37 @@ export default function NotificacoesBell() {
   }
 
   async function marcarTudo() {
-    await marcarTodasNotificacoesLidas();
-    await carregar({ showLoading: true, page: 1 });
+    if (marcandoLidas || totalNaoLidas <= 0) return;
+
+    try {
+      setMarcandoLidas(true);
+      const resultado = await marcarTodasNotificacoesLidas();
+      const lidaEm = new Date().toISOString();
+
+      setItens((atuais) => atuais.map((item) => ({
+        ...item,
+        lida_em: item.lida_em || lidaEm
+      })));
+      setTotalNaoLidas(Number(resultado?.total_nao_lidas) || 0);
+      await carregar({ showLoading: true, page: 1 });
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao marcar notificacoes como lidas');
+    } finally {
+      setMarcandoLidas(false);
+    }
   }
 
   async function abrirSolicitacao(item) {
     if (item.destinatario_id && !item.lida_em) {
       await marcarNotificacaoLida(item.destinatario_id);
+      const lidaEm = new Date().toISOString();
+      setItens((atuais) => atuais.map((notificacao) => (
+        notificacao.destinatario_id === item.destinatario_id
+          ? { ...notificacao, lida_em: lidaEm }
+          : notificacao
+      )));
+      setTotalNaoLidas((total) => Math.max(Number(total || 0) - 1, 0));
     }
 
     await carregar({ page: 1 });
@@ -163,10 +188,10 @@ export default function NotificacoesBell() {
                   type="button"
                   onClick={marcarTudo}
                   className="btn btn-ghost btn-sm"
-                  disabled={!itens.length || !totalNaoLidas}
+                  disabled={marcandoLidas || !totalNaoLidas}
                 >
                   <HiOutlineCheck className="h-4 w-4" />
-                  Marcar lidas
+                  {marcandoLidas ? 'Marcando...' : 'Marcar lidas'}
                 </button>
                 <button
                   type="button"
