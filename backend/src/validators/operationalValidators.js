@@ -352,6 +352,7 @@ function validateCompraQuery(query = {}) {
         'itens',
         'origem',
         'forma_pagamento_ids',
+        'desconto_total',
         'anexos_cabecalho'
       ],
       'Compra direta'
@@ -390,6 +391,7 @@ function validateCompraQuery(query = {}) {
       link_geral: parseOptionalUrl(body.link_geral, 'Link geral'),
       origem: 'COMPRA_DIRETA',
       forma_pagamento_ids: formaPagamentoIds,
+      desconto_total: parseDecimal(body.desconto_total, 'Desconto concedido', { min: 0, scale: 2 }) || 0,
       anexos_cabecalho: body.anexos_cabecalho || [],
       itens: body.itens
     };

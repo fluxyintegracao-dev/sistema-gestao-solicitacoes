@@ -144,6 +144,22 @@ function normalizarValorMinimoPedido(value) {
   return normalized;
 }
 
+function normalizarDescontoTotal(value) {
+  if (value === '' || value === null || value === undefined) {
+    return 0;
+  }
+
+  const raw = String(value).trim();
+  const normalized = raw.includes(',')
+    ? Number(raw.replace(/\./g, '').replace(',', '.'))
+    : Number(raw);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    throw new Error('Desconto concedido invalido.');
+  }
+
+  return Number(normalized.toFixed(2));
+}
+
 function normalizarNumeroCotacao(value) {
   if (value === '' || value === null || value === undefined) {
     return null;
@@ -311,6 +327,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       respondido_em: cotacaoFornecedor?.respondido_em,
       prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
       valor_minimo_pedido: cotacaoFornecedor?.valor_minimo_pedido ?? '',
+      desconto_total: cotacaoFornecedor?.desconto_total ?? 0,
       condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
       observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
       pdf_resposta_url: arquivoRespostaUrl || null,
@@ -357,6 +374,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   const respostasPreparadas = [];
   const isRascunho = options.rascunho === true;
   const valorMinimoPedido = normalizarValorMinimoPedido(options.valor_minimo_pedido);
+  const descontoTotal = normalizarDescontoTotal(options.desconto_total);
   const condicaoPagamento = isRascunho
     ? String(options.condicao_pagamento || '').trim() || null
     : normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
@@ -464,6 +482,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       respondido_em: isRascunho ? cotacaoTravada.respondido_em : new Date(),
       visualizado_em: cotacaoTravada.visualizado_em || new Date(),
       valor_minimo_pedido: valorMinimoPedido,
+      desconto_total: descontoTotal,
       condicao_pagamento: condicaoPagamento,
       prazo_entrega: prazoEntrega,
       observacao_resposta: observacaoResposta
@@ -927,6 +946,7 @@ module.exports = {
 
       await salvarRespostasCotacao(cotacaoFornecedor, itens, {
         valor_minimo_pedido: req.body?.valor_minimo_pedido,
+        desconto_total: req.body?.desconto_total,
         condicao_pagamento: req.body?.condicao_pagamento,
         prazo_entrega: req.body?.prazo_entrega,
         observacao_resposta: req.body?.observacao_resposta,
@@ -961,6 +981,7 @@ module.exports = {
       const usuarioInterno = await identificarUsuarioInternoOpcional(req);
       await salvarRespostasCotacao(cotacaoFornecedor, itens, {
         valor_minimo_pedido: req.body?.valor_minimo_pedido,
+        desconto_total: req.body?.desconto_total,
         condicao_pagamento: req.body?.condicao_pagamento,
         prazo_entrega: req.body?.prazo_entrega,
         observacao_resposta: req.body?.observacao_resposta,

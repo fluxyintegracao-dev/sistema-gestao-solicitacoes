@@ -32,6 +32,26 @@ function statusClass(status, statusMap) {
   return 'app-status-pill bg-emerald-100 text-emerald-700';
 }
 
+const STATUS_PEDIDOS_FALLBACK = [
+  { codigo: 'ABERTO', nome: 'Aberto', ativo: true },
+  { codigo: 'EM_ANALISE', nome: 'Em analise interna', ativo: true },
+  { codigo: 'ENVIADO_FORNECEDOR', nome: 'Enviado ao fornecedor', ativo: true },
+  { codigo: 'NEGOCIACAO', nome: 'Em negociacao', ativo: true },
+  { codigo: 'FECHADO_FORNECEDOR', nome: 'Fechado com o fornecedor', ativo: true },
+  { codigo: 'CANCELADO', nome: 'Cancelado', ativo: true }
+];
+
+async function carregarStatusPedidosComFallback() {
+  try {
+    const dataStatus = await getStatusPedidosCompra();
+    const statuses = Array.isArray(dataStatus?.statuses) ? dataStatus.statuses : [];
+    return statuses.length ? statuses : STATUS_PEDIDOS_FALLBACK;
+  } catch (error) {
+    console.warn('Falha ao buscar configuracao de status dos pedidos. Usando lista padrao.', error);
+    return STATUS_PEDIDOS_FALLBACK;
+  }
+}
+
 export default function PedidosCompra() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -59,13 +79,13 @@ export default function PedidosCompra() {
           obra_id: filtros.obra_id || undefined
         }),
         getObras(),
-        getStatusPedidosCompra()
+        carregarStatusPedidosComFallback()
       ]);
 
       setPedidos(Array.isArray(dataPedidos) ? dataPedidos : []);
       setSelecionados([]);
       setObras(Array.isArray(dataObras) ? dataObras : []);
-      setStatusOptions(Array.isArray(dataStatus?.statuses) ? dataStatus.statuses : []);
+      setStatusOptions(Array.isArray(dataStatus) ? dataStatus : []);
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao carregar pedidos de compra');

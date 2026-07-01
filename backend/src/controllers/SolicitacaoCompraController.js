@@ -701,6 +701,27 @@ function arredondarMoeda(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function ratearValorMonetario(valorTotal, bases = []) {
+  const basesNormalizadas = bases.map((base) => Math.max(0, arredondarMoeda(base)));
+  const totalBase = arredondarMoeda(basesNormalizadas.reduce((acc, base) => acc + base, 0));
+  const totalRateio = Math.min(Math.max(0, arredondarMoeda(valorTotal)), totalBase);
+
+  if (!basesNormalizadas.length || totalRateio <= 0 || totalBase <= 0) {
+    return basesNormalizadas.map(() => 0);
+  }
+
+  let acumulado = 0;
+  return basesNormalizadas.map((base, index) => {
+    if (index === basesNormalizadas.length - 1) {
+      return arredondarMoeda(totalRateio - acumulado);
+    }
+
+    const parcela = arredondarMoeda((base / totalBase) * totalRateio);
+    acumulado = arredondarMoeda(acumulado + parcela);
+    return parcela;
+  });
+}
+
 function normalizeHeaderCompraDireta(value) {
   return normalizeTextCompra(value)
     .replace(/[^A-Z0-9]+/g, '_')
@@ -2390,6 +2411,7 @@ module.exports = {
         tipo_solicitacao_id,
         parceiro_id,
         forma_pagamento_ids,
+        desconto_total,
         anexos_cabecalho
       } = req.body;
       const compraDireta = normalizeTextCompra(origem) === 'COMPRA_DIRETA';
@@ -2434,11 +2456,36 @@ module.exports = {
         }
       }
 
-      const valorTotalCompraDireta = compraDireta
-        ? arredondarMoeda([...itensPreparados, ...itensManuaisPreparados].reduce(
+      const entradasCompraDireta = [...itensPreparados, ...itensManuaisPreparados];
+      const valorBrutoCompraDireta = compraDireta
+        ? arredondarMoeda(entradasCompraDireta.reduce(
             (acc, entry) => acc + Number(entry.item.valor_total || 0),
             0
           ))
+        : 0;
+      const descontoTotalCompraDireta = compraDireta
+        ? arredondarMoeda(parseValorMonetario(desconto_total))
+        : 0;
+
+      if (compraDireta && descontoTotalCompraDireta > valorBrutoCompraDireta) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'O desconto concedido nao pode ser maior que o valor bruto dos itens.' });
+      }
+
+      if (compraDireta) {
+        const rateiosDesconto = ratearValorMonetario(
+          descontoTotalCompraDireta,
+          entradasCompraDireta.map((entry) => entry.item.valor_total)
+        );
+        entradasCompraDireta.forEach((entry, index) => {
+          const descontoRateado = rateiosDesconto[index] || 0;
+          entry.item.desconto_rateado = descontoRateado;
+          entry.item.valor_total = arredondarMoeda(Math.max(0, Number(entry.item.valor_total || 0) - descontoRateado));
+        });
+      }
+
+      const valorTotalCompraDireta = compraDireta
+        ? arredondarMoeda(valorBrutoCompraDireta - descontoTotalCompraDireta)
         : 0;
 
       if (compraDireta && valorTotalCompraDireta <= 0) {
@@ -2519,7 +2566,8 @@ module.exports = {
           observacoes: observacoes || null,
           necessario_para: necessario_para || null,
           link_geral: link_geral || null,
-          valor_fechado: compraDireta ? valorTotalCompraDireta : 0
+          valor_fechado: compraDireta ? valorTotalCompraDireta : 0,
+          desconto_total: compraDireta ? descontoTotalCompraDireta : 0
         },
         { transaction }
       );
@@ -2597,6 +2645,8 @@ module.exports = {
         compraDireta && parceiroCompraDireta ? `Credor: ${parceiroCompraDireta.nome || parceiroCompraDireta.cpf_cnpj || parceiroCompraDireta.id}` : null,
         compraDireta && resumoFormasPagamento ? `Formas de pagamento: ${resumoFormasPagamento}` : null,
         compraDireta && dados_pagamento ? `Dados para pagamento: ${dados_pagamento}` : null,
+        compraDireta && descontoTotalCompraDireta > 0 ? `Valor bruto: R$ ${formatCurrencyPdf(valorBrutoCompraDireta)}` : null,
+        compraDireta && descontoTotalCompraDireta > 0 ? `Desconto concedido: R$ ${formatCurrencyPdf(descontoTotalCompraDireta)}` : null,
         compraDireta ? `Valor total: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
         observacoes ? `Observações: ${observacoes}` : null
       ]
@@ -2646,6 +2696,8 @@ module.exports = {
             parceiro_id: compraDireta ? parceiroCompraDireta?.id || null : null,
             formas_pagamento: compraDireta ? formasPagamentoMetadata : undefined,
             dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
+            valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
+            desconto_total: compraDireta ? descontoTotalCompraDireta : null,
             valor_total: compraDireta ? valorTotalCompraDireta : null,
             fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
             diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
@@ -2679,6 +2731,8 @@ module.exports = {
           origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
           formas_pagamento: compraDireta ? formasPagamentoMetadata : undefined,
           dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
+          valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
+          desconto_total: compraDireta ? descontoTotalCompraDireta : null,
           valor_total: compraDireta ? valorTotalCompraDireta : null
         },
         transaction
@@ -2711,6 +2765,8 @@ module.exports = {
         origem: compraDireta ? 'COMPRA_DIRETA' : 'NORMAL',
         formas_pagamento: compraDireta ? formasPagamentoMetadata : [],
         dados_pagamento: compraDireta ? dados_pagamento || null : null,
+        valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
+        desconto_total: compraDireta ? descontoTotalCompraDireta : null,
         valor_total: compraDireta ? valorTotalCompraDireta : null
       });
     } catch (error) {

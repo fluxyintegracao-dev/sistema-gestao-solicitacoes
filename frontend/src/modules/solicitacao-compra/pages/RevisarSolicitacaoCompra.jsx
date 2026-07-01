@@ -146,6 +146,10 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
   }, [itensResumo]);
 
   const prontoParaCriar = confirmado && previewVisualizado;
+  const valorBrutoCompraDireta = Number(draft?.resumo?.valor_bruto || draft?.resumo?.valor_total || 0);
+  const descontoCompraDireta = Number(draft?.resumo?.desconto_total || 0);
+  const valorLiquidoCompraDireta = Number(draft?.resumo?.valor_total || 0);
+  const temDescontoCompraDireta = modoCompraDireta && descontoCompraDireta > 0;
 
   const conteudoPreviewPdf = useMemo(() => {
     if (!draft) {
@@ -191,7 +195,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <h1>${modoCompraDireta ? 'Compra Direta' : 'Solicitacao de Compra'}</h1>
           <div class="meta"><strong>Obra:</strong> ${escapeHtml(draft.resumo?.obra_nome || '-')}</div>
           <div class="meta"><strong>Solicitante:</strong> ${escapeHtml(draft.resumo?.solicitante_nome || '-')}</div>
-          ${modoCompraDireta ? `<div class="meta"><strong>Valor total:</strong> ${escapeHtml(formatarMoeda(draft.resumo?.valor_total))}</div>` : ''}
+          ${temDescontoCompraDireta ? `<div class="meta"><strong>Valor bruto:</strong> ${escapeHtml(formatarMoeda(valorBrutoCompraDireta))}</div>` : ''}
+          ${temDescontoCompraDireta ? `<div class="meta"><strong>Desconto concedido:</strong> ${escapeHtml(formatarMoeda(descontoCompraDireta))}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Valor total${temDescontoCompraDireta ? ' liquido' : ''}:</strong> ${escapeHtml(formatarMoeda(valorLiquidoCompraDireta))}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Credor:</strong> ${escapeHtml(draft.resumo?.credor_nome || '-')}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Formas de pagamento:</strong> ${escapeHtml(formatarFormasPagamento(draft.resumo?.formas_pagamento))}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Dados para pagamento:</strong> ${escapeHtml(draft.payload?.dados_pagamento || '-')}</div>` : ''}
@@ -218,7 +224,15 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
         </body>
       </html>
     `;
-  }, [draft, itensResumo, modoCompraDireta]);
+  }, [
+    descontoCompraDireta,
+    draft,
+    itensResumo,
+    modoCompraDireta,
+    temDescontoCompraDireta,
+    valorBrutoCompraDireta,
+    valorLiquidoCompraDireta
+  ]);
 
   function abrirPreviaPdf() {
     if (!draft) {
@@ -338,9 +352,9 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
               <CardMetrica titulo="Itens" valor={totalItens} detalhe="Total revisado nesta compra" />
               {modoCompraDireta && (
                 <CardMetrica
-                  titulo="Total"
-                  valor={formatarMoeda(draft.resumo?.valor_total)}
-                  detalhe="Valor que sera levado para a solicitacao"
+                  titulo={temDescontoCompraDireta ? 'Total liquido' : 'Total'}
+                  valor={formatarMoeda(valorLiquidoCompraDireta)}
+                  detalhe={temDescontoCompraDireta ? `Bruto ${formatarMoeda(valorBrutoCompraDireta)} - desconto ${formatarMoeda(descontoCompraDireta)}` : 'Valor que sera levado para a solicitacao'}
                 />
               )}
               <CardMetrica
@@ -446,7 +460,16 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
             <LinhaResumo titulo="Link geral" valor={textoOuPadrao(draft.payload?.link_geral)} className="break-all" />
             {modoCompraDireta && (
               <>
-                <LinhaResumo titulo="Valor total" valor={formatarMoeda(draft.resumo?.valor_total)} />
+                {temDescontoCompraDireta && (
+                  <LinhaResumo titulo="Valor bruto" valor={formatarMoeda(valorBrutoCompraDireta)} />
+                )}
+                {temDescontoCompraDireta && (
+                  <LinhaResumo titulo="Desconto concedido" valor={formatarMoeda(descontoCompraDireta)} />
+                )}
+                <LinhaResumo
+                  titulo={temDescontoCompraDireta ? 'Valor total liquido' : 'Valor total'}
+                  valor={formatarMoeda(valorLiquidoCompraDireta)}
+                />
                 <LinhaResumo
                   titulo="Notas/Guias anexadas"
                   valor={`${draft.resumo?.anexos_cabecalho?.length || 0} arquivo(s)`}

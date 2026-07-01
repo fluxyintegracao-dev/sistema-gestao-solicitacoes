@@ -253,6 +253,26 @@ function formatStatusLabel(value, statusMap) {
   return statusMap[String(value || '').toUpperCase()]?.nome || String(value || '-').replace(/_/g, ' ').toUpperCase();
 }
 
+const STATUS_PEDIDOS_FALLBACK = [
+  { codigo: 'ABERTO', nome: 'Aberto', ativo: true, bloqueia_edicao: false },
+  { codigo: 'EM_ANALISE', nome: 'Em analise interna', ativo: true, bloqueia_edicao: false },
+  { codigo: 'ENVIADO_FORNECEDOR', nome: 'Enviado ao fornecedor', ativo: true, bloqueia_edicao: false },
+  { codigo: 'NEGOCIACAO', nome: 'Em negociacao', ativo: true, bloqueia_edicao: false },
+  { codigo: 'FECHADO_FORNECEDOR', nome: 'Fechado com o fornecedor', ativo: true, bloqueia_edicao: true },
+  { codigo: 'CANCELADO', nome: 'Cancelado', ativo: true, bloqueia_edicao: true }
+];
+
+async function carregarStatusPedidosComFallback() {
+  try {
+    const dataStatus = await getStatusPedidosCompra();
+    const statuses = Array.isArray(dataStatus?.statuses) ? dataStatus.statuses : [];
+    return statuses.length ? statuses : STATUS_PEDIDOS_FALLBACK;
+  } catch (error) {
+    console.warn('Falha ao buscar configuracao de status dos pedidos. Usando lista padrao.', error);
+    return STATUS_PEDIDOS_FALLBACK;
+  }
+}
+
 function isItemAbaixoMinimo(item) {
   return !item?.removido && item?.quantidade_minima_item && Number(item.quantidade_pedido) < Number(item.quantidade_minima_item);
 }
@@ -402,10 +422,10 @@ export default function PedidoCompraDetalhe() {
       setLoading(true);
       const [data, dataStatus] = await Promise.all([
         obterPedidoCompra(id),
-        getStatusPedidosCompra()
+        carregarStatusPedidosComFallback()
       ]);
       setPedido(data || null);
-      setStatusOptions(Array.isArray(dataStatus?.statuses) ? dataStatus.statuses : []);
+      setStatusOptions(Array.isArray(dataStatus) ? dataStatus : []);
 
       const proximasEdicoes = {};
       (data?.itens || []).forEach((item) => {

@@ -223,6 +223,7 @@ export default function CotacaoFornecedorPublica() {
   const [salvandoRascunho, setSalvandoRascunho] = useState(false);
   const [enviandoPlanilha, setEnviandoPlanilha] = useState(false);
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
+  const [descontoTotal, setDescontoTotal] = useState('');
   const [condicoesPagamento, setCondicoesPagamento] = useState(() => criarCondicoesPagamentoVazias());
   const [prazoEntrega, setPrazoEntrega] = useState('');
   const [observacaoResposta, setObservacaoResposta] = useState('');
@@ -243,6 +244,7 @@ export default function CotacaoFornecedorPublica() {
           : []
       );
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
+      setDescontoTotal(data?.cotacao?.desconto_total ?? '');
       setCondicoesPagamento(parseCondicoesPagamento(data?.cotacao?.condicao_pagamento ?? ''));
       setPrazoEntrega(data?.cotacao?.prazo_entrega ?? '');
       setObservacaoResposta(data?.cotacao?.observacao_resposta ?? '');
@@ -343,6 +345,7 @@ export default function CotacaoFornecedorPublica() {
     return {
       itens: itensPayload,
       valor_minimo_pedido: valorMinimoPedido,
+      desconto_total: descontoTotal,
       condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
       prazo_entrega: prazoEntrega,
       observacao_resposta: observacaoResposta
@@ -502,6 +505,15 @@ export default function CotacaoFornecedorPublica() {
                 value={valorMinimoPedido}
                 disabled={formularioBloqueado}
                 onChange={setValorMinimoPedido}
+              />
+            </div>
+            <div>
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Desconto concedido</p>
+              <CurrencyInput
+                className="input h-7 text-xs px-2 w-full"
+                value={descontoTotal}
+                disabled={formularioBloqueado}
+                onChange={setDescontoTotal}
               />
             </div>
             <div>
