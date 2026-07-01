@@ -1276,6 +1276,7 @@ module.exports = {
         }
 
         grupo.apropriacoes.set(apropriacaoKey, {
+          linha: linhaPlanilha,
           apropriacao_id: apropriacao.id,
           percentual: idxApropriacaoPercentual >= 0 ? parseDecimalOpcional(row[idxApropriacaoPercentual]) : null,
           quantidade: idxApropriacaoQuantidade >= 0 ? parseDecimalOpcional(row[idxApropriacaoQuantidade]) : null,
@@ -1309,13 +1310,37 @@ module.exports = {
           }
 
           for (const item of grupo.apropriacoes.values()) {
-            await ContratoApropriacao.upsert({
+            const whereVinculo = {
               contrato_id: grupo.contrato.id,
-              apropriacao_id: item.apropriacao_id,
+              apropriacao_id: item.apropriacao_id
+            };
+            const payloadVinculo = {
               percentual: item.percentual,
               quantidade: item.quantidade,
               observacao: item.observacao
-            }, { transaction });
+            };
+            const vinculoExistente = await ContratoApropriacao.findOne({
+              where: whereVinculo,
+              transaction,
+              lock: transaction.LOCK.UPDATE
+            });
+
+            if (vinculoExistente) {
+              await vinculoExistente.update(payloadVinculo, { transaction });
+            } else {
+              await ContratoApropriacao.create({
+                ...whereVinculo,
+                ...payloadVinculo
+              }, { transaction });
+            }
+
+            const vinculoGravado = await ContratoApropriacao.findOne({
+              where: whereVinculo,
+              transaction
+            });
+            if (!vinculoGravado) {
+              throw new Error(`Falha ao gravar apropriacao da linha ${item.linha}.`);
+            }
             resultado.apropriacoes_vinculadas += 1;
           }
         }
