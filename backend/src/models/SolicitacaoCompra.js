@@ -102,6 +102,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(14, 2),
         allowNull: false,
         defaultValue: 0
+      },
+      desconto_total: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
       }
     },
     {

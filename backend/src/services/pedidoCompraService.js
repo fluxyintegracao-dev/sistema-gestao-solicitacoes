@@ -54,6 +54,27 @@ function roundPedidoQty(value) {
   return Number(asNumber(value).toFixed(2));
 }
 
+function calcularRateiosMonetarios(valorTotal, bases = []) {
+  const valoresBase = bases.map((base) => Math.max(0, roundMoney(base)));
+  const totalBase = roundMoney(valoresBase.reduce((sum, base) => sum + base, 0));
+  const totalRatear = Math.min(Math.max(0, roundMoney(valorTotal)), totalBase);
+
+  if (!valoresBase.length || totalRatear <= 0 || totalBase <= 0) {
+    return valoresBase.map(() => 0);
+  }
+
+  let acumulado = 0;
+  return valoresBase.map((base, index) => {
+    if (index === valoresBase.length - 1) {
+      return roundMoney(totalRatear - acumulado);
+    }
+
+    const parcela = roundMoney((base / totalBase) * totalRatear);
+    acumulado = roundMoney(acumulado + parcela);
+    return parcela;
+  });
+}
+
 function safeJsonParse(value, fallback = null) {
   if (!value) return fallback;
   if (typeof value === 'object') return value;
@@ -504,10 +525,25 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
     });
   }
 
-  for (const item of itensAtivos) {
-    const valorItem = roundMoney(asNumber(item.quantidade_pedido) * asNumber(item.preco_unitario));
-    if (roundMoney(item.valor_total) !== valorItem) {
-      await item.update({ valor_total: valorItem }, { transaction });
+  const valoresBrutos = itensAtivos.map((item) =>
+    roundMoney(asNumber(item.quantidade_pedido) * asNumber(item.preco_unitario))
+  );
+  const descontosRateados = calcularRateiosMonetarios(pedido.desconto_total, valoresBrutos);
+
+  for (const [index, item] of itensAtivos.entries()) {
+    const descontoRateado = descontosRateados[index] || 0;
+    const valorItem = roundMoney(Math.max(0, valoresBrutos[index] - descontoRateado));
+    if (
+      roundMoney(item.valor_total) !== valorItem ||
+      roundMoney(item.desconto_rateado) !== descontoRateado
+    ) {
+      await item.update(
+        {
+          valor_total: valorItem,
+          desconto_rateado: descontoRateado
+        },
+        { transaction }
+      );
     }
     valorTotal += valorItem;
   }
@@ -621,9 +657,14 @@ async function obterOuCriarPedidoPorFornecedor({
   });
 
   if (pedido) {
+    const atualizacaoPedido = {
+      valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
+      desconto_total: roundMoney(vinculacaoFornecedor.desconto_total)
+    };
     if (normalizeText(pedido.status) === 'CANCELADO') {
       await pedido.update(
         {
+          ...atualizacaoPedido,
           status: 'ABERTO',
           cancelado_por: null,
           cancelado_em: null,
@@ -632,6 +673,11 @@ async function obterOuCriarPedidoPorFornecedor({
         },
         { transaction }
       );
+    } else if (
+      roundMoney(pedido.desconto_total) !== atualizacaoPedido.desconto_total ||
+      String(pedido.valor_minimo_pedido || '') !== String(atualizacaoPedido.valor_minimo_pedido || '')
+    ) {
+      await pedido.update(atualizacaoPedido, { transaction });
     }
     return pedido;
   }
@@ -645,6 +691,7 @@ async function obterOuCriarPedidoPorFornecedor({
       status: 'ABERTO',
       origem: 'COTACAO',
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
+      desconto_total: roundMoney(vinculacaoFornecedor.desconto_total),
       atingiu_pedido_minimo: true,
       observacoes: null
     },
@@ -924,6 +971,26 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
     });
   }
 
+  const porFornecedor = new Map();
+  for (const alocacao of alocacoes) {
+    const fornecedorId = Number(alocacao.vinculacaoFornecedor?.fornecedor_compra_id || 0);
+    if (!porFornecedor.has(fornecedorId)) {
+      porFornecedor.set(fornecedorId, []);
+    }
+    porFornecedor.get(fornecedorId).push(alocacao);
+  }
+
+  for (const grupo of porFornecedor.values()) {
+    const descontoTotal = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
+    const bases = grupo.map((alocacao) => alocacao.valor_total);
+    const descontos = calcularRateiosMonetarios(descontoTotal, bases);
+    grupo.forEach((alocacao, index) => {
+      const descontoRateado = descontos[index] || 0;
+      alocacao.desconto_rateado = descontoRateado;
+      alocacao.valor_total = roundMoney(Math.max(0, asNumber(alocacao.valor_total) - descontoRateado));
+    });
+  }
+
   return alocacoes;
 }
 
@@ -957,6 +1024,7 @@ async function persistirAlocacoesSolicitacao({ solicitacao, alocacoes, usuarioId
         quantidade_alocada: alocacao.quantidade_alocada,
         preco_unitario: alocacao.preco_unitario,
         valor_total: alocacao.valor_total,
+        desconto_rateado: alocacao.desconto_rateado || 0,
         status: 'ATIVA',
         criado_por: usuarioId || null
       },

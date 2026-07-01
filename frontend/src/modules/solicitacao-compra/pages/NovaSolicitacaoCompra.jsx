@@ -179,6 +179,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [dadosPagamento, setDadosPagamento] = useState('');
+  const [descontoTotal, setDescontoTotal] = useState('');
   const [anexosCabecalho, setAnexosCabecalho] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [formaPagamentoIds, setFormaPagamentoIds] = useState([]);
@@ -332,6 +333,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
       setDadosPagamento(payload.dados_pagamento || '');
+      setDescontoTotal(payload.desconto_total ? String(payload.desconto_total) : '');
       setAnexosCabecalho(Array.isArray(payload.anexos_cabecalho) ? payload.anexos_cabecalho : []);
       setFormaPagamentoIds(
         Array.isArray(payload.forma_pagamento_ids)
@@ -421,9 +423,19 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     [itens]
   );
 
-  const valorTotalCompraDireta = useMemo(
+  const valorBrutoCompraDireta = useMemo(
     () => itens.reduce((acc, item) => acc + calcularValorTotalItem(item), 0),
     [itens]
+  );
+
+  const descontoCompraDireta = useMemo(
+    () => arredondarMoeda(Math.max(0, parseValorMonetario(descontoTotal))),
+    [descontoTotal]
+  );
+
+  const valorTotalCompraDireta = useMemo(
+    () => arredondarMoeda(Math.max(0, valorBrutoCompraDireta - descontoCompraDireta)),
+    [valorBrutoCompraDireta, descontoCompraDireta]
   );
 
   const parceiroSelecionado = useMemo(
@@ -873,6 +885,11 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       }
     }
 
+    if (modoCompraDireta && descontoCompraDireta > valorBrutoCompraDireta) {
+      alert('O desconto concedido nao pode ser maior que o valor bruto dos itens.');
+      return;
+    }
+
     try {
       setLoading(true);
 
@@ -898,6 +915,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         necessario_para: necessarioPara || null,
         observacoes: observacoes || null,
         dados_pagamento: modoCompraDireta ? dadosPagamento || null : undefined,
+        desconto_total: modoCompraDireta ? descontoCompraDireta : undefined,
         forma_pagamento_ids: modoCompraDireta ? formaPagamentoIds.map((id) => Number(id)).filter((id) => id > 0) : undefined,
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : undefined,
         itens: itensNormalizados.map((item) => ({
@@ -932,6 +950,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
               gera_boleto: Boolean(forma.gera_boleto)
             }))
           : [],
+        valor_bruto: modoCompraDireta ? valorBrutoCompraDireta : null,
+        desconto_total: modoCompraDireta ? descontoCompraDireta : null,
         valor_total: modoCompraDireta ? valorTotalCompraDireta : null,
         dados_pagamento: modoCompraDireta ? dadosPagamento || '' : '',
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : [],
@@ -1112,10 +1132,28 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right text-emerald-800">
               <div className="text-xs uppercase tracking-[0.14em]">Total da solicitação</div>
               <div className="mt-1 text-2xl font-semibold">{formatarMoeda(valorTotalCompraDireta)}</div>
+              {descontoCompraDireta > 0 && (
+                <div className="mt-1 text-xs">
+                  Bruto {formatarMoeda(valorBrutoCompraDireta)} - desconto {formatarMoeda(descontoCompraDireta)}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="grid gap-3">
+            <div className="max-w-xs">
+              <label className="text-sm font-semibold text-[var(--c-fg)]">Desconto concedido pelo fornecedor</label>
+              <input
+                className="input mt-1"
+                value={descontoTotal}
+                onChange={(event) => setDescontoTotal(event.target.value)}
+                placeholder="R$ 0,00"
+              />
+              <p className="mt-1 text-xs text-[var(--c-muted)]">
+                O desconto sera rateado proporcionalmente entre os itens para apurar o custo liquido da compra.
+              </p>
+            </div>
+
             <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>
               <input
                 type="file"

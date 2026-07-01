@@ -1772,7 +1772,7 @@ router.get('/configuracoes/visibilidade-ui', UiVisibilityConfigController.show);
 router.patch('/configuracoes/visibilidade-ui', allowConfiguracoesAparencia, UiVisibilityConfigController.update);
 router.get('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowComprasConfiguracoesManage, ConfiguracaoSistemaController.getCotacoesConfig);
 router.patch('/configuracoes/cotacoes', requireEnabledModule('COTACOES'), allowComprasConfiguracoesManage, ConfiguracaoSistemaController.setCotacoesConfig);
-router.get('/configuracoes/status-pedidos-compra', allowComprasConfiguracoesManage, ConfiguracaoSistemaController.getStatusPedidosCompra);
+router.get('/configuracoes/status-pedidos-compra', allowComprasPedidosRead, ConfiguracaoSistemaController.getStatusPedidosCompra);
 router.patch('/configuracoes/status-pedidos-compra', allowComprasConfiguracoesManage, ConfiguracaoSistemaController.setStatusPedidosCompra);
 router.get('/configuracoes/comercial-categorias-contrato', allowConfiguracoesGeral, ConfiguracaoSistemaController.getComercialCategoriasContrato);
 router.patch('/configuracoes/comercial-categorias-contrato', allowConfiguracoesGeral, ConfiguracaoSistemaController.setComercialCategoriasContrato);
