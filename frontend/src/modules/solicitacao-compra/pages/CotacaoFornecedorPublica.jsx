@@ -29,6 +29,7 @@ function normalizarDecimalEditavel(valor, limiteDecimais = 2) {
   const [inteiroRaw = '', decimalRaw = ''] = texto.split(',');
   const inteiro = inteiroRaw.replace(/\D/g, '');
   const decimal = decimalRaw.replace(/\D/g, '').slice(0, limiteDecimais);
+  if (texto.includes(',')) return `${inteiro || '0'},${decimal}`;
   return decimal ? `${inteiro || '0'},${decimal}` : inteiro;
 }
 
