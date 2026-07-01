@@ -58,6 +58,10 @@ function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
 
+function empresaIntercompanySelecionavel(empresa) {
+  return empresa?.ativo !== false && String(empresa?.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING';
+}
+
 function formatCurrency(value) {
   const number = Number(value || 0);
   return number.toLocaleString('pt-BR', {
@@ -874,6 +878,25 @@ export default function FinanceiroTituloNovo() {
       return;
     }
 
+    if (field === 'empresa_origem_id') {
+      setForm((current) => ({
+        ...current,
+        empresa_origem_id: value,
+        empresa_destino_id: String(current.empresa_destino_id) === String(value) ? '' : current.empresa_destino_id,
+        empresa_contraparte_id: String(current.empresa_destino_id) === String(value) ? '' : current.empresa_contraparte_id
+      }));
+      return;
+    }
+
+    if (field === 'empresa_destino_id') {
+      setForm((current) => ({
+        ...current,
+        empresa_destino_id: String(current.empresa_origem_id) === String(value) ? '' : value,
+        empresa_contraparte_id: String(current.empresa_origem_id) === String(value) ? '' : value
+      }));
+      return;
+    }
+
     if (field === 'tipo') {
       setSearchParams({ tipo: value });
       setParceiroDocumentoBusca('');
@@ -1609,7 +1632,7 @@ export default function FinanceiroTituloNovo() {
                   >
                     <option value="">Empresa origem</option>
                     {empresasGrupo
-                      .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                      .filter(empresaIntercompanySelecionavel)
                       .map((empresa) => (
                         <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                       ))}
@@ -1617,16 +1640,15 @@ export default function FinanceiroTituloNovo() {
                   <select
                     className="input w-full"
                     value={form.empresa_destino_id}
-                    onChange={(event) => setForm((current) => ({
-                      ...current,
-                      empresa_destino_id: event.target.value,
-                      empresa_contraparte_id: event.target.value
-                    }))}
+                    onChange={(event) => updateField('empresa_destino_id', event.target.value)}
                     disabled={!form.intercompany}
                   >
                     <option value="">Empresa destino</option>
                     {empresasGrupo
-                      .filter((empresa) => empresa.ativo !== false && String(empresa.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING')
+                      .filter((empresa) => (
+                        empresaIntercompanySelecionavel(empresa)
+                        && String(empresa.id) !== String(form.empresa_origem_id)
+                      ))
                       .map((empresa) => (
                         <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
                       ))}

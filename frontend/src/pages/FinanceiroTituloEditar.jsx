@@ -89,6 +89,10 @@ function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
 
+function empresaIntercompanySelecionavel(empresa) {
+  return empresa?.ativo !== false && String(empresa?.tipo_empresa || 'OPERACIONAL').toUpperCase() !== 'HOLDING';
+}
+
 function normalizarBusca(value) {
   return String(value || '')
     .normalize('NFD')
@@ -539,6 +543,18 @@ export default function FinanceiroTituloEditar() {
         next.empresa_destino_id = '';
         next.tipo_intercompany = '';
         next.motivo_intercompany = '';
+      }
+      if (field === 'empresa_origem_id' && String(next.empresa_destino_id) === String(value)) {
+        next.empresa_destino_id = '';
+        next.empresa_contraparte_id = '';
+      }
+      if (field === 'empresa_destino_id') {
+        if (String(next.empresa_origem_id) === String(value)) {
+          next.empresa_destino_id = '';
+          next.empresa_contraparte_id = '';
+        } else {
+          next.empresa_contraparte_id = value;
+        }
       }
       return next;
     });
@@ -1380,14 +1396,21 @@ export default function FinanceiroTituloEditar() {
                 <span>Origem</span>
                 <select value={form.empresa_origem_id} onChange={(event) => updateField('empresa_origem_id', event.target.value)} disabled={Boolean(bloqueio)}>
                   <option value="">Selecione</option>
-                  {empresasGrupo.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
+                  {empresasGrupo
+                    .filter(empresaIntercompanySelecionavel)
+                    .map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
                 </select>
               </label>
               <label className="form-field">
                 <span>Destino</span>
                 <select value={form.empresa_destino_id} onChange={(event) => updateField('empresa_destino_id', event.target.value)} disabled={Boolean(bloqueio)}>
                   <option value="">Selecione</option>
-                  {empresasGrupo.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
+                  {empresasGrupo
+                    .filter((empresa) => (
+                      empresaIntercompanySelecionavel(empresa)
+                      && String(empresa.id) !== String(form.empresa_origem_id)
+                    ))
+                    .map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
                 </select>
               </label>
               <label className="form-field">
