@@ -111,9 +111,18 @@ function normalizePedidoCompraStatusList(value) {
     normalized.push(normalizeStatusEntry(entry, fallbackMap.get(codigo) || null));
   });
 
-  if (!seen.has('ABERTO')) {
-    normalized.unshift(normalizeStatusEntry(fallbackMap.get('ABERTO'), fallbackMap.get('ABERTO')));
-    seen.add('ABERTO');
+  for (const fallback of DEFAULT_STATUS_PEDIDOS_COMPRA) {
+    if (seen.has(fallback.codigo)) {
+      continue;
+    }
+
+    const entry = normalizeStatusEntry(fallback, fallback);
+    if (fallback.codigo === 'ABERTO') {
+      normalized.unshift(entry);
+    } else {
+      normalized.push(entry);
+    }
+    seen.add(fallback.codigo);
   }
 
   if (!normalized.length) {

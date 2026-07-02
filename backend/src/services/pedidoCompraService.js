@@ -1141,7 +1141,13 @@ async function getPedidoStatusFechadoFornecedorConfig() {
   });
   if (porNome) return porNome;
 
-  throw new Error('Configure um status ativo de pedido fechado com fornecedor.');
+  return {
+    codigo: 'FECHADO_FORNECEDOR',
+    nome: 'Fechado com o fornecedor',
+    cor: '#16a34a',
+    bloqueia_edicao: true,
+    ativo: true
+  };
 }
 
 async function getPedidoStatusAbertoConfig() {
@@ -1153,7 +1159,13 @@ async function getPedidoStatusAbertoConfig() {
   const editavel = ativo.find((item) => !item.bloqueia_edicao);
   if (editavel) return editavel;
 
-  throw new Error('Configure um status ativo e editavel para reabrir pedidos.');
+  return {
+    codigo: 'ABERTO',
+    nome: 'Aberto',
+    cor: '#2563eb',
+    bloqueia_edicao: false,
+    ativo: true
+  };
 }
 
 function isPedidoCancelado(status) {
