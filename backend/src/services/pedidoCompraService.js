@@ -1129,6 +1129,203 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
   }
 }
 
+async function getPedidoStatusFechadoFornecedorConfig() {
+  const statusList = await getPedidoCompraStatusConfig();
+  const ativo = (statusList || []).filter((item) => item?.ativo !== false);
+  const exato = ativo.find((item) => item.codigo === 'FECHADO_FORNECEDOR');
+  if (exato) return exato;
+
+  const porNome = ativo.find((item) => {
+    const texto = normalizeText(`${item.codigo || ''} ${item.nome || ''}`);
+    return texto.includes('FECHADO') && texto.includes('FORNECEDOR');
+  });
+  if (porNome) return porNome;
+
+  throw new Error('Configure um status ativo de pedido fechado com fornecedor.');
+}
+
+async function getPedidoStatusAbertoConfig() {
+  const statusList = await getPedidoCompraStatusConfig();
+  const ativo = (statusList || []).filter((item) => item?.ativo !== false);
+  const aberto = ativo.find((item) => item.codigo === 'ABERTO');
+  if (aberto) return aberto;
+
+  const editavel = ativo.find((item) => !item.bloqueia_edicao);
+  if (editavel) return editavel;
+
+  throw new Error('Configure um status ativo e editavel para reabrir pedidos.');
+}
+
+function isPedidoCancelado(status) {
+  return normalizeText(status) === 'CANCELADO';
+}
+
+async function fecharPedidosDaSolicitacaoCompraAutomaticamente({ solicitacaoId, usuarioId, transaction }) {
+  const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
+  const pedidos = await PedidoCompra.findAll({
+    where: { solicitacao_compra_id: Number(solicitacaoId) },
+    transaction
+  });
+
+  const solicitacao = await SolicitacaoCompra.findByPk(Number(solicitacaoId), {
+    transaction,
+    attributes: ['id', 'codigo', 'solicitacao_principal_id']
+  });
+
+  for (const pedido of pedidos) {
+    const statusAnterior = String(pedido.status || '');
+    if (statusAnterior === statusFechado.codigo || isPedidoCancelado(statusAnterior)) {
+      continue;
+    }
+
+    await pedido.update(
+      {
+        status: statusFechado.codigo,
+        encerrado_em: new Date()
+      },
+      { transaction }
+    );
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: Number(solicitacaoId),
+      usuarioId,
+      fornecedorCompraId: pedido.fornecedor_compra_id,
+      tipoAcao: 'PEDIDO_FECHADO_AUTOMATICAMENTE',
+      descricao: `${buildPedidoCodigo(pedido.id)} fechado automaticamente apos encerramento da cotacao`,
+      metadados: {
+        pedido_compra_id: pedido.id,
+        status_anterior: statusAnterior || null,
+        status_novo: statusFechado.codigo,
+        origem: 'ENCERRAMENTO_COTACAO'
+      },
+      transaction
+    });
+
+    await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+      solicitacao,
+      pedido,
+      usuarioId,
+      acao: 'PEDIDO_COMPRA_ENCERRADO',
+      descricao: `${buildPedidoCodigo(pedido.id)} fechado automaticamente apos encerramento da cotacao`,
+      statusAnterior: statusAnterior || null,
+      statusNovo: statusFechado.codigo,
+      metadados: {
+        automatico: true,
+        origem: 'ENCERRAMENTO_COTACAO'
+      },
+      transaction
+    });
+  }
+}
+
+async function isSolicitacaoCompraComPedidosFechadosComFornecedor(solicitacao) {
+  const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
+  const pedidos = Array.isArray(solicitacao?.pedidos)
+    ? solicitacao.pedidos
+    : await PedidoCompra.findAll({
+        where: { solicitacao_compra_id: Number(solicitacao?.id || 0) },
+        attributes: ['id', 'status']
+      });
+
+  const ativos = pedidos.filter((pedido) => !isPedidoCancelado(pedido.status));
+  return ativos.length > 0 && ativos.every((pedido) => String(pedido.status || '') === statusFechado.codigo);
+}
+
+async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transaction }) {
+  const motivoNormalizado = String(motivo || '').trim();
+  if (!motivoNormalizado) {
+    throw new Error('Informe o motivo da reabertura.');
+  }
+
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+  if (!pedido) {
+    throw new Error('Pedido nao encontrado.');
+  }
+
+  const statusAnterior = String(pedido.status || '');
+  if (isPedidoCancelado(statusAnterior)) {
+    throw new Error('Pedido cancelado nao pode ser reaberto.');
+  }
+
+  const bloqueado = await isPedidoCompraStatusLocked(statusAnterior);
+  const statusAberto = await getPedidoStatusAbertoConfig();
+  if (!bloqueado && statusAnterior === statusAberto.codigo) {
+    return pedido;
+  }
+
+  await pedido.update(
+    {
+      status: statusAberto.codigo,
+      encerrado_em: null
+    },
+    { transaction }
+  );
+
+  const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
+    transaction,
+    attributes: ['id', 'codigo', 'status', 'encerrado_em', 'solicitacao_principal_id']
+  });
+
+  if (solicitacao && normalizeText(solicitacao.status) === 'ENCERRADO') {
+    await solicitacao.update(
+      {
+        status: 'ENVIADO',
+        encerrado_em: null
+      },
+      { transaction }
+    );
+  }
+
+  if (pedido.fornecedor_compra_id) {
+    await SolicitacaoCompraFornecedor.update(
+      { status: 'REABERTA' },
+      {
+        where: {
+          solicitacao_compra_id: pedido.solicitacao_compra_id,
+          fornecedor_compra_id: pedido.fornecedor_compra_id,
+          status: { [Op.ne]: 'CANCELADO' }
+        },
+        transaction
+      }
+    );
+  }
+
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: pedido.solicitacao_compra_id,
+    usuarioId,
+    fornecedorCompraId: pedido.fornecedor_compra_id,
+    tipoAcao: 'PEDIDO_REABERTO_COTACAO',
+    descricao: `${buildPedidoCodigo(pedido.id)} reaberto para ajustes na cotacao`,
+    metadados: {
+      pedido_compra_id: pedido.id,
+      status_anterior: statusAnterior || null,
+      status_novo: statusAberto.codigo,
+      motivo: motivoNormalizado
+    },
+    transaction
+  });
+
+  await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+    solicitacao,
+    pedido,
+    usuarioId,
+    acao: 'PEDIDO_COMPRA_REABERTO',
+    descricao: `${buildPedidoCodigo(pedido.id)} reaberto para ajustes na cotacao. Motivo: ${motivoNormalizado}`,
+    statusAnterior: statusAnterior || null,
+    statusNovo: statusAberto.codigo,
+    metadados: {
+      motivo: motivoNormalizado,
+      origem: 'REABERTURA_COTACAO'
+    },
+    transaction
+  });
+
+  return pedido;
+}
+
 async function criarPedidoParaFornecedor({ solicitacaoId, fornecedorCompraId, usuarioId, transaction }) {
   const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction);
   if (!solicitacao) {
@@ -2323,10 +2520,13 @@ module.exports = {
   cancelarPedidoItens,
   criarPedidoParaFornecedor,
   delegarSolicitacaoCompra,
+  fecharPedidosDaSolicitacaoCompraAutomaticamente,
   gerarPedidosDosVencedores,
+  isSolicitacaoCompraComPedidosFechadosComFornecedor,
   listarAuditoriaItensPedido,
   listarPedidos,
   obterPedidoDetalhe,
+  reabrirPedidoParaCotacao,
   registrarComentarioPedido,
   remanejarPedidoItem,
   removerPedidoItem,

@@ -46,7 +46,12 @@ const {
 const {
   criarOuAtualizarFornecedorCentralizado
 } = require('../services/comprasFornecedorService');
-const { gerarPedidosDosVencedores } = require('../services/pedidoCompraService');
+const {
+  fecharPedidosDaSolicitacaoCompraAutomaticamente,
+  gerarPedidosDosVencedores,
+  isSolicitacaoCompraComPedidosFechadosComFornecedor
+} = require('../services/pedidoCompraService');
+const { isPedidoCompraStatusLocked } = require('../services/pedidoCompraStatusConfig');
 const {
   construirResumoApropriacoes,
   extrairRateiosPayload,
@@ -155,6 +160,17 @@ function getCodigoSolicitacaoPrincipal(solicitacao) {
   }
 
   return '-';
+}
+
+function getCodigoSolicitacaoCompra(solicitacao) {
+  const codigoSolicitacao = String(solicitacao?.codigo || '').trim();
+  if (codigoSolicitacao) return codigoSolicitacao;
+
+  if (solicitacao?.id) {
+    return `SC-${String(solicitacao.id).padStart(5, '0')}`;
+  }
+
+  return '';
 }
 
 function isImageAttachment(item) {
@@ -1133,8 +1149,13 @@ function desenharCabecalhoFicha(doc, solicitacao) {
   const installationConfig = getRuntimeInstallationConfig();
   const pdfLogoPath = getPdfLogoPath();
   const codigoSolicitacaoPrincipal = getCodigoSolicitacaoPrincipal(solicitacao);
+  const codigoSolicitacaoCompra = getCodigoSolicitacaoCompra(solicitacao);
   const compraDireta = isSolicitacaoCompraDireta(solicitacao);
   const dadosCompraDireta = compraDireta ? obterDadosCabecalhoCompraDireta(solicitacao) : null;
+  const codigoCabecalho = !compraDireta && codigoSolicitacaoCompra && codigoSolicitacaoCompra !== codigoSolicitacaoPrincipal
+    ? `${codigoSolicitacaoCompra}\n${codigoSolicitacaoPrincipal}`
+    : codigoSolicitacaoPrincipal;
+  const codigoCabecalhoMultilinha = codigoCabecalho.includes('\n');
   const companyName =
     installationConfig?.pdf_company_name ||
     installationConfig?.company_legal_name ||
@@ -1169,11 +1190,12 @@ function desenharCabecalhoFicha(doc, solicitacao) {
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(9)
+    .fontSize(codigoCabecalhoMultilinha ? 7.2 : 9)
     .fillColor('#000000')
-    .text(codigoSolicitacaoPrincipal, x + 4, y + (totalHeaderHeight / 2) - 5, {
+    .text(codigoCabecalho, x + 4, y + (totalHeaderHeight / 2) - (codigoCabecalhoMultilinha ? 8 : 5), {
       width: logoWidth - 8,
-      align: 'center'
+      align: 'center',
+      lineGap: 1
     });
 
   doc.rect(x + logoWidth, y, PDF_PAGE.width - logoWidth, titleHeight).stroke('#000000');
@@ -2108,12 +2130,24 @@ module.exports = {
             model: SolicitacaoCompraFornecedor,
             as: 'fornecedores',
             attributes: ['id', 'status', 'respondido_em', 'fornecedor_compra_id']
+          },
+          {
+            model: PedidoCompra,
+            as: 'pedidos',
+            attributes: ['id', 'status', 'encerrado_em']
           }
         ]
       });
 
       const solicitacoesVisiveis = [];
       for (const solicitacao of solicitacoes) {
+        if (
+          contextoDelegacao &&
+          await isSolicitacaoCompraComPedidosFechadosComFornecedor(solicitacao)
+        ) {
+          continue;
+        }
+
         if (await podeAcompanharCompraAntesLiberacao(usuario, solicitacao)) {
           solicitacoesVisiveis.push(solicitacao);
         }
@@ -2312,6 +2346,126 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao buscar solicitacao de compra' });
+    }
+  },
+
+  async atualizarQuantidadeItem(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await validarAcessoCompras(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Apenas compras pode alterar itens da solicitacao de compra' });
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
+      const pedidos = await PedidoCompra.findAll({
+        where: { solicitacao_compra_id: Number(solicitacao.id) },
+        attributes: ['id', 'status'],
+        transaction
+      });
+
+      for (const pedido of pedidos) {
+        const pedidoTemEdicaoBloqueada = await isPedidoCompraStatusLocked(pedido.status);
+        if (String(pedido.status || '').toUpperCase() !== 'CANCELADO' && pedidoTemEdicaoBloqueada) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao e possivel alterar quantidade quando existe pedido fechado. Reabra o pedido para ajustar a cotacao.'
+          });
+        }
+      }
+
+      const itemTipo = String(req.body?.item_tipo || '').toUpperCase();
+      const ItemModel = itemTipo === 'MANUAL' ? SolicitacaoCompraItemManual : SolicitacaoCompraItem;
+      const item = await ItemModel.findOne({
+        where: {
+          id: Number(req.params.itemId),
+          solicitacao_compra_id: Number(solicitacao.id)
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!item) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Item da solicitacao de compra nao encontrado' });
+      }
+
+      const quantidadeAnterior = Number(item.quantidade || 0);
+      const quantidadeNova = Number(
+        String(req.body?.quantidade || '')
+          .trim()
+          .replace(/\./g, '')
+          .replace(',', '.')
+      );
+      if (!Number.isFinite(quantidadeNova) || quantidadeNova <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Quantidade invalida' });
+      }
+
+      const valorUnitario = Number(item.valor_unitario || 0);
+      const updates = {
+        quantidade: quantidadeNova
+      };
+      if (Number.isFinite(valorUnitario) && valorUnitario > 0) {
+        updates.valor_total = Number((quantidadeNova * valorUnitario).toFixed(2));
+      }
+
+      await item.update(updates, { transaction });
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'ITEM_QUANTIDADE_SOLICITADA_ALTERADA',
+        descricao: `Quantidade solicitada alterada de ${quantidadeAnterior} para ${quantidadeNova}`,
+        metadados: {
+          item_id: item.id,
+          item_tipo: itemTipo,
+          quantidade_anterior: quantidadeAnterior,
+          quantidade_nova: quantidadeNova,
+          motivo: req.body?.motivo || null
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar quantidade do item da solicitacao de compra' });
     }
   },
 
@@ -3353,6 +3507,12 @@ module.exports = {
         solicitacaoId: solicitacaoDb.id,
         usuarioId: usuario.id,
         vencedores,
+        transaction
+      });
+
+      await fecharPedidosDaSolicitacaoCompraAutomaticamente({
+        solicitacaoId: solicitacaoDb.id,
+        usuarioId: usuario.id,
         transaction
       });
 

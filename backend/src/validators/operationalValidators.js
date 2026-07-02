@@ -814,6 +814,14 @@ function validateCompraPedidoStatusBody(body = {}) {
   };
 }
 
+function validateCompraPedidoReabrirBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo'], 'Reabertura de pedido para cotacao');
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo da reabertura', 1000, { required: true })
+  };
+}
+
 function validateCompraPedidoStatusBatchBody(body = {}) {
   ensureAllowedKeys(body, ['pedido_ids', 'status'], 'Atualizacao em lote de pedidos');
 
@@ -828,6 +836,28 @@ function validateCompraPedidoStatusBatchBody(body = {}) {
   return {
     pedido_ids: body.pedido_ids.map((id) => parseInteger(id, 'Pedido', { required: true })),
     status: parseOptionalText(body.status, 'Status do pedido', 40, { required: true })
+  };
+}
+
+function validateCompraSolicitacaoItemQuantidadeParams(params = {}) {
+  return {
+    id: parseInteger(params.id, 'Solicitacao de compra', { required: true }),
+    itemId: parseInteger(params.itemId, 'Item da solicitacao de compra', { required: true })
+  };
+}
+
+function validateCompraSolicitacaoItemQuantidadeBody(body = {}) {
+  ensureAllowedKeys(body, ['item_tipo', 'quantidade', 'motivo'], 'Atualizacao de quantidade do item da solicitacao de compra');
+
+  const itemTipo = parseOptionalText(body.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+  if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+    throw new ValidationError('Tipo do item invalido.');
+  }
+
+  return {
+    item_tipo: itemTipo,
+    quantidade: parseDecimal(body.quantidade, 'Quantidade', { required: true, min: 0.01 }),
+    motivo: parseOptionalText(body.motivo, 'Motivo da alteracao', 1000, { required: true })
   };
 }
 
@@ -1254,8 +1284,11 @@ module.exports = {
   validateCompraPedidoFreteCancelBody,
   validateCompraPedidoFreteBody,
   validateCompraPedidoRemanejarBody,
+  validateCompraPedidoReabrirBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
+  validateCompraSolicitacaoItemQuantidadeBody,
+  validateCompraSolicitacaoItemQuantidadeParams,
   validateCompraSolicitacaoInativarMassaBody,
   validateCompraSolicitacaoEncaminharComprasMassaBody,
   validateCompraPedidoItemUpdateBody,
