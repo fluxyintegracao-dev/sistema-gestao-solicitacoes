@@ -286,6 +286,7 @@ function buildDefaultForm(solicitacao) {
     banco_cobranca: '',
     linha_digitavel: '',
     codigo_barras: '',
+    desconto_financeiro: '',
     considera_dre: true,
     intercompany: false,
     empresa_origem_id: '',
@@ -820,6 +821,8 @@ export default function FinanceiroCard({
   }, [form.pagamentos, formasPagamento]);
 
   const valorSolicitacao = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
+  const descontoFinanceiro = useMemo(() => roundCurrency(currencyToNumber(form.desconto_financeiro)), [form.desconto_financeiro]);
+  const valorLiquidoPrevisto = useMemo(() => roundCurrency(valorSolicitacao - descontoFinanceiro), [valorSolicitacao, descontoFinanceiro]);
   const diferencaPagamentos = useMemo(() => roundCurrency(valorSolicitacao - totalPagamentos), [valorSolicitacao, totalPagamentos]);
   const totalBateComSolicitacao = Math.abs(diferencaPagamentos) <= 0.009;
   const totalRateioValor = useMemo(() => {
@@ -1058,6 +1061,18 @@ export default function FinanceiroCard({
       return 'A solicitacao precisa ter valor informado para gerar a conta.';
     }
 
+    if (descontoFinanceiro < 0) {
+      return 'O desconto concedido nao pode ser negativo.';
+    }
+
+    if (descontoFinanceiro > valorSolicitacao) {
+      return 'O desconto concedido nao pode ser maior que o valor da solicitacao.';
+    }
+
+    if (valorLiquidoPrevisto <= 0) {
+      return 'O valor liquido do titulo precisa ser maior que zero.';
+    }
+
     const pagamentos = Array.isArray(form.pagamentos) ? form.pagamentos : [];
     if (pagamentos.length === 0) {
       return 'Informe pelo menos uma forma de pagamento.';
@@ -1150,6 +1165,16 @@ export default function FinanceiroCard({
     try {
       setSaving(true);
       setErro('');
+      const impostosPayload = descontoFinanceiro > 0
+        ? [{
+            tipo_imposto: 'DESCONTO',
+            descricao: 'Desconto concedido',
+            natureza: 'RETENCAO',
+            base_calculo: form.valor,
+            valor: form.desconto_financeiro,
+            observacoes: 'Desconto informado na geracao de conta da solicitacao.'
+          }]
+        : [];
 
       await gerarContaPorSolicitacao(solicitacao.id, {
         tipo: form.tipo,
@@ -1165,6 +1190,9 @@ export default function FinanceiroCard({
         linha_digitavel: form.linha_digitavel || undefined,
         codigo_barras: form.codigo_barras || undefined,
         valor: form.valor,
+        valor_bruto: form.valor,
+        valor_liquido: formatCurrencyInput(valorLiquidoPrevisto),
+        impostos: impostosPayload,
         considera_dre: isCategoriaClassificadaParaDre(selectedCategory),
         intercompany: Boolean(form.intercompany),
         empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
@@ -1700,6 +1728,29 @@ export default function FinanceiroCard({
                   <span className="mb-1 block text-slate-500">Obra</span>
                   <div className="input flex items-center bg-slate-50 text-slate-700">
                     {solicitacao.obra?.nome || '-'}
+                  </div>
+                </div>
+                <label className="text-sm">
+                  <span className="mb-1 block text-slate-500">Desconto concedido</span>
+                  <input
+                    className="input w-full"
+                    placeholder="R$ 0,00"
+                    value={form.desconto_financeiro}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      desconto_financeiro: normalizeCurrencyTyping(event.target.value)
+                    }))}
+                    onBlur={(event) => setForm((current) => ({
+                      ...current,
+                      desconto_financeiro: formatCurrencyInput(event.target.value)
+                    }))}
+                  />
+                  <span className="app-note mt-2">Opcional. Reduz o valor liquido do titulo.</span>
+                </label>
+                <div className="text-sm">
+                  <span className="mb-1 block text-slate-500">Valor liquido previsto</span>
+                  <div className="input flex items-center bg-slate-50 text-slate-700">
+                    {formatCurrency(valorLiquidoPrevisto)}
                   </div>
                 </div>
                 <div className="text-sm">
