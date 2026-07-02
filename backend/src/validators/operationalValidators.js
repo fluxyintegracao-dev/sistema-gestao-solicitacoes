@@ -45,20 +45,34 @@ function parseDecimal(
     return undefined;
   }
 
+  const isNumericValue = typeof value === 'number';
   const raw = String(value).trim().replace(/[R$\s]/gi, '');
   let normalized = raw;
 
   if (brazilianFormat) {
-    if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(raw)) {
+    if (isNumericValue) {
+      normalized = raw;
+    } else if (raw.includes(',')) {
+      const scalePattern = scale == null ? '\\d+' : `\\d{1,${scale}}`;
+      const brazilianDecimalPattern = new RegExp(
+        `^(?:\\d+|\\d{1,3}(?:\\.\\d{3})+)(?:,${scalePattern})?$`
+      );
+      if (!brazilianDecimalPattern.test(raw)) {
+        throw new ValidationError(`${fieldName} invalido.`);
+      }
+      normalized = raw.replace(/\./g, '').replace(',', '.');
+    } else if (/^\d{1,3}(?:\.\d{3})+$/.test(raw)) {
+      normalized = raw.replace(/\./g, '');
+    } else if (/^\d+(?:\.\d+)?$/.test(raw)) {
+      normalized = raw;
+    } else {
       throw new ValidationError(`${fieldName} invalido.`);
     }
-
-    normalized = raw.replace(/\./g, '').replace(',', '.');
   } else if (raw.includes(',')) {
     normalized = raw.replace(/\./g, '').replace(',', '.');
   }
 
-  if (!brazilianFormat && scale != null) {
+  if (scale != null) {
     const [, decimalPart = ''] = normalized.split('.');
     if (decimalPart.length > scale) {
       throw new ValidationError(`${fieldName} invalido.`);
