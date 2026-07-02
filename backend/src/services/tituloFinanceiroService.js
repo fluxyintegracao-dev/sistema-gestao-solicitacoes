@@ -213,6 +213,20 @@ function escalarImpostosParaTitulo(impostos = [], valorParcela = 0, valorBase = 
   })).filter((item) => item.valor > 0);
 }
 
+function calcularValoresParcelaComImpostos(impostosResumo = {}, valorParcela = 0, valorBase = 0) {
+  const base = Number(valorBase || 0);
+  const fator = base > 0 ? Number(valorParcela || 0) / base : 1;
+  const valorBruto = roundCurrency(Number(impostosResumo.valorBruto || valorParcela || 0) * fator);
+  const valorImpostos = roundCurrency(Number(impostosResumo.valorImpostos || 0) * fator);
+  const valorLiquido = roundCurrency(Math.max(valorBruto - valorImpostos, 0));
+
+  return {
+    valorBruto,
+    valorImpostos,
+    valorLiquido
+  };
+}
+
 async function normalizarRateiosTitulo(req, payload = {}, defaultObra, defaultApropriacao, valorTitulo = 0) {
   const rateiosPayload = Array.isArray(payload.rateios) ? payload.rateios.filter(Boolean) : [];
   if (rateiosPayload.length === 0) {
@@ -291,8 +305,17 @@ function escalarRateiosParaTitulo(rateios = [], valorParcela = 0, valorBase = 0)
   }));
 }
 
-async function gravarComplementosTitulo({ titulo, rateios = [], impostos = [], valorBase, valorParcela, usuarioId, transaction }) {
-  const rateiosTitulo = escalarRateiosParaTitulo(rateios, valorParcela, valorBase);
+async function gravarComplementosTitulo({
+  titulo,
+  rateios = [],
+  impostos = [],
+  valorBase,
+  valorParcela,
+  valorRateioParcela = valorParcela,
+  usuarioId,
+  transaction
+}) {
+  const rateiosTitulo = escalarRateiosParaTitulo(rateios, valorRateioParcela, valorBase);
   if (rateiosTitulo.length > 0) {
     await TituloFinanceiroRateio.bulkCreate(
       rateiosTitulo.map((item) => ({
@@ -2264,6 +2287,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
         const descricaoParcela = totalParcelasDoGrupo > 1
           ? `${prefixoForma}${descricaoBase}`.slice(0, 205) + ` - Parcela ${numeroParcela}/${totalParcelasDoGrupo}`
           : `${prefixoForma}${descricaoBase}`.slice(0, 255);
+        const valoresParcela = calcularValoresParcelaComImpostos(impostosResumo, valorParcela, valorOriginal);
         const chequeFields = buildChequeFields(pagamento.formaPagamento, parcelaPayload, index);
         const cobrancaPayload = {
           ...payload,
@@ -2295,12 +2319,12 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           descricao: descricaoParcela || descricaoPadraoTitulo(solicitacao),
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
-          valor_original: valorParcela,
-          valor_bruto: roundCurrency(impostosResumo.valorBruto * (valorParcela / valorOriginal)),
-          valor_impostos: roundCurrency(impostosResumo.valorImpostos * (valorParcela / valorOriginal)),
-          valor_liquido: valorParcela,
+          valor_original: valoresParcela.valorLiquido,
+          valor_bruto: valoresParcela.valorBruto,
+          valor_impostos: valoresParcela.valorImpostos,
+          valor_liquido: valoresParcela.valorLiquido,
           possui_rateio: rateiosTitulo.length > 0,
-          valor_saldo: valorParcela,
+          valor_saldo: valoresParcela.valorLiquido,
           valor_baixado: 0,
           data_emissao: payload.data_emissao || getHoje(),
           data_vencimento: vencimentoParcela,
@@ -2317,6 +2341,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           impostos: impostosResumo.impostos,
           valorBase: valorOriginal,
           valorParcela,
+          valorRateioParcela: valoresParcela.valorLiquido,
           usuarioId: req.user?.id || null,
           transaction
         });
@@ -2561,6 +2586,7 @@ async function criarTituloManual(req, payload = {}) {
         const descricaoParcela = pagamento.quantidadeParcelas > 1
           ? `${prefixoForma}${descricao}`.slice(0, 205) + ` - Parcela ${numeroParcela}/${pagamento.quantidadeParcelas}`
           : `${prefixoForma}${descricao}`.slice(0, 255);
+        const valoresParcela = calcularValoresParcelaComImpostos(impostosResumo, valorParcela, valorOriginal);
         const chequeFields = buildChequeFields(pagamento.formaPagamento, parcelaPayload, index);
         const cobrancaPayload = {
           ...payload,
@@ -2592,12 +2618,12 @@ async function criarTituloManual(req, payload = {}) {
           descricao: descricaoParcela || descricaoPadraoTituloManual(tipo),
           numero_documento: parcelaPayload.numero_documento || pagamento.payload.numero_documento || payload.numero_documento || chequeFields.cheque_numero || null,
           ...chequeFields,
-          valor_original: valorParcela,
-          valor_bruto: roundCurrency(impostosResumo.valorBruto * (valorParcela / valorOriginal)),
-          valor_impostos: roundCurrency(impostosResumo.valorImpostos * (valorParcela / valorOriginal)),
-          valor_liquido: valorParcela,
+          valor_original: valoresParcela.valorLiquido,
+          valor_bruto: valoresParcela.valorBruto,
+          valor_impostos: valoresParcela.valorImpostos,
+          valor_liquido: valoresParcela.valorLiquido,
           possui_rateio: rateiosTitulo.length > 0,
-          valor_saldo: valorParcela,
+          valor_saldo: valoresParcela.valorLiquido,
           valor_baixado: 0,
           data_emissao: payload.data_emissao || getHoje(),
           data_vencimento: vencimentoParcela,
@@ -2614,6 +2640,7 @@ async function criarTituloManual(req, payload = {}) {
           impostos: impostosResumo.impostos,
           valorBase: valorOriginal,
           valorParcela,
+          valorRateioParcela: valoresParcela.valorLiquido,
           usuarioId: req.user?.id || null,
           transaction
         });
