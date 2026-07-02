@@ -85,6 +85,12 @@ function createImposto() {
   };
 }
 
+function isDescontoImposto(imposto) {
+  const tipo = normalizarBusca(imposto?.tipo_imposto || imposto?.tipo || '');
+  const descricao = normalizarBusca(imposto?.descricao || '');
+  return tipo === 'desconto' || descricao === 'desconto' || descricao.includes('desconto concedido');
+}
+
 function getEmpresaObraId(obra) {
   return obra?.empresa_grupo_id ? String(obra.empresa_grupo_id) : '';
 }
@@ -190,6 +196,11 @@ function categoriaCompativel(categoria, tipoTitulo) {
 }
 
 function buildFormFromTitulo(titulo) {
+  const impostosTitulo = Array.isArray(titulo?.impostos) ? titulo.impostos : [];
+  const descontoFinanceiro = roundCurrency(impostosTitulo
+    .filter((imposto) => isDescontoImposto(imposto))
+    .reduce((acc, imposto) => acc + toCurrencyNumber(imposto.valor), 0));
+
   return {
     tipo: String(titulo?.tipo || 'PAGAR').toUpperCase() === 'RECEBER' ? 'RECEBER' : 'PAGAR',
     status: ['PREVISAO', 'ABERTO'].includes(String(titulo?.status || '').toUpperCase())
@@ -202,7 +213,8 @@ function buildFormFromTitulo(titulo) {
     categoria_financeira_id: String(titulo?.categoria_financeira_id || ''),
     descricao: titulo?.descricao || '',
     numero_documento: titulo?.numero_documento || '',
-    valor: formatCurrencyInput(titulo?.valor_original),
+    valor: formatCurrencyInput(titulo?.valor_bruto ?? titulo?.valor_original),
+    desconto_financeiro: descontoFinanceiro > 0 ? formatCurrencyInput(descontoFinanceiro) : '',
     data_emissao: titulo?.data_emissao || today(),
     data_vencimento: titulo?.data_vencimento || today(),
     competencia_data: titulo?.competencia_data || today(),
@@ -237,8 +249,9 @@ function buildFormFromTitulo(titulo) {
         observacoes: rateio.observacoes || ''
       }))
       : [],
-    impostos: Array.isArray(titulo?.impostos)
-      ? titulo.impostos.map((imposto) => ({
+    impostos: impostosTitulo
+      .filter((imposto) => !isDescontoImposto(imposto))
+      .map((imposto) => ({
         id: imposto.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         tipo_imposto: imposto.tipo_imposto || '',
         descricao: imposto.descricao || '',
@@ -248,7 +261,6 @@ function buildFormFromTitulo(titulo) {
         valor: imposto.valor != null ? formatCurrencyInput(imposto.valor) : '',
         observacoes: imposto.observacoes || ''
       }))
-      : []
   };
 }
 
@@ -452,9 +464,10 @@ export default function FinanceiroTituloEditar() {
       .filter((imposto) => imposto.natureza === 'ACRESCIMO')
       .reduce((acc, imposto) => acc + toCurrencyNumber(imposto.valor), 0));
   }, [form?.impostos]);
+  const descontoFinanceiro = useMemo(() => roundCurrency(toCurrencyNumber(form?.desconto_financeiro)), [form?.desconto_financeiro]);
   const valorLiquidoPrevisto = useMemo(() => {
-    return roundCurrency(valorTitulo - totalImpostosRetencao + totalImpostosAcrescimo);
-  }, [valorTitulo, totalImpostosRetencao, totalImpostosAcrescimo]);
+    return roundCurrency(Math.max(valorTitulo - descontoFinanceiro - totalImpostosRetencao + totalImpostosAcrescimo, 0));
+  }, [valorTitulo, descontoFinanceiro, totalImpostosRetencao, totalImpostosAcrescimo]);
 
   useEffect(() => {
     if (!form || form.tipo !== 'PAGAR' || !form.parceiro_id) {
@@ -695,6 +708,8 @@ export default function FinanceiroTituloEditar() {
     if (!form.parceiro_id) return 'Selecione o parceiro.';
     if (!form.descricao.trim()) return 'Informe a descricao.';
     if (toCurrencyNumber(form.valor) <= 0) return 'Informe o valor do titulo.';
+    if (descontoFinanceiro < 0) return 'Informe um desconto valido.';
+    if (descontoFinanceiro > valorTitulo) return 'O desconto nao pode ser maior que o valor do titulo.';
     if (!form.data_vencimento) return 'Informe o vencimento.';
     if ((form.rateios || []).length > 0) {
       for (const rateio of form.rateios) {
@@ -712,8 +727,8 @@ export default function FinanceiroTituloEditar() {
     }
     if ((form.impostos || []).length > 0) {
       for (const imposto of form.impostos) {
-        if (!String(imposto.tipo_imposto || imposto.descricao || '').trim()) return 'Informe o tipo dos impostos/descontos.';
-        if (toCurrencyNumber(imposto.valor) <= 0) return 'Informe o valor dos impostos/descontos.';
+        if (!String(imposto.tipo_imposto || imposto.descricao || '').trim()) return 'Informe o tipo dos impostos/retencoes.';
+        if (toCurrencyNumber(imposto.valor) <= 0) return 'Informe o valor dos impostos/retencoes.';
       }
     }
     if (!form.categoria_financeira_id) return 'Selecione a categoria financeira do titulo.';
@@ -766,6 +781,7 @@ export default function FinanceiroTituloEditar() {
         tipo_intercompany: form.intercompany ? form.tipo_intercompany || null : null,
         motivo_intercompany: form.intercompany ? form.motivo_intercompany || null : null,
         valor_bruto: form.valor,
+        desconto_financeiro: formatCurrencyInput(descontoFinanceiro),
         valor_liquido: formatCurrencyInput(valorLiquidoPrevisto),
         rateios: (form.rateios || []).map((rateio) => ({
           obra_id: rateio.obra_id ? Number(rateio.obra_id) : undefined,
@@ -1020,6 +1036,16 @@ export default function FinanceiroTituloEditar() {
             <input value={form.valor} onChange={(event) => updateField('valor', normalizeCurrencyTyping(event.target.value))} disabled={Boolean(bloqueio)} />
           </label>
 
+          <label className="form-field">
+            <span>Desconto concedido</span>
+            <input
+              value={form.desconto_financeiro}
+              onChange={(event) => updateField('desconto_financeiro', normalizeCurrencyTyping(event.target.value))}
+              disabled={Boolean(bloqueio)}
+              placeholder="R$ 0,00"
+            />
+          </label>
+
           <label className="form-field xl:col-span-2">
             <span>Descricao</span>
             <input value={form.descricao} onChange={(event) => updateField('descricao', event.target.value)} disabled={Boolean(bloqueio)} />
@@ -1129,13 +1155,13 @@ export default function FinanceiroTituloEditar() {
         <div className="rounded-xl border border-[var(--c-border)] p-4">
           <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-base font-semibold text-[var(--c-text)]">Impostos, retencoes e descontos</h2>
+              <h2 className="text-base font-semibold text-[var(--c-text)]">Impostos e retencoes</h2>
               <p className="text-xs text-[var(--c-muted)]">
-                Registre retencoes, descontos ou acrescimos para acompanhar o valor liquido do titulo.
+                Registre retencoes ou acrescimos para acompanhar o valor liquido do titulo. Desconto fica no campo proprio ao lado do valor.
               </p>
             </div>
             <button type="button" className="btn btn-outline" onClick={adicionarImposto} disabled={Boolean(bloqueio)}>
-              Adicionar imposto/desconto
+              Adicionar imposto/retencao
             </button>
           </div>
 
@@ -1147,7 +1173,7 @@ export default function FinanceiroTituloEditar() {
                     <label className="form-field xl:col-span-2">
                       <span>Natureza</span>
                       <select value={imposto.natureza} onChange={(event) => updateImposto(index, 'natureza', event.target.value)} disabled={Boolean(bloqueio)}>
-                        <option value="RETENCAO">Retencao/desconto</option>
+                        <option value="RETENCAO">Retencao</option>
                         <option value="ACRESCIMO">Acrescimo</option>
                       </select>
                     </label>
@@ -1183,7 +1209,7 @@ export default function FinanceiroTituloEditar() {
           )}
 
           <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2 text-sm text-[var(--c-text)]">
-            Valor bruto: <strong>{formatCurrency(valorTitulo)}</strong>. Retencoes/descontos: <strong>{formatCurrency(totalImpostosRetencao)}</strong>. Acrescimos: <strong>{formatCurrency(totalImpostosAcrescimo)}</strong>. Valor liquido previsto: <strong>{formatCurrency(valorLiquidoPrevisto)}</strong>.
+            Valor bruto: <strong>{formatCurrency(valorTitulo)}</strong>. Desconto: <strong>{formatCurrency(descontoFinanceiro)}</strong>. Retencoes: <strong>{formatCurrency(totalImpostosRetencao)}</strong>. Acrescimos: <strong>{formatCurrency(totalImpostosAcrescimo)}</strong>. Valor liquido previsto: <strong>{formatCurrency(valorLiquidoPrevisto)}</strong>.
           </div>
         </div>
 

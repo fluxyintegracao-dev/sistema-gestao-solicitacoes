@@ -73,6 +73,17 @@ function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function toCurrencyNumber(value) {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value).trim().replace(/[R$\s]/gi, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 function normalizarStatusTituloInicial(status) {
   const normalized = String(status || '').trim().toUpperCase();
   return STATUS_TITULO_INICIAL.includes(normalized) ? normalized : 'ABERTO';
@@ -167,21 +178,44 @@ function assertValoresIguais({ atual, esperado, mensagem }) {
 
 function normalizarImpostosTitulo(payload = {}, valorTitulo = 0) {
   const impostos = Array.isArray(payload.impostos) ? payload.impostos : [];
+  const descontoFinanceiro = roundCurrency(toCurrencyNumber(
+    payload.desconto_financeiro ?? payload.desconto_titulo ?? payload.desconto_concedido ?? 0
+  ));
   const normalizados = impostos
     .map((item) => {
-      const valor = roundCurrency(item?.valor);
+      const valor = roundCurrency(toCurrencyNumber(item?.valor));
       if (!Number.isFinite(valor) || valor <= 0) return null;
+      const tipo = String(item.tipo_imposto || item.tipo || 'IMPOSTO').trim().slice(0, 60);
+      const descricao = item.descricao ? String(item.descricao).trim().slice(0, 180) : null;
+      const isDescontoDuplicado = descontoFinanceiro > 0
+        && (
+          String(tipo || '').trim().toUpperCase() === 'DESCONTO'
+          || String(descricao || '').trim().toUpperCase() === 'DESCONTO'
+        );
+      if (isDescontoDuplicado) return null;
       return {
-        tipo_imposto: String(item.tipo_imposto || item.tipo || 'IMPOSTO').trim().slice(0, 60),
-        descricao: item.descricao ? String(item.descricao).trim().slice(0, 180) : null,
+        tipo_imposto: tipo,
+        descricao,
         natureza: String(item.natureza || 'RETENCAO').trim().toUpperCase() === 'ACRESCIMO' ? 'ACRESCIMO' : 'RETENCAO',
-        base_calculo: item.base_calculo != null ? roundCurrency(item.base_calculo) : roundCurrency(valorTitulo),
-        aliquota: item.aliquota != null ? Number(item.aliquota) : null,
+        base_calculo: item.base_calculo != null ? roundCurrency(toCurrencyNumber(item.base_calculo)) : roundCurrency(valorTitulo),
+        aliquota: item.aliquota != null ? toCurrencyNumber(item.aliquota) : null,
         valor,
         observacoes: item.observacoes || null
       };
     })
     .filter(Boolean);
+
+  if (descontoFinanceiro > 0) {
+    normalizados.push({
+      tipo_imposto: 'DESCONTO',
+      descricao: 'Desconto concedido',
+      natureza: 'RETENCAO',
+      base_calculo: roundCurrency(valorTitulo),
+      aliquota: null,
+      valor: descontoFinanceiro,
+      observacoes: payload.desconto_observacoes || null
+    });
+  }
 
   const totalRetencoes = somarValores(normalizados
     .filter((item) => item.natureza === 'RETENCAO')
@@ -189,10 +223,8 @@ function normalizarImpostosTitulo(payload = {}, valorTitulo = 0) {
   const totalAcrescimos = somarValores(normalizados
     .filter((item) => item.natureza === 'ACRESCIMO')
     .map((item) => item.valor));
-  const valorBruto = roundCurrency(payload.valor_bruto != null ? payload.valor_bruto : valorTitulo);
-  const valorLiquido = roundCurrency(payload.valor_liquido != null
-    ? payload.valor_liquido
-    : valorTitulo);
+  const valorBruto = roundCurrency(payload.valor_bruto != null ? toCurrencyNumber(payload.valor_bruto) : valorTitulo);
+  const valorLiquido = roundCurrency(Math.max(valorBruto - totalRetencoes + totalAcrescimos, 0));
 
   return {
     impostos: normalizados,
@@ -1714,7 +1746,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     throw createHttpError(400, 'Parceiro e obrigatorio para editar o titulo.');
   }
 
-  const valorOriginal = Number(payload.valor);
+  const valorOriginal = toCurrencyNumber(payload.valor);
   if (!Number.isFinite(valorOriginal) || valorOriginal <= 0) {
     throw createHttpError(400, 'Valor invalido para editar o titulo.');
   }
@@ -1764,6 +1796,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
   const rateiosTitulo = atualizarRateios
     ? await normalizarRateiosTitulo(req, payload, obra, apropriacao, valorOriginal)
     : [];
+  const valorLiquidoTitulo = impostosResumo.valorLiquido;
 
   const antes = {
     tipo: titulo.tipo,
@@ -1791,11 +1824,11 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
     status: statusTitulo,
     descricao,
     numero_documento: payload.numero_documento || null,
-    valor_original: roundCurrency(valorOriginal),
+    valor_original: valorLiquidoTitulo,
     valor_bruto: impostosResumo.valorBruto,
     valor_impostos: impostosResumo.valorImpostos,
     valor_liquido: impostosResumo.valorLiquido,
-    valor_saldo: roundCurrency(valorOriginal),
+    valor_saldo: valorLiquidoTitulo,
     valor_baixado: 0,
     possui_rateio: atualizarRateios ? rateiosTitulo.length > 0 : Boolean(titulo.possui_rateio),
     data_emissao: payload.data_emissao || null,
@@ -1827,6 +1860,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
       impostos: impostosResumo.impostos,
       valorBase: valorOriginal,
       valorParcela: valorOriginal,
+      valorRateioParcela: valorLiquidoTitulo,
       usuarioId: req.user?.id || null
     });
   }
@@ -1849,7 +1883,7 @@ async function atualizarTitulo(req, tituloId, payload = {}) {
         parceiro_id: parceiro.id,
         categoria_financeira_id: categoria?.id || null,
         status: statusTitulo,
-        valor_original: roundCurrency(valorOriginal),
+        valor_original: valorLiquidoTitulo,
         valor_bruto: impostosResumo.valorBruto,
         valor_impostos: impostosResumo.valorImpostos,
         valor_liquido: impostosResumo.valorLiquido,
