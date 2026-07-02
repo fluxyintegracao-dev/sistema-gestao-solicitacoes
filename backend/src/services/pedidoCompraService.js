@@ -1169,7 +1169,7 @@ async function fecharPedidosDaSolicitacaoCompraAutomaticamente({ solicitacaoId, 
 
   const solicitacao = await SolicitacaoCompra.findByPk(Number(solicitacaoId), {
     transaction,
-    attributes: ['id', 'codigo', 'solicitacao_principal_id']
+    attributes: ['id', 'solicitacao_principal_id']
   });
 
   for (const pedido of pedidos) {
@@ -1266,7 +1266,7 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
 
   const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
     transaction,
-    attributes: ['id', 'codigo', 'status', 'encerrado_em', 'solicitacao_principal_id']
+    attributes: ['id', 'status', 'encerrado_em', 'solicitacao_principal_id']
   });
 
   if (solicitacao && normalizeText(solicitacao.status) === 'ENCERRADO') {

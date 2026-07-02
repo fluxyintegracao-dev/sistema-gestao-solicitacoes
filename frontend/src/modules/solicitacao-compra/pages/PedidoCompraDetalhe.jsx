@@ -969,7 +969,7 @@ export default function PedidoCompraDetalhe() {
   }
 
   async function handleReabrirCotacao() {
-    const motivo = window.prompt('Informe o motivo para reabrir este pedido e voltar para a cotacao.');
+    const motivo = window.prompt('Informe o motivo para reabrir este pedido para edicao ou cancelamento.');
     if (motivo === null) return;
 
     const motivoNormalizado = motivo.trim();
@@ -982,10 +982,10 @@ export default function PedidoCompraDetalhe() {
       setReabrindoCotacao(true);
       const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
       setPedido(data || null);
-      alert('Pedido reaberto para cotacao.');
+      alert('Pedido reaberto para edicao.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao reabrir pedido para cotacao');
+      alert(error.message || 'Erro ao reabrir pedido');
     } finally {
       setReabrindoCotacao(false);
     }
@@ -1294,7 +1294,7 @@ export default function PedidoCompraDetalhe() {
                 onClick={handleReabrirCotacao}
                 disabled={reabrindoCotacao}
               >
-                {reabrindoCotacao ? 'Reabrindo...' : 'Reabrir cotacao'}
+                {reabrindoCotacao ? 'Reabrindo...' : 'Reabrir pedido'}
               </button>
             ) : null}
             {podeGerenciarPedido ? (
