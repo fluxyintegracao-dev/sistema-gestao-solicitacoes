@@ -661,6 +661,7 @@ async function obterOuCriarPedidoPorFornecedor({
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
       desconto_total: roundMoney(vinculacaoFornecedor.desconto_total)
     };
+    const statusAnterior = String(pedido.status || '');
     if (normalizeText(pedido.status) === 'CANCELADO') {
       await pedido.update(
         {
@@ -673,6 +674,46 @@ async function obterOuCriarPedidoPorFornecedor({
         },
         { transaction }
       );
+    } else if (await isPedidoCompraStatusLocked(statusAnterior)) {
+      const statusAberto = await getPedidoStatusAbertoConfig();
+      await pedido.update(
+        {
+          ...atualizacaoPedido,
+          status: statusAberto.codigo,
+          encerrado_em: null
+        },
+        { transaction }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId,
+        fornecedorCompraId: pedido.fornecedor_compra_id,
+        tipoAcao: 'PEDIDO_REABERTO_PARA_REENCERRAMENTO',
+        descricao: `${buildPedidoCodigo(pedido.id)} reaberto automaticamente para atualizar vencedores da cotacao`,
+        metadados: {
+          pedido_compra_id: pedido.id,
+          status_anterior: statusAnterior || null,
+          status_novo: statusAberto.codigo,
+          origem: 'ENCERRAMENTO_COTACAO'
+        },
+        transaction
+      });
+
+      await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+        solicitacao,
+        pedido,
+        usuarioId,
+        acao: 'PEDIDO_COMPRA_REABERTO_COTACAO',
+        descricao: `${buildPedidoCodigo(pedido.id)} reaberto automaticamente para atualizar vencedores da cotacao`,
+        statusAnterior: statusAnterior || null,
+        statusNovo: statusAberto.codigo,
+        metadados: {
+          automatico: true,
+          origem: 'ENCERRAMENTO_COTACAO'
+        },
+        transaction
+      });
     } else if (
       roundMoney(pedido.desconto_total) !== atualizacaoPedido.desconto_total ||
       String(pedido.valor_minimo_pedido || '') !== String(atualizacaoPedido.valor_minimo_pedido || '')
@@ -1141,7 +1182,13 @@ async function getPedidoStatusFechadoFornecedorConfig() {
   });
   if (porNome) return porNome;
 
-  throw new Error('Configure um status ativo de pedido fechado com fornecedor.');
+  return {
+    codigo: 'FECHADO_FORNECEDOR',
+    nome: 'Fechado com o fornecedor',
+    cor: '#16a34a',
+    bloqueia_edicao: true,
+    ativo: true
+  };
 }
 
 async function getPedidoStatusAbertoConfig() {
@@ -1153,7 +1200,13 @@ async function getPedidoStatusAbertoConfig() {
   const editavel = ativo.find((item) => !item.bloqueia_edicao);
   if (editavel) return editavel;
 
-  throw new Error('Configure um status ativo e editavel para reabrir pedidos.');
+  return {
+    codigo: 'ABERTO',
+    nome: 'Aberto',
+    cor: '#2563eb',
+    bloqueia_edicao: false,
+    ativo: true
+  };
 }
 
 function isPedidoCancelado(status) {

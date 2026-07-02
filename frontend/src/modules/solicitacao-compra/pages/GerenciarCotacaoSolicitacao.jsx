@@ -49,17 +49,34 @@ function fmtMoeda(valor) {
 
 function parseNumeroCompra(value) {
   if (value === null || value === undefined || value === '') return 0;
-  const normalized = String(value).trim().replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value).trim().replace(/[^\d.,-]/g, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized.replace(/[^\d.-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseNumeroCompraDigitado(value) {
+  if (value === null || value === undefined || value === '') return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  const raw = String(value).trim().replace(/[^\d.,-]/g, '');
+  const normalized = raw.replace(/\./g, '').replace(',', '.');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function sanitizeNumeroCompraInput(value) {
+  return String(value ?? '').replace(/[^\d.,]/g, '');
 }
 
 function formatNumeroCompra(value) {
   const parsed = Number(value || 0);
   if (!Number.isFinite(parsed)) return '';
   return parsed.toLocaleString('pt-BR', {
-    minimumFractionDigits: Number.isInteger(parsed) ? 0 : 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6
   });
 }
 
@@ -221,7 +238,10 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
     const itens = itensGanhos
       .filter((item) => itensSelecionados.includes(item.resposta_item_id))
       .map((item) => {
-        const quantidade = parseNumeroCompra(quantidadesRemanejar[String(item.resposta_item_id)] ?? item.quantidade);
+        const quantidadeDigitada = quantidadesRemanejar[String(item.resposta_item_id)];
+        const quantidade = quantidadeDigitada === undefined
+          ? parseNumeroCompra(item.quantidade)
+          : parseNumeroCompraDigitado(quantidadeDigitada);
         const quantidadeVencedora = parseNumeroCompra(item.quantidade);
         const quantidadeSolicitada = parseNumeroCompra(item.quantidade_solicitada || item.quantidade);
 
@@ -921,6 +941,15 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
     return parseNumeroCompra(registro?.quantidade_alocada);
   }
 
+  function getQuantidadeAlocadaInput(respostaItemId) {
+    const registro = vencedoresSelecionados[String(respostaItemId)];
+    if (!registro) return '';
+    if (registro.quantidade_alocada_input !== undefined) {
+      return registro.quantidade_alocada_input;
+    }
+    return formatNumeroCompra(registro.quantidade_alocada);
+  }
+
   function getTotalAlocadoItem(item) {
     return (item.respostas || []).reduce((acc, resp) => acc + getQuantidadeAlocada(resp.resposta_item_id), 0);
   }
@@ -937,7 +966,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
         if (!resp.fornecedor_id || !resp.disponivel || !resp.preco) return;
         const fId = resp.fornecedor_id;
         const quantidadeGanha = getQuantidadeAlocada(resp.resposta_item_id);
-        const totalItem = Number(resp.preco || 0) * (quantidadeGanha || Number(item.quantidade || 0));
+        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || parseNumeroCompra(item.quantidade));
 
         if (!totaisFornecedor[fId]) {
           totaisFornecedor[fId] = {
@@ -1113,7 +1142,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                           </td>
                           <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
                           <td className="font-medium">
-                            {resp.preco ? fmtMoeda(Number(resp.preco) * Number(item.quantidade || 0)) : '-'}
+                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * parseNumeroCompra(item.quantidade || 0)) : '-'}
                           </td>
                           <td>{resp.prazo || '-'}</td>
                           <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
@@ -1137,7 +1166,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                                 />
                                 <input
                                   className="input h-8 w-20 px-2 text-xs"
-                                  value={isVencedor ? formatNumeroCompra(quantidadeAlocada) : ''}
+                                  value={isVencedor ? getQuantidadeAlocadaInput(resp.resposta_item_id) : ''}
                                   placeholder="Qtd."
                                   disabled={!podeComprar || !isVencedor}
                                   onChange={(event) => onVencedorChange({
@@ -1531,7 +1560,12 @@ export default function GerenciarCotacaoSolicitacao() {
     if (!resposta?.resposta_item_id) return;
 
     const respostaId = String(resposta.resposta_item_id);
-    const quantidadeNumero = parseNumeroCompra(quantidade);
+    const quantidadeInput = typeof quantidade === 'string'
+      ? sanitizeNumeroCompraInput(quantidade)
+      : formatNumeroCompra(quantidade);
+    const quantidadeNumero = typeof quantidade === 'string'
+      ? parseNumeroCompraDigitado(quantidadeInput)
+      : parseNumeroCompra(quantidadeInput);
 
     setVencedoresSelecionados((prev) => {
       const next = { ...prev };
@@ -1542,7 +1576,8 @@ export default function GerenciarCotacaoSolicitacao() {
 
       next[respostaId] = {
         resposta_item_id: Number(resposta.resposta_item_id),
-        quantidade_alocada: quantidadeNumero
+        quantidade_alocada: quantidadeNumero,
+        quantidade_alocada_input: quantidadeInput
       };
       return next;
     });
