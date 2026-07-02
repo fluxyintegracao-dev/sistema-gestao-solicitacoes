@@ -1205,6 +1205,7 @@ function validateFinanceTituloCreateBody(body = {}) {
       'tipo_rateio',
       'rateios',
       'impostos',
+      'desconto_financeiro',
       'valor_bruto',
       'valor_liquido',
       'origem_frete_id'
@@ -1254,6 +1255,7 @@ function validateFinanceTituloCreateBody(body = {}) {
     tipo_rateio: parseEnum(body.tipo_rateio, 'Tipo de rateio', ['PERCENTUAL', 'VALOR']),
     rateios: parseRateiosTitulo(body.rateios),
     impostos: parseImpostosTitulo(body.impostos),
+    desconto_financeiro: parseDecimal(body.desconto_financeiro, 'Desconto financeiro', { min: 0 }),
     valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
     valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 }),
     origem_frete_id: parseInteger(body.origem_frete_id, 'Frete do pedido')
@@ -1293,6 +1295,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
       'tipo_rateio',
       'rateios',
       'impostos',
+      'desconto_financeiro',
       'valor_bruto',
       'valor_liquido'
     ],
@@ -1335,6 +1338,7 @@ function validateFinanceTituloUpdateBody(body = {}) {
     tipo_rateio: parseEnum(body.tipo_rateio, 'Tipo de rateio', ['PERCENTUAL', 'VALOR']),
     rateios: parseRateiosTitulo(body.rateios),
     impostos: parseImpostosTitulo(body.impostos),
+    desconto_financeiro: parseDecimal(body.desconto_financeiro, 'Desconto financeiro', { min: 0 }),
     valor_bruto: parseDecimal(body.valor_bruto, 'Valor bruto', { min: 0.01 }),
     valor_liquido: parseDecimal(body.valor_liquido, 'Valor liquido', { min: 0.01 })
   };
