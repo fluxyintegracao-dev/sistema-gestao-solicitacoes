@@ -200,6 +200,7 @@ function buildDefaultForm(tipo = 'PAGAR') {
     identificador_externo: '',
     boleto_emitido_em: '',
     valor: '',
+    desconto_financeiro: '',
     data_emissao: today(),
     competencia_data: today(),
     considera_dre: true,
@@ -754,6 +755,7 @@ export default function FinanceiroTituloNovo() {
   }, [form.pagamentos, formasPagamento]);
 
   const valorTitulo = useMemo(() => roundCurrency(currencyToNumber(form.valor)), [form.valor]);
+  const descontoFinanceiro = useMemo(() => roundCurrency(currencyToNumber(form.desconto_financeiro)), [form.desconto_financeiro]);
   const diferencaPagamentos = useMemo(() => roundCurrency(valorTitulo - totalPagamentos), [valorTitulo, totalPagamentos]);
   const totalBateComTitulo = Math.abs(diferencaPagamentos) <= 0.009;
   const totalRateioValor = useMemo(() => {
@@ -779,8 +781,8 @@ export default function FinanceiroTituloNovo() {
       .reduce((acc, item) => acc + currencyToNumber(item.valor), 0));
   }, [form.impostos]);
   const valorLiquidoPrevisto = useMemo(() => {
-    return roundCurrency(valorTitulo - totalImpostosRetencao + totalImpostosAcrescimo);
-  }, [valorTitulo, totalImpostosRetencao, totalImpostosAcrescimo]);
+    return roundCurrency(valorTitulo - totalImpostosRetencao - descontoFinanceiro + totalImpostosAcrescimo);
+  }, [valorTitulo, totalImpostosRetencao, descontoFinanceiro, totalImpostosAcrescimo]);
 
   function preencherFavorecidoComParceiro(parceiro) {
     const pix = getParceiroPixPrincipal(parceiro);
@@ -1120,6 +1122,18 @@ export default function FinanceiroTituloNovo() {
       return 'Informe o valor total do titulo.';
     }
 
+    if (descontoFinanceiro < 0) {
+      return 'O desconto concedido nao pode ser negativo.';
+    }
+
+    if (descontoFinanceiro > valorTitulo) {
+      return 'O desconto concedido nao pode ser maior que o valor do titulo.';
+    }
+
+    if (valorLiquidoPrevisto <= 0) {
+      return 'O valor liquido do titulo precisa ser maior que zero.';
+    }
+
     if (!form.categoria_financeira_id) {
       return 'Selecione a categoria financeira do titulo.';
     }
@@ -1238,6 +1252,7 @@ export default function FinanceiroTituloNovo() {
         apropriacao_id: form.apropriacao_id ? Number(form.apropriacao_id) : undefined,
         categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined
       };
+      delete payload.desconto_financeiro;
       const origemFreteId = searchParams.get('origem_frete_id');
       if (origemFreteId) {
         payload.origem_frete_id = Number(origemFreteId);
@@ -1274,7 +1289,7 @@ export default function FinanceiroTituloNovo() {
         valor_rateio: rateio.tipo_rateio === 'VALOR' ? rateio.valor_rateio : undefined,
         observacoes: rateio.observacoes || undefined
       }));
-      payload.impostos = (form.impostos || []).map((imposto) => ({
+      const impostosPayload = (form.impostos || []).map((imposto) => ({
         tipo_imposto: imposto.tipo_imposto || imposto.descricao,
         descricao: imposto.descricao || imposto.tipo_imposto,
         natureza: imposto.natureza || 'RETENCAO',
@@ -1283,6 +1298,17 @@ export default function FinanceiroTituloNovo() {
         valor: imposto.valor,
         observacoes: imposto.observacoes || undefined
       }));
+      if (descontoFinanceiro > 0) {
+        impostosPayload.push({
+          tipo_imposto: 'DESCONTO',
+          descricao: 'Desconto concedido',
+          natureza: 'RETENCAO',
+          base_calculo: form.valor,
+          valor: form.desconto_financeiro,
+          observacoes: 'Desconto informado no cadastro do titulo.'
+        });
+      }
+      payload.impostos = impostosPayload;
       payload.pagamentos = (form.pagamentos || []).map((pagamento) => {
         const forma = getFormaPagamento(pagamento.forma_pagamento_id);
         const usaDetalhe = formaUsaParcelasDetalhadas(forma);
@@ -1578,6 +1604,25 @@ export default function FinanceiroTituloNovo() {
                   required
                 />
               </label>
+
+              <label className="sol-filter-field xl:col-span-2">
+                <span className="sol-filter-label">Desconto concedido</span>
+                <input
+                  className="input w-full"
+                  placeholder="R$ 0,00"
+                  value={form.desconto_financeiro}
+                  onChange={(event) => updateField('desconto_financeiro', normalizeCurrencyTyping(event.target.value))}
+                  onBlur={(event) => updateField('desconto_financeiro', formatCurrencyInput(event.target.value))}
+                />
+                <span className="app-note mt-2">Opcional. Reduz o valor liquido do titulo.</span>
+              </label>
+
+              <div className="sol-filter-field xl:col-span-2">
+                <span className="sol-filter-label">Valor liquido</span>
+                <div className="input flex items-center bg-slate-50 text-slate-700">
+                  {formatCurrency(valorLiquidoPrevisto)}
+                </div>
+              </div>
 
               <div className="sol-filter-field xl:col-span-3">
                 <span className="sol-filter-label">Total das formas</span>
@@ -2258,7 +2303,7 @@ export default function FinanceiroTituloNovo() {
                       </div>
                     ))}
                     <div className="text-xs text-[var(--c-muted)]">
-                      Retencoes/descontos: {formatCurrency(totalImpostosRetencao)}. Acrescimos: {formatCurrency(totalImpostosAcrescimo)}.
+                      Retencoes/descontos: {formatCurrency(totalImpostosRetencao + descontoFinanceiro)}. Acrescimos: {formatCurrency(totalImpostosAcrescimo)}.
                     </div>
                   </div>
                 )}
