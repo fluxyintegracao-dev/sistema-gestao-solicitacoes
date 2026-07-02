@@ -14,6 +14,7 @@ import {
   listarFornecedoresCompra,
   obterPedidoCompra,
   registrarFretePedidoCompra,
+  reabrirPedidoCompraParaCotacao,
   removerItemPedidoCompra,
   remanejarItemPedidoCompra,
   uploadAnexoTemporarioCompra
@@ -401,6 +402,7 @@ export default function PedidoCompraDetalhe() {
   const [salvandoComentario, setSalvandoComentario] = useState(false);
   const [anexandoEspelho, setAnexandoEspelho] = useState(false);
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [reabrindoCotacao, setReabrindoCotacao] = useState(false);
   const [itensSelecionadosCancelamento, setItensSelecionadosCancelamento] = useState([]);
   const [cancelandoItens, setCancelandoItens] = useState(false);
   const [remanejoSelecionado, setRemanejoSelecionado] = useState('');
@@ -504,6 +506,8 @@ export default function PedidoCompraDetalhe() {
   const statusAtual = statusMap[String(pedido?.status || '').toUpperCase()] || pedido?.status_configuracao || null;
   const edicaoBloqueadaPorStatus = Boolean(statusAtual?.bloqueia_edicao || pedido?.edicao_bloqueada);
   const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeGerenciarPedido);
+  const pedidoCancelado = String(pedido?.status || '').toUpperCase() === 'CANCELADO';
+  const podeReabrirCotacao = Boolean(podeGerenciarPedido && edicaoBloqueadaPorStatus && !pedidoCancelado);
   const permiteFreteEmbutido = !edicaoBloqueadaPorStatus;
   const statusSelectOptions = useMemo(() => {
     const ativos = (statusOptions || []).filter((item) => item?.ativo !== false);
@@ -964,6 +968,29 @@ export default function PedidoCompraDetalhe() {
     }
   }
 
+  async function handleReabrirCotacao() {
+    const motivo = window.prompt('Informe o motivo para reabrir este pedido para edicao ou cancelamento.');
+    if (motivo === null) return;
+
+    const motivoNormalizado = motivo.trim();
+    if (!motivoNormalizado) {
+      alert('Informe o motivo da reabertura.');
+      return;
+    }
+
+    try {
+      setReabrindoCotacao(true);
+      const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
+      setPedido(data || null);
+      alert('Pedido reaberto para edicao.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao reabrir pedido');
+    } finally {
+      setReabrindoCotacao(false);
+    }
+  }
+
   async function handleBaixarPdf() {
     try {
       setBaixandoPdf(true);
@@ -1260,6 +1287,16 @@ export default function PedidoCompraDetalhe() {
             <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
               {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
             </button>
+            {podeReabrirCotacao ? (
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={handleReabrirCotacao}
+                disabled={reabrindoCotacao}
+              >
+                {reabrindoCotacao ? 'Reabrindo...' : 'Reabrir pedido'}
+              </button>
+            ) : null}
             {podeGerenciarPedido ? (
               <button
                 type="button"

@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
-import { baixarPdfSolicitacaoCompra, obterSolicitacaoCompra } from '../../../services/compras';
+import {
+  atualizarQuantidadeItemSolicitacaoCompra,
+  baixarPdfSolicitacaoCompra,
+  obterSolicitacaoCompra
+} from '../../../services/compras';
 import { useSafeNavigateBack } from '../../../utils/navigation';
 
 function formatarData(data) {
@@ -51,6 +55,7 @@ export default function SolicitacaoCompraDetalheView() {
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
+  const [salvandoQuantidadeId, setSalvandoQuantidadeId] = useState(null);
 
   async function carregar() {
     try {
@@ -71,6 +76,8 @@ export default function SolicitacaoCompraDetalheView() {
 
   const itensCombinados = useMemo(() => {
     const itens = (solicitacao?.itens || []).map((item) => ({
+      id: item.id,
+      item_tipo: 'CADASTRADO',
       tipo: 'CADASTRADO',
       nome: item.insumo?.nome || '-',
       unidade: item.unidade?.sigla || '-',
@@ -82,6 +89,8 @@ export default function SolicitacaoCompraDetalheView() {
     }));
 
     const manuais = (solicitacao?.itensManuais || []).map((item) => ({
+      id: item.id,
+      item_tipo: 'MANUAL',
       tipo: 'MANUAL',
       nome: item.nome_manual || '-',
       unidade: item.unidade_sigla_manual || '-',
@@ -117,6 +126,57 @@ export default function SolicitacaoCompraDetalheView() {
       alert(error.message || 'Erro ao abrir PDF');
     } finally {
       setBaixando(false);
+    }
+  }
+
+  function parseQuantidadeDigitada(value) {
+    const texto = String(value || '').trim();
+    if (!texto) return NaN;
+    return Number(texto.replace(/\./g, '').replace(',', '.'));
+  }
+
+  async function handleEditarQuantidade(item) {
+    if (!item?.id) {
+      alert('Item sem identificador para edicao.');
+      return;
+    }
+
+    const quantidadeTexto = window.prompt(
+      `Informe a nova quantidade para ${item.nome}:`,
+      String(item.quantidade ?? '').replace('.', ',')
+    );
+    if (quantidadeTexto === null) return;
+
+    const quantidade = parseQuantidadeDigitada(quantidadeTexto);
+    if (!Number.isFinite(quantidade) || quantidade <= 0) {
+      alert('Informe uma quantidade valida maior que zero.');
+      return;
+    }
+
+    const motivo = window.prompt('Informe o motivo da alteracao da quantidade solicitada.');
+    if (motivo === null) return;
+
+    const motivoNormalizado = motivo.trim();
+    if (!motivoNormalizado) {
+      alert('Informe o motivo da alteracao.');
+      return;
+    }
+
+    const loadingKey = `${item.item_tipo}-${item.id}`;
+    try {
+      setSalvandoQuantidadeId(loadingKey);
+      const data = await atualizarQuantidadeItemSolicitacaoCompra(id, item.id, {
+        item_tipo: item.item_tipo,
+        quantidade,
+        motivo: motivoNormalizado
+      });
+      setSolicitacao(data || null);
+      alert('Quantidade solicitada atualizada com auditoria.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao atualizar quantidade solicitada');
+    } finally {
+      setSalvandoQuantidadeId(null);
     }
   }
 
@@ -230,8 +290,11 @@ export default function SolicitacaoCompraDetalheView() {
                 </tr>
               </thead>
               <tbody>
-                {itensCombinados.map((item, index) => (
-                  <tr key={`${item.tipo}-${index}`}>
+                {itensCombinados.map((item, index) => {
+                  const loadingKey = `${item.item_tipo}-${item.id}`;
+
+                  return (
+                  <tr key={loadingKey}>
                     <td>{index + 1}</td>
                     <td>
                       <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.tipo === 'MANUAL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
@@ -240,7 +303,19 @@ export default function SolicitacaoCompraDetalheView() {
                     </td>
                     <td className={item.tipo === 'MANUAL' ? 'font-semibold text-red-700' : ''}>{item.nome}</td>
                     <td>{item.unidade}</td>
-                    <td>{item.quantidade}</td>
+                    <td>
+                      <div className="flex items-center gap-2">
+                        <span>{item.quantidade}</span>
+                        <button
+                          type="button"
+                          className="rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
+                          onClick={() => handleEditarQuantidade(item)}
+                          disabled={salvandoQuantidadeId === loadingKey}
+                        >
+                          {salvandoQuantidadeId === loadingKey ? 'Salvando...' : 'Editar'}
+                        </button>
+                      </div>
+                    </td>
                     <td>{item.especificacao}</td>
                     <td>{item.apropriacao}</td>
                     <td>{formatarData(item.necessario_para)}</td>
@@ -260,7 +335,8 @@ export default function SolicitacaoCompraDetalheView() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </ResizableTable>
           </div>

@@ -12,6 +12,7 @@ const {
   listarAuditoriaItensPedido,
   listarPedidos,
   obterPedidoDetalhe,
+  reabrirPedidoParaCotacao,
   registrarComentarioPedido,
   remanejarPedidoItem,
   removerPedidoItem
@@ -356,6 +357,40 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return responderErroController(res, error, 'Erro ao atualizar status do pedido', { status: 400 });
+    }
+  },
+
+  async reabrirCotacao(req, res) {
+    const transaction = await PedidoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
+        await transaction.rollback();
+        return;
+      }
+
+      await reabrirPedidoParaCotacao({
+        pedidoId: req.params.id,
+        usuarioId: usuario.id,
+        motivo: req.body?.motivo,
+        transaction
+      });
+
+      await transaction.commit();
+      const pedido = await obterPedidoDetalhe(req.params.id, {
+        obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
+      });
+      return res.json(pedido);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao reabrir pedido para cotacao', { status: 400 });
     }
   },
 

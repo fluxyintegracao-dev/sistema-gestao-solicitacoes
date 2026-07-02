@@ -534,6 +534,15 @@ export async function atualizarStatusPedidoCompra(id, data) {
   return handleJsonResponse(response, 'Erro ao atualizar status do pedido');
 }
 
+export async function reabrirPedidoCompraParaCotacao(id, data) {
+  const response = await fetch(`${API_URL}/compras/pedidos/${id}/reabrir-cotacao`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao reabrir pedido para cotacao');
+}
+
 export async function atualizarStatusPedidosCompraEmLote(data) {
   const response = await fetch(`${API_URL}/compras/pedidos/status-lote`, {
     method: 'PATCH',
@@ -541,6 +550,15 @@ export async function atualizarStatusPedidosCompraEmLote(data) {
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao atualizar pedidos em lote');
+}
+
+export async function atualizarQuantidadeItemSolicitacaoCompra(id, itemId, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens/${itemId}/quantidade`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar quantidade do item da solicitacao de compra');
 }
 
 export async function cancelarPedidoCompra(id, data = {}) {
