@@ -389,6 +389,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
   );
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+  const setoresExtrasVisiveisUsuario = await obterSetoresExtrasVisiveisUsuario(req.user.id);
 
   if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
     const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
@@ -422,8 +423,12 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
         attributes: ['id']
       })
     ]);
+    const solicitacaoEmSetorExtra = await solicitacaoPertenceASetoresVisiveis(
+      solicitacao,
+      setoresExtrasVisiveisUsuario
+    );
 
-    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario && !solicitacaoEmSetorExtra) {
       return {
         allowed: false,
         status: 403,
@@ -494,13 +499,18 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
     const podeVerPeloModoRecebimento =
       solicitacaoDoSetorUsuario &&
       String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
+    const solicitacaoEmSetorExtra = await solicitacaoPertenceASetoresVisiveis(
+      solicitacao,
+      setoresExtrasVisiveisUsuario
+    );
 
     if (
       !itemCriadoPeloUsuario &&
       !podeVerPeloModoRecebimento &&
       !historicoResponsavel &&
       !historicoInteracao &&
-      !historicoSetorGeo
+      !historicoSetorGeo &&
+      !solicitacaoEmSetorExtra
     ) {
       return {
         allowed: false,
@@ -698,6 +708,11 @@ async function obterSetoresVisiveisPorUsuario() {
       : [];
   });
   return regras;
+}
+
+async function obterSetoresExtrasVisiveisUsuario(usuarioId) {
+  const regras = await obterSetoresVisiveisPorUsuario();
+  return expandirTokensComAliasesGeo(regras[String(usuarioId)] || []);
 }
 
 async function obterTiposSolicitacaoPorSetorConfig() {
@@ -1008,6 +1023,69 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
   )`);
 }
 
+function montarCondicoesVisibilidadeSetores(tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0) return [];
+
+  const condicoes = [
+    { area_responsavel: { [Op.in]: tokensValidos } }
+  ];
+
+  const literalHistorico = montarLiteralHistoricoSetoresEnvolvidos(tokensValidos);
+  if (literalHistorico) {
+    condicoes.push({
+      id: { [Op.in]: literalHistorico }
+    });
+  }
+
+  return condicoes;
+}
+
+function historicoPertenceASetoresVisiveis(historico, tokens = []) {
+  if (!historico) return false;
+  if (setorPertenceAoUsuario(tokens, historico?.setor)) return true;
+  if (String(historico?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
+  const envio = parseObservacaoEnvioSetor(historico?.observacao);
+  return setorPertenceAoUsuario(tokens, envio?.origem) || setorPertenceAoUsuario(tokens, envio?.destino);
+}
+
+async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0 || !solicitacao) return false;
+  if (setorPertenceAoUsuario(tokensValidos, solicitacao.area_responsavel)) return true;
+
+  if (Array.isArray(solicitacao.historicos) && solicitacao.historicos.length > 0) {
+    return solicitacao.historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
+  }
+
+  const historicos = await Historico.findAll({
+    where: {
+      solicitacao_id: solicitacao.id,
+      [Op.or]: [
+        { setor: { [Op.in]: tokensValidos } },
+        { acao: 'ENVIADA_SETOR' }
+      ]
+    },
+    attributes: ['acao', 'setor', 'observacao']
+  });
+
+  return historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
+}
+
 function parseObservacaoEnvioSetor(observacao) {
   const texto = String(observacao || '').trim();
   const match = texto.match(/^De\s+(.+?)\s+para\s+(.+)$/i);
@@ -1175,8 +1253,7 @@ module.exports = {
         setorTokens.some(isGeoToken);
       const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
       const literalHistoricoSetorUsuario = montarLiteralHistoricoSetoresEnvolvidos(setorTokens);
-      const regrasSetoresPorUsuario = await obterSetoresVisiveisPorUsuario();
-      const setoresExtrasUsuario = regrasSetoresPorUsuario[String(usuarioId)] || [];
+      const setoresExtrasUsuario = await obterSetoresExtrasVisiveisUsuario(usuarioId);
       const setoresVisiveisAoAtribuir = Array.from(new Set([
         ...setorTokens,
         ...setoresExtrasUsuario
@@ -1189,6 +1266,7 @@ module.exports = {
         where[Op.and].push({
           [Op.or]: [
             { criado_por: usuarioId },
+            ...montarCondicoesVisibilidadeSetores(setoresExtrasUsuario),
             {
               id: {
                 [Op.in]: Sequelize.literal(`(
@@ -1219,10 +1297,14 @@ module.exports = {
         // e tambem solicitacoes que ja passaram por esse setor.
         where[Op.and] = where[Op.and] || [];
         const tokensGeoUsuario = setorTokens.filter(isGeoToken);
-        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoUsuario);
+        const tokensGeoEExtrasUsuario = Array.from(new Set([
+          ...tokensGeoUsuario,
+          ...setoresExtrasUsuario
+        ]));
+        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoEExtrasUsuario);
         where[Op.and].push({
           [Op.or]: [
-            { area_responsavel: { [Op.in]: tokensGeoUsuario } },
+            { area_responsavel: { [Op.in]: tokensGeoEExtrasUsuario } },
             literalHistoricoGeoUsuario ? {
               id: {
                 [Op.in]: literalHistoricoGeoUsuario
@@ -1310,6 +1392,10 @@ module.exports = {
             id: { [Op.in]: literalHistoricoSetorUsuario }
           });
         }
+
+        montarCondicoesVisibilidadeSetores(setoresExtrasUsuario).forEach(condicao => {
+          condicoes.push(condicao);
+        });
 
         const regrasTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
         const compartilhamentos = obterTiposCompartilhadosParaTokens(setorTokens, regrasTiposCompartilhados);

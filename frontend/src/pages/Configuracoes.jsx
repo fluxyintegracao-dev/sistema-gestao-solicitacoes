@@ -176,7 +176,7 @@ const SECOES_CONFIG = [
       },
       {
         title: 'Setores Visiveis por Usuario',
-        description: 'Defina setores extras que cada usuario pode visualizar quando atribuido.',
+        description: 'Defina setores extras que cada usuario pode visualizar sem alterar regras de acao.',
         to: '/setores-visiveis-usuario'
       },
       {

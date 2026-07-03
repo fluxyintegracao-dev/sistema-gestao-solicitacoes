@@ -97,7 +97,7 @@ export default function SetoresVisiveisUsuario() {
       <div>
         <h1 className="text-2xl font-semibold">Setores visiveis por usuario</h1>
         <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
-          Defina quais setores cada usuario pode visualizar quando a solicitacao estiver atribuida/interagida por ele.
+          Defina setores adicionais que cada usuario pode visualizar na lista e no detalhe. As acoes continuam obedecendo as permissoes e regras atuais do setor responsavel.
         </p>
       </div>
 
