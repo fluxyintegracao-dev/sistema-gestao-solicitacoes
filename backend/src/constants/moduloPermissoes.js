@@ -163,6 +163,8 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.solicitacoes.gerenciar', label: 'Gerenciar solicitacoes', descricao: 'Liberar, recusar, enviar para fornecedores, encerrar e comentar solicitacoes de compra.' },
           { key: 'compras.solicitacoes.excluir', label: 'Inativar solicitacoes', descricao: 'Inativar uma ou mais solicitacoes de compra na fila operacional.' },
           { key: 'compras.solicitacoes.encaminhar_compras', label: 'Enviar para Compras', descricao: 'Encaminhar solicitacoes de compra antigas ou fora do fluxo para a fila do setor de Compras.' },
+          { key: 'compras.solicitacoes.editar_itens', label: 'Editar itens da solicitacao', descricao: 'Editar itens operacionais da solicitacao de compra sem encerrar cotacao.' },
+          { key: 'compras.solicitacoes.editar_quantidade', label: 'Alterar quantidade solicitada', descricao: 'Alterar quantidade solicitada dos itens com auditoria.' },
           { key: 'compras.solicitacoes.gerar_pedidos', label: 'Gerar pedidos pela cotacao', descricao: 'Gerar pedidos de compra a partir da cotacao encerrada.' }
         ]
       },
@@ -193,7 +195,10 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.pedidos.remanejar', label: 'Remanejar itens', descricao: 'Remanejar itens de um pedido para outro fornecedor da mesma cotacao.' },
           { key: 'compras.pedidos.cancelar', label: 'Cancelar pedido ou item', descricao: 'Cancelar pedidos ou itens mantendo rastreabilidade.' },
           { key: 'compras.pedidos.anexar_espelho', label: 'Anexar espelho', descricao: 'Anexar espelho do pedido enviado pelo fornecedor.' },
-          { key: 'compras.pedidos.alterar_status', label: 'Alterar status do pedido', descricao: 'Alterar status de pedidos individualmente ou em lote.' }
+          { key: 'compras.pedidos.alterar_status', label: 'Alterar status do pedido', descricao: 'Alterar status de pedidos individualmente ou em lote.' },
+          { key: 'compras.pedidos.reabrir', label: 'Reabrir pedido', descricao: 'Reabrir pedido fechado para ajustes com justificativa.' },
+          { key: 'compras.pedidos.registrar_frete', label: 'Registrar frete', descricao: 'Registrar, editar e acompanhar fretes vinculados ao pedido.' },
+          { key: 'compras.pedidos.cancelar_frete', label: 'Cancelar frete', descricao: 'Cancelar fretes registrados com auditoria.' }
         ]
       },
       {
@@ -201,7 +206,10 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Delegacao de Compras',
         permissoes: [
           { key: 'compras.delegacao.visualizar', label: 'Visualizar delegacao', descricao: 'Acompanhar responsaveis, prazos e atrasos das solicitacoes de compra.' },
-          { key: 'compras.delegacao.gerenciar', label: 'Gerenciar delegacao', descricao: 'Atribuir responsavel, prazo e motivo de atraso.' }
+          { key: 'compras.delegacao.gerenciar', label: 'Gerenciar delegacao', descricao: 'Atribuir responsavel, prazo e motivo de atraso.' },
+          { key: 'compras.delegacao.alterar_responsavel', label: 'Alterar responsavel', descricao: 'Alterar responsavel pela solicitacao no painel de delegacao.' },
+          { key: 'compras.delegacao.alterar_prazo', label: 'Alterar prazo', descricao: 'Alterar prazo de finalizacao da compra.' },
+          { key: 'compras.delegacao.salvar_motivo', label: 'Salvar motivo de atraso', descricao: 'Registrar motivo de atraso sem alterar responsavel ou prazo.' }
         ]
       },
       {
@@ -209,7 +217,11 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Cotações',
         permissoes: [
           { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotações', descricao: 'Ver cotações e comparativo de fornecedores.' },
-          { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotações', descricao: 'Criar, editar e encerrar cotações.' }
+          { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e operar cotacoes sem encerrar ou reabrir.' },
+          { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
+          { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
+          { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Definir vencedores e gerar pedidos.' },
+          { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
         ]
       },
       {

@@ -14,7 +14,7 @@ import {
 } from '../constants/moduleGovernance';
 
 const PERMISSAO_SOLICITACOES_MINHAS = 'solicitacoes.lista.visualizar_minhas';
-const PERFIS_BASE = ['USUARIO', 'ADMINISTRADOR', 'FINANCEIRO', 'COMPRAS', 'RH_DP', 'DIRETORIA', 'ENGENHEIRO'];
+const PERFIS_BASE = ['USUARIO', 'ESTAGIARIO', 'ADMINISTRADOR', 'FINANCEIRO', 'COMPRAS', 'RH_DP', 'DIRETORIA', 'ENGENHEIRO'];
 
 function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();

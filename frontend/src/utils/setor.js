@@ -96,6 +96,12 @@ export function obterTokensSetorUsuario(user) {
     });
   }
 
+  if (Array.isArray(user?.setores_visiveis)) {
+    user.setores_visiveis.forEach((setor) => {
+      if (setor) tokens.add(String(setor).toUpperCase());
+    });
+  }
+
   const capabilities = userSetorCapabilities(user);
   if (capabilities.eh_setor_geo) {
     tokens.add('GEO');

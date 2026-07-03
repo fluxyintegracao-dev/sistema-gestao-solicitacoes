@@ -23,6 +23,11 @@ import {
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
+import {
+  canEncerrarComprasCotacoes,
+  canOperateComprasCotacoes,
+  canReabrirComprasCotacoes
+} from '../../../utils/acessoProduto';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
@@ -933,7 +938,7 @@ function SecaoEnvioFornecedores({
 
 // SecaoComparativo
 
-function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSelecionados, onVencedorChange, onRemanejamentoAplicado, onEncerrar, encerrando }) {
+function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar, vencedoresSelecionados, onVencedorChange, onRemanejamentoAplicado, onEncerrar, encerrando }) {
   const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
 
   function getQuantidadeAlocada(respostaItemId) {
@@ -1062,7 +1067,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                 <div className="text-xs text-[var(--c-muted)]">
                   {forn.itensRespondidos} item(ns) respondido(s) - {forn.vencedor_itens} ganhador(es)
                 </div>
-                {forn.itensGanhos.length > 0 && (
+                {podeEncerrar && forn.itensGanhos.length > 0 && (
                   <button
                     type="button"
                     className="btn btn-xs btn-outline mt-1"
@@ -1094,7 +1099,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                     {item.quantidade} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
-                  {podeComprar ? (
+                  {podeEncerrar ? (
                     <div className="mt-1 text-xs text-[var(--c-muted)]">
                       Selecionado: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
                     </div>
@@ -1154,7 +1159,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                                 <input
                                   type="checkbox"
                                   checked={isVencedor}
-                                  disabled={!podeComprar || !resp.disponivel || !resp.preco}
+                                  disabled={!podeEncerrar || !resp.disponivel || !resp.preco}
                                   onChange={(event) => {
                                     const checked = event.target.checked;
                                     onVencedorChange({
@@ -1168,7 +1173,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
                                   className="input h-8 w-20 px-2 text-xs"
                                   value={isVencedor ? getQuantidadeAlocadaInput(resp.resposta_item_id) : ''}
                                   placeholder="Qtd."
-                                  disabled={!podeComprar || !isVencedor}
+                                  disabled={!podeEncerrar || !isVencedor}
                                   onChange={(event) => onVencedorChange({
                                     item,
                                     resposta: resp,
@@ -1187,7 +1192,7 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, vencedoresSel
             </div>
           ))}
 
-          {podeComprar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
+          {podeEncerrar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
               <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando}>
                 {encerrando
@@ -1248,14 +1253,9 @@ export default function GerenciarCotacaoSolicitacao() {
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
 
-  const perfilUpper = String(user?.perfil || '').toUpperCase();
-  const tokens = [
-    String(user?.area || '').toUpperCase(),
-    String(user?.setor?.codigo || '').toUpperCase(),
-    String(user?.setor?.nome || '').toUpperCase()
-  ];
-  const podeComprar =
-    perfilUpper === 'SUPERADMIN' || perfilUpper === 'ADMIN' || tokens.includes('COMPRAS');
+  const podeComprar = canOperateComprasCotacoes(user);
+  const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
+  const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
 
   async function carregarFornecedores() {
     try {
@@ -1903,7 +1903,7 @@ export default function GerenciarCotacaoSolicitacao() {
                         const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
-                        const podeReabrirCotacao = ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
+                        const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
                           && String(solicitacao.status || '').toUpperCase() !== 'ENCERRADO';
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                           ? whatsappLink(
@@ -2023,6 +2023,7 @@ export default function GerenciarCotacaoSolicitacao() {
             comparativo={comparativo}
             solicitacao={solicitacao}
             podeComprar={podeComprar}
+            podeEncerrar={podeEncerrarCotacao}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}

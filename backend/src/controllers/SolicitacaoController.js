@@ -389,6 +389,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
   );
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+  const setoresExtrasVisiveisUsuario = await obterSetoresExtrasVisiveisUsuario(req.user.id);
 
   if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
     const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
@@ -422,8 +423,12 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
         attributes: ['id']
       })
     ]);
+    const solicitacaoEmSetorExtra = await solicitacaoPertenceASetoresVisiveis(
+      solicitacao,
+      setoresExtrasVisiveisUsuario
+    );
 
-    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario && !solicitacaoEmSetorExtra) {
       return {
         allowed: false,
         status: 403,
@@ -494,13 +499,18 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
     const podeVerPeloModoRecebimento =
       solicitacaoDoSetorUsuario &&
       String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
+    const solicitacaoEmSetorExtra = await solicitacaoPertenceASetoresVisiveis(
+      solicitacao,
+      setoresExtrasVisiveisUsuario
+    );
 
     if (
       !itemCriadoPeloUsuario &&
       !podeVerPeloModoRecebimento &&
       !historicoResponsavel &&
       !historicoInteracao &&
-      !historicoSetorGeo
+      !historicoSetorGeo &&
+      !solicitacaoEmSetorExtra
     ) {
       return {
         allowed: false,
@@ -538,11 +548,9 @@ async function enviarSolicitacaoParaSetorInterno({
 
   if (!podeEnviarQualquerSetor) {
     const areaUsuario = await obterAreaUsuario(req);
-    const tokensSetorUsuario = expandirTokensComAliasesGeo(
-      await obterTokensSetorUsuario(req, areaUsuario)
-    );
+    const tokensSetorUsuario = await obterTokensSetoresOperacionaisUsuario(req, areaUsuario);
     if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
-      return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam no seu setor atual.' };
+      return { ok: false, status: 403, error: 'Voce so pode enviar solicitacoes que estejam nos seus setores permitidos.' };
     }
   }
 
@@ -659,6 +667,15 @@ async function obterTokensSetorUsuario(req, areaUsuario) {
   return Array.from(tokens).filter(Boolean);
 }
 
+async function obterTokensSetoresOperacionaisUsuario(req, areaUsuario) {
+  const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
+  const setoresExtrasVisiveisUsuario = await obterSetoresExtrasVisiveisUsuario(req.user?.id);
+  return expandirTokensComAliasesGeo([
+    ...tokensSetorUsuario,
+    ...setoresExtrasVisiveisUsuario
+  ]);
+}
+
 async function lerConfiguracaoJson(chave, fallback) {
   const item = await ConfiguracaoSistema.findOne({
     where: { chave },
@@ -698,6 +715,11 @@ async function obterSetoresVisiveisPorUsuario() {
       : [];
   });
   return regras;
+}
+
+async function obterSetoresExtrasVisiveisUsuario(usuarioId) {
+  const regras = await obterSetoresVisiveisPorUsuario();
+  return expandirTokensComAliasesGeo(regras[String(usuarioId)] || []);
 }
 
 async function obterTiposSolicitacaoPorSetorConfig() {
@@ -1008,6 +1030,69 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
   )`);
 }
 
+function montarCondicoesVisibilidadeSetores(tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0) return [];
+
+  const condicoes = [
+    { area_responsavel: { [Op.in]: tokensValidos } }
+  ];
+
+  const literalHistorico = montarLiteralHistoricoSetoresEnvolvidos(tokensValidos);
+  if (literalHistorico) {
+    condicoes.push({
+      id: { [Op.in]: literalHistorico }
+    });
+  }
+
+  return condicoes;
+}
+
+function historicoPertenceASetoresVisiveis(historico, tokens = []) {
+  if (!historico) return false;
+  if (setorPertenceAoUsuario(tokens, historico?.setor)) return true;
+  if (String(historico?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
+  const envio = parseObservacaoEnvioSetor(historico?.observacao);
+  return setorPertenceAoUsuario(tokens, envio?.origem) || setorPertenceAoUsuario(tokens, envio?.destino);
+}
+
+async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(v => String(v || '').trim().toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0 || !solicitacao) return false;
+  if (setorPertenceAoUsuario(tokensValidos, solicitacao.area_responsavel)) return true;
+
+  if (Array.isArray(solicitacao.historicos) && solicitacao.historicos.length > 0) {
+    return solicitacao.historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
+  }
+
+  const historicos = await Historico.findAll({
+    where: {
+      solicitacao_id: solicitacao.id,
+      [Op.or]: [
+        { setor: { [Op.in]: tokensValidos } },
+        { acao: 'ENVIADA_SETOR' }
+      ]
+    },
+    attributes: ['acao', 'setor', 'observacao']
+  });
+
+  return historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
+}
+
 function parseObservacaoEnvioSetor(observacao) {
   const texto = String(observacao || '').trim();
   const match = texto.match(/^De\s+(.+?)\s+para\s+(.+)$/i);
@@ -1175,8 +1260,7 @@ module.exports = {
         setorTokens.some(isGeoToken);
       const isSetorAdministrativo = setorTokens.some(isAdministrativoToken);
       const literalHistoricoSetorUsuario = montarLiteralHistoricoSetoresEnvolvidos(setorTokens);
-      const regrasSetoresPorUsuario = await obterSetoresVisiveisPorUsuario();
-      const setoresExtrasUsuario = regrasSetoresPorUsuario[String(usuarioId)] || [];
+      const setoresExtrasUsuario = await obterSetoresExtrasVisiveisUsuario(usuarioId);
       const setoresVisiveisAoAtribuir = Array.from(new Set([
         ...setorTokens,
         ...setoresExtrasUsuario
@@ -1189,6 +1273,7 @@ module.exports = {
         where[Op.and].push({
           [Op.or]: [
             { criado_por: usuarioId },
+            ...montarCondicoesVisibilidadeSetores(setoresExtrasUsuario),
             {
               id: {
                 [Op.in]: Sequelize.literal(`(
@@ -1219,10 +1304,14 @@ module.exports = {
         // e tambem solicitacoes que ja passaram por esse setor.
         where[Op.and] = where[Op.and] || [];
         const tokensGeoUsuario = setorTokens.filter(isGeoToken);
-        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoUsuario);
+        const tokensGeoEExtrasUsuario = Array.from(new Set([
+          ...tokensGeoUsuario,
+          ...setoresExtrasUsuario
+        ]));
+        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoEExtrasUsuario);
         where[Op.and].push({
           [Op.or]: [
-            { area_responsavel: { [Op.in]: tokensGeoUsuario } },
+            { area_responsavel: { [Op.in]: tokensGeoEExtrasUsuario } },
             literalHistoricoGeoUsuario ? {
               id: {
                 [Op.in]: literalHistoricoGeoUsuario
@@ -1310,6 +1399,10 @@ module.exports = {
             id: { [Op.in]: literalHistoricoSetorUsuario }
           });
         }
+
+        montarCondicoesVisibilidadeSetores(setoresExtrasUsuario).forEach(condicao => {
+          condicoes.push(condicao);
+        });
 
         const regrasTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
         const compartilhamentos = obterTiposCompartilhadosParaTokens(setorTokens, regrasTiposCompartilhados);
@@ -2618,9 +2711,16 @@ module.exports = {
       }
 
       const setorAtual = solicitacao.area_responsavel;
-      const setorValidacaoStatus = String(areaUsuario || setorAtual || '').trim();
+      const setorValidacaoStatus = String(setorAtual || areaUsuario || '').trim();
 
       if (!isSuperadmin) {
+        const tokensSetorOperacionais = await obterTokensSetoresOperacionaisUsuario(req, areaUsuario);
+        if (!setorPertenceAoUsuario(tokensSetorOperacionais, solicitacao.area_responsavel)) {
+          return res.status(403).json({
+            error: 'Voce so pode alterar status de solicitacoes que estejam nos seus setores permitidos.'
+          });
+        }
+
         const setorAtualStr = setorValidacaoStatus;
         const whereSetor = {
           ativo: true
@@ -3627,6 +3727,7 @@ module.exports = {
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isUsuarioSetorObra(req);
       const tokensSetor = await obterTokensSetorUsuario(req, areaUsuario);
+      const tokensSetorOperacionais = await obterTokensSetoresOperacionaisUsuario(req, areaUsuario);
       const isUsuarioFinanceiro = await userHasSetorCapability(req.user, 'eh_setor_financeiro');
 
       if (isSetorObra) {
@@ -3642,10 +3743,9 @@ module.exports = {
       }
 
       if (String(perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
-        const tokensSetorUsuario = expandirTokensComAliasesGeo(tokensSetor);
-        if (!setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)) {
+        if (!setorPertenceAoUsuario(tokensSetorOperacionais, solicitacao.area_responsavel)) {
           return res.status(403).json({
-            error: 'Voce so pode assumir solicitacoes que estejam no seu setor atual.'
+            error: 'Voce so pode atribuir responsaveis em solicitacoes que estejam nos seus setores permitidos.'
           });
         }
       }
@@ -3660,7 +3760,7 @@ module.exports = {
       // REGRA PARA USUARIO
       if (perfil === 'USUARIO') {
         const modoRecebimento = await obterModoRecebimentoPorSetorETipo(
-          tokensSetor,
+          tokensSetorOperacionais,
           solicitacao.tipo_solicitacao_id
         );
         if (modoRecebimento !== 'TODOS_VISIVEIS') {
@@ -3670,9 +3770,9 @@ module.exports = {
         }
 
         let regra = null;
-        if (tokensSetor.length > 0) {
+        if (tokensSetorOperacionais.length > 0) {
           regra = await SetorPermissao.findOne({
-            where: { setor: { [Op.in]: tokensSetor } }
+            where: { setor: { [Op.in]: tokensSetorOperacionais } }
           });
         }
 
@@ -3695,23 +3795,34 @@ module.exports = {
 
       const usuarioAcao = await User.findByPk(req.user.id);
       const usuarioResponsavel = await User.findByPk(usuario_responsavel_id);
-
-      if (perfil === 'USUARIO') {
-        if (!usuarioResponsavel || usuarioResponsavel.setor_id !== req.user.setor_id) {
-          return res.status(403).json({
-            error: 'Usuarios com perfil USUARIO so podem atribuir para pessoas do mesmo setor.'
-          });
-        }
-      }
-      if (req.user?.setor_id && usuarioResponsavel && usuarioResponsavel.setor_id !== req.user.setor_id) {
-        return res.status(403).json({
-          error: 'Atribuicoes devem ser para pessoas do mesmo setor.'
-        });
-      }
-
       const setorSolicitacao = await resolveSetorReferencia(solicitacao.area_responsavel, {
         attributes: ['id', 'nome', 'codigo', 'eh_setor_obra']
       });
+
+      if (perfil === 'USUARIO') {
+        const setorResponsavelPermitidoIds = new Set([
+          req.user?.setor_id,
+          setorSolicitacao?.id
+        ].filter(Boolean).map(Number));
+        if (!usuarioResponsavel || !setorResponsavelPermitidoIds.has(Number(usuarioResponsavel.setor_id))) {
+          return res.status(403).json({
+            error: 'Usuarios com perfil USUARIO so podem atribuir para pessoas dos seus setores permitidos.'
+          });
+        }
+      }
+      const setorResponsavelPermitidoIds = new Set([
+        req.user?.setor_id,
+        setorSolicitacao?.id
+      ].filter(Boolean).map(Number));
+      if (
+        req.user?.setor_id &&
+        usuarioResponsavel &&
+        !setorResponsavelPermitidoIds.has(Number(usuarioResponsavel.setor_id))
+      ) {
+        return res.status(403).json({
+          error: 'Atribuicoes devem ser para pessoas dos seus setores permitidos.'
+        });
+      }
 
       if (setorSolicitacao && hasSetorCapability(setorSolicitacao, 'eh_setor_obra')) {
         const { UsuarioObra } = require('../models');
@@ -4437,6 +4548,7 @@ module.exports = {
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isUsuarioSetorObra(req);
       const tokensSetor = await obterTokensSetorUsuario(req, areaUsuario);
+      const tokensSetorOperacionais = await obterTokensSetoresOperacionaisUsuario(req, areaUsuario);
       const isUsuarioFinanceiro = await userHasSetorCapability(req.user, 'eh_setor_financeiro');
 
       if (isSetorObra) {
@@ -4458,10 +4570,18 @@ module.exports = {
         });
       }
 
+      if (String(perfil || '').trim().toUpperCase() !== 'SUPERADMIN') {
+        if (!setorPertenceAoUsuario(tokensSetorOperacionais, solicitacao.area_responsavel)) {
+          return res.status(403).json({
+            error: 'Voce so pode assumir solicitacoes que estejam nos seus setores permitidos.'
+          });
+        }
+      }
+
       // REGRA PARA USUARIO
       if (perfil === 'USUARIO') {
         const modoRecebimento = await obterModoRecebimentoPorSetorETipo(
-          tokensSetor,
+          tokensSetorOperacionais,
           solicitacao.tipo_solicitacao_id
         );
         if (modoRecebimento !== 'TODOS_VISIVEIS') {
@@ -4471,9 +4591,9 @@ module.exports = {
         }
 
         let regra = null;
-        if (tokensSetor.length > 0) {
+        if (tokensSetorOperacionais.length > 0) {
           regra = await SetorPermissao.findOne({
-            where: { setor: { [Op.in]: tokensSetor } }
+            where: { setor: { [Op.in]: tokensSetorOperacionais } }
           });
         }
 

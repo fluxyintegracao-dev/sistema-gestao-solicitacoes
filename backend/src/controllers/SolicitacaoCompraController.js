@@ -66,9 +66,12 @@ const {
 const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
+  canAlterarQuantidadeSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
+  canEncerrarComprasCotacoes,
   canManageComprasCotacoes,
   canManageComprasDelegacao,
+  canOperateComprasCotacoes,
   canViewAllComprasScope,
   isSuperadmin,
   isBusinessAdmin
@@ -359,7 +362,7 @@ async function validarAcessoIntegracao(usuario) {
 }
 
 async function validarAcessoCompras(usuario) {
-  return canManageComprasCotacoes(usuario);
+  return canOperateComprasCotacoes(usuario);
 }
 
 async function buscarTipoSolicitacaoCompra(transaction) {
@@ -2359,7 +2362,7 @@ module.exports = {
         return;
       }
 
-      if (!(await validarAcessoCompras(usuario))) {
+      if (!(await canAlterarQuantidadeSolicitacaoCompra(usuario))) {
         await transaction.rollback();
         return res.status(403).json({ error: 'Apenas compras pode alterar itens da solicitacao de compra' });
       }
@@ -3407,7 +3410,7 @@ module.exports = {
         return;
       }
 
-      if (!(await validarAcessoCompras(usuario))) {
+      if (!(await canEncerrarComprasCotacoes(usuario))) {
         await transaction.rollback();
         return res.status(403).json({ error: 'Apenas compras pode encerrar a cotacao' });
       }

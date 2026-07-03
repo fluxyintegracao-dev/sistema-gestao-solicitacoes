@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { Op, fn, col, where } = require('sequelize');
-const { User, Setor } = require('../models');
+const { ConfiguracaoSistema, User, Setor } = require('../models');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { getModuloConfig } = require('../services/moduleConfigService');
 const {
@@ -44,6 +44,26 @@ const SETOR_ATTRIBUTES = [
   'eh_setor_geo',
   'eh_setor_administrativo'
 ];
+const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
+
+async function obterSetoresVisiveisUsuario(usuarioId) {
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave: CHAVE_SETORES_VISIVEIS_POR_USUARIO },
+    order: [['id', 'DESC']]
+  });
+  if (!item?.valor) return [];
+
+  try {
+    const parsed = JSON.parse(item.valor);
+    const regras = parsed?.regras && typeof parsed.regras === 'object' ? parsed.regras : {};
+    const setores = regras[String(usuarioId)] || [];
+    return Array.isArray(setores)
+      ? [...new Set(setores.map((valor) => String(valor || '').trim().toUpperCase()).filter(Boolean))]
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 async function findUserByEmail(emailNormalizado) {
   return User.findOne({
@@ -72,6 +92,7 @@ async function buildSessionUser(user) {
   const mfaRequiredByPolicy = isMfaRequiredProfile(user);
   const mfaEnabled = Boolean(user.mfa_totp_enabled);
   const setores = await listarSetoresDoUsuario(user);
+  const setoresVisiveis = await obterSetoresVisiveisUsuario(user.id);
 
   return {
     id: user.id,
@@ -81,6 +102,7 @@ async function buildSessionUser(user) {
     setor_id: user.setor_id,
     setor: user.setor,
     setores,
+    setores_visiveis: setoresVisiveis,
     financeiro_liberado: Boolean(financeiroLiberado),
     rh_dp_capacidades: capacidadesRhDp.filter((item) => item.startsWith('rh_dp_')),
     integracao_sienge_capacidades: capacidadesRhDp.filter((item) => item.startsWith('integracao_sienge_')),
