@@ -1629,6 +1629,9 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
           attributes: [
             'id',
             'status',
+            'obra_id',
+            'origem',
+            'solicitacao_principal_id',
             'numero_sienge',
             'necessario_para',
             'comprador_responsavel_id',
@@ -1702,7 +1705,8 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
 
   const statusConfig = await findPedidoCompraStatusConfig(pedido.status);
   const solicitacao = await carregarSolicitacaoPedidos(pedido.solicitacao_compra_id);
-  const edicaoBloqueada = Boolean(statusConfig?.bloqueia_edicao || isSolicitacaoCompraEncerrada(solicitacao));
+  const cotacaoEncerrada = isSolicitacaoCompraEncerrada(solicitacao);
+  const edicaoBloqueada = Boolean(statusConfig?.bloqueia_edicao || cotacaoEncerrada);
   const respostaIdsAtuais = new Set(
     (pedido.itens || [])
       .filter((item) => !item.removido)
@@ -1805,7 +1809,7 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
     fretes,
     status_configuracao: statusConfig,
     edicao_bloqueada: edicaoBloqueada,
-    edicao_bloqueada_motivo: edicaoBloqueada && isSolicitacaoCompraEncerrada(solicitacao)
+    edicao_bloqueada_motivo: edicaoBloqueada && cotacaoEncerrada && !statusConfig?.bloqueia_edicao
       ? 'COTACAO_ENCERRADA'
       : null,
     candidatos_adicao: candidatos,
