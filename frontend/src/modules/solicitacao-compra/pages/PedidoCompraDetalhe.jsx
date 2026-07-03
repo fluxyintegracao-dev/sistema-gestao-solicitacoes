@@ -1358,7 +1358,9 @@ export default function PedidoCompraDetalhe() {
 
       {edicaoBloqueadaPorStatus ? (
         <div className="app-alert mt-4">
-          O status atual do pedido bloqueia edicao. Enquanto ele estiver em "{formatStatusLabel(pedido.status, statusMap)}", os itens nao poderao ser alterados, adicionados ou removidos.
+          {pedido.edicao_bloqueada_motivo === 'COTACAO_ENCERRADA'
+            ? 'Este pedido foi criado antes do fechamento automatico e esta vinculado a uma cotacao ja encerrada. Reabra o pedido para editar itens ou cancelar.'
+            : `O status atual do pedido bloqueia edicao. Enquanto ele estiver em "${formatStatusLabel(pedido.status, statusMap)}", os itens nao poderao ser alterados, adicionados ou removidos.`}
         </div>
       ) : null}
 
