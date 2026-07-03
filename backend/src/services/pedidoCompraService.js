@@ -333,89 +333,94 @@ async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, sol
   return mapaPrecos;
 }
 
-async function carregarSolicitacaoPedidos(id, transaction) {
+async function carregarSolicitacaoPedidos(id, transaction, { incluirPedidos = true } = {}) {
+  const include = [
+    {
+      model: Obra,
+      as: 'obra',
+      attributes: [
+        'id',
+        'nome',
+        'codigo',
+        'cno',
+        'cidade',
+        'endereco_logradouro',
+        'endereco_numero',
+        'endereco_complemento',
+        'endereco_bairro',
+        'endereco_cep',
+        'endereco_uf'
+      ]
+    },
+    {
+      model: SolicitacaoCompraItem,
+      as: 'itens',
+      include: [
+        { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo'] },
+        { model: Unidade, as: 'unidade', attributes: ['id', 'sigla'] }
+      ]
+    },
+    {
+      model: SolicitacaoCompraItemManual,
+      as: 'itensManuais'
+    },
+    {
+      model: SolicitacaoCompraFornecedor,
+      as: 'fornecedores',
+      include: [
+        {
+          model: FornecedorCompra,
+          as: 'fornecedor',
+          attributes: ['id', 'nome', 'email', 'whatsapp', 'contato']
+        },
+        {
+          model: SolicitacaoCompraRespostaItem,
+          as: 'respostas',
+          where: { deleted_at: null },
+          required: false,
+          attributes: [
+            'id',
+            'item_tipo',
+            'solicitacao_compra_item_id',
+            'solicitacao_compra_item_manual_id',
+            'disponivel',
+            'preco',
+            'prazo',
+            'observacao',
+            'quantidade_minima_item',
+            'vencedor'
+          ]
+        }
+      ]
+    },
+    {
+      model: SolicitacaoCompraAlocacao,
+      as: 'alocacoes',
+      required: false
+    }
+  ];
+
+  if (incluirPedidos) {
+    include.push({
+      model: PedidoCompra,
+      as: 'pedidos',
+      include: [
+        {
+          model: PedidoCompraItem,
+          as: 'itens'
+        },
+        {
+          model: FornecedorCompra,
+          as: 'fornecedor',
+          attributes: ['id', 'nome', 'email', 'whatsapp']
+        }
+      ]
+    });
+  }
+
   return SolicitacaoCompra.findByPk(id, {
     transaction,
-    include: [
-      {
-        model: Obra,
-        as: 'obra',
-        attributes: [
-          'id',
-          'nome',
-          'codigo',
-          'cno',
-          'cidade',
-          'endereco_logradouro',
-          'endereco_numero',
-          'endereco_complemento',
-          'endereco_bairro',
-          'endereco_cep',
-          'endereco_uf'
-        ]
-      },
-      {
-        model: SolicitacaoCompraItem,
-        as: 'itens',
-        include: [
-          { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo'] },
-          { model: Unidade, as: 'unidade', attributes: ['id', 'sigla'] }
-        ]
-      },
-      {
-        model: SolicitacaoCompraItemManual,
-        as: 'itensManuais'
-      },
-      {
-        model: SolicitacaoCompraFornecedor,
-        as: 'fornecedores',
-        include: [
-          {
-            model: FornecedorCompra,
-            as: 'fornecedor',
-            attributes: ['id', 'nome', 'email', 'whatsapp', 'contato']
-          },
-          {
-            model: SolicitacaoCompraRespostaItem,
-            as: 'respostas',
-            where: { deleted_at: null },
-            required: false,
-            attributes: [
-              'id',
-              'item_tipo',
-              'solicitacao_compra_item_id',
-              'solicitacao_compra_item_manual_id',
-              'disponivel',
-              'preco',
-              'prazo',
-              'observacao',
-              'quantidade_minima_item',
-              'vencedor'
-            ]
-          }
-        ]
-      },
-      {
-        model: SolicitacaoCompraAlocacao,
-        as: 'alocacoes',
-        required: false
-      },
-      {
-        model: PedidoCompra,
-        as: 'pedidos',
-        include: [
-          {
-            model: PedidoCompraItem,
-            as: 'itens'
-          },
-          {
-            model: FornecedorCompra,
-            as: 'fornecedor',
-            attributes: ['id', 'nome', 'email', 'whatsapp']
-          }
-        ]
-      }
-    ]
+    include
   });
 }
 
@@ -1704,8 +1709,13 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
   }
 
   const statusConfig = await findPedidoCompraStatusConfig(pedido.status);
-  const solicitacao = await carregarSolicitacaoPedidos(pedido.solicitacao_compra_id);
-  const cotacaoEncerrada = isSolicitacaoCompraEncerrada(solicitacao);
+  const bloqueadoPorStatus = Boolean(statusConfig?.bloqueia_edicao);
+  const cotacaoEncerradaMinima = isSolicitacaoCompraEncerrada(pedido.solicitacao);
+  const precisaSolicitacaoOperacional = !bloqueadoPorStatus && !cotacaoEncerradaMinima;
+  const solicitacao = precisaSolicitacaoOperacional
+    ? await carregarSolicitacaoPedidos(pedido.solicitacao_compra_id, null, { incluirPedidos: false })
+    : pedido.solicitacao;
+  const cotacaoEncerrada = cotacaoEncerradaMinima || isSolicitacaoCompraEncerrada(solicitacao);
   const edicaoBloqueada = Boolean(statusConfig?.bloqueia_edicao || cotacaoEncerrada);
   const respostaIdsAtuais = new Set(
     (pedido.itens || [])
