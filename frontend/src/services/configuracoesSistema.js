@@ -13,7 +13,7 @@ function normalizarRegistryPermissoesAreas(registry) {
   if (!Array.isArray(registry)) return registry;
 
   return registry.map((grupo) => {
-    if (grupo?.key !== 'compras' || !Array.isArray(grupo?.areas)) return grupo;
+    if (!Array.isArray(grupo?.areas) || !grupo.areas.some((area) => area?.key === 'compras.cotacoes')) return grupo;
 
     return {
       ...grupo,
