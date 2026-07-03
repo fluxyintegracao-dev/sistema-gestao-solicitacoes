@@ -26,9 +26,16 @@ const {
 const {
   getUserObraScopeIds,
   canAccessSolicitacaoCompraByScope,
+  canAlterarStatusComprasPedidos,
   canAuditComprasPedidos,
+  canCancelarComprasPedidos,
+  canCancelarFreteComprasPedidos,
+  canEditarItensComprasPedidos,
   canManageComprasDelegacao,
   canManageComprasPedidos,
+  canReabrirComprasPedidos,
+  canRegistrarFreteComprasPedidos,
+  canRemanejarComprasPedidos,
   canViewAllComprasScope,
   canViewComprasDelegacao,
   canViewComprasPedidos,
@@ -302,6 +309,11 @@ module.exports = {
         return;
       }
 
+      if (!(await canEditarItensComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para adicionar itens ao pedido de compra' });
+      }
+
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
@@ -334,6 +346,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canAlterarStatusComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para alterar status de pedidos de compra' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
@@ -370,6 +387,11 @@ module.exports = {
         return;
       }
 
+      if (!(await canReabrirComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para reabrir pedido de compra' });
+      }
+
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
@@ -402,6 +424,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canAlterarStatusComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para alterar status de pedidos de compra' });
       }
 
       const ids = Array.isArray(req.body?.pedido_ids) ? req.body.pedido_ids : [];
@@ -444,6 +471,11 @@ module.exports = {
         return;
       }
 
+      if (!(await canEditarItensComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para editar itens do pedido de compra' });
+      }
+
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
@@ -477,6 +509,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canEditarItensComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para remover itens do pedido de compra' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
@@ -513,6 +550,11 @@ module.exports = {
         return;
       }
 
+      if (!(await canCancelarComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para cancelar pedido de compra' });
+      }
+
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
@@ -545,6 +587,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canCancelarComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para cancelar itens do pedido de compra' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
@@ -580,6 +627,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canRemanejarComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para remanejar itens do pedido de compra' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
@@ -619,6 +671,11 @@ module.exports = {
         return;
       }
 
+      if (!(await canRegistrarFreteComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para registrar frete do pedido' });
+      }
+
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
         await transaction.rollback();
         return;
@@ -648,6 +705,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canRegistrarFreteComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para editar frete do pedido' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {
@@ -683,6 +745,11 @@ module.exports = {
       if (!usuario) {
         await transaction.rollback();
         return;
+      }
+
+      if (!(await canCancelarFreteComprasPedidos(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para cancelar frete do pedido' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {

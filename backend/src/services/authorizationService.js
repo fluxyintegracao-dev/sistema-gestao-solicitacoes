@@ -138,8 +138,13 @@ const COMPRAS_SOLICITACOES_VIEW_KEYS = [
   'compras.solicitacoes.gerenciar',
   'compras.solicitacoes.encaminhar_compras',
   'compras.solicitacoes.gerar_pedidos',
+  'compras.solicitacoes.editar_itens',
+  'compras.solicitacoes.editar_quantidade',
   'compras.delegacao.visualizar',
-  'compras.delegacao.gerenciar'
+  'compras.delegacao.gerenciar',
+  'compras.delegacao.alterar_responsavel',
+  'compras.delegacao.alterar_prazo',
+  'compras.delegacao.salvar_motivo'
 ];
 
 const COMPRAS_SOLICITACOES_CREATE_KEYS = [
@@ -149,6 +154,16 @@ const COMPRAS_SOLICITACOES_CREATE_KEYS = [
 const COMPRAS_SOLICITACOES_MANAGE_KEYS = [
   'compras.solicitacoes.gerenciar',
   'compras.solicitacoes.gerar_pedidos'
+];
+
+const COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS = [
+  'compras.solicitacoes.editar_itens',
+  ...COMPRAS_SOLICITACOES_MANAGE_KEYS
+];
+
+const COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS = [
+  'compras.solicitacoes.editar_quantidade',
+  ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS
 ];
 
 const COMPRAS_SOLICITACOES_ENCAMINHAR_KEYS = [
@@ -164,6 +179,13 @@ const COMPRAS_PEDIDOS_VIEW_KEYS = [
   'compras.pedidos.visualizar',
   'compras.pedidos.criar',
   'compras.pedidos.aprovar',
+  'compras.pedidos.editar_itens',
+  'compras.pedidos.remanejar',
+  'compras.pedidos.cancelar',
+  'compras.pedidos.alterar_status',
+  'compras.pedidos.reabrir',
+  'compras.pedidos.registrar_frete',
+  'compras.pedidos.cancelar_frete',
   'compras.pedidos.auditoria',
   'compras.relatorios.visualizar',
   'compras.relatorios.pedidos'
@@ -174,6 +196,41 @@ const COMPRAS_PEDIDOS_MANAGE_KEYS = [
   'compras.pedidos.aprovar'
 ];
 
+const COMPRAS_PEDIDOS_EDIT_ITEMS_KEYS = [
+  'compras.pedidos.editar_itens',
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS
+];
+
+const COMPRAS_PEDIDOS_REMANEJAR_KEYS = [
+  'compras.pedidos.remanejar',
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS
+];
+
+const COMPRAS_PEDIDOS_CANCELAR_KEYS = [
+  'compras.pedidos.cancelar',
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS
+];
+
+const COMPRAS_PEDIDOS_ALTERAR_STATUS_KEYS = [
+  'compras.pedidos.alterar_status',
+  'compras.pedidos.aprovar'
+];
+
+const COMPRAS_PEDIDOS_REABRIR_KEYS = [
+  'compras.pedidos.reabrir',
+  'compras.pedidos.aprovar'
+];
+
+const COMPRAS_PEDIDOS_FRETE_KEYS = [
+  'compras.pedidos.registrar_frete',
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS
+];
+
+const COMPRAS_PEDIDOS_CANCELAR_FRETE_KEYS = [
+  'compras.pedidos.cancelar_frete',
+  ...COMPRAS_PEDIDOS_MANAGE_KEYS
+];
+
 const COMPRAS_PEDIDOS_AUDIT_KEYS = [
   'compras.pedidos.auditoria'
 ];
@@ -181,6 +238,10 @@ const COMPRAS_PEDIDOS_AUDIT_KEYS = [
 const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.visualizar',
   'compras.cotacoes.gerenciar',
+  'compras.cotacoes.editar_respostas',
+  'compras.cotacoes.salvar_rascunho',
+  'compras.cotacoes.encerrar',
+  'compras.cotacoes.reabrir',
   'compras.relatorios.visualizar',
   'compras.relatorios.cotacoes'
 ];
@@ -189,13 +250,40 @@ const COMPRAS_COTACOES_MANAGE_KEYS = [
   'compras.cotacoes.gerenciar'
 ];
 
+const COMPRAS_COTACOES_OPERATE_KEYS = [
+  'compras.cotacoes.gerenciar',
+  'compras.cotacoes.editar_respostas',
+  'compras.cotacoes.salvar_rascunho'
+];
+
+const COMPRAS_COTACOES_ENCERRAR_KEYS = [
+  'compras.cotacoes.encerrar',
+  'compras.cotacoes.gerenciar',
+  'compras.solicitacoes.gerar_pedidos'
+];
+
+const COMPRAS_COTACOES_REABRIR_KEYS = [
+  'compras.cotacoes.reabrir',
+  'compras.cotacoes.gerenciar'
+];
+
 const COMPRAS_DELEGACAO_VIEW_KEYS = [
   'compras.delegacao.visualizar',
-  'compras.delegacao.gerenciar'
+  'compras.delegacao.gerenciar',
+  'compras.delegacao.alterar_responsavel',
+  'compras.delegacao.alterar_prazo',
+  'compras.delegacao.salvar_motivo'
 ];
 
 const COMPRAS_DELEGACAO_MANAGE_KEYS = [
-  'compras.delegacao.gerenciar'
+  'compras.delegacao.gerenciar',
+  'compras.delegacao.alterar_responsavel',
+  'compras.delegacao.alterar_prazo'
+];
+
+const COMPRAS_DELEGACAO_MOTIVO_KEYS = [
+  'compras.delegacao.salvar_motivo',
+  ...COMPRAS_DELEGACAO_MANAGE_KEYS
 ];
 
 const COMPRAS_FORNECEDORES_VIEW_KEYS = [
@@ -271,12 +359,24 @@ const COMPRAS_PERMISSION_KEYS = [
   ...COMPRAS_SOLICITACOES_VIEW_KEYS,
   ...COMPRAS_SOLICITACOES_CREATE_KEYS,
   ...COMPRAS_SOLICITACOES_MANAGE_KEYS,
+  ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS,
+  ...COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS,
   ...COMPRAS_SOLICITACOES_DELETE_KEYS,
   ...COMPRAS_PEDIDOS_VIEW_KEYS,
   ...COMPRAS_PEDIDOS_MANAGE_KEYS,
+  ...COMPRAS_PEDIDOS_EDIT_ITEMS_KEYS,
+  ...COMPRAS_PEDIDOS_REMANEJAR_KEYS,
+  ...COMPRAS_PEDIDOS_CANCELAR_KEYS,
+  ...COMPRAS_PEDIDOS_ALTERAR_STATUS_KEYS,
+  ...COMPRAS_PEDIDOS_REABRIR_KEYS,
+  ...COMPRAS_PEDIDOS_FRETE_KEYS,
+  ...COMPRAS_PEDIDOS_CANCELAR_FRETE_KEYS,
   ...COMPRAS_PEDIDOS_AUDIT_KEYS,
   ...COMPRAS_COTACOES_VIEW_KEYS,
   ...COMPRAS_COTACOES_MANAGE_KEYS,
+  ...COMPRAS_COTACOES_OPERATE_KEYS,
+  ...COMPRAS_COTACOES_ENCERRAR_KEYS,
+  ...COMPRAS_COTACOES_REABRIR_KEYS,
   ...COMPRAS_DELEGACAO_VIEW_KEYS,
   ...COMPRAS_DELEGACAO_MANAGE_KEYS,
   ...COMPRAS_FORNECEDORES_VIEW_KEYS,
@@ -1509,6 +1609,30 @@ async function canManageCompraSolicitacoes(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canEditarItensSolicitacaoCompra(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canAlterarQuantidadeSolicitacaoCompra(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 async function canEncaminharCompraSolicitacoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1552,6 +1676,90 @@ async function canManageComprasPedidos(user) {
 
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, COMPRAS_PEDIDOS_MANAGE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canEditarItensComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_EDIT_ITEMS_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canRemanejarComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_REMANEJAR_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canCancelarComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_CANCELAR_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canAlterarStatusComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_ALTERAR_STATUS_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canReabrirComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_REABRIR_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canRegistrarFreteComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_FRETE_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+async function canCancelarFreteComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_CANCELAR_FRETE_KEYS);
   }
 
   return userHasSetorCapability(user, 'eh_setor_compras');
@@ -1696,6 +1904,42 @@ async function canManageComprasCotacoes(user) {
     await userHasSetorCapability(user, 'eh_setor_compras') ||
     tokens.includes('COMPRAS')
   );
+}
+
+async function canOperateComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_OPERATE_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canEncerrarComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_ENCERRAR_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canReabrirComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_REABRIR_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
 }
 
 async function getComprasVisibilityScope(user) {
@@ -2580,9 +2824,21 @@ module.exports = {
   canManageComercialContratos,
   canManageContratos,
   canManageComercialEmpreendimentos,
+  canAlterarQuantidadeSolicitacaoCompra,
+  canAlterarStatusComprasPedidos,
+  canCancelarComprasPedidos,
+  canCancelarFreteComprasPedidos,
+  canEditarItensComprasPedidos,
+  canEditarItensSolicitacaoCompra,
+  canEncerrarComprasCotacoes,
   canManageComprasCotacoes,
   canManageComprasFornecedores,
   canManageComprasPedidos,
+  canOperateComprasCotacoes,
+  canReabrirComprasCotacoes,
+  canReabrirComprasPedidos,
+  canRegistrarFreteComprasPedidos,
+  canRemanejarComprasPedidos,
   canManageConfiguracoesArea,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,

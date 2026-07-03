@@ -21,6 +21,10 @@ export function isAdmin(user) {
   return normalizeToken(user?.perfil) === 'ADMIN';
 }
 
+export function isEstagiario(user) {
+  return normalizeToken(user?.perfil) === 'ESTAGIARIO';
+}
+
 export function isBusinessAdmin(user) {
   return isSuperadmin(user) || isAdministrador(user);
 }
@@ -137,6 +141,8 @@ export function canAccessCompras(user) {
       'compras.solicitacoes.gerenciar',
       'compras.solicitacoes.excluir',
       'compras.solicitacoes.encaminhar_compras',
+      'compras.solicitacoes.editar_itens',
+      'compras.solicitacoes.editar_quantidade',
       'compras.solicitacoes.gerar_pedidos',
       'compras.pedidos.visualizar',
       'compras.pedidos.criar',
@@ -147,10 +153,20 @@ export function canAccessCompras(user) {
       'compras.pedidos.cancelar',
       'compras.pedidos.anexar_espelho',
       'compras.pedidos.alterar_status',
+      'compras.pedidos.reabrir',
+      'compras.pedidos.registrar_frete',
+      'compras.pedidos.cancelar_frete',
       'compras.delegacao.visualizar',
       'compras.delegacao.gerenciar',
+      'compras.delegacao.alterar_responsavel',
+      'compras.delegacao.alterar_prazo',
+      'compras.delegacao.salvar_motivo',
       'compras.cotacoes.visualizar',
       'compras.cotacoes.gerenciar',
+      'compras.cotacoes.editar_respostas',
+      'compras.cotacoes.salvar_rascunho',
+      'compras.cotacoes.encerrar',
+      'compras.cotacoes.reabrir',
       'compras.fornecedores.visualizar',
       'compras.fornecedores.gerenciar',
       'compras.relatorios.visualizar',
@@ -177,6 +193,8 @@ export function canViewCompraSolicitacoes(user) {
       'compras.solicitacoes.visualizar',
       'compras.solicitacoes.gerenciar',
       'compras.solicitacoes.encaminhar_compras',
+      'compras.solicitacoes.editar_itens',
+      'compras.solicitacoes.editar_quantidade',
       'compras.solicitacoes.gerar_pedidos',
       'compras.delegacao.visualizar',
       'compras.delegacao.gerenciar'
@@ -199,6 +217,33 @@ export function canManageCompraSolicitacoes(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
+      'compras.solicitacoes.gerenciar',
+      'compras.solicitacoes.gerar_pedidos'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEditarItensSolicitacaoCompra(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.solicitacoes.editar_itens',
+      'compras.solicitacoes.gerenciar',
+      'compras.solicitacoes.gerar_pedidos'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canAlterarQuantidadeSolicitacaoCompra(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.solicitacoes.editar_quantidade',
+      'compras.solicitacoes.editar_itens',
       'compras.solicitacoes.gerenciar',
       'compras.solicitacoes.gerar_pedidos'
     ]);
@@ -229,13 +274,103 @@ export function canDeleteCompraSolicitacoes(user) {
 
 export function canManageComprasPedidos(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
       'compras.pedidos.criar',
       'compras.pedidos.aprovar'
     ]);
   }
-  return isBusinessAdmin(user) || userHasSetorCapability(user, 'eh_setor_compras');
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEditarItensComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.editar_itens',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canRemanejarComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.remanejar',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canCancelarComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.cancelar',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canAlterarStatusComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.alterar_status',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canReabrirComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.reabrir',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canRegistrarFreteComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.registrar_frete',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canCancelarFreteComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.pedidos.cancelar_frete',
+      'compras.pedidos.criar',
+      'compras.pedidos.aprovar'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
 export function canViewComprasPedidos(user) {
@@ -246,6 +381,13 @@ export function canViewComprasPedidos(user) {
       'compras.pedidos.visualizar',
       'compras.pedidos.criar',
       'compras.pedidos.aprovar',
+      'compras.pedidos.editar_itens',
+      'compras.pedidos.remanejar',
+      'compras.pedidos.cancelar',
+      'compras.pedidos.alterar_status',
+      'compras.pedidos.reabrir',
+      'compras.pedidos.registrar_frete',
+      'compras.pedidos.cancelar_frete',
       'compras.pedidos.auditoria',
       'compras.relatorios.visualizar',
       'compras.relatorios.pedidos'
@@ -262,7 +404,13 @@ export function canViewComprasDelegacao(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, ['compras.delegacao.visualizar', 'compras.delegacao.gerenciar']);
+    return hasAnyPermissao(user, [
+      'compras.delegacao.visualizar',
+      'compras.delegacao.gerenciar',
+      'compras.delegacao.alterar_responsavel',
+      'compras.delegacao.alterar_prazo',
+      'compras.delegacao.salvar_motivo'
+    ]);
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
@@ -284,6 +432,10 @@ export function canViewComprasCotacoes(user) {
     return hasAnyPermissao(user, [
       'compras.cotacoes.visualizar',
       'compras.cotacoes.gerenciar',
+      'compras.cotacoes.editar_respostas',
+      'compras.cotacoes.salvar_rascunho',
+      'compras.cotacoes.encerrar',
+      'compras.cotacoes.reabrir',
       'compras.relatorios.visualizar',
       'compras.relatorios.cotacoes'
     ]);
@@ -297,6 +449,47 @@ export function canManageComprasCotacoes(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'compras.cotacoes.gerenciar');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canOperateComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.cotacoes.gerenciar',
+      'compras.cotacoes.editar_respostas',
+      'compras.cotacoes.salvar_rascunho'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEncerrarComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.cotacoes.encerrar',
+      'compras.cotacoes.gerenciar',
+      'compras.solicitacoes.gerar_pedidos'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canReabrirComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.cotacoes.reabrir',
+      'compras.cotacoes.gerenciar'
+    ]);
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }

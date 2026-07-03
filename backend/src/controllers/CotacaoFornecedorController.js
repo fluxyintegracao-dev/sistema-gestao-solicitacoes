@@ -28,7 +28,10 @@ const {
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
-const { canViewAllComprasScope } = require('../services/authorizationService');
+const {
+  canReabrirComprasCotacoes,
+  canViewAllComprasScope
+} = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
 
 const CONDICOES_PAGAMENTO_EXIGEM_PRAZO_PADRAO = ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS'];
@@ -1001,6 +1004,11 @@ module.exports = {
   async reabrir(req, res) {
     const transaction = await sequelize.transaction();
     try {
+      if (!(await canReabrirComprasCotacoes(req.user))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para reabrir cotacao' });
+      }
+
       const cotacaoFornecedor = await SolicitacaoCompraFornecedor.findByPk(req.params.id, {
         include: [
           {

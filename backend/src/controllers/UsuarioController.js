@@ -763,7 +763,7 @@ module.exports = {
         const permissaoComprasRaw =
           idxPermissaoCompras >= 0 ? String(row[idxPermissaoCompras] ?? '').trim() : '';
         const perfil = (perfilRaw || 'USUARIO').toUpperCase();
-        const perfisPermitidos = new Set(['USUARIO', 'ADMIN', 'ADMINISTRADOR', 'SUPERADMIN']);
+        const perfisPermitidos = new Set(['USUARIO', 'ESTAGIARIO', 'ADMIN', 'ADMINISTRADOR', 'SUPERADMIN']);
 
         if (![nome, email, setorRaw, senhaRaw, obrasRaw].some(Boolean)) {
           resultado.ignorados += 1;
@@ -786,7 +786,7 @@ module.exports = {
         if (!perfisPermitidos.has(perfil)) {
           resultado.erros.push({
             linha,
-            error: `Perfil inválido: ${perfil}. Use USUARIO, ADMIN, ADMINISTRADOR ou SUPERADMIN.`
+            error: `Perfil inválido: ${perfil}. Use USUARIO, ESTAGIARIO, ADMIN, ADMINISTRADOR ou SUPERADMIN.`
           });
           continue;
         }

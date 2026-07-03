@@ -22,7 +22,16 @@ import {
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { buscarParceiros } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
-import { canManageComprasPedidos, isBusinessAdmin } from '../../../utils/acessoProduto';
+import {
+  canAlterarStatusComprasPedidos,
+  canCancelarComprasPedidos,
+  canCancelarFreteComprasPedidos,
+  canEditarItensComprasPedidos,
+  canReabrirComprasPedidos,
+  canRegistrarFreteComprasPedidos,
+  canRemanejarComprasPedidos,
+  isBusinessAdmin
+} from '../../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../../utils/navigation';
 import { isValidCpfCnpj, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
@@ -381,7 +390,22 @@ export default function PedidoCompraDetalhe() {
   const navigateBack = useSafeNavigateBack('/pedidos-compra');
   const { user } = useAuth();
   const businessAdmin = isBusinessAdmin(user);
-  const podeGerenciarPedido = canManageComprasPedidos(user);
+  const podeEditarItensPedido = canEditarItensComprasPedidos(user);
+  const podeAlterarStatusPedido = canAlterarStatusComprasPedidos(user);
+  const podeCancelarPedido = canCancelarComprasPedidos(user);
+  const podeReabrirPedido = canReabrirComprasPedidos(user);
+  const podeRegistrarFretePedido = canRegistrarFreteComprasPedidos(user);
+  const podeCancelarFretePedido = canCancelarFreteComprasPedidos(user);
+  const podeRemanejarPedido = canRemanejarComprasPedidos(user);
+  const podeGerenciarPedido = Boolean(
+    podeEditarItensPedido ||
+    podeAlterarStatusPedido ||
+    podeCancelarPedido ||
+    podeReabrirPedido ||
+    podeRegistrarFretePedido ||
+    podeCancelarFretePedido ||
+    podeRemanejarPedido
+  );
   const [pedido, setPedido] = useState(null);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -505,9 +529,9 @@ export default function PedidoCompraDetalhe() {
   );
   const statusAtual = statusMap[String(pedido?.status || '').toUpperCase()] || pedido?.status_configuracao || null;
   const edicaoBloqueadaPorStatus = Boolean(statusAtual?.bloqueia_edicao || pedido?.edicao_bloqueada);
-  const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeGerenciarPedido);
+  const pedidoBloqueado = Boolean(edicaoBloqueadaPorStatus || !podeEditarItensPedido);
   const pedidoCancelado = String(pedido?.status || '').toUpperCase() === 'CANCELADO';
-  const podeReabrirCotacao = Boolean(podeGerenciarPedido && edicaoBloqueadaPorStatus && !pedidoCancelado);
+  const podeReabrirCotacao = Boolean(podeReabrirPedido && edicaoBloqueadaPorStatus && !pedidoCancelado);
   const permiteFreteEmbutido = !edicaoBloqueadaPorStatus;
   const statusSelectOptions = useMemo(() => {
     const ativos = (statusOptions || []).filter((item) => item?.ativo !== false);
@@ -540,7 +564,12 @@ export default function PedidoCompraDetalhe() {
 
   function fretePermiteControle(frete) {
     const status = getFreteStatus(frete);
-    return podeGerenciarPedido && !frete?.tituloFinanceiro?.id && !frete?.titulo_financeiro_id && !['TITULO_GERADO', 'CANCELADO'].includes(status);
+    return podeRegistrarFretePedido && !frete?.tituloFinanceiro?.id && !frete?.titulo_financeiro_id && !['TITULO_GERADO', 'CANCELADO'].includes(status);
+  }
+
+  function fretePermiteCancelamento(frete) {
+    const status = getFreteStatus(frete);
+    return podeCancelarFretePedido && !frete?.tituloFinanceiro?.id && !frete?.titulo_financeiro_id && !['TITULO_GERADO', 'CANCELADO'].includes(status);
   }
 
   useEffect(() => {
@@ -876,7 +905,7 @@ export default function PedidoCompraDetalhe() {
   }
 
   async function handleCancelarFrete(frete) {
-    if (!fretePermiteControle(frete)) {
+    if (!fretePermiteCancelamento(frete)) {
       alert('Este frete nao pode ser cancelado porque ja foi cancelado ou possui titulo financeiro vinculado.');
       return;
     }
@@ -1264,7 +1293,7 @@ export default function PedidoCompraDetalhe() {
                 className="input"
                 value={pedido.status || ''}
                 onChange={(event) => handleAtualizarStatus(event.target.value)}
-                disabled={!podeGerenciarPedido || savingStatus}
+                disabled={!podeAlterarStatusPedido || savingStatus}
               >
                 {statusSelectOptions.map((status) => (
                   <option key={status.codigo} value={status.codigo}>
@@ -1297,7 +1326,7 @@ export default function PedidoCompraDetalhe() {
                 {reabrindoCotacao ? 'Reabrindo...' : 'Reabrir pedido'}
               </button>
             ) : null}
-            {podeGerenciarPedido ? (
+            {podeCancelarPedido ? (
               <button
                 type="button"
                 className="btn btn-outline"
@@ -1394,7 +1423,7 @@ export default function PedidoCompraDetalhe() {
                   Custo rateado nos itens para acompanhamento da obra.
                 </p>
               </div>
-              {podeGerenciarPedido ? (
+              {podeRegistrarFretePedido ? (
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -1454,24 +1483,28 @@ export default function PedidoCompraDetalhe() {
                           </Link>
                         </div>
                       ) : null}
-                      {fretePermiteControle(frete) ? (
+                      {(fretePermiteControle(frete) || fretePermiteCancelamento(frete)) ? (
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            className="btn btn-outline !py-1 text-xs"
-                            onClick={() => abrirEdicaoFrete(frete)}
-                            disabled={salvandoFrete}
-                          >
-                            Editar frete
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline !py-1 text-xs text-red-600"
-                            onClick={() => handleCancelarFrete(frete)}
-                            disabled={salvandoFrete}
-                          >
-                            Cancelar frete
-                          </button>
+                          {fretePermiteControle(frete) ? (
+                            <button
+                              type="button"
+                              className="btn btn-outline !py-1 text-xs"
+                              onClick={() => abrirEdicaoFrete(frete)}
+                              disabled={salvandoFrete}
+                            >
+                              Editar frete
+                            </button>
+                          ) : null}
+                          {fretePermiteCancelamento(frete) ? (
+                            <button
+                              type="button"
+                              className="btn btn-outline !py-1 text-xs text-red-600"
+                              onClick={() => handleCancelarFrete(frete)}
+                              disabled={salvandoFrete}
+                            >
+                              Cancelar frete
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -1485,7 +1518,7 @@ export default function PedidoCompraDetalhe() {
             </div>
           </div>
 
-          {podeGerenciarPedido ? (
+          {podeEditarItensPedido ? (
             <div className="card sol-surface-card">
               <div className="card-header">
                 <h2 className="font-semibold">Historico operacional</h2>
@@ -1528,7 +1561,7 @@ export default function PedidoCompraDetalhe() {
             </div>
           ) : null}
 
-          {podeGerenciarPedido ? (
+          {podeEditarItensPedido ? (
             <div className="card sol-surface-card">
               <div className="card-header">
                 <h2 className="font-semibold">Itens cotados disponiveis</h2>
@@ -1621,7 +1654,7 @@ export default function PedidoCompraDetalhe() {
                     Auditoria do pedido
                   </button>
                 ) : null}
-                {podeGerenciarPedido ? (
+                {podeCancelarPedido ? (
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -1662,7 +1695,7 @@ export default function PedidoCompraDetalhe() {
                 <table className="table">
                   <thead>
                     <tr>
-                      {podeGerenciarPedido ? <th className="w-10">Sel.</th> : null}
+                      {podeCancelarPedido ? <th className="w-10">Sel.</th> : null}
                       <th>Item</th>
                       <th>Origem</th>
                       <th>Solicitado</th>
@@ -1679,7 +1712,7 @@ export default function PedidoCompraDetalhe() {
 
                       return (
                         <tr key={item.id} className={item.removido ? 'opacity-80' : ''}>
-                          {podeGerenciarPedido ? (
+                          {podeCancelarPedido ? (
                             <td>
                               <input
                                 type="checkbox"
@@ -1723,7 +1756,7 @@ export default function PedidoCompraDetalhe() {
                                 className="btn btn-outline"
                                 onClick={() => abrirModalEdicao(item.id)}
                               >
-                                {podeGerenciarPedido && !item.removido ? 'Editar' : 'Ver item'}
+                                {podeEditarItensPedido && !item.removido ? 'Editar' : 'Ver item'}
                               </button>
                               {businessAdmin ? (
                                 <button
@@ -1767,7 +1800,7 @@ export default function PedidoCompraDetalhe() {
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
               <div>
                 <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>
-                  {podeGerenciarPedido && !itemEditando.removido ? 'Editar item do pedido' : 'Detalhes do item'}
+                  {podeEditarItensPedido && !itemEditando.removido ? 'Editar item do pedido' : 'Detalhes do item'}
                 </h2>
                 <p className="mt-0.5 text-xs" style={{ color: 'var(--c-muted)' }}>
                   PC-{String(pedido.id).padStart(5, '0')} - {itemEditando.descricao}
@@ -1933,7 +1966,7 @@ export default function PedidoCompraDetalhe() {
               </div>
             </div>
 
-            {podeGerenciarPedido && !itemEditando.removido ? (
+            {podeRemanejarPedido && !itemEditando.removido ? (
               <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -1989,7 +2022,7 @@ export default function PedidoCompraDetalhe() {
                   A trilha de auditoria saiu desta tela para evitar sobrecarga visual em pedidos grandes.
                 </div>
                 <div className="flex flex-wrap gap-2">
-                {podeGerenciarPedido && !itemEditando.removido ? (
+                {podeEditarItensPedido && !itemEditando.removido ? (
                   <button
                     type="button"
                     className="btn btn-outline"
@@ -2002,7 +2035,7 @@ export default function PedidoCompraDetalhe() {
                 <button type="button" className="btn btn-outline" onClick={fecharModalEdicao} disabled={modalProcessando}>
                   Cancelar
                 </button>
-                {podeGerenciarPedido && !itemEditando.removido ? (
+                {podeEditarItensPedido && !itemEditando.removido ? (
                   <button
                     type="button"
                     className="btn btn-primary"

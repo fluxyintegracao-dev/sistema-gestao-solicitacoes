@@ -182,6 +182,7 @@ export default function UsuarioNovo() {
               <option value="">Selecione</option>
               {isBusinessAdminLogado && <option value="ADMINISTRADOR">ADMINISTRADOR</option>}
               <option value="ADMIN">ADMIN</option>
+              <option value="ESTAGIARIO">ESTAGIARIO</option>
               {isSuperadminLogado && <option value="SUPERADMIN">SUPERADMIN</option>}
               <option value="USUARIO">USUARIO</option>
             </select>
