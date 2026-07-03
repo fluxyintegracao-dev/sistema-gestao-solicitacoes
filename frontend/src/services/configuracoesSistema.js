@@ -1,5 +1,41 @@
 import { API_URL, authHeaders } from './api';
 
+const COMPRAS_COTACOES_PERMISSOES_DETALHADAS = [
+  { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotacoes', descricao: 'Ver cotacoes e comparativo de fornecedores.' },
+  { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e operar cotacoes sem encerrar ou reabrir.' },
+  { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
+  { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
+  { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Definir vencedores e gerar pedidos.' },
+  { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
+];
+
+function normalizarRegistryPermissoesAreas(registry) {
+  if (!Array.isArray(registry)) return registry;
+
+  return registry.map((grupo) => {
+    if (grupo?.key !== 'compras' || !Array.isArray(grupo?.areas)) return grupo;
+
+    return {
+      ...grupo,
+      areas: grupo.areas.map((area) => {
+        if (area?.key !== 'compras.cotacoes') return area;
+
+        const permissoesAtuais = Array.isArray(area.permissoes) ? area.permissoes : [];
+        const porChave = new Map(permissoesAtuais.map((permissao) => [String(permissao?.key || '').toLowerCase(), permissao]));
+
+        return {
+          ...area,
+          permissoes: COMPRAS_COTACOES_PERMISSOES_DETALHADAS.map((permissao) => ({
+            ...permissao,
+            ...(porChave.get(permissao.key) || {}),
+            descricao: permissao.descricao
+          }))
+        };
+      })
+    };
+  });
+}
+
 export async function getTemaSistema() {
   const res = await fetch(`${API_URL}/configuracoes/tema`, {
     headers: authHeaders()
@@ -380,7 +416,8 @@ export async function getPermissoesAreasRegistry() {
     headers: authHeaders()
   });
   if (!res.ok) throw new Error('Erro ao buscar registro de permissoes');
-  return res.json();
+  const registry = await res.json();
+  return normalizarRegistryPermissoesAreas(registry);
 }
 
 export async function getPermissoesAreas() {
