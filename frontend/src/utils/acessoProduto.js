@@ -474,7 +474,6 @@ export function canEncerrarComprasCotacoes(user) {
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
       'compras.cotacoes.encerrar',
-      'compras.cotacoes.gerenciar',
       'compras.solicitacoes.gerar_pedidos'
     ]);
   }
@@ -486,10 +485,7 @@ export function canReabrirComprasCotacoes(user) {
   if (!hasEnabledModule(user, 'COTACOES')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasAnyPermissao(user, [
-      'compras.cotacoes.reabrir',
-      'compras.cotacoes.gerenciar'
-    ]);
+    return hasPermissao(user, 'compras.cotacoes.reabrir');
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }

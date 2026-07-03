@@ -258,13 +258,11 @@ const COMPRAS_COTACOES_OPERATE_KEYS = [
 
 const COMPRAS_COTACOES_ENCERRAR_KEYS = [
   'compras.cotacoes.encerrar',
-  'compras.cotacoes.gerenciar',
   'compras.solicitacoes.gerar_pedidos'
 ];
 
 const COMPRAS_COTACOES_REABRIR_KEYS = [
-  'compras.cotacoes.reabrir',
-  'compras.cotacoes.gerenciar'
+  'compras.cotacoes.reabrir'
 ];
 
 const COMPRAS_DELEGACAO_VIEW_KEYS = [

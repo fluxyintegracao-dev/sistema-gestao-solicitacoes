@@ -217,7 +217,7 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Cotações',
         permissoes: [
           { key: 'compras.cotacoes.visualizar', label: 'Visualizar cotações', descricao: 'Ver cotações e comparativo de fornecedores.' },
-          { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e encerrar cotacoes.' },
+          { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e operar cotacoes sem encerrar ou reabrir.' },
           { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
           { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
           { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Definir vencedores e gerar pedidos.' },
