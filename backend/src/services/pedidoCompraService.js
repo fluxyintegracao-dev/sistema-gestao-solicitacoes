@@ -206,6 +206,10 @@ function fornecedorRespondeuCotacao(vinculacaoFornecedor) {
     normalizeText(vinculacaoFornecedor?.status) === 'RESPONDIDO';
 }
 
+function isSolicitacaoCompraEncerrada(solicitacao) {
+  return normalizeText(solicitacao?.status) === 'ENCERRADO' || Boolean(solicitacao?.encerrado_em);
+}
+
 function getQuantidadeBaseItem(solicitacao, resposta) {
   const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
   return baseItem ? roundQty(baseItem.quantidade_solicitada) : 0;
@@ -1628,7 +1632,8 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
             'numero_sienge',
             'necessario_para',
             'comprador_responsavel_id',
-            'solicitante_id'
+            'solicitante_id',
+            'encerrado_em'
           ]
         },
       {
@@ -1697,6 +1702,7 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
 
   const statusConfig = await findPedidoCompraStatusConfig(pedido.status);
   const solicitacao = await carregarSolicitacaoPedidos(pedido.solicitacao_compra_id);
+  const edicaoBloqueada = Boolean(statusConfig?.bloqueia_edicao || isSolicitacaoCompraEncerrada(solicitacao));
   const respostaIdsAtuais = new Set(
     (pedido.itens || [])
       .filter((item) => !item.removido)
@@ -1708,50 +1714,54 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
     (item) => Number(item.fornecedor_compra_id) === Number(pedido.fornecedor_compra_id)
   );
 
-  const candidatos = (vinculacaoFornecedor?.respostas || [])
-    .filter((resposta) => Boolean(resposta.disponivel) && asNumber(resposta.preco) > 0)
-    .filter((resposta) => !respostaIdsAtuais.has(Number(resposta.id)))
-    .map((resposta) => {
-      const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
-      return {
-        resposta_item_id: resposta.id,
-        descricao: baseItem?.descricao || 'Item',
-        unidade: baseItem?.unidade || null,
-        quantidade_solicitada: baseItem?.quantidade_solicitada || 0,
-        quantidade_minima_item: resposta.quantidade_minima_item || null,
-        preco_unitario: resposta.preco,
-        prazo: resposta.prazo || '',
-        observacao: resposta.observacao || ''
-      };
-    });
+  const candidatos = edicaoBloqueada
+    ? []
+    : (vinculacaoFornecedor?.respostas || [])
+      .filter((resposta) => Boolean(resposta.disponivel) && asNumber(resposta.preco) > 0)
+      .filter((resposta) => !respostaIdsAtuais.has(Number(resposta.id)))
+      .map((resposta) => {
+        const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
+        return {
+          resposta_item_id: resposta.id,
+          descricao: baseItem?.descricao || 'Item',
+          unidade: baseItem?.unidade || null,
+          quantidade_solicitada: baseItem?.quantidade_solicitada || 0,
+          quantidade_minima_item: resposta.quantidade_minima_item || null,
+          preco_unitario: resposta.preco,
+          prazo: resposta.prazo || '',
+          observacao: resposta.observacao || ''
+        };
+      });
 
-  const candidatosRemanejamento = (solicitacao?.fornecedores || [])
-    .flatMap((fornecedor) => (fornecedor.respostas || []).map((resposta) => ({ fornecedor, resposta })))
-    .filter(({ fornecedor, resposta }) => (
-      fornecedorRespondeuCotacao(fornecedor) &&
-      Number(fornecedor.fornecedor_compra_id) !== Number(pedido.fornecedor_compra_id) &&
-      Boolean(resposta.disponivel) &&
-      asNumber(resposta.preco) > 0
-    ))
-    .map(({ fornecedor, resposta }) => {
-      const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
-      return {
-        resposta_item_id: resposta.id,
-        fornecedor_id: fornecedor.fornecedor_compra_id,
-        fornecedor_nome: fornecedor.fornecedor?.nome || fornecedor.nome || 'Fornecedor',
-        item_tipo: baseItem?.item_tipo || normalizeText(resposta.item_tipo),
-        solicitacao_compra_item_id: baseItem?.solicitacao_compra_item_id || null,
-        solicitacao_compra_item_manual_id: baseItem?.solicitacao_compra_item_manual_id || null,
-        item_key: buildItemKeyFromResposta(resposta),
-        descricao: baseItem?.descricao || 'Item',
-        unidade: baseItem?.unidade || null,
-        quantidade_solicitada: baseItem?.quantidade_solicitada || 0,
-        quantidade_minima_item: resposta.quantidade_minima_item || null,
-        preco_unitario: resposta.preco,
-        prazo: resposta.prazo || '',
-        observacao: resposta.observacao || ''
-      };
-    });
+  const candidatosRemanejamento = edicaoBloqueada
+    ? []
+    : (solicitacao?.fornecedores || [])
+      .flatMap((fornecedor) => (fornecedor.respostas || []).map((resposta) => ({ fornecedor, resposta })))
+      .filter(({ fornecedor, resposta }) => (
+        fornecedorRespondeuCotacao(fornecedor) &&
+        Number(fornecedor.fornecedor_compra_id) !== Number(pedido.fornecedor_compra_id) &&
+        Boolean(resposta.disponivel) &&
+        asNumber(resposta.preco) > 0
+      ))
+      .map(({ fornecedor, resposta }) => {
+        const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
+        return {
+          resposta_item_id: resposta.id,
+          fornecedor_id: fornecedor.fornecedor_compra_id,
+          fornecedor_nome: fornecedor.fornecedor?.nome || fornecedor.nome || 'Fornecedor',
+          item_tipo: baseItem?.item_tipo || normalizeText(resposta.item_tipo),
+          solicitacao_compra_item_id: baseItem?.solicitacao_compra_item_id || null,
+          solicitacao_compra_item_manual_id: baseItem?.solicitacao_compra_item_manual_id || null,
+          item_key: buildItemKeyFromResposta(resposta),
+          descricao: baseItem?.descricao || 'Item',
+          unidade: baseItem?.unidade || null,
+          quantidade_solicitada: baseItem?.quantidade_solicitada || 0,
+          quantidade_minima_item: resposta.quantidade_minima_item || null,
+          preco_unitario: resposta.preco,
+          prazo: resposta.prazo || '',
+          observacao: resposta.observacao || ''
+        };
+      });
 
   const ultimoPrecoPorInsumo = await buscarUltimosPrecosPorInsumo(
     (pedido.itens || []).map((item) => item.itemCadastrado?.insumo_id),
@@ -1794,7 +1804,10 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
     itens,
     fretes,
     status_configuracao: statusConfig,
-    edicao_bloqueada: Boolean(statusConfig?.bloqueia_edicao),
+    edicao_bloqueada: edicaoBloqueada,
+    edicao_bloqueada_motivo: edicaoBloqueada && isSolicitacaoCompraEncerrada(solicitacao)
+      ? 'COTACAO_ENCERRADA'
+      : null,
     candidatos_adicao: candidatos,
     candidatos_remanejamento: candidatosRemanejamento
   };
