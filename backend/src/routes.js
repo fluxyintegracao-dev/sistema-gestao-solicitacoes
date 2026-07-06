@@ -874,6 +874,18 @@ const allowComercialEmpreendimentosRead = permit({
   )
 });
 
+const allowComercialObrasRead = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canReadComercialBaseData(req.user))
+      || (await canViewComercialContratos(req.user))
+      || (await canCreateComercialContratos(req.user))
+      || (await canManageComercialContratos(req.user))
+      ? true
+      : 'Acesso negado para obras comerciais'
+  )
+});
+
 const allowComercialEmpreendimentosManage = permit({
   resource: 'COMERCIAL',
   custom: async (req) => (
@@ -1430,6 +1442,7 @@ router.patch('/parceiros/:id', allowConfiguracoesCadastros, validateRequest({ pa
 // -------------------------------------------------------------------
 // COMERCIAL
 // -------------------------------------------------------------------
+router.get('/comercial/obras', allowComercialObrasRead, ComercialEmpreendimentoController.obras);
 router.get('/comercial/empreendimentos', allowComercialEmpreendimentosRead, validateRequest({ query: validateComercialEmpreendimentoQuery }), ComercialEmpreendimentoController.index);
 router.post('/comercial/empreendimentos', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ body: validateComercialEmpreendimentoCreateBody }), ComercialEmpreendimentoController.create);
 router.patch('/comercial/empreendimentos/:id', allowComercialEmpreendimentosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Empreendimento'), body: validateComercialEmpreendimentoUpdateBody }), ComercialEmpreendimentoController.update);

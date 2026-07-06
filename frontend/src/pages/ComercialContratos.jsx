@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { getMinhasObras } from '../services/obras';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
@@ -21,6 +20,7 @@ import {
   getEmpreendimentosComerciais,
   getLinkDocumentoContratoComercial,
   getModelosContratoComercial,
+  getObrasComerciais,
   getUnidadesComerciais,
   sincronizarStatusFinanceiroContratoComercial,
   trocarUnidadeContratoComercial
@@ -672,7 +672,7 @@ export default function ComercialContratos() {
         buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
         buscarParceiros({ corretor: 1, ativo: 1, limit: 300 }),
         buscarParceiros({ testemunha: 1, ativo: 1, limit: 300 }),
-        getMinhasObras(),
+        getObrasComerciais(),
         getCategoriasFinanceiras(),
         getContratosComerciais(),
         getComercialCategoriasContrato().catch(() => null),
