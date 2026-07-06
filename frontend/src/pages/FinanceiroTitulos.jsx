@@ -1519,31 +1519,95 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
   }
 
-  function exportarModeloCodigosBarras() {
-    const linhas = [
-      ['id', 'codigo', 'tipo', 'credor_cliente', 'vencimento', 'valor_saldo', 'linha_digitavel', 'codigo_barras', 'banco_boleto']
-    ];
+  function getTituloExportColumns() {
+    const columns = [{ key: 'id', value: (titulo) => titulo.id || '' }];
 
-    const base = titulos.length > 0 ? titulos : [];
-    base.forEach((titulo) => {
-      linhas.push([
-        titulo.id,
-        titulo.codigo || '',
-        titulo.tipo || '',
-        titulo.parceiro?.nome || '',
-        titulo.data_vencimento || '',
-        Number(titulo.valor_saldo || titulo.valor_original || 0).toFixed(2).replace('.', ','),
-        titulo.linha_digitavel || '',
-        formatCodigoBarrasExport(titulo.codigo_barras),
-        titulo.banco_boleto || ''
-      ]);
+    tableHeaders.forEach((header) => {
+      switch (header) {
+        case 'Titulo':
+          columns.push(
+            { key: 'codigo', value: (titulo) => getTituloCodigo(titulo) },
+            { key: 'descricao', value: (titulo) => titulo.descricao || '' }
+          );
+          break;
+        case 'Status':
+          columns.push({ key: 'status', value: (titulo) => titulo.status || '' });
+          break;
+        case 'Tipo':
+          columns.push({ key: 'tipo', value: (titulo) => titulo.tipo || '' });
+          break;
+        case 'Documento':
+          columns.push({ key: 'numero_documento', value: (titulo) => titulo.numero_documento || '' });
+          break;
+        case parceiroResultadoLabel:
+          columns.push(
+            { key: 'credor_cliente', value: (titulo) => titulo.parceiro?.nome || '' },
+            { key: 'documento_parceiro', value: (titulo) => titulo.parceiro?.cpf_cnpj || '' }
+          );
+          break;
+        case 'Obra':
+          columns.push({ key: 'obra', value: (titulo) => titulo.obra?.nome || '' });
+          break;
+        case 'Categoria':
+          columns.push({ key: 'categoria_financeira', value: (titulo) => titulo.categoriaFinanceira?.nome || '' });
+          break;
+        case 'Forma pagamento':
+          columns.push(
+            { key: 'forma_pagamento', value: (titulo) => titulo.formaPagamento?.nome || '' },
+            { key: 'forma_pagamento_codigo', value: (titulo) => titulo.formaPagamento?.codigo || '' }
+          );
+          break;
+        case 'Origem':
+          columns.push({
+            key: 'origem',
+            value: (titulo) => titulo.solicitacao?.codigo || getOrigemTitulo(titulo) || ''
+          });
+          break;
+        case 'Emissao':
+          columns.push({ key: 'emissao', value: (titulo) => formatDate(titulo.data_emissao) });
+          break;
+        case 'Vencimento':
+          columns.push({ key: 'vencimento', value: (titulo) => formatDate(titulo.data_vencimento) });
+          break;
+        case 'Valor total':
+          columns.push({ key: 'valor_total', value: (titulo) => formatCurrency(titulo.valor_original) });
+          break;
+        case 'Saldo':
+          columns.push({ key: 'valor_saldo', value: (titulo) => formatCurrency(titulo.valor_saldo) });
+          break;
+        default:
+          break;
+      }
+    });
+
+    const keys = new Set(columns.map((column) => column.key));
+    [
+      { key: 'linha_digitavel', value: (titulo) => titulo.linha_digitavel || '' },
+      { key: 'codigo_barras', value: (titulo) => formatCodigoBarrasExport(titulo.codigo_barras) },
+      { key: 'banco_boleto', value: (titulo) => titulo.banco_boleto || '' }
+    ].forEach((column) => {
+      if (!keys.has(column.key)) {
+        columns.push(column);
+        keys.add(column.key);
+      }
+    });
+
+    return columns;
+  }
+
+  function exportarTitulos() {
+    const columns = getTituloExportColumns();
+    const linhas = [columns.map((column) => column.key)];
+
+    titulos.forEach((titulo) => {
+      linhas.push(columns.map((column) => column.value(titulo)));
     });
 
     if (linhas.length === 1) {
-      linhas.push(['', '', fixedTipo || draftFilters.tipo || 'PAGAR', '', '', '', '', '', '']);
+      linhas.push(columns.map((column) => (column.key === 'tipo' ? fixedTipo || draftFilters.tipo || 'PAGAR' : '')));
     }
 
-    downloadCsv(`modelo-codigos-barras-${fixedTipo || draftFilters.tipo || 'titulos'}.csv`, linhas);
+    downloadCsv(`titulos-${fixedTipo || draftFilters.tipo || 'financeiros'}.csv`, linhas);
   }
 
   async function importarCodigosBarras(event) {
@@ -2204,11 +2268,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             <button
               type="button"
               className="btn btn-outline btn-sm"
-              onClick={exportarModeloCodigosBarras}
+              onClick={exportarTitulos}
               disabled={loading}
-              title="Exporta os titulos listados para preencher linha digitavel ou codigo de barras"
+              title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
             >
-              Exportar codigos
+              Exportar titulos
             </button>
             <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
               {importandoCodigos ? 'Importando...' : 'Importar codigos'}
