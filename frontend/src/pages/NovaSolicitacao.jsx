@@ -467,6 +467,12 @@ export default function NovaSolicitacao() {
   const exibirItensApropriacao = obraSelecionadaEhObra && campoVisivel('itens_apropriacao');
   const refContratoAberturaObrigatoria = campoObrigatorio('ref_contrato_abertura');
   const itensApropriacaoObrigatorio = campoObrigatorio('itens_apropriacao');
+  const apropriacoesContratoObrigatorias =
+    Boolean(form.tipo_solicitacao_id) &&
+    obraSelecionadaEhObra &&
+    exibirCamposContrato &&
+    Boolean(form.contrato_id) &&
+    Boolean(comportamentoTipo.exige_apropriacoes_contrato);
   const exibirDescricao = campoVisivel('descricao');
   const descricaoObrigatoria = campoObrigatorio('descricao');
   const exibirAnexos = campoVisivel('anexos');
@@ -821,6 +827,10 @@ export default function NovaSolicitacao() {
     }
     if (itensApropriacaoObrigatorio && !form.itens_apropriacao && apropriacoesRateioSelecionadas.length === 0) {
       alert('Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.');
+      return;
+    }
+    if (apropriacoesContratoObrigatorias && apropriacoesRateioSelecionadas.length === 0) {
+      alert('Selecione ao menos uma apropriacao do contrato para esta solicitacao.');
       return;
     }
     if (refContratoAberturaObrigatoria && !form.ref_contrato_abertura) {
@@ -1768,9 +1778,14 @@ export default function NovaSolicitacao() {
               <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
-                    <p className="text-sm font-semibold text-[var(--c-text)]">Apropriacoes do contrato</p>
+                    <p className="text-sm font-semibold text-[var(--c-text)]">
+                      Apropriacoes do contrato
+                      {apropriacoesContratoObrigatorias ? <span className="text-red-600"> *</span> : null}
+                    </p>
                     <p className="text-xs text-[var(--c-muted)]">
-                      Marque os itens que receberao esta solicitacao e informe o rateio por percentual ou valor em R$.
+                      {apropriacoesContratoObrigatorias
+                        ? 'Obrigatorio para este tipo. Marque os itens que receberao esta solicitacao e informe o rateio por percentual ou valor em R$.'
+                        : 'Marque os itens que receberao esta solicitacao e informe o rateio por percentual ou valor em R$.'}
                     </p>
                   </div>
                   <span className="rounded-full bg-[var(--c-surface-alt)] px-2 py-1 text-xs font-semibold text-[var(--c-muted)]">

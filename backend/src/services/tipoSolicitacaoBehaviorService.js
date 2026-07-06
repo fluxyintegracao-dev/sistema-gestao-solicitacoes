@@ -25,7 +25,8 @@ function getDefaultTipoSolicitacaoBehavior() {
     mostrar_ref_contrato_abertura: false,
     exige_ref_contrato_abertura: false,
     mostrar_itens_apropriacao: false,
-    exige_itens_apropriacao: false
+    exige_itens_apropriacao: false,
+    exige_apropriacoes_contrato: false
   };
 }
 
@@ -43,6 +44,7 @@ function applyTipoSolicitacaoModuleAvailability(behavior, availability = {}) {
     normalized.exige_contrato = false;
     normalized.mostrar_ref_contrato_abertura = false;
     normalized.exige_ref_contrato_abertura = false;
+    normalized.exige_apropriacoes_contrato = false;
   }
 
   if (!apropriacoesDisponiveis) {
@@ -50,6 +52,7 @@ function applyTipoSolicitacaoModuleAvailability(behavior, availability = {}) {
     normalized.exige_apropriacao_principal = false;
     normalized.mostrar_itens_apropriacao = false;
     normalized.exige_itens_apropriacao = false;
+    normalized.exige_apropriacoes_contrato = false;
   }
 
   return normalized;
