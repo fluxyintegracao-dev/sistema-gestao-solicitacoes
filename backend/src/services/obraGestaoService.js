@@ -124,7 +124,7 @@ function sumMovimentosAtivos(titulo) {
 
 function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
   const custosExecutados = [];
-  const parcelas = [];
+  const receitas = [];
 
   titulos.forEach((titulo) => {
     const solicitacao = titulo.solicitacao_id ? solicitacoesMap.get(Number(titulo.solicitacao_id)) : null;
@@ -159,30 +159,32 @@ function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
         });
       }
 
-      if (STATUS_TITULO_ABERTO.has(status)) {
-        parcelas.push({
-          id: titulo.id,
-          tipo: titulo.tipo,
-          status,
-          descricao: titulo.descricao,
-          parceiro_nome: parceiroNome,
-          data_vencimento: titulo.data_vencimento,
-          valor_original: roundCurrency(titulo.valor_original),
-          valor_saldo: saldo,
-          valor_baixado: roundCurrency(titulo.valor_baixado),
-          codigo_referencia: titulo.numero_documento || solicitacao?.codigo || `TIT-${titulo.id}`,
-          solicitacao_id: titulo.solicitacao_id || null
-        });
-      }
+      return;
+    }
+
+    if (String(titulo.tipo || '').toUpperCase() === TIPO_TITULO_RECEBER && STATUS_TITULO_ABERTO.has(status)) {
+      receitas.push({
+        id: titulo.id,
+        tipo: titulo.tipo,
+        status,
+        descricao: titulo.descricao,
+        parceiro_nome: parceiroNome,
+        data_vencimento: titulo.data_vencimento,
+        valor_original: roundCurrency(titulo.valor_original),
+        valor_saldo: saldo,
+        valor_baixado: roundCurrency(titulo.valor_baixado),
+        codigo_referencia: titulo.numero_documento || solicitacao?.codigo || `TIT-${titulo.id}`,
+        solicitacao_id: titulo.solicitacao_id || null
+      });
     }
   });
 
   custosExecutados.sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0));
-  parcelas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0));
+  receitas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0));
 
   return {
     custosExecutados,
-    parcelas
+    receitas
   };
 }
 
@@ -496,7 +498,7 @@ async function obterGestaoObra(obraId) {
       .filter((id) => id > 0)
   );
 
-  const { custosExecutados: custosTitulos, parcelas } = summarizeTitulosByBuckets({
+  const { custosExecutados: custosTitulos, receitas } = summarizeTitulosByBuckets({
     titulos,
     solicitacoesMap,
     bucketMap
@@ -558,9 +560,13 @@ async function obterGestaoObra(obraId) {
       total_pago: kpis.custo_pago,
       itens: custosExecutados
     },
+    receitas: {
+      total: receitas.length,
+      itens: receitas
+    },
     parcelas: {
-      total: parcelas.length,
-      itens: parcelas
+      total: receitas.length,
+      itens: receitas
     },
     pedidos: {
       total: pedidos.length,

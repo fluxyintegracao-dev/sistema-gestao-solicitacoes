@@ -25,7 +25,7 @@ const TAB_DEFINITIONS = [
   { id: 'dashboard', label: 'Dashboard', icon: HiOutlineChartBar },
   { id: 'orcamento', label: 'Orcamento', icon: HiOutlineReceiptPercent },
   { id: 'custos', label: 'Custos', icon: HiOutlineBanknotes },
-  { id: 'parcelas', label: 'Parcelas', icon: HiOutlineClipboardDocumentList },
+  { id: 'parcelas', label: 'Receitas', icon: HiOutlineClipboardDocumentList },
   { id: 'pedidos', label: 'Pedidos', icon: HiOutlinePaperAirplane },
   { id: 'arquivos', label: 'Arquivos', icon: HiOutlineFolderOpen },
   { id: 'relatorio-final', label: 'Relatorio Final', icon: HiOutlineBuildingOffice2 }
@@ -542,20 +542,20 @@ export default function ObraGestao() {
         <section className="card px-4 py-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Parcelas</h2>
+              <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Receitas</h2>
               <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
-                Titulos a pagar em aberto ou parcial vinculados a obra.
+                Titulos a receber em aberto ou parcial vinculados a obra.
               </p>
             </div>
             <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
-              <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Parcelas</div>
-              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--c-text)' }}>{data.parcelas.total}</div>
+              <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Receitas</div>
+              <div className="mt-1 text-lg font-bold" style={{ color: 'var(--c-text)' }}>{(data.receitas || data.parcelas).total}</div>
             </div>
           </div>
 
-          {data.parcelas.itens.length === 0 ? (
+          {(data.receitas || data.parcelas).itens.length === 0 ? (
             <div className="mt-3">
-              <DetailTableEmpty message="Nenhuma parcela em aberto para esta obra." />
+              <DetailTableEmpty message="Nenhuma receita em aberto para esta obra." />
             </div>
           ) : (
             <div className="mt-3 overflow-hidden rounded-xl border" style={{ borderColor: 'var(--ui-border)' }}>
@@ -571,7 +571,7 @@ export default function ObraGestao() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.parcelas.itens.map((item) => (
+                  {(data.receitas || data.parcelas).itens.map((item) => (
                     <tr key={item.id} className="border-t" style={{ borderColor: 'var(--ui-border)' }}>
                       <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatDate(item.data_vencimento)}</td>
                       <td className="px-4 py-3 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.parceiro_nome}</td>
