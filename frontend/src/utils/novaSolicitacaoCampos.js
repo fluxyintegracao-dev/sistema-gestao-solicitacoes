@@ -6,6 +6,7 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'apropriacao_principal', label: 'Apropriacao principal', descricao: 'Apropriacao da solicitacao na obra.' },
   { id: 'subtipo', label: 'Subtipo', descricao: 'Subtipo de contrato ou classificacao complementar.' },
   { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
+  { id: 'apropriacoes_contrato', label: 'Apropriacoes do contrato', descricao: 'Rateio entre apropriacoes vinculadas ao contrato selecionado.' },
   { id: 'valor', label: 'Valor', descricao: 'Valor da solicitacao.' },
   { id: 'data_vencimento', label: 'Data de vencimento', descricao: 'Prazo ou vencimento esperado.' },
   { id: 'data_demissao', label: 'Data de demissao', descricao: 'Data efetiva de desligamento do colaborador.' },
@@ -104,6 +105,11 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
       return { visivel: Boolean(behavior.mostrar_subtipo), obrigatorio: Boolean(behavior.exige_subtipo) };
     case 'contrato':
       return { visivel: Boolean(behavior.mostrar_contrato), obrigatorio: Boolean(behavior.exige_contrato) };
+    case 'apropriacoes_contrato':
+      return {
+        visivel: Boolean(behavior.mostrar_contrato || behavior.exige_contrato || behavior.exige_apropriacoes_contrato),
+        obrigatorio: Boolean(behavior.exige_apropriacoes_contrato)
+      };
     case 'valor':
       return { visivel: Boolean(behavior.mostrar_valor), obrigatorio: Boolean(behavior.exige_valor) };
     case 'data_vencimento':

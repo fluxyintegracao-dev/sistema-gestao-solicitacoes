@@ -2099,7 +2099,7 @@ module.exports = {
         });
       }
       if (
-        comportamentoTipo.exige_apropriacoes_contrato === true &&
+        (comportamentoTipo.exige_apropriacoes_contrato === true || campoObrigatorio('apropriacoes_contrato')) &&
         campoVisivel('contrato') &&
         contrato_id &&
         rateioApropriacoes.length === 0

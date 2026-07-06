@@ -472,7 +472,7 @@ export default function NovaSolicitacao() {
     obraSelecionadaEhObra &&
     exibirCamposContrato &&
     Boolean(form.contrato_id) &&
-    Boolean(comportamentoTipo.exige_apropriacoes_contrato);
+    (Boolean(comportamentoTipo.exige_apropriacoes_contrato) || campoObrigatorio('apropriacoes_contrato'));
   const exibirDescricao = campoVisivel('descricao');
   const descricaoObrigatoria = campoObrigatorio('descricao');
   const exibirAnexos = campoVisivel('anexos');
