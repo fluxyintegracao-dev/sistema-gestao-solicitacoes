@@ -32,8 +32,18 @@ function parseHistoricoMetadata(metadata) {
 
 async function obterCaminhoArquivoHistorico(historico) {
   const metadata = parseHistoricoMetadata(historico?.metadata);
-  if (metadata?.caminho) {
-    return metadata.caminho;
+  const caminhoDireto = (
+    metadata?.caminho ||
+    metadata?.caminho_arquivo ||
+    metadata?.arquivo_url ||
+    metadata?.url ||
+    metadata?.file_url ||
+    metadata?.download_url ||
+    metadata?.comprovante_pdf_url
+  );
+
+  if (caminhoDireto) {
+    return caminhoDireto;
   }
 
   if (!metadata?.anexo_id) {
@@ -229,11 +239,6 @@ class AnexoController {
 
         if (!historico) {
           return res.status(404).json({ error: 'Historico nao encontrado' });
-        }
-
-        const acoesComArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'];
-        if (!acoesComArquivo.includes(String(historico.acao || '').trim().toUpperCase())) {
-          return res.status(400).json({ error: 'Historico nao possui arquivo para assinatura' });
         }
 
         const acessoHistorico = await canAccessSolicitacaoFile(req, historico.solicitacao_id);

@@ -406,7 +406,20 @@ async function canAccessCompraFile(req, solicitacaoCompraId) {
 
 function addCandidate(candidates, value) {
   const normalized = String(value || '').trim();
-  if (normalized) candidates.add(normalized);
+  if (!normalized) return;
+
+  candidates.add(normalized);
+
+  // URLs antigas do S3 e query strings podem alternar espacos entre "+" e
+  // "%20"/espaco literal. Mantemos as variantes apenas para comparacao de
+  // arquivos ja registrados, sem liberar acesso fora das regras existentes.
+  if (normalized.includes('+')) {
+    candidates.add(normalized.replace(/\+/g, ' '));
+  }
+
+  if (normalized.includes(' ')) {
+    candidates.add(normalized.replace(/\s/g, '+'));
+  }
 }
 
 function decodePathPart(value) {
@@ -483,7 +496,7 @@ function getRegisteredFilePath(target) {
   if (!target?.record) return null;
 
   if (target.kind === 'HISTORICO_SOLICITACAO_ARQUIVO') {
-    return parseMetadata(target.record.metadata)?.caminho || null;
+    return getMetadataFilePaths(target.record.metadata)[0] || null;
   }
 
   return (
@@ -579,16 +592,25 @@ async function findOneFileRecord(model, query) {
 }
 
 async function findHistoricoFileResource(fileCandidates) {
-  const acoesComArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'];
+  const metadataPathFields = [
+    '$.caminho',
+    '$.caminho_arquivo',
+    '$.arquivo_url',
+    '$.url',
+    '$.file_url',
+    '$.download_url',
+    '$.comprovante_pdf_url'
+  ];
 
   try {
     const historico = await Historico.findOne({
       where: {
-        acao: { [Op.in]: acoesComArquivo },
-        [Op.or]: fileCandidates.map((candidate) =>
-          sequelizeWhere(
-            fn('JSON_UNQUOTE', fn('JSON_EXTRACT', col('metadata'), '$.caminho')),
-            candidate
+        [Op.or]: fileCandidates.flatMap((candidate) =>
+          metadataPathFields.map((metadataPath) =>
+            sequelizeWhere(
+              fn('JSON_UNQUOTE', fn('JSON_EXTRACT', col('metadata'), metadataPath)),
+              candidate
+            )
           )
         )
       },
@@ -605,7 +627,6 @@ async function findHistoricoFileResource(fileCandidates) {
   }
 
   const historicosRecentes = await Historico.findAll({
-    where: { acao: { [Op.in]: acoesComArquivo } },
     attributes: ['id', 'solicitacao_id', 'metadata'],
     order: [['id', 'DESC']],
     limit: 1500
