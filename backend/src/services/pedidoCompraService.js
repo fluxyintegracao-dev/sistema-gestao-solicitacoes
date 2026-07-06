@@ -1222,6 +1222,20 @@ function isPedidoCancelado(status) {
   return normalizeText(status) === 'CANCELADO';
 }
 
+function getPedidoStatusValue(pedido) {
+  return pedido?.status ?? pedido?.get?.('status') ?? '';
+}
+
+function isPedidoFechadoComFornecedorStatus(status, statusFechado) {
+  const normalized = normalizeText(status);
+  const normalizedConfig = normalizeText(statusFechado?.codigo);
+  return (
+    normalized === normalizedConfig ||
+    normalized === 'FECHADO_FORNECEDOR' ||
+    (normalized.includes('FECHADO') && normalized.includes('FORNECEDOR'))
+  );
+}
+
 async function fecharPedidosDaSolicitacaoCompraAutomaticamente({ solicitacaoId, usuarioId, transaction }) {
   const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
   const pedidos = await PedidoCompra.findAll({
@@ -1289,8 +1303,10 @@ async function isSolicitacaoCompraComPedidosFechadosComFornecedor(solicitacao) {
         attributes: ['id', 'status']
       });
 
-  const ativos = pedidos.filter((pedido) => !isPedidoCancelado(pedido.status));
-  return ativos.length > 0 && ativos.every((pedido) => String(pedido.status || '') === statusFechado.codigo);
+  const ativos = pedidos.filter((pedido) => !isPedidoCancelado(getPedidoStatusValue(pedido)));
+  return ativos.length > 0 && ativos.every((pedido) => (
+    isPedidoFechadoComFornecedorStatus(getPedidoStatusValue(pedido), statusFechado)
+  ));
 }
 
 async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transaction }) {

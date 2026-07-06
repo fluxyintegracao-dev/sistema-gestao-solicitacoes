@@ -124,7 +124,7 @@ function sumMovimentosAtivos(titulo) {
 
 function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
   const custosExecutados = [];
-  const parcelas = [];
+  const receitas = [];
 
   titulos.forEach((titulo) => {
     const solicitacao = titulo.solicitacao_id ? solicitacoesMap.get(Number(titulo.solicitacao_id)) : null;
@@ -159,30 +159,32 @@ function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
         });
       }
 
-      if (STATUS_TITULO_ABERTO.has(status)) {
-        parcelas.push({
-          id: titulo.id,
-          tipo: titulo.tipo,
-          status,
-          descricao: titulo.descricao,
-          parceiro_nome: parceiroNome,
-          data_vencimento: titulo.data_vencimento,
-          valor_original: roundCurrency(titulo.valor_original),
-          valor_saldo: saldo,
-          valor_baixado: roundCurrency(titulo.valor_baixado),
-          codigo_referencia: titulo.numero_documento || solicitacao?.codigo || `TIT-${titulo.id}`,
-          solicitacao_id: titulo.solicitacao_id || null
-        });
-      }
+      return;
+    }
+
+    if (String(titulo.tipo || '').toUpperCase() === TIPO_TITULO_RECEBER && STATUS_TITULO_ABERTO.has(status)) {
+      receitas.push({
+        id: titulo.id,
+        tipo: titulo.tipo,
+        status,
+        descricao: titulo.descricao,
+        parceiro_nome: parceiroNome,
+        data_vencimento: titulo.data_vencimento,
+        valor_original: roundCurrency(titulo.valor_original),
+        valor_saldo: saldo,
+        valor_baixado: roundCurrency(titulo.valor_baixado),
+        codigo_referencia: titulo.numero_documento || solicitacao?.codigo || `TIT-${titulo.id}`,
+        solicitacao_id: titulo.solicitacao_id || null
+      });
     }
   });
 
   custosExecutados.sort((a, b) => new Date(b.data_movimento || 0) - new Date(a.data_movimento || 0));
-  parcelas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0));
+  receitas.sort((a, b) => new Date(a.data_vencimento || 0) - new Date(b.data_vencimento || 0));
 
   return {
     custosExecutados,
-    parcelas
+    receitas
   };
 }
 
@@ -291,6 +293,67 @@ function summarizeArquivos({ anexos, comprovantes, contratoAnexos }) {
   ];
 
   return arquivos.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+}
+
+async function carregarComprovantesObraSeguro({ obraId, solicitacaoIds }) {
+  const whereBase = {
+    [Op.or]: [
+      { obra_id: obraId },
+      solicitacaoIds.length
+        ? { solicitacao_id: { [Op.in]: solicitacaoIds } }
+        : { solicitacao_id: null }
+    ]
+  };
+
+  const include = [
+    {
+      model: Solicitacao,
+      as: 'solicitacao',
+      required: false,
+      attributes: ['id', 'codigo']
+    }
+  ];
+
+  const options = {
+    where: {
+      deleted_at: null,
+      ...whereBase
+    },
+    include,
+    order: [['createdAt', 'DESC']],
+    limit: 50
+  };
+
+  try {
+    return await Comprovante.findAll(options);
+  } catch (error) {
+    if (!String(error?.message || '').includes('deleted_at')) {
+      throw error;
+    }
+
+    console.warn('Tabela de comprovantes sem coluna deleted_at na gestao da obra. Repetindo consulta em modo legado.', {
+      obra_id: obraId,
+      error: error.message
+    });
+
+    return Comprovante.findAll({
+      attributes: [
+        'id',
+        'nome_original',
+        'caminho_arquivo',
+        'solicitacao_id',
+        'obra_id',
+        'valor',
+        'status',
+        'createdAt',
+        'updatedAt'
+      ],
+      where: whereBase,
+      include,
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
+  }
 }
 
 function buildKpis({ buckets, custosExecutados, pedidos }) {
@@ -404,27 +467,7 @@ async function carregarDadosObra(obraId) {
       order: [['createdAt', 'DESC']],
       limit: 50
     }),
-    Comprovante.findAll({
-      where: {
-        deleted_at: null,
-        [Op.or]: [
-          { obra_id: obraId },
-          solicitacaoIds.length
-            ? { solicitacao_id: { [Op.in]: solicitacaoIds } }
-            : { solicitacao_id: null }
-        ]
-      },
-      include: [
-        {
-          model: Solicitacao,
-          as: 'solicitacao',
-          required: false,
-          attributes: ['id', 'codigo']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: 50
-    })
+    carregarComprovantesObraSeguro({ obraId, solicitacaoIds })
   ]);
 
   return {
@@ -455,7 +498,7 @@ async function obterGestaoObra(obraId) {
       .filter((id) => id > 0)
   );
 
-  const { custosExecutados: custosTitulos, parcelas } = summarizeTitulosByBuckets({
+  const { custosExecutados: custosTitulos, receitas } = summarizeTitulosByBuckets({
     titulos,
     solicitacoesMap,
     bucketMap
@@ -517,9 +560,13 @@ async function obterGestaoObra(obraId) {
       total_pago: kpis.custo_pago,
       itens: custosExecutados
     },
+    receitas: {
+      total: receitas.length,
+      itens: receitas
+    },
     parcelas: {
-      total: parcelas.length,
-      itens: parcelas
+      total: receitas.length,
+      itens: receitas
     },
     pedidos: {
       total: pedidos.length,
