@@ -29,9 +29,35 @@ function getPrazoInfo(solicitacao) {
     : { label: `Prazo ${formatDate(solicitacao.prazo_compra)}`, className: 'app-status-pill bg-emerald-100 text-emerald-700', atrasado: false };
 }
 
+function normalizeStatus(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
 function isCompraAberta(status) {
-  const normalized = String(status || '').toUpperCase();
-  return !['ENCERRADA', 'RECUSADA', 'CANCELADA'].includes(normalized);
+  const normalized = normalizeStatus(status);
+  return !['ENCERRADA', 'ENCERRADO', 'RECUSADA', 'CANCELADA'].includes(normalized);
+}
+
+function isPedidoCancelado(pedido) {
+  return normalizeStatus(pedido?.status) === 'CANCELADO';
+}
+
+function isPedidoFechadoComFornecedor(pedido) {
+  const normalized = normalizeStatus(pedido?.status);
+  return (
+    normalized === 'FECHADO_FORNECEDOR' ||
+    (normalized.includes('FECHADO') && normalized.includes('FORNECEDOR'))
+  );
+}
+
+function isCompraOcultaDelegacaoPorPedidos(solicitacao) {
+  const pedidos = Array.isArray(solicitacao?.pedidos) ? solicitacao.pedidos : [];
+  const ativos = pedidos.filter((pedido) => !isPedidoCancelado(pedido));
+  return ativos.length > 0 && ativos.every(isPedidoFechadoComFornecedor);
 }
 
 function renderMotivoRegistrado(label, motivo) {
@@ -102,6 +128,7 @@ export default function ComprasDelegacao() {
   const solicitacoesFiltradas = useMemo(() => {
     const termo = filtro.trim().toLowerCase();
     return solicitacoes
+      .filter((solicitacao) => !isCompraOcultaDelegacaoPorPedidos(solicitacao))
       .filter((solicitacao) => isCompraAberta(solicitacao.status))
       .filter((solicitacao) => {
         if (!termo) return true;
