@@ -293,6 +293,67 @@ function summarizeArquivos({ anexos, comprovantes, contratoAnexos }) {
   return arquivos.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
 }
 
+async function carregarComprovantesObraSeguro({ obraId, solicitacaoIds }) {
+  const whereBase = {
+    [Op.or]: [
+      { obra_id: obraId },
+      solicitacaoIds.length
+        ? { solicitacao_id: { [Op.in]: solicitacaoIds } }
+        : { solicitacao_id: null }
+    ]
+  };
+
+  const include = [
+    {
+      model: Solicitacao,
+      as: 'solicitacao',
+      required: false,
+      attributes: ['id', 'codigo']
+    }
+  ];
+
+  const options = {
+    where: {
+      deleted_at: null,
+      ...whereBase
+    },
+    include,
+    order: [['createdAt', 'DESC']],
+    limit: 50
+  };
+
+  try {
+    return await Comprovante.findAll(options);
+  } catch (error) {
+    if (!String(error?.message || '').includes('deleted_at')) {
+      throw error;
+    }
+
+    console.warn('Tabela de comprovantes sem coluna deleted_at na gestao da obra. Repetindo consulta em modo legado.', {
+      obra_id: obraId,
+      error: error.message
+    });
+
+    return Comprovante.findAll({
+      attributes: [
+        'id',
+        'nome_original',
+        'caminho_arquivo',
+        'solicitacao_id',
+        'obra_id',
+        'valor',
+        'status',
+        'createdAt',
+        'updatedAt'
+      ],
+      where: whereBase,
+      include,
+      order: [['createdAt', 'DESC']],
+      limit: 50
+    });
+  }
+}
+
 function buildKpis({ buckets, custosExecutados, pedidos }) {
   const investimentoTotal = roundCurrency(
     buckets.reduce((total, bucket) => total + asNumber(bucket.valor_orcado), 0)
@@ -404,27 +465,7 @@ async function carregarDadosObra(obraId) {
       order: [['createdAt', 'DESC']],
       limit: 50
     }),
-    Comprovante.findAll({
-      where: {
-        deleted_at: null,
-        [Op.or]: [
-          { obra_id: obraId },
-          solicitacaoIds.length
-            ? { solicitacao_id: { [Op.in]: solicitacaoIds } }
-            : { solicitacao_id: null }
-        ]
-      },
-      include: [
-        {
-          model: Solicitacao,
-          as: 'solicitacao',
-          required: false,
-          attributes: ['id', 'codigo']
-        }
-      ],
-      order: [['createdAt', 'DESC']],
-      limit: 50
-    })
+    carregarComprovantesObraSeguro({ obraId, solicitacaoIds })
   ]);
 
   return {
