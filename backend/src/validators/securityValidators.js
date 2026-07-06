@@ -118,21 +118,36 @@ function validateResetPasswordBody(body = {}) {
 }
 
 function validatePresignQuery(query = {}) {
-  ensureAllowedKeys(query, ['url', 'key'], 'Consulta de arquivo');
+  ensureAllowedKeys(query, ['url', 'key', 'historico_id'], 'Consulta de arquivo');
 
   if (query.url && query.key) {
     throw new ValidationError('Informe url ou key, nunca ambos.');
   }
 
-  const alvo = sanitizeString(query.url || query.key, 'Arquivo', {
-    required: true,
-    max: 2048
-  });
+  const alvo = query.url || query.key
+    ? sanitizeString(query.url || query.key, 'Arquivo', {
+        required: true,
+        max: 2048
+      })
+    : null;
+
+  const historicoId = query.historico_id
+    ? sanitizeString(query.historico_id, 'Historico', {
+        required: true,
+        max: 20,
+        pattern: /^\d+$/
+      })
+    : undefined;
+
+  if (!alvo && !historicoId) {
+    throw new ValidationError('Informe url, key ou historico_id.');
+  }
 
   return {
     ...query,
     url: query.url ? alvo : undefined,
-    key: query.key ? alvo : undefined
+    key: query.key ? alvo : undefined,
+    historico_id: historicoId
   };
 }
 
