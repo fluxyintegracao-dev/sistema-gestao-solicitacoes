@@ -317,6 +317,13 @@ function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function formatCurrencyForExport(value) {
+  return `R$ ${Number(value || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })}`;
+}
+
 function formatChequeTerceiroLabel(cheque) {
   const numero = cheque?.numero_cheque || cheque?.codigo || 'Sem numero';
   const titular = cheque?.titular_nome || cheque?.cliente_nome || cheque?.parceiroEntregou?.nome || 'Titular nao informado';
@@ -1570,10 +1577,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           columns.push({ key: 'vencimento', value: (titulo) => formatDate(titulo.data_vencimento) });
           break;
         case 'Valor total':
-          columns.push({ key: 'valor_total', value: (titulo) => formatCurrency(titulo.valor_original) });
+          columns.push({ key: 'valor_total', value: (titulo) => formatCurrencyForExport(titulo.valor_original) });
           break;
         case 'Saldo':
-          columns.push({ key: 'valor_saldo', value: (titulo) => formatCurrency(titulo.valor_saldo) });
+          columns.push({ key: 'valor_saldo', value: (titulo) => formatCurrencyForExport(titulo.valor_saldo) });
           break;
         default:
           break;
