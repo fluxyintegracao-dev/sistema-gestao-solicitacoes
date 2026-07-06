@@ -1,11 +1,22 @@
 const {
   atualizarEmpreendimento,
   criarEmpreendimento,
-  listarEmpreendimentos
+  listarEmpreendimentos,
+  listarObrasComerciais
 } = require('../services/comercialService');
 const { responderErroController } = require('../utils/controllerError');
 
 module.exports = {
+  async obras(req, res) {
+    try {
+      const data = await listarObrasComerciais();
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao listar obras comerciais');
+    }
+  },
+
   async index(req, res) {
     try {
       const data = await listarEmpreendimentos(req.query || {});

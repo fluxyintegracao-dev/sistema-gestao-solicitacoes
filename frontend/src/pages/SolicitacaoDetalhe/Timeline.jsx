@@ -26,17 +26,21 @@ export default function Timeline({
     return valor.replace(/%(?![0-9A-Fa-f]{2})/g, '%25');
   }
 
-  async function obterUrlAssinada(caminhoArquivo) {
+  async function obterUrlAssinada(caminhoArquivo, historicoId = null) {
     if (!caminhoArquivo) return null;
     if (!String(caminhoArquivo).startsWith('http')) {
       return fileUrl(caminhoArquivo);
     }
 
     const caminhoNormalizado = normalizarUrlArquivo(caminhoArquivo);
+    const params = new URLSearchParams({ url: caminhoNormalizado });
+    if (historicoId) {
+      params.set('historico_id', historicoId);
+    }
 
     try {
       const res = await fetch(
-        `${API_URL}/anexos/presign?url=${encodeURIComponent(caminhoNormalizado)}`,
+        `${API_URL}/anexos/presign?${params.toString()}`,
         { headers: authHeaders() }
       );
       if (!res.ok) throw new Error('Falha ao assinar URL');
@@ -48,8 +52,8 @@ export default function Timeline({
     }
   }
 
-  async function prepararPreviewArquivo(caminhoArquivo) {
-    const urlAssinada = await obterUrlAssinada(caminhoArquivo);
+  async function prepararPreviewArquivo(caminhoArquivo, historicoId = null) {
+    const urlAssinada = await obterUrlAssinada(caminhoArquivo, historicoId);
     if (!urlAssinada) {
       return { url: null, downloadUrl: null, isObjectUrl: false };
     }
@@ -64,9 +68,9 @@ export default function Timeline({
     setPreview(null);
   }
 
-  async function baixarArquivo(caminhoArquivo, nomeArquivo) {
+  async function baixarArquivo(caminhoArquivo, nomeArquivo, historicoId = null) {
     try {
-      const urlArquivo = await obterUrlAssinada(caminhoArquivo);
+      const urlArquivo = await obterUrlAssinada(caminhoArquivo, historicoId);
       if (!urlArquivo) throw new Error('Falha ao gerar link seguro para download');
 
       const link = document.createElement('a');
@@ -287,7 +291,7 @@ export default function Timeline({
                   <button
                     className="text-sm" style={{ color: 'var(--c-primary)' }}
                     onClick={async () => {
-                      const previewArquivo = await prepararPreviewArquivo(caminhoArquivo);
+                      const previewArquivo = await prepararPreviewArquivo(caminhoArquivo, h.id);
                       setPreview({
                         nome: h.descricao,
                         caminho: caminhoArquivo,
@@ -305,7 +309,7 @@ export default function Timeline({
                     onClick={async e => {
                       e.preventDefault();
                       e.stopPropagation();
-                      await baixarArquivo(caminhoArquivo, h.descricao);
+                      await baixarArquivo(caminhoArquivo, h.descricao, h.id);
                     }}
                   >
                     Download

@@ -865,6 +865,17 @@ async function listarEmpreendimentos(filters = {}) {
   });
 }
 
+async function listarObrasComerciais() {
+  return Obra.findAll({
+    attributes: ['id', 'codigo', 'nome', 'empresa_grupo_id', 'tipo_centro_custo', 'ativo'],
+    where: { ativo: true },
+    order: [
+      ['nome', 'ASC'],
+      ['codigo', 'ASC']
+    ]
+  });
+}
+
 async function criarEmpreendimento(payload = {}) {
   if (payload.obra_id) {
     await ensureObraExists(payload.obra_id);
@@ -2221,6 +2232,7 @@ module.exports = {
   excluirContratoComercial,
   listarContratosComerciais,
   listarEmpreendimentos,
+  listarObrasComerciais,
   listarTabelasPrecoComerciais,
   listarUnidadesComerciais,
   sincronizarStatusFinanceiroContratoComercial,

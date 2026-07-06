@@ -19,6 +19,34 @@ const {
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { publishSolicitacaoRealtimeEvent } = require('../services/solicitacaoRealtimeService');
 
+function parseHistoricoMetadata(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+
+  try {
+    return JSON.parse(metadata);
+  } catch {
+    return {};
+  }
+}
+
+async function obterCaminhoArquivoHistorico(historico) {
+  const metadata = parseHistoricoMetadata(historico?.metadata);
+  if (metadata?.caminho) {
+    return metadata.caminho;
+  }
+
+  if (!metadata?.anexo_id) {
+    return null;
+  }
+
+  const anexo = await Anexo.findByPk(metadata.anexo_id, {
+    attributes: ['id', 'caminho_arquivo']
+  });
+
+  return anexo?.caminho_arquivo || null;
+}
+
 async function validarAcessoSolicitacao(req, solicitacao) {
   if (!solicitacao) {
     return {
@@ -187,11 +215,41 @@ class AnexoController {
 
   async presign(req, res) {
     try {
-      const { url, key } = req.query;
+      const { url, key, historico_id: historicoId } = req.query;
       const alvo = url || key;
 
-      if (!alvo) {
+      if (!alvo && !historicoId) {
         return res.status(400).json({ error: 'url obrigatoria' });
+      }
+
+      if (historicoId) {
+        const historico = await Historico.findByPk(historicoId, {
+          attributes: ['id', 'solicitacao_id', 'acao', 'metadata']
+        });
+
+        if (!historico) {
+          return res.status(404).json({ error: 'Historico nao encontrado' });
+        }
+
+        const acoesComArquivo = ['ANEXO_ADICIONADO', 'COMPROVANTE_ADICIONADO'];
+        if (!acoesComArquivo.includes(String(historico.acao || '').trim().toUpperCase())) {
+          return res.status(400).json({ error: 'Historico nao possui arquivo para assinatura' });
+        }
+
+        const acessoHistorico = await canAccessSolicitacaoFile(req, historico.solicitacao_id);
+        if (!acessoHistorico.allowed) {
+          return res.status(acessoHistorico.status || 403).json({
+            error: acessoHistorico.error || 'Acesso negado ao arquivo do historico'
+          });
+        }
+
+        const caminhoHistorico = await obterCaminhoArquivoHistorico(historico);
+        if (!caminhoHistorico) {
+          return res.status(404).json({ error: 'Arquivo do historico nao encontrado' });
+        }
+
+        const signedUrl = await getPresignedUrl(caminhoHistorico);
+        return res.json({ url: signedUrl });
       }
 
       const arquivoRegistrado = await resolveRegisteredFileResource(alvo);

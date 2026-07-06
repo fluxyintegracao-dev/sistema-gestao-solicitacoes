@@ -36,6 +36,13 @@ export async function getEmpreendimentosComerciais(params = {}) {
   return parseJson(response, 'Erro ao buscar empreendimentos');
 }
 
+export async function getObrasComerciais() {
+  const response = await fetch(`${API_URL}/comercial/obras`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar obras comerciais');
+}
+
 export async function criarEmpreendimentoComercial(data) {
   const response = await fetch(`${API_URL}/comercial/empreendimentos`, {
     method: 'POST',

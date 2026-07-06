@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { getMinhasObras } from '../services/obras';
 import {
   atualizarEmpreendimentoComercial,
   criarEmpreendimentoComercial,
-  getEmpreendimentosComerciais
+  getEmpreendimentosComerciais,
+  getObrasComerciais
 } from '../services/comercial';
 import { maskCep, onlyDigits } from '../utils/formatters';
 
@@ -63,7 +63,7 @@ export default function ComercialEmpreendimentos() {
       setError('');
       const [empreendimentosData, obrasData] = await Promise.all([
         getEmpreendimentosComerciais(),
-        getMinhasObras()
+        getObrasComerciais()
       ]);
       setEmpreendimentos(Array.isArray(empreendimentosData) ? empreendimentosData : []);
       setObras(Array.isArray(obrasData) ? obrasData : []);
