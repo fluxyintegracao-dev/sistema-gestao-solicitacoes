@@ -2098,6 +2098,16 @@ module.exports = {
           error: 'Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.'
         });
       }
+      if (
+        (comportamentoTipo.exige_apropriacoes_contrato === true || campoObrigatorio('apropriacoes_contrato')) &&
+        campoVisivel('contrato') &&
+        contrato_id &&
+        rateioApropriacoes.length === 0
+      ) {
+        return res.status(400).json({
+          error: 'Selecione ao menos uma apropriacao do contrato para esta solicitacao.'
+        });
+      }
       if (campoObrigatorio('ref_contrato_abertura') && !ref_contrato_abertura) {
         return res.status(400).json({
           error: 'Para Abertura de Contrato, informe a ref do contrato.'

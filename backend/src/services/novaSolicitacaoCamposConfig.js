@@ -64,6 +64,17 @@ const CAMPOS_NOVA_SOLICITACAO = [
     obrigatorioPadrao: (behavior) => Boolean(behavior.exige_contrato)
   },
   {
+    id: 'apropriacoes_contrato',
+    label: 'Apropriacoes do contrato',
+    descricao: 'Rateio entre apropriacoes vinculadas ao contrato selecionado.',
+    visivelPadrao: (behavior) => Boolean(
+      behavior.mostrar_contrato ||
+      behavior.exige_contrato ||
+      behavior.exige_apropriacoes_contrato
+    ),
+    obrigatorioPadrao: (behavior) => Boolean(behavior.exige_apropriacoes_contrato)
+  },
+  {
     id: 'valor',
     label: 'Valor',
     descricao: 'Valor da solicitacao.',

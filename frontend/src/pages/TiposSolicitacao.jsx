@@ -30,7 +30,8 @@ const BEHAVIOR_FIELDS = [
   { key: 'mostrar_ref_contrato_abertura', label: 'Mostrar ref. contrato abertura' },
   { key: 'exige_ref_contrato_abertura', label: 'Exigir ref. contrato abertura' },
   { key: 'mostrar_itens_apropriacao', label: 'Mostrar itens de apropriacao' },
-  { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriacao' }
+  { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriacao' },
+  { key: 'exige_apropriacoes_contrato', label: 'Exigir apropriacoes do contrato' }
 ];
 
 function formatarRegrasTipo(tipo) {
