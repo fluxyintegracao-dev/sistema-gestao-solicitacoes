@@ -17,7 +17,6 @@ function defaultForm() {
     parceiro_reserva_id: '',
     codigo: '',
     nome: '',
-    bloco: '',
     torre: '',
     pavimento: '',
     metragem_privativa: '',
@@ -52,7 +51,6 @@ function pickForm(item = {}) {
     parceiro_reserva_id: item.parceiro_reserva_id ? String(item.parceiro_reserva_id) : '',
     codigo: String(item.codigo || '').replace(/\D/g, ''),
     nome: item.nome || '',
-    bloco: item.bloco || '',
     torre: item.torre || '',
     pavimento: item.pavimento || '',
     metragem_privativa: item.metragem_privativa || '',
@@ -129,7 +127,6 @@ export default function ComercialUnidades() {
       const blob = normalizeSearch([
         item.codigo,
         item.nome,
-        item.bloco,
         item.torre,
         item.fracao_ideal,
         item.empreendimento?.nome,
@@ -151,7 +148,6 @@ export default function ComercialUnidades() {
         parceiro_reserva_id: form.parceiro_reserva_id ? Number(form.parceiro_reserva_id) : undefined,
         codigo: form.codigo,
         nome: form.nome,
-        bloco: form.bloco,
         torre: form.torre,
         pavimento: form.pavimento,
         metragem_privativa: form.metragem_privativa || undefined,
@@ -249,11 +245,7 @@ export default function ComercialUnidades() {
                 </label>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="sol-filter-field">
-                  <span className="sol-filter-label">Bloco</span>
-                  <input className="input w-full" value={form.bloco} onChange={(event) => setForm((current) => ({ ...current, bloco: event.target.value }))} />
-                </label>
+              <div className="grid gap-3 md:grid-cols-2">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Torre</span>
                   <input className="input w-full" value={form.torre} onChange={(event) => setForm((current) => ({ ...current, torre: event.target.value }))} />

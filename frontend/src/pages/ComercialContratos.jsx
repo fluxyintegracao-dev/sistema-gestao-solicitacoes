@@ -3,7 +3,6 @@ import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
-import { getCategoriasFinanceiras } from '../services/financeiro';
 import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
@@ -16,6 +15,7 @@ import {
   gerarDocumentoContratoComercial,
   getContratoComercialById,
   getContratosComerciais,
+  getCategoriasFinanceirasComercial,
   getDocumentosContratoComercial,
   getEmpreendimentosComerciais,
   getLinkDocumentoContratoComercial,
@@ -673,7 +673,7 @@ export default function ComercialContratos() {
         buscarParceiros({ corretor: 1, ativo: 1, limit: 300 }),
         buscarParceiros({ testemunha: 1, ativo: 1, limit: 300 }),
         getObrasComerciais(),
-        getCategoriasFinanceiras(),
+        getCategoriasFinanceirasComercial(),
         getContratosComerciais(),
         getComercialCategoriasContrato().catch(() => null),
         getModelosContratoComercial().catch(() => [])

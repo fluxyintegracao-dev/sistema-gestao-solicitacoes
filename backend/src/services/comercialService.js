@@ -35,6 +35,11 @@ function normalizeSearch(value) {
   return String(value || '').trim();
 }
 
+function normalizeOptionalText(value) {
+  const text = String(value || '').trim();
+  return text || null;
+}
+
 function normalizeContractStatus(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) {
@@ -111,6 +116,38 @@ async function ensureCategoriaPermitidaNoComercial(categoriaId, campo) {
         : 'Categoria financeira nao esta liberada para contratos comerciais.'
     );
   }
+}
+
+async function listarCategoriasFinanceirasComercial(filters = {}) {
+  const config = await getComercialCategoriasContratoConfig();
+  const permitidas = new Set([
+    ...normalizarIdList(config?.contrato_venda_categoria_ids),
+    ...normalizarIdList(config?.comissao_categoria_ids)
+  ]);
+  const term = normalizeSearch(filters.q || filters.busca);
+  const where = {
+    ativo: true,
+    considera_dre: true,
+    tipo: { [Op.in]: ['PAGAR', 'RECEBER', 'AMBOS'] }
+  };
+
+  if (permitidas.size > 0) {
+    where.id = { [Op.in]: Array.from(permitidas) };
+  }
+
+  if (term) {
+    where[Op.or] = [
+      { codigo: { [Op.like]: `%${term}%` } },
+      { nome: { [Op.like]: `%${term}%` } },
+      { dre_grupo: { [Op.like]: `%${term}%` } },
+      { dre_subgrupo: { [Op.like]: `%${term}%` } }
+    ];
+  }
+
+  return CategoriaFinanceira.findAll({
+    where,
+    order: [['codigo', 'ASC'], ['nome', 'ASC']]
+  });
 }
 
 function mergeObservacoes(...values) {
@@ -543,10 +580,25 @@ async function ensureUniqueContratoNumero(numero, contratoId = null) {
   }
 }
 
-async function ensureUniqueUnidadeCodigo(empreendimentoId, codigo, unidadeId = null) {
+function buildUnidadeTorreWhere(torre) {
+  const normalized = normalizeOptionalText(torre);
+  if (normalized) {
+    return { torre: normalized };
+  }
+
+  return {
+    [Op.or]: [
+      { torre: null },
+      { torre: '' }
+    ]
+  };
+}
+
+async function ensureUniqueUnidadeCodigo(empreendimentoId, codigo, torre = null, unidadeId = null) {
   const where = {
     empreendimento_id: empreendimentoId,
-    codigo
+    codigo,
+    ...buildUnidadeTorreWhere(torre)
   };
 
   if (unidadeId) {
@@ -555,7 +607,7 @@ async function ensureUniqueUnidadeCodigo(empreendimentoId, codigo, unidadeId = n
 
   const existing = await UnidadeComercial.findOne({ where });
   if (existing) {
-    throw createHttpError(400, 'Ja existe uma unidade com este codigo no empreendimento.');
+    throw createHttpError(400, 'Ja existe uma unidade com este codigo nesta torre do empreendimento.');
   }
 }
 
@@ -941,7 +993,8 @@ async function listarUnidadesComerciais(filters = {}) {
 
 async function criarUnidadeComercial(payload = {}) {
   await ensureEmpreendimentoExists(payload.empreendimento_id);
-  await ensureUniqueUnidadeCodigo(payload.empreendimento_id, payload.codigo);
+  const torre = normalizeOptionalText(payload.torre);
+  await ensureUniqueUnidadeCodigo(payload.empreendimento_id, payload.codigo, torre);
 
   if (payload.parceiro_reserva_id) {
     await ensureClienteParceiro(payload.parceiro_reserva_id);
@@ -953,7 +1006,7 @@ async function criarUnidadeComercial(payload = {}) {
     codigo: payload.codigo,
     nome: payload.nome || null,
     bloco: payload.bloco || null,
-    torre: payload.torre || null,
+    torre,
     pavimento: payload.pavimento || null,
     tipologia: payload.tipologia || null,
     metragem_privativa: payload.metragem_privativa ?? null,
@@ -977,15 +1030,26 @@ async function atualizarUnidadeComercial(id, payload = {}) {
     await ensureEmpreendimentoExists(payload.empreendimento_id);
   }
 
-  if (payload.codigo) {
-    await ensureUniqueUnidadeCodigo(empreendimentoId, payload.codigo, unidade.id);
+  const updatePayload = { ...payload };
+  const deveValidarCodigo = Object.prototype.hasOwnProperty.call(payload, 'codigo')
+    || Object.prototype.hasOwnProperty.call(payload, 'torre')
+    || Object.prototype.hasOwnProperty.call(payload, 'empreendimento_id');
+  const codigo = Object.prototype.hasOwnProperty.call(payload, 'codigo') ? payload.codigo : unidade.codigo;
+  const torre = Object.prototype.hasOwnProperty.call(payload, 'torre') ? normalizeOptionalText(payload.torre) : unidade.torre;
+
+  if (deveValidarCodigo) {
+    await ensureUniqueUnidadeCodigo(empreendimentoId, codigo, torre, unidade.id);
+  }
+
+  if (Object.prototype.hasOwnProperty.call(updatePayload, 'torre')) {
+    updatePayload.torre = normalizeOptionalText(updatePayload.torre);
   }
 
   if (payload.parceiro_reserva_id) {
     await ensureClienteParceiro(payload.parceiro_reserva_id);
   }
 
-  await unidade.update(payload);
+  await unidade.update(updatePayload);
   return ensureUnidadeExists(id);
 }
 
@@ -2230,6 +2294,7 @@ module.exports = {
   criarUnidadeComercial,
   distratarContratoComercial,
   excluirContratoComercial,
+  listarCategoriasFinanceirasComercial,
   listarContratosComerciais,
   listarEmpreendimentos,
   listarObrasComerciais,
