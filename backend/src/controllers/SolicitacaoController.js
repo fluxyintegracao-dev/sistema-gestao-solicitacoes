@@ -392,6 +392,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
   );
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
+  const isSetorObra = await isSetorObraGeral(req);
   const setoresExtrasVisiveisUsuario = await obterSetoresExtrasVisiveisUsuario(req.user.id);
   const temPermissoesAreasConfiguradas = await userHasConfiguredAreaPermissions(req.user);
   const [
@@ -457,7 +458,12 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
       })
     ]);
 
-    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+    const acessoPorObraVinculada =
+      isSetorObra &&
+      podeVerSolicitacoesProprias &&
+      acessoObra;
+
+    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario && !acessoPorObraVinculada) {
       return {
         allowed: false,
         status: 403,
@@ -595,7 +601,6 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
     }
   }
 
-  const isSetorObra = await isSetorObraGeral(req);
   if (perfil !== 'SUPERADMIN' && !isSetorAdministrativo && !isUsuarioGeo && !isSetorObra) {
     const permitidoPorEscopo = await solicitacaoAtendeEscopoOperacionalUsuario({
       req,

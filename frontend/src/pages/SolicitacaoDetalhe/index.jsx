@@ -245,12 +245,9 @@ export default function SolicitacaoDetalhe() {
       solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)
     );
   const podeAlterarStatus =
-    !isSetorObra &&
-    (
-      isSuperadmin ||
-      podeAlterarStatusQualquerSetor ||
-      solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)
-    );
+    isSuperadmin ||
+    podeAlterarStatusQualquerSetor ||
+    solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user);
   const podeMarcarPendenciaFinanceira = isSuperadmin || isSetorGeo || isSetorFinanceiro;
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
