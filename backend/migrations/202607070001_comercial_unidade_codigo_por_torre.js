@@ -9,6 +9,12 @@ module.exports = {
 
     const queryInterface = sequelize.getQueryInterface();
 
+    if (!(await indexExists(sequelize, tableName, 'idx_unidades_comerciais_empreendimento'))) {
+      await queryInterface.addIndex(tableName, ['empreendimento_id'], {
+        name: 'idx_unidades_comerciais_empreendimento'
+      });
+    }
+
     if (await indexExists(sequelize, tableName, 'uk_unidades_comerciais_codigo')) {
       await queryInterface.removeIndex(tableName, 'uk_unidades_comerciais_codigo');
     }
