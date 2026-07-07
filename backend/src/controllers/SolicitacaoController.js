@@ -1222,7 +1222,7 @@ module.exports = {
     try {
       const { id: usuarioId } = req.user;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      let areaUsuario = req.user?.area || null;
+      let areaUsuario = null;
       const {
         area,
         status,
@@ -1320,10 +1320,8 @@ module.exports = {
           },
           attributes: ['id', 'codigo', 'nome']
         });
-        if (!areaUsuario) {
-          areaUsuario = setorAtual?.codigo || setorAtual?.nome || null;
-        }
       }
+      areaUsuario = resolveSetorPersistenciaValue(setorAtual, req.user?.area);
       if (areaUsuario) {
         areaUsuario = String(areaUsuario).trim().toUpperCase();
       }
