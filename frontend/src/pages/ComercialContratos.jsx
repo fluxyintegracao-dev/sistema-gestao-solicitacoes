@@ -3,7 +3,6 @@ import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
-import { getComercialCategoriasContrato } from '../services/configuracoesSistema';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
@@ -666,7 +665,7 @@ export default function ComercialContratos() {
     try {
       setLoading(true);
       setError('');
-      const [empreData, unidData, clientesData, corretoresData, testemunhasData, obrasData, categoriasData, contratosData, categoriaConfigData, modelosData] = await Promise.all([
+      const [empreData, unidData, clientesData, corretoresData, testemunhasData, obrasData, categoriasData, contratosData, modelosData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
         getUnidadesComerciais({ ativo: 1 }),
         buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
@@ -675,7 +674,6 @@ export default function ComercialContratos() {
         getObrasComerciais(),
         getCategoriasFinanceirasComercial(),
         getContratosComerciais(),
-        getComercialCategoriasContrato().catch(() => null),
         getModelosContratoComercial().catch(() => [])
       ]);
       setEmpreendimentos(Array.isArray(empreData) ? empreData : []);
@@ -684,7 +682,11 @@ export default function ComercialContratos() {
       setCorretores(Array.isArray(corretoresData) ? corretoresData : []);
       setTestemunhas(Array.isArray(testemunhasData) ? testemunhasData : []);
       setObras(Array.isArray(obrasData) ? obrasData : []);
-      setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
+      const categoriasPayload = Array.isArray(categoriasData?.categorias)
+        ? categoriasData.categorias
+        : (Array.isArray(categoriasData) ? categoriasData : []);
+      const categoriaConfigData = categoriasData?.config || null;
+      setCategorias(categoriasPayload);
       if (categoriaConfigData) {
         setCategoriaConfig({
           contrato_venda_categoria_ids: Array.isArray(categoriaConfigData.contrato_venda_categoria_ids)
