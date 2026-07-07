@@ -171,18 +171,44 @@ function parseImportDate(value) {
   return parsed.toISOString().slice(0, 10);
 }
 
-function parseImportDecimal(value) {
+function parseImportDecimal(value, fieldName = 'Valor numerico') {
   const raw = String(value || '').trim();
   if (!raw) {
     return undefined;
   }
 
-  const normalized = raw.includes(',')
-    ? raw.replace(/\./g, '').replace(',', '.')
-    : raw;
+  let normalized = raw
+    .replace(/\s/g, '')
+    .replace(/^R\$/i, '')
+    .replace(/[^\d,.-]/g, '');
+
+  if (!normalized || ['-', '.', ','].includes(normalized)) {
+    return undefined;
+  }
+
+  const hasComma = normalized.includes(',');
+  const hasDot = normalized.includes('.');
+
+  if (hasComma && hasDot) {
+    normalized = normalized.lastIndexOf(',') > normalized.lastIndexOf('.')
+      ? normalized.replace(/\./g, '').replace(',', '.')
+      : normalized.replace(/,/g, '');
+  } else if (hasComma) {
+    normalized = normalized.replace(/\./g, '').replace(',', '.');
+  } else if (hasDot) {
+    const parts = normalized.split('.');
+    const looksLikeThousands = parts.length > 2 || (
+      parts.length === 2 && parts[1].length === 3 && parts[0].length <= 3
+    );
+
+    if (looksLikeThousands) {
+      normalized = normalized.replace(/\./g, '');
+    }
+  }
+
   const parsed = Number(normalized);
   if (!Number.isFinite(parsed)) {
-    throw new ValidationError('Valor numerico invalido na importacao.');
+    throw new ValidationError(`${fieldName} invalido na importacao.`);
   }
 
   return parsed;
@@ -1333,8 +1359,14 @@ async function importarColaboradoresRh(file, user) {
         data_demissao: parseImportDate(pickImportValue(row, ['data_demissao', 'demissao', 'desligamento'])) || undefined,
         data_nascimento: parseImportDate(pickImportValue(row, ['data_nascimento', 'nascimento'])) || undefined,
         status: normalizeToken(pickImportValue(row, ['status'])) || 'ATIVO',
-        salario_base: parseImportDecimal(pickImportValue(row, ['salario_base', 'salario'])) || undefined,
-        valor_contratual: parseImportDecimal(pickImportValue(row, ['valor_contratual', 'valor_contrato'])) || undefined,
+        salario_base: parseImportDecimal(
+          pickImportValue(row, ['salario_base', 'salario']),
+          'Salario base'
+        ) || undefined,
+        valor_contratual: parseImportDecimal(
+          pickImportValue(row, ['valor_contratual', 'valor_contrato']),
+          'Valor contratual'
+        ) || undefined,
         observacoes: String(pickImportValue(row, ['observacoes']) || '').trim() || undefined,
         pagamento: {
           favorecido_nome: String(
