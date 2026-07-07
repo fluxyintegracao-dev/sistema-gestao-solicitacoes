@@ -26,6 +26,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(14),
       allowNull: false
     },
+    parceiro_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     matricula: {
       type: DataTypes.STRING(60),
       allowNull: true

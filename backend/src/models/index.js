@@ -1268,6 +1268,16 @@ db.RhColaborador.belongsTo(db.Setor, {
   as: 'setor'
 });
 
+db.Parceiro.hasMany(db.RhColaborador, {
+  foreignKey: 'parceiro_id',
+  as: 'rhColaboradores'
+});
+
+db.RhColaborador.belongsTo(db.Parceiro, {
+  foreignKey: 'parceiro_id',
+  as: 'parceiro'
+});
+
 db.RhColaborador.hasOne(db.RhColaboradorPagamento, {
   foreignKey: 'colaborador_id',
   as: 'pagamento',

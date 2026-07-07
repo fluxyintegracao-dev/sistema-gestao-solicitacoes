@@ -2,6 +2,7 @@ const XLSX = require('xlsx');
 const { Op } = require('sequelize');
 const {
   Obra,
+  Parceiro,
   RhColaborador,
   RhColaboradorPagamento,
   RhDocumento,
@@ -40,6 +41,11 @@ const COLABORADOR_INCLUDE = [
   {
     model: RhColaboradorPagamento,
     as: 'pagamento'
+  },
+  {
+    model: Parceiro,
+    as: 'parceiro',
+    attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email', 'fornecedor', 'ativo']
   }
 ];
 
@@ -420,6 +426,112 @@ async function upsertPagamentoColaborador(colaboradorId, pagamento, transaction)
 
   await existing.update(payload, { transaction });
   return existing;
+}
+
+function inferTipoPessoaParceiro(documento) {
+  const digits = normalizeDigits(documento);
+  if (digits.length === 14) return 'J';
+  return 'F';
+}
+
+function inferPixTipoChave(chavePix, documentoFallback) {
+  const raw = String(chavePix || '').trim();
+  if (!raw) return null;
+  if (raw.includes('@')) return 'EMAIL';
+
+  const digits = normalizeDigits(raw);
+  const documento = normalizeDigits(documentoFallback);
+  if (digits.length === 14) return 'CNPJ';
+  if (digits.length === 11) {
+    return documento && digits === documento ? 'CPF' : 'TELEFONE';
+  }
+  if (digits.length === 10) return 'TELEFONE';
+  return 'ALEATORIA';
+}
+
+function normalizePixChaveForType(tipoChave, chavePix) {
+  const raw = String(chavePix || '').trim();
+  if (!raw) return null;
+
+  const tipo = String(tipoChave || '').toUpperCase();
+  if (['CPF', 'CNPJ', 'TELEFONE'].includes(tipo)) {
+    return normalizeDigits(raw);
+  }
+  if (tipo === 'EMAIL') {
+    return raw.toLowerCase();
+  }
+  return raw;
+}
+
+function buildParceiroPixPayload(pagamento = {}, documento) {
+  const pixMap = [
+    ['chave_pix', 'pix_chave_fixa_1_tipo', 'pix_chave_fixa_1'],
+    ['chave_pix_secundaria', 'pix_chave_fixa_2_tipo', 'pix_chave_fixa_2'],
+    ['chave_pix_variavel', 'pix_chave_variavel_tipo', 'pix_chave_variavel']
+  ];
+
+  return pixMap.reduce((payload, [source, tipoField, chaveField]) => {
+    const raw = String(pagamento?.[source] || '').trim();
+    if (!raw) {
+      return payload;
+    }
+
+    const tipo = inferPixTipoChave(raw, documento);
+    payload[tipoField] = tipo;
+    payload[chaveField] = normalizePixChaveForType(tipo, raw);
+    return payload;
+  }, {});
+}
+
+async function sincronizarParceiroColaborador(colaboradorData = {}, pagamentoData = {}, transaction) {
+  const documento = normalizeDigits(colaboradorData.cpf || pagamentoData?.favorecido_documento);
+  if (![11, 14].includes(documento.length)) {
+    return null;
+  }
+
+  const nome = String(colaboradorData.nome || pagamentoData?.favorecido_nome || '').trim();
+  const telefone = String(colaboradorData.telefone || '').trim();
+  const email = String(colaboradorData.email || '').trim();
+  const pixPayload = buildParceiroPixPayload(pagamentoData, documento);
+
+  let parceiro = await Parceiro.findOne({
+    where: { cpf_cnpj: documento },
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+
+  if (!parceiro) {
+    parceiro = await Parceiro.create(
+      {
+        cpf_cnpj: documento,
+        nome: nome || `Colaborador ${documento}`,
+        telefone: telefone || null,
+        email: email || null,
+        tipo_pessoa: inferTipoPessoaParceiro(documento),
+        cliente: false,
+        fornecedor: true,
+        corretor: false,
+        testemunha: false,
+        ativo: true,
+        ...pixPayload
+      },
+      { transaction }
+    );
+
+    return parceiro;
+  }
+
+  const updatePayload = {
+    fornecedor: true,
+    ativo: true,
+    ...(nome ? { nome } : {}),
+    ...(telefone ? { telefone } : {}),
+    ...(email ? { email } : {}),
+    ...pixPayload
+  };
+
+  await parceiro.update(updatePayload, { transaction });
+  return parceiro;
 }
 
 async function listarTiposDocumentoRh(filters = {}) {
@@ -841,10 +953,13 @@ async function criarColaboradorRh(data, user) {
     await ensureSetorExists(data.setor_id, transaction);
     await assertUniqueColaborador(data, null, transaction);
 
+    const parceiro = await sincronizarParceiroColaborador(data, data.pagamento, transaction);
+
     const created = await RhColaborador.create(
       {
         ...data,
         data_inicio: data.data_inicio || data.data_admissao,
+        parceiro_id: parceiro?.id || null,
         pagamento: undefined,
         criado_por: user?.id || null,
         atualizado_por: user?.id || null
@@ -906,7 +1021,21 @@ async function atualizarColaboradorRh(id, data, user) {
     );
 
     await colaborador.update(collaboratorPayload, { transaction });
-    await upsertPagamentoColaborador(colaborador.id, data.pagamento, transaction);
+    const pagamento = await upsertPagamentoColaborador(colaborador.id, data.pagamento, transaction);
+    const parceiro = await sincronizarParceiroColaborador(
+      {
+        nome: colaborador.nome,
+        cpf: colaborador.cpf,
+        telefone: colaborador.telefone,
+        email: colaborador.email
+      },
+      pagamento ? pagamento.get({ plain: true }) : data.pagamento,
+      transaction
+    );
+
+    if (parceiro && Number(colaborador.parceiro_id) !== Number(parceiro.id)) {
+      await colaborador.update({ parceiro_id: parceiro.id }, { transaction });
+    }
 
     return RhColaborador.findByPk(colaborador.id, {
       include: COLABORADOR_INCLUDE,
