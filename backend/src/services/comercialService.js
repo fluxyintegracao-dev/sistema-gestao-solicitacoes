@@ -127,7 +127,6 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
   const term = normalizeSearch(filters.q || filters.busca);
   const where = {
     ativo: true,
-    considera_dre: true,
     tipo: { [Op.in]: ['PAGAR', 'RECEBER', 'AMBOS'] }
   };
 
@@ -137,17 +136,27 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
 
   if (term) {
     where[Op.or] = [
-      { codigo: { [Op.like]: `%${term}%` } },
       { nome: { [Op.like]: `%${term}%` } },
       { dre_grupo: { [Op.like]: `%${term}%` } },
       { dre_subgrupo: { [Op.like]: `%${term}%` } }
     ];
   }
 
-  return CategoriaFinanceira.findAll({
+  const categorias = await CategoriaFinanceira.findAll({
     where,
-    order: [['codigo', 'ASC'], ['nome', 'ASC']]
+    order: [['nome', 'ASC']]
   });
+
+  return {
+    categorias,
+    config: config
+      ? {
+          contrato_venda_categoria_ids: normalizarIdList(config.contrato_venda_categoria_ids),
+          comissao_categoria_ids: normalizarIdList(config.comissao_categoria_ids),
+          opcoes_pagamento: config.opcoes_pagamento || {}
+        }
+      : null
+  };
 }
 
 function mergeObservacoes(...values) {
