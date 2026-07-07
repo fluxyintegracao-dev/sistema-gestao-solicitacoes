@@ -112,6 +112,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'solicitacoes.acoes.criar', label: 'Criar solicitação', descricao: 'Permite abrir novas solicitações.' },
           { key: 'solicitacoes.acoes.aprovar', label: 'Aprovar / rejeitar', descricao: 'Permite aprovar ou rejeitar solicitações pendentes.' },
           { key: 'solicitacoes.acoes.ver_aba_financeiro', label: 'Ver aba Financeiro', descricao: 'Exibe a aba de títulos financeiros dentro de uma solicitação.' },
+          { key: 'solicitacoes.acoes.alterar_status_qualquer_setor', label: 'Alterar status em qualquer setor', descricao: 'Permite alterar o status de solicitações em outros setores usando os status do setor do próprio usuário.' },
           { key: 'solicitacoes.acoes.alterar_valor', label: 'Alterar valor da solicitação', descricao: 'Permite editar o valor financeiro da solicitação sem exigir perfil administrativo do GEO.' },
           { key: 'solicitacoes.acoes.alterar_data_vencimento', label: 'Alterar data de vencimento', descricao: 'Permite editar a data de vencimento da solicitação sem exigir perfil administrativo do GEO.' }
         ]

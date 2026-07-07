@@ -24,7 +24,9 @@ import {
   canAccessFinanceiro,
   canDeleteSolicitacaoAnexo,
   canViewSolicitacaoFinanceiro,
-  hasEnabledModule
+  hasConfiguredAreaPermissions,
+  hasEnabledModule,
+  hasPermissao
 } from '../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../utils/navigation';
 
@@ -46,6 +48,9 @@ export default function SolicitacaoDetalhe() {
   const podeAcessarModuloFinanceiro = canAccessFinanceiro(user);
   const isFinanceiro = canViewSolicitacaoFinanceiro(user);
   const podeEnviarQualquerSetor = Boolean(user?.pode_enviar_qualquer_setor);
+  const podeAlterarStatusQualquerSetor =
+    hasConfiguredAreaPermissions(user) &&
+    hasPermissao(user, 'solicitacoes.acoes.alterar_status_qualquer_setor');
   const podeInformarPagamento = isSuperadmin || isSetorFinanceiro;
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
@@ -239,6 +244,13 @@ export default function SolicitacaoDetalhe() {
       podeEnviarQualquerSetor ||
       solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)
     );
+  const podeAlterarStatus =
+    !isSetorObra &&
+    (
+      isSuperadmin ||
+      podeAlterarStatusQualquerSetor ||
+      solicitacaoEstaNoSetorDoUsuario(solicitacao.area_responsavel, user)
+    );
   const podeMarcarPendenciaFinanceira = isSuperadmin || isSetorGeo || isSetorFinanceiro;
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
@@ -269,7 +281,7 @@ export default function SolicitacaoDetalhe() {
         solicitacao={solicitacao}
         onAlterarStatus={() => setModalStatus(true)}
         onEnviarSetor={() => setModalEnviarSetor(true)}
-        mostrarAlterarStatus
+        mostrarAlterarStatus={podeAlterarStatus}
         mostrarEnviarSetor={podeEnviarSetor}
         mostrarContratoInfo={moduloContratosHabilitado}
         mostrarApropriacaoInfo={moduloComprasHabilitado}
