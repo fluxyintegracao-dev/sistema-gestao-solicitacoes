@@ -90,6 +90,9 @@ const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
 const SOLICITACOES_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const PERMISSAO_SOLICITACOES_VISUALIZAR_MINHAS = 'solicitacoes.lista.visualizar_minhas';
+const PERMISSAO_SOLICITACOES_VISUALIZAR_SETOR = 'solicitacoes.lista.visualizar_setor';
+const PERMISSAO_SOLICITACOES_VISUALIZAR_TODAS = 'solicitacoes.lista.visualizar_todas';
 const SOLICITACAO_RESPONSAVEL_ACTIONS = [
   'RESPONSAVEL_ATRIBUIDO',
   'RESPONSAVEL_ASSUMIU',
@@ -390,6 +393,78 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
   const setoresExtrasVisiveisUsuario = await obterSetoresExtrasVisiveisUsuario(req.user.id);
+  const temPermissoesAreasConfiguradas = await userHasConfiguredAreaPermissions(req.user);
+  const [
+    podeVerSolicitacoesProprias,
+    podeVerSolicitacoesSetor,
+    permissaoVerTodasSolicitacoes
+  ] = await Promise.all([
+    userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_MINHAS]),
+    userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_SETOR]),
+    userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_TODAS])
+  ]);
+  const podeVerTodasSolicitacoes = temPermissoesAreasConfiguradas && permissaoVerTodasSolicitacoes;
+
+  if (
+    perfil !== 'SUPERADMIN' &&
+    temPermissoesAreasConfiguradas &&
+    !podeVerSolicitacoesProprias &&
+    !podeVerSolicitacoesSetor &&
+    !podeVerTodasSolicitacoes
+  ) {
+    return {
+      allowed: false,
+      status: 403,
+      error: 'Acesso negado'
+    };
+  }
+
+  if (
+    perfil !== 'SUPERADMIN' &&
+    temPermissoesAreasConfiguradas &&
+    !podeVerSolicitacoesSetor &&
+    !podeVerTodasSolicitacoes
+  ) {
+    const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
+    const [historicoResponsavel, mencaoUsuario] = await Promise.all([
+      Historico.findOne({
+        where: {
+          solicitacao_id: solicitacao.id,
+          usuario_responsavel_id: req.user.id,
+          acao: {
+            [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU']
+          }
+        },
+        attributes: ['id']
+      }),
+      NotificacaoDestinatario.findOne({
+        include: [
+          {
+            model: Notificacao,
+            as: 'notificacao',
+            required: true,
+            where: {
+              solicitacao_id: solicitacao.id,
+              tipo: 'MENCAO_COMENTARIO'
+            },
+            attributes: ['id']
+          }
+        ],
+        where: {
+          usuario_id: req.user.id
+        },
+        attributes: ['id']
+      })
+    ]);
+
+    if (!itemCriadoPeloUsuario && !historicoResponsavel && !mencaoUsuario) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Acesso negado'
+      };
+    }
+  }
 
   if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
     const itemCriadoPeloUsuario = Number(solicitacao.criado_por) === Number(req.user.id);
@@ -1334,12 +1409,16 @@ module.exports = {
       const isSetorObra = await isSetorObraGeral(req);
       const isUsuarioGeo = await isUsuarioSetorGeo(req);
       const temPermissoesAreasConfiguradas = await userHasConfiguredAreaPermissions(req.user);
-      const podeVerSolicitacoesProprias = await userHasAreaPermission(req.user, [
-        'solicitacoes.lista.visualizar_minhas'
+      const [
+        podeVerSolicitacoesProprias,
+        podeVerSolicitacoesSetor,
+        permissaoVerTodasSolicitacoes
+      ] = await Promise.all([
+        userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_MINHAS]),
+        userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_SETOR]),
+        userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_TODAS])
       ]);
-      const podeVerTodasSolicitacoes = temPermissoesAreasConfiguradas && await userHasAreaPermission(req.user, [
-        'solicitacoes.lista.visualizar_todas'
-      ]);
+      const podeVerTodasSolicitacoes = temPermissoesAreasConfiguradas && permissaoVerTodasSolicitacoes;
 
       const setorTokensBase = [
         setorAtual?.codigo,
@@ -1363,12 +1442,22 @@ module.exports = {
       const modoRecebimentoSetorUsuario = await obterModoRecebimentoSetor(setorTokens);
       const setorTodosVisiveis = modoRecebimentoSetorUsuario === 'TODOS_VISIVEIS';
 
-      if (isSetorAdministrativo && perfil !== 'SUPERADMIN') {
-        where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({
-          [Op.or]: [
+      if (
+        perfil !== 'SUPERADMIN' &&
+        temPermissoesAreasConfiguradas &&
+        !podeVerSolicitacoesProprias &&
+        !podeVerSolicitacoesSetor &&
+        !podeVerTodasSolicitacoes
+      ) {
+        where.id = -1;
+      }
+
+      if (isSetorAdministrativo && perfil !== 'SUPERADMIN' && !podeVerTodasSolicitacoes) {
+        const condicoesAdministrativo = [];
+
+        if (!temPermissoesAreasConfiguradas || podeVerSolicitacoesProprias) {
+          condicoesAdministrativo.push(
             { criado_por: usuarioId },
-            ...montarCondicoesVisibilidadeSetores(setoresExtrasUsuario),
             {
               id: {
                 [Op.in]: Sequelize.literal(`(
@@ -1390,30 +1479,70 @@ module.exports = {
                 )`)
               }
             }
-          ]
+          );
+        }
+
+        if (!temPermissoesAreasConfiguradas || podeVerSolicitacoesSetor) {
+          condicoesAdministrativo.push(...montarCondicoesVisibilidadeSetores(setoresExtrasUsuario));
+        }
+
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: condicoesAdministrativo.length > 0 ? condicoesAdministrativo : [{ id: -1 }]
         });
       }
 
-      if (!isSetorAdministrativo && perfil !== 'SUPERADMIN' && adminGEO) {
+      if (!isSetorAdministrativo && perfil !== 'SUPERADMIN' && adminGEO && !podeVerTodasSolicitacoes) {
         // ADMIN GEO ve solicitacoes do setor GEO/gerencia de processos
         // e tambem solicitacoes que ja passaram por esse setor.
         where[Op.and] = where[Op.and] || [];
-        const tokensGeoUsuario = setorTokens.filter(isGeoToken);
-        const tokensGeoEExtrasUsuario = Array.from(new Set([
-          ...tokensGeoUsuario,
-          ...setoresExtrasUsuario
-        ]));
-        const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoEExtrasUsuario);
-        where[Op.and].push({
-          [Op.or]: [
-            { area_responsavel: { [Op.in]: tokensGeoEExtrasUsuario } },
-            literalHistoricoGeoUsuario ? {
-              id: {
-                [Op.in]: literalHistoricoGeoUsuario
+        if (temPermissoesAreasConfiguradas && !podeVerSolicitacoesSetor) {
+          const condicoesGeoMinhas = [];
+          if (podeVerSolicitacoesProprias) {
+            condicoesGeoMinhas.push(
+              { criado_por: usuarioId },
+              {
+                id: {
+                  [Op.in]: Sequelize.literal(`(
+                    SELECT solicitacao_id
+                    FROM historicos
+                    WHERE usuario_responsavel_id = ${usuarioId}
+                      AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  )`)
+                }
+              },
+              {
+                id: {
+                  [Op.in]: Sequelize.literal(`(
+                    SELECT n.solicitacao_id
+                    FROM notificacoes n
+                    INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
+                    WHERE nd.usuario_id = ${usuarioId}
+                      AND n.tipo = 'MENCAO_COMENTARIO'
+                  )`)
+                }
               }
-            } : null
-          ].filter(Boolean)
-        });
+            );
+          }
+          where[Op.and].push({ [Op.or]: condicoesGeoMinhas.length > 0 ? condicoesGeoMinhas : [{ id: -1 }] });
+        } else {
+          const tokensGeoUsuario = setorTokens.filter(isGeoToken);
+          const tokensGeoEExtrasUsuario = Array.from(new Set([
+            ...tokensGeoUsuario,
+            ...setoresExtrasUsuario
+          ]));
+          const literalHistoricoGeoUsuario = montarLiteralHistoricoSetoresEnvolvidos(tokensGeoEExtrasUsuario);
+          where[Op.and].push({
+            [Op.or]: [
+              { area_responsavel: { [Op.in]: tokensGeoEExtrasUsuario } },
+              literalHistoricoGeoUsuario ? {
+                id: {
+                  [Op.in]: literalHistoricoGeoUsuario
+                }
+              } : null
+            ].filter(Boolean)
+          });
+        }
       }
 
       // Setor OBRA: "Ver proprias" equivale a criadas pelo usuario + obras vinculadas.
@@ -1432,28 +1561,27 @@ module.exports = {
       }
 
       // SUPERADMIN ve tudo; demais passam por regra de visibilidade
-      if (perfil !== 'SUPERADMIN' && !isSetorAdministrativo && !adminGEO && !isSetorObra) {
+      if (
+        perfil !== 'SUPERADMIN' &&
+        !isSetorAdministrativo &&
+        !adminGEO &&
+        !isSetorObra &&
+        !podeVerTodasSolicitacoes
+      ) {
         const condicoes = [];
 
-        // Criador ve
-        condicoes.push({ criado_por: usuarioId });
+        const podeAplicarEscopoMinhas =
+          !temPermissoesAreasConfiguradas || podeVerSolicitacoesProprias;
+        const podeAplicarEscopoSetor =
+          !temPermissoesAreasConfiguradas || podeVerSolicitacoesSetor;
 
-        // Setor atual ve
-        const setoresPermitidos = [];
-        if (areaUsuario) setoresPermitidos.push(areaUsuario);
-        if (setorAtual?.codigo) setoresPermitidos.push(setorAtual.codigo);
-        if (setorAtual?.nome) setoresPermitidos.push(setorAtual.nome);
-        if (setorAtual?.id) setoresPermitidos.push(String(setorAtual.id));
-        if (req.user.setor_id) setoresPermitidos.push(String(req.user.setor_id));
-        const setoresUnicos = Array.from(new Set(setoresPermitidos.filter(Boolean)));
-        if (setoresUnicos.length > 0) {
-          condicoes.push({ area_responsavel: { [Op.in]: setoresUnicos } });
-        }
+        if (podeAplicarEscopoMinhas) {
+          // Criador ve
+          condicoes.push({ criado_por: usuarioId });
 
-        // Responsavel ve (respeita setores configurados para o usuario)
-        condicoes.push({
-          [Op.and]: [
-            { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+          // Responsavel direto ou usuario mencionado ve a propria demanda,
+          // sem liberar o restante do setor quando a permissao granular de setor foi removida.
+          condicoes.push(
             {
               id: {
                 [Op.in]: Sequelize.literal(`(
@@ -1463,52 +1591,94 @@ module.exports = {
                     AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
                 )`)
               }
-            }
-          ]
-        });
-
-        // Qualquer interacao do usuario no historico (respeita setores configurados)
-        condicoes.push({
-          [Op.and]: [
-            { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+            },
             {
               id: {
                 [Op.in]: Sequelize.literal(`(
-                  SELECT solicitacao_id
-                  FROM historicos
-                  WHERE usuario_responsavel_id = ${usuarioId}
+                  SELECT n.solicitacao_id
+                  FROM notificacoes n
+                  INNER JOIN notificacao_destinatarios nd ON nd.notificacao_id = n.id
+                  WHERE nd.usuario_id = ${usuarioId}
+                    AND n.tipo = 'MENCAO_COMENTARIO'
                 )`)
               }
             }
-          ]
-        });
+          );
+        }
 
-        // Mantem visibilidade de solicitacoes que ja passaram pelo setor do usuario
-        if (literalHistoricoSetorUsuario) {
+        if (podeAplicarEscopoSetor) {
+          // Setor atual ve
+          const setoresPermitidos = [];
+          if (areaUsuario) setoresPermitidos.push(areaUsuario);
+          if (setorAtual?.codigo) setoresPermitidos.push(setorAtual.codigo);
+          if (setorAtual?.nome) setoresPermitidos.push(setorAtual.nome);
+          if (setorAtual?.id) setoresPermitidos.push(String(setorAtual.id));
+          if (req.user.setor_id) setoresPermitidos.push(String(req.user.setor_id));
+          const setoresUnicos = Array.from(new Set(setoresPermitidos.filter(Boolean)));
+          if (setoresUnicos.length > 0) {
+            condicoes.push({ area_responsavel: { [Op.in]: setoresUnicos } });
+          }
+
+          // Responsavel ve (respeita setores configurados para o usuario)
           condicoes.push({
-            id: { [Op.in]: literalHistoricoSetorUsuario }
+            [Op.and]: [
+              { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+              {
+                id: {
+                  [Op.in]: Sequelize.literal(`(
+                    SELECT solicitacao_id
+                    FROM historicos
+                    WHERE usuario_responsavel_id = ${usuarioId}
+                      AND acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+                  )`)
+                }
+              }
+            ]
+          });
+
+          // Qualquer interacao do usuario no historico (respeita setores configurados)
+          condicoes.push({
+            [Op.and]: [
+              { area_responsavel: { [Op.in]: setoresVisiveisAoAtribuir } },
+              {
+                id: {
+                  [Op.in]: Sequelize.literal(`(
+                    SELECT solicitacao_id
+                    FROM historicos
+                    WHERE usuario_responsavel_id = ${usuarioId}
+                  )`)
+                }
+              }
+            ]
+          });
+
+          // Mantem visibilidade de solicitacoes que ja passaram pelo setor do usuario
+          if (literalHistoricoSetorUsuario) {
+            condicoes.push({
+              id: { [Op.in]: literalHistoricoSetorUsuario }
+            });
+          }
+
+          montarCondicoesVisibilidadeSetores(setoresExtrasUsuario).forEach(condicao => {
+            condicoes.push(condicao);
+          });
+
+          const regrasTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
+          const compartilhamentos = obterTiposCompartilhadosParaTokens(setorTokens, regrasTiposCompartilhados);
+          compartilhamentos.forEach((regra) => {
+            if (regra?.setor_origem && Array.isArray(regra.tipos) && regra.tipos.length > 0) {
+              condicoes.push({
+                [Op.and]: [
+                  { area_responsavel: regra.setor_origem },
+                  { tipo_solicitacao_id: { [Op.in]: regra.tipos } }
+                ]
+              });
+            }
           });
         }
 
-        montarCondicoesVisibilidadeSetores(setoresExtrasUsuario).forEach(condicao => {
-          condicoes.push(condicao);
-        });
-
-        const regrasTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
-        const compartilhamentos = obterTiposCompartilhadosParaTokens(setorTokens, regrasTiposCompartilhados);
-        compartilhamentos.forEach((regra) => {
-          if (regra?.setor_origem && Array.isArray(regra.tipos) && regra.tipos.length > 0) {
-            condicoes.push({
-              [Op.and]: [
-                { area_responsavel: regra.setor_origem },
-                { tipo_solicitacao_id: { [Op.in]: regra.tipos } }
-              ]
-            });
-          }
-        });
-
         where[Op.and] = where[Op.and] || [];
-        where[Op.and].push({ [Op.or]: condicoes });
+        where[Op.and].push({ [Op.or]: condicoes.length > 0 ? condicoes : [{ id: -1 }] });
       }
 
       /* ===============================
