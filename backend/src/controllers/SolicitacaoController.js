@@ -385,7 +385,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
 
   const areaUsuario = await obterAreaUsuario(req);
   const tokensSetorUsuario = expandirTokensComAliasesGeo(
-    await obterTokensSetorUsuario(req, areaUsuario)
+    await obterTokensSetorPrincipalUsuario(req, areaUsuario)
   );
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
@@ -512,6 +512,24 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
       !historicoSetorGeo &&
       !solicitacaoEmSetorExtra
     ) {
+      return {
+        allowed: false,
+        status: 403,
+        error: 'Acesso negado'
+      };
+    }
+  }
+
+  const isSetorObra = await isSetorObraGeral(req);
+  if (perfil !== 'SUPERADMIN' && !isSetorAdministrativo && !isUsuarioGeo && !isSetorObra) {
+    const permitidoPorEscopo = await solicitacaoAtendeEscopoOperacionalUsuario({
+      req,
+      solicitacao,
+      tokensSetorUsuario,
+      setoresExtrasVisiveisUsuario
+    });
+
+    if (!permitidoPorEscopo) {
       return {
         allowed: false,
         status: 403,
@@ -664,6 +682,16 @@ async function obterTokensSetorUsuario(req, areaUsuario) {
   tokensMultiSetor.forEach((token) => {
     if (token) tokens.add(String(token).trim().toUpperCase());
   });
+  return Array.from(tokens).filter(Boolean);
+}
+
+async function obterTokensSetorPrincipalUsuario(req, areaUsuario) {
+  const setorAtual = await resolveUserSetor(req.user, {
+    attributes: ['id', 'codigo', 'nome', 'eh_setor_obra', 'eh_setor_financeiro', 'eh_setor_compras', 'eh_setor_geo', 'eh_setor_administrativo']
+  });
+  const tokens = new Set(buildSetorComparisonTokens(setorAtual));
+  if (areaUsuario) tokens.add(String(areaUsuario).trim().toUpperCase());
+  if (req.user?.setor_id) tokens.add(String(req.user.setor_id).trim().toUpperCase());
   return Array.from(tokens).filter(Boolean);
 }
 
@@ -1003,8 +1031,6 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
 
   if (tokensValidos.length === 0) return null;
 
-  const inList = tokensValidos.map(v => `'${v.replace(/'/g, "''")}'`).join(', ');
-
   const likes = tokensValidos
     .map(token => {
       const seguro = token.replace(/'/g, "''");
@@ -1020,13 +1046,8 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
     SELECT DISTINCT h.solicitacao_id
     FROM historicos h
     WHERE h.solicitacao_id = Solicitacao.id
-      AND (
-        UPPER(CAST(h.setor AS CHAR)) IN (${inList})
-        OR (
-          h.acao = 'ENVIADA_SETOR'
-          AND (${likes})
-        )
-      )
+      AND h.acao = 'ENVIADA_SETOR'
+      AND (${likes})
   )`);
 }
 
@@ -1057,7 +1078,6 @@ function montarCondicoesVisibilidadeSetores(tokens = []) {
 
 function historicoPertenceASetoresVisiveis(historico, tokens = []) {
   if (!historico) return false;
-  if (setorPertenceAoUsuario(tokens, historico?.setor)) return true;
   if (String(historico?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
   const envio = parseObservacaoEnvioSetor(historico?.observacao);
   return setorPertenceAoUsuario(tokens, envio?.origem) || setorPertenceAoUsuario(tokens, envio?.destino);
@@ -1082,15 +1102,92 @@ async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
   const historicos = await Historico.findAll({
     where: {
       solicitacao_id: solicitacao.id,
-      [Op.or]: [
-        { setor: { [Op.in]: tokensValidos } },
-        { acao: 'ENVIADA_SETOR' }
-      ]
+      acao: 'ENVIADA_SETOR'
     },
     attributes: ['acao', 'setor', 'observacao']
   });
 
   return historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
+}
+
+async function solicitacaoAtendeEscopoOperacionalUsuario({
+  req,
+  solicitacao,
+  tokensSetorUsuario = [],
+  setoresExtrasVisiveisUsuario = []
+}) {
+  if (!solicitacao || !req?.user?.id) return false;
+
+  const usuarioId = Number(req.user.id);
+  if (Number(solicitacao.criado_por) === usuarioId) return true;
+
+  const tokensProprios = Array.from(new Set(
+    (Array.isArray(tokensSetorUsuario) ? tokensSetorUsuario : [])
+      .map(v => String(v || '').trim().toUpperCase())
+      .filter(Boolean)
+  ));
+  const tokensExtras = Array.from(new Set(
+    (Array.isArray(setoresExtrasVisiveisUsuario) ? setoresExtrasVisiveisUsuario : [])
+      .map(v => String(v || '').trim().toUpperCase())
+      .filter(Boolean)
+  ));
+  const tokensVisiveis = Array.from(new Set([...tokensProprios, ...tokensExtras]));
+
+  if (setorPertenceAoUsuario(tokensVisiveis, solicitacao.area_responsavel)) {
+    return true;
+  }
+
+  if (await solicitacaoPertenceASetoresVisiveis(solicitacao, tokensProprios)) {
+    return true;
+  }
+
+  if (tokensExtras.length > 0 && await solicitacaoPertenceASetoresVisiveis(solicitacao, tokensExtras)) {
+    return true;
+  }
+
+  const historicoUsuario = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacao.id,
+      usuario_responsavel_id: usuarioId
+    },
+    attributes: ['id']
+  });
+
+  if (historicoUsuario && setorPertenceAoUsuario(tokensVisiveis, solicitacao.area_responsavel)) {
+    return true;
+  }
+
+  const mencaoUsuario = await NotificacaoDestinatario.findOne({
+    include: [
+      {
+        model: Notificacao,
+        as: 'notificacao',
+        required: true,
+        where: {
+          solicitacao_id: solicitacao.id,
+          tipo: 'MENCAO_COMENTARIO'
+        },
+        attributes: ['id']
+      }
+    ],
+    where: {
+      usuario_id: usuarioId
+    },
+    attributes: ['id']
+  });
+
+  if (mencaoUsuario) return true;
+
+  const regrasTiposCompartilhados = await obterConfiguracaoTiposCompartilhados();
+  const compartilhamentos = obterTiposCompartilhadosParaTokens(tokensProprios, regrasTiposCompartilhados);
+
+  return compartilhamentos.some((regra) => {
+    if (!regra?.setor_origem || !Array.isArray(regra.tipos)) return false;
+    return (
+      setorPertenceAoUsuario([regra.setor_origem], solicitacao.area_responsavel) &&
+      regra.tipos.map(Number).includes(Number(solicitacao.tipo_solicitacao_id))
+    );
+  });
 }
 
 function parseObservacaoEnvioSetor(observacao) {
@@ -1125,7 +1222,7 @@ module.exports = {
     try {
       const { id: usuarioId } = req.user;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      let areaUsuario = req.user?.area || null;
+      let areaUsuario = null;
       const {
         area,
         status,
@@ -1223,10 +1320,8 @@ module.exports = {
           },
           attributes: ['id', 'codigo', 'nome']
         });
-        if (!areaUsuario) {
-          areaUsuario = setorAtual?.codigo || setorAtual?.nome || null;
-        }
       }
+      areaUsuario = resolveSetorPersistenciaValue(setorAtual, req.user?.area);
       if (areaUsuario) {
         areaUsuario = String(areaUsuario).trim().toUpperCase();
       }
@@ -1387,11 +1482,6 @@ module.exports = {
             }
           ]
         });
-
-        // Vinculo com obra ve
-        if (obrasVinculadas.length > 0) {
-          condicoes.push({ obra_id: { [Op.in]: obrasVinculadas } });
-        }
 
         // Mantem visibilidade de solicitacoes que ja passaram pelo setor do usuario
         if (literalHistoricoSetorUsuario) {
@@ -2701,6 +2791,11 @@ module.exports = {
       const isSuperadmin = perfil === 'SUPERADMIN';
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isSetorObraGeral(req);
+      const permissoesFonte = Array.isArray(req.user?.areas_permissoes)
+        ? req.user.areas_permissoes
+        : (Array.isArray(usuario?.areas_permissoes) ? usuario.areas_permissoes : []);
+      const permissoesArea = permissoesFonte.map((item) => String(item || '').trim().toLowerCase());
+      const podeAlterarStatusQualquerSetor = permissoesArea.includes('solicitacoes.acoes.alterar_status_qualquer_setor');
 
       const solicitacao = await Solicitacao.findByPk(id);
       if (!solicitacao) {
@@ -2721,11 +2816,13 @@ module.exports = {
       }
 
       const setorAtual = solicitacao.area_responsavel;
-      const setorValidacaoStatus = String(setorAtual || areaUsuario || '').trim();
+      const setorValidacaoStatus = String(
+        (!isSuperadmin && podeAlterarStatusQualquerSetor ? areaUsuario : setorAtual) || areaUsuario || ''
+      ).trim();
 
       if (!isSuperadmin) {
         const tokensSetorOperacionais = await obterTokensSetoresOperacionaisUsuario(req, areaUsuario);
-        if (!setorPertenceAoUsuario(tokensSetorOperacionais, solicitacao.area_responsavel)) {
+        if (!podeAlterarStatusQualquerSetor && !setorPertenceAoUsuario(tokensSetorOperacionais, solicitacao.area_responsavel)) {
           return res.status(403).json({
             error: 'Voce so pode alterar status de solicitacoes que estejam nos seus setores permitidos.'
           });

@@ -43,6 +43,15 @@ export async function getObrasComerciais() {
   return parseJson(response, 'Erro ao buscar obras comerciais');
 }
 
+export async function getCategoriasFinanceirasComercial(params = {}) {
+  const query = buildQuery(params);
+  const url = query ? `${API_URL}/comercial/categorias-financeiras?${query}` : `${API_URL}/comercial/categorias-financeiras`;
+  const response = await fetch(url, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar categorias financeiras comerciais');
+}
+
 export async function criarEmpreendimentoComercial(data) {
   const response = await fetch(`${API_URL}/comercial/empreendimentos`, {
     method: 'POST',

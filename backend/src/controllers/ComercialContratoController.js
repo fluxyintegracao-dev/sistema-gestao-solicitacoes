@@ -4,6 +4,7 @@ const {
   criarContratoComercial,
   distratarContratoComercial,
   excluirContratoComercial,
+  listarCategoriasFinanceirasComercial,
   listarContratosComerciais,
   sincronizarStatusFinanceiroContratoComercial,
   trocarUnidadeContratoComercial
@@ -18,6 +19,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao listar contratos comerciais');
+    }
+  },
+
+  async categoriasFinanceiras(req, res) {
+    try {
+      const data = await listarCategoriasFinanceirasComercial(req.query || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao listar categorias financeiras comerciais');
     }
   },
 

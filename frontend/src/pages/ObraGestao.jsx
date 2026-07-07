@@ -8,7 +8,6 @@ import {
   HiOutlineClipboardDocumentList,
   HiOutlineFolderOpen,
   HiOutlineMapPin,
-  HiOutlinePaperAirplane,
   HiOutlinePlus,
   HiOutlineReceiptPercent,
   HiOutlineTrash
@@ -26,7 +25,6 @@ const TAB_DEFINITIONS = [
   { id: 'orcamento', label: 'Orcamento', icon: HiOutlineReceiptPercent },
   { id: 'custos', label: 'Custos', icon: HiOutlineBanknotes },
   { id: 'parcelas', label: 'Receitas', icon: HiOutlineClipboardDocumentList },
-  { id: 'pedidos', label: 'Pedidos', icon: HiOutlinePaperAirplane },
   { id: 'arquivos', label: 'Arquivos', icon: HiOutlineFolderOpen },
   { id: 'relatorio-final', label: 'Relatorio Final', icon: HiOutlineBuildingOffice2 }
 ];
@@ -597,67 +595,6 @@ export default function ObraGestao() {
           )}
         </section>
       )}
-      {activeTab === 'pedidos' && (
-        <section className="grid gap-4 xl:grid-cols-2">
-          <div className="card px-4 py-3">
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Pedidos</h2>
-            <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>Solicitacoes com numero de pedido e valor sem titulo financeiro vinculado.</p>
-
-            {data.pedidos.itens.length === 0 ? (
-              <div className="mt-3">
-                <DetailTableEmpty message="Nenhum pedido operacional encontrado." />
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {data.pedidos.itens.map((item) => (
-                  <div key={item.id} className="rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>{item.codigo}</div>
-                        <div className="mt-1 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.tipo}</div>
-                        <div className="mt-0.5 text-sm" style={{ color: 'var(--c-text)' }}>{item.descricao}</div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Pedido</div>
-                        <div className="mt-1 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{item.numero_pedido}</div>
-                        <div className="mt-0.5 text-sm font-bold obra-accent-blue">{formatCurrency(item.valor)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="card px-4 py-3">
-            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Solicitacoes de Compra</h2>
-            <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>Pedidos de compra criados para a obra.</p>
-
-            {data.pedidos.compras.length === 0 ? (
-              <div className="mt-3">
-                <DetailTableEmpty message="Nenhuma solicitacao de compra encontrada." />
-              </div>
-            ) : (
-              <div className="mt-3 space-y-2">
-                {data.pedidos.compras.map((item) => (
-                  <div key={item.id} className="rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>{item.codigo}</div>
-                        <div className="mt-1 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.status}</div>
-                      </div>
-                      <div className="text-right text-xs" style={{ color: 'var(--c-text)' }}>
-                        <div>Criado em: {formatDate(item.createdAt)}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
       {activeTab === 'arquivos' && (
         <section className="card px-4 py-3">
           <div className="flex items-start justify-between gap-4">

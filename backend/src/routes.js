@@ -922,6 +922,17 @@ const allowComercialContratosManage = permit({
   )
 });
 
+const allowComercialContratosCategorias = permit({
+  resource: 'COMERCIAL',
+  custom: async (req) => (
+    (await canViewComercialContratos(req.user))
+      || (await canCreateComercialContratos(req.user))
+      || (await canManageComercialContratos(req.user))
+      ? true
+      : 'Acesso negado para categorias financeiras comerciais'
+  )
+});
+
 function allowConfiguracoesArea(area, errorMessage = 'Acesso negado para configuracoes') {
   return permit({
     resource: 'CONFIGURACOES',
@@ -1460,6 +1471,7 @@ router.post('/comercial/contratos-modelos', allowComercialContratosManage, uploa
 router.get('/comercial/contratos-documentos/:documentoId/link', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.obterLink);
 router.post('/comercial/contratos-documentos/:documentoId/enviar-d4sign', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.enviarD4Sign);
 router.delete('/comercial/contratos-documentos/:documentoId', allowComercialContratosManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('documentoId', 'Documento comercial') }), ComercialContratoDocumentoController.excluirDocumento);
+router.get('/comercial/categorias-financeiras', allowComercialContratosCategorias, ComercialContratoController.categoriasFinanceiras);
 router.get('/comercial/contratos', allowComercialContratosRead, validateRequest({ query: validateComercialContratoQuery }), ComercialContratoController.index);
 router.get('/comercial/contratos/:id', allowComercialContratosRead, validateRequest({ params: validateNumericIdParam('id', 'Contrato comercial') }), ComercialContratoController.show);
 router.post('/comercial/contratos', allowComercialContratosCreate, criticalRateLimit, validateRequest({ body: validateComercialContratoCreateBody }), ComercialContratoController.create);
