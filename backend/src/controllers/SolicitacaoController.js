@@ -385,7 +385,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
 
   const areaUsuario = await obterAreaUsuario(req);
   const tokensSetorUsuario = expandirTokensComAliasesGeo(
-    await obterTokensSetorUsuario(req, areaUsuario)
+    await obterTokensSetorPrincipalUsuario(req, areaUsuario)
   );
   const perfil = String(req.user?.perfil || '').trim().toUpperCase();
   const isSetorAdministrativo = tokensSetorUsuario.some(isAdministrativoToken);
@@ -682,6 +682,16 @@ async function obterTokensSetorUsuario(req, areaUsuario) {
   tokensMultiSetor.forEach((token) => {
     if (token) tokens.add(String(token).trim().toUpperCase());
   });
+  return Array.from(tokens).filter(Boolean);
+}
+
+async function obterTokensSetorPrincipalUsuario(req, areaUsuario) {
+  const setorAtual = await resolveUserSetor(req.user, {
+    attributes: ['id', 'codigo', 'nome', 'eh_setor_obra', 'eh_setor_financeiro', 'eh_setor_compras', 'eh_setor_geo', 'eh_setor_administrativo']
+  });
+  const tokens = new Set(buildSetorComparisonTokens(setorAtual));
+  if (areaUsuario) tokens.add(String(areaUsuario).trim().toUpperCase());
+  if (req.user?.setor_id) tokens.add(String(req.user.setor_id).trim().toUpperCase());
   return Array.from(tokens).filter(Boolean);
 }
 
