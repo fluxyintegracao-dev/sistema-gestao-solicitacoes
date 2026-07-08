@@ -57,6 +57,43 @@ function normalizeStorageKey(rawKey, { strict = false } = {}) {
   return key;
 }
 
+function getAllowedStorageBuckets() {
+  const configuredBuckets = [
+    process.env.AWS_S3_BUCKET,
+    process.env.AWS_S3_ALLOWED_BUCKETS,
+    // Buckets historicos usados por ambientes que compartilham anexos antigos.
+    'gestaosolicitacoes-uploads-prod',
+    'fluxy-staging-jrfluxy'
+  ];
+
+  return new Set(
+    configuredBuckets
+      .flatMap((value) => String(value || '').split(','))
+      .map((value) => value.trim())
+      .filter(Boolean)
+  );
+}
+
+function buildVirtualHostedS3Hosts(bucket) {
+  const region = String(process.env.AWS_REGION || '').toLowerCase();
+  const bucketLower = String(bucket || '').toLowerCase();
+
+  return new Set([
+    `${bucketLower}.s3.amazonaws.com`,
+    region ? `${bucketLower}.s3.${region}.amazonaws.com` : null,
+    region ? `${bucketLower}.s3-${region}.amazonaws.com` : null
+  ].filter(Boolean));
+}
+
+function buildPathStyleS3Hosts() {
+  const region = String(process.env.AWS_REGION || '').toLowerCase();
+  return new Set([
+    's3.amazonaws.com',
+    region ? `s3.${region}.amazonaws.com` : null,
+    region ? `s3-${region}.amazonaws.com` : null
+  ].filter(Boolean));
+}
+
 function shouldUseLocalUploadFallback() {
   return (
     process.env.NODE_ENV !== 'production' &&
@@ -100,41 +137,41 @@ async function uploadToS3(file, folder) {
   return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${command.input.Key}`;
 }
 
-function getKeyFromUrl(url, { strict = false } = {}) {
+function getStorageTargetFromUrl(url, { strict = false } = {}) {
   try {
-    const bucket = process.env.AWS_S3_BUCKET;
-    const region = process.env.AWS_REGION;
     const parsed = new URL(url);
+    const allowedBuckets = getAllowedStorageBuckets();
 
-    if (!bucket || !['http:', 'https:'].includes(parsed.protocol)) {
+    if (!allowedBuckets.size || !['http:', 'https:'].includes(parsed.protocol)) {
       if (strict) throw createPresignTargetError('Arquivo fora do storage configurado.');
       return null;
     }
 
     const hostname = parsed.hostname.toLowerCase();
-    const bucketLower = String(bucket).toLowerCase();
-    const regionLower = String(region || '').toLowerCase();
-    const virtualHostedHosts = new Set([
-      `${bucketLower}.s3.amazonaws.com`,
-      regionLower ? `${bucketLower}.s3.${regionLower}.amazonaws.com` : null,
-      regionLower ? `${bucketLower}.s3-${regionLower}.amazonaws.com` : null
-    ].filter(Boolean));
 
-    if (virtualHostedHosts.has(hostname) || hostname.startsWith(`${bucketLower}.s3`)) {
-      return normalizeStorageKey(parsed.pathname.replace(/^\//, ''), { strict });
+    for (const bucket of allowedBuckets) {
+      const bucketLower = String(bucket).toLowerCase();
+      const virtualHostedHosts = buildVirtualHostedS3Hosts(bucket);
+      if (virtualHostedHosts.has(hostname) || hostname.startsWith(`${bucketLower}.s3`)) {
+        return {
+          bucket,
+          key: normalizeStorageKey(parsed.pathname.replace(/^\//, ''), { strict })
+        };
+      }
     }
 
-    const pathStyleHosts = new Set([
-      's3.amazonaws.com',
-      regionLower ? `s3.${regionLower}.amazonaws.com` : null,
-      regionLower ? `s3-${regionLower}.amazonaws.com` : null
-    ].filter(Boolean));
-
+    const pathStyleHosts = buildPathStyleS3Hosts();
     if (pathStyleHosts.has(hostname)) {
       const parts = parsed.pathname.replace(/^\//, '').split('/');
       const pathBucket = parts.shift();
-      if (String(pathBucket || '').toLowerCase() === bucketLower) {
-        return normalizeStorageKey(parts.join('/'), { strict });
+      const matchedBucket = Array.from(allowedBuckets).find(
+        (bucket) => String(bucket).toLowerCase() === String(pathBucket || '').toLowerCase()
+      );
+      if (matchedBucket) {
+        return {
+          bucket: matchedBucket,
+          key: normalizeStorageKey(parts.join('/'), { strict })
+        };
       }
     }
   } catch (error) {
@@ -150,7 +187,7 @@ function getKeyFromUrl(url, { strict = false } = {}) {
   return null;
 }
 
-function getKeyFromTarget(urlOrKey, { strict = false } = {}) {
+function getStorageTarget(urlOrKey, { strict = false } = {}) {
   const target = String(urlOrKey || '').trim();
   if (!target) {
     if (strict) throw createPresignTargetError('Arquivo invalido para assinatura.');
@@ -158,10 +195,16 @@ function getKeyFromTarget(urlOrKey, { strict = false } = {}) {
   }
 
   if (/^https?:\/\//i.test(target)) {
-    return getKeyFromUrl(target, { strict });
+    return getStorageTargetFromUrl(target, { strict });
   }
 
-  return normalizeStorageKey(target, { strict });
+  const key = normalizeStorageKey(target, { strict });
+  if (!key) return null;
+
+  return {
+    bucket: process.env.AWS_S3_BUCKET,
+    key
+  };
 }
 
 function shouldForceAttachmentForTarget(target) {
@@ -175,19 +218,20 @@ async function getPresignedUrl(urlOrKey, expiresIn = 300, options = {}) {
     return urlOrKey;
   }
 
-  const key = getKeyFromTarget(urlOrKey, options);
+  const storageTarget = getStorageTarget(urlOrKey, options);
 
-  if (!key) {
+  if (!storageTarget?.key) {
     if (options.strict) {
       throw createPresignTargetError('Arquivo invalido para assinatura.');
     }
     return urlOrKey;
   }
 
+  const { key } = storageTarget;
   const riskyInlineTarget = shouldForceAttachmentForTarget(key);
 
   const command = new GetObjectCommand({
-    Bucket: process.env.AWS_S3_BUCKET,
+    Bucket: storageTarget.bucket || process.env.AWS_S3_BUCKET,
     Key: key,
     ...(riskyInlineTarget
       ? {
