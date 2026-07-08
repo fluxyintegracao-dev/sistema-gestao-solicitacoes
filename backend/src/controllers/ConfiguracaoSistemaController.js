@@ -59,6 +59,10 @@ const {
   obterConfiguracaoNotificacoesSistema,
   salvarConfiguracaoNotificacoesSistema
 } = require('../services/notificacaoConfigService');
+const {
+  normalizarPayloadSetoresVisiveis,
+  obterRegrasSetoresVisiveisPorUsuario
+} = require('../services/setoresVisiveisUsuarioService');
 
 const CHAVE_TEMA = 'TEMA_SISTEMA';
 const CHAVE_AREAS_OBRA = 'AREAS_OBRA_VISIVEIS';
@@ -682,17 +686,7 @@ module.exports = {
 
   async getSetoresVisiveisPorUsuario(req, res) {
     try {
-      const item = await ConfiguracaoSistema.findOne({
-        where: { chave: CHAVE_SETORES_VISIVEIS_POR_USUARIO },
-        order: [['id', 'DESC']]
-      });
-
-      if (!item || !item.valor) {
-        return res.json({ regras: {} });
-      }
-
-      const data = parseJsonOrDefault(item.valor, { regras: {} });
-      const regras = data?.regras && typeof data.regras === 'object' ? data.regras : {};
+      const regras = await obterRegrasSetoresVisiveisPorUsuario();
       return res.json({ regras });
     } catch (error) {
       console.error(error);
@@ -703,15 +697,10 @@ module.exports = {
   async updateSetoresVisiveisPorUsuario(req, res) {
     try {
       const input = req.body?.regras && typeof req.body.regras === 'object'
-        ? req.body.regras
+        ? { regras: req.body.regras }
         : {};
 
-      const regras = {};
-      Object.entries(input).forEach(([usuarioId, setores]) => {
-        const key = String(usuarioId || '').trim();
-        if (!key) return;
-        regras[key] = normalizarListaSetores(setores);
-      });
+      const regras = await normalizarPayloadSetoresVisiveis(input);
 
       const existente = await ConfiguracaoSistema.findOne({
         where: { chave: CHAVE_SETORES_VISIVEIS_POR_USUARIO },
