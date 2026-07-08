@@ -253,7 +253,7 @@ class AnexoController {
           return res.status(404).json({ error: 'Arquivo do historico nao encontrado' });
         }
 
-        const signedUrl = await getPresignedUrl(caminhoHistorico);
+        const signedUrl = await getPresignedUrl(caminhoHistorico, 300, { strict: true });
         return res.json({ url: signedUrl });
       }
 
@@ -277,9 +277,24 @@ class AnexoController {
       }
 
       const caminhoRegistrado = getRegisteredFilePath(arquivoRegistrado) || alvo;
-      const signedUrl = await getPresignedUrl(caminhoRegistrado);
+      const signedUrl = await getPresignedUrl(caminhoRegistrado, 300, { strict: true });
       return res.json({ url: signedUrl });
     } catch (error) {
+      if (error?.code === 'FILE_PRESIGN_INVALID_TARGET') {
+        await registrarEventoSeguranca({
+          req,
+          usuarioId: req.user?.id || null,
+          tipoEvento: 'FILE_PRESIGN_INVALID_TARGET',
+          recursoTipo: 'FILE',
+          recursoId: String(req.query?.url || req.query?.key || req.query?.historico_id || '').slice(0, 120),
+          status: 'DENIED',
+          descricao: error.message
+        });
+        return res.status(error.statusCode || 400).json({
+          error: error.message || 'Arquivo invalido para assinatura'
+        });
+      }
+
       console.error('Erro ao gerar URL assinada:', error);
       return res.status(500).json({ error: 'Erro ao gerar URL assinada' });
     }
