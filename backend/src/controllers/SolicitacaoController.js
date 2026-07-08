@@ -556,7 +556,7 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
       historicoSetorGeo = solicitacao.historicos.some((item) => {
         if (isGeoToken(item?.setor)) return true;
         if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
-        const envio = parseObservacaoEnvioSetor(item?.observacao);
+        const envio = extrairSetoresEnvioHistorico(item);
         return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
       });
     } else {
@@ -568,13 +568,13 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
             { setor: { [Op.in]: tokensSetorUsuario.filter(isGeoToken) } }
           ]
         },
-        attributes: ['acao', 'setor', 'observacao']
+        attributes: ['acao', 'setor', 'observacao', 'descricao', 'metadata']
       });
 
       historicoSetorGeo = historicosGeo.some((item) => {
         if (isGeoToken(item?.setor)) return true;
         if (String(item?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
-        const envio = parseObservacaoEnvioSetor(item?.observacao);
+        const envio = extrairSetoresEnvioHistorico(item);
         return isGeoToken(envio?.origem) || isGeoToken(envio?.destino);
       });
     }
@@ -1092,14 +1092,20 @@ async function registrarNegacaoSolicitacao(req, solicitacaoId, obraId, descricao
   });
 }
 
-function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
+function normalizarTokensHistoricoSetores(tokens = []) {
   const tokensValidos = Array.from(
     new Set(
       (Array.isArray(tokens) ? tokens : [])
         .map(v => String(v || '').trim().toUpperCase())
-        .filter(Boolean)
+        .filter(token => token && /[A-ZÀ-Ú]/i.test(token))
     )
   );
+
+  return tokensValidos;
+}
+
+function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
+  const tokensValidos = normalizarTokensHistoricoSetores(tokens);
 
   if (tokensValidos.length === 0) return null;
 
@@ -1107,8 +1113,9 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
     .map(token => {
       const seguro = token.replace(/'/g, "''");
       return [
-        `UPPER(COALESCE(h.observacao, '')) LIKE 'DE ${seguro} PARA %'`,
-        `UPPER(COALESCE(h.observacao, '')) LIKE '% PARA ${seguro}'`
+        `UPPER(COALESCE(NULLIF(h.observacao, ''), NULLIF(h.descricao, ''), '')) LIKE 'DE ${seguro} PARA %'`,
+        `UPPER(COALESCE(NULLIF(h.observacao, ''), NULLIF(h.descricao, ''), '')) LIKE '% PARA ${seguro}'`,
+        `UPPER(COALESCE(h.setor, '')) = '${seguro}'`
       ];
     })
     .flat()
@@ -1118,7 +1125,7 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
     SELECT DISTINCT h.solicitacao_id
     FROM historicos h
     WHERE h.solicitacao_id = Solicitacao.id
-      AND h.acao = 'ENVIADA_SETOR'
+      AND UPPER(TRIM(h.acao)) = 'ENVIADA_SETOR'
       AND (${likes})
   )`);
 }
@@ -1151,8 +1158,13 @@ function montarCondicoesVisibilidadeSetores(tokens = []) {
 function historicoPertenceASetoresVisiveis(historico, tokens = []) {
   if (!historico) return false;
   if (String(historico?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') return false;
-  const envio = parseObservacaoEnvioSetor(historico?.observacao);
-  return setorPertenceAoUsuario(tokens, envio?.origem) || setorPertenceAoUsuario(tokens, envio?.destino);
+  const tokensValidos = normalizarTokensHistoricoSetores(tokens);
+  if (tokensValidos.length === 0) return false;
+  const envio = extrairSetoresEnvioHistorico(historico);
+  return (
+    setorPertenceAoUsuario(tokensValidos, envio?.origem) ||
+    setorPertenceAoUsuario(tokensValidos, envio?.destino)
+  );
 }
 
 async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
@@ -1176,7 +1188,7 @@ async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
       solicitacao_id: solicitacao.id,
       acao: 'ENVIADA_SETOR'
     },
-    attributes: ['acao', 'setor', 'observacao']
+    attributes: ['acao', 'setor', 'observacao', 'descricao', 'metadata']
   });
 
   return historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
@@ -1269,6 +1281,44 @@ function parseObservacaoEnvioSetor(observacao) {
   return {
     origem: String(match[1] || '').trim(),
     destino: String(match[2] || '').trim()
+  };
+}
+
+function parseHistoricoMetadata(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+
+  try {
+    return JSON.parse(metadata);
+  } catch (_) {
+    return {};
+  }
+}
+
+function extrairSetoresEnvioHistorico(historico) {
+  if (!historico || String(historico?.acao || '').toUpperCase() !== 'ENVIADA_SETOR') {
+    return { origem: null, destino: null };
+  }
+
+  const metadata = parseHistoricoMetadata(historico.metadata);
+  const envioTexto =
+    parseObservacaoEnvioSetor(historico.observacao) ||
+    parseObservacaoEnvioSetor(historico.descricao);
+
+  return {
+    origem:
+      metadata.setor_origem ||
+      metadata.setorOrigem ||
+      metadata.origem ||
+      envioTexto?.origem ||
+      null,
+    destino:
+      metadata.setor_destino ||
+      metadata.setorDestino ||
+      metadata.destino ||
+      envioTexto?.destino ||
+      historico.setor ||
+      null
   };
 }
 
@@ -3088,7 +3138,7 @@ module.exports = {
               solicitacao_id: id,
               acao: 'ENVIADA_SETOR'
             },
-            attributes: ['observacao', 'createdAt'],
+            attributes: ['acao', 'setor', 'observacao', 'descricao', 'metadata', 'createdAt'],
             order: [['createdAt', 'DESC']]
           });
 
@@ -3096,7 +3146,7 @@ module.exports = {
           let setorRetorno = null;
 
           for (const envio of envios) {
-            const parsed = parseObservacaoEnvioSetor(envio.observacao);
+            const parsed = extrairSetoresEnvioHistorico(envio);
             if (!parsed) continue;
             const destinoNorm = normalizarTokenComparacao(parsed.destino);
             if (destinoNorm !== setorAtualNorm && destinoNorm !== 'OBRA') continue;
