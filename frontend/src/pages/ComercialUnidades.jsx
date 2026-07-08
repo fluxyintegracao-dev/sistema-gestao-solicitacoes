@@ -370,7 +370,7 @@ export default function ComercialUnidades() {
 
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Busca</span>
-                <input className="input w-full" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Codigo, fracao ideal, reserva ou empreendimento" />
+                <input className="input w-full" value={busca} onChange={(event) => setBusca(event.target.value)} placeholder="Codigo, torre, pavimento, reserva ou empreendimento" />
               </label>
             </div>
 
@@ -392,6 +392,8 @@ export default function ComercialUnidades() {
                         </div>
                         <div className="grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-2">
                           <span>Empreendimento: {item.empreendimento?.nome || '-'}</span>
+                          <span>Torre: {item.torre || '-'}</span>
+                          <span>Pavimento: {item.pavimento || '-'}</span>
                           <span>Metragem privativa: {item.metragem_privativa || '-'}</span>
                           <span>Fracao ideal: {item.fracao_ideal || '-'}</span>
                           <span>Reserva: {item.parceiroReserva?.nome || '-'}</span>
