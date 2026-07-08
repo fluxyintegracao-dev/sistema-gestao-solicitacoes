@@ -1328,26 +1328,32 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
     throw new Error('Pedido cancelado nao pode ser reaberto.');
   }
 
-  const bloqueado = await isPedidoCompraStatusLocked(statusAnterior);
-  const statusAberto = await getPedidoStatusAbertoConfig();
-  if (!bloqueado && statusAnterior === statusAberto.codigo) {
-    return pedido;
-  }
-
-  await pedido.update(
-    {
-      status: statusAberto.codigo,
-      encerrado_em: null
-    },
-    { transaction }
-  );
-
   const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, {
     transaction,
+    lock: transaction?.LOCK?.UPDATE,
     attributes: ['id', 'status', 'encerrado_em', 'solicitacao_principal_id']
   });
 
-  if (solicitacao && normalizeText(solicitacao.status) === 'ENCERRADO') {
+  const bloqueado = await isPedidoCompraStatusLocked(statusAnterior);
+  const statusAberto = await getPedidoStatusAbertoConfig();
+  const pedidoAberto = !bloqueado && normalizeText(statusAnterior) === normalizeText(statusAberto.codigo);
+  const cotacaoEncerrada = isSolicitacaoCompraEncerrada(solicitacao);
+
+  if (pedidoAberto && !cotacaoEncerrada) {
+    return pedido;
+  }
+
+  if (!pedidoAberto) {
+    await pedido.update(
+      {
+        status: statusAberto.codigo,
+        encerrado_em: null
+      },
+      { transaction }
+    );
+  }
+
+  if (solicitacao && cotacaoEncerrada) {
     await solicitacao.update(
       {
         status: 'ENVIADO',
@@ -1381,6 +1387,7 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
       pedido_compra_id: pedido.id,
       status_anterior: statusAnterior || null,
       status_novo: statusAberto.codigo,
+      cotacao_reaberta: cotacaoEncerrada,
       motivo: motivoNormalizado
     },
     transaction
@@ -1396,7 +1403,8 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
     statusNovo: statusAberto.codigo,
     metadados: {
       motivo: motivoNormalizado,
-      origem: 'REABERTURA_COTACAO'
+      origem: 'REABERTURA_COTACAO',
+      cotacao_reaberta: cotacaoEncerrada
     },
     transaction
   });
@@ -2049,9 +2057,60 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
   return pedido;
 }
 
+async function assertPedidoSemVinculoFinanceiroParaCancelamento(pedidoId, transaction) {
+  const pedidoCompraId = Number(pedidoId);
+  const [alocacoesComTitulo, fretesComTitulo] = await Promise.all([
+    SolicitacaoCompraAlocacao.count({
+      where: {
+        pedido_compra_id: pedidoCompraId,
+        titulo_financeiro_id: { [Op.ne]: null },
+        [Op.or]: [
+          { status: { [Op.ne]: 'CANCELADA' } },
+          { status: null }
+        ]
+      },
+      transaction
+    }),
+    PedidoCompraFrete.count({
+      where: {
+        pedido_compra_id: pedidoCompraId,
+        [Op.and]: [
+          {
+            [Op.or]: [
+              { status_financeiro: { [Op.ne]: 'CANCELADO' } },
+              { status_financeiro: null }
+            ]
+          },
+          {
+            [Op.or]: [
+              { titulo_financeiro_id: { [Op.ne]: null } },
+              { status_financeiro: 'TITULO_GERADO' }
+            ]
+          }
+        ]
+      },
+      transaction
+    })
+  ]);
+
+  if (alocacoesComTitulo > 0 || fretesComTitulo > 0) {
+    throw new Error('Este pedido possui titulo financeiro vinculado. Estorne ou cancele o financeiro antes de cancelar o pedido.');
+  }
+}
+
 async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }) {
-  const pedido = await assertPedidoEditavel(pedidoId, transaction);
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+  await assertPedidoEditavel(pedido, transaction);
   const motivoNormalizado = String(motivo || '').trim();
+  if (!motivoNormalizado) {
+    throw new Error('Informe o motivo do cancelamento do pedido.');
+  }
+
+  await assertPedidoSemVinculoFinanceiroParaCancelamento(pedido.id, transaction);
+
   const statusAnterior = pedido.status;
 
   await pedido.update(
@@ -2060,7 +2119,7 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
       cancelado_por: usuarioId || null,
       cancelado_em: new Date(),
       encerrado_em: new Date(),
-      motivo_cancelamento: motivoNormalizado || null
+      motivo_cancelamento: motivoNormalizado
     },
     { transaction }
   );
@@ -2077,7 +2136,7 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
         quantidade_cancelada: item.quantidade_pedido,
         cancelado_por: usuarioId || null,
         cancelado_em: new Date(),
-        motivo_cancelamento: motivoNormalizado || null
+        motivo_cancelamento: motivoNormalizado
       },
       { transaction }
     );
@@ -2089,7 +2148,7 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
       acao: 'PEDIDO_CANCELADO',
       descricao: `Item ${item.descricao} cancelado junto com o pedido`,
       dadosAnteriores: { removido: false, quantidade_pedido: item.quantidade_pedido },
-      dadosNovos: { removido: true, motivo: motivoNormalizado || null },
+      dadosNovos: { removido: true, motivo: motivoNormalizado },
       transaction
     });
   }
@@ -2099,7 +2158,7 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
       status: 'CANCELADA',
       cancelado_por: usuarioId || null,
       cancelado_em: new Date(),
-      motivo_cancelamento: motivoNormalizado || null
+      motivo_cancelamento: motivoNormalizado
     },
     { where: { pedido_compra_id: pedido.id, status: 'ATIVA' }, transaction }
   );
@@ -2109,10 +2168,8 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     usuarioId,
     fornecedorCompraId: pedido.fornecedor_compra_id,
     tipoAcao: 'PEDIDO_CANCELADO',
-    descricao: motivoNormalizado
-      ? `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`
-      : `${buildPedidoCodigo(pedido.id)} cancelado`,
-    metadados: { pedido_compra_id: pedido.id, motivo: motivoNormalizado || null },
+    descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
+    metadados: { pedido_compra_id: pedido.id, motivo: motivoNormalizado },
     transaction
   });
 
@@ -2122,12 +2179,10 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     pedido,
     usuarioId,
     acao: 'PEDIDO_COMPRA_CANCELADO',
-    descricao: motivoNormalizado
-      ? `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`
-      : `${buildPedidoCodigo(pedido.id)} cancelado`,
+    descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
     statusAnterior,
     statusNovo: 'CANCELADO',
-    metadados: { motivo: motivoNormalizado || null },
+    metadados: { motivo: motivoNormalizado },
     transaction
   });
 

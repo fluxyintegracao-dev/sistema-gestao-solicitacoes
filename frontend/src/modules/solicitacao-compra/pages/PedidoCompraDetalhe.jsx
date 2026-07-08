@@ -998,6 +998,11 @@ export default function PedidoCompraDetalhe() {
   }
 
   async function handleReabrirCotacao() {
+    const confirmou = window.confirm(
+      'Reabrir este pedido para edicao ou cancelamento? A cotacao vinculada voltara para edicao e a acao ficara registrada no historico.'
+    );
+    if (!confirmou) return;
+
     const motivo = window.prompt('Informe o motivo para reabrir este pedido para edicao ou cancelamento.');
     if (motivo === null) return;
 
@@ -1011,7 +1016,7 @@ export default function PedidoCompraDetalhe() {
       setReabrindoCotacao(true);
       const data = await reabrirPedidoCompraParaCotacao(id, { motivo: motivoNormalizado });
       setPedido(data || null);
-      alert('Pedido reaberto para edicao.');
+      alert('Pedido reaberto para edicao ou cancelamento.');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao reabrir pedido');
@@ -1109,12 +1114,22 @@ export default function PedidoCompraDetalhe() {
   }
 
   async function handleCancelarPedido() {
+    const confirmou = window.confirm(
+      'Cancelar este pedido? O historico sera preservado e um novo evento de cancelamento sera registrado. Se houver titulo financeiro ou frete vinculado, o sistema bloqueara a acao.'
+    );
+    if (!confirmou) return;
+
     const motivo = window.prompt('Informe o motivo do cancelamento do pedido.');
     if (motivo === null) return;
+    const motivoNormalizado = motivo.trim();
+    if (!motivoNormalizado) {
+      alert('Informe o motivo do cancelamento do pedido.');
+      return;
+    }
 
     try {
       setCancelandoPedido(true);
-      const data = await cancelarPedidoCompra(id, { motivo });
+      const data = await cancelarPedidoCompra(id, { motivo: motivoNormalizado });
       setPedido(data || null);
       alert('Pedido cancelado e historico da solicitacao atualizado.');
     } catch (error) {
