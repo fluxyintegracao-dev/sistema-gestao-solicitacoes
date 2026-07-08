@@ -4,7 +4,6 @@ const crypto = require('crypto');
 const express = require('express');
 const router = express.Router();
 
-const fakeAuth = require('./middlewares/fakeAuth');
 const permit = require('./middlewares/permissions');
 const csrfProtection = require('./middlewares/csrf');
 const requireMfaCompletion = require('./middlewares/requireMfaCompletion');

@@ -4,6 +4,7 @@
  * Mantem isolamento: nao usa JWT do CORE e grava pelo servico oficial do CRM.
  */
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 
 const { criarLead } = require('../services/crmService');
@@ -24,7 +25,9 @@ function requireLeadSecret(req, res, next) {
     || ''
   ).trim();
 
-  if (header !== key) {
+  const headerBuffer = Buffer.from(header);
+  const keyBuffer = Buffer.from(key);
+  if (headerBuffer.length !== keyBuffer.length || !crypto.timingSafeEqual(headerBuffer, keyBuffer)) {
     return res.status(401).json({ error: 'Chave de integracao invalida' });
   }
 

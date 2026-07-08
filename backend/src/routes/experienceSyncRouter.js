@@ -5,6 +5,7 @@
  * Nunca expõe dados financeiros, contratos ou clientes.
  */
 const express = require('express');
+const crypto = require('crypto');
 const router = express.Router();
 
 function toNumberOrNull(value) {
@@ -32,9 +33,13 @@ function isSoldUnit(unit = {}) {
 // Middleware: valida X-Experience-Sync-Key
 function requireSyncKey(req, res, next) {
   const key = String(process.env.EXPERIENCE_SYNC_KEY || '').trim();
-  if (!key) return next(); // sem key configurada = desabilitado silenciosamente em dev
+  if (!key) {
+    return res.status(503).json({ error: 'Sincronizacao do Experience nao configurada' });
+  }
   const header = String(req.headers['x-experience-sync-key'] || '').trim();
-  if (header !== key) {
+  const headerBuffer = Buffer.from(header);
+  const keyBuffer = Buffer.from(key);
+  if (headerBuffer.length !== keyBuffer.length || !crypto.timingSafeEqual(headerBuffer, keyBuffer)) {
     return res.status(401).json({ error: 'Chave de sincronização inválida' });
   }
   return next();
