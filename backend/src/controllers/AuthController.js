@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { Op, fn, col, where } = require('sequelize');
-const { ConfiguracaoSistema, User, Setor } = require('../models');
+const { User, Setor } = require('../models');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { getModuloConfig } = require('../services/moduleConfigService');
 const {
@@ -29,6 +29,7 @@ const {
 const { isMfaRequiredProfile } = require('../services/mfaPolicyService');
 const { listarSetoresDoUsuario } = require('../services/usuariosSetores');
 const { obterAcessoPrioridadeDiretoriaPorUsuario } = require('../services/prioridadeDiretoriaAcesso');
+const { obterSetoresVisiveisUsuario } = require('../services/setoresVisiveisUsuarioService');
 const {
   requestPasswordResetByEmail,
   resetPasswordByToken
@@ -44,27 +45,6 @@ const SETOR_ATTRIBUTES = [
   'eh_setor_geo',
   'eh_setor_administrativo'
 ];
-const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
-
-async function obterSetoresVisiveisUsuario(usuarioId) {
-  const item = await ConfiguracaoSistema.findOne({
-    where: { chave: CHAVE_SETORES_VISIVEIS_POR_USUARIO },
-    order: [['id', 'DESC']]
-  });
-  if (!item?.valor) return [];
-
-  try {
-    const parsed = JSON.parse(item.valor);
-    const regras = parsed?.regras && typeof parsed.regras === 'object' ? parsed.regras : {};
-    const setores = regras[String(usuarioId)] || [];
-    return Array.isArray(setores)
-      ? [...new Set(setores.map((valor) => String(valor || '').trim().toUpperCase()).filter(Boolean))]
-      : [];
-  } catch {
-    return [];
-  }
-}
-
 async function findUserByEmail(emailNormalizado) {
   return User.findOne({
     where: {

@@ -60,17 +60,35 @@ export default function SetoresVisiveisUsuario() {
     return new Set(lista.map(item => String(item || '').toUpperCase()));
   }, [regras, usuarioSelecionado]);
 
-  function alternarSetor(codigo) {
+  function obterAliasesSetor(setor) {
+    return [
+      setor?.codigo,
+      setor?.nome,
+      setor?.id,
+      String(setor?.nome || '').replace(/\s+/g, '_'),
+      String(setor?.nome || '').replace(/\s+/g, '')
+    ].map(item => String(item || '').trim().toUpperCase()).filter(Boolean);
+  }
+
+  function setorEstaSelecionado(setor) {
+    const aliases = obterAliasesSetor(setor);
+
+    return aliases.some(alias => setoresSelecionados.has(alias));
+  }
+
+  function alternarSetor(setorSelecionado) {
     const usuarioId = String(usuarioSelecionado || '');
     if (!usuarioId) return;
-    const setor = String(codigo || '').toUpperCase();
+    const codigo = String(setorSelecionado?.codigo || '').toUpperCase();
+    const aliases = obterAliasesSetor(setorSelecionado);
 
     setRegras(prev => {
       const atuais = new Set((prev[usuarioId] || []).map(item => String(item || '').toUpperCase()));
-      if (atuais.has(setor)) {
-        atuais.delete(setor);
+      const marcado = aliases.some(alias => atuais.has(alias));
+      if (marcado) {
+        aliases.forEach(alias => atuais.delete(alias));
       } else {
-        atuais.add(setor);
+        atuais.add(codigo);
       }
       return {
         ...prev,
@@ -122,13 +140,13 @@ export default function SetoresVisiveisUsuario() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {setoresOrdenados.map(setor => {
               const codigo = String(setor.codigo || '').toUpperCase();
-              const marcado = setoresSelecionados.has(codigo);
+              const marcado = setorEstaSelecionado(setor);
               return (
                 <label key={setor.id} className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
                     checked={marcado}
-                    onChange={() => alternarSetor(codigo)}
+                    onChange={() => alternarSetor(setor)}
                   />
                   <span>
                     {setor.nome} ({codigo})

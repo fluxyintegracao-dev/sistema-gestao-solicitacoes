@@ -83,9 +83,11 @@ const {
   userHasAreaPermission,
   userHasConfiguredAreaPermissions
 } = require('../services/authorizationService');
+const {
+  obterRegrasSetoresVisiveisPorUsuario
+} = require('../services/setoresVisiveisUsuarioService');
 
 const CHAVE_AREAS_POR_SETOR_ORIGEM = 'AREAS_POR_SETOR_ORIGEM';
-const CHAVE_SETORES_VISIVEIS_POR_USUARIO = 'SETORES_VISIVEIS_POR_USUARIO';
 const CHAVE_TIPOS_SOLICITACAO_POR_SETOR = 'TIPOS_SOLICITACAO_POR_SETOR';
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 const DEFAULT_SOLICITACOES_PAGE_SIZE = 25;
@@ -812,17 +814,7 @@ async function obterRegrasAreasPorSetorOrigem() {
 }
 
 async function obterSetoresVisiveisPorUsuario() {
-  const data = await lerConfiguracaoJson(CHAVE_SETORES_VISIVEIS_POR_USUARIO, { regras: {} });
-  const regrasRaw = data?.regras && typeof data.regras === 'object' ? data.regras : {};
-  const regras = {};
-  Object.entries(regrasRaw).forEach(([usuarioId, setores]) => {
-    const key = String(usuarioId || '').trim();
-    if (!key) return;
-    regras[key] = Array.isArray(setores)
-      ? [...new Set(setores.map(v => String(v || '').trim().toUpperCase()).filter(Boolean))]
-      : [];
-  });
-  return regras;
+  return obterRegrasSetoresVisiveisPorUsuario();
 }
 
 async function obterSetoresExtrasVisiveisUsuario(usuarioId) {
