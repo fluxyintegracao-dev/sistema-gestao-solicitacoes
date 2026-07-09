@@ -667,12 +667,13 @@ function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase,
     return addMonths(dataVencimentoBase || dataCompra, index);
   }
 
-  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
-    if (!parcela?.data_vencimento) {
-      const label = isFormaCheque(formaPagamento) ? 'cheque' : isFormaOutros(formaPagamento) ? 'guia de pagamento' : 'boleto';
-      throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
-    }
+  if (parcela?.data_vencimento) {
     return parcela.data_vencimento;
+  }
+
+  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
+    const label = isFormaCheque(formaPagamento) ? 'cheque' : isFormaOutros(formaPagamento) ? 'guia de pagamento' : 'boleto';
+    throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
   }
 
   if (!dataVencimentoBase) {
