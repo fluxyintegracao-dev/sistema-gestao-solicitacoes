@@ -1,7 +1,7 @@
-const XLSX = require('xlsx');
 const { Op } = require('sequelize');
 const { Apropriacao, Obra, sequelize } = require('../models');
 const { isObraCentroCusto } = require('../constants/centroCusto');
+const { allSheetsToArrayRows, createWorkbookBuffer } = require('../utils/excelWorkbook');
 
 function parseBoolean(value, fallback = false) {
   if (typeof value === 'boolean') {
@@ -145,18 +145,15 @@ function parseLinhasSienge(rows) {
   return linhas;
 }
 
-function extrairLinhasXlsx(file) {
-  const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+async function extrairLinhasXlsx(file) {
+  const sheets = await allSheetsToArrayRows(file.buffer, {
+    filename: file.originalname,
+    raw: false,
+    defval: ''
+  });
   const linhas = [];
 
-  workbook.SheetNames.forEach((sheetName) => {
-    const worksheet = workbook.Sheets[sheetName];
-    const rows = XLSX.utils.sheet_to_json(worksheet, {
-      header: 1,
-      raw: false,
-      defval: ''
-    });
-
+  sheets.forEach(({ rows }) => {
     const headerIndex = findHeaderRow(rows);
     const linhasPlanilha = headerIndex >= 0
       ? parseLinhasModelo(rows, headerIndex)
@@ -296,7 +293,7 @@ async function atualizarHierarquiaApropriacao(apropriacao, options = {}) {
 }
 
 module.exports = {
-  modeloXlsx(req, res) {
+  async modeloXlsx(req, res) {
     try {
       const linhasModelo = [
         ['codigo_obra', 'codigo', 'descricao', 'valor_orcado', 'somadora', 'codigo_apropriacao_pai'],
@@ -314,14 +311,10 @@ module.exports = {
         ['codigo_apropriacao_pai e opcional. Quando vazio, o sistema usa o prefixo do codigo para encontrar a apropriacao pai.']
       ];
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhasModelo), 'Apropriacoes');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
-
-      const buffer = XLSX.write(workbook, {
-        bookType: 'xlsx',
-        type: 'buffer'
-      });
+      const buffer = await createWorkbookBuffer([
+        { name: 'Apropriacoes', rows: linhasModelo },
+        { name: 'Instrucoes', rows: instrucoes }
+      ]);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', 'attachment; filename="modelo-apropriacoes-obras.xlsx"');
@@ -442,7 +435,7 @@ module.exports = {
         return res.status(400).json({ error: 'Arquivo Excel e obrigatorio' });
       }
 
-      const linhasExtraidas = extrairLinhasXlsx(req.file);
+      const linhasExtraidas = await extrairLinhasXlsx(req.file);
       if (!linhasExtraidas.length) {
         return res.status(400).json({ error: 'Nenhuma apropriacao encontrada no arquivo.' });
       }

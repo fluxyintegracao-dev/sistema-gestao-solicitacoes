@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
-const XLSX = require('xlsx');
 const {
   Anexo,
   Apropriacao,
@@ -29,6 +28,7 @@ const {
   Unidade,
   User
 } = require('../models');
+const { createWorkbookBuffer, sheetToJsonRows } = require('../utils/excelWorkbook');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
 const { normalizeOriginalName } = require('../utils/fileName');
@@ -772,15 +772,12 @@ function buildCompraDiretaImportMap(items, getKey, fallback = null) {
   return fallback || map;
 }
 
-function normalizeCompraDiretaImportedRows(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) {
-    return [];
-  }
-
-  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+async function normalizeCompraDiretaImportedRows(file) {
+  const rawRows = await sheetToJsonRows(file.buffer, {
+    filename: file.originalname,
+    defval: '',
+    raw: false
+  });
   return rawRows.map((raw) => {
     const normalized = {};
     Object.entries(raw || {}).forEach(([key, value]) => {
@@ -1902,10 +1899,10 @@ module.exports = {
         ['Limite', `A importacao aceita no maximo ${COMPRA_DIRETA_IMPORT_MAX_ITEMS} itens por arquivo.`]
       ];
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhasModelo), 'Itens');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = await createWorkbookBuffer([
+        { name: 'Itens', rows: linhasModelo },
+        { name: 'Instrucoes', rows: instrucoes }
+      ]);
 
       return responderXlsx(res, buffer, 'modelo-itens-compra-direta.xlsx');
     } catch (error) {
@@ -1928,7 +1925,7 @@ module.exports = {
         return res.status(400).json({ error: 'Selecione a obra antes de importar os itens.' });
       }
 
-      const rows = normalizeCompraDiretaImportedRows(req.file.buffer)
+      const rows = (await normalizeCompraDiretaImportedRows(req.file))
         .filter((row) => Object.values(row).some((value) => String(value || '').trim()));
 
       if (!rows.length) {

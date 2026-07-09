@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const XLSX = require('xlsx');
 const {
   Apropriacao,
   FornecedorCompra,
@@ -13,6 +12,7 @@ const {
   SolicitacaoCompraLog
 } = require('../models');
 const { construirResumoApropriacoes } = require('./compraApropriacao');
+const { createWorkbookBuffer, sheetToJsonRows } = require('../utils/excelWorkbook');
 
 function normalizeText(value) {
   return String(value || '')
@@ -198,7 +198,7 @@ function gerarModeloCotacaoCsv(solicitacao, itensSelecionados = []) {
   return `${header.join(',')}\n${rows.join('\n')}\n`;
 }
 
-function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
+async function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
   const linhas = filtrarItensCotaveisPorSelecao(obterItensCotaveis(solicitacao), itensSelecionados);
   const header = [
     'PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'PRAZO',
@@ -208,27 +208,20 @@ function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
     item.produto_id, item.nome, item.quantidade, '', '', '', '', ''
   ]);
 
-  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-
-  // Larguras sugeridas para as colunas
-  ws['!cols'] = [
-    { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 14 },
-    { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 22 }
-  ];
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Cotacao');
-  return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+  return createWorkbookBuffer([
+    {
+      name: 'Cotacao',
+      rows: [header, ...rows],
+      columns: [
+        { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 14 },
+        { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 22 }
+      ]
+    }
+  ]);
 }
 
-function parseXlsxRows(buffer) {
-  const wb = XLSX.read(buffer, { type: 'buffer' });
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) return [];
-
-  const ws = wb.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
-
+async function parseXlsxRows(buffer, filename = '') {
+  const rows = await sheetToJsonRows(buffer, { filename, defval: '' });
   // Normaliza os headers para uppercase sem acentos (mesmo padrao do CSV)
   return rows.map((row) => {
     const normalized = {};

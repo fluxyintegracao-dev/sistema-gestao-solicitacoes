@@ -1145,7 +1145,7 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      const buffer = gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
+      const buffer = await gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
