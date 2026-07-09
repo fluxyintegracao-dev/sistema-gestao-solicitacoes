@@ -1,12 +1,31 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
+import { useAuth } from '../../../contexts/AuthContext';
+import { listarApropriacoes } from '../../../services/apropriacoes';
 import {
+  atualizarApropriacoesItemSolicitacaoCompra,
   atualizarQuantidadeItemSolicitacaoCompra,
   baixarPdfSolicitacaoCompra,
   obterSolicitacaoCompra
 } from '../../../services/compras';
+import {
+  canAlterarQuantidadeSolicitacaoCompra,
+  canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra
+} from '../../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../../utils/navigation';
+import {
+  calcularResumoRateios,
+  criarRateioBase,
+  formatarQuantidade,
+  montarLinhasResumoApropriacao,
+  normalizarRateiosEntrada,
+  parseQuantidade,
+  sincronizarItemComRateios,
+  validarRateiosItem
+} from '../utils/apropriacoes';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -52,10 +71,16 @@ export default function SolicitacaoCompraDetalheView() {
   const { id } = useParams();
   const navigate = useNavigate();
   const navigateBack = useSafeNavigateBack('/solicitacoes-compra');
+  const { user } = useAuth();
   const [solicitacao, setSolicitacao] = useState(null);
+  const [apropriacoes, setApropriacoes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [baixando, setBaixando] = useState(false);
   const [salvandoQuantidadeId, setSalvandoQuantidadeId] = useState(null);
+  const [modalApropriacaoItem, setModalApropriacaoItem] = useState(null);
+  const [rateiosModal, setRateiosModal] = useState([]);
+  const [motivoApropriacao, setMotivoApropriacao] = useState('');
+  const [salvandoApropriacaoId, setSalvandoApropriacaoId] = useState(null);
 
   async function carregar() {
     try {
@@ -74,6 +99,28 @@ export default function SolicitacaoCompraDetalheView() {
     carregar();
   }, [id]);
 
+  const obraIdSolicitacao = solicitacao?.obra_id || solicitacao?.obra?.id || '';
+
+  useEffect(() => {
+    async function carregarApropriacoes() {
+      if (!obraIdSolicitacao) {
+        setApropriacoes([]);
+        return;
+      }
+
+      try {
+        const data = await listarApropriacoes({ obra_id: obraIdSolicitacao });
+        const lista = Array.isArray(data) ? data : [];
+        setApropriacoes(lista.filter((item) => item?.ativo !== false && item?.somadora !== true));
+      } catch (error) {
+        console.error(error);
+        setApropriacoes([]);
+      }
+    }
+
+    carregarApropriacoes();
+  }, [obraIdSolicitacao]);
+
   const itensCombinados = useMemo(() => {
     const itens = (solicitacao?.itens || []).map((item) => ({
       id: item.id,
@@ -83,7 +130,10 @@ export default function SolicitacaoCompraDetalheView() {
       unidade: item.unidade?.sigla || '-',
       quantidade: item.quantidade,
       especificacao: item.especificacao || '-',
-      apropriacao: item.apropriacao?.codigo || '-',
+      apropriacao_id: item.apropriacao_id || '',
+      apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
+      apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+      apropriacao_linhas: item.apropriacao_linhas || [],
       necessario_para: item.necessario_para,
       link_produto: item.link_produto || ''
     }));
@@ -96,13 +146,16 @@ export default function SolicitacaoCompraDetalheView() {
       unidade: item.unidade_sigla_manual || '-',
       quantidade: item.quantidade,
       especificacao: item.especificacao || '-',
-      apropriacao: item.apropriacao?.codigo || '-',
+      apropriacao_id: item.apropriacao_id || '',
+      apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
+      apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+      apropriacao_linhas: item.apropriacao_linhas || [],
       necessario_para: item.necessario_para,
       link_produto: item.link_produto || ''
     }));
 
     return [...itens, ...manuais];
-  }, [solicitacao]);
+  }, [apropriacoes, solicitacao]);
 
   const resumoCotacao = useMemo(() => {
     const fornecedores = Array.isArray(solicitacao?.fornecedores) ? solicitacao.fornecedores : [];
@@ -113,6 +166,14 @@ export default function SolicitacaoCompraDetalheView() {
       enviados: fornecedores.filter((item) => String(item.status || '').toUpperCase() === 'ENVIADO').length
     };
   }, [solicitacao]);
+
+  const podeEditarQuantidadeItem = canAlterarQuantidadeSolicitacaoCompra(user);
+  const podeEditarApropriacoesItem =
+    canEditarApropriacoesItemSolicitacaoCompra(user) || canEditarApropriacoesItemCompraDireta(user);
+
+  const resumoRateiosModal = modalApropriacaoItem
+    ? calcularResumoRateios({ ...modalApropriacaoItem, apropriacoes: rateiosModal })
+    : null;
 
   async function handleAbrirPdf() {
     try {
@@ -177,6 +238,86 @@ export default function SolicitacaoCompraDetalheView() {
       alert(error.message || 'Erro ao atualizar quantidade solicitada');
     } finally {
       setSalvandoQuantidadeId(null);
+    }
+  }
+
+  function abrirModalApropriacao(item) {
+    const rateios = normalizarRateiosEntrada(item);
+    setModalApropriacaoItem(item);
+    setRateiosModal(rateios.length ? rateios : [criarRateioBase(item?.quantidade)]);
+    setMotivoApropriacao('');
+  }
+
+  function fecharModalApropriacao() {
+    setModalApropriacaoItem(null);
+    setRateiosModal([]);
+    setMotivoApropriacao('');
+    setSalvandoApropriacaoId(null);
+  }
+
+  function atualizarRateioModal(index, campo, valor) {
+    setRateiosModal((atual) =>
+      atual.map((rateio, rateioIndex) =>
+        rateioIndex === index
+          ? {
+              ...rateio,
+              [campo]: valor
+            }
+          : rateio
+      )
+    );
+  }
+
+  function adicionarRateioModal() {
+    setRateiosModal((atual) => [...atual, criarRateioBase('')]);
+  }
+
+  function removerRateioModal(index) {
+    setRateiosModal((atual) => atual.filter((_, rateioIndex) => rateioIndex !== index));
+  }
+
+  async function salvarApropriacoesItem() {
+    if (!modalApropriacaoItem?.id) {
+      alert('Item sem identificador para edicao.');
+      return;
+    }
+
+    const itemComRateios = sincronizarItemComRateios({
+      ...modalApropriacaoItem,
+      apropriacoes: rateiosModal
+    });
+    const validacao = validarRateiosItem(itemComRateios);
+
+    if (!validacao.ok) {
+      alert(validacao.mensagem);
+      return;
+    }
+
+    const motivo = motivoApropriacao.trim();
+    if (!motivo) {
+      alert('Informe o motivo da alteracao.');
+      return;
+    }
+
+    const loadingKey = `${modalApropriacaoItem.item_tipo}-${modalApropriacaoItem.id}`;
+    try {
+      setSalvandoApropriacaoId(loadingKey);
+      const data = await atualizarApropriacoesItemSolicitacaoCompra(id, modalApropriacaoItem.id, {
+        item_tipo: modalApropriacaoItem.item_tipo,
+        apropriacoes: normalizarRateiosEntrada(itemComRateios).map((rateio) => ({
+          apropriacao_id: Number(rateio.apropriacao_id),
+          quantidade_apropriada: parseQuantidade(rateio.quantidade_apropriada)
+        })),
+        motivo
+      });
+      setSolicitacao(data || null);
+      fecharModalApropriacao();
+      alert('Apropriacoes do item atualizadas com auditoria.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao atualizar apropriacoes do item');
+    } finally {
+      setSalvandoApropriacaoId(null);
     }
   }
 
@@ -306,18 +447,34 @@ export default function SolicitacaoCompraDetalheView() {
                     <td>
                       <div className="flex items-center gap-2">
                         <span>{item.quantidade}</span>
-                        <button
-                          type="button"
-                          className="rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
-                          onClick={() => handleEditarQuantidade(item)}
-                          disabled={salvandoQuantidadeId === loadingKey}
-                        >
-                          {salvandoQuantidadeId === loadingKey ? 'Salvando...' : 'Editar'}
-                        </button>
+                        {podeEditarQuantidadeItem && (
+                          <button
+                            type="button"
+                            className="rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
+                            onClick={() => handleEditarQuantidade(item)}
+                            disabled={salvandoQuantidadeId === loadingKey}
+                          >
+                            {salvandoQuantidadeId === loadingKey ? 'Salvando...' : 'Editar'}
+                          </button>
+                        )}
                       </div>
                     </td>
                     <td>{item.especificacao}</td>
-                    <td>{item.apropriacao}</td>
+                    <td>
+                      <div className="flex flex-col gap-2">
+                        <span>{item.apropriacao}</span>
+                        {podeEditarApropriacoesItem && (
+                          <button
+                            type="button"
+                            className="w-fit rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
+                            onClick={() => abrirModalApropriacao(item)}
+                            disabled={salvandoApropriacaoId === loadingKey}
+                          >
+                            {salvandoApropriacaoId === loadingKey ? 'Salvando...' : 'Editar apropr.'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>{formatarData(item.necessario_para)}</td>
                     <td>
                       {item.link_produto ? (
@@ -386,6 +543,99 @@ export default function SolicitacaoCompraDetalheView() {
           </div>
         </div>
       </div>
+
+      {modalApropriacaoItem && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes do item</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  {modalApropriacaoItem.nome} - quantidade total {formatarQuantidade(modalApropriacaoItem.quantidade)}
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-3">
+              {rateiosModal.map((rateio, rateioIndex) => (
+                <div key={`${rateioIndex}-${rateio.apropriacao_id || 'nova'}`} className="rounded-xl border border-[var(--c-border)] p-3">
+                  <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
+                    <label className="grid gap-1 text-sm font-semibold text-[var(--c-text)]">
+                      Apropriacao
+                      <ApropriacaoAutocomplete
+                        value={rateio.apropriacao_id}
+                        options={apropriacoes}
+                        onChange={(value) => atualizarRateioModal(rateioIndex, 'apropriacao_id', value)}
+                        placeholder="Digite codigo ou descricao"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-sm font-semibold text-[var(--c-text)]">
+                      Quantidade
+                      <input
+                        className="input"
+                        value={rateio.quantidade_apropriada}
+                        onChange={(event) => atualizarRateioModal(rateioIndex, 'quantidade_apropriada', event.target.value)}
+                        placeholder="Ex.: 10,5"
+                      />
+                    </label>
+                    <div className="flex items-end">
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => removerRateioModal(rateioIndex)}
+                        disabled={rateiosModal.length <= 1}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              <button type="button" className="btn btn-outline w-fit" onClick={adicionarRateioModal}>
+                Adicionar apropriacao
+              </button>
+
+              {resumoRateiosModal && (
+                <div className={`rounded-xl border px-3 py-2 text-sm ${
+                  resumoRateiosModal.fechado
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
+                  Total: {formatarQuantidade(resumoRateiosModal.total)} | Distribuido: {formatarQuantidade(resumoRateiosModal.distribuido)} | Saldo: {formatarQuantidade(resumoRateiosModal.saldo)}
+                </div>
+              )}
+
+              <label className="grid gap-1 text-sm font-semibold text-[var(--c-text)]">
+                Motivo da alteracao
+                <textarea
+                  className="input min-h-24"
+                  value={motivoApropriacao}
+                  onChange={(event) => setMotivoApropriacao(event.target.value)}
+                  placeholder="Explique por que a apropriacao do item foi alterada."
+                />
+              </label>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={salvarApropriacoesItem}
+                  disabled={Boolean(salvandoApropriacaoId)}
+                >
+                  {salvandoApropriacaoId ? 'Salvando...' : 'Salvar apropriacoes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {Array.isArray(solicitacao.fornecedores) && solicitacao.fornecedores.length > 0 && (
         <div className="mt-4 card sol-surface-card">

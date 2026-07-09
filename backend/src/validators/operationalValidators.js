@@ -875,6 +875,26 @@ function validateCompraSolicitacaoItemQuantidadeBody(body = {}) {
   };
 }
 
+function validateCompraSolicitacaoItemApropriacoesBody(body = {}) {
+  ensureAllowedKeys(body, ['item_tipo', 'apropriacao_id', 'apropriacoes', 'motivo'], 'Atualizacao de apropriacoes do item da solicitacao de compra');
+
+  const itemTipo = parseOptionalText(body.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+  if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+    throw new ValidationError('Tipo do item invalido.');
+  }
+
+  if (!Array.isArray(body.apropriacoes) && !body.apropriacao_id) {
+    throw new ValidationError('Informe ao menos uma apropriacao para o item.');
+  }
+
+  return {
+    item_tipo: itemTipo,
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao', { required: false }),
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined,
+    motivo: parseOptionalText(body.motivo, 'Motivo da alteracao', 1000, { required: true })
+  };
+}
+
 function validateCompraSolicitacaoInativarMassaBody(body = {}) {
   ensureAllowedKeys(body, ['solicitacao_ids'], 'Inativacao em massa de solicitacoes de compra');
 
@@ -1166,6 +1186,16 @@ function validateSolicitacaoStatusBody(body = {}) {
   };
 }
 
+function validateSolicitacaoApropriacoesBody(body = {}) {
+  ensureAllowedKeys(body, ['apropriacao_id', 'apropriacoes_rateio', 'motivo'], 'Atualizacao de apropriacoes da solicitacao');
+
+  return {
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao', { required: false }),
+    apropriacoes_rateio: Array.isArray(body.apropriacoes_rateio) ? body.apropriacoes_rateio : undefined,
+    motivo: parseOptionalText(body.motivo, 'Motivo da alteracao', 1000, { required: true })
+  };
+}
+
 function validateSolicitacaoPedidoBody(body = {}) {
   ensureAllowedKeys(body, ['numero_pedido'], 'Atualizacao de pedido');
 
@@ -1303,6 +1333,7 @@ module.exports = {
   validateCompraPedidoStatusBatchBody,
   validateCompraSolicitacaoItemQuantidadeBody,
   validateCompraSolicitacaoItemQuantidadeParams,
+  validateCompraSolicitacaoItemApropriacoesBody,
   validateCompraSolicitacaoInativarMassaBody,
   validateCompraSolicitacaoEncaminharComprasMassaBody,
   validateCompraPedidoItemUpdateBody,
@@ -1327,6 +1358,7 @@ module.exports = {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoApropriacoesBody,
   validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
   validateSolicitacaoDataVencimentoBody,

@@ -13,22 +13,73 @@ import FinanceiroCard from './FinanceiroCard';
 import Pagamentos from './Pagamentos';
 import ModalAlterarStatus from './ModalAlterarStatus';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
+import ApropriacaoAutocomplete from '../../components/ui/ApropriacaoAutocomplete';
 import {
   aprovarDiretoriaSolicitacao,
+  atualizarApropriacoesSolicitacao,
   atualizarPendenciaFinanceiraSolicitacao,
   getSolicitacaoById,
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
+import { listarApropriacoes } from '../../services/apropriacoes';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import {
   canAccessFinanceiro,
   canDeleteSolicitacaoAnexo,
+  canEditarApropriacoesSolicitacao,
   canViewSolicitacaoFinanceiro,
   hasConfiguredAreaPermissions,
   hasEnabledModule,
   hasPermissao
 } from '../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../utils/navigation';
+
+function parseNumeroLocal(valor) {
+  if (valor === null || valor === undefined || valor === '') return 0;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+  const texto = String(valor).trim().replace(/\s+/g, '');
+  if (!texto) return 0;
+  const normalizado = texto.includes(',')
+    ? texto.replace(/\./g, '').replace(',', '.')
+    : texto;
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
+function formatarMoedaLocal(valor) {
+  const numero = Number(valor || 0);
+  return numero.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+}
+
+function formatarNumeroEntrada(valor) {
+  if (valor === null || valor === undefined || valor === '') return '';
+  return String(valor);
+}
+
+function normalizarRateiosSolicitacao(solicitacao) {
+  const rateios = Array.isArray(solicitacao?.apropriacoes) ? solicitacao.apropriacoes : [];
+  if (rateios.length) {
+    return rateios.map((item) => ({
+      apropriacao_id: item?.apropriacao_id ? String(item.apropriacao_id) : '',
+      percentual: formatarNumeroEntrada(item?.percentual),
+      valor: formatarNumeroEntrada(item?.valor)
+    }));
+  }
+
+  if (solicitacao?.apropriacao_id) {
+    return [{
+      apropriacao_id: String(solicitacao.apropriacao_id),
+      percentual: '100',
+      valor: ''
+    }];
+  }
+
+  return [{
+    apropriacao_id: '',
+    percentual: '100',
+    valor: ''
+  }];
+}
 
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
@@ -54,6 +105,7 @@ export default function SolicitacaoDetalhe() {
   const podeInformarPagamento = isSuperadmin || isSetorFinanceiro;
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
+  const podeEditarApropriacoes = moduloComprasHabilitado && canEditarApropriacoesSolicitacao(user);
 
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -65,6 +117,12 @@ export default function SolicitacaoDetalhe() {
     observacao: ''
   });
   const [salvandoPendenciaFinanceira, setSalvandoPendenciaFinanceira] = useState(false);
+  const [apropriacoesCatalogo, setApropriacoesCatalogo] = useState([]);
+  const [modalApropriacoesAberto, setModalApropriacoesAberto] = useState(false);
+  const [salvandoApropriacoes, setSalvandoApropriacoes] = useState(false);
+  const [apropriacaoPrincipalId, setApropriacaoPrincipalId] = useState('');
+  const [rateiosApropriacao, setRateiosApropriacao] = useState([]);
+  const [motivoApropriacoes, setMotivoApropriacoes] = useState('');
   const localMutationsRef = useRef(new Map());
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
@@ -79,6 +137,32 @@ export default function SolicitacaoDetalhe() {
   useEffect(() => {
     carregar();
   }, [id]);
+
+  useEffect(() => {
+    const obraId = solicitacao?.obra_id || solicitacao?.obra?.id;
+    if (!obraId || !podeEditarApropriacoes) {
+      setApropriacoesCatalogo([]);
+      return;
+    }
+
+    let ativo = true;
+    listarApropriacoes({ obra_id: obraId })
+      .then((dados) => {
+        if (!ativo) return;
+        const lista = Array.isArray(dados) ? dados : dados?.items || dados?.rows || [];
+        setApropriacoesCatalogo(
+          lista.filter((item) => item?.ativo !== false && item?.somadora !== true)
+        );
+      })
+      .catch((error) => {
+        console.error(error);
+        if (ativo) setApropriacoesCatalogo([]);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [solicitacao?.obra_id, solicitacao?.obra?.id, podeEditarApropriacoes]);
 
   useEffect(() => {
     if (!solicitacao) return;
@@ -193,6 +277,103 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
+  function abrirModalApropriacoes() {
+    setApropriacaoPrincipalId(solicitacao?.apropriacao_id ? String(solicitacao.apropriacao_id) : '');
+    setRateiosApropriacao(normalizarRateiosSolicitacao(solicitacao));
+    setMotivoApropriacoes('');
+    setModalApropriacoesAberto(true);
+  }
+
+  function fecharModalApropriacoes() {
+    if (salvandoApropriacoes) return;
+    setModalApropriacoesAberto(false);
+  }
+
+  function atualizarRateioApropriacao(index, campo, valor) {
+    setRateiosApropriacao((atuais) => (
+      atuais.map((item, i) => (i === index ? { ...item, [campo]: valor } : item))
+    ));
+  }
+
+  function adicionarRateioApropriacao() {
+    setRateiosApropriacao((atuais) => [
+      ...atuais,
+      { apropriacao_id: '', percentual: '', valor: '' }
+    ]);
+  }
+
+  function removerRateioApropriacao(index) {
+    setRateiosApropriacao((atuais) => (
+      atuais.length <= 1 ? atuais : atuais.filter((_, i) => i !== index)
+    ));
+  }
+
+  function resumoRateioApropriacao() {
+    const percentual = rateiosApropriacao.reduce(
+      (acc, item) => acc + parseNumeroLocal(item.percentual),
+      0
+    );
+    const valor = rateiosApropriacao.reduce(
+      (acc, item) => acc + parseNumeroLocal(item.valor),
+      0
+    );
+
+    return {
+      percentual,
+      valor,
+      usaPercentual: rateiosApropriacao.some((item) => String(item.percentual || '').trim()),
+      usaValor: rateiosApropriacao.some((item) => String(item.valor || '').trim())
+    };
+  }
+
+  async function salvarApropriacoesSolicitacao() {
+    if (!String(motivoApropriacoes || '').trim()) {
+      alert('Informe o motivo da alteracao das apropriacoes.');
+      return;
+    }
+
+    const rateiosValidos = rateiosApropriacao
+      .filter((item) => (
+        String(item.apropriacao_id || '').trim() ||
+        String(item.percentual || '').trim() ||
+        String(item.valor || '').trim()
+      ))
+      .map((item) => ({
+        apropriacao_id: item.apropriacao_id ? Number(item.apropriacao_id) : null,
+        percentual: String(item.percentual || '').trim() ? parseNumeroLocal(item.percentual) : null,
+        valor: String(item.valor || '').trim() ? parseNumeroLocal(item.valor) : null
+      }));
+
+    if (rateiosValidos.some((item) => !item.apropriacao_id)) {
+      alert('Preencha todas as apropriacoes do rateio.');
+      return;
+    }
+
+    const resumo = resumoRateioApropriacao();
+    if (resumo.usaPercentual && resumo.usaValor) {
+      alert('Use somente percentual ou somente valor em R$ no rateio.');
+      return;
+    }
+
+    try {
+      setSalvandoApropriacoes(true);
+      await atualizarApropriacoesSolicitacao(solicitacao.id, {
+        apropriacao_id: apropriacaoPrincipalId ? Number(apropriacaoPrincipalId) : null,
+        apropriacoes_rateio: rateiosValidos,
+        motivo: motivoApropriacoes.trim()
+      });
+      registrarMutacaoLocal(solicitacao.id);
+      setModalApropriacoesAberto(false);
+      await carregar({ silent: true });
+      alert('Apropriacoes atualizadas com sucesso.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao atualizar apropriacoes');
+    } finally {
+      setSalvandoApropriacoes(false);
+    }
+  }
+
   useLiveUpdateSubscription({
     enabled: !!id,
     filter: (payload) => (
@@ -283,6 +464,20 @@ export default function SolicitacaoDetalhe() {
         mostrarContratoInfo={moduloContratosHabilitado}
         mostrarApropriacaoInfo={moduloComprasHabilitado}
       />
+
+      {podeEditarApropriacoes && (
+        <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes da solicitacao</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              Ajuste a apropriacao principal ou o rateio do contrato com motivo e auditoria.
+            </p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={abrirModalApropriacoes}>
+            Editar apropriacoes
+          </button>
+        </div>
+      )}
 
       {podeAprovarDiretoria && (
         <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -447,6 +642,119 @@ export default function SolicitacaoDetalhe() {
             void carregar({ silent: true });
           }}
         />
+      )}
+
+      {modalApropriacoesAberto && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-4xl rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  A alteracao nao muda a visibilidade da solicitacao e fica registrada no historico.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={fecharModalApropriacoes}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+              <label className="block text-sm font-semibold text-[var(--c-text)]">
+                Apropriacao principal
+                <ApropriacaoAutocomplete
+                  value={apropriacaoPrincipalId}
+                  options={apropriacoesCatalogo}
+                  onChange={setApropriacaoPrincipalId}
+                  placeholder="Digite para buscar a apropriacao"
+                  className="mt-1"
+                />
+              </label>
+
+              <div className="rounded-2xl border border-[var(--c-border)] p-4">
+                <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-[var(--c-text)]">Rateio do contrato</h3>
+                    <p className="text-sm text-[var(--c-muted)]">
+                      Use percentual ou valor em R$. Nao misture os dois criterios na mesma alteracao.
+                    </p>
+                  </div>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={adicionarRateioApropriacao}>
+                    Adicionar linha
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {rateiosApropriacao.map((rateio, index) => (
+                    <div
+                      key={`${index}-${rateio.apropriacao_id || 'nova'}`}
+                      className="grid gap-2 rounded-xl border border-[var(--c-border)] p-3 md:grid-cols-[1fr_140px_160px_auto]"
+                    >
+                      <ApropriacaoAutocomplete
+                        value={rateio.apropriacao_id}
+                        options={apropriacoesCatalogo}
+                        onChange={(valor) => atualizarRateioApropriacao(index, 'apropriacao_id', valor)}
+                        placeholder="Buscar apropriacao"
+                      />
+                      <input
+                        className="input"
+                        value={rateio.percentual}
+                        onChange={(event) => atualizarRateioApropriacao(index, 'percentual', event.target.value)}
+                        placeholder="%"
+                        inputMode="decimal"
+                      />
+                      <input
+                        className="input"
+                        value={rateio.valor}
+                        onChange={(event) => atualizarRateioApropriacao(index, 'valor', event.target.value)}
+                        placeholder="Valor R$"
+                        inputMode="decimal"
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => removerRateioApropriacao(index)}
+                        disabled={rateiosApropriacao.length <= 1}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-3 grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-3">
+                  <span>Percentual informado: <strong>{resumoRateioApropriacao().percentual.toFixed(4)}%</strong></span>
+                  <span>Valor informado: <strong>{formatarMoedaLocal(resumoRateioApropriacao().valor)}</strong></span>
+                  <span>Valor da solicitacao: <strong>{formatarMoedaLocal(solicitacao?.valor)}</strong></span>
+                </div>
+              </div>
+
+              <label className="block text-sm font-semibold text-[var(--c-text)]">
+                Motivo da alteracao *
+                <textarea
+                  className="input mt-1 min-h-[96px]"
+                  value={motivoApropriacoes}
+                  onChange={(event) => setMotivoApropriacoes(event.target.value)}
+                  placeholder="Explique por que a apropriacao foi alterada."
+                />
+              </label>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={fecharModalApropriacoes}>
+                Cancelar
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={salvarApropriacoesSolicitacao}
+                disabled={salvandoApropriacoes}
+              >
+                {salvandoApropriacoes ? 'Salvando...' : 'Salvar apropriacoes'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

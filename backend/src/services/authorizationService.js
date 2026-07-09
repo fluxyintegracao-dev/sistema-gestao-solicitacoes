@@ -166,6 +166,18 @@ const COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS = [
   ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS
 ];
 
+const SOLICITACOES_APROPRIACOES_EDIT_KEYS = [
+  'solicitacoes.apropriacoes.editar'
+];
+
+const COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS = [
+  'compras.solicitacoes.editar_apropriacoes_itens'
+];
+
+const COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS = [
+  'compras.compra_direta.editar_apropriacoes_itens'
+];
+
 const COMPRAS_SOLICITACOES_ENCAMINHAR_KEYS = [
   'compras.solicitacoes.encaminhar_compras',
   'compras.solicitacoes.gerenciar'
@@ -359,6 +371,8 @@ const COMPRAS_PERMISSION_KEYS = [
   ...COMPRAS_SOLICITACOES_MANAGE_KEYS,
   ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS,
   ...COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS,
+  ...COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS,
+  ...COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS,
   ...COMPRAS_SOLICITACOES_DELETE_KEYS,
   ...COMPRAS_PEDIDOS_VIEW_KEYS,
   ...COMPRAS_PEDIDOS_MANAGE_KEYS,
@@ -1631,6 +1645,42 @@ async function canAlterarQuantidadeSolicitacaoCompra(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canEditarApropriacoesSolicitacao(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_APROPRIACOES_EDIT_KEYS);
+  }
+
+  return false;
+}
+
+async function canEditarApropriacoesItemSolicitacaoCompra(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS);
+  }
+
+  return false;
+}
+
+async function canEditarApropriacoesItemCompraDireta(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS);
+  }
+
+  return false;
+}
+
 async function canEncaminharCompraSolicitacoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -2883,6 +2933,9 @@ module.exports = {
   canManageCompraSolicitacoes,
   canEncaminharCompraSolicitacoes,
   canDeleteCompraSolicitacoes,
+  canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra,
+  canEditarApropriacoesSolicitacao,
   canViewComprasCotacoes,
   canViewAllComprasScope,
   canViewCompraSolicitacoes,

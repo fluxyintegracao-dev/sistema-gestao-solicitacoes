@@ -561,6 +561,15 @@ export async function atualizarQuantidadeItemSolicitacaoCompra(id, itemId, data)
   return handleJsonResponse(response, 'Erro ao atualizar quantidade do item da solicitacao de compra');
 }
 
+export async function atualizarApropriacoesItemSolicitacaoCompra(id, itemId, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens/${itemId}/apropriacoes`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar apropriacoes do item da solicitacao de compra');
+}
+
 export async function cancelarPedidoCompra(id, data = {}) {
   const response = await fetch(`${API_URL}/compras/pedidos/${id}/cancelar`, {
     method: 'PATCH',

@@ -80,6 +80,7 @@ const {
 const { criarParceiro } = require('../services/parceiroService');
 const { isObraCentroCusto } = require('../constants/centroCusto');
 const {
+  canEditarApropriacoesSolicitacao,
   userHasAreaPermission,
   userHasConfiguredAreaPermissions
 } = require('../services/authorizationService');
@@ -2907,6 +2908,18 @@ module.exports = {
             attributes: ['id', 'codigo', 'descricao', 'obra_id']
           },
           {
+            model: SolicitacaoApropriacao,
+            as: 'apropriacoes',
+            required: false,
+            include: [
+              {
+                model: Apropriacao,
+                as: 'apropriacao',
+                attributes: ['id', 'codigo', 'descricao', 'obra_id']
+              }
+            ]
+          },
+          {
             model: Parceiro,
             as: 'parceiro',
             attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email']
@@ -3397,6 +3410,294 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar ref. do contrato' });
+    }
+  },
+
+  async atualizarApropriacoes(req, res) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      const { id } = req.params;
+
+      const solicitacao = await Solicitacao.findByPk(id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      if (!acesso.allowed) {
+        await transaction.rollback();
+        return res.status(acesso.status).json({ error: acesso.error });
+      }
+
+      const podeEditar = await canEditarApropriacoesSolicitacao(req.user);
+      if (!podeEditar) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para alterar apropriacoes da solicitacao.' });
+      }
+
+      const totalTitulos = await TituloFinanceiro.count({
+        where: { solicitacao_id: Number(id) },
+        transaction
+      });
+      if (totalTitulos > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Nao e possivel alterar apropriacoes depois que a solicitacao possui titulo financeiro.'
+        });
+      }
+
+      const solicitacoesCompra = await SolicitacaoCompra.findAll({
+        where: { solicitacao_principal_id: Number(id) },
+        attributes: ['id'],
+        transaction
+      });
+      const solicitacaoCompraIds = solicitacoesCompra.map((item) => Number(item.id)).filter(Boolean);
+      if (solicitacaoCompraIds.length > 0) {
+        const totalPedidos = await PedidoCompra.count({
+          where: {
+            solicitacao_compra_id: { [Op.in]: solicitacaoCompraIds },
+            status: { [Op.ne]: 'CANCELADO' }
+          },
+          transaction
+        });
+
+        if (totalPedidos > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao e possivel alterar apropriacoes depois que a solicitacao possui pedido de compra.'
+          });
+        }
+      }
+
+      const apropriacaoAnteriorId = solicitacao.apropriacao_id || null;
+      const rateiosAnteriores = await SolicitacaoApropriacao.findAll({
+        where: { solicitacao_id: Number(id) },
+        include: [
+          {
+            model: Apropriacao,
+            as: 'apropriacao',
+            attributes: ['id', 'codigo', 'descricao']
+          }
+        ],
+        transaction
+      });
+
+      const rateioApropriacoes = normalizarApropriacoesRateio(req.body?.apropriacoes_rateio || []);
+      let apropriacao = null;
+      if (req.body?.apropriacao_id) {
+        apropriacao = await Apropriacao.findOne({
+          where: {
+            id: Number(req.body.apropriacao_id),
+            obra_id: Number(solicitacao.obra_id)
+          },
+          transaction
+        });
+
+        if (!apropriacao) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Apropriacao principal nao pertence a obra da solicitacao.' });
+        }
+        if (apropriacao.ativo === false) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Apropriacao principal esta inativa.' });
+        }
+        if (apropriacao.somadora === true) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Selecione uma apropriacao analitica. Apropriacoes somadoras nao podem receber lancamentos.'
+          });
+        }
+      }
+
+      let rateioApropriacoesDetalhado = [];
+      if (rateioApropriacoes.length > 0) {
+        if (!solicitacao.contrato_id) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'A solicitacao precisa ter contrato vinculado para ratear apropriacoes do contrato.' });
+        }
+
+        const contrato = await Contrato.findOne({
+          where: {
+            id: Number(solicitacao.contrato_id),
+            obra_id: Number(solicitacao.obra_id)
+          },
+          attributes: ['id', 'obra_id'],
+          transaction
+        });
+        if (!contrato) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Contrato selecionado nao pertence a obra da solicitacao.' });
+        }
+
+        const apropriacoesContrato = await ContratoApropriacao.findAll({
+          where: { contrato_id: Number(solicitacao.contrato_id) },
+          include: [
+            {
+              model: Apropriacao,
+              as: 'apropriacao',
+              attributes: ['id', 'obra_id', 'codigo', 'descricao', 'ativo', 'somadora']
+            }
+          ],
+          transaction
+        });
+        const mapaContrato = new Map(
+          apropriacoesContrato
+            .filter((item) => item.apropriacao)
+            .map((item) => [Number(item.apropriacao_id), item])
+        );
+
+        if (mapaContrato.size === 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'O contrato selecionado nao possui apropriacoes estruturadas cadastradas.' });
+        }
+
+        for (const item of rateioApropriacoes) {
+          const vinculoContrato = mapaContrato.get(Number(item.apropriacao_id));
+          if (!vinculoContrato) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'Uma ou mais apropriacoes selecionadas nao pertencem ao contrato.' });
+          }
+          if (Number(vinculoContrato.apropriacao.obra_id) !== Number(solicitacao.obra_id)) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'Uma ou mais apropriacoes selecionadas nao pertencem a obra da solicitacao.' });
+          }
+          if (vinculoContrato.apropriacao.ativo === false) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'Uma ou mais apropriacoes selecionadas estao inativas.' });
+          }
+          if (vinculoContrato.apropriacao.somadora === true) {
+            await transaction.rollback();
+            return res.status(400).json({
+              error: 'Uma ou mais apropriacoes selecionadas sao somadoras. Selecione apenas apropriacoes analiticas.'
+            });
+          }
+          rateioApropriacoesDetalhado.push({
+            ...item,
+            contrato_id: Number(solicitacao.contrato_id),
+            apropriacao: vinculoContrato.apropriacao
+          });
+        }
+
+        if (!apropriacao && rateioApropriacoesDetalhado.length > 0) {
+          apropriacao = rateioApropriacoesDetalhado[0].apropriacao;
+        }
+
+        const valorTotalSolicitacao = arredondarCentavos(parseDecimalOpcionalSolicitacao(solicitacao.valor));
+        if (!valorTotalSolicitacao || valorTotalSolicitacao <= 0) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Informe o valor total da solicitacao para validar o rateio das apropriacoes.' });
+        }
+
+        const rateiosComPercentual = rateioApropriacoesDetalhado.filter(item => item.percentual !== null && item.percentual !== undefined);
+        const rateiosComValor = rateioApropriacoesDetalhado.filter(item => item.valor_rateio !== null && item.valor_rateio !== undefined);
+        const possuiLinhaComDoisCriterios = rateioApropriacoesDetalhado.some(item => (
+          item.percentual !== null &&
+          item.percentual !== undefined &&
+          item.valor_rateio !== null &&
+          item.valor_rateio !== undefined
+        ));
+
+        if (possuiLinhaComDoisCriterios) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Informe o rateio usando apenas percentual ou apenas valor em R$ por apropriacao.' });
+        }
+
+        if (rateiosComPercentual.length === rateioApropriacoesDetalhado.length) {
+          const totalPercentual = rateiosComPercentual.reduce((acc, item) => acc + Number(item.percentual || 0), 0);
+          if (rateiosComPercentual.some(item => Number(item.percentual || 0) <= 0) || Math.abs(totalPercentual - 100) > 0.0001) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'A soma dos percentuais do rateio deve ser exatamente 100%.' });
+          }
+        } else if (rateiosComValor.length === rateioApropriacoesDetalhado.length) {
+          const totalValorRateio = arredondarCentavos(rateiosComValor.reduce((acc, item) => acc + Number(item.valor_rateio || 0), 0));
+          if (rateiosComValor.some(item => Number(item.valor_rateio || 0) <= 0) || totalValorRateio !== valorTotalSolicitacao) {
+            await transaction.rollback();
+            return res.status(400).json({ error: 'A soma dos valores em R$ do rateio deve ser igual ao valor total da solicitacao.' });
+          }
+        } else {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Todas as apropriacoes selecionadas devem usar o mesmo criterio de rateio: percentual ou valor em R$.'
+          });
+        }
+      }
+
+      await SolicitacaoApropriacao.destroy({
+        where: { solicitacao_id: Number(id) },
+        transaction
+      });
+
+      if (rateioApropriacoesDetalhado.length > 0) {
+        await SolicitacaoApropriacao.bulkCreate(
+          rateioApropriacoesDetalhado.map(item => ({
+            solicitacao_id: Number(id),
+            contrato_id: Number(solicitacao.contrato_id),
+            apropriacao_id: item.apropriacao_id,
+            percentual: item.percentual,
+            quantidade: item.quantidade,
+            valor_rateio: item.valor_rateio,
+            observacao: item.observacao
+          })),
+          { transaction }
+        );
+      }
+
+      await solicitacao.update({
+        apropriacao_id: apropriacao?.id || null
+      }, { transaction });
+
+      const textoRateio = formatarRateioApropriacoesHistorico(rateioApropriacoesDetalhado);
+      await Historico.create({
+        solicitacao_id: Number(id),
+        usuario_responsavel_id: req.user.id,
+        setor: req.user.setor_id || req.user.area,
+        acao: 'APROPRIACOES_ATUALIZADAS',
+        descricao: `Apropriacoes atualizadas. Motivo: ${req.body?.motivo || '-'}${textoRateio ? ` | Rateio: ${textoRateio}` : ''}`,
+        metadata: JSON.stringify({
+          apropriacao_anterior_id: apropriacaoAnteriorId,
+          apropriacao_nova_id: apropriacao?.id || null,
+          apropriacoes_rateio_anteriores: rateiosAnteriores.map((item) => item.toJSON()),
+          apropriacoes_rateio_novas: rateioApropriacoesDetalhado.map((item) => ({
+            apropriacao_id: item.apropriacao_id,
+            percentual: item.percentual,
+            quantidade: item.quantidade,
+            valor_rateio: item.valor_rateio,
+            observacao: item.observacao
+          })),
+          motivo: req.body?.motivo || null
+        })
+      }, { transaction });
+
+      await transaction.commit();
+
+      await publishSolicitacaoRealtimeEvent({
+        action: 'APROPRIACOES_UPDATED',
+        solicitacao,
+        actor: {
+          id: req.user.id,
+          nome: req.user?.nome || null
+        },
+        metadata: {
+          apropriacao_anterior_id: apropriacaoAnteriorId,
+          apropriacao_nova_id: apropriacao?.id || null
+        }
+      });
+
+      return res.json({
+        id: Number(id),
+        apropriacao_id: apropriacao?.id || null,
+        apropriacoes_rateio: rateioApropriacoesDetalhado
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar apropriacoes da solicitacao' });
     }
   },
 

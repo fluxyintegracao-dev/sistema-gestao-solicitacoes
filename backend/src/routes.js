@@ -62,6 +62,7 @@ const {
   validateCompraPedidoReabrirBody,
   validateCompraPedidoStatusBody,
   validateCompraPedidoStatusBatchBody,
+  validateCompraSolicitacaoItemApropriacoesBody,
   validateCompraSolicitacaoItemQuantidadeBody,
   validateCompraSolicitacaoItemQuantidadeParams,
   validateCompraSolicitacaoInativarMassaBody,
@@ -86,6 +87,7 @@ const {
   validateContratoRelatorioOperacionalQuery,
   validateContratoUpdateBody,
   validateSolicitacaoArquivarMassaBody,
+  validateSolicitacaoApropriacoesBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
   validateSolicitacaoCredorCreateBody,
@@ -1256,6 +1258,7 @@ router.patch('/solicitacoes/:id/pedido', validateRequest({ params: validateNumer
 router.patch('/solicitacoes/:id/ref-contrato', requireEnabledModule('CONTRATOS'), validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoRefContratoBody }), auditSuccess({ eventType: 'SOLICITACAO_CONTRATO_UPDATED', resourceType: 'SOLICITACAO', description: 'Referencia de contrato atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarRefContrato);
 router.patch('/solicitacoes/:id/valor', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoValorBody }), auditSuccess({ eventType: 'SOLICITACAO_VALOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Valor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarValor);
 router.patch('/solicitacoes/:id/data-vencimento', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoDataVencimentoBody }), auditSuccess({ eventType: 'SOLICITACAO_DUE_DATE_UPDATED', resourceType: 'SOLICITACAO', description: 'Data de vencimento da solicitacao atualizada', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarDataVencimento);
+router.patch('/solicitacoes/:id/apropriacoes', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoApropriacoesBody }), auditSuccess({ eventType: 'SOLICITACAO_APROPRIACOES_UPDATED', resourceType: 'SOLICITACAO', description: 'Apropriacoes da solicitacao atualizadas', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarApropriacoes);
 router.patch('/solicitacoes/:id/credor', requireEnabledModule('FINANCEIRO'), allowSolicitacaoFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoCredorBody }), auditSuccess({ eventType: 'SOLICITACAO_CREDOR_UPDATED', resourceType: 'SOLICITACAO', description: 'Credor da solicitacao atualizado', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.atualizarCredor);
 router.post('/solicitacoes/:id/credor/cadastrar', requireEnabledModule('FINANCEIRO'), allowSolicitacaoFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao'), body: validateSolicitacaoCredorCreateBody }), auditSuccess({ eventType: 'SOLICITACAO_CREDOR_CREATED_AND_LINKED', resourceType: 'SOLICITACAO', description: 'Credor cadastrado e vinculado a solicitacao', resourceIdResolver: (req) => req.params.id }), SolicitacaoController.cadastrarCredorFinanceiro);
 router.post('/solicitacoes/credores', auditSuccess({ eventType: 'SOLICITACAO_CREDOR_CREATED', resourceType: 'PARCEIRO', description: 'Credor criado durante abertura de solicitacao' }), ParceiroController.createCredorNovaSolicitacao);
@@ -1736,6 +1739,7 @@ router.post('/compras/solicitacoes/:id/enviar', allowCompraSolicitacoesManage, v
 router.patch('/compras/solicitacoes/:id/recusar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.recusar);
 router.patch('/compras/solicitacoes/:id/encerrar', allowComprasCotacoesEncerrar, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
 router.patch('/compras/solicitacoes/:id/itens/:itemId/quantidade', allowCompraSolicitacoesAlterarQuantidade, criticalRateLimit, validateRequest({ params: validateCompraSolicitacaoItemQuantidadeParams, body: validateCompraSolicitacaoItemQuantidadeBody }), requireCompraAccess, SolicitacaoCompraController.atualizarQuantidadeItem);
+router.patch('/compras/solicitacoes/:id/itens/:itemId/apropriacoes', allowCompraSolicitacoesCreateFlowRead, criticalRateLimit, validateRequest({ params: validateCompraSolicitacaoItemQuantidadeParams, body: validateCompraSolicitacaoItemApropriacoesBody }), requireCompraAccess, SolicitacaoCompraController.atualizarApropriacoesItem);
 router.post('/compras/solicitacoes/:id/comentarios', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraCotacaoComentarioBody }), requireCompraAccess, SolicitacaoCompraController.comentar);
 router.patch('/compras/solicitacoes/:id/delegar', allowComprasDelegacaoRead, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraDelegacaoBody }), requireCompraAccess, PedidoCompraController.delegarSolicitacao);
 router.post('/compras/solicitacoes/:id/pedidos', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraPedidoCreateBody }), requireCompraAccess, PedidoCompraController.createFromSolicitacao);

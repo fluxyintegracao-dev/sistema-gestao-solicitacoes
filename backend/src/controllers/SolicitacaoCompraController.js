@@ -24,6 +24,7 @@ const {
   SolicitacaoCompraAlocacao,
   SolicitacaoCompraRespostaItem,
   StatusArea,
+  TituloFinanceiro,
   TipoSolicitacao,
   Unidade,
   User
@@ -67,6 +68,8 @@ const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
   canAlterarQuantidadeSolicitacaoCompra,
+  canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
   canEncerrarComprasCotacoes,
   canManageComprasCotacoes,
@@ -2466,6 +2469,206 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar quantidade do item da solicitacao de compra' });
+    }
+  },
+
+  async atualizarApropriacoesItem(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+      const podeEditar = compraDireta
+        ? await canEditarApropriacoesItemCompraDireta(usuario)
+        : await canEditarApropriacoesItemSolicitacaoCompra(usuario);
+
+      if (!podeEditar) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para alterar apropriacoes dos itens.' });
+      }
+
+      if (!compraDireta && isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!compraDireta && !(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (compraDireta && solicitacao.solicitacao_principal_id) {
+        const totalTitulos = await TituloFinanceiro.count({
+          where: { solicitacao_id: Number(solicitacao.solicitacao_principal_id) },
+          transaction
+        });
+
+        if (totalTitulos > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao e possivel alterar apropriacoes de compra direta com titulo financeiro ja criado.'
+          });
+        }
+      }
+
+      if (!compraDireta) {
+        const pedidos = await PedidoCompra.findAll({
+          where: { solicitacao_compra_id: Number(solicitacao.id) },
+          attributes: ['id', 'status'],
+          transaction
+        });
+
+        for (const pedido of pedidos) {
+          const pedidoTemEdicaoBloqueada = await isPedidoCompraStatusLocked(pedido.status);
+          if (String(pedido.status || '').toUpperCase() !== 'CANCELADO' && pedidoTemEdicaoBloqueada) {
+            await transaction.rollback();
+            return res.status(400).json({
+              error: 'Nao e possivel alterar apropriacoes quando existe pedido fechado. Reabra o pedido para ajustar a cotacao.'
+            });
+          }
+        }
+      }
+
+      const itemTipo = String(req.body?.item_tipo || '').toUpperCase();
+      const ItemModel = itemTipo === 'MANUAL' ? SolicitacaoCompraItemManual : SolicitacaoCompraItem;
+      const ApropriacaoModel = itemTipo === 'MANUAL'
+        ? SolicitacaoCompraItemManualApropriacao
+        : SolicitacaoCompraItemApropriacao;
+      const foreignKey = itemTipo === 'MANUAL'
+        ? 'solicitacao_compra_item_manual_id'
+        : 'solicitacao_compra_item_id';
+
+      const item = await ItemModel.findOne({
+        where: {
+          id: Number(req.params.itemId),
+          solicitacao_compra_id: Number(solicitacao.id)
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!item) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Item da solicitacao de compra nao encontrado' });
+      }
+
+      const rateiosEntrada = Array.isArray(req.body?.apropriacoes) && req.body.apropriacoes.length > 0
+        ? req.body.apropriacoes
+        : [{ apropriacao_id: req.body?.apropriacao_id, quantidade_apropriada: item.quantidade }];
+      const rateios = extrairRateiosPayload({
+        apropriacoes: rateiosEntrada,
+        quantidade: item.quantidade,
+        apropriacao_id: req.body?.apropriacao_id
+      });
+
+      const validacaoRateio = validarRateiosPayload({ ...item.toJSON(), apropriacoes: rateios });
+      if (!validacaoRateio.ok) {
+        await transaction.rollback();
+        return res.status(400).json({ error: validacaoRateio.mensagem || 'Rateio de apropriacoes invalido.' });
+      }
+
+      const mapaApropriacoes = await carregarMapaApropriacoes({
+        obraId: solicitacao.obra_id,
+        itens: [{ apropriacoes: rateios }],
+        transaction
+      });
+
+      for (const rateio of rateios) {
+        const apropriacao = mapaApropriacoes.get(Number(rateio.apropriacao_id));
+        if (!apropriacao) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Uma ou mais apropriacoes nao pertencem a obra da solicitacao.' });
+        }
+        if (apropriacao.ativo === false) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Uma ou mais apropriacoes selecionadas estao inativas.' });
+        }
+        if (apropriacao.somadora === true) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Uma ou mais apropriacoes selecionadas sao somadoras. Selecione apenas apropriacoes analiticas.'
+          });
+        }
+      }
+
+      const apropriacoesAnteriores = await ApropriacaoModel.findAll({
+        where: { [foreignKey]: Number(item.id) },
+        attributes: ['apropriacao_id', 'quantidade_apropriada'],
+        transaction
+      });
+
+      await item.update({ apropriacao_id: Number(rateios[0].apropriacao_id) }, { transaction });
+      await ApropriacaoModel.destroy({
+        where: { [foreignKey]: Number(item.id) },
+        transaction
+      });
+      await ApropriacaoModel.bulkCreate(
+        rateios.map((rateio) => ({
+          [foreignKey]: Number(item.id),
+          apropriacao_id: Number(rateio.apropriacao_id),
+          quantidade_apropriada: Number(rateio.quantidade_apropriada || 0)
+        })),
+        { transaction }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'ITEM_APROPRIACOES_ATUALIZADAS',
+        descricao: `Apropriacoes do item ${item.id} atualizadas`,
+        metadados: {
+          item_id: item.id,
+          item_tipo: itemTipo,
+          apropriacoes_anteriores: apropriacoesAnteriores.map((row) => row.toJSON()),
+          apropriacoes_novas: rateios,
+          motivo: req.body?.motivo || null
+        },
+        transaction
+      });
+
+      if (solicitacao.solicitacao_principal_id) {
+        await Historico.create(
+          {
+            solicitacao_id: solicitacao.solicitacao_principal_id,
+            usuario_responsavel_id: usuario.id,
+            setor: usuario.setor_id,
+            acao: 'ITEM_APROPRIACOES_ATUALIZADAS',
+            descricao: `Apropriacoes do item ${item.id} atualizadas na ${solicitacao.codigo || `SC-${String(solicitacao.id).padStart(5, '0')}`}. Motivo: ${req.body?.motivo || '-'}`,
+            metadata: JSON.stringify({
+              solicitacao_compra_id: solicitacao.id,
+              item_id: item.id,
+              item_tipo: itemTipo,
+              apropriacoes_anteriores: apropriacoesAnteriores.map((row) => row.toJSON()),
+              apropriacoes_novas: rateios
+            })
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar apropriacoes do item da solicitacao de compra' });
     }
   },
 
