@@ -505,6 +505,10 @@ function isFormaBoleto(formaPagamento) {
   return getTipoFormaPagamento(formaPagamento).includes('BOLETO');
 }
 
+function isFormaPix(formaPagamento) {
+  return getTipoFormaPagamento(formaPagamento).includes('PIX');
+}
+
 function isFormaOutros(formaPagamento) {
   const value = getTipoFormaPagamento(formaPagamento);
   return value.includes('OUTROS') || value.includes('OUTRO');
@@ -1149,7 +1153,7 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   }
 
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
-  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false && !isFormaOutros(forma)) {
+  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false && !isFormaPix(forma) && !isFormaOutros(forma)) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
   }
 
