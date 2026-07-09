@@ -242,11 +242,12 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(solicitacao, valor = '') {
+function createPagamento(solicitacao, valor = '', categoriaFinanceiraId = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
     parceiro_nome: solicitacao?.parceiro?.nome || '',
+    categoria_financeira_id: categoriaFinanceiraId ? String(categoriaFinanceiraId) : '',
     valor,
     data_vencimento: solicitacao?.data_vencimento || today(),
     competencia_data: '',
@@ -766,7 +767,14 @@ export default function FinanceiroCard({
   useEffect(() => {
     if (selectedCategory && !isCategoriaCompativel(selectedCategory, form.tipo)) {
       setSelectedCategory(null);
-      setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+      setForm((current) => ({
+        ...current,
+        categoria_financeira_id: '',
+        pagamentos: (current.pagamentos || []).map((pagamento) => ({
+          ...pagamento,
+          categoria_financeira_id: ''
+        }))
+      }));
       setCategoriaSearch('');
     }
   }, [form.tipo, selectedCategory]);
@@ -775,12 +783,12 @@ export default function FinanceiroCard({
     return titulos.reduce((acc, item) => acc + Number(item.valor_original || 0), 0);
   }, [titulos]);
 
-  const categoriasFiltradas = useMemo(() => {
-    return categorias.filter((categoria) => {
-      if (!isCategoriaCompativel(categoria, form.tipo)) {
-        return false;
-      }
+  const categoriasCompativeis = useMemo(() => {
+    return categorias.filter((categoria) => isCategoriaCompativel(categoria, form.tipo));
+  }, [categorias, form.tipo]);
 
+  const categoriasFiltradas = useMemo(() => {
+    return categoriasCompativeis.filter((categoria) => {
       if (!categoriaSearch.trim()) {
         return true;
       }
@@ -794,7 +802,7 @@ export default function FinanceiroCard({
         categoria.classificacao_gerencial
       ], categoriaSearch);
     });
-  }, [categoriaSearch, categorias, form.tipo]);
+  }, [categoriaSearch, categoriasCompativeis]);
 
   function getFormaPagamento(formaPagamentoId) {
     return formasPagamento.find((item) => String(item.id) === String(formaPagamentoId)) || null;
@@ -851,11 +859,16 @@ export default function FinanceiroCard({
   }, [categoriaSearch, categoriasFiltradas, selectedCategory]);
 
   function selecionarCategoria(categoria) {
+    const categoriaId = categoria?.id ? String(categoria.id) : '';
     setSelectedCategory(categoria);
     setCategoriaSearch(categoria?.nome || '');
     setForm((current) => ({
       ...current,
-      categoria_financeira_id: categoria?.id ? String(categoria.id) : ''
+      categoria_financeira_id: categoriaId,
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: categoriaId
+      }))
     }));
     setCategoriaModalOpen(false);
   }
@@ -863,7 +876,14 @@ export default function FinanceiroCard({
   function limparCategoria() {
     setSelectedCategory(null);
     setCategoriaSearch('');
-    setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+    setForm((current) => ({
+      ...current,
+      categoria_financeira_id: '',
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: ''
+      }))
+    }));
   }
 
   function updatePagamento(index, changes) {
@@ -983,7 +1003,11 @@ export default function FinanceiroCard({
       ...current,
       pagamentos: [
         ...(current.pagamentos || []),
-        createPagamento({ ...solicitacao, parceiro: selectedPartner || solicitacao?.parceiro })
+        createPagamento(
+          { ...solicitacao, parceiro: selectedPartner || solicitacao?.parceiro },
+          '',
+          current.categoria_financeira_id
+        )
       ]
     }));
   }
@@ -998,6 +1022,7 @@ export default function FinanceiroCard({
           pagamentos: [
             {
               ...primeiroPagamento,
+              categoria_financeira_id: primeiroPagamento.categoria_financeira_id || current.categoria_financeira_id,
               valor: primeiroPagamento.valor || current.valor,
               parcelas: Array.isArray(primeiroPagamento.parcelas) ? primeiroPagamento.parcelas : []
             }
@@ -1010,7 +1035,12 @@ export default function FinanceiroCard({
   function removerPagamento(index) {
     setForm((current) => {
       const pagamentos = (current.pagamentos || []).filter((_, itemIndex) => itemIndex !== index);
-      return { ...current, pagamentos: pagamentos.length ? pagamentos : [createPagamento(solicitacao, current.valor)] };
+      return {
+        ...current,
+        pagamentos: pagamentos.length
+          ? pagamentos
+          : [createPagamento(solicitacao, current.valor, current.categoria_financeira_id)]
+      };
     });
   }
 
@@ -1091,6 +1121,10 @@ export default function FinanceiroCard({
 
       if (geracaoMultiplaTitulos && !pagamento.parceiro_id) {
         return `Selecione o ${parceiroRoleLabel} do titulo ${pagamentoIndex + 1}.`;
+      }
+
+      if (geracaoMultiplaTitulos && !(pagamento.categoria_financeira_id || form.categoria_financeira_id)) {
+        return `Selecione a categoria financeira do titulo ${pagamentoIndex + 1}.`;
       }
 
       if (valorPagamento <= 0) {
@@ -1216,6 +1250,7 @@ export default function FinanceiroCard({
           const usaDetalhe = formaUsaParcelasDetalhadas(forma);
           return {
             parceiro_id: geracaoMultiplaTitulos ? pagamento.parceiro_id || undefined : undefined,
+            categoria_financeira_id: pagamento.categoria_financeira_id || form.categoria_financeira_id || undefined,
             valor: usaDetalhe ? undefined : pagamento.valor,
             forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
             cartao_id: pagamento.cartao_id || undefined,
@@ -1775,7 +1810,14 @@ export default function FinanceiroCard({
                         setCategoriaSearch(event.target.value);
                         if (selectedCategory) {
                           setSelectedCategory(null);
-                          setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                          setForm((current) => ({
+                            ...current,
+                            categoria_financeira_id: '',
+                            pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                              ...pagamento,
+                              categoria_financeira_id: ''
+                            }))
+                          }));
                         }
                       }}
                     />
@@ -2067,6 +2109,29 @@ export default function FinanceiroCard({
                           tipo={form.tipo}
                           onSelect={selecionarParceiroPagamento}
                         />
+                      )}
+
+                      {geracaoMultiplaTitulos && (
+                        <label className="text-sm">
+                          <span className="mb-1 block text-slate-500">Categoria financeira deste titulo</span>
+                          <select
+                            className="input w-full"
+                            value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                            onChange={(event) => updatePagamento(pagamentoIndex, {
+                              categoria_financeira_id: event.target.value
+                            })}
+                          >
+                            <option value="">Selecione a categoria</option>
+                            {categoriasCompativeis.map((categoria) => (
+                              <option key={categoria.id} value={categoria.id}>
+                                {categoria.nome}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="mt-1 block text-xs text-slate-500">
+                            A categoria deste titulo sera aplicada a todas as parcelas geradas nele.
+                          </span>
+                        </label>
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">

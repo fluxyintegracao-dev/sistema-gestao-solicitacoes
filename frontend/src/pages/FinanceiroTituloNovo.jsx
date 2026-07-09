@@ -141,13 +141,14 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(valor = '', parceiro = null) {
+function createPagamento(valor = '', parceiro = null, categoriaFinanceiraId = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     valor,
     parceiro_id: parceiro?.id ? String(parceiro.id) : '',
     parceiro_nome: parceiro?.nome || '',
     parceiro_busca: '',
+    categoria_financeira_id: categoriaFinanceiraId ? String(categoriaFinanceiraId) : '',
     data_vencimento: today(),
     forma_pagamento_id: '',
     cartao_id: '',
@@ -852,7 +853,15 @@ export default function FinanceiroTituloNovo() {
 
   function selecionarCategoriaFinanceira(categoria) {
     if (!categoria) return;
-    setForm((current) => ({ ...current, categoria_financeira_id: String(categoria.id) }));
+    const categoriaId = String(categoria.id);
+    setForm((current) => ({
+      ...current,
+      categoria_financeira_id: categoriaId,
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: categoriaId
+      }))
+    }));
     setCategoriaBusca(categoria.nome || '');
     setCategoriaModalOpen(false);
   }
@@ -910,6 +919,10 @@ export default function FinanceiroTituloNovo() {
         tipo: value,
         parceiro_id: '',
         categoria_financeira_id: '',
+        pagamentos: (current.pagamentos || []).map((pagamento) => ({
+          ...pagamento,
+          categoria_financeira_id: ''
+        })),
         forma_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.forma_cobranca : '',
         status_cobranca: value === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
         banco_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.banco_cobranca : '',
@@ -1040,14 +1053,22 @@ export default function FinanceiroTituloNovo() {
   function adicionarPagamento() {
     setForm((current) => ({
       ...current,
-      pagamentos: [...(current.pagamentos || []), createPagamento('', parceiroSelecionado)]
+      pagamentos: [
+        ...(current.pagamentos || []),
+        createPagamento('', parceiroSelecionado, current.categoria_financeira_id)
+      ]
     }));
   }
 
   function removerPagamento(index) {
     setForm((current) => {
       const pagamentos = (current.pagamentos || []).filter((_, itemIndex) => itemIndex !== index);
-      return { ...current, pagamentos: pagamentos.length ? pagamentos : [createPagamento(current.valor)] };
+      return {
+        ...current,
+        pagamentos: pagamentos.length
+          ? pagamentos
+          : [createPagamento(current.valor, parceiroSelecionado, current.categoria_financeira_id)]
+      };
     });
   }
 
@@ -1160,6 +1181,10 @@ export default function FinanceiroTituloNovo() {
 
       if (pagamentos.length > 1 && !pagamento.parceiro_id) {
         return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} da ${labelForma}.`;
+      }
+
+      if (pagamentos.length > 1 && !(pagamento.categoria_financeira_id || form.categoria_financeira_id)) {
+        return `Selecione a categoria financeira da ${labelForma}.`;
       }
 
       if (valorPagamento <= 0) {
@@ -1314,6 +1339,7 @@ export default function FinanceiroTituloNovo() {
         const usaDetalhe = formaUsaParcelasDetalhadas(forma);
         return {
           parceiro_id: pagamento.parceiro_id ? Number(pagamento.parceiro_id) : undefined,
+          categoria_financeira_id: pagamento.categoria_financeira_id || form.categoria_financeira_id || undefined,
           valor: usaDetalhe ? undefined : pagamento.valor,
           forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
           cartao_id: pagamento.cartao_id || undefined,
@@ -1414,6 +1440,10 @@ export default function FinanceiroTituloNovo() {
                       tipo,
                       parceiro_id: '',
                       categoria_financeira_id: '',
+                      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                        ...pagamento,
+                        categoria_financeira_id: ''
+                      })),
                       forma_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.forma_cobranca : '',
                       status_cobranca: tipo === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
                       banco_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.banco_cobranca : '',
@@ -1472,7 +1502,14 @@ export default function FinanceiroTituloNovo() {
                       value={categoriaBusca}
                       onChange={(event) => {
                         setCategoriaBusca(event.target.value);
-                        setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                        setForm((current) => ({
+                          ...current,
+                          categoria_financeira_id: '',
+                          pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                            ...pagamento,
+                            categoria_financeira_id: ''
+                          }))
+                        }));
                       }}
                     />
                     <button
@@ -1493,7 +1530,14 @@ export default function FinanceiroTituloNovo() {
                         className="btn btn-outline shrink-0"
                         onClick={() => {
                           setCategoriaBusca('');
-                          updateField('categoria_financeira_id', '');
+                          setForm((current) => ({
+                            ...current,
+                            categoria_financeira_id: '',
+                            pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                              ...pagamento,
+                              categoria_financeira_id: ''
+                            }))
+                          }));
                         }}
                       >
                         Limpar
@@ -1802,6 +1846,29 @@ export default function FinanceiroTituloNovo() {
                             Use quando cada titulo precisar sair para um {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} diferente.
                           </span>
                         </div>
+                      )}
+
+                      {quantidadePagamentos > 1 && (
+                        <label className="text-sm">
+                          <span className="mb-1 block text-[var(--c-muted)]">Categoria financeira deste titulo</span>
+                          <select
+                            className="input w-full"
+                            value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                            onChange={(event) => updatePagamento(pagamentoIndex, {
+                              categoria_financeira_id: event.target.value
+                            })}
+                          >
+                            <option value="">Selecione a categoria</option>
+                            {categoriasFiltradas.map((categoria) => (
+                              <option key={categoria.id} value={categoria.id}>
+                                {categoria.nome}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                            A categoria deste titulo sera aplicada a todas as parcelas geradas nele.
+                          </span>
+                        </label>
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">

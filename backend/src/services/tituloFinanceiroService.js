@@ -2223,11 +2223,11 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     obra: solicitacao.obra
   });
 
-  const [, categoria] = await Promise.all([
+  const [, categoriaPadrao] = await Promise.all([
     validarEmpresaGrupo(empresaTituloId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
-  validarCategoriaDreTitulo(categoria, payload);
+  validarCategoriaDreTitulo(categoriaPadrao, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
@@ -2242,6 +2242,10 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     }
     const parceiroPagamento = await validarParceiro(parceiroIdPagamento);
     validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
+    const categoriaPagamento = pagamentoPayload.categoria_financeira_id
+      ? await validarCategoriaFinanceira(pagamentoPayload.categoria_financeira_id, tipo)
+      : categoriaPadrao;
+    validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
@@ -2273,6 +2277,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
     pagamentos.push({
       parceiro: parceiroPagamento,
+      categoria: categoriaPagamento,
       formaPagamento,
       payload: pagamentoPayload,
       quantidadeParcelas,
@@ -2339,7 +2344,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           empresa_id: empresaTituloId,
           ...intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
-          categoria_financeira_id: categoria?.id || null,
+          categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
@@ -2518,7 +2523,7 @@ async function criarTituloManual(req, payload = {}) {
     throw createHttpError(400, 'Descricao e obrigatoria para criar o titulo manual.');
   }
 
-  const [obra, parceiro, categoria] = await Promise.all([
+  const [obra, parceiro, categoriaPadrao] = await Promise.all([
     validarObraTitulo(req, obraId),
     validarParceiro(parceiroId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
@@ -2531,7 +2536,7 @@ async function criarTituloManual(req, payload = {}) {
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
-  validarCategoriaDreTitulo(categoria, payload);
+  validarCategoriaDreTitulo(categoriaPadrao, payload);
   const intercompanyFields = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
@@ -2548,6 +2553,10 @@ async function criarTituloManual(req, payload = {}) {
       ? parceiro
       : await validarParceiro(parceiroPagamentoId);
     validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
+    const categoriaPagamento = pagamentoPayload.categoria_financeira_id
+      ? await validarCategoriaFinanceira(pagamentoPayload.categoria_financeira_id, tipo)
+      : categoriaPadrao;
+    validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
@@ -2579,6 +2588,7 @@ async function criarTituloManual(req, payload = {}) {
 
     pagamentos.push({
       parceiro: parceiroPagamento,
+      categoria: categoriaPagamento,
       formaPagamento,
       payload: pagamentoPayload,
       quantidadeParcelas,
@@ -2638,7 +2648,7 @@ async function criarTituloManual(req, payload = {}) {
           empresa_id: empresaTituloId,
           ...intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
-          categoria_financeira_id: categoria?.id || null,
+          categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
