@@ -546,7 +546,7 @@ export default function SolicitacaoCompraDetalheView() {
 
       {modalApropriacaoItem && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
-          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+          <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes do item</h2>
@@ -561,7 +561,7 @@ export default function SolicitacaoCompraDetalheView() {
 
             <div className="grid gap-3">
               {rateiosModal.map((rateio, rateioIndex) => (
-                <div key={`${rateioIndex}-${rateio.apropriacao_id || 'nova'}`} className="rounded-xl border border-[var(--c-border)] p-3">
+                <div key={`rateio-item-${rateioIndex}`} className="rounded-xl border border-[var(--c-border)] p-3">
                   <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
                     <label className="grid gap-1 text-sm font-semibold text-[var(--c-text)]">
                       Apropriacao

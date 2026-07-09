@@ -2352,6 +2352,41 @@ module.exports = {
     }
   },
 
+  async showCompraDiretaPorSolicitacao(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const vinculada = await SolicitacaoCompra.findOne({
+        where: {
+          solicitacao_principal_id: Number(req.params.solicitacaoId),
+          origem: 'COMPRA_DIRETA'
+        },
+        attributes: ['id'],
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!vinculada) {
+        return res.status(404).json({ error: 'Compra direta vinculada nao encontrada' });
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(vinculada.id);
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
+      return res.json(solicitacao);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar compra direta vinculada' });
+    }
+  },
+
   async atualizarQuantidadeItem(req, res) {
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 

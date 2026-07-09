@@ -1720,6 +1720,7 @@ router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, upload
 router.get('/compras/formas-pagamento-ativas', allowCompraSolicitacoesCreate, SolicitacaoCompraController.formasPagamentoAtivas);
 router.get('/compras/solicitacoes-diretas/modelo-itens-xlsx', allowCompraSolicitacoesCreate, SolicitacaoCompraController.modeloCompraDiretaXlsx);
 router.post('/compras/solicitacoes-diretas/importar-itens-xlsx', allowCompraSolicitacoesCreate, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.importarCompraDiretaXlsx);
+router.get('/compras/solicitacoes-diretas/por-solicitacao/:solicitacaoId', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('solicitacaoId', 'Solicitacao principal') }), SolicitacaoCompraController.showCompraDiretaPorSolicitacao);
 router.get('/compras/solicitacoes', allowCompraSolicitacoesOrDelegacaoRead, validateRequest({ query: validateCompraQuery }), scopeCompraListAccess, SolicitacaoCompraController.index);
 router.post('/compras/solicitacoes/inativar-massa', allowCompraSolicitacoesDelete, criticalRateLimit, validateRequest({ body: validateCompraSolicitacaoInativarMassaBody }), scopeCompraListAccess, SolicitacaoCompraController.inativar);
 router.post('/compras/solicitacoes/encaminhar-compras-massa', allowCompraSolicitacoesEncaminhar, criticalRateLimit, validateRequest({ body: validateCompraSolicitacaoEncaminharComprasMassaBody }), scopeCompraListAccess, SolicitacaoCompraController.encaminharParaCompras);

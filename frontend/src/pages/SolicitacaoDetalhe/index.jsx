@@ -21,11 +21,24 @@ import {
   getSolicitacaoById,
   updateStatusSolicitacao
 } from '../../services/solicitacoes';
+import {
+  atualizarApropriacoesItemSolicitacaoCompra,
+  obterCompraDiretaPorSolicitacao
+} from '../../services/compras';
 import { listarApropriacoes } from '../../services/apropriacoes';
+import {
+  criarRateioBase,
+  montarLinhasResumoApropriacao,
+  normalizarRateiosEntrada,
+  parseQuantidade,
+  sincronizarItemComRateios,
+  validarRateiosItem
+} from '../../modules/solicitacao-compra/utils/apropriacoes';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import {
   canAccessFinanceiro,
   canDeleteSolicitacaoAnexo,
+  canEditarApropriacoesItemCompraDireta,
   canEditarApropriacoesSolicitacao,
   canViewSolicitacaoFinanceiro,
   hasConfiguredAreaPermissions,
@@ -56,11 +69,19 @@ function formatarNumeroEntrada(valor) {
   return String(valor);
 }
 
+function normalizarTextoBusca(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase();
+}
+
 function normalizarRateiosSolicitacao(solicitacao) {
   const rateios = Array.isArray(solicitacao?.apropriacoes) ? solicitacao.apropriacoes : [];
   if (rateios.length) {
     return rateios.map((item) => ({
-      apropriacao_id: item?.apropriacao_id ? String(item.apropriacao_id) : '',
+      apropriacao_id: item?.apropriacao_id || item?.apropriacao?.id ? String(item.apropriacao_id || item.apropriacao.id) : '',
       percentual: formatarNumeroEntrada(item?.percentual),
       valor: formatarNumeroEntrada(item?.valor)
     }));
@@ -106,6 +127,7 @@ export default function SolicitacaoDetalhe() {
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
   const podeEditarApropriacoes = moduloComprasHabilitado && canEditarApropriacoesSolicitacao(user);
+  const podeEditarItensCompraDiretaBase = moduloComprasHabilitado && canEditarApropriacoesItemCompraDireta(user);
 
   const [solicitacao, setSolicitacao] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +145,24 @@ export default function SolicitacaoDetalhe() {
   const [apropriacaoPrincipalId, setApropriacaoPrincipalId] = useState('');
   const [rateiosApropriacao, setRateiosApropriacao] = useState([]);
   const [motivoApropriacoes, setMotivoApropriacoes] = useState('');
+  const [modalCompraDiretaAberto, setModalCompraDiretaAberto] = useState(false);
+  const [compraDiretaDetalhe, setCompraDiretaDetalhe] = useState(null);
+  const [carregandoCompraDireta, setCarregandoCompraDireta] = useState(false);
+  const [itemCompraDiretaSelecionado, setItemCompraDiretaSelecionado] = useState(null);
+  const [rateiosCompraDireta, setRateiosCompraDireta] = useState([]);
+  const [motivoCompraDireta, setMotivoCompraDireta] = useState('');
+  const [salvandoCompraDireta, setSalvandoCompraDireta] = useState(false);
   const localMutationsRef = useRef(new Map());
+
+  const tipoSolicitacaoNormalizado = normalizarTextoBusca(
+    solicitacao?.tipo?.nome ||
+    solicitacao?.tipo_nome ||
+    solicitacao?.tipo_solicitacao ||
+    solicitacao?.descricao_tipo
+  );
+  const isCompraDiretaSolicitacao = tipoSolicitacaoNormalizado.includes('COMPRA DIRETA');
+  const podeEditarApropriacoesSolicitacaoNormal = podeEditarApropriacoes && !isCompraDiretaSolicitacao;
+  const podeEditarItensCompraDireta = podeEditarItensCompraDiretaBase && isCompraDiretaSolicitacao;
 
   const perfil = String(user?.perfil || '').trim().toUpperCase();
   const setorUsuario = user?.setor?.codigo || user?.area || user?.setor?.nome || '';
@@ -140,7 +179,7 @@ export default function SolicitacaoDetalhe() {
 
   useEffect(() => {
     const obraId = solicitacao?.obra_id || solicitacao?.obra?.id;
-    if (!obraId || !podeEditarApropriacoes) {
+    if (!obraId || (!podeEditarApropriacoesSolicitacaoNormal && !podeEditarItensCompraDireta)) {
       setApropriacoesCatalogo([]);
       return;
     }
@@ -162,7 +201,12 @@ export default function SolicitacaoDetalhe() {
     return () => {
       ativo = false;
     };
-  }, [solicitacao?.obra_id, solicitacao?.obra?.id, podeEditarApropriacoes]);
+  }, [
+    solicitacao?.obra_id,
+    solicitacao?.obra?.id,
+    podeEditarApropriacoesSolicitacaoNormal,
+    podeEditarItensCompraDireta
+  ]);
 
   useEffect(() => {
     if (!solicitacao) return;
@@ -374,6 +418,128 @@ export default function SolicitacaoDetalhe() {
     }
   }
 
+  function montarItensCompraDireta() {
+    const itens = Array.isArray(compraDiretaDetalhe?.itens) ? compraDiretaDetalhe.itens : [];
+    const itensManuais = Array.isArray(compraDiretaDetalhe?.itensManuais) ? compraDiretaDetalhe.itensManuais : [];
+
+    return [
+      ...itens.map((item) => ({
+        ...item,
+        item_tipo: 'INSUMO',
+        descricao: item?.insumo?.nome || item?.descricao || `Item #${item?.id || ''}`,
+        unidade_label: item?.unidade?.sigla || item?.unidade?.nome || item?.unidade_sigla || ''
+      })),
+      ...itensManuais.map((item) => ({
+        ...item,
+        item_tipo: 'MANUAL',
+        descricao: item?.nome_manual || item?.descricao || `Item manual #${item?.id || ''}`,
+        unidade_label: item?.unidade_sigla_manual || item?.unidade_sigla || ''
+      }))
+    ];
+  }
+
+  async function abrirModalCompraDireta() {
+    if (!solicitacao?.id) return;
+
+    try {
+      setCarregandoCompraDireta(true);
+      setItemCompraDiretaSelecionado(null);
+      setRateiosCompraDireta([]);
+      setMotivoCompraDireta('');
+      const data = await obterCompraDiretaPorSolicitacao(solicitacao.id);
+      setCompraDiretaDetalhe(data || null);
+      setModalCompraDiretaAberto(true);
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao carregar itens da compra direta');
+    } finally {
+      setCarregandoCompraDireta(false);
+    }
+  }
+
+  function fecharModalCompraDireta() {
+    if (salvandoCompraDireta) return;
+    setModalCompraDiretaAberto(false);
+    setItemCompraDiretaSelecionado(null);
+    setRateiosCompraDireta([]);
+    setMotivoCompraDireta('');
+  }
+
+  function selecionarItemCompraDireta(item) {
+    const rateios = normalizarRateiosEntrada(item);
+    setItemCompraDiretaSelecionado(item);
+    setRateiosCompraDireta(rateios.length ? rateios : [criarRateioBase(item?.quantidade)]);
+    setMotivoCompraDireta('');
+  }
+
+  function atualizarRateioCompraDireta(index, campo, valor) {
+    setRateiosCompraDireta((atuais) => (
+      atuais.map((rateio, i) => (i === index ? { ...rateio, [campo]: valor } : rateio))
+    ));
+  }
+
+  function adicionarRateioCompraDireta() {
+    setRateiosCompraDireta((atuais) => [...atuais, criarRateioBase('')]);
+  }
+
+  function removerRateioCompraDireta(index) {
+    setRateiosCompraDireta((atuais) => (
+      atuais.length <= 1 ? atuais : atuais.filter((_, i) => i !== index)
+    ));
+  }
+
+  async function salvarApropriacoesCompraDireta() {
+    if (!compraDiretaDetalhe?.id || !itemCompraDiretaSelecionado?.id) {
+      alert('Selecione um item para alterar.');
+      return;
+    }
+
+    const itemComRateios = sincronizarItemComRateios({
+      ...itemCompraDiretaSelecionado,
+      apropriacoes: rateiosCompraDireta
+    });
+    const validacao = validarRateiosItem(itemComRateios);
+
+    if (!validacao.ok) {
+      alert(validacao.mensagem);
+      return;
+    }
+
+    const motivo = String(motivoCompraDireta || '').trim();
+    if (!motivo) {
+      alert('Informe o motivo da alteracao.');
+      return;
+    }
+
+    try {
+      setSalvandoCompraDireta(true);
+      const data = await atualizarApropriacoesItemSolicitacaoCompra(
+        compraDiretaDetalhe.id,
+        itemCompraDiretaSelecionado.id,
+        {
+          item_tipo: itemCompraDiretaSelecionado.item_tipo,
+          apropriacoes: normalizarRateiosEntrada(itemComRateios).map((rateio) => ({
+            apropriacao_id: Number(rateio.apropriacao_id),
+            quantidade_apropriada: parseQuantidade(rateio.quantidade_apropriada)
+          })),
+          motivo
+        }
+      );
+
+      setCompraDiretaDetalhe(data || null);
+      setItemCompraDiretaSelecionado(null);
+      setRateiosCompraDireta([]);
+      setMotivoCompraDireta('');
+      registrarMutacaoLocal(solicitacao.id);
+      alert('Apropriacoes do item atualizadas com auditoria.');
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao atualizar apropriacoes do item');
+    } finally {
+      setSalvandoCompraDireta(false);
+    }
+  }
+
   useLiveUpdateSubscription({
     enabled: !!id,
     filter: (payload) => (
@@ -465,7 +631,7 @@ export default function SolicitacaoDetalhe() {
         mostrarApropriacaoInfo={moduloComprasHabilitado}
       />
 
-      {podeEditarApropriacoes && (
+      {podeEditarApropriacoesSolicitacaoNormal && (
         <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes da solicitacao</h2>
@@ -475,6 +641,25 @@ export default function SolicitacaoDetalhe() {
           </div>
           <button type="button" className="btn btn-outline btn-sm" onClick={abrirModalApropriacoes}>
             Editar apropriacoes
+          </button>
+        </div>
+      )}
+
+      {podeEditarItensCompraDireta && (
+        <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes dos itens da compra direta</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              Ajuste item por item da compra direta com motivo e auditoria, sem alterar a solicitacao normal.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            onClick={abrirModalCompraDireta}
+            disabled={carregandoCompraDireta}
+          >
+            {carregandoCompraDireta ? 'Carregando...' : 'Editar itens'}
           </button>
         </div>
       )}
@@ -646,7 +831,7 @@ export default function SolicitacaoDetalhe() {
 
       {modalApropriacoesAberto && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-4xl rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+          <div className="w-full max-w-3xl rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
             <div className="mb-4 flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes</h2>
@@ -687,8 +872,8 @@ export default function SolicitacaoDetalhe() {
                 <div className="space-y-3">
                   {rateiosApropriacao.map((rateio, index) => (
                     <div
-                      key={`${index}-${rateio.apropriacao_id || 'nova'}`}
-                      className="grid gap-2 rounded-xl border border-[var(--c-border)] p-3 md:grid-cols-[1fr_140px_160px_auto]"
+                      key={`rateio-solicitacao-${index}`}
+                      className="grid gap-2 rounded-xl border border-[var(--c-border)] p-3 md:grid-cols-[1fr_112px_132px_auto]"
                     >
                       <ApropriacaoAutocomplete
                         value={rateio.apropriacao_id}
@@ -752,6 +937,144 @@ export default function SolicitacaoDetalhe() {
               >
                 {salvandoApropriacoes ? 'Salvando...' : 'Salvar apropriacoes'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalCompraDiretaAberto && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar itens da compra direta</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Escolha um item e ajuste as apropriacoes vinculadas a ele. A alteracao fica registrada com auditoria.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={fecharModalCompraDireta}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+              <div className="space-y-2">
+                <h3 className="text-sm font-semibold text-[var(--c-text)]">Itens</h3>
+                {montarItensCompraDireta().length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[var(--c-border)] p-4 text-sm text-[var(--c-muted)]">
+                    Nenhum item localizado para esta compra direta.
+                  </div>
+                ) : (
+                  montarItensCompraDireta().map((item) => {
+                    const selecionado =
+                      itemCompraDiretaSelecionado?.id === item.id &&
+                      itemCompraDiretaSelecionado?.item_tipo === item.item_tipo;
+                    const resumoApropriacao = montarLinhasResumoApropriacao(item, apropriacoesCatalogo).join(' | ') || '-';
+
+                    return (
+                      <button
+                        key={`${item.item_tipo}-${item.id}`}
+                        type="button"
+                        className={`w-full rounded-xl border p-3 text-left text-sm transition ${
+                          selecionado
+                            ? 'border-[var(--c-primary)] bg-[var(--c-primary-soft)]'
+                            : 'border-[var(--c-border)] bg-[var(--c-surface)] hover:border-[var(--c-primary)]'
+                        }`}
+                        onClick={() => selecionarItemCompraDireta(item)}
+                      >
+                        <div className="font-semibold text-[var(--c-text)]">{item.descricao}</div>
+                        <div className="mt-1 text-xs text-[var(--c-muted)]">
+                          Qtd.: {item.quantidade || '-'} {item.unidade_label || ''}
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-xs text-[var(--c-muted)]">
+                          {resumoApropriacao}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="rounded-2xl border border-[var(--c-border)] p-4">
+                {!itemCompraDiretaSelecionado ? (
+                  <div className="flex min-h-[260px] items-center justify-center rounded-xl border border-dashed border-[var(--c-border)] p-4 text-center text-sm text-[var(--c-muted)]">
+                    Selecione um item para editar as apropriacoes.
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="font-semibold text-[var(--c-text)]">{itemCompraDiretaSelecionado.descricao}</h3>
+                      <p className="text-sm text-[var(--c-muted)]">
+                        Quantidade total: {itemCompraDiretaSelecionado.quantidade || '-'} {itemCompraDiretaSelecionado.unidade_label || ''}
+                      </p>
+                    </div>
+
+                    <div className="space-y-3">
+                      {rateiosCompraDireta.map((rateio, index) => (
+                        <div
+                          key={`rateio-compra-direta-${index}`}
+                          className="grid gap-2 rounded-xl border border-[var(--c-border)] p-3 md:grid-cols-[1fr_140px_auto]"
+                        >
+                          <ApropriacaoAutocomplete
+                            value={rateio.apropriacao_id}
+                            options={apropriacoesCatalogo}
+                            onChange={(valor) => atualizarRateioCompraDireta(index, 'apropriacao_id', valor)}
+                            placeholder="Buscar apropriacao"
+                          />
+                          <input
+                            className="input"
+                            value={rateio.quantidade_apropriada}
+                            onChange={(event) => atualizarRateioCompraDireta(index, 'quantidade_apropriada', event.target.value)}
+                            placeholder="Qtd."
+                            inputMode="decimal"
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            onClick={() => removerRateioCompraDireta(index)}
+                            disabled={rateiosCompraDireta.length <= 1}
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button type="button" className="btn btn-outline btn-sm" onClick={adicionarRateioCompraDireta}>
+                      Adicionar linha
+                    </button>
+
+                    <label className="block text-sm font-semibold text-[var(--c-text)]">
+                      Motivo da alteracao *
+                      <textarea
+                        className="input mt-1 min-h-[88px]"
+                        value={motivoCompraDireta}
+                        onChange={(event) => setMotivoCompraDireta(event.target.value)}
+                        placeholder="Explique por que a apropriacao do item foi alterada."
+                      />
+                    </label>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => selecionarItemCompraDireta(itemCompraDiretaSelecionado)}
+                        disabled={salvandoCompraDireta}
+                      >
+                        Desfazer
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={salvarApropriacoesCompraDireta}
+                        disabled={salvandoCompraDireta}
+                      >
+                        {salvandoCompraDireta ? 'Salvando...' : 'Salvar item'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
