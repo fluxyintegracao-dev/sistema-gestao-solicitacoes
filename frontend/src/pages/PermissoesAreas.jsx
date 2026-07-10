@@ -388,7 +388,7 @@ function ModuleCard({
                           disabled={false}
                           origem={bloqueada ? 'bloqueada' : individual ? 'individual' : vemDoPadrao ? 'padrao' : ''}
                           inputType={areaEscopoCompras ? 'radio' : 'checkbox'}
-                          inputName={areaEscopoCompras ? `compras-escopo-${usuarioSelecionadoId}` : undefined}
+                          inputName={areaEscopoCompras ? `compras-escopo-${normalizeKey(grupo.modulo)}` : undefined}
                         />
                       );
                     })}
