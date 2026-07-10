@@ -53,6 +53,7 @@ const {
   validateCompraPedidoItemParams,
   validateSolicitacaoPedidoCompraPdfParams,
   validateCompraPedidoCancelBody,
+  validateCompraSolicitacaoCancelBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoComentarioBody,
   validateCompraPedidoEspelhoBody,
@@ -1730,6 +1731,7 @@ router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRea
 router.post('/compras/solicitacoes', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
 router.post('/compras/solicitacoes-diretas', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraDiretaCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
 router.delete('/compras/solicitacoes/:id', allowCompraSolicitacoesDelete, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.inativar);
+router.patch('/compras/solicitacoes/:id/cancelar', allowCompraSolicitacoesDelete, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraSolicitacaoCancelBody }), requireCompraAccess, SolicitacaoCompraController.cancelar);
 router.get('/compras/cotacoes', requireEnabledModule('COTACOES'), allowComprasCotacoesRead, scopeCompraListAccess, CotacaoFornecedorController.index);
 router.post('/compras/cotacoes/avulsa', requireEnabledModule('COTACOES'), allowComprasCotacoesManage, SolicitacaoCompraController.createAvulsa);
 router.patch('/compras/cotacoes/:id/reabrir', requireEnabledModule('COTACOES'), allowComprasCotacoesReabrir, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cotacao') }), CotacaoFornecedorController.reabrir);

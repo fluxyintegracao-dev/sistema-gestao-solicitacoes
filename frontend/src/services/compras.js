@@ -255,6 +255,15 @@ export async function inativarSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao inativar solicitacao de compra');
 }
 
+export async function cancelarSolicitacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar solicitacao de compra');
+}
+
 export async function inativarSolicitacoesCompra(ids = []) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/inativar-massa`, {
     method: 'POST',

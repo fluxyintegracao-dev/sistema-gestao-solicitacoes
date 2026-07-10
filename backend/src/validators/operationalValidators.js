@@ -918,12 +918,44 @@ function validateCompraSolicitacaoEncaminharComprasMassaBody(body = {}) {
 }
 
 function validateCompraPedidoCancelBody(body = {}) {
-  ensureAllowedKeys(body, ['motivo', 'itens', 'item_ids'], 'Cancelamento do pedido');
+  ensureAllowedKeys(
+    body,
+    [
+      'motivo',
+      'itens',
+      'item_ids',
+      'cancelar_cotacao',
+      'cancelar_solicitacao_compra',
+      'cancelar_solicitacao_principal'
+    ],
+    'Cancelamento do pedido'
+  );
 
   return {
     motivo: parseOptionalText(body.motivo, 'Motivo', 5000),
     itens: Array.isArray(body.itens) ? body.itens : undefined,
-    item_ids: Array.isArray(body.item_ids) ? body.item_ids : undefined
+    item_ids: Array.isArray(body.item_ids) ? body.item_ids : undefined,
+    cancelar_cotacao: body.cancelar_cotacao === true,
+    cancelar_solicitacao_compra: body.cancelar_solicitacao_compra === true,
+    cancelar_solicitacao_principal: body.cancelar_solicitacao_principal === true
+  };
+}
+
+function validateCompraSolicitacaoCancelBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'motivo',
+      'cancelar_cotacao',
+      'cancelar_solicitacao_principal'
+    ],
+    'Cancelamento da solicitacao de compra'
+  );
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo', 5000, { required: true }),
+    cancelar_cotacao: body.cancelar_cotacao === true,
+    cancelar_solicitacao_principal: body.cancelar_solicitacao_principal === true
   };
 }
 
@@ -1322,6 +1354,7 @@ module.exports = {
   validateCompraPedidoItemParams,
   validateSolicitacaoPedidoCompraPdfParams,
   validateCompraPedidoCancelBody,
+  validateCompraSolicitacaoCancelBody,
   validateCompraPedidoComentarioBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoEspelhoBody,

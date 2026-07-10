@@ -8,10 +8,12 @@ import {
   atualizarApropriacoesItemSolicitacaoCompra,
   atualizarQuantidadeItemSolicitacaoCompra,
   baixarPdfSolicitacaoCompra,
+  cancelarSolicitacaoCompra,
   obterSolicitacaoCompra
 } from '../../../services/compras';
 import {
   canAlterarQuantidadeSolicitacaoCompra,
+  canDeleteCompraSolicitacoes,
   canEditarApropriacoesItemCompraDireta,
   canEditarApropriacoesItemSolicitacaoCompra
 } from '../../../utils/acessoProduto';
@@ -51,7 +53,7 @@ function statusCotacaoClass(status) {
   const value = String(status || '').toUpperCase();
   if (value === 'RESPONDIDO') return 'app-status-pill bg-emerald-100 text-emerald-700';
   if (value === 'VISUALIZADO') return 'app-status-pill bg-amber-100 text-amber-700';
-  if (value === 'CANCELADO') return 'app-status-pill bg-slate-100 text-slate-700';
+  if (['CANCELADA', 'CANCELADO'].includes(value)) return 'app-status-pill bg-slate-100 text-slate-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
 
@@ -81,6 +83,13 @@ export default function SolicitacaoCompraDetalheView() {
   const [rateiosModal, setRateiosModal] = useState([]);
   const [motivoApropriacao, setMotivoApropriacao] = useState('');
   const [salvandoApropriacaoId, setSalvandoApropriacaoId] = useState(null);
+  const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
+  const [cancelandoSolicitacao, setCancelandoSolicitacao] = useState(false);
+  const [cancelamentoForm, setCancelamentoForm] = useState({
+    motivo: '',
+    cancelar_cotacao: true,
+    cancelar_solicitacao_principal: false
+  });
 
   async function carregar() {
     try {
@@ -321,6 +330,44 @@ export default function SolicitacaoCompraDetalheView() {
     }
   }
 
+  function abrirModalCancelamento() {
+    setCancelamentoForm({
+      motivo: '',
+      cancelar_cotacao: true,
+      cancelar_solicitacao_principal: false
+    });
+    setModalCancelamentoAberto(true);
+  }
+
+  function fecharModalCancelamento() {
+    if (cancelandoSolicitacao) return;
+    setModalCancelamentoAberto(false);
+  }
+
+  async function handleConfirmarCancelamentoSolicitacao() {
+    const motivo = String(cancelamentoForm.motivo || '').trim();
+    if (!motivo) {
+      alert('Informe o motivo do cancelamento.');
+      return;
+    }
+
+    try {
+      setCancelandoSolicitacao(true);
+      const data = await cancelarSolicitacaoCompra(id, {
+        ...cancelamentoForm,
+        motivo
+      });
+      setSolicitacao(data || null);
+      setModalCancelamentoAberto(false);
+      alert('Solicitacao de compra cancelada com historico.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar solicitacao de compra');
+    } finally {
+      setCancelandoSolicitacao(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="page solicitacoes-page">
@@ -336,6 +383,10 @@ export default function SolicitacaoCompraDetalheView() {
       </div>
     );
   }
+
+  const statusSolicitacaoCompra = String(solicitacao.status || '').toUpperCase();
+  const solicitacaoCompraCancelada = ['CANCELADA', 'CANCELADO', 'INATIVA'].includes(statusSolicitacaoCompra);
+  const podeCancelarSolicitacaoCompra = canDeleteCompraSolicitacoes(user) && !solicitacaoCompraCancelada;
 
   return (
     <div className="page solicitacoes-page compra-detalhe-page">
@@ -354,6 +405,11 @@ export default function SolicitacaoCompraDetalheView() {
             <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>
               Gerenciar cotacao
             </button>
+            {podeCancelarSolicitacaoCompra && (
+              <button type="button" className="btn btn-danger" onClick={abrirModalCancelamento}>
+                Cancelar SC
+              </button>
+            )}
             <button type="button" className="btn btn-primary" onClick={handleAbrirPdf} disabled={baixando}>
               {baixando ? 'Abrindo PDF...' : 'Abrir PDF'}
             </button>
@@ -630,6 +686,78 @@ export default function SolicitacaoCompraDetalheView() {
                   disabled={Boolean(salvandoApropriacaoId)}
                 >
                   {salvandoApropriacaoId ? 'Salvando...' : 'Salvar apropriacoes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalCancelamentoAberto && (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-black/45 p-4">
+          <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Cancelar solicitacao de compra</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  Esta acao registra historico e remove a compra dos fluxos operacionais em aberto.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline" onClick={fecharModalCancelamento} disabled={cancelandoSolicitacao}>
+                Fechar
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              <label className="grid gap-1 text-sm font-semibold text-[var(--c-text)]">
+                Motivo do cancelamento *
+                <textarea
+                  className="input min-h-[110px]"
+                  value={cancelamentoForm.motivo}
+                  onChange={(event) => setCancelamentoForm((prev) => ({ ...prev, motivo: event.target.value }))}
+                  placeholder="Explique por que a solicitacao de compra esta sendo cancelada."
+                  disabled={cancelandoSolicitacao}
+                />
+              </label>
+
+              <label className="flex items-start gap-3 rounded-xl border border-[var(--c-border)] p-3 text-sm text-[var(--c-text)]">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={cancelamentoForm.cancelar_cotacao}
+                  onChange={(event) => setCancelamentoForm((prev) => ({ ...prev, cancelar_cotacao: event.target.checked }))}
+                  disabled={cancelandoSolicitacao}
+                />
+                <span>
+                  <strong>Cancelar cotacao vinculada</strong>
+                  <span className="mt-1 block text-[var(--c-muted)]">
+                    Fornecedores e respostas ficam preservados para auditoria, mas a cotacao deixa de ficar ativa.
+                  </span>
+                </span>
+              </label>
+
+              <label className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={cancelamentoForm.cancelar_solicitacao_principal}
+                  onChange={(event) => setCancelamentoForm((prev) => ({ ...prev, cancelar_solicitacao_principal: event.target.checked }))}
+                  disabled={cancelandoSolicitacao}
+                />
+                <span>
+                  <strong>Tambem cancelar a solicitacao principal</strong>
+                  <span className="mt-1 block">
+                    O sistema bloqueia esta opcao se ja existir titulo financeiro vinculado.
+                  </span>
+                </span>
+              </label>
+
+              <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] pt-4">
+                <button type="button" className="btn btn-outline" onClick={fecharModalCancelamento} disabled={cancelandoSolicitacao}>
+                  Cancelar
+                </button>
+                <button type="button" className="btn btn-danger" onClick={handleConfirmarCancelamentoSolicitacao} disabled={cancelandoSolicitacao}>
+                  {cancelandoSolicitacao ? 'Cancelando...' : 'Confirmar cancelamento'}
                 </button>
               </div>
             </div>

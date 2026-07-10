@@ -2262,6 +2262,202 @@ module.exports = {
     }
   },
 
+  async cancelar(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada.' });
+      }
+
+      const obraIdsEscopo = Object.prototype.hasOwnProperty.call(req, 'compraScopeObraIds')
+        ? req.compraScopeObraIds
+        : undefined;
+
+      if (!(await validarEscopoEncaminhamentoCompra(usuario, solicitacao, res, {
+        obraIdsEscopo,
+        recursoPreValidado: true
+      }))) {
+        await transaction.rollback();
+        return;
+      }
+
+      const statusAtual = normalizeTextCompra(solicitacao.status);
+      if (['CANCELADA', 'CANCELADO', 'INATIVA'].includes(statusAtual)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Esta solicitacao de compra ja esta cancelada ou inativa.' });
+      }
+
+      const pedidosVinculados = await PedidoCompra.count({
+        where: { solicitacao_compra_id: solicitacao.id },
+        transaction
+      });
+
+      if (pedidosVinculados > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Esta solicitacao ja possui pedido gerado. Cancele pelo pedido para preservar financeiro, cotacao e historico.'
+        });
+      }
+
+      const motivo = String(req.body?.motivo || '').trim();
+      if (!motivo) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o motivo do cancelamento.' });
+      }
+
+      const cancelarCotacao = req.body?.cancelar_cotacao === true;
+      const cancelarSolicitacaoPrincipal = req.body?.cancelar_solicitacao_principal === true;
+      const codigoCompra = solicitacao.codigo || `SC-${String(solicitacao.id).padStart(5, '0')}`;
+      const agora = new Date();
+
+      const solicitacaoPrincipal = solicitacao.solicitacao_principal_id
+        ? await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, { transaction })
+        : null;
+
+      async function registrarHistoricoPrincipal({ acao, statusAnterior, statusNovo, descricao, metadata }) {
+        if (!solicitacaoPrincipal) return;
+
+        await Historico.create({
+          solicitacao_id: solicitacaoPrincipal.id,
+          usuario_responsavel_id: usuario.id,
+          setor: usuario.setor_id || null,
+          acao,
+          status_anterior: statusAnterior || solicitacaoPrincipal.status_global || null,
+          status_novo: statusNovo || solicitacaoPrincipal.status_global || null,
+          descricao,
+          metadata: JSON.stringify(metadata || {})
+        }, { transaction });
+      }
+
+      if (cancelarCotacao) {
+        await SolicitacaoCompraFornecedor.update(
+          { status: 'CANCELADA' },
+          {
+            where: {
+              solicitacao_compra_id: solicitacao.id,
+              status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+            },
+            transaction
+          }
+        );
+
+        await registrarLogSolicitacaoCompra({
+          solicitacaoCompraId: solicitacao.id,
+          usuarioId: usuario.id,
+          tipoAcao: 'COTACAO_CANCELADA',
+          descricao: `Cotacao vinculada cancelada. Motivo: ${motivo}`,
+          transaction
+        });
+
+        await registrarHistoricoPrincipal({
+          acao: 'COTACAO_COMPRA_CANCELADA',
+          descricao: `Cotacao da solicitacao de compra ${codigoCompra} cancelada. Motivo: ${motivo}`,
+          metadata: {
+            solicitacao_compra_id: solicitacao.id,
+            codigo_compra: codigoCompra,
+            motivo,
+            origem: 'cancelamento_solicitacao_compra'
+          }
+        });
+      }
+
+      const statusAnteriorCompra = solicitacao.status;
+      await solicitacao.update({
+        status: 'CANCELADA',
+        encerrado_em: agora,
+        observacoes: [
+          solicitacao.observacoes,
+          `Cancelada em ${agora.toISOString()} pelo usuario #${usuario.id}. Motivo: ${motivo}`
+        ].filter(Boolean).join('\n')
+      }, { transaction });
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'SOLICITACAO_COMPRA_CANCELADA',
+        descricao: `Solicitacao de compra cancelada. Motivo: ${motivo}`,
+        transaction
+      });
+
+      await registrarHistoricoPrincipal({
+        acao: 'SOLICITACAO_COMPRA_CANCELADA',
+        statusAnterior: statusAnteriorCompra,
+        statusNovo: 'CANCELADA',
+        descricao: `Solicitacao de compra ${codigoCompra} cancelada. Motivo: ${motivo}`,
+        metadata: {
+          solicitacao_compra_id: solicitacao.id,
+          codigo_compra: codigoCompra,
+          motivo,
+          cancelou_cotacao: cancelarCotacao,
+          cancelou_solicitacao_principal: cancelarSolicitacaoPrincipal
+        }
+      });
+
+      if (cancelarSolicitacaoPrincipal) {
+        if (!solicitacaoPrincipal) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao ha solicitacao principal vinculada para cancelar.'
+          });
+        }
+
+        const titulosVinculados = await TituloFinanceiro.count({
+          where: {
+            solicitacao_id: solicitacaoPrincipal.id,
+            deleted_at: null
+          },
+          transaction
+        });
+
+        if (titulosVinculados > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'A solicitacao principal possui titulo financeiro vinculado. Cancele apenas a compra ou trate os titulos antes de cancelar a solicitacao.'
+          });
+        }
+
+        const statusAnteriorPrincipal = solicitacaoPrincipal.status_global;
+        await solicitacaoPrincipal.update({
+          status_global: 'CANCELADA',
+          cancelada: true
+        }, { transaction });
+
+        await Historico.create({
+          solicitacao_id: solicitacaoPrincipal.id,
+          usuario_responsavel_id: usuario.id,
+          setor: usuario.setor_id || null,
+          acao: 'SOLICITACAO_CANCELADA_POR_COMPRA',
+          status_anterior: statusAnteriorPrincipal,
+          status_novo: 'CANCELADA',
+          descricao: `Solicitacao principal cancelada a partir do cancelamento da compra ${codigoCompra}. Motivo: ${motivo}`,
+          metadata: JSON.stringify({
+            solicitacao_compra_id: solicitacao.id,
+            codigo_compra: codigoCompra,
+            motivo
+          })
+        }, { transaction });
+      }
+
+      await transaction.commit();
+
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao cancelar solicitacao de compra' });
+    }
+  },
+
   async encaminharParaCompras(req, res) {
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 

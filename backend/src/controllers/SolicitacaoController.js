@@ -1131,6 +1131,31 @@ function montarLiteralHistoricoSetoresEnvolvidos(tokens = []) {
   )`);
 }
 
+function montarLiteralAprovacaoDiretoriaSetores(tokens = []) {
+  const tokensValidos = Array.from(
+    new Set(
+      (Array.isArray(tokens) ? tokens : [])
+        .map(normalizarTokenComparacao)
+        .filter(Boolean)
+    )
+  );
+
+  if (tokensValidos.length === 0) return null;
+
+  const tokensSql = tokensValidos
+    .map(token => `'${token.replace(/'/g, "''")}'`)
+    .join(', ');
+
+  return Sequelize.literal(`(
+    SELECT DISTINCT h.solicitacao_id
+    FROM historicos h
+    WHERE h.solicitacao_id = Solicitacao.id
+      AND UPPER(TRIM(h.acao)) = 'APROVADA_DIRETORIA'
+      AND COALESCE(Solicitacao.fluxo_aprovacao_diretoria, 0) = 1
+      AND REPLACE(REPLACE(UPPER(TRIM(COALESCE(Solicitacao.diretoria_fluxo_codigo, ''))), ' ', '_'), '-', '_') IN (${tokensSql})
+  )`);
+}
+
 function montarCondicoesVisibilidadeSetores(tokens = []) {
   const tokensValidos = Array.from(
     new Set(
@@ -1153,6 +1178,13 @@ function montarCondicoesVisibilidadeSetores(tokens = []) {
     });
   }
 
+  const literalAprovacaoDiretoria = montarLiteralAprovacaoDiretoriaSetores(tokensValidos);
+  if (literalAprovacaoDiretoria) {
+    condicoes.push({
+      id: { [Op.in]: literalAprovacaoDiretoria }
+    });
+  }
+
   return condicoes;
 }
 
@@ -1168,6 +1200,34 @@ function historicoPertenceASetoresVisiveis(historico, tokens = []) {
   );
 }
 
+function solicitacaoPertenceADiretoriaAprovadora(solicitacao, tokens = []) {
+  if (!solicitacao?.fluxo_aprovacao_diretoria || !solicitacao?.diretoria_fluxo_codigo) {
+    return false;
+  }
+
+  return setorPertenceAoUsuario(tokens, solicitacao.diretoria_fluxo_codigo);
+}
+
+async function solicitacaoTemAprovacaoDiretoria(solicitacao) {
+  if (!solicitacao?.id) return false;
+
+  if (Array.isArray(solicitacao.historicos) && solicitacao.historicos.length > 0) {
+    return solicitacao.historicos.some(item => (
+      String(item?.acao || '').trim().toUpperCase() === 'APROVADA_DIRETORIA'
+    ));
+  }
+
+  const historico = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacao.id,
+      acao: 'APROVADA_DIRETORIA'
+    },
+    attributes: ['id']
+  });
+
+  return Boolean(historico);
+}
+
 async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
   const tokensValidos = Array.from(
     new Set(
@@ -1179,6 +1239,12 @@ async function solicitacaoPertenceASetoresVisiveis(solicitacao, tokens = []) {
 
   if (tokensValidos.length === 0 || !solicitacao) return false;
   if (setorPertenceAoUsuario(tokensValidos, solicitacao.area_responsavel)) return true;
+  if (
+    solicitacaoPertenceADiretoriaAprovadora(solicitacao, tokensValidos) &&
+    await solicitacaoTemAprovacaoDiretoria(solicitacao)
+  ) {
+    return true;
+  }
 
   if (Array.isArray(solicitacao.historicos) && solicitacao.historicos.length > 0) {
     return solicitacao.historicos.some(item => historicoPertenceASetoresVisiveis(item, tokensValidos));
@@ -1704,6 +1770,13 @@ module.exports = {
           if (literalHistoricoSetorUsuario) {
             condicoes.push({
               id: { [Op.in]: literalHistoricoSetorUsuario }
+            });
+          }
+
+          const literalAprovacaoDiretoriaSetorUsuario = montarLiteralAprovacaoDiretoriaSetores(setorTokens);
+          if (literalAprovacaoDiretoriaSetorUsuario) {
+            condicoes.push({
+              id: { [Op.in]: literalAprovacaoDiretoriaSetorUsuario }
             });
           }
 
