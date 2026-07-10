@@ -373,6 +373,27 @@ export async function enviarSolicitacaoCompraParaFornecedores(id, data) {
   return handleJsonResponse(response, 'Erro ao enviar cotacao para fornecedores');
 }
 
+export async function cancelarCotacaoSolicitacaoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/cotacao/cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar cotacao');
+}
+
+export async function salvarRespostaInternaCotacao(solicitacaoId, cotacaoId, data) {
+  const response = await fetch(
+    `${API_URL}/compras/solicitacoes/${solicitacaoId}/cotacoes/${cotacaoId}/resposta-interna`,
+    {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    }
+  );
+  return handleJsonResponse(response, 'Erro ao editar resposta da cotacao');
+}
+
 export async function obterComparativoSolicitacaoCompra(id) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/comparativo`, {
     headers: authHeaders()

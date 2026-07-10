@@ -511,6 +511,123 @@ function validateCompraEnviarBody(body = {}) {
   };
 }
 
+function validateCompraCotacaoCancelBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo'], 'Cancelamento da cotacao');
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo do cancelamento', 5000, { required: true })
+  };
+}
+
+function validateCompraCotacaoRespostaInternaParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'cotacaoId'], 'Cotacao da solicitacao de compra');
+  return {
+    id: parseInteger(params.id, 'Solicitacao de compra', { required: true, positiveOnly: true }),
+    cotacaoId: parseInteger(params.cotacaoId, 'Cotacao', { required: true, positiveOnly: true })
+  };
+}
+
+function validateCompraCotacaoRespostaInternaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'itens',
+      'valor_minimo_pedido',
+      'desconto_total',
+      'condicao_pagamento',
+      'prazo_entrega',
+      'observacao_resposta',
+      'finalizar'
+    ],
+    'Resposta interna da cotacao'
+  );
+
+  if (!Array.isArray(body.itens) || body.itens.length === 0) {
+    throw new ValidationError('Informe ao menos um item da resposta.');
+  }
+  if (body.itens.length > 500) {
+    throw new ValidationError('Quantidade de itens da resposta excede o limite permitido.');
+  }
+
+  const itens = body.itens.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ValidationError(`Item ${index + 1} da resposta invalido.`);
+    }
+
+    ensureAllowedKeys(
+      entry,
+      [
+        'item_tipo',
+        'item_referencia_id',
+        'status_disponibilidade',
+        'disponivel',
+        'preco',
+        'prazo',
+        'data_chegada',
+        'observacao',
+        'quantidade_minima_item'
+      ],
+      `Item ${index + 1} da resposta`
+    );
+
+    const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+    if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+      throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
+    }
+
+    const statusDisponibilidade = parseOptionalText(
+      entry.status_disponibilidade || (entry.disponivel === false ? 'NAO_TEM' : 'DISPONIVEL'),
+      'Disponibilidade',
+      20,
+      { required: true }
+    ).toUpperCase();
+    if (!['DISPONIVEL', 'NAO_TEM', 'PARA_CHEGAR'].includes(statusDisponibilidade)) {
+      throw new ValidationError(`Disponibilidade do item ${index + 1} invalida.`);
+    }
+
+    return {
+      item_tipo: itemTipo,
+      item_referencia_id: parseInteger(entry.item_referencia_id, `Item ${index + 1}`, {
+        required: true,
+        positiveOnly: true
+      }),
+      status_disponibilidade: statusDisponibilidade,
+      disponivel: statusDisponibilidade !== 'NAO_TEM',
+      preco: parseDecimal(entry.preco, `Preco do item ${index + 1}`, {
+        min: 0,
+        scale: 10,
+        brazilianFormat: true
+      }),
+      prazo: parseOptionalText(entry.prazo, `Prazo do item ${index + 1}`, 120),
+      data_chegada: parseDateOnly(entry.data_chegada, `Data de chegada do item ${index + 1}`),
+      observacao: parseOptionalText(entry.observacao, `Observacao do item ${index + 1}`, 5000),
+      quantidade_minima_item: parseDecimal(
+        entry.quantidade_minima_item,
+        `Quantidade minima do item ${index + 1}`,
+        { min: 0, scale: 3, brazilianFormat: true }
+      )
+    };
+  });
+
+  return {
+    itens,
+    valor_minimo_pedido: parseDecimal(body.valor_minimo_pedido, 'Valor minimo do pedido', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }),
+    desconto_total: parseDecimal(body.desconto_total, 'Desconto concedido', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }) || 0,
+    condicao_pagamento: parseOptionalText(body.condicao_pagamento, 'Condicao de pagamento', 5000),
+    prazo_entrega: parseOptionalText(body.prazo_entrega, 'Prazo de entrega', 120),
+    observacao_resposta: parseOptionalText(body.observacao_resposta, 'Observacao da resposta', 5000),
+    finalizar: body.finalizar !== false
+  };
+}
+
 function validateCompraEncerrarBody(body = {}) {
   ensureAllowedKeys(body, ['vencedores', 'alocacoes'], 'Encerramento da cotacao');
 
@@ -1346,6 +1463,9 @@ module.exports = {
     validateCompraCreateBody,
     validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
+  validateCompraCotacaoCancelBody,
+  validateCompraCotacaoRespostaInternaBody,
+  validateCompraCotacaoRespostaInternaParams,
   validateCompraEnviarBody,
   validateCompraIntegrarBody,
   validateCompraPedidoCreateBody,

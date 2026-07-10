@@ -38,6 +38,7 @@ const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = req
 const {
   buildCotacaoItemKey,
   carregarSolicitacaoCompraCompleta,
+  isSolicitacaoCompraTerminal,
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
   normalizeText: normalizeTextCompra,
@@ -617,6 +618,8 @@ async function carregarSolicitacaoCompra(id) {
               'solicitacao_compra_item_id',
               'solicitacao_compra_item_manual_id',
               'disponivel',
+              'status_disponibilidade',
+              'data_chegada',
               'preco',
               'prazo',
               'observacao',
@@ -1064,7 +1067,10 @@ function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
 
 function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
-  const fornecedores = (solicitacao.fornecedores || []).map((cotacaoFornecedor) => ({
+  const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
+    (cotacaoFornecedor) => !['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(cotacaoFornecedor.status))
+  );
+  const fornecedores = fornecedoresAtivos.map((cotacaoFornecedor) => ({
     id: cotacaoFornecedor.id,
     fornecedor_id: cotacaoFornecedor.fornecedor?.id || cotacaoFornecedor.fornecedor_compra_id,
     nome: cotacaoFornecedor.fornecedor?.nome || '-',
@@ -1083,7 +1089,7 @@ function montarComparativoSolicitacao(solicitacao) {
   }));
 
   const itensComparativo = itens.map((item) => {
-    const respostas = (solicitacao.fornecedores || [])
+    const respostas = fornecedoresAtivos
       .filter((cotacaoFornecedor) => normalizeTextCompra(cotacaoFornecedor.status) === 'RESPONDIDO')
       .filter((cotacaoFornecedor) => cotacaoFornecedorIncluiItem(cotacaoFornecedor, item))
       .map((cotacaoFornecedor) => {
@@ -2272,7 +2278,10 @@ module.exports = {
         return;
       }
 
-      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao de compra nao encontrada.' });
@@ -3505,7 +3514,10 @@ module.exports = {
         return res.status(403).json({ error: 'Apenas compras pode enviar cotacoes para fornecedores' });
       }
 
-      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
@@ -3516,9 +3528,11 @@ module.exports = {
         return responderCompraDiretaForaDoFluxoCompras(res);
       }
 
-      if (normalizeTextCompra(solicitacao.status) === 'ENCERRADO') {
+      if (isSolicitacaoCompraTerminal(solicitacao.status)) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
+        return res.status(400).json({
+          error: `Solicitacao de compra ${normalizeTextCompra(solicitacao.status)} nao aceita novo envio para fornecedores.`
+        });
       }
 
       if (isCompraAguardandoDiretoria(solicitacao)) {
@@ -3663,10 +3677,40 @@ module.exports = {
             { transaction }
           );
         } else {
+          const reativandoCotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(
+            normalizeTextCompra(vinculacao.status)
+          );
+
+          if (reativandoCotacaoCancelada) {
+            await SolicitacaoCompraRespostaItem.update(
+              { deleted_at: new Date() },
+              {
+                where: {
+                  solicitacao_compra_fornecedor_id: vinculacao.id,
+                  deleted_at: null
+                },
+                transaction
+              }
+            );
+          }
+
           await vinculacao.update(
             {
               status: 'ENVIADO',
-              enviado_em: new Date()
+              enviado_em: new Date(),
+              ...(reativandoCotacaoCancelada
+                ? {
+                    token: gerarTokenCotacao(),
+                    visualizado_em: null,
+                    respondido_em: null,
+                    valor_minimo_pedido: null,
+                    desconto_total: 0,
+                    condicao_pagamento: null,
+                    prazo_entrega: null,
+                    observacao_resposta: null,
+                    pdf_resposta_url: null
+                  }
+                : {})
             },
             { transaction }
           );
@@ -3846,6 +3890,21 @@ module.exports = {
         return res.status(403).json({ error: 'Apenas compras pode encerrar a cotacao' });
       }
 
+      const solicitacaoTravada = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!solicitacaoTravada) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+      if (isSolicitacaoCompraTerminal(solicitacaoTravada.status)) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: `Solicitacao de compra ${normalizeTextCompra(solicitacaoTravada.status)} nao pode ser encerrada novamente.`
+        });
+      }
+
       const solicitacao = await carregarSolicitacaoCompra(req.params.id);
       if (!solicitacao) {
         await transaction.rollback();
@@ -3912,8 +3971,7 @@ module.exports = {
         await resposta.update({ vencedor: true }, { transaction });
       }
 
-      const solicitacaoDb = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
-      await solicitacaoDb.update(
+      await solicitacaoTravada.update(
         {
           status: 'ENCERRADO',
           encerrado_em: new Date()
@@ -3922,7 +3980,7 @@ module.exports = {
       );
 
       await registrarLogSolicitacaoCompra({
-        solicitacaoCompraId: solicitacaoDb.id,
+        solicitacaoCompraId: solicitacaoTravada.id,
         usuarioId: usuario.id,
         tipoAcao: 'ENCERRAMENTO',
         descricao: normalizeTextCompra(solicitacao.status) === 'ENCERRADO'
@@ -3938,14 +3996,14 @@ module.exports = {
       });
 
       await gerarPedidosDosVencedores({
-        solicitacaoId: solicitacaoDb.id,
+        solicitacaoId: solicitacaoTravada.id,
         usuarioId: usuario.id,
         vencedores,
         transaction
       });
 
       await fecharPedidosDaSolicitacaoCompraAutomaticamente({
-        solicitacaoId: solicitacaoDb.id,
+        solicitacaoId: solicitacaoTravada.id,
         usuarioId: usuario.id,
         transaction
       });

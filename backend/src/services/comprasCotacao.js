@@ -22,6 +22,41 @@ function normalizeText(value) {
     .toUpperCase();
 }
 
+const STATUS_SOLICITACAO_COMPRA_TERMINAIS = new Set([
+  'CANCELADA',
+  'CANCELADO',
+  'INATIVA',
+  'RECUSADO',
+  'ENCERRADO'
+]);
+
+const STATUS_COTACAO_FORNECEDOR_CANCELADOS = new Set(['CANCELADA', 'CANCELADO']);
+
+function isSolicitacaoCompraTerminal(status) {
+  return STATUS_SOLICITACAO_COMPRA_TERMINAIS.has(normalizeText(status));
+}
+
+function isSolicitacaoCompraCancelada(status) {
+  return ['CANCELADA', 'CANCELADO', 'INATIVA'].includes(normalizeText(status));
+}
+
+function isCotacaoFornecedorCancelada(status) {
+  return STATUS_COTACAO_FORNECEDOR_CANCELADOS.has(normalizeText(status));
+}
+
+function assertSolicitacaoCompraAceitaCotacao(solicitacao, acao = 'continuar o fluxo de cotacao') {
+  const status = normalizeText(solicitacao?.status);
+  if (isSolicitacaoCompraTerminal(status)) {
+    throw new Error(`Solicitacao de compra ${status || 'sem status'} nao permite ${acao}.`);
+  }
+}
+
+function assertCotacaoFornecedorAtiva(cotacaoFornecedor, acao = 'alterar a cotacao') {
+  if (isCotacaoFornecedorCancelada(cotacaoFornecedor?.status)) {
+    throw new Error(`Cotacao cancelada nao permite ${acao}.`);
+  }
+}
+
 function gerarTokenCotacao() {
   return crypto.randomBytes(24).toString('hex');
 }
@@ -353,6 +388,8 @@ async function carregarSolicitacaoCompraCompleta(id) {
 }
 
 module.exports = {
+  assertCotacaoFornecedorAtiva,
+  assertSolicitacaoCompraAceitaCotacao,
   buildCotacaoItemKey,
   carregarSolicitacaoCompraCompleta,
   filtrarItensCotaveisPorSelecao,
@@ -360,6 +397,9 @@ module.exports = {
   gerarModeloCotacaoXlsx,
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
+  isCotacaoFornecedorCancelada,
+  isSolicitacaoCompraCancelada,
+  isSolicitacaoCompraTerminal,
   normalizeText,
   obterCodigoProdutoCotacao,
   obterItensCotaveis,

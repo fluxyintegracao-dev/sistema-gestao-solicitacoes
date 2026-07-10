@@ -165,6 +165,7 @@ export function canAccessCompras(user) {
       'compras.cotacoes.gerenciar',
       'compras.cotacoes.editar_respostas',
       'compras.cotacoes.salvar_rascunho',
+      'compras.cotacoes.cancelar',
       'compras.cotacoes.encerrar',
       'compras.cotacoes.reabrir',
       'compras.fornecedores.visualizar',
@@ -513,6 +514,16 @@ export function canReabrirComprasCotacoes(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'compras.cotacoes.reabrir');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canCancelarComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.cotacoes.cancelar');
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }

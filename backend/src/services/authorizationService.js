@@ -252,6 +252,7 @@ const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.gerenciar',
   'compras.cotacoes.editar_respostas',
   'compras.cotacoes.salvar_rascunho',
+  'compras.cotacoes.cancelar',
   'compras.cotacoes.encerrar',
   'compras.cotacoes.reabrir',
   'compras.relatorios.visualizar',
@@ -275,6 +276,10 @@ const COMPRAS_COTACOES_ENCERRAR_KEYS = [
 
 const COMPRAS_COTACOES_REABRIR_KEYS = [
   'compras.cotacoes.reabrir'
+];
+
+const COMPRAS_COTACOES_CANCELAR_KEYS = [
+  'compras.cotacoes.cancelar'
 ];
 
 const COMPRAS_DELEGACAO_VIEW_KEYS = [
@@ -1990,6 +1995,18 @@ async function canReabrirComprasCotacoes(user) {
   return canManageComprasCotacoes(user);
 }
 
+async function canCancelarComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_CANCELAR_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
 async function getComprasVisibilityScope(user) {
   if (isBusinessAdmin(user)) {
     return 'TODAS';
@@ -2884,6 +2901,7 @@ module.exports = {
   canManageComprasPedidos,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes,
+  canCancelarComprasCotacoes,
   canReabrirComprasPedidos,
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,

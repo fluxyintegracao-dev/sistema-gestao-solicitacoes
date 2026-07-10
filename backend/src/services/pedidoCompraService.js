@@ -21,7 +21,11 @@ const {
   Unidade,
   User
 } = require('../models');
-const { registrarLogSolicitacaoCompra } = require('./comprasCotacao');
+const {
+  isSolicitacaoCompraCancelada,
+  normalizeText: normalizeCotacaoText,
+  registrarLogSolicitacaoCompra
+} = require('./comprasCotacao');
 const {
   findPedidoCompraStatusConfig,
   getPedidoCompraStatusConfig,
@@ -1091,6 +1095,9 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
   }
+  if (isSolicitacaoCompraCancelada(solicitacao.status) || normalizeCotacaoText(solicitacao.status) === 'RECUSADO') {
+    throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
+  }
 
   const alocacoes = await persistirAlocacoesSolicitacao({
     solicitacao,
@@ -1416,6 +1423,9 @@ async function criarPedidoParaFornecedor({ solicitacaoId, fornecedorCompraId, us
   const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction);
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
+  }
+  if (isSolicitacaoCompraCancelada(solicitacao.status) || normalizeCotacaoText(solicitacao.status) === 'RECUSADO') {
+    throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
   }
 
   const vinculacaoFornecedor = (solicitacao.fornecedores || []).find(

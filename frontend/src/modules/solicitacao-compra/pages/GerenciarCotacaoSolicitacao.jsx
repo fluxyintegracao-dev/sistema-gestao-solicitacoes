@@ -5,10 +5,13 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineChatBubbleLeftRight,
   HiOutlineClipboardDocument,
-  HiOutlineArrowPath
+  HiOutlineArrowPath,
+  HiOutlinePencilSquare,
+  HiOutlineXMark
 } from 'react-icons/hi2';
 import {
   baixarPdfSolicitacaoCompra,
+  cancelarCotacaoSolicitacaoCompra,
   comentarSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
@@ -19,12 +22,14 @@ import {
   obterUrlAssinadaCompra,
   obterUrlPdfCotacaoPublica,
   recusarSolicitacaoCompra,
-  reabrirCotacaoCompra
+  reabrirCotacaoCompra,
+  salvarRespostaInternaCotacao
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes
 } from '../../../utils/acessoProduto';
@@ -88,7 +93,7 @@ function formatNumeroCompra(value) {
 function clsStatus(status) {
   const v = String(status || '').toUpperCase();
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
-  if (v === 'RECUSADO') return 'app-status-pill bg-red-100 text-red-700';
+  if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
@@ -116,6 +121,149 @@ function CotacaoActionButton({ as: Component = 'button', children, className = '
     >
       {children}
     </Component>
+  );
+}
+
+function decimalApiParaInput(value, limite = 10) {
+  if (value === null || value === undefined || value === '') return '';
+  const texto = String(value).replace('.', ',');
+  if (!texto.includes(',')) return texto;
+  const [inteiro, decimal = ''] = texto.split(',');
+  const decimalLimpo = decimal.slice(0, limite).replace(/0+$/, '');
+  return decimalLimpo ? `${inteiro},${decimalLimpo}` : inteiro;
+}
+
+function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
+  const selecoes = new Set(
+    (cotacaoFornecedor?.itensSelecionados || []).map((item) => buildItemKey({
+      item_tipo: item.item_tipo,
+      item_referencia_id: item.solicitacao_compra_item_id || item.solicitacao_compra_item_manual_id
+    }))
+  );
+  const itensCotacao = selecoes.size
+    ? itensCombinados.filter((item) => selecoes.has(buildItemKey(item)))
+    : itensCombinados;
+  const respostas = new Map(
+    (cotacaoFornecedor?.respostas || []).map((resposta) => [
+      buildItemKey({
+        item_tipo: resposta.item_tipo,
+        item_referencia_id: resposta.solicitacao_compra_item_id || resposta.solicitacao_compra_item_manual_id
+      }),
+      resposta
+    ])
+  );
+
+  return {
+    valor_minimo_pedido: decimalApiParaInput(cotacaoFornecedor?.valor_minimo_pedido, 2),
+    desconto_total: decimalApiParaInput(cotacaoFornecedor?.desconto_total, 2),
+    condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
+    prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
+    observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
+    itens: itensCotacao.map((item) => {
+      const resposta = respostas.get(buildItemKey(item));
+      return {
+        ...item,
+        status_disponibilidade: resposta?.status_disponibilidade
+          || (resposta ? (resposta.disponivel ? 'DISPONIVEL' : 'NAO_TEM') : 'DISPONIVEL'),
+        preco: decimalApiParaInput(resposta?.preco, 10),
+        prazo: resposta?.prazo || '',
+        quantidade_minima_item: decimalApiParaInput(resposta?.quantidade_minima_item, 3),
+        data_chegada: resposta?.data_chegada || '',
+        observacao: resposta?.observacao || ''
+      };
+    })
+  };
+}
+
+function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChangeItem, onSalvar, onFechar }) {
+  if (!cotacao || !form) return null;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3" role="dialog" aria-modal="true">
+      <div className="flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar resposta da cotacao</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              {cotacao.fornecedor?.nome || 'Fornecedor'} - a alteracao sera registrada na auditoria como resposta interna.
+            </p>
+          </div>
+          <button type="button" className="compras-icon-action" onClick={onFechar} title="Fechar" aria-label="Fechar">
+            <HiOutlineXMark />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <label className="app-filter-field">
+              <span className="app-filter-label">Valor minimo do pedido</span>
+              <input className="input" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Desconto concedido</span>
+              <input className="input" inputMode="decimal" value={form.desconto_total} onFocus={(e) => e.target.select()} onChange={(e) => onChange('desconto_total', sanitizeNumeroCompraInput(e.target.value))} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Prazo de entrega *</span>
+              <input className="input" value={form.prazo_entrega} onChange={(e) => onChange('prazo_entrega', e.target.value)} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Condicao de pagamento *</span>
+              <input className="input" value={form.condicao_pagamento} onChange={(e) => onChange('condicao_pagamento', e.target.value)} placeholder="Ex.: Boleto 30/60/90" />
+            </label>
+          </div>
+
+          <label className="mt-3 block">
+            <span className="app-filter-label">Observacao geral</span>
+            <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
+          </label>
+
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--c-border)]">
+            <table className="table min-w-[980px] text-xs">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Disponibilidade</th>
+                  <th>Preco unit.</th>
+                  <th>Prazo</th>
+                  <th>Qtd. min.</th>
+                  <th>Data chegada</th>
+                  <th>Observacao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.itens.map((item, index) => (
+                  <tr key={buildItemKey(item)}>
+                    <td className="min-w-[210px]">
+                      <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
+                      <div className="text-[var(--c-muted)]">{formatNumeroCompra(item.quantidade)} {item.unidade}</div>
+                    </td>
+                    <td>
+                      <select className="input min-w-[130px]" value={item.status_disponibilidade} onChange={(e) => onChangeItem(index, 'status_disponibilidade', e.target.value)}>
+                        <option value="DISPONIVEL">Disponivel</option>
+                        <option value="NAO_TEM">Nao tem</option>
+                        <option value="PARA_CHEGAR">Para chegar</option>
+                      </select>
+                    </td>
+                    <td><input className="input min-w-[120px]" inputMode="decimal" value={item.preco} onChange={(e) => onChangeItem(index, 'preco', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[110px]" value={item.prazo} onChange={(e) => onChangeItem(index, 'prazo', e.target.value)} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} disabled={item.status_disponibilidade !== 'PARA_CHEGAR'} /></td>
+                    <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
+          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
+          <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1244,6 +1392,12 @@ export default function GerenciarCotacaoSolicitacao() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [reabrindoCotacaoId, setReabrindoCotacaoId] = useState(null);
+  const [cancelandoCotacao, setCancelandoCotacao] = useState(false);
+  const [modalCancelamentoCotacao, setModalCancelamentoCotacao] = useState(false);
+  const [motivoCancelamentoCotacao, setMotivoCancelamentoCotacao] = useState('');
+  const [cotacaoRespostaInterna, setCotacaoRespostaInterna] = useState(null);
+  const [formRespostaInterna, setFormRespostaInterna] = useState(null);
+  const [salvandoRespostaInterna, setSalvandoRespostaInterna] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
@@ -1256,6 +1410,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const podeComprar = canOperateComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
+  const podeCancelarCotacao = canCancelarComprasCotacoes(user);
 
   async function carregarFornecedores() {
     try {
@@ -1529,6 +1684,83 @@ export default function GerenciarCotacaoSolicitacao() {
     }
   }
 
+  async function handleCancelarCotacao() {
+    const motivo = motivoCancelamentoCotacao.trim();
+    if (!motivo) {
+      alert('Informe o motivo do cancelamento da cotacao.');
+      return;
+    }
+
+    try {
+      setCancelandoCotacao(true);
+      await cancelarCotacaoSolicitacaoCompra(id, { motivo });
+      setModalCancelamentoCotacao(false);
+      setMotivoCancelamentoCotacao('');
+      await carregarTudo();
+      alert('Cotacao cancelada. Os links foram bloqueados e a solicitacao voltou para liberada para compra.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar cotacao');
+    } finally {
+      setCancelandoCotacao(false);
+    }
+  }
+
+  function abrirRespostaInterna(cotacaoFornecedor) {
+    setCotacaoRespostaInterna(cotacaoFornecedor);
+    setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados));
+  }
+
+  function alterarRespostaInterna(field, value) {
+    setFormRespostaInterna((atual) => ({ ...atual, [field]: value }));
+  }
+
+  function alterarItemRespostaInterna(index, field, value) {
+    setFormRespostaInterna((atual) => ({
+      ...atual,
+      itens: atual.itens.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item)
+    }));
+  }
+
+  async function handleSalvarRespostaInterna(finalizar) {
+    if (!formRespostaInterna || !cotacaoRespostaInterna) return;
+    if (finalizar && (!formRespostaInterna.condicao_pagamento.trim() || !formRespostaInterna.prazo_entrega.trim())) {
+      alert('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
+      return;
+    }
+
+    try {
+      setSalvandoRespostaInterna(true);
+      await salvarRespostaInternaCotacao(id, cotacaoRespostaInterna.id, {
+        valor_minimo_pedido: formRespostaInterna.valor_minimo_pedido || null,
+        desconto_total: formRespostaInterna.desconto_total || 0,
+        condicao_pagamento: formRespostaInterna.condicao_pagamento,
+        prazo_entrega: formRespostaInterna.prazo_entrega,
+        observacao_resposta: formRespostaInterna.observacao_resposta,
+        finalizar,
+        itens: formRespostaInterna.itens.map((item) => ({
+          item_tipo: item.item_tipo,
+          item_referencia_id: item.item_referencia_id,
+          status_disponibilidade: item.status_disponibilidade,
+          preco: item.preco || null,
+          prazo: item.prazo || null,
+          quantidade_minima_item: item.quantidade_minima_item || null,
+          data_chegada: item.status_disponibilidade === 'PARA_CHEGAR' ? (item.data_chegada || null) : null,
+          observacao: item.observacao || null
+        }))
+      });
+      setCotacaoRespostaInterna(null);
+      setFormRespostaInterna(null);
+      await carregarTudo();
+      alert(finalizar ? 'Resposta atualizada e registrada na auditoria.' : 'Rascunho salvo e registrado na auditoria.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao editar resposta da cotacao');
+    } finally {
+      setSalvandoRespostaInterna(false);
+    }
+  }
+
   async function handleCriarFornecedorRapido() {
     try {
       if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
@@ -1714,6 +1946,19 @@ export default function GerenciarCotacaoSolicitacao() {
   }
 
   const isAvulsa = solicitacao.origem === 'AVULSA';
+  const statusSolicitacao = normalizeText(solicitacao.status);
+  const fluxoTerminal = ['cancelada', 'cancelado', 'inativa', 'recusado', 'encerrado'].includes(statusSolicitacao);
+  const cotacoesAtivas = (solicitacao.fornecedores || []).filter(
+    (cotacao) => !['cancelada', 'cancelado'].includes(normalizeText(cotacao.status))
+  );
+  const temPedidoAtivo = (solicitacao.pedidos || []).some(
+    (pedido) => normalizeText(pedido.status) !== 'cancelado'
+  );
+  const podeOperarFluxo = podeComprar && !fluxoTerminal;
+  const podeExibirCancelamentoCotacao = podeCancelarCotacao
+    && !fluxoTerminal
+    && cotacoesAtivas.length > 0
+    && !temPedidoAtivo;
 
   return (
     <div className="page solicitacoes-page page-compra-nova cotacao-gestao-page">
@@ -1737,7 +1982,16 @@ export default function GerenciarCotacaoSolicitacao() {
             <button type="button" className="btn btn-outline" onClick={() => navigate('/cotacoes')}>
               Lista de cotacoes
             </button>
-            {podeComprar && !['ENCERRADO', 'RECUSADO'].includes(String(solicitacao.status || '').toUpperCase()) && (
+            {podeExibirCancelamentoCotacao && (
+              <button
+                type="button"
+                className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50"
+                onClick={() => setModalCancelamentoCotacao(true)}
+              >
+                Cancelar cotacao
+              </button>
+            )}
+            {podeOperarFluxo && (
               <button type="button" className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50" onClick={handleRecusarSolicitacao}>
                 Recusar
               </button>
@@ -1766,7 +2020,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
       <div className="mt-4 grid gap-4">
         <div className="grid gap-3">
-          {podeComprar && (
+          {podeOperarFluxo && (
             <div className="card sol-surface-card">
               <div className="card-header">
                 <h2 className="font-semibold">Comentario da cotacao</h2>
@@ -1808,7 +2062,7 @@ export default function GerenciarCotacaoSolicitacao() {
             {/* Componente de envio para fornecedores */}
             <SecaoEnvioFornecedores
               solicitacao={solicitacao}
-              podeComprar={podeComprar}
+              podeComprar={podeOperarFluxo}
               categoriasFornecedor={categoriasFornecedor}
               fornecedores={fornecedores}
               buscandoFornecedores={buscandoFornecedores}
@@ -1903,8 +2157,10 @@ export default function GerenciarCotacaoSolicitacao() {
                         const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
+                        const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
+                        const podeEditarResposta = podeOperarFluxo && !cotacaoCancelada;
                         const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
-                          && String(solicitacao.status || '').toUpperCase() !== 'ENCERRADO';
+                          && !fluxoTerminal;
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                           ? whatsappLink(
                               cotacaoFornecedor.fornecedor.whatsapp,
@@ -1999,6 +2255,15 @@ export default function GerenciarCotacaoSolicitacao() {
                               )}
                               <CotacaoActionButton
                                 type="button"
+                                onClick={() => abrirRespostaInterna(cotacaoFornecedor)}
+                                disabled={!podeEditarResposta}
+                                title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+                                aria-label="Editar resposta internamente"
+                              >
+                                <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
+                              <CotacaoActionButton
+                                type="button"
                                 onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
                                 disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
                                 title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
@@ -2022,8 +2287,8 @@ export default function GerenciarCotacaoSolicitacao() {
           <SecaoComparativo
             comparativo={comparativo}
             solicitacao={solicitacao}
-            podeComprar={podeComprar}
-            podeEncerrar={podeEncerrarCotacao}
+            podeComprar={podeOperarFluxo}
+            podeEncerrar={podeEncerrarCotacao && !fluxoTerminal}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
@@ -2034,6 +2299,44 @@ export default function GerenciarCotacaoSolicitacao() {
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
+      <ModalRespostaInternaCotacao
+        cotacao={cotacaoRespostaInterna}
+        form={formRespostaInterna}
+        salvando={salvandoRespostaInterna}
+        onChange={alterarRespostaInterna}
+        onChangeItem={alterarItemRespostaInterna}
+        onSalvar={handleSalvarRespostaInterna}
+        onFechar={() => {
+          if (salvandoRespostaInterna) return;
+          setCotacaoRespostaInterna(null);
+          setFormRespostaInterna(null);
+        }}
+      />
+      {modalCancelamentoCotacao && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-[560px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Cancelar cotacao</h2>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">
+              Os links serao bloqueados, as respostas deixarao de participar do comparativo e a solicitacao voltara para liberada para compra. O historico sera preservado.
+            </p>
+            <label className="mt-4 block">
+              <span className="app-filter-label">Motivo do cancelamento *</span>
+              <textarea
+                className="input mt-1 min-h-[96px] w-full"
+                value={motivoCancelamentoCotacao}
+                onChange={(event) => setMotivoCancelamentoCotacao(event.target.value)}
+                placeholder="Explique por que a cotacao esta sendo cancelada."
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={() => setModalCancelamentoCotacao(false)} disabled={cancelandoCotacao}>Voltar</button>
+              <button type="button" className="btn btn-primary" onClick={handleCancelarCotacao} disabled={cancelandoCotacao || !motivoCancelamentoCotacao.trim()}>
+                {cancelandoCotacao ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
