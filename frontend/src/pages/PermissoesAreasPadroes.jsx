@@ -14,6 +14,13 @@ import {
 } from '../constants/moduleGovernance';
 
 const PERMISSAO_SOLICITACOES_MINHAS = 'solicitacoes.lista.visualizar_minhas';
+const COMPRAS_SCOPE_KEYS = [
+  'compras.escopo.minhas_atribuidas',
+  'compras.escopo.setor',
+  'compras.escopo.todas'
+];
+const COMPRAS_SCOPE_DEFAULT = 'compras.escopo.minhas_atribuidas';
+const COMPRAS_SCOPE_SELECT_ALL = 'compras.escopo.setor';
 const PERFIS_BASE = ['USUARIO', 'ESTAGIARIO', 'ADMINISTRADOR', 'FINANCEIRO', 'COMPRAS', 'RH_DP', 'DIRETORIA', 'ENGENHEIRO'];
 
 function normalizeKey(value) {
@@ -25,6 +32,17 @@ function normalizePerfil(value) {
     .trim()
     .toUpperCase()
     .replace(/\s+/g, '_');
+}
+
+function isComprasScopeKey(value) {
+  return COMPRAS_SCOPE_KEYS.includes(normalizeKey(value));
+}
+
+function getEffectiveComprasScope(permissoes = []) {
+  const normalized = new Set(permissoes.map(normalizeKey));
+  if (normalized.has('compras.escopo.todas')) return 'compras.escopo.todas';
+  if (normalized.has('compras.escopo.setor')) return 'compras.escopo.setor';
+  return COMPRAS_SCOPE_DEFAULT;
 }
 
 function normalizePadroes(input) {
@@ -73,7 +91,7 @@ function uniq(lista = []) {
   return [...new Set(lista.filter(Boolean))];
 }
 
-function CheckboxPermissao({ permissao, checked, disabled, onChange }) {
+function CheckboxPermissao({ permissao, checked, disabled, onChange, inputType = 'checkbox', inputName }) {
   return (
     <label
       className={`flex items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
@@ -85,7 +103,8 @@ function CheckboxPermissao({ permissao, checked, disabled, onChange }) {
       }`}
     >
       <input
-        type="checkbox"
+        type={inputType}
+        name={inputName}
         className="mt-0.5 shrink-0"
         checked={checked}
         disabled={disabled}
@@ -156,7 +175,10 @@ function ModuleCard({
       </div>
 
       <div className="space-y-4 p-4">
-        {grupo.areas.map((area) => (
+        {grupo.areas.map((area) => {
+          const areaEscopoCompras = area.key === 'compras.escopo';
+          const escopoComprasAtivo = areaEscopoCompras ? getEffectiveComprasScope(permissoesAtuais) : null;
+          return (
           <div key={area.key} className="rounded-xl border border-[var(--ui-border)] bg-[var(--ui-canvas)] p-3">
             <div className="mb-3">
               <h3 className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--c-muted)]">{area.label}</h3>
@@ -170,15 +192,18 @@ function ModuleCard({
                   <CheckboxPermissao
                     key={permissao.key}
                     permissao={permissao}
-                    checked={permissoesAtuais.includes(key) || obrigatoria}
+                    checked={areaEscopoCompras ? key === escopoComprasAtivo : permissoesAtuais.includes(key) || obrigatoria}
                     disabled={obrigatoria}
                     onChange={() => onTogglePermissao(key)}
+                    inputType={areaEscopoCompras ? 'radio' : 'checkbox'}
+                    inputName={areaEscopoCompras ? 'compras-escopo-padrao' : undefined}
                   />
                 );
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -268,6 +293,16 @@ export default function PermissoesAreasPadroes() {
     const normalized = normalizeKey(key);
     if (permissoesObrigatorias.includes(normalized)) return;
 
+    if (isComprasScopeKey(normalized)) {
+      const atual = getEffectiveComprasScope(permissoesAtuais);
+      if (atual === normalized) return;
+      updatePermissoes([
+        ...permissoesAtuais.filter((item) => !isComprasScopeKey(item)),
+        normalized
+      ]);
+      return;
+    }
+
     if (permissoesAtuais.includes(normalized)) {
       updatePermissoes(permissoesAtuais.filter((item) => item !== normalized));
       return;
@@ -277,7 +312,13 @@ export default function PermissoesAreasPadroes() {
   }
 
   function selectAll(keys) {
-    updatePermissoes(uniq([...permissoesAtuais, ...keys.map(normalizeKey)]));
+    const normalizedKeys = keys.map(normalizeKey);
+    const possuiEscopoCompras = normalizedKeys.some(isComprasScopeKey);
+    updatePermissoes(uniq([
+      ...permissoesAtuais.filter((key) => !possuiEscopoCompras || !isComprasScopeKey(key)),
+      ...normalizedKeys.filter((key) => !isComprasScopeKey(key)),
+      ...(possuiEscopoCompras ? [COMPRAS_SCOPE_SELECT_ALL] : [])
+    ]));
   }
 
   function clearAll(keys) {
