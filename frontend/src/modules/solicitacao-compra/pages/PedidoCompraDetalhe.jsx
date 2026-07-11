@@ -1324,7 +1324,7 @@ export default function PedidoCompraDetalhe() {
                 className="input"
                 value={pedido.status || ''}
                 onChange={(event) => handleAtualizarStatus(event.target.value)}
-                disabled={!podeAlterarStatusPedido || savingStatus}
+                disabled={!podeAlterarStatusPedido || savingStatus || pedidoCancelado}
               >
                 {statusSelectOptions.map((status) => (
                   <option key={status.codigo} value={status.codigo}>
@@ -1344,9 +1344,11 @@ export default function PedidoCompraDetalhe() {
             <button type="button" className="btn btn-outline" onClick={handleBaixarPdf} disabled={baixandoPdf}>
               {baixandoPdf ? 'Gerando PDF...' : 'Baixar PDF'}
             </button>
-            <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
-              {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
-            </button>
+            {!pedidoCancelado ? (
+              <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
+                {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
+              </button>
+            ) : null}
             {podeReabrirCotacao ? (
               <button
                 type="button"
@@ -1456,7 +1458,7 @@ export default function PedidoCompraDetalhe() {
                   Custo rateado nos itens para acompanhamento da obra.
                 </p>
               </div>
-              {podeRegistrarFretePedido ? (
+              {podeRegistrarFretePedido && !pedidoCancelado ? (
                 <button
                   type="button"
                   className="btn btn-outline"

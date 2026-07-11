@@ -402,8 +402,13 @@ export default function SolicitacaoCompraDetalheView() {
             <button type="button" className="btn btn-outline" onClick={() => navigateBack('/solicitacoes-compra')}>
               Voltar
             </button>
-            <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>
-              Gerenciar cotacao
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}
+              disabled={solicitacaoCompraCancelada}
+            >
+              {solicitacaoCompraCancelada ? 'Cotacao cancelada' : 'Gerenciar cotacao'}
             </button>
             {podeCancelarSolicitacaoCompra && (
               <button type="button" className="btn btn-danger" onClick={abrirModalCancelamento}>
@@ -503,7 +508,7 @@ export default function SolicitacaoCompraDetalheView() {
                     <td>
                       <div className="flex items-center gap-2">
                         <span>{item.quantidade}</span>
-                        {podeEditarQuantidadeItem && (
+                        {podeEditarQuantidadeItem && !solicitacaoCompraCancelada && (
                           <button
                             type="button"
                             className="rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
@@ -519,7 +524,7 @@ export default function SolicitacaoCompraDetalheView() {
                     <td>
                       <div className="flex flex-col gap-2">
                         <span>{item.apropriacao}</span>
-                        {podeEditarApropriacoesItem && (
+                        {podeEditarApropriacoesItem && !solicitacaoCompraCancelada && (
                           <button
                             type="button"
                             className="w-fit rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
@@ -574,8 +579,13 @@ export default function SolicitacaoCompraDetalheView() {
               <div className="text-xs text-[var(--c-muted)]">
                 Enviados: {resumoCotacao.enviados} - Visualizados: {resumoCotacao.visualizados}
               </div>
-              <button type="button" className="btn btn-primary w-full" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>
-                Abrir gestao da cotacao
+              <button
+                type="button"
+                className="btn btn-primary w-full"
+                onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}
+                disabled={solicitacaoCompraCancelada}
+              >
+                {solicitacaoCompraCancelada ? 'Cotacao cancelada' : 'Abrir gestao da cotacao'}
               </button>
             </div>
           </div>

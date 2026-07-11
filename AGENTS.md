@@ -20,6 +20,7 @@ Guia rapido para colaboradores e agentes automatizados.
 2. Pedir confirmacao antes de alteracoes grandes.
 3. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
 4. Em sessoes com mais de um repositorio no mesmo workspace, ler `docs/COLABORACAO_WORKSPACE.md` e registrar ownership em `docs/workspace/OWNERSHIP_ATIVO.md`.
+5. Antes de pausar um fluxo sensivel ainda nao commitado, criar ou atualizar o handoff correspondente em `docs/handoffs/`, informando arquivos alterados, validacoes executadas, riscos e proximo passo exato.
 
 ## Estado Atual (resumo das mudancas feitas)
 

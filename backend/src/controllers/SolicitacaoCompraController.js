@@ -2618,6 +2618,11 @@ module.exports = {
         return responderCompraDiretaForaDoFluxoCompras(res);
       }
 
+      if (['CANCELADA', 'CANCELADO'].includes(String(solicitacao.status || '').toUpperCase())) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Solicitacao de compra cancelada nao permite alterar itens.' });
+      }
+
       if (isCompraAguardandoDiretoria(solicitacao)) {
         await transaction.rollback();
         return responderCompraAguardandoDiretoria(res);
@@ -2729,6 +2734,10 @@ module.exports = {
       }
 
       const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+      if (['CANCELADA', 'CANCELADO'].includes(String(solicitacao.status || '').toUpperCase())) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Solicitacao de compra cancelada nao permite alterar apropriacoes.' });
+      }
       const podeEditar = compraDireta
         ? await canEditarApropriacoesItemCompraDireta(usuario)
         : await canEditarApropriacoesItemSolicitacaoCompra(usuario);
@@ -2817,7 +2826,10 @@ module.exports = {
         apropriacao_id: req.body?.apropriacao_id
       });
 
-      const validacaoRateio = validarRateiosPayload({ ...item.toJSON(), apropriacoes: rateios });
+      const validacaoRateio = validarRateiosPayload({
+        rateios,
+        quantidadeTotal: item.quantidade
+      });
       if (!validacaoRateio.ok) {
         await transaction.rollback();
         return res.status(400).json({ error: validacaoRateio.mensagem || 'Rateio de apropriacoes invalido.' });

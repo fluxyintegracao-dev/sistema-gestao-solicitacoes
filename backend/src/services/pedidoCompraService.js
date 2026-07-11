@@ -1528,6 +1528,7 @@ async function listarPedidos({
   return pedidos.filter((pedido) => {
     if (!filtro) return true;
     const haystack = [
+      buildPedidoCodigo(pedido.id),
       pedido.fornecedor?.nome,
       pedido.solicitacao?.numero_sienge,
       pedido.obra?.nome,
@@ -2003,6 +2004,9 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
   if (statusAnterior === statusConfig.codigo) {
     return pedido;
   }
+  if (isPedidoCancelado(statusAnterior)) {
+    throw new Error('Pedido cancelado nao pode ter o status alterado.');
+  }
 
   await pedido.update(
     {
@@ -2178,13 +2182,32 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     { where: { pedido_compra_id: pedido.id, status: 'ATIVA' }, transaction }
   );
 
+  const [fretesCancelados] = await PedidoCompraFrete.update(
+    { status_financeiro: 'CANCELADO' },
+    {
+      where: {
+        pedido_compra_id: pedido.id,
+        titulo_financeiro_id: null,
+        [Op.or]: [
+          { status_financeiro: { [Op.ne]: 'CANCELADO' } },
+          { status_financeiro: null }
+        ]
+      },
+      transaction
+    }
+  );
+
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: pedido.solicitacao_compra_id,
     usuarioId,
     fornecedorCompraId: pedido.fornecedor_compra_id,
     tipoAcao: 'PEDIDO_CANCELADO',
     descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
-    metadados: { pedido_compra_id: pedido.id, motivo: motivoNormalizado },
+    metadados: {
+      pedido_compra_id: pedido.id,
+      motivo: motivoNormalizado,
+      fretes_cancelados: Number(fretesCancelados || 0)
+    },
     transaction
   });
 
@@ -2197,7 +2220,10 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
     statusAnterior,
     statusNovo: 'CANCELADO',
-    metadados: { motivo: motivoNormalizado },
+    metadados: {
+      motivo: motivoNormalizado,
+      fretes_cancelados: Number(fretesCancelados || 0)
+    },
     transaction
   });
 

@@ -757,9 +757,9 @@ module.exports = {
         return;
       }
 
-      if (!(await canCancelarFreteComprasPedidos(usuario))) {
+      if (!(await canRegistrarFreteComprasPedidos(usuario))) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Acesso negado para cancelar frete do pedido' });
+        return res.status(403).json({ error: 'Acesso negado para registrar frete do pedido' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {

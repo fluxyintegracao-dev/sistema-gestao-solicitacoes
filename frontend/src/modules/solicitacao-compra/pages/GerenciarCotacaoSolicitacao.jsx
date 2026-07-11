@@ -1381,6 +1381,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [solicitacao, setSolicitacao] = useState(null);
+  const [erroCarregamento, setErroCarregamento] = useState('');
   const [fornecedores, setFornecedores] = useState([]);
   const [categoriasFornecedor, setCategoriasFornecedor] = useState([]);
   const [categoriaFornecedorId, setCategoriaFornecedorId] = useState('');
@@ -1476,6 +1477,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function carregarTudo() {
     try {
       setLoading(true);
+      setErroCarregamento('');
       const [dataSolicitacao, dataCategorias] = await Promise.all([
         obterSolicitacaoCompra(id),
         listarCategoriasParceiro()
@@ -1507,7 +1509,14 @@ export default function GerenciarCotacaoSolicitacao() {
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar solicitacao de compra');
+      const mensagem = error.message || 'Erro ao carregar solicitacao de compra';
+      setSolicitacao(null);
+      setErroCarregamento(
+        /nao encontrada|não encontrada/i.test(mensagem)
+          ? 'Solicitacao de compra cancelada ou indisponivel para cotacao.'
+          : mensagem
+      );
+      alert(mensagem);
     } finally {
       setLoading(false);
     }
@@ -1942,7 +1951,13 @@ export default function GerenciarCotacaoSolicitacao() {
   }
 
   if (!solicitacao) {
-    return <div className="page solicitacoes-page"><div className="app-empty-card sol-surface-card">Solicitacao de compra nao encontrada.</div></div>;
+    return (
+      <div className="page solicitacoes-page">
+        <div className="app-empty-card sol-surface-card">
+          {erroCarregamento || 'Solicitacao de compra nao encontrada.'}
+        </div>
+      </div>
+    );
   }
 
   const isAvulsa = solicitacao.origem === 'AVULSA';
