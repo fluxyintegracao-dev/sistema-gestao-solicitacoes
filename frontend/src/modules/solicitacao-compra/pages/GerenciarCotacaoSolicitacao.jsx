@@ -1086,8 +1086,23 @@ function SecaoEnvioFornecedores({
 
 // SecaoComparativo
 
-function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar, vencedoresSelecionados, onVencedorChange, onRemanejamentoAplicado, onEncerrar, encerrando }) {
+function SecaoComparativo({
+  comparativo,
+  solicitacao,
+  podeComprar,
+  podeEncerrar,
+  podeEditarResposta,
+  vencedoresSelecionados,
+  onVencedorChange,
+  onEditarRespostaFornecedor,
+  onRemanejamentoAplicado,
+  onEncerrar,
+  encerrando
+}) {
   const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
+  const [modoVisualizacao, setModoVisualizacao] = useState('cards');
+  const [painelFornecedoresAberto, setPainelFornecedoresAberto] = useState(false);
+  const [fornecedoresVisiveis, setFornecedoresVisiveis] = useState({});
 
   function getQuantidadeAlocada(respostaItemId) {
     const registro = vencedoresSelecionados[String(respostaItemId)];
@@ -1169,6 +1184,150 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
       .slice(0, 3);
   }, [comparativo, vencedoresSelecionados]);
 
+  const fornecedoresMapa = useMemo(() => {
+    const fornecedoresPorId = new Map();
+    (comparativo?.fornecedores || []).forEach((fornecedor) => {
+      fornecedoresPorId.set(String(fornecedor.fornecedor_id), {
+        ...fornecedor,
+        possuiResposta: false
+      });
+    });
+
+    (comparativo?.itens || []).forEach((item) => {
+      (item.respostas || []).forEach((resposta) => {
+        const key = String(resposta.fornecedor_id);
+        const atual = fornecedoresPorId.get(key) || {
+          id: resposta.cotacao_fornecedor_id,
+          fornecedor_id: resposta.fornecedor_id,
+          nome: resposta.fornecedor_nome,
+          status: resposta.status_fornecedor
+        };
+        fornecedoresPorId.set(key, {
+          ...atual,
+          id: atual.id || resposta.cotacao_fornecedor_id,
+          possuiResposta: true
+        });
+      });
+    });
+
+    return [...fornecedoresPorId.values()]
+      .filter((fornecedor) => fornecedor.possuiResposta)
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+  }, [comparativo]);
+
+  const fornecedoresMapaVisiveis = useMemo(() => {
+    if (!fornecedoresMapa.length) return [];
+    return fornecedoresMapa.filter((fornecedor) => fornecedoresVisiveis[String(fornecedor.fornecedor_id)] !== false);
+  }, [fornecedoresMapa, fornecedoresVisiveis]);
+
+  function toggleFornecedorMapa(fornecedorId) {
+    setFornecedoresVisiveis((atual) => ({
+      ...atual,
+      [String(fornecedorId)]: atual[String(fornecedorId)] === false
+    }));
+  }
+
+  function mostrarTodosFornecedoresMapa() {
+    setFornecedoresVisiveis({});
+  }
+
+  function ocultarTodosFornecedoresMapa() {
+    setFornecedoresVisiveis(
+      fornecedoresMapa.reduce((acc, fornecedor) => {
+        acc[String(fornecedor.fornecedor_id)] = false;
+        return acc;
+      }, {})
+    );
+  }
+
+  function renderCelulaFornecedorMapa(item, fornecedor) {
+    const resposta = (item.respostas || []).find((resp) => String(resp.fornecedor_id) === String(fornecedor.fornecedor_id));
+    if (!resposta) {
+      return (
+        <td key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`} className="min-w-[220px] border-l border-[var(--c-border)] bg-slate-50/70 px-2 py-2 align-top text-xs text-[var(--c-muted)]">
+          -
+        </td>
+      );
+    }
+
+    const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
+    const isVencedor = quantidadeAlocada > 0;
+    const podeSelecionar = podeEncerrar && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const precoUnitario = parseNumeroCompra(resposta.preco);
+    const quantidadeItem = parseNumeroCompra(item.quantidade);
+
+    return (
+      <td
+        key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
+        className={`min-w-[240px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${isVencedor ? 'bg-emerald-50' : 'bg-white'}`}
+      >
+        <div className="grid gap-1">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
+              <div className="text-[11px] text-[var(--c-muted)]">
+                Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
+              </div>
+            </div>
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              onClick={() => onEditarRespostaFornecedor?.(resposta.cotacao_fornecedor_id)}
+              disabled={!podeEditarResposta}
+              title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+              aria-label="Editar resposta internamente"
+            >
+              <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1 text-[11px] text-[var(--c-muted)]">
+            <span className={`rounded-full px-2 py-0.5 font-semibold ${resposta.disponivel ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+              {resposta.disponivel ? 'Disponivel' : 'Nao tem'}
+            </span>
+            <span>Prazo: {resposta.prazo || resposta.prazo_entrega_fornecedor || '-'}</span>
+            {resposta.quantidade_minima_item ? <span>Min.: {resposta.quantidade_minima_item}</span> : null}
+          </div>
+
+          <div className="text-[11px] text-[var(--c-muted)]">
+            Cond.: {resposta.condicao_pagamento || '-'}
+          </div>
+          {resposta.observacao ? (
+            <div className="line-clamp-2 text-[11px] text-[var(--c-muted)]" title={resposta.observacao}>
+              Obs.: {resposta.observacao}
+            </div>
+          ) : null}
+
+          <div className="mt-1 flex items-center gap-2 rounded-md border border-[var(--c-border)] bg-slate-50 px-2 py-1">
+            <input
+              type="checkbox"
+              checked={isVencedor}
+              disabled={!podeSelecionar}
+              onChange={(event) => {
+                onVencedorChange({
+                  item,
+                  resposta,
+                  quantidade: event.target.checked ? item.quantidade : 0
+                });
+              }}
+            />
+            <input
+              className="input h-7 w-24 px-2 text-xs"
+              value={isVencedor ? getQuantidadeAlocadaInput(resposta.resposta_item_id) : ''}
+              placeholder="Qtd."
+              disabled={!podeEncerrar || !isVencedor}
+              onChange={(event) => onVencedorChange({
+                item,
+                resposta,
+                quantidade: event.target.value
+              })}
+            />
+          </div>
+        </div>
+      </td>
+    );
+  }
+
   if (!comparativo?.itens?.length) {
     return (
       <div className="card sol-surface-card cotacao-comparativo-panel">
@@ -1190,9 +1349,27 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
             <h2 className="font-semibold">Comparativo por item</h2>
             <p className="mt-0.5 text-xs text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
           </div>
-          <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-            {comparativo.itens.length} item(ns)
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-[var(--c-border)] bg-slate-50 p-1 text-xs">
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setModoVisualizacao('cards')}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'mapa' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setModoVisualizacao('mapa')}
+              >
+                Mapa
+              </button>
+            </div>
+            <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+              {comparativo.itens.length} item(ns)
+            </span>
+          </div>
         </div>
 
         {rankingFornecedores.length > 0 && (
@@ -1237,6 +1414,108 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
           </div>
         )}
 
+        {modoVisualizacao === 'mapa' && (
+          <div className="mb-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] px-3 py-2">
+              <div>
+                <div className="text-sm font-semibold text-[var(--c-text)]">Mapa de comparacao</div>
+                <div className="text-xs text-[var(--c-muted)]">Itens nas linhas e fornecedores respondidos nas colunas.</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn btn-xs btn-outline" onClick={() => setPainelFornecedoresAberto((atual) => !atual)}>
+                  Fornecedores ({fornecedoresMapaVisiveis.length}/{fornecedoresMapa.length})
+                </button>
+                <button type="button" className="btn btn-xs btn-outline" onClick={mostrarTodosFornecedoresMapa}>Mostrar todos</button>
+                <button type="button" className="btn btn-xs btn-outline" onClick={ocultarTodosFornecedoresMapa}>Ocultar todos</button>
+              </div>
+            </div>
+
+            {painelFornecedoresAberto && (
+              <div className="grid gap-2 border-b border-[var(--c-border)] px-3 py-3 sm:grid-cols-2 lg:grid-cols-3">
+                {fornecedoresMapa.map((fornecedor) => {
+                  const visivel = fornecedoresVisiveis[String(fornecedor.fornecedor_id)] !== false;
+                  return (
+                    <label
+                      key={fornecedor.fornecedor_id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${visivel ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-[var(--c-border)] bg-white text-slate-600'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visivel}
+                        onChange={() => toggleFornecedorMapa(fornecedor.fornecedor_id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate font-semibold">{fornecedor.nome}</span>
+                      <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--c-muted)]">{fmtStatus(fornecedor.status)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {fornecedoresMapaVisiveis.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="table min-w-[980px] text-xs">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-20 min-w-[260px] bg-slate-100">Item</th>
+                      <th className="sticky left-[260px] z-20 min-w-[110px] bg-slate-100 text-right">Qtd.</th>
+                      {fornecedoresMapaVisiveis.map((fornecedor) => (
+                        <th key={fornecedor.fornecedor_id} className="min-w-[240px] border-l border-[var(--c-border)] bg-slate-100">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
+                            <button
+                              type="button"
+                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              onClick={() => onEditarRespostaFornecedor?.(fornecedor.id)}
+                              disabled={!podeEditarResposta}
+                              title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+                              aria-label="Editar resposta internamente"
+                            >
+                              <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparativo.itens.map((item) => {
+                      const totalAlocadoItem = getTotalAlocadoItem(item);
+                      const quantidadeItem = parseNumeroCompra(item.quantidade);
+                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      return (
+                        <tr key={buildItemKey(item)}>
+                          <td className="sticky left-0 z-10 min-w-[260px] bg-white px-3 py-2 align-top">
+                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
+                            <div className="text-[11px] text-[var(--c-muted)]">
+                              {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
+                              {item.especificacao ? ` - ${item.especificacao}` : ''}
+                            </div>
+                            {podeEncerrar ? (
+                              <div className={`mt-1 text-[11px] ${excedeu ? 'text-red-700' : 'text-[var(--c-muted)]'}`}>
+                                Selecionado: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="sticky left-[260px] z-10 min-w-[110px] bg-white px-3 py-2 text-right align-top font-semibold">
+                            {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                          </td>
+                          {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-3 py-8 text-center text-sm text-[var(--c-muted)]">
+                Selecione ao menos um fornecedor respondido para visualizar o mapa.
+              </div>
+            )}
+          </div>
+        )}
+
+        {modoVisualizacao === 'cards' && (
         <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
             <div key={buildItemKey(item)} className="cotacao-comparativo-item app-list-card px-3 py-2.5">
@@ -1339,6 +1618,8 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
               </div>
             </div>
           ))}
+        </div>
+        )}
 
           {podeEncerrar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
@@ -1351,7 +1632,6 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
               </button>
             </div>
           )}
-        </div>
       </div>
 
       {/* Modal de pedido final */}
@@ -1718,6 +1998,17 @@ export default function GerenciarCotacaoSolicitacao() {
   function abrirRespostaInterna(cotacaoFornecedor) {
     setCotacaoRespostaInterna(cotacaoFornecedor);
     setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados));
+  }
+
+  function abrirRespostaInternaPorId(cotacaoFornecedorId) {
+    const cotacaoFornecedor = (solicitacao?.fornecedores || []).find(
+      (item) => Number(item.id) === Number(cotacaoFornecedorId)
+    );
+    if (!cotacaoFornecedor) {
+      alert('Cotacao do fornecedor nao encontrada para edicao.');
+      return;
+    }
+    abrirRespostaInterna(cotacaoFornecedor);
   }
 
   function alterarRespostaInterna(field, value) {
@@ -2304,8 +2595,10 @@ export default function GerenciarCotacaoSolicitacao() {
             solicitacao={solicitacao}
             podeComprar={podeOperarFluxo}
             podeEncerrar={podeEncerrarCotacao && !fluxoTerminal}
+            podeEditarResposta={podeOperarFluxo}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
+            onEditarRespostaFornecedor={abrirRespostaInternaPorId}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
             onEncerrar={handleEncerrar}
             encerrando={encerrando}

@@ -83,3 +83,27 @@ Executar o teste funcional em dev e preparar um unico commit do fluxo de cancela
 - Confirmar que a SC cancelada nao permite abrir/gerenciar cotacao, editar quantidade ou editar apropriacao.
 - Abrir o modal de apropriacao na nova solicitacao de compra e na compra direta em desktop/notebook.
 - Abrir o modal de editar apropriacoes no detalhe da SC e validar se o tamanho ficou centralizado e legivel.
+
+## Atualizacao - 2026-07-12 - Mapa de comparacao da cotacao
+
+### Ajuste pendente de commit
+
+- `frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx`
+  - Adicionada visualizacao alternativa `Mapa` no comparativo por item, mantendo a visualizacao atual em `Cards`.
+  - O mapa usa os dados ja retornados pelo endpoint de comparativo: itens nas linhas e fornecedores respondidos nas colunas.
+  - Cada celula mostra preco, total estimado, disponibilidade, prazo, condicao de pagamento, observacao e controles de vencedor/quantidade.
+  - Fornecedores podem ser exibidos/ocultados no proprio mapa.
+  - O lapis reaproveita o modal existente de resposta interna do fornecedor; nao houve endpoint novo nem alteracao de backend.
+
+### Validacao executada
+
+- `git diff --check`
+- `npm run build` em `frontend/`
+
+### Teste funcional recomendado
+
+- Abrir uma cotacao com dois ou mais fornecedores respondidos.
+- Alternar entre `Cards` e `Mapa` e confirmar que os dados permanecem coerentes.
+- Ocultar/mostrar fornecedores no mapa.
+- Marcar vencedor e ajustar quantidade no mapa, depois confirmar que o botao de encerrar segue gerando/atualizando pedidos.
+- Clicar no lapis de um fornecedor no mapa e confirmar que abre o modal de resposta interna ja existente.
