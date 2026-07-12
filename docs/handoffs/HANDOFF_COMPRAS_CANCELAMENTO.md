@@ -58,3 +58,28 @@ Registrar o estado do trabalho pendente no modulo de Compras para permitir retom
 ## Proximo passo recomendado
 
 Executar o teste funcional em dev e preparar um unico commit do fluxo de cancelamento. Nao iniciar o novo modulo de Custos e Recebiveis antes de concluir e publicar este conjunto.
+
+## Atualizacao - 2026-07-12
+
+### Ajustes pendentes de commit
+
+- `backend/src/controllers/SolicitacaoCompraController.js`
+  - SC com status `CANCELADA`/`CANCELADO` agora pode ser acompanhada historicamente mesmo quando a solicitacao principal nao esta mais liberada para compras.
+  - O ajuste nao libera operacoes: edicao de itens/apropriacoes e cotacao continuam bloqueadas pelas validacoes ja existentes para status cancelado.
+- `frontend/src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx`
+  - Modal de apropriacao da nova solicitacao de compra/compra direta ajustado para largura responsiva intermediaria (`max-w-[820px]`).
+- `frontend/src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx`
+  - Modal de edicao de apropriacoes do item ajustado para largura responsiva intermediaria (`max-w-[860px]`) e colunas mais compactas.
+
+### Validacao executada
+
+- `node --check backend/src/controllers/SolicitacaoCompraController.js`
+- `git diff --check`
+- `npm run build` em `frontend/`
+
+### Teste funcional recomendado
+
+- Abrir uma SC cancelada pelo link direto `/solicitacoes-compra/:id` e confirmar que ela carrega como historico.
+- Confirmar que a SC cancelada nao permite abrir/gerenciar cotacao, editar quantidade ou editar apropriacao.
+- Abrir o modal de apropriacao na nova solicitacao de compra e na compra direta em desktop/notebook.
+- Abrir o modal de editar apropriacoes no detalhe da SC e validar se o tamanho ficou centralizado e legivel.

@@ -506,6 +506,10 @@ function isStatusSolicitacaoCompraLiberadoParaCompras(status) {
   return normalizado.startsWith('PEDIDO_');
 }
 
+function isSolicitacaoCompraCancelada(solicitacao) {
+  return ['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(solicitacao?.status));
+}
+
 async function isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction = null) {
   if (isStatusSolicitacaoCompraLiberadoParaCompras(solicitacao?.status)) {
     return true;
@@ -559,6 +563,7 @@ function podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao) {
 }
 
 async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction = null) {
+  if (isSolicitacaoCompraCancelada(solicitacao)) return true;
   if (await isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction)) return true;
   if (isSuperadmin(usuario)) return true;
   if (Number(solicitacao?.solicitante_id || 0) > 0 && Number(solicitacao.solicitante_id) === Number(usuario?.id)) {

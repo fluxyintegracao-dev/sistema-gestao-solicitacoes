@@ -1576,7 +1576,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
       {modalApropriacaoIndex !== null && itemModalAtual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="card w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="card w-full max-w-[820px] max-h-[90vh] overflow-y-auto">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Apropriar item</h2>
@@ -1605,7 +1605,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
               <div className="grid gap-3">
                 {rateiosModal.map((rateio, rateioIndex) => (
-                  <div key={`rateio-${rateioIndex}`} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 md:grid-cols-[minmax(0,1fr)_180px_96px]">
+                  <div key={`rateio-${rateioIndex}`} className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 md:grid-cols-[minmax(0,1fr)_170px_96px]">
                     <div className="grid gap-2">
                       <label className="text-sm font-medium">Apropriação</label>
                       <ApropriacaoAutocomplete
