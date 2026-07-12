@@ -73,11 +73,49 @@ function dataCurta(valor) {
 }
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+const FILTER_DEBOUNCE_MS = 450;
+const EXPORT_PAGE_SIZE = 200;
 const STATUS_AUTOMATICOS_SOLICITACAO = [
   'TITULO_CADASTRADO',
   'PARCIALMENTE PAGO',
   'PAGA'
 ];
+
+function validarDataIso(valor) {
+  const texto = String(valor || '').trim();
+  if (!texto) return true;
+  const match = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const ano = Number(match[1]);
+  const mes = Number(match[2]);
+  const dia = Number(match[3]);
+  if (ano < 1900 || ano > 2200) return false;
+
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  return data.getUTCFullYear() === ano
+    && data.getUTCMonth() === mes - 1
+    && data.getUTCDate() === dia;
+}
+
+function obterErrosFiltrosData(filtros) {
+  const erros = {};
+  const campos = [
+    ['data_registro', 'Informe uma data de registro valida.'],
+    ['data_vencimento_inicio', 'Informe uma data inicial valida.'],
+    ['data_vencimento_fim', 'Informe uma data final valida.']
+  ];
+  campos.forEach(([campo, mensagem]) => {
+    if (!validarDataIso(filtros?.[campo])) erros[campo] = mensagem;
+  });
+
+  const inicio = String(filtros?.data_vencimento_inicio || '').trim();
+  const fim = String(filtros?.data_vencimento_fim || '').trim();
+  if (!erros.data_vencimento_inicio && !erros.data_vencimento_fim && inicio && fim && inicio > fim) {
+    erros.data_vencimento_fim = 'A data final deve ser igual ou posterior a data inicial.';
+  }
+  return erros;
+}
 
 export default function Solicitacoes({ arquivadas = false }) {
   const navigate = useNavigate();
@@ -98,6 +136,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   ];
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [exportando, setExportando] = useState(false);
   const [setoresMap, setSetoresMap] = useState({});
   const [setoresLista, setSetoresLista] = useState([]);
   const [tiposSolicitacao, setTiposSolicitacao] = useState([]);
@@ -161,6 +200,8 @@ export default function Solicitacoes({ arquivadas = false }) {
     const escopo = arquivadas ? 'arquivadas' : 'ativas';
     return `solicitacoes:filtros:${escopo}:${identificador}`;
   }, [user?.id, user?.email, user?.nome, user?.perfil, arquivadas]);
+  const errosFiltrosData = useMemo(() => obterErrosFiltrosData(filtros), [filtros]);
+  const filtrosDataValidos = Object.keys(errosFiltrosData).length === 0;
 
   useEffect(() => {
     setPaginaAtual(1);
@@ -171,12 +212,16 @@ export default function Solicitacoes({ arquivadas = false }) {
   }, [solicitacoes]);
 
   useEffect(() => {
+    if (!filtrosDataValidos) {
+      setLoading(false);
+      return undefined;
+    }
     const timeout = setTimeout(() => {
       carregar();
-    }, 250);
+    }, FILTER_DEBOUNCE_MS);
 
     return () => clearTimeout(timeout);
-  }, [filtros, arquivadas, paginaAtual, limitePorPagina]);
+  }, [filtros, arquivadas, paginaAtual, limitePorPagina, filtrosDataValidos]);
 
   useEffect(() => {
     try {
@@ -615,6 +660,11 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function carregar({ silent = false } = {}) {
+    if (!filtrosDataValidos) {
+      if (!silent) setLoading(false);
+      return;
+    }
+
     try {
       if (!silent) {
         setLoading(true);
@@ -672,6 +722,8 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function carregarEmSegundoPlano() {
+    if (!filtrosDataValidos) return;
+
     try {
       const paramsObj = {};
       Object.entries(filtros).forEach(([chave, valor]) => {
@@ -947,18 +999,11 @@ export default function Solicitacoes({ arquivadas = false }) {
     return n.toFixed(2).replace('.', ',');
   }
 
-  function exportarSelecionadasExcel() {
-    if (selecionadasIds.length === 0) {
-      alert('Selecione ao menos uma solicitação.');
+  function baixarSolicitacoesCsv(lista, escopo) {
+    if (!Array.isArray(lista) || lista.length === 0) {
+      alert('Nenhuma solicitação encontrada para exportar.');
       return;
     }
-
-    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
-    if (selecionadas.length === 0) {
-      alert('Nenhuma solicitação selecionada para exportar.');
-      return;
-    }
-
     const linhas = [
       [
         'Código',
@@ -974,7 +1019,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         'Data Registro',
         'Data Vencimento'
       ],
-      ...selecionadas.map(item => [
+      ...lista.map(item => [
         item.codigo || '',
         item.numero_pedido || '',
         item.obra?.nome || '',
@@ -1006,11 +1051,68 @@ export default function Solicitacoes({ arquivadas = false }) {
     const a = document.createElement('a');
     const dataRef = new Date().toISOString().slice(0, 10);
     a.href = url;
-    a.download = `solicitacoes-selecionadas-${dataRef}.csv`;
+    a.download = `solicitacoes-${escopo}-${dataRef}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
+  }
+
+  async function buscarTodasSolicitacoesFiltradas() {
+    const filtrosSnapshot = { ...filtros };
+    const registrosPorId = new Map();
+    let pagina = 1;
+    let totalPaginas = 1;
+
+    do {
+      const paramsObj = {};
+      Object.entries(filtrosSnapshot).forEach(([chave, valor]) => {
+        if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+          paramsObj[chave] = String(valor).trim();
+        }
+      });
+      if (arquivadas) paramsObj.arquivadas = '1';
+      paramsObj.page = String(pagina);
+      paramsObj.limit = String(EXPORT_PAGE_SIZE);
+
+      const params = new URLSearchParams(paramsObj).toString();
+      const res = await fetch(`${API_URL}/solicitacoes?${params}`, {
+        headers: authHeaders()
+      });
+      if (!res.ok) throw new Error('Erro ao buscar solicitações para exportação');
+
+      const data = await res.json();
+      const itens = Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []);
+      itens.forEach((item) => registrosPorId.set(Number(item.id), item));
+      totalPaginas = Math.max(1, Number(data?.meta?.total_pages || 1));
+      pagina += 1;
+    } while (pagina <= totalPaginas);
+
+    return Array.from(registrosPorId.values());
+  }
+
+  async function exportarSolicitacoesExcel() {
+    if (!filtrosDataValidos) {
+      alert('Corrija as datas dos filtros antes de exportar.');
+      return;
+    }
+
+    const selecionadas = solicitacoes.filter(item => selecionadasIds.includes(Number(item.id)));
+    if (selecionadas.length > 0) {
+      baixarSolicitacoesCsv(selecionadas, 'selecionadas');
+      return;
+    }
+
+    try {
+      setExportando(true);
+      const filtradas = await buscarTodasSolicitacoesFiltradas();
+      baixarSolicitacoesCsv(filtradas, 'filtradas');
+    } catch (error) {
+      console.error(error);
+      alert('Erro ao exportar as solicitações filtradas.');
+    } finally {
+      setExportando(false);
+    }
   }
 
   function toggleColuna(id) {
@@ -1555,6 +1657,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         mostrarFiltroResponsavel={isSetorFinanceiro}
         mostrarSomaValor={mostrarSomaValor}
         somaValorFiltrado={somaValorFiltrado}
+        errosDatas={errosFiltrosData}
       />
 
       {!arquivadas && (
@@ -1566,13 +1669,13 @@ export default function Solicitacoes({ arquivadas = false }) {
             <button
               type="button"
               className="btn btn-outline inline-flex items-center gap-2"
-              onClick={exportarSelecionadasExcel}
-              disabled={processandoMassa || selecionadasIds.length === 0}
-              title="Exportar selecionadas para Excel (.csv)"
-              aria-label="Exportar selecionadas para Excel"
+              onClick={exportarSolicitacoesExcel}
+              disabled={processandoMassa || exportando || !filtrosDataValidos}
+              title={selecionadasIds.length > 0 ? 'Exportar selecionadas para Excel (.csv)' : 'Exportar todas as solicitações filtradas (.csv)'}
+              aria-label="Exportar solicitações para Excel"
             >
               <HiDocumentArrowDown className="w-4 h-4" />
-              <span className="hidden sm:inline">Exportar</span>
+              <span className="hidden sm:inline">{exportando ? 'Exportando...' : 'Exportar'}</span>
             </button>
             <button
               ref={botaoColunasRef}
@@ -1775,12 +1878,12 @@ export default function Solicitacoes({ arquivadas = false }) {
           <button
             type="button"
             className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-            onClick={exportarSelecionadasExcel}
-            disabled={processandoMassa}
+            onClick={exportarSolicitacoesExcel}
+            disabled={processandoMassa || exportando || !filtrosDataValidos}
             title="Exportar selecionadas"
           >
             <HiDocumentArrowDown className="w-4 h-4" />
-            <span className="hidden sm:inline">Exportar</span>
+            <span className="hidden sm:inline">{exportando ? 'Exportando...' : 'Exportar'}</span>
           </button>
 
           {!arquivadas && podeSolicitarPrioridadeFinanceiro && (

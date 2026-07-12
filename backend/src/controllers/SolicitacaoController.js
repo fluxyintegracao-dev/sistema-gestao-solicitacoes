@@ -252,6 +252,49 @@ function parseSolicitacoesPageSize(value) {
     : DEFAULT_SOLICITACOES_PAGE_SIZE;
 }
 
+function isDataIsoConsultaValida(value) {
+  const texto = String(value || '').trim();
+  if (!texto) return true;
+  const match = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return false;
+
+  const ano = Number(match[1]);
+  const mes = Number(match[2]);
+  const dia = Number(match[3]);
+  if (ano < 1900 || ano > 2200) return false;
+
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  return data.getUTCFullYear() === ano
+    && data.getUTCMonth() === mes - 1
+    && data.getUTCDate() === dia;
+}
+
+function validarDatasConsultaSolicitacoes(filtros) {
+  const campos = [
+    'data_registro',
+    'data_vencimento',
+    'data_vencimento_inicio',
+    'data_vencimento_fim',
+    'data_inicio',
+    'data_fim'
+  ];
+  const campoInvalido = campos.find((campo) => !isDataIsoConsultaValida(filtros?.[campo]));
+  if (campoInvalido) return `Data invalida no filtro ${campoInvalido}.`;
+
+  const intervalos = [
+    ['data_inicio', 'data_fim'],
+    ['data_vencimento_inicio', 'data_vencimento_fim']
+  ];
+  for (const [campoInicio, campoFim] of intervalos) {
+    const inicio = String(filtros?.[campoInicio] || '').trim();
+    const fim = String(filtros?.[campoFim] || '').trim();
+    if (inicio && fim && inicio > fim) {
+      return `Periodo invalido entre ${campoInicio} e ${campoFim}.`;
+    }
+  }
+  return null;
+}
+
 async function montarResumoSolicitacoesLista(solicitacoes) {
   if (!Array.isArray(solicitacoes) || solicitacoes.length === 0) {
     return [];
@@ -1437,6 +1480,17 @@ module.exports = {
         limit,
         apenas_obras
       } = req.query;
+      const erroDatas = validarDatasConsultaSolicitacoes({
+        data_registro,
+        data_vencimento,
+        data_vencimento_inicio,
+        data_vencimento_fim,
+        data_inicio,
+        data_fim
+      });
+      if (erroDatas) {
+        return res.status(400).json({ error: erroDatas });
+      }
       const paginacaoSolicitada = true;
       const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
         String(apenas_obras || '').trim().toLowerCase()
