@@ -2362,8 +2362,7 @@ async function cancelarFluxoPedidoCompra({
         const statusAnteriorPrincipal = solicitacaoPrincipal.status_global;
         await solicitacaoPrincipal.update(
           {
-            status_global: 'CANCELADA',
-            cancelada: true
+            status_global: 'CANCELADA'
           },
           { transaction }
         );

@@ -69,6 +69,42 @@ const itemTableColumns = [
   { key: 'link', width: 280, minWidth: 140 }
 ];
 
+function combinarItensSolicitacaoCompra(solicitacao, apropriacoes = []) {
+  const itens = (solicitacao?.itens || []).map((item) => ({
+    id: item.id,
+    item_tipo: 'CADASTRADO',
+    tipo: 'CADASTRADO',
+    nome: item.insumo?.nome || '-',
+    unidade: item.unidade?.sigla || '-',
+    quantidade: item.quantidade,
+    especificacao: item.especificacao || '-',
+    apropriacao_id: item.apropriacao_id || '',
+    apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
+    apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+    apropriacao_linhas: item.apropriacao_linhas || [],
+    necessario_para: item.necessario_para,
+    link_produto: item.link_produto || ''
+  }));
+
+  const manuais = (solicitacao?.itensManuais || []).map((item) => ({
+    id: item.id,
+    item_tipo: 'MANUAL',
+    tipo: 'MANUAL',
+    nome: item.nome_manual || '-',
+    unidade: item.unidade_sigla_manual || '-',
+    quantidade: item.quantidade,
+    especificacao: item.especificacao || '-',
+    apropriacao_id: item.apropriacao_id || '',
+    apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
+    apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+    apropriacao_linhas: item.apropriacao_linhas || [],
+    necessario_para: item.necessario_para,
+    link_produto: item.link_produto || ''
+  }));
+
+  return [...itens, ...manuais];
+}
+
 export default function SolicitacaoCompraDetalheView() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -131,39 +167,7 @@ export default function SolicitacaoCompraDetalheView() {
   }, [obraIdSolicitacao]);
 
   const itensCombinados = useMemo(() => {
-    const itens = (solicitacao?.itens || []).map((item) => ({
-      id: item.id,
-      item_tipo: 'CADASTRADO',
-      tipo: 'CADASTRADO',
-      nome: item.insumo?.nome || '-',
-      unidade: item.unidade?.sigla || '-',
-      quantidade: item.quantidade,
-      especificacao: item.especificacao || '-',
-      apropriacao_id: item.apropriacao_id || '',
-      apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
-      apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
-      apropriacao_linhas: item.apropriacao_linhas || [],
-      necessario_para: item.necessario_para,
-      link_produto: item.link_produto || ''
-    }));
-
-    const manuais = (solicitacao?.itensManuais || []).map((item) => ({
-      id: item.id,
-      item_tipo: 'MANUAL',
-      tipo: 'MANUAL',
-      nome: item.nome_manual || '-',
-      unidade: item.unidade_sigla_manual || '-',
-      quantidade: item.quantidade,
-      especificacao: item.especificacao || '-',
-      apropriacao_id: item.apropriacao_id || '',
-      apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
-      apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
-      apropriacao_linhas: item.apropriacao_linhas || [],
-      necessario_para: item.necessario_para,
-      link_produto: item.link_produto || ''
-    }));
-
-    return [...itens, ...manuais];
+    return combinarItensSolicitacaoCompra(solicitacao, apropriacoes);
   }, [apropriacoes, solicitacao]);
 
   const resumoCotacao = useMemo(() => {
@@ -241,7 +245,11 @@ export default function SolicitacaoCompraDetalheView() {
         motivo: motivoNormalizado
       });
       setSolicitacao(data || null);
-      alert('Quantidade solicitada atualizada com auditoria.');
+      const itemAtualizado = combinarItensSolicitacaoCompra(data, apropriacoes).find(
+        (itemAtual) => itemAtual.item_tipo === item.item_tipo && Number(itemAtual.id) === Number(item.id)
+      );
+      abrirModalApropriacao(itemAtualizado || { ...item, quantidade });
+      alert('Quantidade atualizada. Revise obrigatoriamente a apropriacao deste item antes de continuar.');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao atualizar quantidade solicitada');
@@ -612,7 +620,7 @@ export default function SolicitacaoCompraDetalheView() {
 
       {modalApropriacaoItem && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
-          <div className="max-h-[88vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
+          <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes do item</h2>

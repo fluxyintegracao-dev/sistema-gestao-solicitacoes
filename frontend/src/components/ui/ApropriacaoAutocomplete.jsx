@@ -31,6 +31,7 @@ export default function ApropriacaoAutocomplete({
     () => options.find((item) => String(item.id) === String(value || '')),
     [options, value],
   );
+  const selectedLabel = selectedOption ? optionLabel(selectedOption) : '';
 
   useEffect(() => {
     if (!open) {
@@ -41,11 +42,12 @@ export default function ApropriacaoAutocomplete({
   const filteredOptions = useMemo(() => {
     const q = normalize(query.trim());
     if (!q) return options;
+    if (selectedLabel && q === normalize(selectedLabel)) return options;
     return options.filter((item) => {
       const searchable = [item.codigo, item.descricao, item.nome].filter(Boolean).join(' ');
       return normalize(searchable).includes(q);
     });
-  }, [options, query]);
+  }, [options, query, selectedLabel]);
 
   useEffect(() => {
     setActiveIndex(0);

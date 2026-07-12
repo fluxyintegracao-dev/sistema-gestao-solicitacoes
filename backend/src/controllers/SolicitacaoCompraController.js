@@ -2436,8 +2436,7 @@ module.exports = {
 
         const statusAnteriorPrincipal = solicitacaoPrincipal.status_global;
         await solicitacaoPrincipal.update({
-          status_global: 'CANCELADA',
-          cancelada: true
+          status_global: 'CANCELADA'
         }, { transaction });
 
         await Historico.create({
