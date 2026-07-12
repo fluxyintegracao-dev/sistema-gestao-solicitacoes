@@ -117,8 +117,8 @@ Este e o documento correto para ela seguir porque contem:
 Documentos complementares, se a extensao permitir mais de um arquivo:
 
 ```text
-docs/GUIA_TREINAMENTO_OPERACIONAL_FLUXY.md
-docs/CHECKLIST_IMPLANTACAO_CLIENTE_FLUXY.md
+docs/modulos/treinamento/README.md
+docs/README.md
 docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md
 ```
 
@@ -461,9 +461,10 @@ Testes:
 - exames;
 - EPI;
 - treinamentos;
-- acidentes;
-- documentos;
-- eventos eSocial preparados sem transmissao oficial.
+- PCMSO e PGR com anexos;
+- exames e ASO com controle de validade;
+- EPI e treinamentos ocupacionais;
+- LTCAT com avaliacoes quantitativas e anexos.
 
 Evidencias:
 

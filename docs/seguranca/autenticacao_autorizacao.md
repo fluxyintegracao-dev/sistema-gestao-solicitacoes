@@ -22,10 +22,10 @@ Autorizacao:
    - Chave `USUARIOS_ACESSO_FINANCEIRO` em `ConfiguracaoSistema`.
    - Libera o modulo FINANCEIRO para usuarios fora do perfil FINANCEIRO.
 
-4. Capacidades granulares RH/DP e SIENGE
+4. Capacidades granulares RH/DP
    - Chave `USUARIOS_PERMISSOES_RH_DP` em `ConfiguracaoSistema`.
-   - Controla acesso por area dentro dos modulos RH_DP e INTEGRACAO_SIENGE.
-   - Exemplo de chave: `rh_dp_colaboradores_view`, `integracao_sienge_retry`.
+   - Controla acesso por area dentro do modulo RH_DP para compatibilidade com configuracoes existentes.
+   - Exemplo de chave: `rh_dp_colaboradores_view`.
 
 5. Permissoes de areas por usuario (modular, todos os demais modulos)
    - Chave `PERMISSOES_AREAS_USUARIOS` em `ConfiguracaoSistema`.
@@ -45,7 +45,6 @@ Campos relevantes enviados ao frontend apos autenticacao:
 - `modulos_habilitados` - modulos ativos da instalacao
 - `financeiro_liberado` - acesso ao modulo financeiro
 - `rh_dp_capacidades` - lista de chaves de capacidade RH/DP
-- `integracao_sienge_capacidades` - lista de chaves de capacidade SIENGE
 - `areas_permissoes` - lista de chaves de permissao de area (vazia = acesso completo)
 
 Observacao:

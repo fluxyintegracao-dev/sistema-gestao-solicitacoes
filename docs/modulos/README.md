@@ -1,10 +1,13 @@
 # Modulos
 
-Leitura funcional por area do sistema.
+Cada subdiretorio possui a documentacao canonica do estado atual do modulo. Arquivos soltos com nomes de fase, sprint, plano, diagnostico ou relatorio sao historicos e nao substituem o `README.md` canonico.
 
-- `solicitacoes.md`
-- `compras.md`
-- `comunicacao-interna.md`
-- `financeiro-comprovantes.md`
-- `arquivos-modelos.md`
-- `provisionamento-financeiro.md`
+Antes de alterar um modulo:
+
+1. leia seu `README.md`;
+2. consulte `../arquitetura/MAPA_MODULOS.md`;
+3. consulte `../arquitetura/PROPRIEDADE_DADOS.md`;
+4. confira regras detalhadas ainda referenciadas em `../regras_negocio/`;
+5. valide todos os consumidores e efeitos indicados.
+
+Modulos canonicos: Solicitacoes, Obras, Contratos, Compras, Cotacoes e Pedidos, Financeiro, Provisionamento, Comercial, CRM, RH/DP, SST, Fiscal, Boletos, Comunicacao Interna, Biblioteca de Modelos, Treinamento e Governanca. Configuracoes e Painel sao documentados como dominios transversais.

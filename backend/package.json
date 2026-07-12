@@ -10,7 +10,8 @@
     "test:boleto-caixa-retorno": "node scripts/validarBoletoCaixaRetornoCnab240.js",
     "test:fiscal-dfe-processor": "node scripts/validarFiscalDfeProcessor.js",
     "test:payments": "node scripts/validarPagamentosEngine.js",
-    "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js"
+    "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
+    "test:docs": "node scripts/validarDocumentacao.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

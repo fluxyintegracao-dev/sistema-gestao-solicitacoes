@@ -16,7 +16,7 @@ Entram na primeira versao:
 - perfil, senha, MFA, Politica de Privacidade e Termos de Uso
 
 Ficam fora da primeira versao:
-- financeiro completo, baixas, boletos, CNAB e SIENGE
+- financeiro completo, baixas, boletos e CNAB
 - compras, cotacoes/RFQ e pedidos
 - comercial/CRM
 - fiscal, SST, RH/DP

@@ -227,7 +227,7 @@ Componentes:
 - RH
 - DP
 - SST
-- eSocial
+- SST documental simplificado
 - Colaboradores
 - Documentos
 - Apuracoes

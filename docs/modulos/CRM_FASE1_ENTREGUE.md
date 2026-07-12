@@ -158,7 +158,7 @@ CRM adicionado em `src/services/moduleConfigService.js` — habilitável via Con
 
 ## Próxima fase
 
-Ver `PLANO_MODULO_CRM.md` — **Fase 2: Operação expandida**
+O estado atual consolidado esta em `docs/modulos/crm/README.md`.
 
 Escopo Fase 2:
 - `crm_interactions` — timeline completa do lead

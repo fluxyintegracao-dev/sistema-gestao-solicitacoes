@@ -249,7 +249,7 @@ Sempre atualizar documentacao quando houver:
 Arquivos sugeridos:
 - `AGENTS.md`
 - `docs/COLABORACAO_CODEX.md`
-- `docs/RELATORIO_FUNCIONALIDADES_REGRAS_E_VALOR.md`
+- `docs/README.md`
 
 ---
 

@@ -20,7 +20,7 @@ Frontend:
 ## Observacoes operacionais
 - `backend/uploads/` contem artefatos antigos preservados e nao deve ser limpo automaticamente.
 - O repositorio nao usa mais `python-service`; o runtime ativo e apenas Node + React.
-- O backend ainda executa `sequelize.sync({ alter: true })`, entao qualquer mudanca de model precisa ser tratada com muito cuidado.
+- O backend executa migrations pendentes por `runMigrations()` e nao depende de `sequelize.sync({ alter: true })` no runtime normal. Qualquer mudanca de model precisa de migration controlada.
 
 ## Monitoramento basico
 - PM2: `pm2 logs backend-solicitacoes --lines 30`

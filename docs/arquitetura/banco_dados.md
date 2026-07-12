@@ -2,7 +2,7 @@
 
 ## Modelo Geral
 
-- uma base por cliente
+- uma base institucional para o ambiente, com suporte a multiempresa
 - MySQL como banco principal
 - migrations registradas em `schema_migrations`
 - ajustes legados idempotentes ainda executados no bootstrap do backend

@@ -1,69 +1,27 @@
-# Repo Contexto - FLUXY Core
+# Contexto do Repositorio FLUXY
 
-## Papel deste repositorio
+## Papel
 
-Este repositorio e o produto principal do FLUXY que sera implantado para os clientes.
+Este repositorio contem o sistema institucional e a fonte oficial de suas regras operacionais.
 
-Ele contem:
+## Responsabilidades
 
-- backend operacional do cliente
-- frontend operacional do cliente
-- modulos do produto
-- regras de negocio
-- documentacao funcional e tecnica
+- frontend web;
+- backend e banco;
+- aplicativo mobile;
+- solicitacoes, obras, contratos, compras e financeiro;
+- comercial operacional, CRM, RH/DP, SST e fiscal;
+- seguranca, permissoes, auditoria e governanca.
 
-## Modelo de produto
+## Arquivos de alto risco
 
-- single-tenant por instalacao
-- uma base de dados por cliente
-- frontend por cliente
-- backend por cliente
+- `backend/src/routes.js`;
+- `backend/src/services/authorizationService.js`;
+- `backend/src/services/moduleConfigService.js`;
+- `backend/src/constants/moduloPermissoes.js`;
+- models e migrations financeiras;
+- `frontend/src/App.jsx`;
+- `frontend/src/layout/Layout.jsx`;
+- `frontend/src/utils/acessoProduto.js`.
 
-## Responsabilidades principais
-
-- solicitacoes
-- compras
-- cotacoes
-- pedidos de compra
-- parceiros
-- financeiro
-- conciliacao OFX
-- gestao de obras
-- modulos habilitados por instalacao
-
-## Integracao com outros repositorios
-
-### `fluxy-ops`
-
-Papel:
-
-- painel interno do provedor
-- control plane
-- monitoramento de empresas
-- planos
-- modulos
-- storage
-- concorrencia
-
-Contrato atual:
-
-- `fluxy-core` envia telemetria para `fluxy-ops`
-- integracao via push
-- falha do `fluxy-ops` nao pode quebrar o `fluxy-core`
-
-## Arquivos de alto risco neste repositorio
-
-- `backend/server.js`
-- `backend/src/app.js`
-- `backend/src/routes.js`
-- `frontend/src/layout/Layout.jsx`
-- `frontend/src/contexts/AuthContext.jsx`
-- `backend/src/controllers/SolicitacaoController.js`
-
-## Regra local
-
-Se a tarefa envolver `fluxy-core` e `fluxy-ops`, registrar sempre:
-
-- ownership local
-- contrato de integracao alterado
-- handoff ao final
+Qualquer integracao com outro repositorio deve usar contratos explicitos e nao pode acessar diretamente o banco do FLUXY.

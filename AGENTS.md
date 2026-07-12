@@ -9,7 +9,7 @@ Guia rapido para colaboradores e agentes automatizados.
 - Evitar mudancas destrutivas.
 - Sempre explicar as alteracoes.
 - Mudancas de frontend devem priorizar estabilidade operacional: antes de alterar telas, botoes, menus, filtros, tabelas ou fluxos, mapear quais acoes, permissoes, endpoints e regras de negocio dependem daquele trecho.
-- O padrao visual do Fluxy deve ser de sistema operacional/SaaS: compacto, escaneavel, utilitario e consistente. Evitar excesso de cards, botoes grandes sem necessidade, decoracao visual sem funcao e alteracoes esteticas que reduzam densidade util ou clareza.
+- O padrao visual do Fluxy deve ser de sistema corporativo operacional: compacto, escaneavel, utilitario e consistente. Evitar excesso de cards, botoes grandes sem necessidade, decoracao visual sem funcao e alteracoes esteticas que reduzam densidade util ou clareza.
 - Nao aplicar automaticamente padroes visuais genericos de landing page, hero, grids de cards ou botoes primarios em excesso nas telas internas do sistema.
 - Em ajustes de UI, preservar a logica existente dos botoes e fluxos. Se uma mudanca visual puder afetar clique, navegacao, permissao, envio de formulario, status, anexos, financeiro, compras ou solicitacoes, validar o comportamento antes de considerar concluido.
 - Preferir evoluir o frontend com componentes e padroes reutilizaveis, como filtros, tabelas, botoes de acao, toolbars e shells de pagina, em vez de correcoes isoladas que aumentem risco de efeito cascata.

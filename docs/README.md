@@ -1,94 +1,63 @@
-# Documentacao - FLUXY
+# Documentacao Canonica do FLUXY
 
-Este diretorio organiza o conhecimento funcional, tecnico e operacional do produto para continuidade segura por pessoas e por IA.
+Esta pasta descreve o sistema institucional em operacao. A documentacao deve refletir o codigo atual e deixar explicitas as dependencias que podem causar efeitos entre modulos.
 
-O FLUXY entrou oficialmente na fase de consolidacao operacional e institucionalizacao. A prioridade atual e tratar o sistema como infraestrutura operacional institucional da empresa, com foco em estabilidade, governanca, seguranca, testes, documentacao, deploy seguro e reducao de dependencia do fundador tecnico.
+## Ordem de autoridade
 
-## Objetivo
+Em caso de divergencia, use esta ordem:
 
-Manter documentado:
+1. regras obrigatorias de `AGENTS.md`;
+2. codigo, migrations e configuracoes do runtime atual;
+3. documentos de arquitetura e regras transversais;
+4. `README.md` canonico do modulo;
+5. ADRs ainda vigentes;
+6. logs, handoffs, planos e relatorios historicos.
 
-- o contexto de produto
-- a arquitetura atual
-- as regras de negocio
-- os modulos ativos
-- a seguranca aplicada
-- o historico de decisoes e mudancas
+Planos, fases, sprints e relatorios de entrega registram contexto historico. Eles nao definem sozinhos o comportamento atual.
 
-## Ordem Recomendada de Leitura
+## Leitura obrigatoria antes de alterar codigo
 
-1. `docs/contexto/visao_geral.md`
-2. `docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md`
-3. `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
-4. `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
-5. `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
-6. `docs/contexto/escopo_produto.md`
-7. `docs/arquitetura/visao_geral.md`
-8. `docs/arquitetura/stack_e_componentes.md`
-9. `docs/arquitetura/deploy_ambientes.md`
-10. `docs/arquitetura/fluxos_principais.md`
-11. `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
-12. `docs/modulos/solicitacoes.md`
-13. `docs/modulos/compras.md`
-14. `docs/modulos/financeiro.md`
-15. `docs/modulos/comercial.md`
-16. `docs/modulos/provisionamento_financeiro.md`
-17. `docs/modulos/rh_dp.md`
-18. `docs/modulos/integracao_sienge.md`
-19. `docs/modulos/obras.md`
-20. `docs/seguranca/visao_geral.md`
+- `arquitetura/visao_geral.md`: topologia e principios;
+- `arquitetura/MAPA_MODULOS.md`: dependencias entre dominios;
+- `arquitetura/PROPRIEDADE_DADOS.md`: dono de cada dado compartilhado;
+- `arquitetura/FLUXOS_ENTRE_MODULOS.md`: efeitos de uma operacao em outros modulos;
+- `arquitetura/IDEMPOTENCIA_TRANSACOES.md`: protecoes de operacoes criticas;
+- `seguranca/autenticacao_autorizacao.md`: precedencia de permissoes;
+- documento canonico do modulo afetado.
 
-## Estrutura
+## Modulos documentados
 
-- `docs/contexto`
-  Resume posicionamento, escopo, origem do produto e publico-alvo.
+- `modulos/solicitacoes/README.md`
+- `modulos/comunicacao-interna/README.md`
+- `modulos/biblioteca-modelos/README.md`
+- `modulos/treinamento/README.md`
+- `modulos/compras/README.md`
+- `modulos/cotacoes-pedidos/README.md`
+- `modulos/financeiro/README.md`
+- `modulos/boletos/README.md`
+- `modulos/fiscal/README.md`
+- `modulos/obras/README.md`
+- `modulos/provisionamento/README.md`
+- `modulos/contratos/README.md`
+- `modulos/comercial/README.md`
+- `modulos/crm/README.md`
+- `modulos/rh-dp/README.md`
+- `modulos/sst/README.md`
+- `modulos/governanca/README.md`
 
-- `docs/arquitetura`
-  Explica stack, deploy, banco, fluxos macro e responsabilidades de cada camada.
+## Dominios transversais
 
-- `docs/regras_negocio`
-  Documenta regras operacionais que nao devem ficar apenas implcitas no codigo.
+Parceiros, usuarios, setores, empresas, anexos, notificacoes, auditoria, configuracoes e permissoes sao compartilhados. A propriedade e as regras de consumo estao registradas nos documentos de arquitetura.
 
-- `docs/modulos`
-  Descreve o comportamento de cada modulo na pratica.
+## Manutencao
 
-- `docs/seguranca`
-  Registra autenticacao, autorizacao, auditoria, anexos e protecoes da API.
+Toda mudanca relevante deve atualizar, no mesmo fluxo:
 
-- `docs/logs_desenvolvimento`
-  Guarda changelog e decisoes que impactam continuidade do produto.
+- regras do modulo;
+- dependencias de entrada e saida;
+- endpoints, services, models e migrations afetados;
+- permissoes e configuracoes;
+- testes e validacoes;
+- changelog quando houver mudanca operacional percebida pelo usuario.
 
-- `docs/prompts_padrao`
-  Base para trabalho assistido por IA em feature, bugfix e refactor.
-
-## Documentos Operacionais Importantes
-
-- `docs/ROADMAP_ESTRATEGICO_LONGO_PRAZO.md`
-- `docs/arquitetura/deploy_ambientes.md`
-- `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`
-- `docs/RELATORIO_OBSIDIAN_REPOSICIONAMENTO_FLUXY.md`
-- `docs/PLANO_IMPLANTACAO_INSTITUCIONAL_5_DIAS_FLUXY.md`
-- `docs/RELATORIO_OBSIDIAN_IMPLANTACAO_5_DIAS_FLUXY.md`
-- `docs/PLANO_TESTES_SMOKE_E_CENTRAL_TREINAMENTO_FLUXY.md`
-- `docs/RELATORIO_OBSIDIAN_TESTES_TREINAMENTO_FLUXY.md`
-- `docs/arquitetura/promocao_dev_v2_para_main.md`
-- `docs/ROTEIRO_APRESENTACAO_TREINAMENTO_FLUXY.md`
-- `docs/CHECKLIST_IMPLANTACAO_CLIENTE_FLUXY.md`
-- `docs/MANUAL_FLUXO_OPERACIONAL_FINANCEIRO.md`
-- `docs/CHECKLIST_ATIVACAO_MODULO_COMPRAS.md`
-- `docs/PLANO_INTEGRACAO_MODULO_COMPRAS.md`
-- `docs/RELATORIO_FUNCIONALIDADES_REGRAS_E_VALOR.md`
-- `docs/arquitetura/modularidade_solicitacoes_contratos_apropriacoes.md`
-- `docs/modulos/comercial.md`
-- `docs/modulos/provisionamento_financeiro.md`
-- `docs/modulos/integracao_sienge.md`
-- `docs/PLANO_MODULO_COMERCIAL_CONSTRUCAO_CIVIL.md`
-- `docs/PLANO_MODULO_RH_DP_E_INTEGRACAO_SIENGE.md`
-
-## Regras de Manutencao
-
-- Mudanca de regra de negocio deve atualizar `docs/regras_negocio`.
-- Mudanca estrutural deve atualizar `docs/arquitetura`.
-- Mudanca funcional relevante deve atualizar `docs/modulos`.
-- Toda entrega importante deve registrar resumo em `docs/logs_desenvolvimento/changelog.md`.
-- Documentacao deve permanecer em ASCII para reduzir risco de problema de encoding no projeto.
+Nao criar um novo documento de fase para representar o estado atual. Atualize o documento canonico e use o changelog para registrar a entrega.
