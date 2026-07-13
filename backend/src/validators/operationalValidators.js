@@ -522,15 +522,14 @@ function validateCompraEnviarBody(body = {}) {
     };
   });
 
-  let itens = null;
+  let itens;
   if (body.itens !== undefined) {
     itens = normalizarItensCotacao(body.itens, 'cotacao');
   }
 
-  return {
-    fornecedores,
-    itens
-  };
+  return itens === undefined
+    ? { fornecedores }
+    : { fornecedores, itens };
 }
 
 function validateCompraCotacaoCancelBody(body = {}) {
