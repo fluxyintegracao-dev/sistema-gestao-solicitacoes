@@ -1734,6 +1734,18 @@ router.put('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowC
 router.delete('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowComprasFornecedoresManage, FornecedorCompraController.destroy);
 router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
 router.get('/compras/formas-pagamento-ativas', allowCompraSolicitacoesCreate, SolicitacaoCompraController.formasPagamentoAtivas);
+router.post(
+  '/compras/solicitacoes-diretas/credores',
+  allowCompraSolicitacoesCreate,
+  criticalRateLimit,
+  validateRequest({ body: validateSolicitacaoCredorCreateBody }),
+  auditSuccess({
+    eventType: 'COMPRA_DIRETA_CREDOR_CREATED',
+    resourceType: 'PARCEIRO',
+    description: 'Credor criado durante abertura de compra direta'
+  }),
+  ParceiroController.createCredorCompraDireta
+);
 router.get('/compras/solicitacoes-diretas/modelo-itens-xlsx', allowCompraSolicitacoesCreate, SolicitacaoCompraController.modeloCompraDiretaXlsx);
 router.post('/compras/solicitacoes-diretas/importar-itens-xlsx', allowCompraSolicitacoesCreate, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.importarCompraDiretaXlsx);
 router.get('/compras/solicitacoes-diretas/por-solicitacao/:solicitacaoId', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('solicitacaoId', 'Solicitacao principal') }), SolicitacaoCompraController.showCompraDiretaPorSolicitacao);

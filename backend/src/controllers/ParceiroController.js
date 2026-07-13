@@ -393,6 +393,23 @@ module.exports = {
     }
   },
 
+  async createCredorCompraDireta(req, res) {
+    try {
+      const parceiro = await criarParceiro({
+        ...req.body,
+        fornecedor: true,
+        cliente: false,
+        corretor: false,
+        testemunha: false,
+        ativo: true
+      });
+
+      return res.status(201).json(parceiro);
+    } catch (error) {
+      return responderErroController(res, error, 'Erro ao cadastrar credor da compra direta', { status: 400 });
+    }
+  },
+
   async update(req, res) {
     try {
       const parceiro = await atualizarParceiro(req.params.id, req.body || {});

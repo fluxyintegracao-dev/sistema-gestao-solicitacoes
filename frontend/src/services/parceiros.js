@@ -91,6 +91,16 @@ export async function criarCredorNovaSolicitacao(data) {
   return parseJson(response, 'Erro ao cadastrar credor');
 }
 
+export async function criarCredorCompraDireta(data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/credores`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao cadastrar credor da compra direta');
+}
+
 export async function atualizarParceiro(id, data) {
   const response = await fetch(`${API_URL}/parceiros/${id}`, {
     method: 'PATCH',

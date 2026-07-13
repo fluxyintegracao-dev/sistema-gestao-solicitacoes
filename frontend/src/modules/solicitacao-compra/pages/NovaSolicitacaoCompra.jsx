@@ -9,7 +9,7 @@ import {
   obterUrlAssinadaCompra,
   uploadAnexoTemporarioCompra
 } from '../../../services/compras';
-import { buscarParceiros, criarCredorNovaSolicitacao } from '../../../services/parceiros';
+import { buscarParceiros, criarCredorCompraDireta } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
@@ -542,19 +542,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       return;
     }
 
-    if (!tipoSolicitacaoIdContexto || !areaResponsavelContexto) {
-      alert('Retorne a Nova Solicitacao e informe Area Responsavel e Tipo da Solicitacao antes de cadastrar o credor.');
-      return;
-    }
-
     setSalvandoCredor(true);
     try {
-      const parceiro = await criarCredorNovaSolicitacao({
+      const parceiro = await criarCredorCompraDireta({
         ...novoCredor,
         cpf_cnpj: novoCredor.cpf_cnpj.replace(/\D/g, ''),
-        telefone: novoCredor.telefone.replace(/\D/g, ''),
-        tipo_solicitacao_id: tipoSolicitacaoIdContexto,
-        area_responsavel: areaResponsavelContexto
+        telefone: novoCredor.telefone.replace(/\D/g, '')
       });
       selecionarCredorCompraDireta(parceiro);
       setNovoCredor(criarNovoCredorPadrao());
