@@ -43,6 +43,9 @@ const {
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
+const {
+  buildIntercompanyCartaoPayload
+} = require('./tituloIntercompanyCartaoHelper');
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -1544,6 +1547,54 @@ async function validarIntercompanyTitulo(payload = {}) {
   };
 }
 
+async function resolverIntercompanyPagamento({
+  formaPagamento,
+  pagamentoPayload = {},
+  empresaTituloId,
+  tipoTitulo,
+  intercompanyFieldsPadrao
+}) {
+  if (!isFormaCartao(formaPagamento) || !pagamentoPayload.cartao_id) {
+    return intercompanyFieldsPadrao;
+  }
+
+  const cartao = await CartaoFinanceiro.findByPk(pagamentoPayload.cartao_id, {
+    include: [{
+      model: ContaBancaria,
+      as: 'contaBancaria',
+      attributes: ['id', 'nome', 'empresa_id', 'ativo']
+    }]
+  });
+
+  if (!cartao || cartao.ativo === false) {
+    throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+  }
+
+  const conta = cartao.contaBancaria;
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(400, 'O cartao precisa ter uma conta financeira ativa vinculada.');
+  }
+
+  const empresaCartaoId = Number(conta.empresa_id);
+  if (!Number.isInteger(empresaCartaoId) || empresaCartaoId <= 0) {
+    throw createHttpError(
+      400,
+      'A conta vinculada ao cartao precisa ter uma empresa do grupo configurada.'
+    );
+  }
+
+  const intercompanyCartao = buildIntercompanyCartaoPayload({
+    empresaTituloId,
+    empresaCartaoId,
+    tipoTitulo,
+    cartaoNome: cartao.nome
+  });
+
+  return intercompanyCartao.intercompany
+    ? validarIntercompanyTitulo(intercompanyCartao)
+    : intercompanyCartao;
+}
+
 function buildMovimentoIntercompanyFields(titulo = {}) {
   return {
     intercompany_group_id: titulo.intercompany_group_id || null,
@@ -2232,7 +2283,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
   validarCategoriaDreTitulo(categoriaPadrao, payload);
-  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  const intercompanyFieldsPadrao = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -2251,6 +2302,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       : categoriaPadrao;
     validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const intercompanyFields = await resolverIntercompanyPagamento({
+      formaPagamento,
+      pagamentoPayload,
+      empresaTituloId,
+      tipoTitulo: tipo,
+      intercompanyFieldsPadrao
+    });
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
       1
@@ -2283,6 +2341,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
       parceiro: parceiroPagamento,
       categoria: categoriaPagamento,
       formaPagamento,
+      intercompanyFields,
       payload: pagamentoPayload,
       quantidadeParcelas,
       valoresParcelas,
@@ -2346,7 +2405,7 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           obra_id: solicitacao.obra_id,
           apropriacao_id: solicitacao.apropriacao_id || null,
           empresa_id: empresaTituloId,
-          ...intercompanyFields,
+          ...pagamento.intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
           categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
@@ -2541,7 +2600,7 @@ async function criarTituloManual(req, payload = {}) {
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
   validarCategoriaDreTitulo(categoriaPadrao, payload);
-  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  const intercompanyFieldsPadrao = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -2562,6 +2621,13 @@ async function criarTituloManual(req, payload = {}) {
       : categoriaPadrao;
     validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const intercompanyFields = await resolverIntercompanyPagamento({
+      formaPagamento,
+      pagamentoPayload,
+      empresaTituloId,
+      tipoTitulo: tipo,
+      intercompanyFieldsPadrao
+    });
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
       1
@@ -2594,6 +2660,7 @@ async function criarTituloManual(req, payload = {}) {
       parceiro: parceiroPagamento,
       categoria: categoriaPagamento,
       formaPagamento,
+      intercompanyFields,
       payload: pagamentoPayload,
       quantidadeParcelas,
       valoresParcelas,
@@ -2650,7 +2717,7 @@ async function criarTituloManual(req, payload = {}) {
           obra_id: obra.id,
           apropriacao_id: apropriacao?.id || null,
           empresa_id: empresaTituloId,
-          ...intercompanyFields,
+          ...pagamento.intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
           categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,

@@ -1229,7 +1229,9 @@ export default function FinanceiroCard({
         impostos: impostosPayload,
         considera_dre: isCategoriaClassificadaParaDre(selectedCategory),
         intercompany: Boolean(form.intercompany),
-        empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
+        empresa_contraparte_id: form.intercompany
+          ? Number(form.tipo === 'PAGAR' ? form.empresa_origem_id : form.empresa_destino_id) || undefined
+          : undefined,
         empresa_origem_id: form.intercompany && form.empresa_origem_id ? Number(form.empresa_origem_id) : undefined,
         empresa_destino_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
         tipo_intercompany: form.intercompany ? form.tipo_intercompany || undefined : undefined,
@@ -2002,6 +2004,9 @@ export default function FinanceiroCard({
                   />
                   Movimentacao entre empresas do grupo
                 </label>
+                <div className="text-xs text-[var(--c-muted)]">
+                  Use esta configuracao manual para pagamentos sem cartao. Em pagamentos com cartao, o sistema usa automaticamente a empresa da conta vinculada ao cartao em cada titulo.
+                </div>
                 {form.intercompany && (
                   <div className="grid gap-3 md:grid-cols-2">
                     <select
@@ -2088,6 +2093,14 @@ export default function FinanceiroCard({
                   const usaDetalhe = formaUsaParcelasDetalhadas(forma);
                   const usaCartao = isFormaCartao(forma);
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
+                  const cartaoSelecionado = cartoesFiltrados.find((item) => String(item.id) === String(pagamento.cartao_id));
+                  const empresaContaCartao = cartaoSelecionado?.contaBancaria?.empresa;
+                  const empresaTitulo = empresasGrupo.find((item) => String(item.id) === String(form.empresa_id));
+                  const cartaoEntreEmpresas = Boolean(
+                    empresaContaCartao?.id
+                    && empresaTitulo?.id
+                    && String(empresaContaCartao.id) !== String(empresaTitulo.id)
+                  );
 
                   return (
                     <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
@@ -2220,24 +2233,37 @@ export default function FinanceiroCard({
                       </div>
 
                       {forma?.exige_cartao && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-slate-500">Cartao previsto</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.cartao_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
-                          >
-                            <option value="">Informar na baixa</option>
-                            {cartoesFiltrados.map((cartao) => (
-                              <option key={cartao.id} value={cartao.id}>
-                                {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)})
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-slate-500">
-                            Opcional; a fatura sera vinculada na baixa do titulo.
-                          </span>
-                        </label>
+                        <div className="space-y-2">
+                          <label className="text-sm">
+                            <span className="mb-1 block text-slate-500">Cartao utilizado</span>
+                            <select
+                              className="input w-full"
+                              value={pagamento.cartao_id || ''}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                            >
+                              <option value="">Selecione o cartao</option>
+                              {cartoesFiltrados.map((cartao) => {
+                                const empresaCartao = cartao?.contaBancaria?.empresa?.nome;
+                                return (
+                                  <option key={cartao.id} value={cartao.id}>
+                                    {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)}){empresaCartao ? ` - ${empresaCartao}` : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <span className="mt-1 block text-xs text-slate-500">
+                              A conta vinculada ao cartao define a empresa que realizou o pagamento.
+                            </span>
+                          </label>
+
+                          {cartaoSelecionado && (
+                            <div className={`rounded-lg border px-3 py-2 text-xs ${cartaoEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                              {cartaoEntreEmpresas
+                                ? `Entre empresas automatico: ${empresaContaCartao?.nome || 'empresa do cartao'} paga titulo de ${empresaTitulo?.nome || 'empresa da obra'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                : `Pagamento na mesma empresa do titulo: ${empresaTitulo?.nome || empresaContaCartao?.nome || 'empresa da obra'}.`}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {usaDetalhe && (

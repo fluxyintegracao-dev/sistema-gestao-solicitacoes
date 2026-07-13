@@ -1769,7 +1769,7 @@ export default function FinanceiroTituloNovo() {
                   />
                 </div>
                 <span className="app-note mt-2">
-                  Informe origem, destino e tipo da movimentacao entre empresas do grupo.
+                  Use esta configuracao nas formas sem cartao. Para cartoes, a conta vinculada define automaticamente as empresas envolvidas.
                 </span>
               </div>
 
@@ -1792,6 +1792,16 @@ export default function FinanceiroTituloNovo() {
                   const usaDetalhe = formaUsaParcelasDetalhadas(forma);
                   const usaCartao = isFormaCartao(forma);
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
+                  const cartaoSelecionado = cartoesFiltrados.find((item) => String(item.id) === String(pagamento.cartao_id));
+                  const empresaContaCartao = cartaoSelecionado?.contaBancaria?.empresa;
+                  const empresaTitulo = empresasGrupo.find((item) => String(item.id) === String(form.empresa_id));
+                  const nomeEmpresaCartao = empresaContaCartao?.nome || empresaContaCartao?.razao_social;
+                  const nomeEmpresaTitulo = empresaTitulo?.nome || empresaTitulo?.razao_social;
+                  const cartaoEntreEmpresas = Boolean(
+                    empresaContaCartao?.id
+                    && empresaTitulo?.id
+                    && String(empresaContaCartao.id) !== String(empresaTitulo.id)
+                  );
 
                   return (
                     <div key={pagamento.id || pagamentoIndex} className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
@@ -1956,24 +1966,40 @@ export default function FinanceiroTituloNovo() {
                       </div>
 
                       {forma?.exige_cartao && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-[var(--c-muted)]">Cartao previsto</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.cartao_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
-                          >
-                            <option value="">Informar na baixa</option>
-                            {cartoesFiltrados.map((cartao) => (
-                              <option key={cartao.id} value={cartao.id}>
-                                {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)})
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                            Opcional; a fatura sera vinculada na baixa do titulo.
-                          </span>
-                        </label>
+                        <div className="space-y-2">
+                          <label className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Cartao</span>
+                            <select
+                              className="input w-full"
+                              value={pagamento.cartao_id || ''}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                            >
+                              <option value="">Selecione o cartao</option>
+                              {cartoesFiltrados.map((cartao) => {
+                                const empresaCartao = cartao?.contaBancaria?.empresa;
+                                const nomeEmpresa = empresaCartao?.nome || empresaCartao?.razao_social;
+                                return (
+                                  <option key={cartao.id} value={cartao.id}>
+                                    {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)}){nomeEmpresa ? ` - ${nomeEmpresa}` : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                              A conta vinculada ao cartao define a empresa da movimentacao bancaria.
+                            </span>
+                          </label>
+
+                          {cartaoSelecionado && (
+                            <div className={`rounded-lg border px-3 py-2 text-xs ${cartaoEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                              {cartaoEntreEmpresas
+                                ? form.tipo === 'RECEBER'
+                                  ? `Entre empresas automatico: ${nomeEmpresaTitulo || 'empresa do titulo'} recebe por conta de ${nomeEmpresaCartao || 'empresa do cartao'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                  : `Entre empresas automatico: ${nomeEmpresaCartao || 'empresa do cartao'} paga titulo de ${nomeEmpresaTitulo || 'empresa da obra'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                : `Movimentacao na mesma empresa do titulo: ${nomeEmpresaTitulo || nomeEmpresaCartao || 'empresa da obra'}.`}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {usaDetalhe && (
