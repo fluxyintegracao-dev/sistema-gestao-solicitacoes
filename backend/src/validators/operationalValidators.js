@@ -462,9 +462,10 @@ function validateCompraEnviarBody(body = {}) {
 
   const normalizarItensCotacao = (itensPayload, contexto) => {
     if (itensPayload === undefined) return undefined;
-    if (!Array.isArray(itensPayload) || itensPayload.length === 0) {
+    if (!Array.isArray(itensPayload)) {
       throw new ValidationError(`Selecione ao menos um item para ${contexto}.`);
     }
+    if (itensPayload.length === 0) return [];
 
     if (itensPayload.length > 500) {
       throw new ValidationError('Quantidade de itens excede o limite permitido.');

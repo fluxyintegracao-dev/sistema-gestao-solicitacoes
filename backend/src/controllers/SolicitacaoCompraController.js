@@ -1070,6 +1070,19 @@ function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
   return selecionados;
 }
 
+function selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveis) {
+  if (Array.isArray(entry?.itens) && entry.itens.length > 0) {
+    return entry.itens;
+  }
+  if (Array.isArray(itensPayload) && itensPayload.length > 0) {
+    return itensPayload;
+  }
+  if ((itensCotaveis || []).length === 1) {
+    return itensCotaveis;
+  }
+  return Array.isArray(entry?.itens) ? entry.itens : itensPayload;
+}
+
 async function carregarItensCotaveisDiretos(solicitacaoCompraId, transaction) {
   const [itens, itensManuais] = await Promise.all([
     SolicitacaoCompraItem.findAll({
@@ -3718,7 +3731,7 @@ module.exports = {
         let itensSelecionadosCotacao = [];
         try {
           itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
-            Array.isArray(entry.itens) ? entry.itens : itensPayload,
+            selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveisSolicitacao),
             itensCotaveisSolicitacao
           );
         } catch (error) {

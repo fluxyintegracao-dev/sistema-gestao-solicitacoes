@@ -2113,10 +2113,15 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleEnviarFornecedores() {
     try {
       const payload = [];
-      fornecedoresSelecionados.forEach((selectionKey) => {
-        const fornecedor =
+      const fornecedoresParaEnvio = fornecedoresSelecionados
+        .map((selectionKey) => (
           fornecedoresSelecionadosDados[selectionKey] ||
-          fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
+          fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey)
+        ))
+        .filter(Boolean);
+
+      fornecedoresParaEnvio.forEach((fornecedor) => {
+        const selectionKey = fornecedorSelectionKey(fornecedor);
         if (fornecedor) {
           const itensFornecedor = itensCombinados
             .filter((item) => itensSelecionadosEnvio?.[selectionKey]?.[buildItemKey(item)])
@@ -2125,9 +2130,16 @@ export default function GerenciarCotacaoSolicitacao() {
               item_referencia_id: item.item_referencia_id,
               item_key: buildItemKey(item)
             }));
+          const itensEnvio = itensFornecedor.length || itensCombinados.length !== 1
+            ? itensFornecedor
+            : itensCombinados.map((item) => ({
+              item_tipo: item.item_tipo,
+              item_referencia_id: item.item_referencia_id,
+              item_key: buildItemKey(item)
+            }));
           payload.push({
             ...fornecedorToCotacaoPayload(fornecedor),
-            itens: itensFornecedor
+            itens: itensEnvio
           });
         }
       });
