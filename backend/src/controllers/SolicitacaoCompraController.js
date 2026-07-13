@@ -1075,6 +1075,10 @@ function montarComparativoSolicitacao(solicitacao) {
   const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
     (cotacaoFornecedor) => !['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(cotacaoFornecedor.status))
   );
+  const fornecedorTemRespostaValida = (cotacaoFornecedor) => {
+    const status = normalizeTextCompra(cotacaoFornecedor.status);
+    return Boolean(cotacaoFornecedor.respondido_em) || ['RESPONDIDO', 'FINALIZADA'].includes(status);
+  };
   const fornecedores = fornecedoresAtivos.map((cotacaoFornecedor) => ({
     id: cotacaoFornecedor.id,
     fornecedor_id: cotacaoFornecedor.fornecedor?.id || cotacaoFornecedor.fornecedor_compra_id,
@@ -1095,7 +1099,7 @@ function montarComparativoSolicitacao(solicitacao) {
 
   const itensComparativo = itens.map((item) => {
     const respostas = fornecedoresAtivos
-      .filter((cotacaoFornecedor) => normalizeTextCompra(cotacaoFornecedor.status) === 'RESPONDIDO')
+      .filter(fornecedorTemRespostaValida)
       .filter((cotacaoFornecedor) => cotacaoFornecedorIncluiItem(cotacaoFornecedor, item))
       .map((cotacaoFornecedor) => {
       const resposta = (cotacaoFornecedor.respostas || []).find((entry) => {
@@ -4021,6 +4025,26 @@ module.exports = {
       await fecharPedidosDaSolicitacaoCompraAutomaticamente({
         solicitacaoId: solicitacaoTravada.id,
         usuarioId: usuario.id,
+        transaction
+      });
+
+      await SolicitacaoCompraFornecedor.update(
+        { status: 'FINALIZADA' },
+        {
+          where: {
+            solicitacao_compra_id: solicitacaoTravada.id,
+            status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+          },
+          transaction
+        }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacaoTravada.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'COTACAO_FINALIZADA',
+        descricao: 'Cotacoes dos fornecedores finalizadas apos fechamento dos pedidos',
+        metadados: { origem: 'ENCERRAMENTO_COTACAO' },
         transaction
       });
 

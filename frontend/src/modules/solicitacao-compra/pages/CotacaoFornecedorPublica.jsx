@@ -429,7 +429,7 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
-  const respostaFinalizada = String(statusCotacao).toUpperCase() === 'RESPONDIDO';
+  const respostaFinalizada = ['RESPONDIDO', 'FINALIZADA'].includes(String(statusCotacao).toUpperCase());
   const cotacaoReaberta = String(statusCotacao).toUpperCase() === 'REABERTA';
   const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(

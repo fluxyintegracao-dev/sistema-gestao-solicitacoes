@@ -52,6 +52,7 @@ function statusClass(status) {
 function statusCotacaoClass(status) {
   const value = String(status || '').toUpperCase();
   if (value === 'RESPONDIDO') return 'app-status-pill bg-emerald-100 text-emerald-700';
+  if (value === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
   if (value === 'VISUALIZADO') return 'app-status-pill bg-amber-100 text-amber-700';
   if (['CANCELADA', 'CANCELADO'].includes(value)) return 'app-status-pill bg-slate-100 text-slate-700';
   return 'app-status-pill bg-blue-100 text-blue-700';

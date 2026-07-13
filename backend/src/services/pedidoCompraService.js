@@ -206,8 +206,9 @@ function buildItemKeyFromPedidoItem(item) {
 }
 
 function fornecedorRespondeuCotacao(vinculacaoFornecedor) {
+  const status = normalizeText(vinculacaoFornecedor?.status);
   return Boolean(vinculacaoFornecedor?.respondido_em) ||
-    normalizeText(vinculacaoFornecedor?.status) === 'RESPONDIDO';
+    ['RESPONDIDO', 'FINALIZADA'].includes(status);
 }
 
 function isSolicitacaoCompraEncerrada(solicitacao) {

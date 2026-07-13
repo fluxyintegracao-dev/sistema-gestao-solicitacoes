@@ -119,6 +119,7 @@ function formatNumeroCompra(value) {
 function clsStatus(status) {
   const v = String(status || '').toUpperCase();
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
+  if (v === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
   if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
