@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 import { textMatchesSearchTerms } from '../utils/search';
+import CategoriaFinanceiraAutocomplete from '../components/ui/CategoriaFinanceiraAutocomplete';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -1859,26 +1860,15 @@ export default function FinanceiroTituloNovo() {
                       )}
 
                       {quantidadePagamentos > 1 && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-[var(--c-muted)]">Categoria financeira deste titulo</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, {
-                              categoria_financeira_id: event.target.value
-                            })}
-                          >
-                            <option value="">Selecione a categoria</option>
-                            {categoriasFiltradas.map((categoria) => (
-                              <option key={categoria.id} value={categoria.id}>
-                                {categoria.nome}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                            A categoria deste titulo sera aplicada a todas as parcelas geradas nele.
-                          </span>
-                        </label>
+                        <CategoriaFinanceiraAutocomplete
+                          label="Categoria financeira deste titulo"
+                          value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                          options={categoriasFiltradas}
+                          onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
+                            categoria_financeira_id: categoriaId
+                          })}
+                          helperText="A categoria deste titulo sera aplicada a todas as parcelas geradas nele."
+                        />
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">

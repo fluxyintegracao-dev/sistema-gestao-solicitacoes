@@ -6,6 +6,7 @@ import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
 import { textMatchesSearchTerms } from '../../utils/search';
+import CategoriaFinanceiraAutocomplete from '../../components/ui/CategoriaFinanceiraAutocomplete';
 import {
   gerarContaPorSolicitacao,
   getCartoesFinanceiros,
@@ -2125,26 +2126,15 @@ export default function FinanceiroCard({
                       )}
 
                       {geracaoMultiplaTitulos && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-slate-500">Categoria financeira deste titulo</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, {
-                              categoria_financeira_id: event.target.value
-                            })}
-                          >
-                            <option value="">Selecione a categoria</option>
-                            {categoriasCompativeis.map((categoria) => (
-                              <option key={categoria.id} value={categoria.id}>
-                                {categoria.nome}
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-slate-500">
-                            A categoria deste titulo sera aplicada a todas as parcelas geradas nele.
-                          </span>
-                        </label>
+                        <CategoriaFinanceiraAutocomplete
+                          label="Categoria financeira deste titulo"
+                          value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                          options={categoriasCompativeis}
+                          onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
+                            categoria_financeira_id: categoriaId
+                          })}
+                          helperText="A categoria deste titulo sera aplicada a todas as parcelas geradas nele."
+                        />
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">
