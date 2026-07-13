@@ -2122,7 +2122,8 @@ export default function GerenciarCotacaoSolicitacao() {
             .filter((item) => itensSelecionadosEnvio?.[selectionKey]?.[buildItemKey(item)])
             .map((item) => ({
               item_tipo: item.item_tipo,
-              item_referencia_id: item.item_referencia_id
+              item_referencia_id: item.item_referencia_id,
+              item_key: buildItemKey(item)
             }));
           payload.push({
             ...fornecedorToCotacaoPayload(fornecedor),
@@ -2139,7 +2140,8 @@ export default function GerenciarCotacaoSolicitacao() {
           contato: novoFornecedor.contato,
           itens: itensCombinados.map((item) => ({
             item_tipo: item.item_tipo,
-            item_referencia_id: item.item_referencia_id
+            item_referencia_id: item.item_referencia_id,
+            item_key: buildItemKey(item)
           }))
         });
       }

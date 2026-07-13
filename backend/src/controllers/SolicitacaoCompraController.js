@@ -1070,6 +1070,32 @@ function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
   return selecionados;
 }
 
+async function carregarItensCotaveisDiretos(solicitacaoCompraId, transaction) {
+  const [itens, itensManuais] = await Promise.all([
+    SolicitacaoCompraItem.findAll({
+      where: { solicitacao_compra_id: solicitacaoCompraId },
+      attributes: ['id'],
+      transaction
+    }),
+    SolicitacaoCompraItemManual.findAll({
+      where: { solicitacao_compra_id: solicitacaoCompraId },
+      attributes: ['id'],
+      transaction
+    })
+  ]);
+
+  return [
+    ...itens.map((item) => ({
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: Number(item.id)
+    })),
+    ...itensManuais.map((item) => ({
+      item_tipo: 'MANUAL',
+      item_referencia_id: Number(item.id)
+    }))
+  ];
+}
+
 function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
   const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
@@ -3617,6 +3643,9 @@ module.exports = {
         if (!itensCotaveisSolicitacao.length) {
           const solicitacaoComItens = await carregarSolicitacaoCompra(solicitacao.id);
           itensCotaveisSolicitacao = obterItensCotaveis(solicitacaoComItens || {});
+        }
+        if (!itensCotaveisSolicitacao.length) {
+          itensCotaveisSolicitacao = await carregarItensCotaveisDiretos(solicitacao.id, transaction);
         }
 
         const algumFornecedorComItens = fornecedoresPayload.some((fornecedor) => (

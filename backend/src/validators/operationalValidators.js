@@ -437,17 +437,21 @@ function validateCompraEnviarBody(body = {}) {
 
     ensureAllowedKeys(
       entry,
-      ['item_tipo', 'item_referencia_id', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
+      ['item_tipo', 'item_referencia_id', 'item_key', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
       `${contexto} ${index + 1}`
     );
 
-    const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+    const itemKeyParts = String(entry.item_key || '').split(':');
+    const tipoPeloItemKey = itemKeyParts.length === 2 ? itemKeyParts[0] : null;
+    const referenciaPeloItemKey = itemKeyParts.length === 2 ? itemKeyParts[1] : null;
+    const itemTipo = parseOptionalText(entry.item_tipo || tipoPeloItemKey, 'Tipo do item', 20, { required: true }).toUpperCase();
     if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
       throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
     }
 
     const referenciaInformada =
       entry.item_referencia_id ||
+      referenciaPeloItemKey ||
       (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
 
     return {
