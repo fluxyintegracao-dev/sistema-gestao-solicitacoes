@@ -43,12 +43,14 @@ Portanto, o problema foi tratado como desalinhamento de contrato frontend/backen
 - Validador do backend passou a aceitar esses campos sem rejeitar o payload.
 - Controller passou a normalizar os itens usando varias chaves possiveis, mas sempre cruzando contra os itens reais da solicitacao de compra.
 - Se o item nao pertencer a solicitacao, o erro agora deve indicar o item informado, em vez de cair genericamente como item ausente.
+- Controller recebeu uma segunda camada defensiva: se o include completo da solicitacao nao trouxer o item no mesmo formato do payload, ele valida os IDs recebidos diretamente em `solicitacao_compra_itens` e `solicitacao_compra_itens_manuais` filtrando pela propria solicitacao de compra antes de gravar os vinculos. Isso evita liberar item de outra solicitacao e reduz a dependencia do formato retornado pelo carregamento agregado.
 
 ## Validacoes executadas
 - `git diff --check`
 - `node -e "require('./backend/src/controllers/SolicitacaoCompraController'); require('./backend/src/validators/operationalValidators'); console.log('backend compra cotacao ok')"`
 - Script Node com o mesmo formato de payload visto no DevTools validou `fornecedores[].itens`.
 - `npm --prefix frontend run build`
+- `node -e "require('./backend/src/controllers/SolicitacaoCompraController'); console.log('controller ok')"`
 
 ## Proximo teste manual
 No ambiente dev:
@@ -65,4 +67,3 @@ Se o mesmo erro continuar apos deploy:
 
 Se o erro mudar para item nao pertencente a solicitacao:
 - Auditar no banco os itens da solicitacao de compra 48 e confirmar quais IDs estao em `solicitacao_compra_itens` e/ou itens manuais.
-

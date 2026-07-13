@@ -1094,6 +1094,78 @@ function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
   return selecionados;
 }
 
+async function normalizarItensSelecionadosCotacaoSeguro({
+  itensPayload,
+  itensCotaveis,
+  solicitacaoCompraId,
+  transaction
+}) {
+  try {
+    return normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis);
+  } catch (error) {
+    const payload = Array.isArray(itensPayload) ? itensPayload : [];
+    if (!payload.length) {
+      throw error;
+    }
+
+    const idsItens = [];
+    const idsItensManuais = [];
+
+    payload.forEach((item) => {
+      const tipo = normalizeTextCompra(item.item_tipo);
+      const referenciaId = Number(item.solicitacao_compra_item_id || item.item_referencia_id);
+      const referenciaManualId = Number(item.solicitacao_compra_item_manual_id || item.item_referencia_id);
+
+      if (tipo === 'CADASTRADO' && referenciaId > 0) {
+        idsItens.push(referenciaId);
+      }
+      if (tipo === 'MANUAL' && referenciaManualId > 0) {
+        idsItensManuais.push(referenciaManualId);
+      }
+    });
+
+    const [itens, itensManuais] = await Promise.all([
+      idsItens.length
+        ? SolicitacaoCompraItem.findAll({
+            where: {
+              id: { [Op.in]: [...new Set(idsItens)] },
+              solicitacao_compra_id: solicitacaoCompraId
+            },
+            attributes: ['id'],
+            transaction
+          })
+        : [],
+      idsItensManuais.length
+        ? SolicitacaoCompraItemManual.findAll({
+            where: {
+              id: { [Op.in]: [...new Set(idsItensManuais)] },
+              solicitacao_compra_id: solicitacaoCompraId
+            },
+            attributes: ['id'],
+            transaction
+          })
+        : []
+    ]);
+
+    const itensCotaveisValidados = [
+      ...itens.map((item) => ({
+        item_tipo: 'CADASTRADO',
+        item_referencia_id: Number(item.id)
+      })),
+      ...itensManuais.map((item) => ({
+        item_tipo: 'MANUAL',
+        item_referencia_id: Number(item.id)
+      }))
+    ];
+
+    if (!itensCotaveisValidados.length) {
+      throw error;
+    }
+
+    return normalizarItensSelecionadosCotacao(payload, itensCotaveisValidados);
+  }
+}
+
 function selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveis) {
   if (Array.isArray(entry?.itens) && entry.itens.length > 0) {
     return entry.itens;
@@ -3748,10 +3820,12 @@ module.exports = {
 
         let itensSelecionadosCotacao = [];
         try {
-          itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
-            selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveisSolicitacao),
-            itensCotaveisSolicitacao
-          );
+          itensSelecionadosCotacao = await normalizarItensSelecionadosCotacaoSeguro({
+            itensPayload: selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveisSolicitacao),
+            itensCotaveis: itensCotaveisSolicitacao,
+            solicitacaoCompraId: solicitacao.id,
+            transaction
+          });
         } catch (error) {
           await transaction.rollback();
           return res.status(400).json({
