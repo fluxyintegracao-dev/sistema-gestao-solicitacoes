@@ -430,6 +430,45 @@ function validateCompraEnviarBody(body = {}) {
     throw new ValidationError('Quantidade de fornecedores excede o limite permitido.');
   }
 
+  const normalizarItemCotacao = (entry, index, contexto = 'Item') => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ValidationError(`${contexto} ${index + 1} invalido.`);
+    }
+
+    ensureAllowedKeys(
+      entry,
+      ['item_tipo', 'item_referencia_id', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
+      `${contexto} ${index + 1}`
+    );
+
+    const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+    if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+      throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
+    }
+
+    const referenciaInformada =
+      entry.item_referencia_id ||
+      (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
+
+    return {
+      item_tipo: itemTipo,
+      item_referencia_id: parseInteger(referenciaInformada, `${contexto} ${index + 1}`, { required: true, positiveOnly: true })
+    };
+  };
+
+  const normalizarItensCotacao = (itensPayload, contexto) => {
+    if (itensPayload === undefined) return undefined;
+    if (!Array.isArray(itensPayload) || itensPayload.length === 0) {
+      throw new ValidationError(`Selecione ao menos um item para ${contexto}.`);
+    }
+
+    if (itensPayload.length > 500) {
+      throw new ValidationError('Quantidade de itens excede o limite permitido.');
+    }
+
+    return itensPayload.map((entry, index) => normalizarItemCotacao(entry, index, 'Item'));
+  };
+
   const fornecedores = body.fornecedores.map((entry, index) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       throw new ValidationError(`Fornecedor ${index + 1} invalido.`);
@@ -437,7 +476,7 @@ function validateCompraEnviarBody(body = {}) {
 
     ensureAllowedKeys(
       entry,
-      ['fornecedor_id', 'parceiro_id', 'nome', 'cnpj', 'documento', 'email', 'whatsapp', 'contato'],
+      ['fornecedor_id', 'parceiro_id', 'nome', 'cnpj', 'documento', 'email', 'whatsapp', 'contato', 'itens'],
       `Fornecedor ${index + 1}`
     );
 
@@ -464,45 +503,14 @@ function validateCompraEnviarBody(body = {}) {
       cnpj,
       email,
       whatsapp,
-      contato
+      contato,
+      itens: normalizarItensCotacao(entry.itens, `o fornecedor ${index + 1}`)
     };
   });
 
   let itens = null;
   if (body.itens !== undefined) {
-    if (!Array.isArray(body.itens) || body.itens.length === 0) {
-      throw new ValidationError('Selecione ao menos um item para cotacao.');
-    }
-
-    if (body.itens.length > 500) {
-      throw new ValidationError('Quantidade de itens excede o limite permitido.');
-    }
-
-    itens = body.itens.map((entry, index) => {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        throw new ValidationError(`Item ${index + 1} invalido.`);
-      }
-
-      ensureAllowedKeys(
-        entry,
-        ['item_tipo', 'item_referencia_id', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
-        `Item ${index + 1}`
-      );
-
-      const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
-      if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
-        throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
-      }
-
-      const referenciaInformada =
-        entry.item_referencia_id ||
-        (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
-
-      return {
-        item_tipo: itemTipo,
-        item_referencia_id: parseInteger(referenciaInformada, `Item ${index + 1}`, { required: true, positiveOnly: true })
-      };
-    });
+    itens = normalizarItensCotacao(body.itens, 'cotacao');
   }
 
   return {

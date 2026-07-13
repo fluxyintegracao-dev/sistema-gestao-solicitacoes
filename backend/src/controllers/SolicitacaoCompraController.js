@@ -3609,13 +3609,11 @@ module.exports = {
         return res.status(400).json({ error: 'Selecione ao menos um fornecedor' });
       }
 
-      let itensSelecionadosCotacao = [];
+      let itensCotaveisSolicitacao = [];
       try {
         const solicitacaoCompleta = await carregarSolicitacaoCompraCompleta(solicitacao.id);
-        itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
-          itensPayload,
-          obterItensCotaveis(solicitacaoCompleta || {})
-        );
+        itensCotaveisSolicitacao = obterItensCotaveis(solicitacaoCompleta || {});
+        normalizarItensSelecionadosCotacao(itensPayload, itensCotaveisSolicitacao);
       } catch (error) {
         await transaction.rollback();
         return res.status(400).json({ error: error.message || 'Itens invalidos para envio da cotacao.' });
@@ -3676,6 +3674,19 @@ module.exports = {
           continue;
         }
         fornecedoresProcessados.add(fornecedorKey);
+
+        let itensSelecionadosCotacao = [];
+        try {
+          itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
+            Array.isArray(entry.itens) ? entry.itens : itensPayload,
+            itensCotaveisSolicitacao
+          );
+        } catch (error) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: error.message || `Itens invalidos para o fornecedor ${fornecedor.nome}.`
+          });
+        }
 
         let vinculacao = await SolicitacaoCompraFornecedor.findOne({
           where: {

@@ -775,6 +775,8 @@ function SecaoEnvioFornecedores({
   onBuscarFornecedores,
   onToggleFornecedor,
   onToggleItemEnvio,
+  onToggleFornecedorItensEnvio,
+  onToggleItemParaTodosFornecedores,
   onSelecionarTodosItensEnvio,
   onLimparItensEnvio,
   onChangeNovoFornecedor,
@@ -842,7 +844,16 @@ function SecaoEnvioFornecedores({
       .filter(Boolean)
   ), [fornecedoresSelecionados, fornecedoresSelecionadosDados, fornecedores]);
 
-  const qtdItensSelecionados = itensCombinados.filter((item) => itensSelecionadosEnvio?.[buildItemKey(item)]).length;
+  const itemKeys = useMemo(() => itensCombinados.map((item) => buildItemKey(item)), [itensCombinados]);
+  const totalCelulasEnvio = fornecedoresSelecionadosDetalhes.length * itemKeys.length;
+  const qtdItensSelecionados = fornecedoresSelecionadosDetalhes.reduce((total, fornecedor) => {
+    const selectionKey = fornecedorSelectionKey(fornecedor);
+    return total + itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
+  }, 0);
+  const fornecedoresSemItens = fornecedoresSelecionadosDetalhes.filter((fornecedor) => {
+    const selectionKey = fornecedorSelectionKey(fornecedor);
+    return !itemKeys.some((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey]));
+  });
 
   function selecionarTodosComCategoria() {
     fornecedoresComCategoria.forEach((fornecedor) => {
@@ -1155,49 +1166,91 @@ function SecaoEnvioFornecedores({
             <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens que serao enviados</div>
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens por fornecedor</div>
                   <div className="text-xs text-[var(--c-muted)]">
-                    Selecione os itens que vao compor estes links. Depois de gerar, a selecao fica gravada na cotacao.
+                    Marque quais itens cada fornecedor recebera no link. Cada coluna vira uma cotacao daquele fornecedor.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                    {qtdItensSelecionados}/{itensCombinados.length} item(ns)
+                    {qtdItensSelecionados}/{totalCelulasEnvio} selecao(oes)
                   </span>
-                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Todos</button>
+                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Selecionar tudo</button>
                   <button type="button" className="btn btn-xs btn-outline" onClick={onLimparItensEnvio}>Limpar</button>
                 </div>
               </div>
+              {fornecedoresSemItens.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/45 dark:text-amber-100">
+                  Selecione ao menos um item para: {fornecedoresSemItens.map((fornecedor) => fornecedor.nome).join(', ')}.
+                </div>
+              )}
               <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
-                <table className="min-w-[920px] w-full text-left text-xs">
+                <table className="min-w-[980px] w-full text-left text-xs">
                   <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     <tr>
-                      <th className="w-10 px-3 py-2">Sel.</th>
-                      <th className="px-3 py-2">Item</th>
-                      <th className="w-24 px-3 py-2">Qtd.</th>
-                      <th className="px-3 py-2">Especificacao</th>
-                      <th className="w-32 px-3 py-2">Necessario</th>
+                      <th className="sticky left-0 z-10 min-w-[260px] bg-slate-100 px-3 py-2 dark:bg-slate-900">Item</th>
+                      <th className="min-w-[95px] px-3 py-2">Qtd.</th>
+                      <th className="min-w-[180px] px-3 py-2">Especificacao</th>
+                      <th className="min-w-[115px] px-3 py-2">Necessario</th>
+                      {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
+                        const selectionKey = fornecedorSelectionKey(fornecedor);
+                        const itensFornecedor = itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
+                        const todosMarcados = itemKeys.length > 0 && itensFornecedor === itemKeys.length;
+                        return (
+                          <th key={selectionKey} className="min-w-[190px] border-l border-[var(--c-border)] px-3 py-2 text-center">
+                            <label className="flex cursor-pointer flex-col items-center gap-1 normal-case tracking-normal">
+                              <span className="line-clamp-2 font-semibold text-slate-700 dark:text-slate-100">{fornecedor.nome}</span>
+                              <span className="text-[10px] text-[var(--c-muted)]">{itensFornecedor}/{itemKeys.length} item(ns)</span>
+                              <input
+                                type="checkbox"
+                                checked={todosMarcados}
+                                onChange={(event) => onToggleFornecedorItensEnvio(selectionKey, event.target.checked)}
+                                aria-label={`Selecionar todos os itens para ${fornecedor.nome}`}
+                              />
+                            </label>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {itensCombinados.map((item) => {
                       const itemKey = buildItemKey(item);
+                      const itemMarcadoParaTodos = fornecedoresSelecionadosDetalhes.length > 0
+                        && fornecedoresSelecionadosDetalhes.every((fornecedor) => Boolean(itensSelecionadosEnvio?.[fornecedorSelectionKey(fornecedor)]?.[itemKey]));
                       return (
                         <tr key={itemKey} className="border-t border-[var(--c-border)] align-top">
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(itensSelecionadosEnvio?.[itemKey])}
-                              onChange={(event) => onToggleItemEnvio(itemKey, event.target.checked)}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
-                            <div className="text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</div>
+                          <td className="sticky left-0 z-[1] bg-white px-3 py-2 dark:bg-slate-950">
+                            <label className="flex items-start gap-2">
+                              <input
+                                className="mt-1"
+                                type="checkbox"
+                                checked={itemMarcadoParaTodos}
+                                onChange={(event) => onToggleItemParaTodosFornecedores(itemKey, event.target.checked)}
+                                aria-label={`Selecionar ${item.nome} para todos os fornecedores`}
+                              />
+                              <span>
+                                <span className="block font-semibold text-[var(--c-text)]">{item.nome}</span>
+                                <span className="block text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</span>
+                              </span>
+                            </label>
                           </td>
                           <td className="px-3 py-2">{formatNumeroCompra(item.quantidade)} {item.unidade}</td>
                           <td className="px-3 py-2 text-[var(--c-muted)]">{item.especificacao || '-'}</td>
                           <td className="px-3 py-2">{fmt(item.necessario_para)}</td>
+                          {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
+                            const selectionKey = fornecedorSelectionKey(fornecedor);
+                            return (
+                              <td key={`${selectionKey}-${itemKey}`} className="border-l border-[var(--c-border)] px-3 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])}
+                                  onChange={(event) => onToggleItemEnvio(selectionKey, itemKey, event.target.checked)}
+                                  aria-label={`Enviar ${item.nome} para ${fornecedor.nome}`}
+                                />
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
@@ -1967,26 +2020,50 @@ export default function GerenciarCotacaoSolicitacao() {
     return [...itens, ...manuais];
   }, [solicitacao]);
 
+  const criarMapaTodosItensEnvio = () => itensCombinados.reduce((acc, item) => {
+    acc[buildItemKey(item)] = true;
+    return acc;
+  }, {});
+
   const selecionarTodosItensEnvio = () => {
+    const todos = criarMapaTodosItensEnvio();
     setItensSelecionadosEnvio(
-      itensCombinados.reduce((acc, item) => {
-        acc[buildItemKey(item)] = true;
+      fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = { ...todos };
         return acc;
       }, {})
     );
   };
 
   const limparItensEnvio = () => {
-    setItensSelecionadosEnvio({});
+    setItensSelecionadosEnvio(
+      fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = {};
+        return acc;
+      }, {})
+    );
   };
 
-  const garantirItensEnvioSelecionados = () => {
+  const garantirItensEnvioSelecionados = (selectionKeyEspecifico = null) => {
     setItensSelecionadosEnvio((atual) => {
-      if (Object.values(atual || {}).some(Boolean)) {
+      const todos = criarMapaTodosItensEnvio();
+
+      if (selectionKeyEspecifico) {
+        const selecaoAtual = atual?.[selectionKeyEspecifico] || {};
+        if (Object.values(selecaoAtual).some(Boolean)) {
+          return atual;
+        }
+        return { ...atual, [selectionKeyEspecifico]: { ...todos } };
+      }
+
+      const existeSelecao = Object.values(atual || {}).some((selecaoFornecedor) => (
+        selecaoFornecedor && typeof selecaoFornecedor === 'object' && Object.values(selecaoFornecedor).some(Boolean)
+      ));
+      if (existeSelecao) {
         return atual;
       }
-      return itensCombinados.reduce((acc, item) => {
-        acc[buildItemKey(item)] = true;
+      return fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = { ...todos };
         return acc;
       }, {});
     });
@@ -2040,7 +2117,18 @@ export default function GerenciarCotacaoSolicitacao() {
         const fornecedor =
           fornecedoresSelecionadosDados[selectionKey] ||
           fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
-        if (fornecedor) payload.push(fornecedorToCotacaoPayload(fornecedor));
+        if (fornecedor) {
+          const itensFornecedor = itensCombinados
+            .filter((item) => itensSelecionadosEnvio?.[selectionKey]?.[buildItemKey(item)])
+            .map((item) => ({
+              item_tipo: item.item_tipo,
+              item_referencia_id: item.item_referencia_id
+            }));
+          payload.push({
+            ...fornecedorToCotacaoPayload(fornecedor),
+            itens: itensFornecedor
+          });
+        }
       });
       if (String(novoFornecedor.nome || '').trim()) {
         payload.push({
@@ -2048,25 +2136,30 @@ export default function GerenciarCotacaoSolicitacao() {
           cnpj: novoFornecedor.cnpj,
           email: novoFornecedor.email,
           whatsapp: novoFornecedor.whatsapp,
-          contato: novoFornecedor.contato
+          contato: novoFornecedor.contato,
+          itens: itensCombinados.map((item) => ({
+            item_tipo: item.item_tipo,
+            item_referencia_id: item.item_referencia_id
+          }))
         });
       }
       if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
 
-      const itensPayload = itensCombinados
-        .filter((item) => itensSelecionadosEnvio[buildItemKey(item)])
-        .map((item) => ({
-          item_tipo: item.item_tipo,
-          item_referencia_id: item.item_referencia_id
-        }));
-
-      if (!itensPayload.length) {
-        alert('Selecione ao menos um item para gerar a cotacao.');
+      const fornecedorSemItens = payload.find((fornecedor) => !Array.isArray(fornecedor.itens) || fornecedor.itens.length === 0);
+      if (fornecedorSemItens) {
+        const fornecedorSelecionado = fornecedores.find((item) => {
+          const fornecedorPayload = fornecedorToCotacaoPayload(item);
+          return (
+            (fornecedorSemItens.fornecedor_id && Number(fornecedorPayload.fornecedor_id) === Number(fornecedorSemItens.fornecedor_id)) ||
+            (fornecedorSemItens.parceiro_id && Number(fornecedorPayload.parceiro_id) === Number(fornecedorSemItens.parceiro_id))
+          );
+        });
+        alert(`Selecione ao menos um item para ${fornecedorSelecionado?.nome || fornecedorSemItens.nome || 'cada fornecedor'}.`);
         return;
       }
 
       setEnviandoFornecedores(true);
-      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload, itens: itensPayload });
+      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
       setFornecedoresSelecionados([]);
       setFornecedoresSelecionadosDados({});
       setItensSelecionadosEnvio({});
@@ -2235,7 +2328,7 @@ export default function GerenciarCotacaoSolicitacao() {
         ...atual,
         [fornecedorSelectionKey(fornecedorFormatado)]: fornecedorFormatado
       }));
-      garantirItensEnvioSelecionados();
+      garantirItensEnvioSelecionados(fornecedorSelectionKey(fornecedorFormatado));
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
@@ -2556,11 +2649,40 @@ export default function GerenciarCotacaoSolicitacao() {
                   return next;
                 });
                 if (checked) {
-                  garantirItensEnvioSelecionados();
+                  garantirItensEnvioSelecionados(selectionKey);
+                } else {
+                  setItensSelecionadosEnvio((prev) => {
+                    const next = { ...prev };
+                    delete next[selectionKey];
+                    return next;
+                  });
                 }
               }}
-              onToggleItemEnvio={(itemKey, checked) => {
-                setItensSelecionadosEnvio((prev) => ({ ...prev, [itemKey]: checked }));
+              onToggleItemEnvio={(selectionKey, itemKey, checked) => {
+                setItensSelecionadosEnvio((prev) => ({
+                  ...prev,
+                  [selectionKey]: {
+                    ...(prev?.[selectionKey] || {}),
+                    [itemKey]: checked
+                  }
+                }));
+              }}
+              onToggleFornecedorItensEnvio={(selectionKey, checked) => {
+                setItensSelecionadosEnvio((prev) => ({
+                  ...prev,
+                  [selectionKey]: checked ? criarMapaTodosItensEnvio() : {}
+                }));
+              }}
+              onToggleItemParaTodosFornecedores={(itemKey, checked) => {
+                setItensSelecionadosEnvio((prev) => (
+                  fornecedoresSelecionados.reduce((acc, selectionKey) => {
+                    acc[selectionKey] = {
+                      ...(prev?.[selectionKey] || {}),
+                      [itemKey]: checked
+                    };
+                    return acc;
+                  }, { ...prev })
+                ));
               }}
               onSelecionarTodosItensEnvio={selecionarTodosItensEnvio}
               onLimparItensEnvio={limparItensEnvio}
