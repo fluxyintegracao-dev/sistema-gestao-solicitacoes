@@ -167,15 +167,19 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const { user } = useAuth();
   const obraIdInicial = String(searchParams.get('obra_id') || '').trim();
   const tipoSolicitacaoIdInicial = String(searchParams.get('tipo_solicitacao_id') || '').trim();
+  const areaResponsavelInicial = String(searchParams.get('area_responsavel') || '').trim();
   const draftKey = modoCompraDireta ? DRAFT_COMPRA_DIRETA_KEY : DRAFT_KEY;
   const hidratandoDraftRef = useRef(false);
   const draftCarregadoRef = useRef(false);
   const importacaoCompraDiretaInputRef = useRef(null);
+  const buscaCredorRequestRef = useRef(0);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
   const [obraId, setObraId] = useState('');
+  const [tipoSolicitacaoIdContexto, setTipoSolicitacaoIdContexto] = useState(tipoSolicitacaoIdInicial);
+  const [areaResponsavelContexto, setAreaResponsavelContexto] = useState(areaResponsavelInicial);
   const [necessarioPara, setNecessarioPara] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [dadosPagamento, setDadosPagamento] = useState('');
@@ -187,6 +191,9 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [parceiroBusca, setParceiroBusca] = useState('');
   const [parceiros, setParceiros] = useState([]);
   const [buscandoParceiros, setBuscandoParceiros] = useState(false);
+  const [autocompleteCredorAberto, setAutocompleteCredorAberto] = useState(false);
+  const [credorAtivoIndex, setCredorAtivoIndex] = useState(0);
+  const [erroBuscaCredor, setErroBuscaCredor] = useState('');
   const [modalCredorAberto, setModalCredorAberto] = useState(false);
   const [novoCredor, setNovoCredor] = useState(criarNovoCredorPadrao);
   const [salvandoCredor, setSalvandoCredor] = useState(false);
@@ -330,6 +337,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
       hidratandoDraftRef.current = true;
       setObraId(String(payload.obra_id || ''));
+      setTipoSolicitacaoIdContexto(
+        String(dados?.contexto?.tipo_solicitacao_id || payload.tipo_solicitacao_id || tipoSolicitacaoIdInicial || '').trim()
+      );
+      setAreaResponsavelContexto(
+        String(dados?.contexto?.area_responsavel || areaResponsavelInicial || '').trim()
+      );
       setNecessarioPara(payload.necessario_para || '');
       setObservacoes(payload.observacoes || '');
       setDadosPagamento(payload.dados_pagamento || '');
@@ -443,22 +456,83 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     [parceiroId, parceiros]
   );
 
-  async function buscarCredoresCompraDireta() {
+  useEffect(() => {
+    if (!modoCompraDireta || parceiroId) {
+      return undefined;
+    }
+
     const termo = String(parceiroBusca || '').trim();
-    if (!termo) {
-      alert('Digite parte do nome ou CPF/CNPJ do credor.');
+    const buscaAtual = buscaCredorRequestRef.current + 1;
+    buscaCredorRequestRef.current = buscaAtual;
+    setCredorAtivoIndex(0);
+    setErroBuscaCredor('');
+
+    if (termo.length < 2) {
+      setParceiros([]);
+      setBuscandoParceiros(false);
+      return undefined;
+    }
+
+    setParceiros([]);
+    setBuscandoParceiros(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 });
+        if (buscaCredorRequestRef.current !== buscaAtual) return;
+        setParceiros(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (buscaCredorRequestRef.current !== buscaAtual) return;
+        console.error(error);
+        setParceiros([]);
+        setErroBuscaCredor(error.message || 'Erro ao buscar credores.');
+      } finally {
+        if (buscaCredorRequestRef.current === buscaAtual) {
+          setBuscandoParceiros(false);
+        }
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [modoCompraDireta, parceiroBusca, parceiroId]);
+
+  function selecionarCredorCompraDireta(parceiro) {
+    if (!parceiro) return;
+    buscaCredorRequestRef.current += 1;
+    setParceiroId(String(parceiro.id));
+    setParceiroBusca(formatarCredor(parceiro));
+    setParceiros((atual) => [
+      parceiro,
+      ...atual.filter((item) => Number(item.id) !== Number(parceiro.id))
+    ]);
+    setBuscandoParceiros(false);
+    setErroBuscaCredor('');
+    setAutocompleteCredorAberto(false);
+    setCredorAtivoIndex(0);
+  }
+
+  function tratarTecladoCredor(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setAutocompleteCredorAberto(true);
+      setCredorAtivoIndex((atual) => Math.min(atual + 1, Math.max(parceiros.length - 1, 0)));
       return;
     }
 
-    setBuscandoParceiros(true);
-    try {
-      const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 });
-      setParceiros(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
-      alert(error.message || 'Erro ao buscar credores');
-    } finally {
-      setBuscandoParceiros(false);
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setCredorAtivoIndex((atual) => Math.max(atual - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && autocompleteCredorAberto && parceiros.length > 0) {
+      event.preventDefault();
+      selecionarCredorCompraDireta(parceiros[credorAtivoIndex] || parceiros[0]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setAutocompleteCredorAberto(false);
     }
   }
 
@@ -468,16 +542,21 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       return;
     }
 
+    if (!tipoSolicitacaoIdContexto || !areaResponsavelContexto) {
+      alert('Retorne a Nova Solicitacao e informe Area Responsavel e Tipo da Solicitacao antes de cadastrar o credor.');
+      return;
+    }
+
     setSalvandoCredor(true);
     try {
       const parceiro = await criarCredorNovaSolicitacao({
         ...novoCredor,
         cpf_cnpj: novoCredor.cpf_cnpj.replace(/\D/g, ''),
-        telefone: novoCredor.telefone.replace(/\D/g, '')
+        telefone: novoCredor.telefone.replace(/\D/g, ''),
+        tipo_solicitacao_id: tipoSolicitacaoIdContexto,
+        area_responsavel: areaResponsavelContexto
       });
-      setParceiros((atual) => [parceiro, ...atual.filter((item) => Number(item.id) !== Number(parceiro.id))]);
-      setParceiroId(String(parceiro.id));
-      setParceiroBusca(formatarCredor(parceiro));
+      selecionarCredorCompraDireta(parceiro);
       setNovoCredor(criarNovoCredorPadrao());
       setModalCredorAberto(false);
     } catch (error) {
@@ -909,7 +988,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
       const payload = {
         obra_id: obraId,
-        tipo_solicitacao_id: modoCompraDireta ? tipoSolicitacaoIdInicial || null : undefined,
+        tipo_solicitacao_id: modoCompraDireta ? tipoSolicitacaoIdContexto || null : undefined,
         origem: modoCompraDireta ? 'COMPRA_DIRETA' : undefined,
         parceiro_id: modoCompraDireta ? parceiroId || null : undefined,
         necessario_para: necessarioPara || null,
@@ -963,7 +1042,14 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         }))
       };
 
-      window.localStorage.setItem(draftKey, JSON.stringify({ payload, resumo }));
+      const contexto = modoCompraDireta
+        ? {
+            tipo_solicitacao_id: tipoSolicitacaoIdContexto || null,
+            area_responsavel: areaResponsavelContexto || ''
+          }
+        : undefined;
+
+      window.localStorage.setItem(draftKey, JSON.stringify({ payload, resumo, contexto }));
       navigate(modoCompraDireta ? '/solicitacoes-compra-direta/revisar' : '/solicitacoes-compra/revisar');
     } catch (error) {
       console.error(error);
@@ -1058,39 +1144,79 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             <div className="grid gap-2 md:col-span-2">
               <label className="text-sm font-medium">Credor</label>
               <div className="flex flex-wrap gap-2">
-                <input
-                  className="input min-w-[260px] flex-1"
-                  value={parceiroBusca}
-                  onChange={(event) => {
-                    setParceiroBusca(event.target.value);
-                    setParceiroId('');
-                  }}
-                  placeholder="Buscar credor por nome ou CPF/CNPJ"
-                />
-                <button type="button" className="btn btn-outline" onClick={buscarCredoresCompraDireta} disabled={buscandoParceiros}>
-                  {buscandoParceiros ? 'Buscando...' : 'Buscar'}
-                </button>
+                <div className="relative min-w-[260px] flex-1">
+                  <input
+                    className="input w-full"
+                    value={parceiroBusca}
+                    onChange={(event) => {
+                      buscaCredorRequestRef.current += 1;
+                      setParceiroBusca(event.target.value);
+                      setParceiroId('');
+                      setAutocompleteCredorAberto(true);
+                    }}
+                    onFocus={() => setAutocompleteCredorAberto(true)}
+                    onBlur={() => window.setTimeout(() => setAutocompleteCredorAberto(false), 120)}
+                    onKeyDown={tratarTecladoCredor}
+                    placeholder="Digite nome, CPF ou CNPJ"
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={autocompleteCredorAberto}
+                    aria-controls="compra-direta-credores-opcoes"
+                  />
+
+                  {autocompleteCredorAberto && !parceiroId && String(parceiroBusca || '').trim().length >= 2 && (
+                    <div
+                      id="compra-direta-credores-opcoes"
+                      className="absolute left-0 right-0 top-[calc(100%+6px)] z-[90] max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                      role="listbox"
+                    >
+                      {buscandoParceiros && (
+                        <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Buscando credores...</div>
+                      )}
+
+                      {!buscandoParceiros && erroBuscaCredor && (
+                        <div className="px-3 py-2 text-sm text-red-600">{erroBuscaCredor}</div>
+                      )}
+
+                      {!buscandoParceiros && !erroBuscaCredor && parceiros.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Nenhum credor encontrado.</div>
+                      )}
+
+                      {!buscandoParceiros && !erroBuscaCredor && parceiros.map((parceiro, index) => (
+                        <button
+                          key={parceiro.id}
+                          type="button"
+                          className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${
+                            index === credorAtivoIndex
+                              ? 'bg-[var(--c-primary)] text-white'
+                              : 'text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'
+                          }`}
+                          onMouseEnter={() => setCredorAtivoIndex(index)}
+                          onMouseDown={(event) => {
+                            event.preventDefault();
+                            selecionarCredorCompraDireta(parceiro);
+                          }}
+                          role="option"
+                          aria-selected={index === credorAtivoIndex}
+                        >
+                          <span className="block truncate font-medium">
+                            {parceiro.nome || parceiro.razao_social || `Credor ${parceiro.id}`}
+                          </span>
+                          {parceiro.cpf_cnpj && (
+                            <span className={`block truncate text-xs ${index === credorAtivoIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>
+                              {parceiro.cpf_cnpj}
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button type="button" className="btn btn-outline" onClick={() => setModalCredorAberto(true)}>
                   Cadastrar novo credor
                 </button>
               </div>
-              {parceiros.length > 0 && !parceiroId && (
-                <div className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2">
-                  {parceiros.slice(0, 6).map((parceiro) => (
-                    <button
-                      key={parceiro.id}
-                      type="button"
-                      className="rounded-md px-3 py-2 text-left text-sm hover:bg-[var(--c-surface-hover)]"
-                      onClick={() => {
-                        setParceiroId(String(parceiro.id));
-                        setParceiroBusca(formatarCredor(parceiro));
-                      }}
-                    >
-                      {formatarCredor(parceiro)}
-                    </button>
-                  ))}
-                </div>
-              )}
               {parceiroId && (
                 <div className="text-sm text-emerald-700">
                   Credor selecionado: <strong>{parceiroBusca || formatarCredor(parceiroSelecionado)}</strong>
