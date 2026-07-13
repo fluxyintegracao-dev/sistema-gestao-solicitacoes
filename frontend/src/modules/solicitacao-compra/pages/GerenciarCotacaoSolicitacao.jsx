@@ -23,6 +23,7 @@ import {
   obterUrlPdfCotacaoPublica,
   recusarSolicitacaoCompra,
   reabrirCotacaoCompra,
+  atualizarQuantidadeItemSolicitacaoCompra,
   salvarRespostaInternaCotacao
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
@@ -81,6 +82,31 @@ function sanitizeNumeroCompraInput(value) {
   return String(value ?? '').replace(/[^\d.,]/g, '');
 }
 
+function limparMoedaCotacaoInput(value, limiteDecimais = 10) {
+  const raw = String(value ?? '').replace(/[^\d,]/g, '');
+  if (!raw) return '';
+  const [inteiroRaw = '', ...decimaisRaw] = raw.split(',');
+  const inteiro = inteiroRaw.replace(/^0+(?=\d)/, '') || '0';
+  if (!decimaisRaw.length) return inteiro;
+  return `${inteiro},${decimaisRaw.join('').slice(0, limiteDecimais)}`;
+}
+
+function formatarMoedaCotacaoInput(value, limiteDecimais = 10) {
+  const limpo = limparMoedaCotacaoInput(value, limiteDecimais);
+  if (!limpo) return '';
+  const [inteiro, decimal] = limpo.split(',');
+  const inteiroFormatado = Number(inteiro || 0).toLocaleString('pt-BR', {
+    maximumFractionDigits: 0
+  });
+  return `R$ ${inteiroFormatado}${limpo.includes(',') ? `,${decimal || ''}` : ''}`;
+}
+
+function normalizarMoedaCotacaoParaEnvio(value) {
+  const limpo = limparMoedaCotacaoInput(value, 10);
+  if (!limpo) return null;
+  return limpo.endsWith(',') ? limpo.slice(0, -1) : limpo;
+}
+
 function formatNumeroCompra(value) {
   const parsed = Number(value || 0);
   if (!Number.isFinite(parsed)) return '';
@@ -111,6 +137,17 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
   { key: 'acoes', width: 190, minWidth: 170 }
+];
+
+const CONDICOES_PAGAMENTO_COTACAO = [
+  'Pix',
+  'Boleto',
+  'Transferencia',
+  'Cartao',
+  'Cheque',
+  'Dinheiro',
+  'Faturado',
+  'Outros'
 ];
 
 function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
@@ -165,7 +202,9 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
         ...item,
         status_disponibilidade: resposta?.status_disponibilidade
           || (resposta ? (resposta.disponivel ? 'DISPONIVEL' : 'NAO_TEM') : 'DISPONIVEL'),
-        preco: decimalApiParaInput(resposta?.preco, 10),
+        preco: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.preco, 10)),
+        quantidade_original: decimalApiParaInput(item.quantidade, 6),
+        quantidade_solicitada: decimalApiParaInput(item.quantidade, 6),
         prazo: resposta?.prazo || '',
         quantidade_minima_item: decimalApiParaInput(resposta?.quantidade_minima_item, 3),
         data_chegada: resposta?.data_chegada || '',
@@ -175,8 +214,38 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
   };
 }
 
-function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChangeItem, onSalvar, onFechar }) {
+function ModalRespostaInternaCotacao({
+  cotacao,
+  form,
+  salvando,
+  onChange,
+  onChangeItem,
+  onAplicarDataChegadaTodos,
+  onSalvar,
+  onFechar
+}) {
+  const [condicoesAbertas, setCondicoesAbertas] = useState(false);
+  const [dataChegadaTodos, setDataChegadaTodos] = useState('');
   if (!cotacao || !form) return null;
+
+  const condicoesSelecionadas = new Set(
+    CONDICOES_PAGAMENTO_COTACAO.filter((opcao) => {
+      const atual = String(form.condicao_pagamento || '').toLowerCase();
+      return atual.split(/[;,]/).some((parte) => parte.trim() === opcao.toLowerCase());
+    })
+  );
+
+  function alternarCondicao(opcao) {
+    const partesLivres = String(form.condicao_pagamento || '')
+      .split(/[;,]/)
+      .map((parte) => parte.trim())
+      .filter(Boolean)
+      .filter((parte) => !CONDICOES_PAGAMENTO_COTACAO.some((base) => base.toLowerCase() === parte.toLowerCase()));
+    const proximas = condicoesSelecionadas.has(opcao)
+      ? [...condicoesSelecionadas].filter((item) => item !== opcao)
+      : [...condicoesSelecionadas, opcao];
+    onChange('condicao_pagamento', [...proximas, ...partesLivres].join('; '));
+  }
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3" role="dialog" aria-modal="true">
@@ -209,8 +278,57 @@ function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChan
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Condicao de pagamento *</span>
-              <input className="input" value={form.condicao_pagamento} onChange={(e) => onChange('condicao_pagamento', e.target.value)} placeholder="Ex.: Boleto 30/60/90" />
+              <div className="relative">
+                <input
+                  className="input"
+                  value={form.condicao_pagamento}
+                  onClick={() => setCondicoesAbertas(true)}
+                  onFocus={() => setCondicoesAbertas(true)}
+                  onChange={(e) => onChange('condicao_pagamento', e.target.value)}
+                  placeholder="Ex.: Boleto 30/60/90"
+                />
+                {condicoesAbertas && (
+                  <div
+                    className="absolute left-0 right-0 top-[calc(100%+4px)] z-[95] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-xl"
+                    onMouseDown={(event) => event.preventDefault()}
+                  >
+                    <div className="grid gap-1">
+                      {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
+                        <label key={opcao} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={condicoesSelecionadas.has(opcao)}
+                            onChange={() => alternarCondicao(opcao)}
+                          />
+                          <span>{opcao}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <button type="button" className="btn btn-xs btn-outline mt-2 w-full justify-center" onClick={() => setCondicoesAbertas(false)}>
+                      Fechar opcoes
+                    </button>
+                  </div>
+                )}
+              </div>
             </label>
+          </div>
+
+          <div className="mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+            <label className="app-filter-field bg-white">
+              <span className="app-filter-label">Data chegada para todos</span>
+              <input
+                className="input"
+                type="date"
+                value={dataChegadaTodos}
+                onChange={(event) => {
+                  setDataChegadaTodos(event.target.value);
+                  onAplicarDataChegadaTodos(event.target.value);
+                }}
+              />
+            </label>
+            <div className="self-center text-xs text-[var(--c-muted)]">
+              Use este campo para aplicar uma previsao unica de chegada a todos os itens da resposta. Cada item ainda pode ser ajustado individualmente.
+            </div>
           </div>
 
           <label className="mt-3 block">
@@ -223,6 +341,7 @@ function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChan
               <thead>
                 <tr>
                   <th>Item</th>
+                  <th>Qtd. solic.</th>
                   <th>Disponibilidade</th>
                   <th>Preco unit.</th>
                   <th>Prazo</th>
@@ -236,7 +355,15 @@ function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChan
                   <tr key={buildItemKey(item)}>
                     <td className="min-w-[210px]">
                       <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
-                      <div className="text-[var(--c-muted)]">{formatNumeroCompra(item.quantidade)} {item.unidade}</div>
+                      <div className="text-[var(--c-muted)]">{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
+                    </td>
+                    <td>
+                      <input
+                        className="input min-w-[105px]"
+                        inputMode="decimal"
+                        value={item.quantidade_solicitada}
+                        onChange={(e) => onChangeItem(index, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
+                      />
                     </td>
                     <td>
                       <select className="input min-w-[130px]" value={item.status_disponibilidade} onChange={(e) => onChangeItem(index, 'status_disponibilidade', e.target.value)}>
@@ -245,10 +372,10 @@ function ModalRespostaInternaCotacao({ cotacao, form, salvando, onChange, onChan
                         <option value="PARA_CHEGAR">Para chegar</option>
                       </select>
                     </td>
-                    <td><input className="input min-w-[120px]" inputMode="decimal" value={item.preco} onChange={(e) => onChangeItem(index, 'preco', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
                     <td><input className="input min-w-[110px]" value={item.prazo} onChange={(e) => onChangeItem(index, 'prazo', e.target.value)} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
                     <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
-                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} disabled={item.status_disponibilidade !== 'PARA_CHEGAR'} /></td>
+                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} /></td>
                     <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
                   </tr>
                 ))}
@@ -1259,70 +1386,68 @@ function SecaoComparativo({
     return (
       <td
         key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
-        className={`min-w-[240px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${isVencedor ? 'bg-emerald-50' : 'bg-white'}`}
+        className={`min-w-[270px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${isVencedor ? 'bg-emerald-50/80' : 'bg-white'}`}
       >
-        <div className="grid gap-1">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
-              <div className="text-[11px] text-[var(--c-muted)]">
-                Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
-              </div>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
+            <div className="text-[11px] text-[var(--c-muted)]">
+              Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
             </div>
-            <button
-              type="button"
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
-              onClick={() => onEditarRespostaFornecedor?.(resposta.cotacao_fornecedor_id)}
-              disabled={!podeEditarResposta}
-              title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
-              aria-label="Editar resposta internamente"
-            >
-              <HiOutlinePencilSquare className="h-3.5 w-3.5" />
-            </button>
           </div>
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => onEditarRespostaFornecedor?.(resposta.cotacao_fornecedor_id)}
+            disabled={!podeEditarResposta}
+            title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+            aria-label="Editar resposta internamente"
+          >
+            <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+          </button>
+        </div>
 
-          <div className="flex flex-wrap gap-1 text-[11px] text-[var(--c-muted)]">
-            <span className={`rounded-full px-2 py-0.5 font-semibold ${resposta.disponivel ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-              {resposta.disponivel ? 'Disponivel' : 'Nao tem'}
-            </span>
-            <span>Prazo: {resposta.prazo || resposta.prazo_entrega_fornecedor || '-'}</span>
-            {resposta.quantidade_minima_item ? <span>Min.: {resposta.quantidade_minima_item}</span> : null}
-          </div>
-
-          <div className="text-[11px] text-[var(--c-muted)]">
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
+          <span className={`font-semibold ${resposta.disponivel ? 'text-emerald-700' : 'text-red-700'}`}>
+            {resposta.disponivel ? 'Disponivel' : 'Nao tem'}
+          </span>
+          <span>Prazo: {resposta.prazo || resposta.prazo_entrega_fornecedor || '-'}</span>
+          <span>Qtd. min.: {resposta.quantidade_minima_item || '-'}</span>
+          <span>Chegada: {fmt(resposta.data_chegada)}</span>
+          <span className="col-span-2 truncate" title={resposta.condicao_pagamento || ''}>
             Cond.: {resposta.condicao_pagamento || '-'}
-          </div>
+          </span>
           {resposta.observacao ? (
-            <div className="line-clamp-2 text-[11px] text-[var(--c-muted)]" title={resposta.observacao}>
+            <span className="col-span-2 line-clamp-2" title={resposta.observacao}>
               Obs.: {resposta.observacao}
-            </div>
+            </span>
           ) : null}
+        </div>
 
-          <div className="mt-1 flex items-center gap-2 rounded-md border border-[var(--c-border)] bg-slate-50 px-2 py-1">
-            <input
-              type="checkbox"
-              checked={isVencedor}
-              disabled={!podeSelecionar}
-              onChange={(event) => {
-                onVencedorChange({
-                  item,
-                  resposta,
-                  quantidade: event.target.checked ? item.quantidade : 0
-                });
-              }}
-            />
-            <input
-              className="input h-7 w-24 px-2 text-xs"
-              value={isVencedor ? getQuantidadeAlocadaInput(resposta.resposta_item_id) : ''}
-              placeholder="Qtd."
-              disabled={!podeEncerrar || !isVencedor}
-              onChange={(event) => onVencedorChange({
+        <div className="mt-2 flex items-center gap-2 border-t border-[var(--c-border)] pt-2">
+          <input
+            type="checkbox"
+            checked={isVencedor}
+            disabled={!podeSelecionar}
+            onChange={(event) => {
+              onVencedorChange({
                 item,
                 resposta,
-                quantidade: event.target.value
-              })}
-            />
-          </div>
+                quantidade: event.target.checked ? item.quantidade : 0
+              });
+            }}
+          />
+          <input
+            className="input h-7 w-24 px-2 text-xs"
+            value={isVencedor ? getQuantidadeAlocadaInput(resposta.resposta_item_id) : ''}
+            placeholder="Qtd."
+            disabled={!podeEncerrar || !isVencedor}
+            onChange={(event) => onVencedorChange({
+              item,
+              resposta,
+              quantidade: event.target.value
+            })}
+          />
         </div>
       </td>
     );
@@ -1372,7 +1497,7 @@ function SecaoComparativo({
           </div>
         </div>
 
-        {rankingFornecedores.length > 0 && (
+        {modoVisualizacao === 'cards' && rankingFornecedores.length > 0 && (
           <div className="mb-3 grid gap-2 sm:grid-cols-3">
             {rankingFornecedores.map((forn, idx) => (
               <div
@@ -2022,6 +2147,13 @@ export default function GerenciarCotacaoSolicitacao() {
     }));
   }
 
+  function aplicarDataChegadaRespostaInterna(value) {
+    setFormRespostaInterna((atual) => ({
+      ...atual,
+      itens: atual.itens.map((item) => ({ ...item, data_chegada: value }))
+    }));
+  }
+
   async function handleSalvarRespostaInterna(finalizar) {
     if (!formRespostaInterna || !cotacaoRespostaInterna) return;
     if (finalizar && (!formRespostaInterna.condicao_pagamento.trim() || !formRespostaInterna.prazo_entrega.trim())) {
@@ -2029,8 +2161,31 @@ export default function GerenciarCotacaoSolicitacao() {
       return;
     }
 
+    const itemQuantidadeInvalida = formRespostaInterna.itens.find((item) => {
+      const quantidade = parseNumeroCompraDigitado(item.quantidade_solicitada);
+      return !Number.isFinite(quantidade) || quantidade <= 0;
+    });
+    if (itemQuantidadeInvalida) {
+      alert('Quantidade solicitada do item deve ser maior que zero.');
+      return;
+    }
+
     try {
       setSalvandoRespostaInterna(true);
+      const itensComQuantidadeAlterada = formRespostaInterna.itens.filter((item) => {
+        const original = parseNumeroCompraDigitado(item.quantidade_original);
+        const atual = parseNumeroCompraDigitado(item.quantidade_solicitada);
+        return Number.isFinite(atual) && atual > 0 && Math.abs(atual - original) > 0.000001;
+      });
+
+      for (const item of itensComQuantidadeAlterada) {
+        await atualizarQuantidadeItemSolicitacaoCompra(id, item.item_referencia_id, {
+          item_tipo: item.item_tipo,
+          quantidade: item.quantidade_solicitada,
+          motivo: `Quantidade alterada durante edicao interna da resposta da cotacao do fornecedor ${cotacaoRespostaInterna?.fornecedor?.nome || cotacaoRespostaInterna?.fornecedor_nome || cotacaoRespostaInterna.id}`
+        });
+      }
+
       await salvarRespostaInternaCotacao(id, cotacaoRespostaInterna.id, {
         valor_minimo_pedido: formRespostaInterna.valor_minimo_pedido || null,
         desconto_total: formRespostaInterna.desconto_total || 0,
@@ -2042,10 +2197,10 @@ export default function GerenciarCotacaoSolicitacao() {
           item_tipo: item.item_tipo,
           item_referencia_id: item.item_referencia_id,
           status_disponibilidade: item.status_disponibilidade,
-          preco: item.preco || null,
+          preco: normalizarMoedaCotacaoParaEnvio(item.preco),
           prazo: item.prazo || null,
           quantidade_minima_item: item.quantidade_minima_item || null,
-          data_chegada: item.status_disponibilidade === 'PARA_CHEGAR' ? (item.data_chegada || null) : null,
+          data_chegada: item.data_chegada || null,
           observacao: item.observacao || null
         }))
       });
@@ -2613,6 +2768,7 @@ export default function GerenciarCotacaoSolicitacao() {
         salvando={salvandoRespostaInterna}
         onChange={alterarRespostaInterna}
         onChangeItem={alterarItemRespostaInterna}
+        onAplicarDataChegadaTodos={aplicarDataChegadaRespostaInterna}
         onSalvar={handleSalvarRespostaInterna}
         onFechar={() => {
           if (salvandoRespostaInterna) return;

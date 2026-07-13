@@ -449,9 +449,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         itemTipo === 'MANUAL' ? itemReferenciaId : null,
       disponivel,
       status_disponibilidade: statusEfetivo,
-      data_chegada: statusEfetivo === 'PARA_CHEGAR' && itemResposta.data_chegada
-        ? itemResposta.data_chegada
-        : null,
+      data_chegada: itemResposta.data_chegada || null,
       preco: disponivel ? precoNormalizado : null,
       prazo: itemResposta.prazo ? String(itemResposta.prazo).trim() : null,
       observacao: itemResposta.observacao ? String(itemResposta.observacao).trim() : null,

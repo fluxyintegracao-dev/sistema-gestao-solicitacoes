@@ -107,3 +107,35 @@ Executar o teste funcional em dev e preparar um unico commit do fluxo de cancela
 - Ocultar/mostrar fornecedores no mapa.
 - Marcar vencedor e ajustar quantidade no mapa, depois confirmar que o botao de encerrar segue gerando/atualizando pedidos.
 - Clicar no lapis de um fornecedor no mapa e confirmar que abre o modal de resposta interna ja existente.
+
+## Atualizacao - 2026-07-12 - Mapa em tabela e resposta interna
+
+### Ajuste pendente de commit
+
+- `backend/src/controllers/CotacaoFornecedorController.js`
+  - Preserva `data_chegada` enviada na resposta da cotacao mesmo quando a disponibilidade do item nao estiver marcada como `PARA_CHEGAR`.
+- `frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx`
+  - Modo `Mapa` ajustado para leitura em tabela, com itens em linhas e fornecedores em colunas.
+  - Ranking/card de fornecedores fica restrito ao modo `Cards`.
+  - Modal de resposta interna permite editar a quantidade solicitada do item usando endpoint existente de auditoria da SC antes de salvar a resposta.
+  - `Preco unit.` usa mascara de moeda com ate 10 casas decimais e envia valor normalizado.
+  - `Condicao de pagamento` ganhou lista selecionavel por checkbox, mantendo texto livre.
+  - Data de chegada pode ser editada por item ou aplicada em massa pelo campo de cabecalho.
+- `frontend/src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx`
+  - Modal de apropriacao ganhou mais altura util para Nova Solicitacao de Compra e Compra Direta.
+- `frontend/src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx`
+  - Modal de editar apropriacoes da SC ganhou tamanho intermediario mais legivel.
+
+### Validacao executada
+
+- `git diff --check`
+- `node -c backend/src/controllers/CotacaoFornecedorController.js`
+- `npm run build` em `frontend/`
+
+### Teste funcional recomendado
+
+- Abrir cotacao com resposta e alternar entre `Cards` e `Mapa`, validando que o mapa aparece como tabela.
+- Editar resposta interna pelo lapis: preco com virgula e varias casas decimais, condicao de pagamento, data de chegada por item e data em massa.
+- Alterar quantidade solicitada dentro do modal de resposta interna e confirmar registro/auditoria.
+- Abrir Nova Solicitacao de Compra e Compra Direta para validar altura do modal de apropriacao.
+- Abrir detalhe da SC e validar o modal de editar apropriacoes.

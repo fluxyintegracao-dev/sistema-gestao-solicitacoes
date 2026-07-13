@@ -620,7 +620,7 @@ export default function SolicitacaoCompraDetalheView() {
 
       {modalApropriacaoItem && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/45 p-4">
-          <div className="max-h-[88vh] w-full max-w-[860px] overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-4 shadow-2xl sm:p-5">
+          <div className="max-h-[92vh] w-full max-w-[980px] overflow-y-auto rounded-2xl bg-[var(--c-surface)] p-4 shadow-2xl sm:p-5">
             <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes do item</h2>
