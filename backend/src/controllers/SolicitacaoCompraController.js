@@ -1039,23 +1039,47 @@ function cotacaoFornecedorIncluiItem(cotacaoFornecedor, item) {
 }
 
 function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
-  const itensPorKey = new Map(
-    (itensCotaveis || []).map((item) => [buildCotacaoItemKey(item.item_tipo, item.item_referencia_id), item])
-  );
-  const payload = Array.isArray(itensPayload) && itensPayload.length
+  const itensPorKey = new Map();
+  (itensCotaveis || []).forEach((item) => {
+    const tipo = normalizeTextCompra(item.item_tipo);
+    const referenciaId = Number(item.item_referencia_id);
+    if (referenciaId > 0) {
+      itensPorKey.set(buildCotacaoItemKey(tipo, referenciaId), item);
+    }
+    const itemCadastradoId = Number(item.solicitacao_compra_item_id || (tipo === 'CADASTRADO' ? item.id : null));
+    if (itemCadastradoId > 0) {
+      itensPorKey.set(buildCotacaoItemKey('CADASTRADO', itemCadastradoId), item);
+    }
+    const itemManualId = Number(item.solicitacao_compra_item_manual_id || (tipo === 'MANUAL' ? item.id : null));
+    if (itemManualId > 0) {
+      itensPorKey.set(buildCotacaoItemKey('MANUAL', itemManualId), item);
+    }
+  });
+
+  const payload = Array.isArray(itensPayload)
     ? itensPayload
     : itensCotaveis;
   const selecionados = [];
   const selecionadosKeys = new Set();
 
   payload.forEach((item) => {
-    const key = buildCotacaoItemKey(item.item_tipo, item.item_referencia_id);
+    const tipo = normalizeTextCompra(item.item_tipo);
+    const keysPossiveis = [
+      item.item_key,
+      buildCotacaoItemKey(tipo, item.item_referencia_id),
+      item.solicitacao_compra_item_id ? buildCotacaoItemKey('CADASTRADO', item.solicitacao_compra_item_id) : null,
+      item.solicitacao_compra_item_manual_id ? buildCotacaoItemKey('MANUAL', item.solicitacao_compra_item_manual_id) : null
+    ].filter(Boolean);
+
+    const key = keysPossiveis.find((itemKey) => itensPorKey.has(itemKey));
     const itemBase = itensPorKey.get(key);
     if (!itemBase) {
-      throw new Error('Item invalido informado para envio da cotacao.');
+      const itemInformado = item.item_key || buildCotacaoItemKey(tipo, item.item_referencia_id);
+      throw new Error(`Item ${itemInformado} nao pertence a esta solicitacao de compra.`);
     }
-    if (selecionadosKeys.has(key)) return;
-    selecionadosKeys.add(key);
+    const keyBase = buildCotacaoItemKey(itemBase.item_tipo, itemBase.item_referencia_id);
+    if (selecionadosKeys.has(keyBase)) return;
+    selecionadosKeys.add(keyBase);
     selecionados.push({
       item_tipo: itemBase.item_tipo,
       solicitacao_compra_item_id: itemBase.item_tipo === 'CADASTRADO' ? itemBase.item_referencia_id : null,

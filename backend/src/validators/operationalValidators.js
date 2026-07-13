@@ -449,14 +449,23 @@ function validateCompraEnviarBody(body = {}) {
       throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
     }
 
+    const solicitacaoCompraItemId = parseInteger(entry.solicitacao_compra_item_id, `${contexto} ${index + 1}`, {
+      positiveOnly: true
+    });
+    const solicitacaoCompraItemManualId = parseInteger(entry.solicitacao_compra_item_manual_id, `${contexto} ${index + 1}`, {
+      positiveOnly: true
+    });
     const referenciaInformada =
       entry.item_referencia_id ||
       referenciaPeloItemKey ||
-      (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
+      (itemTipo === 'CADASTRADO' ? solicitacaoCompraItemId : solicitacaoCompraItemManualId);
 
     return {
       item_tipo: itemTipo,
-      item_referencia_id: parseInteger(referenciaInformada, `${contexto} ${index + 1}`, { required: true, positiveOnly: true })
+      item_referencia_id: parseInteger(referenciaInformada, `${contexto} ${index + 1}`, { required: true, positiveOnly: true }),
+      item_key: parseOptionalText(entry.item_key, 'Chave do item', 80),
+      solicitacao_compra_item_id: solicitacaoCompraItemId,
+      solicitacao_compra_item_manual_id: solicitacaoCompraItemManualId
     };
   };
 

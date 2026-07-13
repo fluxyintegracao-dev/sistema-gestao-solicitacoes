@@ -131,6 +131,18 @@ function buildItemKey(item) {
   return `${String(item?.item_tipo || '').toUpperCase()}:${Number(item?.item_referencia_id || 0)}`;
 }
 
+function itemToCotacaoPayload(item) {
+  const itemTipo = String(item?.item_tipo || '').toUpperCase();
+  const itemReferenciaId = Number(item?.item_referencia_id || 0);
+  return {
+    item_tipo: itemTipo,
+    item_referencia_id: itemReferenciaId,
+    item_key: buildItemKey(item),
+    solicitacao_compra_item_id: itemTipo === 'CADASTRADO' ? itemReferenciaId : undefined,
+    solicitacao_compra_item_manual_id: itemTipo === 'MANUAL' ? itemReferenciaId : undefined
+  };
+}
+
 const FORNECEDOR_LINK_COLUMNS = [
   { key: 'nome', width: 250, minWidth: 160 },
   { key: 'telefone', width: 150, minWidth: 120 },
@@ -2125,18 +2137,10 @@ export default function GerenciarCotacaoSolicitacao() {
         if (fornecedor) {
           const itensFornecedor = itensCombinados
             .filter((item) => itensSelecionadosEnvio?.[selectionKey]?.[buildItemKey(item)])
-            .map((item) => ({
-              item_tipo: item.item_tipo,
-              item_referencia_id: item.item_referencia_id,
-              item_key: buildItemKey(item)
-            }));
+            .map(itemToCotacaoPayload);
           const itensEnvio = itensFornecedor.length || itensCombinados.length !== 1
             ? itensFornecedor
-            : itensCombinados.map((item) => ({
-              item_tipo: item.item_tipo,
-              item_referencia_id: item.item_referencia_id,
-              item_key: buildItemKey(item)
-            }));
+            : itensCombinados.map(itemToCotacaoPayload);
           payload.push({
             ...fornecedorToCotacaoPayload(fornecedor),
             itens: itensEnvio
@@ -2150,11 +2154,7 @@ export default function GerenciarCotacaoSolicitacao() {
           email: novoFornecedor.email,
           whatsapp: novoFornecedor.whatsapp,
           contato: novoFornecedor.contato,
-          itens: itensCombinados.map((item) => ({
-            item_tipo: item.item_tipo,
-            item_referencia_id: item.item_referencia_id,
-            item_key: buildItemKey(item)
-          }))
+          itens: itensCombinados.map(itemToCotacaoPayload)
         });
       }
       if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
