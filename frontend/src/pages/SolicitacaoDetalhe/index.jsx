@@ -831,8 +831,8 @@ export default function SolicitacaoDetalhe() {
 
       {modalApropriacoesAberto && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-3xl rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl">
-            <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[var(--c-surface)] p-5 shadow-2xl sm:p-6">
+            <div className="mb-4 flex shrink-0 items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar apropriacoes</h2>
                 <p className="text-sm text-[var(--c-muted)]">
@@ -844,7 +844,7 @@ export default function SolicitacaoDetalhe() {
               </button>
             </div>
 
-            <div className="max-h-[72vh] space-y-4 overflow-y-auto pr-1">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
               <label className="block text-sm font-semibold text-[var(--c-text)]">
                 Apropriacao principal
                 <ApropriacaoAutocomplete
@@ -925,7 +925,7 @@ export default function SolicitacaoDetalhe() {
               </label>
             </div>
 
-            <div className="mt-5 flex justify-end gap-2">
+            <div className="mt-5 flex shrink-0 justify-end gap-2">
               <button type="button" className="btn btn-outline" onClick={fecharModalApropriacoes}>
                 Cancelar
               </button>
