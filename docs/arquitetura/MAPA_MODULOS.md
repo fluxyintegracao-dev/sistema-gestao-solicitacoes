@@ -9,8 +9,8 @@ Este documento define as dependencias que precisam ser avaliadas antes de altera
 | Solicitacoes | usuarios, setores, obras, parceiros, contratos | compras, financeiro, historico, notificacoes | visibilidade, destino e duplicidade de efeitos |
 | Obras | empresas, contratos e apropriacoes | solicitacoes, compras, financeiro, provisionamento, SST | custo ou rateio incorreto |
 | Contratos | parceiros e obras | solicitacoes, comercial, arquivos | perda de contexto contratual |
-| Compras | solicitacoes, itens, parceiros e apropriacoes | cotacoes, pedidos, fiscal e financeiro | compra duplicada ou apropriacao invalida |
-| Cotacoes e Pedidos | compras e fornecedores | pedidos, PDFs, fiscal e financeiro | vencedor incorreto ou pedido duplicado |
+| Compras | solicitacoes, itens, parceiros/credores e apropriacoes | cotacoes, pedidos, fiscal e financeiro | compra duplicada, credor incorreto ou apropriacao invalida |
+| Cotacoes e Pedidos | compras, fornecedores e matriz de itens por fornecedor | links publicos, comparativo, pedidos, PDFs, fiscal e financeiro | item enviado ao fornecedor errado, vencedor incorreto ou pedido duplicado |
 | Financeiro | solicitacoes, compras, comercial, RH/DP e obras | conciliacao, relatorios, governanca | saldo, baixa ou realizado incorreto |
 
 ## Modulos especializados
@@ -39,6 +39,8 @@ Este documento define as dependencias que precisam ser avaliadas antes de altera
 - `COTACOES` depende de `COMPRAS`.
 - `BOLETOS` depende de `FINANCEIRO`.
 - `PROVISOES` depende de `FINANCEIRO` e `OBRAS`.
+- solicitacao de compra aprovada segue diretamente para cotacao; integracao externa e liberacao manual nao sao pre-requisitos vigentes;
+- `fornecedores[].itens` define o escopo de cada link de cotacao e todo item precisa pertencer a mesma solicitacao de compra;
 - SST pode referenciar colaboradores de RH/DP e obras, sem sincronizacao ou automacao entre os modulos.
 - Um modulo consumidor nunca passa a ser dono do dado apenas porque o proprietario esta desabilitado.
 

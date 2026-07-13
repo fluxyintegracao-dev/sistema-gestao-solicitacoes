@@ -18,6 +18,7 @@ Planos, fases, sprints e relatorios de entrega registram contexto historico. Ele
 ## Leitura obrigatoria antes de alterar codigo
 
 - `arquitetura/visao_geral.md`: topologia e principios;
+- `arquitetura/ESTADO_RUNTIME_E_LEGADOS.md`: diferenca entre regra vigente, compatibilidade temporaria e codigo descontinuado;
 - `arquitetura/MAPA_MODULOS.md`: dependencias entre dominios;
 - `arquitetura/PROPRIEDADE_DADOS.md`: dono de cada dado compartilhado;
 - `arquitetura/FLUXOS_ENTRE_MODULOS.md`: efeitos de uma operacao em outros modulos;
@@ -44,6 +45,7 @@ Planos, fases, sprints e relatorios de entrega registram contexto historico. Ele
 - `modulos/rh-dp/README.md`
 - `modulos/sst/README.md`
 - `modulos/governanca/README.md`
+- `modulos/configuracoes-painel/README.md`
 
 ## Dominios transversais
 

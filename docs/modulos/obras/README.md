@@ -9,7 +9,8 @@ Obras e dono do cadastro da obra, classificacao, dimensoes financeiras da obra e
 - obra deve estar vinculada a empresa e aos usuarios autorizados;
 - classificacao publica/privada pode determinar diretoria de aprovacao;
 - apropriacoes usadas por outros modulos nao podem ser removidas fisicamente;
-- rateios precisam referenciar apropriacoes ativas e fechar 100% quando multiplos;
+- rateios precisam referenciar apropriacoes analiticas ativas da mesma obra;
+- em Solicitacoes/Financeiro, rateio percentual fecha 100% ou o rateio por valor fecha o total; em Compras, a soma das quantidades apropriadas fecha a quantidade do item;
 - orcamento nao pode ser calculado a partir de dados inferidos;
 - custo realizado vem de movimentos financeiros ativos;
 - previsto vem de titulos em aberto ou parciais;

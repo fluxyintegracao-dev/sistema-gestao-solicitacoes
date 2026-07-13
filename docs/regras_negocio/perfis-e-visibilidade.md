@@ -2,8 +2,14 @@
 
 ## Perfis centrais
 - `SUPERADMIN`
+- `ADMINISTRADOR`
 - `ADMIN`
+- `ESTAGIARIO`
 - `USUARIO`
+
+`SUPERADMIN` e `ADMINISTRADOR` formam o conceito `BusinessAdmin` usado em varias autorizacoes, mas somente `SUPERADMIN` possui bypass padrao de modulo. `ADMIN` nao tem acesso global automatico: suas excecoes dependem das permissoes e capacidades do setor.
+
+Perfis especializados ainda reconhecidos por dominios antigos, como `FINANCEIRO` e perfis do CRM, devem ser tratados como compatibilidade localizada. A regra completa de precedencia esta em `../seguranca/autenticacao_autorizacao.md`.
 
 ## Fatores de visibilidade
 A visibilidade efetiva depende de combinacao entre:
@@ -11,6 +17,7 @@ A visibilidade efetiva depende de combinacao entre:
 - setor do usuario
 - setores adicionais vinculados ao usuario
 - vinculo com obra
+- modulos habilitados e permissoes de area
 - historico da solicitacao
 - configuracoes de setores e tipos
 

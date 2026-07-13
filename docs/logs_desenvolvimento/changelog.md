@@ -1,5 +1,15 @@
 # Changelog Documental e Operacional
 
+## 2026-07-13 - Revalidacao documental contra o runtime
+
+- catalogo de modulos, registro de permissoes, rotas, controladores, guards do frontend e mudancas recentes foram confrontados com os documentos canonicos;
+- corrigido o fluxo de Compras para remover integracao externa e liberacao manual como pre-requisitos de cotacao;
+- documentados compra direta, cadastro de credor, rateio por quantidade, cancelamento logico e preservacao historica;
+- documentados itens por fornecedor, validacao de pertencimento, rascunho/resposta interna, comparativo e finalizacao transacional das cotacoes;
+- atualizada a autorizacao para 18 grupos, 80 areas e 268 permissoes, incluindo padroes por setor/perfil e bloqueios individuais;
+- criado inventario unico de codigo descontinuado ainda presente no runtime e do SST em transicao;
+- validador documental passou a confrontar o catalogo de modulos e as metricas do registro de permissoes com a documentacao canonica.
+
 ## 2026-07-12 - Redefinicao do modulo SST
 
 - SST redefinido como modulo documental simples;

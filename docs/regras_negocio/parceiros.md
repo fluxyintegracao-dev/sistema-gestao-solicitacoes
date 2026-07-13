@@ -26,3 +26,7 @@
 
 - cotacao pode selecionar parceiros marcados como fornecedor
 - telefone do parceiro pode alimentar o atalho de WhatsApp para envio da cotacao
+- compra direta exige um parceiro ativo marcado como fornecedor para atuar como credor
+- o fluxo de compra direta permite busca/autocomplete e cadastro rapido do credor
+- cadastro rapido da compra direta exige nome, CPF/CNPJ e telefone, aceita email e cria o registro como fornecedor ativo
+- criar o credor por Compras nao transfere a propriedade do cadastro: Parceiros continua como fonte unica e validacoes de duplicidade continuam centralizadas

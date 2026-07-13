@@ -97,11 +97,12 @@ Guia rapido para colaboradores e agentes automatizados.
   - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
 - sistema de permissoes de areas por usuario:
   - registro central em `backend/src/constants/moduloPermissoes.js`
-  - 8 modulos, 33 permissoes no formato `modulo.area.acao`
+  - 18 grupos, 80 areas e 268 permissoes no formato `modulo.area.acao`
   - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
   - sessao do usuario: campo `areas_permissoes`
   - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`
   - UI: Configuracoes > Permissoes de Areas por Usuario (`/permissoes-areas`)
+  - o grupo SST ainda contem permissoes de funcionalidades legadas; nao ampliar esse conjunto antes da simplificacao descrita em `docs/sst/PLANO_SIMPLIFICACAO_SEGURA.md`
 
 ## Checklist de Deploy
 - Backend: `git pull` -> `npm install` (backend) -> `pm2 restart backend-solicitacoes --update-env`.

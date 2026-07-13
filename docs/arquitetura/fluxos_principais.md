@@ -23,17 +23,18 @@
 ## 4. Compras e Cotacao
 
 1. Usuario cria solicitacao de compra.
-2. Adiciona itens e apropriacoes.
-3. Integra/libera para compra.
-4. Seleciona parceiros e fornecedores.
-5. Gera links de cotacao.
-6. Fornecedor responde no portal publico.
-7. Comprador encerra a cotacao.
-8. Sistema gera pedidos de compra.
+2. Adiciona itens e rateia as quantidades em apropriacoes validas da obra.
+3. Quando configurada, a diretoria aprova ou rejeita a compra.
+4. A compra aprovada fica apta a cotar sem integracao externa ou liberacao manual adicional.
+5. Comprador seleciona fornecedores e define os itens enviados a cada um.
+6. Sistema valida o pertencimento dos itens e gera tokens/links individuais.
+7. Fornecedor salva rascunho ou responde no portal publico; operador autorizado pode registrar resposta interna.
+8. Comprador compara respostas e define vencedor/quantidade por item.
+9. Encerramento gera e fecha os pedidos uma unica vez e finaliza as cotacoes nao canceladas.
 
 ## 5. Pedido de Compra
 
-1. Pedido nasce da cotacao encerrada.
+1. Pedido nasce dos vencedores definidos no encerramento da cotacao.
 2. Usuario pode ajustar itens, quantidades e valores.
 3. Toda edicao gera auditoria.
 4. Status configuravel pode bloquear edicao.

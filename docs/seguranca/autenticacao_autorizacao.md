@@ -1,52 +1,63 @@
 # Seguranca - Autenticacao e Autorizacao
 
-Autenticacao:
-- JWT com expiracao configuravel
-- login com rate limit
+## Autenticacao
 
-Autorizacao:
-- validacao por perfil (ADMIN, USUARIO, SUPERADMIN)
-- validacao por setor e obra
-- backend decide escopo de dados
+- JWT com expiracao configuravel;
+- login protegido por rate limit;
+- MFA e controles de sessao sao aplicados pelo backend quando configurados.
 
-## Camadas de Permissao (ordem de precedencia)
+## Principio de autorizacao
 
-1. Perfil do usuario (SUPERADMIN, ADMINISTRADOR, ADMIN, FINANCEIRO, USUARIO)
-   - SUPERADMIN e ADMINISTRADOR tem bypass total em todas as camadas abaixo.
+A autorizacao efetiva combina modulo habilitado, perfil, permissoes granulares, capacidades de setor, escopo de obra e acesso ao recurso. O frontend usa as mesmas informacoes para navegacao e visibilidade, mas somente o backend autoriza a operacao.
 
-2. Modulos habilitados por instalacao
-   - Chave `MODULOS_HABILITADOS` em `ConfiguracaoSistema`.
-   - Define quais modulos estao ativos para a empresa.
+## Perfis
 
-3. Acesso financeiro por usuario
-   - Chave `USUARIOS_ACESSO_FINANCEIRO` em `ConfiguracaoSistema`.
-   - Libera o modulo FINANCEIRO para usuarios fora do perfil FINANCEIRO.
+Os perfis centrais aceitos pela importacao de usuarios sao `USUARIO`, `ESTAGIARIO`, `ADMIN`, `ADMINISTRADOR` e `SUPERADMIN`.
 
-4. Capacidades granulares RH/DP
-   - Chave `USUARIOS_PERMISSOES_RH_DP` em `ConfiguracaoSistema`.
-   - Controla acesso por area dentro do modulo RH_DP para compatibilidade com configuracoes existentes.
-   - Exemplo de chave: `rh_dp_colaboradores_view`.
+- `SUPERADMIN`: excecao tecnica ampla; por padrao pode atravessar o bloqueio de modulo em rotas autenticadas. Rotas publicas sensiveis podem desativar expressamente esse bypass.
+- `ADMINISTRADOR`: junto com `SUPERADMIN`, forma o conceito `BusinessAdmin` e ignora a matriz granular de areas. Nao recebe automaticamente o bypass de modulo reservado ao `SUPERADMIN`.
+- `ADMIN`: nao e administrador global; suas excecoes dependem de permissoes e capacidades do setor, como `eh_setor_geo`.
+- `USUARIO` e `ESTAGIARIO`: seguem permissoes e escopos atribuídos.
 
-5. Permissoes de areas por usuario (modular, todos os demais modulos)
-   - Chave `PERMISSOES_AREAS_USUARIOS` em `ConfiguracaoSistema`.
-   - Registro central em `backend/src/constants/moduloPermissoes.js`.
-   - Cobre: SOLICITACOES, COMPRAS, FINANCEIRO, OBRAS, CONTRATOS, COMERCIAL, BIBLIOTECA, COMUNICACAO_INTERNA.
-   - Chave no formato `modulo.area.acao` (ex: `financeiro.titulos.criar`).
-   - Se um usuario nao tiver entradas: acesso completo ao que seu perfil permite (compatibilidade).
-   - Se tiver entradas: somente as chaves marcadas valem.
-   - Sessao do usuario recebe `areas_permissoes: [...]`.
-   - Frontend verifica via `hasPermissao(user, 'chave')` em `acessoProduto.js`.
-   - Configuracao administrativa em: Configuracoes > Permissoes de Areas por Usuario.
+O codigo ainda reconhece perfis especializados em fluxos especificos, como `FINANCEIRO`, `ADMIN_CRM`, `GESTOR_COMERCIAL`, `COORDENADOR_CRM` e `DIRETORIA`. Eles sao compatibilidades de dominio, nao substituem a matriz central e nao devem ser generalizados sem revisar cadastro, importacao, sessao e todos os consumidores.
 
-## Session User Object
+## Camadas de decisao
 
-Campos relevantes enviados ao frontend apos autenticacao:
-- `perfil` - papel do usuario
-- `modulos_habilitados` - modulos ativos da instalacao
-- `financeiro_liberado` - acesso ao modulo financeiro
-- `rh_dp_capacidades` - lista de chaves de capacidade RH/DP
-- `areas_permissoes` - lista de chaves de permissao de area (vazia = acesso completo)
+1. Modulo habilitado
+   - configuracao `MODULOS_HABILITADOS`;
+   - middleware `requireEnabledModule` no backend;
+   - `hasEnabledModule` no frontend;
+   - dependencias entre modulos sao aplicadas pelo catalogo.
 
-Observacao:
-- frontend nao deve decidir permissoes
-- verificacoes de permissao no frontend sao UX (ocultar elementos); o backend sempre valida
+2. Perfil e permissao de area
+   - registro central em `backend/src/constants/moduloPermissoes.js`;
+   - estado auditado em 2026-07-13: 18 grupos, 80 areas e 268 chaves;
+   - formato `modulo.area.acao`, por exemplo `financeiro.titulos.criar`;
+   - configuracao `PERMISSOES_AREAS_USUARIOS` contem permissoes por usuario, bloqueios por usuario e padroes por setor/perfil;
+   - a permissao efetiva e a uniao de padrao do setor/perfil, sessao e concessao individual, menos os bloqueios;
+   - sem permissoes configuradas, o backend preserva o acesso legado permitido pelo perfil e setor;
+   - com permissoes configuradas, a chave explicita governa os fluxos que usam a matriz.
+
+3. Compatibilidades especificas
+   - `USUARIOS_ACESSO_FINANCEIRO` libera acesso financeiro adicional;
+   - perfil ou capacidade do setor financeiro tambem podem conceder acesso quando a matriz nao esta configurada;
+   - `USUARIOS_PERMISSOES_RH_DP` permanece como fallback granular de RH/DP quando nao ha matriz central configurada.
+
+4. Escopo do recurso
+   - setor principal e setores adicionais;
+   - obra e configuracao de acesso a todas as obras;
+   - autoria, atribuicao, diretoria e historico do fluxo;
+   - middlewares de recurso revalidam o registro solicitado, inclusive Compras, Pedidos e Contratos.
+
+## Objeto de sessao
+
+Campos relevantes entregues ao frontend:
+
+- `perfil`;
+- `modulos_habilitados`;
+- `financeiro_liberado`;
+- `rh_dp_capacidades`;
+- `areas_permissoes`;
+- setor principal, setores/vinculos adicionais e escopos de obra quando aplicaveis.
+
+Lista vazia de `areas_permissoes` representa compatibilidade sem restricao granular, nao negacao total. Uma chave desconhecida de modulo tambem possui fallback permissivo; consulte `../arquitetura/visao_geral.md` antes de criar ou renomear modulos.

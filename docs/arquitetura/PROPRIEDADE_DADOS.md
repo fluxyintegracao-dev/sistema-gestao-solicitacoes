@@ -6,13 +6,14 @@ Cada dado compartilhado possui um dominio proprietario. Consumidores podem refer
 |---|---|---|
 | usuario, perfil e sessao | Autenticacao/Usuarios | todos os modulos |
 | setor, tipo e status de solicitacao | Solicitacoes/Configuracoes | diretorias, compras, financeiro, relatorios |
-| parceiro | Parceiros | solicitacoes, compras, financeiro, contratos, comercial e fiscal |
+| parceiro, cliente, fornecedor e credor | Parceiros | solicitacoes, compras, financeiro, contratos, comercial e fiscal |
 | empresa do grupo | Configuracoes institucionais | obras, financeiro, RH/DP, comercial e relatorios |
 | obra | Obras | solicitacoes, compras, financeiro, contratos, RH/DP e SST |
 | apropriacao | Obras | solicitacoes, compras, financeiro e provisionamento |
 | contrato operacional | Contratos | solicitacoes, obras e arquivos |
 | solicitacao de compra e itens | Compras | cotacoes, pedidos, fiscal e relatorios |
 | cotacao e resposta do fornecedor | Cotacoes | pedidos e relatorios de compras |
+| escopo de itens enviado a cada fornecedor | Cotacoes | link publico, resposta, comparativo e encerramento |
 | pedido de compra | Cotacoes e Pedidos | fiscal, financeiro, obras e relatorios |
 | titulo financeiro | Financeiro | comercial, RH/DP, obras, conciliacao e relatorios |
 | movimento/baixa | Financeiro | conciliacao, resultado de obras, DRE e governanca |

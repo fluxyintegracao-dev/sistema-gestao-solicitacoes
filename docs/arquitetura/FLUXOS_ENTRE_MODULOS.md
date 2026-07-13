@@ -4,20 +4,21 @@
 
 1. Solicitacao valida obra, setor, tipo e permissao.
 2. Fluxo de compra cria ou vincula a solicitacao de compra uma unica vez.
-3. Itens recebem apropriacoes validas cuja soma deve fechar 100%.
+3. Itens recebem apropriacoes analiticas validas da mesma obra; a soma das quantidades apropriadas deve fechar a quantidade do item.
 4. Compras passa a ser dona dos itens; a solicitacao original continua como origem auditavel.
 
 Validar: idempotencia, status de origem, permissao, historico e notificacao.
 
 ## Compras para cotacao e pedido
 
-1. Compra e liberada para cotacao.
-2. Fornecedores recebem tokens individuais.
-3. Respostas sao imutavelmente associadas ao fornecedor e a cotacao.
-4. Encerramento seleciona vencedor por item.
-5. Pedidos sao gerados uma unica vez e alteracoes posteriores sao auditadas.
+1. Compra conclui a aprovacao interna ou da diretoria e fica apta a cotar sem etapa externa adicional.
+2. Cada fornecedor recebe token individual e somente os itens marcados para ele.
+3. O backend valida que os itens pertencem a mesma compra; rascunhos e respostas permanecem associados ao fornecedor e suas substituicoes preservam historico.
+4. Comparativo considera respostas validas e o encerramento seleciona vencedor/quantidade por item.
+5. Pedidos sao gerados e fechados uma unica vez; cotacoes nao canceladas sao finalizadas na mesma transacao.
+6. Alteracoes posteriores em pedidos sao auditadas e respeitam bloqueios de status.
 
-Validar: prazo, token, minimo, vencedor, total, apropriacao, bloqueio de edicao e duplicidade.
+Validar: aprovacao, escopo de itens por fornecedor, pertencimento do item, prazo, token, rascunho, minimo, vencedor, total, apropriacao, bloqueio de edicao e duplicidade.
 
 ## Origem operacional para financeiro
 

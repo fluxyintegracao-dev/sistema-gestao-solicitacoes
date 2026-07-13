@@ -22,7 +22,13 @@ O banco persiste o estado oficial. Relatorios e dashboards devem derivar de dado
 
 ## Modularidade
 
-Os modulos sao controlados por `MODULOS_HABILITADOS`. Dependencias declaradas devem ser aplicadas tanto no frontend quanto no backend. Desabilitar um modulo nao remove suas colunas nem transfere a propriedade de seus dados para outro dominio.
+Os modulos sao controlados pela chave `MODULOS_HABILITADOS` de `ConfiguracaoSistema`. O catalogo, os valores padrao e as dependencias ficam em `backend/src/services/moduleConfigService.js`; o backend aplica `requireEnabledModule` nas rotas e o frontend recebe `modulos_habilitados` na sessao.
+
+Dependencias declaradas devem ser aplicadas tanto no frontend quanto no backend. Desabilitar um modulo nao remove suas colunas, rotas ou tabelas e nao transfere a propriedade de seus dados para outro dominio.
+
+Por compatibilidade, uma chave de modulo desconhecida e considerada habilitada no backend. O frontend tambem considera habilitado quando a sessao nao contem lista de modulos ou quando a chave nao existe nela. Portanto, todo novo modulo precisa ser incluido no catalogo, exposto na sessao, protegido no backend e frontend e coberto pela validacao documental. Esse comportamento de compatibilidade nao deve ser usado como mecanismo de habilitacao.
+
+O inventario do runtime e os componentes descontinuados ainda presentes no codigo estao em `ESTADO_RUNTIME_E_LEGADOS.md`.
 
 ## Regra de mudanca
 

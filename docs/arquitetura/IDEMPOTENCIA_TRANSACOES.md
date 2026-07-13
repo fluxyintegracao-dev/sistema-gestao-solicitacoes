@@ -4,7 +4,7 @@
 
 - criacao de solicitacao e solicitacao de compra;
 - envio entre setores e aprovacao;
-- liberacao para cotacao;
+- aprovacao e envio da compra para cotacao;
 - resposta de fornecedor;
 - encerramento de cotacao e geracao de pedido;
 - geracao de titulo;

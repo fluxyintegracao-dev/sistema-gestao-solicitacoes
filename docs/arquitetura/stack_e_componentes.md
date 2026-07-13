@@ -64,6 +64,18 @@ Blocos principais em `frontend/src`:
 - `layout/`
   Shell principal, menu e navegacao por perfil.
 
+## Mobile
+
+Stack principal em `mobile/`:
+
+- Expo SDK 54 e Expo Router
+- React Native 0.81
+- React Query
+- React Hook Form e Zod
+- Secure Store para sessao
+
+O app mobile possui cliente e navegacao proprios, mas consome a mesma API e deve respeitar os mesmos modulos, permissoes e escopos do backend. O escopo publicado e as pendencias de lojas ficam em `publicacao-mobile-stores.md`.
+
 ## Infra e Runtime
 
 - backend em EC2 com PM2

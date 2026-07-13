@@ -15,7 +15,10 @@
 
 ## Persistencia local
 O frontend usa `localStorage` para:
-- tema
-- filtros da listagem de solicitacoes
-- colunas visiveis da tabela
-- marcacao local de leitura em comunicacao interna
+- tema e preferencias de timeout;
+- filtros, ordem, largura e visibilidade de colunas em telas operacionais;
+- rascunhos locais de compra normal, compra direta e contrato comercial;
+- marcacao local de leitura em comunicacao interna;
+- preferencias pontuais de configuracao.
+
+`localStorage` e apoio de UX e nunca e a fonte oficial de autorizacao, status, saldo, cotacao, pedido ou outro dado de negocio. O backend deve revalidar todo rascunho ao gravar.
