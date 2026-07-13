@@ -3661,12 +3661,6 @@ module.exports = {
           itensCotaveisSolicitacao = await carregarItensCotaveisDiretos(solicitacao.id, transaction);
         }
 
-        const algumFornecedorComItens = fornecedoresPayload.some((fornecedor) => (
-          Array.isArray(fornecedor.itens) && fornecedor.itens.length > 0
-        ));
-        if (itensPayload || !algumFornecedorComItens) {
-          normalizarItensSelecionadosCotacao(itensPayload, itensCotaveisSolicitacao);
-        }
       } catch (error) {
         await transaction.rollback();
         return res.status(400).json({ error: error.message || 'Itens invalidos para envio da cotacao.' });
