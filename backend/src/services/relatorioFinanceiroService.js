@@ -2395,7 +2395,7 @@ async function gerarDreGerencial(req, filters = {}) {
       {
         model: CategoriaFinanceira,
         as: 'categoriaFinanceira',
-        attributes: ['id', 'codigo', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
         required: false
       }
     ],
@@ -2440,7 +2440,7 @@ async function gerarDreGerencial(req, filters = {}) {
           {
             model: CategoriaFinanceira,
             as: 'categoriaFinanceira',
-            attributes: ['id', 'codigo', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+            attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
             required: true
           }
         ],
