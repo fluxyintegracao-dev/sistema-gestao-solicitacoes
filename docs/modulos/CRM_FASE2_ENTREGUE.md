@@ -142,7 +142,7 @@ Grupo CRM agora inclui:
 
 ## Próxima fase
 
-Ver `PLANO_MODULO_CRM.md` — **Fase 3: Canais e integrações**
+O estado atual consolidado esta em `docs/modulos/crm/README.md`.
 
 Escopo Fase 3:
 - `crm_channels` — canais de comunicação (WhatsApp, Phone, Email, Form)

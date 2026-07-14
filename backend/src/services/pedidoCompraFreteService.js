@@ -230,6 +230,9 @@ async function registrarFretePedido({
   if (!pedido) {
     throw new Error('Pedido de compra nao encontrado.');
   }
+  if (normalizeToken(pedido.status) === 'CANCELADO') {
+    throw new Error('Pedido cancelado nao aceita novos fretes.');
+  }
 
   const key = idempotencyKey ? String(idempotencyKey).trim().slice(0, 120) : null;
   if (key) {

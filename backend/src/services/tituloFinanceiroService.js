@@ -43,6 +43,9 @@ const {
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
+const {
+  buildIntercompanyCartaoPayload
+} = require('./tituloIntercompanyCartaoHelper');
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -505,6 +508,10 @@ function isFormaBoleto(formaPagamento) {
   return getTipoFormaPagamento(formaPagamento).includes('BOLETO');
 }
 
+function isFormaPix(formaPagamento) {
+  return getTipoFormaPagamento(formaPagamento).includes('PIX');
+}
+
 function isFormaOutros(formaPagamento) {
   const value = getTipoFormaPagamento(formaPagamento);
   return value.includes('OUTROS') || value.includes('OUTRO');
@@ -667,12 +674,13 @@ function resolveVencimentoParcela({ formaPagamento, parcela, dataVencimentoBase,
     return addMonths(dataVencimentoBase || dataCompra, index);
   }
 
-  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
-    if (!parcela?.data_vencimento) {
-      const label = isFormaCheque(formaPagamento) ? 'cheque' : isFormaOutros(formaPagamento) ? 'guia de pagamento' : 'boleto';
-      throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
-    }
+  if (parcela?.data_vencimento) {
     return parcela.data_vencimento;
+  }
+
+  if (isFormaBoleto(formaPagamento) || isFormaCheque(formaPagamento) || isFormaOutros(formaPagamento)) {
+    const label = isFormaCheque(formaPagamento) ? 'cheque' : isFormaOutros(formaPagamento) ? 'guia de pagamento' : 'boleto';
+    throw createHttpError(400, `Informe o vencimento do ${label} da parcela ${index + 1}.`);
   }
 
   if (!dataVencimentoBase) {
@@ -1148,7 +1156,7 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
   }
 
   const quantidadeParcelas = Math.max(Number(payload.quantidade_parcelas || 1), 1);
-  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false && !isFormaOutros(forma)) {
+  if (quantidadeParcelas > 1 && forma.permite_parcelamento === false && !isFormaPix(forma) && !isFormaOutros(forma)) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
   }
 
@@ -1537,6 +1545,54 @@ async function validarIntercompanyTitulo(payload = {}) {
     elimina_consolidado: payload.elimina_consolidado !== false,
     transferencia_interna: payload.transferencia_interna !== false
   };
+}
+
+async function resolverIntercompanyPagamento({
+  formaPagamento,
+  pagamentoPayload = {},
+  empresaTituloId,
+  tipoTitulo,
+  intercompanyFieldsPadrao
+}) {
+  if (!isFormaCartao(formaPagamento) || !pagamentoPayload.cartao_id) {
+    return intercompanyFieldsPadrao;
+  }
+
+  const cartao = await CartaoFinanceiro.findByPk(pagamentoPayload.cartao_id, {
+    include: [{
+      model: ContaBancaria,
+      as: 'contaBancaria',
+      attributes: ['id', 'nome', 'empresa_id', 'ativo']
+    }]
+  });
+
+  if (!cartao || cartao.ativo === false) {
+    throw createHttpError(400, 'Cartao financeiro invalido ou inativo.');
+  }
+
+  const conta = cartao.contaBancaria;
+  if (!conta || conta.ativo === false) {
+    throw createHttpError(400, 'O cartao precisa ter uma conta financeira ativa vinculada.');
+  }
+
+  const empresaCartaoId = Number(conta.empresa_id);
+  if (!Number.isInteger(empresaCartaoId) || empresaCartaoId <= 0) {
+    throw createHttpError(
+      400,
+      'A conta vinculada ao cartao precisa ter uma empresa do grupo configurada.'
+    );
+  }
+
+  const intercompanyCartao = buildIntercompanyCartaoPayload({
+    empresaTituloId,
+    empresaCartaoId,
+    tipoTitulo,
+    cartaoNome: cartao.nome
+  });
+
+  return intercompanyCartao.intercompany
+    ? validarIntercompanyTitulo(intercompanyCartao)
+    : intercompanyCartao;
 }
 
 function buildMovimentoIntercompanyFields(titulo = {}) {
@@ -2222,12 +2278,12 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     obra: solicitacao.obra
   });
 
-  const [, categoria] = await Promise.all([
+  const [, categoriaPadrao] = await Promise.all([
     validarEmpresaGrupo(empresaTituloId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
-  validarCategoriaDreTitulo(categoria, payload);
-  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  validarCategoriaDreTitulo(categoriaPadrao, payload);
+  const intercompanyFieldsPadrao = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -2241,7 +2297,18 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
     }
     const parceiroPagamento = await validarParceiro(parceiroIdPagamento);
     validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
+    const categoriaPagamento = pagamentoPayload.categoria_financeira_id
+      ? await validarCategoriaFinanceira(pagamentoPayload.categoria_financeira_id, tipo)
+      : categoriaPadrao;
+    validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const intercompanyFields = await resolverIntercompanyPagamento({
+      formaPagamento,
+      pagamentoPayload,
+      empresaTituloId,
+      tipoTitulo: tipo,
+      intercompanyFieldsPadrao
+    });
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
       1
@@ -2272,7 +2339,9 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
 
     pagamentos.push({
       parceiro: parceiroPagamento,
+      categoria: categoriaPagamento,
       formaPagamento,
+      intercompanyFields,
       payload: pagamentoPayload,
       quantidadeParcelas,
       valoresParcelas,
@@ -2336,9 +2405,9 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
           obra_id: solicitacao.obra_id,
           apropriacao_id: solicitacao.apropriacao_id || null,
           empresa_id: empresaTituloId,
-          ...intercompanyFields,
+          ...pagamento.intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
-          categoria_financeira_id: categoria?.id || null,
+          categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,
@@ -2517,7 +2586,7 @@ async function criarTituloManual(req, payload = {}) {
     throw createHttpError(400, 'Descricao e obrigatoria para criar o titulo manual.');
   }
 
-  const [obra, parceiro, categoria] = await Promise.all([
+  const [obra, parceiro, categoriaPadrao] = await Promise.all([
     validarObraTitulo(req, obraId),
     validarParceiro(parceiroId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
@@ -2530,8 +2599,8 @@ async function criarTituloManual(req, payload = {}) {
   const apropriacao = await validarApropriacaoTitulo(payload.apropriacao_id, obra.id);
 
   validarCompatibilidadeParceiroTitulo(parceiro, tipo);
-  validarCategoriaDreTitulo(categoria, payload);
-  const intercompanyFields = await validarIntercompanyTitulo(payload);
+  validarCategoriaDreTitulo(categoriaPadrao, payload);
+  const intercompanyFieldsPadrao = await validarIntercompanyTitulo(payload);
 
   const pagamentosPayload = Array.isArray(payload.pagamentos) && payload.pagamentos.length > 0
     ? payload.pagamentos
@@ -2547,7 +2616,18 @@ async function criarTituloManual(req, payload = {}) {
       ? parceiro
       : await validarParceiro(parceiroPagamentoId);
     validarCompatibilidadeParceiroTitulo(parceiroPagamento, tipo);
+    const categoriaPagamento = pagamentoPayload.categoria_financeira_id
+      ? await validarCategoriaFinanceira(pagamentoPayload.categoria_financeira_id, tipo)
+      : categoriaPadrao;
+    validarCategoriaDreTitulo(categoriaPagamento, payload);
     const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const intercompanyFields = await resolverIntercompanyPagamento({
+      formaPagamento,
+      pagamentoPayload,
+      empresaTituloId,
+      tipoTitulo: tipo,
+      intercompanyFieldsPadrao
+    });
     const quantidadeParcelas = Math.max(
       Number(pagamentoPayload.quantidade_parcelas || pagamentoPayload.parcelas?.length || 1),
       1
@@ -2578,7 +2658,9 @@ async function criarTituloManual(req, payload = {}) {
 
     pagamentos.push({
       parceiro: parceiroPagamento,
+      categoria: categoriaPagamento,
       formaPagamento,
+      intercompanyFields,
       payload: pagamentoPayload,
       quantidadeParcelas,
       valoresParcelas,
@@ -2635,9 +2717,9 @@ async function criarTituloManual(req, payload = {}) {
           obra_id: obra.id,
           apropriacao_id: apropriacao?.id || null,
           empresa_id: empresaTituloId,
-          ...intercompanyFields,
+          ...pagamento.intercompanyFields,
           parceiro_id: pagamento.parceiro.id,
-          categoria_financeira_id: categoria?.id || null,
+          categoria_financeira_id: pagamento.categoria?.id || categoriaPadrao?.id || null,
           forma_pagamento_id: pagamento.formaPagamento?.id || null,
           cartao_id: pagamento.payload.cartao_id || null,
           grupo_parcelamento_id: pagamento.grupoParcelamentoId,

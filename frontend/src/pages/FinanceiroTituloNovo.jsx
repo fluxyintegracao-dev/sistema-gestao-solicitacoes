@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
 import { textMatchesSearchTerms } from '../utils/search';
+import CategoriaFinanceiraAutocomplete from '../components/ui/CategoriaFinanceiraAutocomplete';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -141,13 +142,14 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(valor = '', parceiro = null) {
+function createPagamento(valor = '', parceiro = null, categoriaFinanceiraId = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     valor,
     parceiro_id: parceiro?.id ? String(parceiro.id) : '',
     parceiro_nome: parceiro?.nome || '',
     parceiro_busca: '',
+    categoria_financeira_id: categoriaFinanceiraId ? String(categoriaFinanceiraId) : '',
     data_vencimento: today(),
     forma_pagamento_id: '',
     cartao_id: '',
@@ -852,7 +854,15 @@ export default function FinanceiroTituloNovo() {
 
   function selecionarCategoriaFinanceira(categoria) {
     if (!categoria) return;
-    setForm((current) => ({ ...current, categoria_financeira_id: String(categoria.id) }));
+    const categoriaId = String(categoria.id);
+    setForm((current) => ({
+      ...current,
+      categoria_financeira_id: categoriaId,
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: categoriaId
+      }))
+    }));
     setCategoriaBusca(categoria.nome || '');
     setCategoriaModalOpen(false);
   }
@@ -910,6 +920,10 @@ export default function FinanceiroTituloNovo() {
         tipo: value,
         parceiro_id: '',
         categoria_financeira_id: '',
+        pagamentos: (current.pagamentos || []).map((pagamento) => ({
+          ...pagamento,
+          categoria_financeira_id: ''
+        })),
         forma_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.forma_cobranca : '',
         status_cobranca: value === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
         banco_cobranca: ['RECEBER', 'PAGAR'].includes(value) ? current.banco_cobranca : '',
@@ -1040,14 +1054,22 @@ export default function FinanceiroTituloNovo() {
   function adicionarPagamento() {
     setForm((current) => ({
       ...current,
-      pagamentos: [...(current.pagamentos || []), createPagamento('', parceiroSelecionado)]
+      pagamentos: [
+        ...(current.pagamentos || []),
+        createPagamento('', parceiroSelecionado, current.categoria_financeira_id)
+      ]
     }));
   }
 
   function removerPagamento(index) {
     setForm((current) => {
       const pagamentos = (current.pagamentos || []).filter((_, itemIndex) => itemIndex !== index);
-      return { ...current, pagamentos: pagamentos.length ? pagamentos : [createPagamento(current.valor)] };
+      return {
+        ...current,
+        pagamentos: pagamentos.length
+          ? pagamentos
+          : [createPagamento(current.valor, parceiroSelecionado, current.categoria_financeira_id)]
+      };
     });
   }
 
@@ -1160,6 +1182,10 @@ export default function FinanceiroTituloNovo() {
 
       if (pagamentos.length > 1 && !pagamento.parceiro_id) {
         return `Selecione o ${form.tipo === 'RECEBER' ? 'cliente' : 'credor'} da ${labelForma}.`;
+      }
+
+      if (pagamentos.length > 1 && !(pagamento.categoria_financeira_id || form.categoria_financeira_id)) {
+        return `Selecione a categoria financeira da ${labelForma}.`;
       }
 
       if (valorPagamento <= 0) {
@@ -1314,6 +1340,7 @@ export default function FinanceiroTituloNovo() {
         const usaDetalhe = formaUsaParcelasDetalhadas(forma);
         return {
           parceiro_id: pagamento.parceiro_id ? Number(pagamento.parceiro_id) : undefined,
+          categoria_financeira_id: pagamento.categoria_financeira_id || form.categoria_financeira_id || undefined,
           valor: usaDetalhe ? undefined : pagamento.valor,
           forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
           cartao_id: pagamento.cartao_id || undefined,
@@ -1414,6 +1441,10 @@ export default function FinanceiroTituloNovo() {
                       tipo,
                       parceiro_id: '',
                       categoria_financeira_id: '',
+                      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                        ...pagamento,
+                        categoria_financeira_id: ''
+                      })),
                       forma_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.forma_cobranca : '',
                       status_cobranca: tipo === 'RECEBER' ? current.status_cobranca : 'PENDENTE_EMISSAO',
                       banco_cobranca: ['RECEBER', 'PAGAR'].includes(tipo) ? current.banco_cobranca : '',
@@ -1472,7 +1503,14 @@ export default function FinanceiroTituloNovo() {
                       value={categoriaBusca}
                       onChange={(event) => {
                         setCategoriaBusca(event.target.value);
-                        setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                        setForm((current) => ({
+                          ...current,
+                          categoria_financeira_id: '',
+                          pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                            ...pagamento,
+                            categoria_financeira_id: ''
+                          }))
+                        }));
                       }}
                     />
                     <button
@@ -1493,7 +1531,14 @@ export default function FinanceiroTituloNovo() {
                         className="btn btn-outline shrink-0"
                         onClick={() => {
                           setCategoriaBusca('');
-                          updateField('categoria_financeira_id', '');
+                          setForm((current) => ({
+                            ...current,
+                            categoria_financeira_id: '',
+                            pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                              ...pagamento,
+                              categoria_financeira_id: ''
+                            }))
+                          }));
                         }}
                       >
                         Limpar
@@ -1725,7 +1770,7 @@ export default function FinanceiroTituloNovo() {
                   />
                 </div>
                 <span className="app-note mt-2">
-                  Informe origem, destino e tipo da movimentacao entre empresas do grupo.
+                  Use esta configuracao nas formas sem cartao. Para cartoes, a conta vinculada define automaticamente as empresas envolvidas.
                 </span>
               </div>
 
@@ -1748,6 +1793,16 @@ export default function FinanceiroTituloNovo() {
                   const usaDetalhe = formaUsaParcelasDetalhadas(forma);
                   const usaCartao = isFormaCartao(forma);
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
+                  const cartaoSelecionado = cartoesFiltrados.find((item) => String(item.id) === String(pagamento.cartao_id));
+                  const empresaContaCartao = cartaoSelecionado?.contaBancaria?.empresa;
+                  const empresaTitulo = empresasGrupo.find((item) => String(item.id) === String(form.empresa_id));
+                  const nomeEmpresaCartao = empresaContaCartao?.nome || empresaContaCartao?.razao_social;
+                  const nomeEmpresaTitulo = empresaTitulo?.nome || empresaTitulo?.razao_social;
+                  const cartaoEntreEmpresas = Boolean(
+                    empresaContaCartao?.id
+                    && empresaTitulo?.id
+                    && String(empresaContaCartao.id) !== String(empresaTitulo.id)
+                  );
 
                   return (
                     <div key={pagamento.id || pagamentoIndex} className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
@@ -1802,6 +1857,18 @@ export default function FinanceiroTituloNovo() {
                             Use quando cada titulo precisar sair para um {form.tipo === 'RECEBER' ? 'cliente' : 'credor'} diferente.
                           </span>
                         </div>
+                      )}
+
+                      {quantidadePagamentos > 1 && (
+                        <CategoriaFinanceiraAutocomplete
+                          label="Categoria financeira deste titulo"
+                          value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                          options={categoriasFiltradas}
+                          onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
+                            categoria_financeira_id: categoriaId
+                          })}
+                          helperText="A categoria deste titulo sera aplicada a todas as parcelas geradas nele."
+                        />
                       )}
 
                       <div className="grid gap-3 md:grid-cols-2">
@@ -1889,24 +1956,40 @@ export default function FinanceiroTituloNovo() {
                       </div>
 
                       {forma?.exige_cartao && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-[var(--c-muted)]">Cartao previsto</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.cartao_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
-                          >
-                            <option value="">Informar na baixa</option>
-                            {cartoesFiltrados.map((cartao) => (
-                              <option key={cartao.id} value={cartao.id}>
-                                {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)})
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-[var(--c-muted)]">
-                            Opcional; a fatura sera vinculada na baixa do titulo.
-                          </span>
-                        </label>
+                        <div className="space-y-2">
+                          <label className="text-sm">
+                            <span className="mb-1 block text-[var(--c-muted)]">Cartao</span>
+                            <select
+                              className="input w-full"
+                              value={pagamento.cartao_id || ''}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                            >
+                              <option value="">Selecione o cartao</option>
+                              {cartoesFiltrados.map((cartao) => {
+                                const empresaCartao = cartao?.contaBancaria?.empresa;
+                                const nomeEmpresa = empresaCartao?.nome || empresaCartao?.razao_social;
+                                return (
+                                  <option key={cartao.id} value={cartao.id}>
+                                    {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)}){nomeEmpresa ? ` - ${nomeEmpresa}` : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                              A conta vinculada ao cartao define a empresa da movimentacao bancaria.
+                            </span>
+                          </label>
+
+                          {cartaoSelecionado && (
+                            <div className={`rounded-lg border px-3 py-2 text-xs ${cartaoEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                              {cartaoEntreEmpresas
+                                ? form.tipo === 'RECEBER'
+                                  ? `Entre empresas automatico: ${nomeEmpresaTitulo || 'empresa do titulo'} recebe por conta de ${nomeEmpresaCartao || 'empresa do cartao'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                  : `Entre empresas automatico: ${nomeEmpresaCartao || 'empresa do cartao'} paga titulo de ${nomeEmpresaTitulo || 'empresa da obra'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                : `Movimentacao na mesma empresa do titulo: ${nomeEmpresaTitulo || nomeEmpresaCartao || 'empresa da obra'}.`}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {usaDetalhe && (

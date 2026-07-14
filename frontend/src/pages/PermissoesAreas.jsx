@@ -14,6 +14,13 @@ import {
 import { isSuperadmin } from '../utils/acessoProduto';
 
 const PERMISSAO_SOLICITACOES_MINHAS = 'solicitacoes.lista.visualizar_minhas';
+const COMPRAS_SCOPE_KEYS = [
+  'compras.escopo.minhas_atribuidas',
+  'compras.escopo.setor',
+  'compras.escopo.todas'
+];
+const COMPRAS_SCOPE_DEFAULT = 'compras.escopo.minhas_atribuidas';
+const COMPRAS_SCOPE_SELECT_ALL = 'compras.escopo.setor';
 
 function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();
@@ -32,6 +39,17 @@ function normalizeToken(value) {
     .toUpperCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+}
+
+function isComprasScopeKey(value) {
+  return COMPRAS_SCOPE_KEYS.includes(normalizeKey(value));
+}
+
+function getEffectiveComprasScope(permissoes = []) {
+  const normalized = new Set(permissoes.map(normalizeKey));
+  if (normalized.has('compras.escopo.todas')) return 'compras.escopo.todas';
+  if (normalized.has('compras.escopo.setor')) return 'compras.escopo.setor';
+  return COMPRAS_SCOPE_DEFAULT;
 }
 
 function normalizeMapa(input) {
@@ -142,7 +160,7 @@ function BadgePerfil({ perfil }) {
   );
 }
 
-function CheckboxItem({ permissao, checked, onChange, disabled, origem }) {
+function CheckboxItem({ permissao, checked, onChange, disabled, origem, inputType = 'checkbox', inputName }) {
   return (
     <label
       className={`flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 text-sm transition-colors ${
@@ -154,7 +172,8 @@ function CheckboxItem({ permissao, checked, onChange, disabled, origem }) {
       }`}
     >
       <input
-        type="checkbox"
+        type={inputType}
+        name={inputName}
         checked={checked}
         onChange={onChange}
         disabled={disabled}
@@ -327,8 +346,14 @@ function ModuleCard({
         <div className="divide-y divide-[var(--ui-border)]">
           {grupo.areas.map((area) => {
             const aberta = areaExpandida === area.key;
+            const areaEscopoCompras = area.key === 'compras.escopo';
+            const escopoComprasAtivo = areaEscopoCompras
+              ? getEffectiveComprasScope(permissoesUsuarioAtual)
+              : null;
             const marcadasArea = area.permissoes.filter(
-              (perm) => permissoesUsuarioAtual.includes(normalizeKey(perm.key))
+              (perm) => areaEscopoCompras
+                ? normalizeKey(perm.key) === escopoComprasAtivo
+                : permissoesUsuarioAtual.includes(normalizeKey(perm.key))
             ).length;
 
             return (
@@ -358,10 +383,12 @@ function ModuleCard({
                         <CheckboxItem
                           key={perm.key}
                           permissao={perm}
-                          checked={permissoesUsuarioAtual.includes(key)}
+                          checked={areaEscopoCompras ? key === escopoComprasAtivo : permissoesUsuarioAtual.includes(key)}
                           onChange={() => onTogglePermissao(perm.key)}
                           disabled={false}
                           origem={bloqueada ? 'bloqueada' : individual ? 'individual' : vemDoPadrao ? 'padrao' : ''}
+                          inputType={areaEscopoCompras ? 'radio' : 'checkbox'}
+                          inputName={areaEscopoCompras ? `compras-escopo-${normalizeKey(grupo.modulo)}` : undefined}
                         />
                       );
                     })}
@@ -490,6 +517,22 @@ export default function PermissoesAreas() {
     const vemDoPadrao = permissoesPadraoUsuarioAtual.includes(normalizedKey);
     const estaBloqueada = permissoesBloqueadasUsuarioAtual.includes(normalizedKey);
 
+    if (isComprasScopeKey(normalizedKey)) {
+      const escopoAtual = getEffectiveComprasScope(permissoesUsuarioAtual);
+      if (escopoAtual === normalizedKey) return;
+
+      const padrao = new Set(permissoesPadraoUsuarioAtual);
+      setUserList(setMapa, id, (lista) => [
+        ...lista.filter((item) => !isComprasScopeKey(item)),
+        ...(padrao.has(normalizedKey) ? [] : [normalizedKey])
+      ]);
+      setUserList(setBloqueiosMapa, id, (lista) => [
+        ...lista.filter((item) => !isComprasScopeKey(item)),
+        ...COMPRAS_SCOPE_KEYS.filter((key) => key !== normalizedKey && padrao.has(key))
+      ]);
+      return;
+    }
+
     if (vemDoPadrao) {
       setUserList(setBloqueiosMapa, id, (lista) =>
         estaBloqueada ? lista.filter((item) => item !== normalizedKey) : [...lista, normalizedKey]
@@ -513,14 +556,23 @@ export default function PermissoesAreas() {
   function selecionarTudoModulo(grupo) {
     if (!usuarioSelecionadoId || selectedUserIsBypassAdmin) return;
 
-    const chaves = grupo.areas.flatMap((area) => area.permissoes.map((perm) => normalizeKey(perm.key)));
+    const chavesOriginais = grupo.areas.flatMap((area) => area.permissoes.map((perm) => normalizeKey(perm.key)));
+    const possuiEscopoCompras = chavesOriginais.some(isComprasScopeKey);
+    const chaves = possuiEscopoCompras
+      ? [...chavesOriginais.filter((key) => !isComprasScopeKey(key)), COMPRAS_SCOPE_SELECT_ALL]
+      : chavesOriginais;
     const padrao = new Set(permissoesPadraoUsuarioAtual);
     setUserList(setMapa, usuarioSelecionadoId, (lista) => [
-      ...lista,
+      ...lista.filter((key) => !possuiEscopoCompras || !isComprasScopeKey(key)),
       ...chaves.filter((key) => !padrao.has(key))
     ]);
     setUserList(setBloqueiosMapa, usuarioSelecionadoId, (lista) =>
-      lista.filter((item) => !chaves.includes(item))
+      [
+        ...lista.filter((item) => !chaves.includes(item) && (!possuiEscopoCompras || !isComprasScopeKey(item))),
+        ...(possuiEscopoCompras
+          ? COMPRAS_SCOPE_KEYS.filter((key) => key !== COMPRAS_SCOPE_SELECT_ALL && padrao.has(key))
+          : [])
+      ]
     );
   }
 

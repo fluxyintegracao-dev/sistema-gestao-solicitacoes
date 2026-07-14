@@ -22,3 +22,7 @@
 ## Infra
 - se o backend nao responde em `127.0.0.1:8000`, o Nginx devolve `502`
 - erros relevantes no Nginx sao `upstream timed out`, `connect() failed`, `502`, `504`
+- pendencia de hardening: restringir `connectSrc` da CSP em `backend/src/app.js`.
+  - estado atual permite origens genericas (`http:`, `https:`, `ws:`, `wss:`) em producao.
+  - impacto atual avaliado como baixo no curto prazo porque o frontend principal roda na Vercel, mas a protecao da CSP fica enfraquecida para qualquer resposta servida pelo backend.
+  - caminho recomendado: aplicar primeiro em modo `Content-Security-Policy-Report-Only`, mapear dominios reais usados por API, Vercel, S3 e integracoes externas, testar login, anexos, cotacao publica e fluxos financeiros, depois transformar em CSP bloqueante.

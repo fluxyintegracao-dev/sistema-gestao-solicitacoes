@@ -1,10 +1,15 @@
 # Backend
 
 ## Estrutura principal
+- `backend/server.js`: valida dependencias de inicializacao, executa migrations, carrega configuracao e inicia a API/jobs
+- `backend/src/app.js`: middlewares HTTP, CORS, seguranca, uploads e montagem das rotas
+- `backend/src/routes.js` e `backend/src/routes/`: contrato HTTP e middlewares de cada rota
 - `backend/src/controllers/`: regras de entrada HTTP
 - `backend/src/models/`: modelos Sequelize
-- `backend/src/services/`: servicos isolados de negocio e integracoes
+- `backend/src/services/`: regras de negocio reutilizaveis e integracoes
 - `backend/src/middlewares/`: auth e permissoes
+- `backend/src/validators/`: contratos de entrada
+- `backend/src/database/runMigrations.js`: executor ordenado de migrations
 - `backend/src/utils/`: utilitarios
 
 ## Controllers centrais
@@ -15,9 +20,11 @@
 - `AuthController.js`: login e payload do usuario
 
 ## Observacoes de implementacao
-- O bootstrap do banco e agressivo em `backend/src/app.js`.
-- Parte do schema ainda e ajustada por SQL idempotente no startup.
-- Existem migrations SQL em `backend/migrations/` para referencia operacional.
+- `backend/server.js` valida ambiente, rate limit e antivirus, executa `runMigrations()`, carrega configuracao de runtime e somente depois abre a porta HTTP.
+- migrations JavaScript em `backend/migrations/` sao ordenadas por nome e registradas em `schema_migrations`.
+- o runtime normal nao executa `sequelize.sync()` nem ajustes de schema em `app.js`.
+- `backend/src/database/legacyBootstrap.js` preserva funcoes antigas, mas nao e chamado pelo bootstrap normal; nao reutiliza-lo para novas mudancas.
+- apos a API subir, iniciam retencao de eventos, automacoes do CRM, snapshots de Governanca e um sincronizador descontinuado inventariado em `ESTADO_RUNTIME_E_LEGADOS.md`.
 
 ## Ponto de atencao
-Evitar novas mudancas amplas em `backend/src/app.js` sem revisar o impacto no banco de producao.
+Mudanca de model exige migration controlada. Mudancas em `server.js`, `app.js`, montagem de rotas ou jobs exigem teste de inicializacao, autenticacao, CORS, uploads, health checks e encerramento do processo.

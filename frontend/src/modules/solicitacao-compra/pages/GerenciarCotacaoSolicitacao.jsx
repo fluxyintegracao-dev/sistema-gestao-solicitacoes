@@ -5,10 +5,13 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineChatBubbleLeftRight,
   HiOutlineClipboardDocument,
-  HiOutlineArrowPath
+  HiOutlineArrowPath,
+  HiOutlinePencilSquare,
+  HiOutlineXMark
 } from 'react-icons/hi2';
 import {
   baixarPdfSolicitacaoCompra,
+  cancelarCotacaoSolicitacaoCompra,
   comentarSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
@@ -19,12 +22,15 @@ import {
   obterUrlAssinadaCompra,
   obterUrlPdfCotacaoPublica,
   recusarSolicitacaoCompra,
-  reabrirCotacaoCompra
+  reabrirCotacaoCompra,
+  atualizarQuantidadeItemSolicitacaoCompra,
+  salvarRespostaInternaCotacao
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes
 } from '../../../utils/acessoProduto';
@@ -76,6 +82,31 @@ function sanitizeNumeroCompraInput(value) {
   return String(value ?? '').replace(/[^\d.,]/g, '');
 }
 
+function limparMoedaCotacaoInput(value, limiteDecimais = 10) {
+  const raw = String(value ?? '').replace(/[^\d,]/g, '');
+  if (!raw) return '';
+  const [inteiroRaw = '', ...decimaisRaw] = raw.split(',');
+  const inteiro = inteiroRaw.replace(/^0+(?=\d)/, '') || '0';
+  if (!decimaisRaw.length) return inteiro;
+  return `${inteiro},${decimaisRaw.join('').slice(0, limiteDecimais)}`;
+}
+
+function formatarMoedaCotacaoInput(value, limiteDecimais = 10) {
+  const limpo = limparMoedaCotacaoInput(value, limiteDecimais);
+  if (!limpo) return '';
+  const [inteiro, decimal] = limpo.split(',');
+  const inteiroFormatado = Number(inteiro || 0).toLocaleString('pt-BR', {
+    maximumFractionDigits: 0
+  });
+  return `R$ ${inteiroFormatado}${limpo.includes(',') ? `,${decimal || ''}` : ''}`;
+}
+
+function normalizarMoedaCotacaoParaEnvio(value) {
+  const limpo = limparMoedaCotacaoInput(value, 10);
+  if (!limpo) return null;
+  return limpo.endsWith(',') ? limpo.slice(0, -1) : limpo;
+}
+
 function formatNumeroCompra(value) {
   const parsed = Number(value || 0);
   if (!Number.isFinite(parsed)) return '';
@@ -88,7 +119,8 @@ function formatNumeroCompra(value) {
 function clsStatus(status) {
   const v = String(status || '').toUpperCase();
   if (v === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
-  if (v === 'RECUSADO') return 'app-status-pill bg-red-100 text-red-700';
+  if (v === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
+  if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
@@ -97,6 +129,18 @@ function clsStatus(status) {
 
 function buildItemKey(item) {
   return `${String(item?.item_tipo || '').toUpperCase()}:${Number(item?.item_referencia_id || 0)}`;
+}
+
+function itemToCotacaoPayload(item) {
+  const itemTipo = String(item?.item_tipo || '').toUpperCase();
+  const itemReferenciaId = Number(item?.item_referencia_id || 0);
+  return {
+    item_tipo: itemTipo,
+    item_referencia_id: itemReferenciaId,
+    item_key: buildItemKey(item),
+    solicitacao_compra_item_id: itemTipo === 'CADASTRADO' ? itemReferenciaId : undefined,
+    solicitacao_compra_item_manual_id: itemTipo === 'MANUAL' ? itemReferenciaId : undefined
+  };
 }
 
 const FORNECEDOR_LINK_COLUMNS = [
@@ -108,6 +152,17 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'acoes', width: 190, minWidth: 170 }
 ];
 
+const CONDICOES_PAGAMENTO_COTACAO = [
+  'Pix',
+  'Boleto',
+  'Transferencia',
+  'Cartao',
+  'Cheque',
+  'Dinheiro',
+  'Faturado',
+  'Outros'
+];
+
 function CotacaoActionButton({ as: Component = 'button', children, className = '', ...props }) {
   return (
     <Component
@@ -116,6 +171,239 @@ function CotacaoActionButton({ as: Component = 'button', children, className = '
     >
       {children}
     </Component>
+  );
+}
+
+function decimalApiParaInput(value, limite = 10) {
+  if (value === null || value === undefined || value === '') return '';
+  const texto = String(value).replace('.', ',');
+  if (!texto.includes(',')) return texto;
+  const [inteiro, decimal = ''] = texto.split(',');
+  const decimalLimpo = decimal.slice(0, limite).replace(/0+$/, '');
+  return decimalLimpo ? `${inteiro},${decimalLimpo}` : inteiro;
+}
+
+function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
+  const selecoes = new Set(
+    (cotacaoFornecedor?.itensSelecionados || []).map((item) => buildItemKey({
+      item_tipo: item.item_tipo,
+      item_referencia_id: item.solicitacao_compra_item_id || item.solicitacao_compra_item_manual_id
+    }))
+  );
+  const itensCotacao = selecoes.size
+    ? itensCombinados.filter((item) => selecoes.has(buildItemKey(item)))
+    : itensCombinados;
+  const respostas = new Map(
+    (cotacaoFornecedor?.respostas || []).map((resposta) => [
+      buildItemKey({
+        item_tipo: resposta.item_tipo,
+        item_referencia_id: resposta.solicitacao_compra_item_id || resposta.solicitacao_compra_item_manual_id
+      }),
+      resposta
+    ])
+  );
+
+  return {
+    valor_minimo_pedido: decimalApiParaInput(cotacaoFornecedor?.valor_minimo_pedido, 2),
+    desconto_total: decimalApiParaInput(cotacaoFornecedor?.desconto_total, 2),
+    condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
+    prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
+    observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
+    itens: itensCotacao.map((item) => {
+      const resposta = respostas.get(buildItemKey(item));
+      return {
+        ...item,
+        status_disponibilidade: resposta?.status_disponibilidade
+          || (resposta ? (resposta.disponivel ? 'DISPONIVEL' : 'NAO_TEM') : 'DISPONIVEL'),
+        preco: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.preco, 10)),
+        quantidade_original: decimalApiParaInput(item.quantidade, 6),
+        quantidade_solicitada: decimalApiParaInput(item.quantidade, 6),
+        prazo: resposta?.prazo || '',
+        quantidade_minima_item: decimalApiParaInput(resposta?.quantidade_minima_item, 3),
+        data_chegada: resposta?.data_chegada || '',
+        observacao: resposta?.observacao || ''
+      };
+    })
+  };
+}
+
+function ModalRespostaInternaCotacao({
+  cotacao,
+  form,
+  salvando,
+  onChange,
+  onChangeItem,
+  onAplicarDataChegadaTodos,
+  onSalvar,
+  onFechar
+}) {
+  const [condicoesAbertas, setCondicoesAbertas] = useState(false);
+  const [dataChegadaTodos, setDataChegadaTodos] = useState('');
+  if (!cotacao || !form) return null;
+
+  const condicoesSelecionadas = new Set(
+    CONDICOES_PAGAMENTO_COTACAO.filter((opcao) => {
+      const atual = String(form.condicao_pagamento || '').toLowerCase();
+      return atual.split(/[;,]/).some((parte) => parte.trim() === opcao.toLowerCase());
+    })
+  );
+
+  function alternarCondicao(opcao) {
+    const partesLivres = String(form.condicao_pagamento || '')
+      .split(/[;,]/)
+      .map((parte) => parte.trim())
+      .filter(Boolean)
+      .filter((parte) => !CONDICOES_PAGAMENTO_COTACAO.some((base) => base.toLowerCase() === parte.toLowerCase()));
+    const proximas = condicoesSelecionadas.has(opcao)
+      ? [...condicoesSelecionadas].filter((item) => item !== opcao)
+      : [...condicoesSelecionadas, opcao];
+    onChange('condicao_pagamento', [...proximas, ...partesLivres].join('; '));
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3" role="dialog" aria-modal="true">
+      <div className="flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar resposta da cotacao</h2>
+            <p className="text-sm text-[var(--c-muted)]">
+              {cotacao.fornecedor?.nome || 'Fornecedor'} - a alteracao sera registrada na auditoria como resposta interna.
+            </p>
+          </div>
+          <button type="button" className="compras-icon-action" onClick={onFechar} title="Fechar" aria-label="Fechar">
+            <HiOutlineXMark />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <label className="app-filter-field">
+              <span className="app-filter-label">Valor minimo do pedido</span>
+              <input className="input" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Desconto concedido</span>
+              <input className="input" inputMode="decimal" value={form.desconto_total} onFocus={(e) => e.target.select()} onChange={(e) => onChange('desconto_total', sanitizeNumeroCompraInput(e.target.value))} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Prazo de entrega *</span>
+              <input className="input" value={form.prazo_entrega} onChange={(e) => onChange('prazo_entrega', e.target.value)} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Condicao de pagamento *</span>
+              <div className="relative">
+                <input
+                  className="input"
+                  value={form.condicao_pagamento}
+                  onClick={() => setCondicoesAbertas(true)}
+                  onFocus={() => setCondicoesAbertas(true)}
+                  onChange={(e) => onChange('condicao_pagamento', e.target.value)}
+                  placeholder="Ex.: Boleto 30/60/90"
+                />
+                {condicoesAbertas && (
+                  <div
+                    className="absolute left-0 right-0 top-[calc(100%+4px)] z-[95] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-xl"
+                    onMouseDown={(event) => event.preventDefault()}
+                  >
+                    <div className="grid gap-1">
+                      {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
+                        <label key={opcao} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                          <input
+                            type="checkbox"
+                            checked={condicoesSelecionadas.has(opcao)}
+                            onChange={() => alternarCondicao(opcao)}
+                          />
+                          <span>{opcao}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <button type="button" className="btn btn-xs btn-outline mt-2 w-full justify-center" onClick={() => setCondicoesAbertas(false)}>
+                      Fechar opcoes
+                    </button>
+                  </div>
+                )}
+              </div>
+            </label>
+          </div>
+
+          <div className="mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+            <label className="app-filter-field bg-white">
+              <span className="app-filter-label">Data chegada para todos</span>
+              <input
+                className="input"
+                type="date"
+                value={dataChegadaTodos}
+                onChange={(event) => {
+                  setDataChegadaTodos(event.target.value);
+                  onAplicarDataChegadaTodos(event.target.value);
+                }}
+              />
+            </label>
+            <div className="self-center text-xs text-[var(--c-muted)]">
+              Use este campo para aplicar uma previsao unica de chegada a todos os itens da resposta. Cada item ainda pode ser ajustado individualmente.
+            </div>
+          </div>
+
+          <label className="mt-3 block">
+            <span className="app-filter-label">Observacao geral</span>
+            <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
+          </label>
+
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--c-border)]">
+            <table className="table min-w-[980px] text-xs">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Qtd. solic.</th>
+                  <th>Disponibilidade</th>
+                  <th>Preco unit.</th>
+                  <th>Prazo</th>
+                  <th>Qtd. min.</th>
+                  <th>Data chegada</th>
+                  <th>Observacao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.itens.map((item, index) => (
+                  <tr key={buildItemKey(item)}>
+                    <td className="min-w-[210px]">
+                      <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
+                      <div className="text-[var(--c-muted)]">{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
+                    </td>
+                    <td>
+                      <input
+                        className="input min-w-[105px]"
+                        inputMode="decimal"
+                        value={item.quantidade_solicitada}
+                        onChange={(e) => onChangeItem(index, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
+                      />
+                    </td>
+                    <td>
+                      <select className="input min-w-[130px]" value={item.status_disponibilidade} onChange={(e) => onChangeItem(index, 'status_disponibilidade', e.target.value)}>
+                        <option value="DISPONIVEL">Disponivel</option>
+                        <option value="NAO_TEM">Nao tem</option>
+                        <option value="PARA_CHEGAR">Para chegar</option>
+                      </select>
+                    </td>
+                    <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[110px]" value={item.prazo} onChange={(e) => onChangeItem(index, 'prazo', e.target.value)} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
+                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} /></td>
+                    <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
+          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
+          <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -499,6 +787,8 @@ function SecaoEnvioFornecedores({
   onBuscarFornecedores,
   onToggleFornecedor,
   onToggleItemEnvio,
+  onToggleFornecedorItensEnvio,
+  onToggleItemParaTodosFornecedores,
   onSelecionarTodosItensEnvio,
   onLimparItensEnvio,
   onChangeNovoFornecedor,
@@ -566,7 +856,16 @@ function SecaoEnvioFornecedores({
       .filter(Boolean)
   ), [fornecedoresSelecionados, fornecedoresSelecionadosDados, fornecedores]);
 
-  const qtdItensSelecionados = itensCombinados.filter((item) => itensSelecionadosEnvio?.[buildItemKey(item)]).length;
+  const itemKeys = useMemo(() => itensCombinados.map((item) => buildItemKey(item)), [itensCombinados]);
+  const totalCelulasEnvio = fornecedoresSelecionadosDetalhes.length * itemKeys.length;
+  const qtdItensSelecionados = fornecedoresSelecionadosDetalhes.reduce((total, fornecedor) => {
+    const selectionKey = fornecedorSelectionKey(fornecedor);
+    return total + itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
+  }, 0);
+  const fornecedoresSemItens = fornecedoresSelecionadosDetalhes.filter((fornecedor) => {
+    const selectionKey = fornecedorSelectionKey(fornecedor);
+    return !itemKeys.some((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey]));
+  });
 
   function selecionarTodosComCategoria() {
     fornecedoresComCategoria.forEach((fornecedor) => {
@@ -879,49 +1178,91 @@ function SecaoEnvioFornecedores({
             <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens que serao enviados</div>
+                  <div className="text-sm font-semibold text-[var(--c-text)]">Itens por fornecedor</div>
                   <div className="text-xs text-[var(--c-muted)]">
-                    Selecione os itens que vao compor estes links. Depois de gerar, a selecao fica gravada na cotacao.
+                    Marque quais itens cada fornecedor recebera no link. Cada coluna vira uma cotacao daquele fornecedor.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">
-                    {qtdItensSelecionados}/{itensCombinados.length} item(ns)
+                    {qtdItensSelecionados}/{totalCelulasEnvio} selecao(oes)
                   </span>
-                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Todos</button>
+                  <button type="button" className="btn btn-xs btn-outline" onClick={onSelecionarTodosItensEnvio}>Selecionar tudo</button>
                   <button type="button" className="btn btn-xs btn-outline" onClick={onLimparItensEnvio}>Limpar</button>
                 </div>
               </div>
+              {fornecedoresSemItens.length > 0 && (
+                <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-700/70 dark:bg-amber-950/45 dark:text-amber-100">
+                  Selecione ao menos um item para: {fornecedoresSemItens.map((fornecedor) => fornecedor.nome).join(', ')}.
+                </div>
+              )}
               <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
-                <table className="min-w-[920px] w-full text-left text-xs">
+                <table className="min-w-[980px] w-full text-left text-xs">
                   <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     <tr>
-                      <th className="w-10 px-3 py-2">Sel.</th>
-                      <th className="px-3 py-2">Item</th>
-                      <th className="w-24 px-3 py-2">Qtd.</th>
-                      <th className="px-3 py-2">Especificacao</th>
-                      <th className="w-32 px-3 py-2">Necessario</th>
+                      <th className="sticky left-0 z-10 min-w-[260px] bg-slate-100 px-3 py-2 dark:bg-slate-900">Item</th>
+                      <th className="min-w-[95px] px-3 py-2">Qtd.</th>
+                      <th className="min-w-[180px] px-3 py-2">Especificacao</th>
+                      <th className="min-w-[115px] px-3 py-2">Necessario</th>
+                      {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
+                        const selectionKey = fornecedorSelectionKey(fornecedor);
+                        const itensFornecedor = itemKeys.filter((itemKey) => Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])).length;
+                        const todosMarcados = itemKeys.length > 0 && itensFornecedor === itemKeys.length;
+                        return (
+                          <th key={selectionKey} className="min-w-[190px] border-l border-[var(--c-border)] px-3 py-2 text-center">
+                            <label className="flex cursor-pointer flex-col items-center gap-1 normal-case tracking-normal">
+                              <span className="line-clamp-2 font-semibold text-slate-700 dark:text-slate-100">{fornecedor.nome}</span>
+                              <span className="text-[10px] text-[var(--c-muted)]">{itensFornecedor}/{itemKeys.length} item(ns)</span>
+                              <input
+                                type="checkbox"
+                                checked={todosMarcados}
+                                onChange={(event) => onToggleFornecedorItensEnvio(selectionKey, event.target.checked)}
+                                aria-label={`Selecionar todos os itens para ${fornecedor.nome}`}
+                              />
+                            </label>
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
                     {itensCombinados.map((item) => {
                       const itemKey = buildItemKey(item);
+                      const itemMarcadoParaTodos = fornecedoresSelecionadosDetalhes.length > 0
+                        && fornecedoresSelecionadosDetalhes.every((fornecedor) => Boolean(itensSelecionadosEnvio?.[fornecedorSelectionKey(fornecedor)]?.[itemKey]));
                       return (
                         <tr key={itemKey} className="border-t border-[var(--c-border)] align-top">
-                          <td className="px-3 py-2">
-                            <input
-                              type="checkbox"
-                              checked={Boolean(itensSelecionadosEnvio?.[itemKey])}
-                              onChange={(event) => onToggleItemEnvio(itemKey, event.target.checked)}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
-                            <div className="text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</div>
+                          <td className="sticky left-0 z-[1] bg-white px-3 py-2 dark:bg-slate-950">
+                            <label className="flex items-start gap-2">
+                              <input
+                                className="mt-1"
+                                type="checkbox"
+                                checked={itemMarcadoParaTodos}
+                                onChange={(event) => onToggleItemParaTodosFornecedores(itemKey, event.target.checked)}
+                                aria-label={`Selecionar ${item.nome} para todos os fornecedores`}
+                              />
+                              <span>
+                                <span className="block font-semibold text-[var(--c-text)]">{item.nome}</span>
+                                <span className="block text-[11px] text-[var(--c-muted)]">{item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}</span>
+                              </span>
+                            </label>
                           </td>
                           <td className="px-3 py-2">{formatNumeroCompra(item.quantidade)} {item.unidade}</td>
                           <td className="px-3 py-2 text-[var(--c-muted)]">{item.especificacao || '-'}</td>
                           <td className="px-3 py-2">{fmt(item.necessario_para)}</td>
+                          {fornecedoresSelecionadosDetalhes.map((fornecedor) => {
+                            const selectionKey = fornecedorSelectionKey(fornecedor);
+                            return (
+                              <td key={`${selectionKey}-${itemKey}`} className="border-l border-[var(--c-border)] px-3 py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={Boolean(itensSelecionadosEnvio?.[selectionKey]?.[itemKey])}
+                                  onChange={(event) => onToggleItemEnvio(selectionKey, itemKey, event.target.checked)}
+                                  aria-label={`Enviar ${item.nome} para ${fornecedor.nome}`}
+                                />
+                              </td>
+                            );
+                          })}
                         </tr>
                       );
                     })}
@@ -938,8 +1279,23 @@ function SecaoEnvioFornecedores({
 
 // SecaoComparativo
 
-function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar, vencedoresSelecionados, onVencedorChange, onRemanejamentoAplicado, onEncerrar, encerrando }) {
+function SecaoComparativo({
+  comparativo,
+  solicitacao,
+  podeComprar,
+  podeEncerrar,
+  podeEditarResposta,
+  vencedoresSelecionados,
+  onVencedorChange,
+  onEditarRespostaFornecedor,
+  onRemanejamentoAplicado,
+  onEncerrar,
+  encerrando
+}) {
   const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
+  const [modoVisualizacao, setModoVisualizacao] = useState('cards');
+  const [painelFornecedoresAberto, setPainelFornecedoresAberto] = useState(false);
+  const [fornecedoresVisiveis, setFornecedoresVisiveis] = useState({});
 
   function getQuantidadeAlocada(respostaItemId) {
     const registro = vencedoresSelecionados[String(respostaItemId)];
@@ -1021,6 +1377,148 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
       .slice(0, 3);
   }, [comparativo, vencedoresSelecionados]);
 
+  const fornecedoresMapa = useMemo(() => {
+    const fornecedoresPorId = new Map();
+    (comparativo?.fornecedores || []).forEach((fornecedor) => {
+      fornecedoresPorId.set(String(fornecedor.fornecedor_id), {
+        ...fornecedor,
+        possuiResposta: false
+      });
+    });
+
+    (comparativo?.itens || []).forEach((item) => {
+      (item.respostas || []).forEach((resposta) => {
+        const key = String(resposta.fornecedor_id);
+        const atual = fornecedoresPorId.get(key) || {
+          id: resposta.cotacao_fornecedor_id,
+          fornecedor_id: resposta.fornecedor_id,
+          nome: resposta.fornecedor_nome,
+          status: resposta.status_fornecedor
+        };
+        fornecedoresPorId.set(key, {
+          ...atual,
+          id: atual.id || resposta.cotacao_fornecedor_id,
+          possuiResposta: true
+        });
+      });
+    });
+
+    return [...fornecedoresPorId.values()]
+      .filter((fornecedor) => fornecedor.possuiResposta)
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+  }, [comparativo]);
+
+  const fornecedoresMapaVisiveis = useMemo(() => {
+    if (!fornecedoresMapa.length) return [];
+    return fornecedoresMapa.filter((fornecedor) => fornecedoresVisiveis[String(fornecedor.fornecedor_id)] !== false);
+  }, [fornecedoresMapa, fornecedoresVisiveis]);
+
+  function toggleFornecedorMapa(fornecedorId) {
+    setFornecedoresVisiveis((atual) => ({
+      ...atual,
+      [String(fornecedorId)]: atual[String(fornecedorId)] === false
+    }));
+  }
+
+  function mostrarTodosFornecedoresMapa() {
+    setFornecedoresVisiveis({});
+  }
+
+  function ocultarTodosFornecedoresMapa() {
+    setFornecedoresVisiveis(
+      fornecedoresMapa.reduce((acc, fornecedor) => {
+        acc[String(fornecedor.fornecedor_id)] = false;
+        return acc;
+      }, {})
+    );
+  }
+
+  function renderCelulaFornecedorMapa(item, fornecedor) {
+    const resposta = (item.respostas || []).find((resp) => String(resp.fornecedor_id) === String(fornecedor.fornecedor_id));
+    if (!resposta) {
+      return (
+        <td key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`} className="min-w-[220px] border-l border-[var(--c-border)] bg-slate-50/70 px-2 py-2 align-top text-xs text-[var(--c-muted)]">
+          -
+        </td>
+      );
+    }
+
+    const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
+    const isVencedor = quantidadeAlocada > 0;
+    const podeSelecionar = podeEncerrar && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const precoUnitario = parseNumeroCompra(resposta.preco);
+    const quantidadeItem = parseNumeroCompra(item.quantidade);
+
+    return (
+      <td
+        key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
+        className={`min-w-[270px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${isVencedor ? 'bg-emerald-50/80' : 'bg-white'}`}
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
+            <div className="text-[11px] text-[var(--c-muted)]">
+              Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
+            </div>
+          </div>
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 shrink-0 items-center justify-center border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            onClick={() => onEditarRespostaFornecedor?.(resposta.cotacao_fornecedor_id)}
+            disabled={!podeEditarResposta}
+            title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+            aria-label="Editar resposta internamente"
+          >
+            <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
+          <span className={`font-semibold ${resposta.disponivel ? 'text-emerald-700' : 'text-red-700'}`}>
+            {resposta.disponivel ? 'Disponivel' : 'Nao tem'}
+          </span>
+          <span>Prazo: {resposta.prazo || resposta.prazo_entrega_fornecedor || '-'}</span>
+          <span>Qtd. min.: {resposta.quantidade_minima_item || '-'}</span>
+          <span>Chegada: {fmt(resposta.data_chegada)}</span>
+          <span className="col-span-2 truncate" title={resposta.condicao_pagamento || ''}>
+            Cond.: {resposta.condicao_pagamento || '-'}
+          </span>
+          {resposta.observacao ? (
+            <span className="col-span-2 line-clamp-2" title={resposta.observacao}>
+              Obs.: {resposta.observacao}
+            </span>
+          ) : null}
+        </div>
+
+        <div className="mt-2 flex items-center gap-2 border-t border-[var(--c-border)] pt-2">
+          <input
+            type="checkbox"
+            checked={isVencedor}
+            disabled={!podeSelecionar}
+            onChange={(event) => {
+              onVencedorChange({
+                item,
+                resposta,
+                quantidade: event.target.checked ? item.quantidade : 0
+              });
+            }}
+          />
+          <input
+            className="input h-7 w-24 px-2 text-xs"
+            value={isVencedor ? getQuantidadeAlocadaInput(resposta.resposta_item_id) : ''}
+            placeholder="Qtd."
+            disabled={!podeEncerrar || !isVencedor}
+            onChange={(event) => onVencedorChange({
+              item,
+              resposta,
+              quantidade: event.target.value
+            })}
+          />
+        </div>
+      </td>
+    );
+  }
+
   if (!comparativo?.itens?.length) {
     return (
       <div className="card sol-surface-card cotacao-comparativo-panel">
@@ -1042,12 +1540,30 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
             <h2 className="font-semibold">Comparativo por item</h2>
             <p className="mt-0.5 text-xs text-[var(--c-muted)]">Compare respostas, selecione vencedores e encerre a cotacao quando estiver pronta.</p>
           </div>
-          <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
-            {comparativo.itens.length} item(ns)
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-[var(--c-border)] bg-slate-50 p-1 text-xs">
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'cards' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setModoVisualizacao('cards')}
+              >
+                Cards
+              </button>
+              <button
+                type="button"
+                className={`rounded-md px-3 py-1.5 font-semibold transition ${modoVisualizacao === 'mapa' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                onClick={() => setModoVisualizacao('mapa')}
+              >
+                Mapa
+              </button>
+            </div>
+            <span className="cotacao-comparativo-count rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+              {comparativo.itens.length} item(ns)
+            </span>
+          </div>
         </div>
 
-        {rankingFornecedores.length > 0 && (
+        {modoVisualizacao === 'cards' && rankingFornecedores.length > 0 && (
           <div className="mb-3 grid gap-2 sm:grid-cols-3">
             {rankingFornecedores.map((forn, idx) => (
               <div
@@ -1089,6 +1605,108 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
           </div>
         )}
 
+        {modoVisualizacao === 'mapa' && (
+          <div className="mb-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] px-3 py-2">
+              <div>
+                <div className="text-sm font-semibold text-[var(--c-text)]">Mapa de comparacao</div>
+                <div className="text-xs text-[var(--c-muted)]">Itens nas linhas e fornecedores respondidos nas colunas.</div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className="btn btn-xs btn-outline" onClick={() => setPainelFornecedoresAberto((atual) => !atual)}>
+                  Fornecedores ({fornecedoresMapaVisiveis.length}/{fornecedoresMapa.length})
+                </button>
+                <button type="button" className="btn btn-xs btn-outline" onClick={mostrarTodosFornecedoresMapa}>Mostrar todos</button>
+                <button type="button" className="btn btn-xs btn-outline" onClick={ocultarTodosFornecedoresMapa}>Ocultar todos</button>
+              </div>
+            </div>
+
+            {painelFornecedoresAberto && (
+              <div className="grid gap-2 border-b border-[var(--c-border)] px-3 py-3 sm:grid-cols-2 lg:grid-cols-3">
+                {fornecedoresMapa.map((fornecedor) => {
+                  const visivel = fornecedoresVisiveis[String(fornecedor.fornecedor_id)] !== false;
+                  return (
+                    <label
+                      key={fornecedor.fornecedor_id}
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${visivel ? 'border-blue-200 bg-blue-50 text-blue-900' : 'border-[var(--c-border)] bg-white text-slate-600'}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={visivel}
+                        onChange={() => toggleFornecedorMapa(fornecedor.fornecedor_id)}
+                      />
+                      <span className="min-w-0 flex-1 truncate font-semibold">{fornecedor.nome}</span>
+                      <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--c-muted)]">{fmtStatus(fornecedor.status)}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+
+            {fornecedoresMapaVisiveis.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="table min-w-[980px] text-xs">
+                  <thead>
+                    <tr>
+                      <th className="sticky left-0 z-20 min-w-[260px] bg-slate-100">Item</th>
+                      <th className="sticky left-[260px] z-20 min-w-[110px] bg-slate-100 text-right">Qtd.</th>
+                      {fornecedoresMapaVisiveis.map((fornecedor) => (
+                        <th key={fornecedor.fornecedor_id} className="min-w-[240px] border-l border-[var(--c-border)] bg-slate-100">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
+                            <button
+                              type="button"
+                              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                              onClick={() => onEditarRespostaFornecedor?.(fornecedor.id)}
+                              disabled={!podeEditarResposta}
+                              title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+                              aria-label="Editar resposta internamente"
+                            >
+                              <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparativo.itens.map((item) => {
+                      const totalAlocadoItem = getTotalAlocadoItem(item);
+                      const quantidadeItem = parseNumeroCompra(item.quantidade);
+                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      return (
+                        <tr key={buildItemKey(item)}>
+                          <td className="sticky left-0 z-10 min-w-[260px] bg-white px-3 py-2 align-top">
+                            <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
+                            <div className="text-[11px] text-[var(--c-muted)]">
+                              {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
+                              {item.especificacao ? ` - ${item.especificacao}` : ''}
+                            </div>
+                            {podeEncerrar ? (
+                              <div className={`mt-1 text-[11px] ${excedeu ? 'text-red-700' : 'text-[var(--c-muted)]'}`}>
+                                Selecionado: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="sticky left-[260px] z-10 min-w-[110px] bg-white px-3 py-2 text-right align-top font-semibold">
+                            {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                          </td>
+                          {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-3 py-8 text-center text-sm text-[var(--c-muted)]">
+                Selecione ao menos um fornecedor respondido para visualizar o mapa.
+              </div>
+            )}
+          </div>
+        )}
+
+        {modoVisualizacao === 'cards' && (
         <div className="app-list-stack gap-2">
           {comparativo.itens.map((item) => (
             <div key={buildItemKey(item)} className="cotacao-comparativo-item app-list-card px-3 py-2.5">
@@ -1191,6 +1809,8 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
               </div>
             </div>
           ))}
+        </div>
+        )}
 
           {podeEncerrar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
@@ -1203,7 +1823,6 @@ function SecaoComparativo({ comparativo, solicitacao, podeComprar, podeEncerrar,
               </button>
             </div>
           )}
-        </div>
       </div>
 
       {/* Modal de pedido final */}
@@ -1233,6 +1852,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [solicitacao, setSolicitacao] = useState(null);
+  const [erroCarregamento, setErroCarregamento] = useState('');
   const [fornecedores, setFornecedores] = useState([]);
   const [categoriasFornecedor, setCategoriasFornecedor] = useState([]);
   const [categoriaFornecedorId, setCategoriaFornecedorId] = useState('');
@@ -1244,6 +1864,12 @@ export default function GerenciarCotacaoSolicitacao() {
   const [previewArquivo, setPreviewArquivo] = useState(null);
   const [enviandoFornecedores, setEnviandoFornecedores] = useState(false);
   const [reabrindoCotacaoId, setReabrindoCotacaoId] = useState(null);
+  const [cancelandoCotacao, setCancelandoCotacao] = useState(false);
+  const [modalCancelamentoCotacao, setModalCancelamentoCotacao] = useState(false);
+  const [motivoCancelamentoCotacao, setMotivoCancelamentoCotacao] = useState('');
+  const [cotacaoRespostaInterna, setCotacaoRespostaInterna] = useState(null);
+  const [formRespostaInterna, setFormRespostaInterna] = useState(null);
+  const [salvandoRespostaInterna, setSalvandoRespostaInterna] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
@@ -1256,6 +1882,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const podeComprar = canOperateComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
+  const podeCancelarCotacao = canCancelarComprasCotacoes(user);
 
   async function carregarFornecedores() {
     try {
@@ -1321,6 +1948,7 @@ export default function GerenciarCotacaoSolicitacao() {
   async function carregarTudo() {
     try {
       setLoading(true);
+      setErroCarregamento('');
       const [dataSolicitacao, dataCategorias] = await Promise.all([
         obterSolicitacaoCompra(id),
         listarCategoriasParceiro()
@@ -1352,7 +1980,14 @@ export default function GerenciarCotacaoSolicitacao() {
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar solicitacao de compra');
+      const mensagem = error.message || 'Erro ao carregar solicitacao de compra';
+      setSolicitacao(null);
+      setErroCarregamento(
+        /nao encontrada|não encontrada/i.test(mensagem)
+          ? 'Solicitacao de compra cancelada ou indisponivel para cotacao.'
+          : mensagem
+      );
+      alert(mensagem);
     } finally {
       setLoading(false);
     }
@@ -1397,26 +2032,50 @@ export default function GerenciarCotacaoSolicitacao() {
     return [...itens, ...manuais];
   }, [solicitacao]);
 
+  const criarMapaTodosItensEnvio = () => itensCombinados.reduce((acc, item) => {
+    acc[buildItemKey(item)] = true;
+    return acc;
+  }, {});
+
   const selecionarTodosItensEnvio = () => {
+    const todos = criarMapaTodosItensEnvio();
     setItensSelecionadosEnvio(
-      itensCombinados.reduce((acc, item) => {
-        acc[buildItemKey(item)] = true;
+      fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = { ...todos };
         return acc;
       }, {})
     );
   };
 
   const limparItensEnvio = () => {
-    setItensSelecionadosEnvio({});
+    setItensSelecionadosEnvio(
+      fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = {};
+        return acc;
+      }, {})
+    );
   };
 
-  const garantirItensEnvioSelecionados = () => {
+  const garantirItensEnvioSelecionados = (selectionKeyEspecifico = null) => {
     setItensSelecionadosEnvio((atual) => {
-      if (Object.values(atual || {}).some(Boolean)) {
+      const todos = criarMapaTodosItensEnvio();
+
+      if (selectionKeyEspecifico) {
+        const selecaoAtual = atual?.[selectionKeyEspecifico] || {};
+        if (Object.values(selecaoAtual).some(Boolean)) {
+          return atual;
+        }
+        return { ...atual, [selectionKeyEspecifico]: { ...todos } };
+      }
+
+      const existeSelecao = Object.values(atual || {}).some((selecaoFornecedor) => (
+        selecaoFornecedor && typeof selecaoFornecedor === 'object' && Object.values(selecaoFornecedor).some(Boolean)
+      ));
+      if (existeSelecao) {
         return atual;
       }
-      return itensCombinados.reduce((acc, item) => {
-        acc[buildItemKey(item)] = true;
+      return fornecedoresSelecionados.reduce((acc, selectionKey) => {
+        acc[selectionKey] = { ...todos };
         return acc;
       }, {});
     });
@@ -1466,11 +2125,27 @@ export default function GerenciarCotacaoSolicitacao() {
   async function handleEnviarFornecedores() {
     try {
       const payload = [];
-      fornecedoresSelecionados.forEach((selectionKey) => {
-        const fornecedor =
+      const fornecedoresParaEnvio = fornecedoresSelecionados
+        .map((selectionKey) => (
           fornecedoresSelecionadosDados[selectionKey] ||
-          fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey);
-        if (fornecedor) payload.push(fornecedorToCotacaoPayload(fornecedor));
+          fornecedores.find((item) => fornecedorSelectionKey(item) === selectionKey)
+        ))
+        .filter(Boolean);
+
+      fornecedoresParaEnvio.forEach((fornecedor) => {
+        const selectionKey = fornecedorSelectionKey(fornecedor);
+        if (fornecedor) {
+          const itensFornecedor = itensCombinados
+            .filter((item) => itensSelecionadosEnvio?.[selectionKey]?.[buildItemKey(item)])
+            .map(itemToCotacaoPayload);
+          const itensEnvio = itensFornecedor.length || itensCombinados.length !== 1
+            ? itensFornecedor
+            : itensCombinados.map(itemToCotacaoPayload);
+          payload.push({
+            ...fornecedorToCotacaoPayload(fornecedor),
+            itens: itensEnvio
+          });
+        }
       });
       if (String(novoFornecedor.nome || '').trim()) {
         payload.push({
@@ -1478,25 +2153,27 @@ export default function GerenciarCotacaoSolicitacao() {
           cnpj: novoFornecedor.cnpj,
           email: novoFornecedor.email,
           whatsapp: novoFornecedor.whatsapp,
-          contato: novoFornecedor.contato
+          contato: novoFornecedor.contato,
+          itens: itensCombinados.map(itemToCotacaoPayload)
         });
       }
       if (!payload.length) { alert('Selecione ou cadastre ao menos um fornecedor.'); return; }
 
-      const itensPayload = itensCombinados
-        .filter((item) => itensSelecionadosEnvio[buildItemKey(item)])
-        .map((item) => ({
-          item_tipo: item.item_tipo,
-          item_referencia_id: item.item_referencia_id
-        }));
-
-      if (!itensPayload.length) {
-        alert('Selecione ao menos um item para gerar a cotacao.');
+      const fornecedorSemItens = payload.find((fornecedor) => !Array.isArray(fornecedor.itens) || fornecedor.itens.length === 0);
+      if (fornecedorSemItens) {
+        const fornecedorSelecionado = fornecedores.find((item) => {
+          const fornecedorPayload = fornecedorToCotacaoPayload(item);
+          return (
+            (fornecedorSemItens.fornecedor_id && Number(fornecedorPayload.fornecedor_id) === Number(fornecedorSemItens.fornecedor_id)) ||
+            (fornecedorSemItens.parceiro_id && Number(fornecedorPayload.parceiro_id) === Number(fornecedorSemItens.parceiro_id))
+          );
+        });
+        alert(`Selecione ao menos um item para ${fornecedorSelecionado?.nome || fornecedorSemItens.nome || 'cada fornecedor'}.`);
         return;
       }
 
       setEnviandoFornecedores(true);
-      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload, itens: itensPayload });
+      await enviarSolicitacaoCompraParaFornecedores(id, { fornecedores: payload });
       setFornecedoresSelecionados([]);
       setFornecedoresSelecionadosDados({});
       setItensSelecionadosEnvio({});
@@ -1529,6 +2206,124 @@ export default function GerenciarCotacaoSolicitacao() {
     }
   }
 
+  async function handleCancelarCotacao() {
+    const motivo = motivoCancelamentoCotacao.trim();
+    if (!motivo) {
+      alert('Informe o motivo do cancelamento da cotacao.');
+      return;
+    }
+
+    try {
+      setCancelandoCotacao(true);
+      await cancelarCotacaoSolicitacaoCompra(id, { motivo });
+      setModalCancelamentoCotacao(false);
+      setMotivoCancelamentoCotacao('');
+      await carregarTudo();
+      alert('Cotacao cancelada. Os links foram bloqueados e a solicitacao voltou para liberada para compra.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao cancelar cotacao');
+    } finally {
+      setCancelandoCotacao(false);
+    }
+  }
+
+  function abrirRespostaInterna(cotacaoFornecedor) {
+    setCotacaoRespostaInterna(cotacaoFornecedor);
+    setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados));
+  }
+
+  function abrirRespostaInternaPorId(cotacaoFornecedorId) {
+    const cotacaoFornecedor = (solicitacao?.fornecedores || []).find(
+      (item) => Number(item.id) === Number(cotacaoFornecedorId)
+    );
+    if (!cotacaoFornecedor) {
+      alert('Cotacao do fornecedor nao encontrada para edicao.');
+      return;
+    }
+    abrirRespostaInterna(cotacaoFornecedor);
+  }
+
+  function alterarRespostaInterna(field, value) {
+    setFormRespostaInterna((atual) => ({ ...atual, [field]: value }));
+  }
+
+  function alterarItemRespostaInterna(index, field, value) {
+    setFormRespostaInterna((atual) => ({
+      ...atual,
+      itens: atual.itens.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item)
+    }));
+  }
+
+  function aplicarDataChegadaRespostaInterna(value) {
+    setFormRespostaInterna((atual) => ({
+      ...atual,
+      itens: atual.itens.map((item) => ({ ...item, data_chegada: value }))
+    }));
+  }
+
+  async function handleSalvarRespostaInterna(finalizar) {
+    if (!formRespostaInterna || !cotacaoRespostaInterna) return;
+    if (finalizar && (!formRespostaInterna.condicao_pagamento.trim() || !formRespostaInterna.prazo_entrega.trim())) {
+      alert('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
+      return;
+    }
+
+    const itemQuantidadeInvalida = formRespostaInterna.itens.find((item) => {
+      const quantidade = parseNumeroCompraDigitado(item.quantidade_solicitada);
+      return !Number.isFinite(quantidade) || quantidade <= 0;
+    });
+    if (itemQuantidadeInvalida) {
+      alert('Quantidade solicitada do item deve ser maior que zero.');
+      return;
+    }
+
+    try {
+      setSalvandoRespostaInterna(true);
+      const itensComQuantidadeAlterada = formRespostaInterna.itens.filter((item) => {
+        const original = parseNumeroCompraDigitado(item.quantidade_original);
+        const atual = parseNumeroCompraDigitado(item.quantidade_solicitada);
+        return Number.isFinite(atual) && atual > 0 && Math.abs(atual - original) > 0.000001;
+      });
+
+      for (const item of itensComQuantidadeAlterada) {
+        await atualizarQuantidadeItemSolicitacaoCompra(id, item.item_referencia_id, {
+          item_tipo: item.item_tipo,
+          quantidade: item.quantidade_solicitada,
+          motivo: `Quantidade alterada durante edicao interna da resposta da cotacao do fornecedor ${cotacaoRespostaInterna?.fornecedor?.nome || cotacaoRespostaInterna?.fornecedor_nome || cotacaoRespostaInterna.id}`
+        });
+      }
+
+      await salvarRespostaInternaCotacao(id, cotacaoRespostaInterna.id, {
+        valor_minimo_pedido: formRespostaInterna.valor_minimo_pedido || null,
+        desconto_total: formRespostaInterna.desconto_total || 0,
+        condicao_pagamento: formRespostaInterna.condicao_pagamento,
+        prazo_entrega: formRespostaInterna.prazo_entrega,
+        observacao_resposta: formRespostaInterna.observacao_resposta,
+        finalizar,
+        itens: formRespostaInterna.itens.map((item) => ({
+          item_tipo: item.item_tipo,
+          item_referencia_id: item.item_referencia_id,
+          status_disponibilidade: item.status_disponibilidade,
+          preco: normalizarMoedaCotacaoParaEnvio(item.preco),
+          prazo: item.prazo || null,
+          quantidade_minima_item: item.quantidade_minima_item || null,
+          data_chegada: item.data_chegada || null,
+          observacao: item.observacao || null
+        }))
+      });
+      setCotacaoRespostaInterna(null);
+      setFormRespostaInterna(null);
+      await carregarTudo();
+      alert(finalizar ? 'Resposta atualizada e registrada na auditoria.' : 'Rascunho salvo e registrado na auditoria.');
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao editar resposta da cotacao');
+    } finally {
+      setSalvandoRespostaInterna(false);
+    }
+  }
+
   async function handleCriarFornecedorRapido() {
     try {
       if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
@@ -1547,7 +2342,7 @@ export default function GerenciarCotacaoSolicitacao() {
         ...atual,
         [fornecedorSelectionKey(fornecedorFormatado)]: fornecedorFormatado
       }));
-      garantirItensEnvioSelecionados();
+      garantirItensEnvioSelecionados(fornecedorSelectionKey(fornecedorFormatado));
       setNovoFornecedor({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
       alert('Fornecedor criado e selecionado.');
     } catch (error) {
@@ -1710,10 +2505,29 @@ export default function GerenciarCotacaoSolicitacao() {
   }
 
   if (!solicitacao) {
-    return <div className="page solicitacoes-page"><div className="app-empty-card sol-surface-card">Solicitacao de compra nao encontrada.</div></div>;
+    return (
+      <div className="page solicitacoes-page">
+        <div className="app-empty-card sol-surface-card">
+          {erroCarregamento || 'Solicitacao de compra nao encontrada.'}
+        </div>
+      </div>
+    );
   }
 
   const isAvulsa = solicitacao.origem === 'AVULSA';
+  const statusSolicitacao = normalizeText(solicitacao.status);
+  const fluxoTerminal = ['cancelada', 'cancelado', 'inativa', 'recusado', 'encerrado'].includes(statusSolicitacao);
+  const cotacoesAtivas = (solicitacao.fornecedores || []).filter(
+    (cotacao) => !['cancelada', 'cancelado'].includes(normalizeText(cotacao.status))
+  );
+  const temPedidoAtivo = (solicitacao.pedidos || []).some(
+    (pedido) => normalizeText(pedido.status) !== 'cancelado'
+  );
+  const podeOperarFluxo = podeComprar && !fluxoTerminal;
+  const podeExibirCancelamentoCotacao = podeCancelarCotacao
+    && !fluxoTerminal
+    && cotacoesAtivas.length > 0
+    && !temPedidoAtivo;
 
   return (
     <div className="page solicitacoes-page page-compra-nova cotacao-gestao-page">
@@ -1737,7 +2551,16 @@ export default function GerenciarCotacaoSolicitacao() {
             <button type="button" className="btn btn-outline" onClick={() => navigate('/cotacoes')}>
               Lista de cotacoes
             </button>
-            {podeComprar && !['ENCERRADO', 'RECUSADO'].includes(String(solicitacao.status || '').toUpperCase()) && (
+            {podeExibirCancelamentoCotacao && (
+              <button
+                type="button"
+                className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50"
+                onClick={() => setModalCancelamentoCotacao(true)}
+              >
+                Cancelar cotacao
+              </button>
+            )}
+            {podeOperarFluxo && (
               <button type="button" className="btn btn-outline text-red-700 hover:border-red-200 hover:bg-red-50" onClick={handleRecusarSolicitacao}>
                 Recusar
               </button>
@@ -1766,7 +2589,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
       <div className="mt-4 grid gap-4">
         <div className="grid gap-3">
-          {podeComprar && (
+          {podeOperarFluxo && (
             <div className="card sol-surface-card">
               <div className="card-header">
                 <h2 className="font-semibold">Comentario da cotacao</h2>
@@ -1808,7 +2631,7 @@ export default function GerenciarCotacaoSolicitacao() {
             {/* Componente de envio para fornecedores */}
             <SecaoEnvioFornecedores
               solicitacao={solicitacao}
-              podeComprar={podeComprar}
+              podeComprar={podeOperarFluxo}
               categoriasFornecedor={categoriasFornecedor}
               fornecedores={fornecedores}
               buscandoFornecedores={buscandoFornecedores}
@@ -1840,11 +2663,40 @@ export default function GerenciarCotacaoSolicitacao() {
                   return next;
                 });
                 if (checked) {
-                  garantirItensEnvioSelecionados();
+                  garantirItensEnvioSelecionados(selectionKey);
+                } else {
+                  setItensSelecionadosEnvio((prev) => {
+                    const next = { ...prev };
+                    delete next[selectionKey];
+                    return next;
+                  });
                 }
               }}
-              onToggleItemEnvio={(itemKey, checked) => {
-                setItensSelecionadosEnvio((prev) => ({ ...prev, [itemKey]: checked }));
+              onToggleItemEnvio={(selectionKey, itemKey, checked) => {
+                setItensSelecionadosEnvio((prev) => ({
+                  ...prev,
+                  [selectionKey]: {
+                    ...(prev?.[selectionKey] || {}),
+                    [itemKey]: checked
+                  }
+                }));
+              }}
+              onToggleFornecedorItensEnvio={(selectionKey, checked) => {
+                setItensSelecionadosEnvio((prev) => ({
+                  ...prev,
+                  [selectionKey]: checked ? criarMapaTodosItensEnvio() : {}
+                }));
+              }}
+              onToggleItemParaTodosFornecedores={(itemKey, checked) => {
+                setItensSelecionadosEnvio((prev) => (
+                  fornecedoresSelecionados.reduce((acc, selectionKey) => {
+                    acc[selectionKey] = {
+                      ...(prev?.[selectionKey] || {}),
+                      [itemKey]: checked
+                    };
+                    return acc;
+                  }, { ...prev })
+                ));
               }}
               onSelecionarTodosItensEnvio={selecionarTodosItensEnvio}
               onLimparItensEnvio={limparItensEnvio}
@@ -1903,8 +2755,10 @@ export default function GerenciarCotacaoSolicitacao() {
                         const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
+                        const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
+                        const podeEditarResposta = podeOperarFluxo && !cotacaoCancelada;
                         const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
-                          && String(solicitacao.status || '').toUpperCase() !== 'ENCERRADO';
+                          && !fluxoTerminal;
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
                           ? whatsappLink(
                               cotacaoFornecedor.fornecedor.whatsapp,
@@ -1999,6 +2853,15 @@ export default function GerenciarCotacaoSolicitacao() {
                               )}
                               <CotacaoActionButton
                                 type="button"
+                                onClick={() => abrirRespostaInterna(cotacaoFornecedor)}
+                                disabled={!podeEditarResposta}
+                                title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+                                aria-label="Editar resposta internamente"
+                              >
+                                <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
+                              <CotacaoActionButton
+                                type="button"
                                 onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
                                 disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
                                 title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
@@ -2022,10 +2885,12 @@ export default function GerenciarCotacaoSolicitacao() {
           <SecaoComparativo
             comparativo={comparativo}
             solicitacao={solicitacao}
-            podeComprar={podeComprar}
-            podeEncerrar={podeEncerrarCotacao}
+            podeComprar={podeOperarFluxo}
+            podeEncerrar={podeEncerrarCotacao && !fluxoTerminal}
+            podeEditarResposta={podeOperarFluxo}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
+            onEditarRespostaFornecedor={abrirRespostaInternaPorId}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
             onEncerrar={handleEncerrar}
             encerrando={encerrando}
@@ -2034,6 +2899,45 @@ export default function GerenciarCotacaoSolicitacao() {
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
+      <ModalRespostaInternaCotacao
+        cotacao={cotacaoRespostaInterna}
+        form={formRespostaInterna}
+        salvando={salvandoRespostaInterna}
+        onChange={alterarRespostaInterna}
+        onChangeItem={alterarItemRespostaInterna}
+        onAplicarDataChegadaTodos={aplicarDataChegadaRespostaInterna}
+        onSalvar={handleSalvarRespostaInterna}
+        onFechar={() => {
+          if (salvandoRespostaInterna) return;
+          setCotacaoRespostaInterna(null);
+          setFormRespostaInterna(null);
+        }}
+      />
+      {modalCancelamentoCotacao && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-[560px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl">
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Cancelar cotacao</h2>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">
+              Os links serao bloqueados, as respostas deixarao de participar do comparativo e a solicitacao voltara para liberada para compra. O historico sera preservado.
+            </p>
+            <label className="mt-4 block">
+              <span className="app-filter-label">Motivo do cancelamento *</span>
+              <textarea
+                className="input mt-1 min-h-[96px] w-full"
+                value={motivoCancelamentoCotacao}
+                onChange={(event) => setMotivoCancelamentoCotacao(event.target.value)}
+                placeholder="Explique por que a cotacao esta sendo cancelada."
+              />
+            </label>
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" onClick={() => setModalCancelamentoCotacao(false)} disabled={cancelandoCotacao}>Voltar</button>
+              <button type="button" className="btn btn-primary" onClick={handleCancelarCotacao} disabled={cancelandoCotacao || !motivoCancelamentoCotacao.trim()}>
+                {cancelandoCotacao ? 'Cancelando...' : 'Confirmar cancelamento'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

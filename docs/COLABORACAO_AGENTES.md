@@ -67,7 +67,6 @@ C:\Fluxy\docs\core-gateway\LGPD_DADOS_EXPERIENCE.md
 C:\Fluxy\docs\core-gateway\EVENTOS_CORE_EXPERIENCE.md
 C:\Fluxy\docs\core-gateway\ROADMAP_EXECUCAO_CORE_GATEWAY.md
 C:\Fluxy\docs\workspace\OWNERSHIP_ATIVO.md
-C:\Fluxy\docs\workspace\INTEGRACOES_ATIVAS.md
 C:\Fluxy\docs\workspace\HANDOFF_GLOBAL.md
 ```
 
@@ -91,7 +90,6 @@ Arquivos reservados ao Agente Principal:
 - `docs/COLABORACAO_AGENTES.md`;
 - `docs/core-gateway/*`;
 - `docs/workspace/OWNERSHIP_ATIVO.md`;
-- `docs/workspace/INTEGRACOES_ATIVAS.md`;
 - `docs/workspace/HANDOFF_GLOBAL.md`;
 - `backend/.env.example`;
 - `backend/src/app.js`;

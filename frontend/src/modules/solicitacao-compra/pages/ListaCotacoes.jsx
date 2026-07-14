@@ -8,6 +8,7 @@ const STATUS_COTACAO = {
   ENVIADO:    { label: 'Enviado',    cls: 'app-status-pill bg-blue-100 text-blue-700' },
   VISUALIZADO:{ label: 'Visualizado',cls: 'app-status-pill bg-yellow-100 text-yellow-700' },
   RESPONDIDO: { label: 'Respondido', cls: 'app-status-pill bg-emerald-100 text-emerald-700' },
+  FINALIZADA: { label: 'Finalizada', cls: 'app-status-pill bg-slate-100 text-slate-700' },
   CANCELADO:  { label: 'Cancelado',  cls: 'app-status-pill bg-slate-100 text-slate-600' },
 };
 
@@ -62,7 +63,7 @@ export default function ListaCotacoes() {
   }, []);
 
   const respondidas = cotacoes.filter(
-    (c) => String(c.status || '').toUpperCase() === 'RESPONDIDO'
+    (c) => ['RESPONDIDO', 'FINALIZADA'].includes(String(c.status || '').toUpperCase())
   ).length;
   const pendentes = cotacoes.filter(
     (c) => ['ENVIADO', 'VISUALIZADO'].includes(String(c.status || '').toUpperCase())
@@ -112,6 +113,7 @@ export default function ListaCotacoes() {
               <option value="ENVIADO">Enviado</option>
               <option value="VISUALIZADO">Visualizado</option>
               <option value="RESPONDIDO">Respondido</option>
+              <option value="FINALIZADA">Finalizada</option>
               <option value="CANCELADO">Cancelado</option>
             </select>
           </label>
@@ -261,4 +263,3 @@ export default function ListaCotacoes() {
     </div>
   );
 }
-

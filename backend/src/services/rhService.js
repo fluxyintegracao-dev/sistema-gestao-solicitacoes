@@ -1,4 +1,3 @@
-const XLSX = require('xlsx');
 const { Op } = require('sequelize');
 const {
   Obra,
@@ -21,6 +20,7 @@ const {
   normalizeTipoEmpresaGrupo,
   normalizeTipoGerencialEmpresaGrupo
 } = require('../constants/empresaGrupo');
+const { sheetToJsonRows } = require('../utils/excelWorkbook');
 
 const COLABORADOR_INCLUDE = [
   {
@@ -110,27 +110,22 @@ function normalizeImportHeader(value) {
     .replace(/^_+|_+$/g, '');
 }
 
-function parseSpreadsheetRows(buffer) {
+async function parseSpreadsheetRows(buffer, filename = '') {
   if (!buffer) {
     throw new ValidationError('Arquivo de importacao invalido.');
   }
 
-  const workbook = XLSX.read(buffer, {
-    type: 'buffer',
-    cellDates: false,
-    raw: false
-  });
-
-  const [sheetName] = workbook.SheetNames;
-  if (!sheetName) {
-    throw new ValidationError('A planilha nao contem abas validas.');
-  }
-
-  const sheet = workbook.Sheets[sheetName];
-  return XLSX.utils.sheet_to_json(sheet, {
+  const rows = await sheetToJsonRows(buffer, {
+    filename,
     defval: '',
     raw: false
   });
+
+  if (!rows.length) {
+    throw new ValidationError('A planilha nao contem abas validas.');
+  }
+
+  return rows;
 }
 
 function pickImportValue(row, aliases = []) {
@@ -1244,7 +1239,7 @@ async function obterLinkDocumentoRh(id) {
 }
 
 async function importarColaboradoresRh(file, user) {
-  const rows = parseSpreadsheetRows(file?.buffer);
+  const rows = await parseSpreadsheetRows(file?.buffer, file?.originalname);
   if (!rows.length) {
     throw new ValidationError('A planilha nao contem registros para importar.');
   }

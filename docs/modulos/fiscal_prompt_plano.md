@@ -47,7 +47,7 @@ Mapear o sistema atual sem implementar funcionalidade fiscal:
 - Uploads, S3, presigned URLs, env, PM2/deploy, migrations e logging.
 - Reaproveitamento, lacunas, riscos e ordem recomendada.
 
-Resultado registrado em `docs/modulos/fiscal_diagnostico_fase1.md`.
+O estado atual consolidado esta registrado em `docs/modulos/fiscal/README.md`.
 
 ### Fase 2 - Arquitetura
 

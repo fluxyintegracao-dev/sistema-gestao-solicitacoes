@@ -240,12 +240,28 @@ export async function obterSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao buscar solicitacao de compra');
 }
 
+export async function obterCompraDiretaPorSolicitacao(solicitacaoId) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/por-solicitacao/${solicitacaoId}`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao buscar compra direta vinculada');
+}
+
 export async function inativarSolicitacaoCompra(id) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}`, {
     method: 'DELETE',
     headers: authHeaders()
   });
   return handleJsonResponse(response, 'Erro ao inativar solicitacao de compra');
+}
+
+export async function cancelarSolicitacaoCompra(id, data = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar solicitacao de compra');
 }
 
 export async function inativarSolicitacoesCompra(ids = []) {
@@ -355,6 +371,27 @@ export async function enviarSolicitacaoCompraParaFornecedores(id, data) {
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao enviar cotacao para fornecedores');
+}
+
+export async function cancelarCotacaoSolicitacaoCompra(id, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/cotacao/cancelar`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao cancelar cotacao');
+}
+
+export async function salvarRespostaInternaCotacao(solicitacaoId, cotacaoId, data) {
+  const response = await fetch(
+    `${API_URL}/compras/solicitacoes/${solicitacaoId}/cotacoes/${cotacaoId}/resposta-interna`,
+    {
+      method: 'PATCH',
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(data)
+    }
+  );
+  return handleJsonResponse(response, 'Erro ao editar resposta da cotacao');
 }
 
 export async function obterComparativoSolicitacaoCompra(id) {
@@ -559,6 +596,15 @@ export async function atualizarQuantidadeItemSolicitacaoCompra(id, itemId, data)
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao atualizar quantidade do item da solicitacao de compra');
+}
+
+export async function atualizarApropriacoesItemSolicitacaoCompra(id, itemId, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens/${itemId}/apropriacoes`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao atualizar apropriacoes do item da solicitacao de compra');
 }
 
 export async function cancelarPedidoCompra(id, data = {}) {

@@ -26,7 +26,8 @@ export default function Filtros({
   statusOptions = [],
   mostrarFiltroResponsavel = false,
   mostrarSomaValor = false,
-  somaValorFiltrado = 0
+  somaValorFiltrado = 0,
+  errosDatas = {}
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() =>
@@ -806,7 +807,13 @@ export default function Filtros({
                 value={filtros.data_registro || ''}
                 onChange={handleChange}
                 type="date"
+                min="1900-01-01"
+                max="2200-12-31"
+                aria-invalid={Boolean(errosDatas.data_registro)}
               />
+              {errosDatas.data_registro && (
+                <span className="text-xs text-red-600">{errosDatas.data_registro}</span>
+              )}
             </div>
           )}
 
@@ -819,7 +826,13 @@ export default function Filtros({
                 value={filtros.data_vencimento_inicio || ''}
                 onChange={handleChange}
                 type="date"
+                min="1900-01-01"
+                max="2200-12-31"
+                aria-invalid={Boolean(errosDatas.data_vencimento_inicio)}
               />
+              {errosDatas.data_vencimento_inicio && (
+                <span className="text-xs text-red-600">{errosDatas.data_vencimento_inicio}</span>
+              )}
             </div>
           )}
 
@@ -832,7 +845,13 @@ export default function Filtros({
                 value={filtros.data_vencimento_fim || ''}
                 onChange={handleChange}
                 type="date"
+                min="1900-01-01"
+                max="2200-12-31"
+                aria-invalid={Boolean(errosDatas.data_vencimento_fim)}
               />
+              {errosDatas.data_vencimento_fim && (
+                <span className="text-xs text-red-600">{errosDatas.data_vencimento_fim}</span>
+              )}
             </div>
           )}
 

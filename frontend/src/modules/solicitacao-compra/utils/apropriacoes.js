@@ -29,10 +29,14 @@ export function criarRateioBase(quantidade = '') {
   };
 }
 
+function resolverApropriacaoId(rateio) {
+  return rateio?.apropriacao_id || rateio?.apropriacao?.id || rateio?.id_apropriacao || '';
+}
+
 export function normalizarRateiosEntrada(item) {
   if (Array.isArray(item?.apropriacoes) && item.apropriacoes.length > 0) {
     return item.apropriacoes.map((rateio) => ({
-      apropriacao_id: rateio?.apropriacao_id ? String(rateio.apropriacao_id) : '',
+      apropriacao_id: resolverApropriacaoId(rateio) ? String(resolverApropriacaoId(rateio)) : '',
       quantidade_apropriada:
         rateio?.quantidade_apropriada !== null && rateio?.quantidade_apropriada !== undefined
           ? String(rateio.quantidade_apropriada)

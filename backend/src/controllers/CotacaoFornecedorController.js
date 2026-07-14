@@ -7,6 +7,7 @@ const {
   FornecedorCompra,
   Insumo,
   Obra,
+  PedidoCompra,
   SolicitacaoCompra,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraFornecedorItem,
@@ -21,8 +22,12 @@ const {
 } = require('../models');
 const { env } = require('../config/env');
 const {
+  assertCotacaoFornecedorAtiva,
+  assertSolicitacaoCompraAceitaCotacao,
   gerarModeloCotacaoCsv,
   gerarModeloCotacaoXlsx,
+  isCotacaoFornecedorCancelada,
+  isSolicitacaoCompraTerminal,
   normalizeText,
   obterItensCotaveisDaCotacao,
   registrarLogSolicitacaoCompra
@@ -315,6 +320,9 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
     })
   );
 
+  const somenteLeitura = isSolicitacaoCompraTerminal(cotacaoFornecedor?.solicitacao?.status)
+    || isCotacaoFornecedorCancelada(cotacaoFornecedor?.status);
+
   return {
     fornecedor: cotacaoFornecedor?.fornecedor || null,
     solicitacao: {
@@ -339,7 +347,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       arquivo_resposta_is_image: Boolean(arquivoRespostaUrl && arquivoRespostaTipo === 'IMAGEM')
     },
     configuracoes,
-    somente_leitura: normalizeText(cotacaoFornecedor?.solicitacao?.status) === 'ENCERRADO',
+    somente_leitura: somenteLeitura,
     itens: await Promise.all(itensCotaveis.map(async (item) => {
       const resposta = respostasPorItem.get(buildItemKey(item.item_tipo, item.item_referencia_id));
       // apropriacao_resumo e apropriacao_linhas sao dados internos — nao enviados ao fornecedor
@@ -441,9 +449,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         itemTipo === 'MANUAL' ? itemReferenciaId : null,
       disponivel,
       status_disponibilidade: statusEfetivo,
-      data_chegada: statusEfetivo === 'PARA_CHEGAR' && itemResposta.data_chegada
-        ? itemResposta.data_chegada
-        : null,
+      data_chegada: itemResposta.data_chegada || null,
       preco: disponivel ? precoNormalizado : null,
       prazo: itemResposta.prazo ? String(itemResposta.prazo).trim() : null,
       observacao: itemResposta.observacao ? String(itemResposta.observacao).trim() : null,
@@ -464,9 +470,43 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       throw new Error('Cotacao nao encontrada.');
     }
 
+    const solicitacaoTravada = await SolicitacaoCompra.findByPk(cotacaoTravada.solicitacao_compra_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!solicitacaoTravada) {
+      throw new Error('Solicitacao de compra nao encontrada.');
+    }
+
+    assertSolicitacaoCompraAceitaCotacao(
+      solicitacaoTravada,
+      isRascunho ? 'salvar rascunho' : 'registrar resposta'
+    );
+    assertCotacaoFornecedorAtiva(
+      cotacaoTravada,
+      isRascunho ? 'salvar rascunho' : 'registrar resposta'
+    );
+
     if (normalizeText(cotacaoTravada.status) === 'RESPONDIDO' && !usuarioInterno) {
       throw new Error('Esta cotacao ja foi respondida. Para alterar a resposta, fale com a equipe de compras.');
     }
+
+    const respostasAnteriores = await SolicitacaoCompraRespostaItem.findAll({
+      where: { solicitacao_compra_fornecedor_id: cotacaoFornecedor.id, deleted_at: null },
+      attributes: [
+        'id',
+        'item_tipo',
+        'solicitacao_compra_item_id',
+        'solicitacao_compra_item_manual_id',
+        'status_disponibilidade',
+        'disponivel',
+        'preco',
+        'prazo',
+        'quantidade_minima_item'
+      ],
+      transaction
+    });
+    const statusAnteriorCotacao = cotacaoTravada.status;
 
     await SolicitacaoCompraRespostaItem.update(
       { deleted_at: new Date() },
@@ -509,9 +549,13 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         cotacao_fornecedor_id: cotacaoFornecedor.id,
         quantidade_itens: respostasPreparadas.length,
         rascunho: isRascunho,
+        status_anterior: statusAnteriorCotacao,
+        status_novo: isRascunho ? 'RASCUNHO' : 'RESPONDIDO',
         origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
         usuario_interno_id: usuarioInterno?.id || null,
-        usuario_interno_nome: usuarioInterno?.nome || null
+        usuario_interno_nome: usuarioInterno?.nome || null,
+        respostas_anteriores: respostasAnteriores.map((item) => item.toJSON()),
+        respostas_novas: respostasPreparadas
       },
       transaction
     });
@@ -901,7 +945,10 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      if (!cotacaoFornecedor.visualizado_em) {
+      const cotacaoSomenteLeitura = isSolicitacaoCompraTerminal(cotacaoFornecedor.solicitacao?.status)
+        || isCotacaoFornecedorCancelada(cotacaoFornecedor.status);
+
+      if (!cotacaoSomenteLeitura && !cotacaoFornecedor.visualizado_em) {
         await cotacaoFornecedor.update({
           status: cotacaoFornecedor.status === 'ENVIADO' ? 'VISUALIZADO' : cotacaoFornecedor.status,
           visualizado_em: new Date()
@@ -931,9 +978,8 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
-        return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel responder.' });
-      }
+      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'registrar resposta');
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'registrar resposta');
 
       const usuarioInterno = await identificarUsuarioInternoOpcional(req);
       if (normalizeText(cotacaoFornecedor.status) === 'RESPONDIDO' && !usuarioInterno) {
@@ -972,9 +1018,8 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
-        return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel salvar rascunho.' });
-      }
+      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'salvar rascunho');
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'salvar rascunho');
 
       const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
       if (!itens.length && !cotacaoFornecedor.pdf_resposta_url) {
@@ -998,6 +1043,152 @@ module.exports = {
       return responderErroController(res, error, 'Erro ao salvar rascunho da cotacao', {
         status: 400
       });
+    }
+  },
+
+  async cancelarFluxo(req, res) {
+    const transaction = await sequelize.transaction();
+    try {
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada.' });
+      }
+
+      if (normalizeText(solicitacao.origem) === 'COMPRA_DIRETA') {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Compra direta nao utiliza o fluxo de cancelamento de cotacao.'
+        });
+      }
+
+      assertSolicitacaoCompraAceitaCotacao(solicitacao, 'cancelar a cotacao');
+
+      const pedidosAtivos = await PedidoCompra.count({
+        where: {
+          solicitacao_compra_id: solicitacao.id,
+          status: { [Op.ne]: 'CANCELADO' }
+        },
+        transaction
+      });
+      if (pedidosAtivos > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'A cotacao ja possui pedido ativo. Cancele o fluxo a partir do pedido para preservar o financeiro e a auditoria.'
+        });
+      }
+
+      const cotacoesAtivas = await SolicitacaoCompraFornecedor.findAll({
+        where: {
+          solicitacao_compra_id: solicitacao.id,
+          status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+        },
+        attributes: ['id', 'fornecedor_compra_id', 'status', 'respondido_em', 'pdf_resposta_url'],
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!cotacoesAtivas.length) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Nao existe cotacao ativa para cancelar.' });
+      }
+
+      const motivo = String(req.body?.motivo || '').trim();
+      const cotacaoIds = cotacoesAtivas.map((item) => item.id);
+      const respostasCanceladas = await SolicitacaoCompraRespostaItem.update(
+        { deleted_at: new Date() },
+        {
+          where: {
+            solicitacao_compra_fornecedor_id: { [Op.in]: cotacaoIds },
+            deleted_at: null
+          },
+          transaction
+        }
+      );
+
+      await SolicitacaoCompraFornecedor.update(
+        { status: 'CANCELADA' },
+        { where: { id: { [Op.in]: cotacaoIds } }, transaction }
+      );
+
+      const statusAnteriorSolicitacao = solicitacao.status;
+      await solicitacao.update(
+        {
+          status: 'LIBERADO_PARA_COMPRA',
+          encerrado_em: null
+        },
+        { transaction }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: req.user?.id || null,
+        tipoAcao: 'COTACAO_CANCELADA',
+        descricao: `Cotacao cancelada pelo usuario interno. Motivo: ${motivo}`,
+        metadados: {
+          motivo,
+          status_solicitacao_anterior: statusAnteriorSolicitacao,
+          status_solicitacao_novo: 'LIBERADO_PARA_COMPRA',
+          cotacoes: cotacoesAtivas.map((item) => ({
+            id: item.id,
+            fornecedor_compra_id: item.fornecedor_compra_id,
+            status_anterior: item.status,
+            respondido_em: item.respondido_em,
+            arquivo_resposta_url: item.pdf_resposta_url || null
+          })),
+          respostas_desativadas: Number(respostasCanceladas?.[0] || 0)
+        },
+        transaction
+      });
+
+      await transaction.commit();
+      return res.json({
+        ok: true,
+        status: 'LIBERADO_PARA_COMPRA',
+        cotacoes_canceladas: cotacaoIds.length,
+        respostas_desativadas: Number(respostasCanceladas?.[0] || 0)
+      });
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao cancelar cotacao', { status: 400 });
+    }
+  },
+
+  async responderInternamente(req, res) {
+    try {
+      const cotacaoBase = await SolicitacaoCompraFornecedor.findByPk(req.params.cotacaoId, {
+        attributes: ['id', 'token', 'solicitacao_compra_id']
+      });
+      if (!cotacaoBase || Number(cotacaoBase.solicitacao_compra_id) !== Number(req.params.id)) {
+        return res.status(404).json({ error: 'Cotacao nao encontrada para esta solicitacao de compra.' });
+      }
+
+      const cotacaoFornecedor = await carregarCotacaoPorToken(cotacaoBase.token);
+      if (!cotacaoFornecedor) {
+        return res.status(404).json({ error: 'Cotacao nao encontrada.' });
+      }
+
+      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'editar a resposta');
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'editar a resposta');
+
+      await salvarRespostasCotacao(cotacaoFornecedor, req.body.itens, {
+        valor_minimo_pedido: req.body.valor_minimo_pedido,
+        desconto_total: req.body.desconto_total,
+        condicao_pagamento: req.body.condicao_pagamento,
+        prazo_entrega: req.body.prazo_entrega,
+        observacao_resposta: req.body.observacao_resposta,
+        usuario_interno: req.user,
+        rascunho: req.body.finalizar === false
+      });
+
+      const atualizada = await carregarCotacaoPorToken(cotacaoBase.token);
+      return res.json(await serializarCotacaoPublica(atualizada, req));
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao editar resposta da cotacao', { status: 400 });
     }
   },
 
@@ -1031,10 +1222,8 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada.' });
       }
 
-      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
-        await transaction.rollback();
-        return res.status(400).json({ error: 'Cotacao encerrada. Nao e possivel reabrir.' });
-      }
+      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'reabrir a cotacao');
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'reabrir a cotacao');
 
       const statusAtual = normalizeText(cotacaoFornecedor.status);
       if (!['RESPONDIDO', 'RASCUNHO'].includes(statusAtual)) {
@@ -1099,9 +1288,8 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      if (normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO') {
-        return res.status(400).json({ error: 'Cotacao encerrada. Nao e mais possivel responder.' });
-      }
+      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'anexar resposta');
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'anexar resposta');
 
       const tipoArquivo = getTipoArquivoResposta(extension);
       const usuarioInterno = await identificarUsuarioInternoOpcional(req);
@@ -1145,7 +1333,7 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada' });
       }
 
-      const buffer = gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
+      const buffer = await gerarModeloCotacaoXlsx(cotacaoFornecedor.solicitacao, cotacaoFornecedor.itensSelecionados || []);
       res.setHeader(
         'Content-Type',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'

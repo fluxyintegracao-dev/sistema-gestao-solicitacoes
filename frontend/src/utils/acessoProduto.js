@@ -165,6 +165,7 @@ export function canAccessCompras(user) {
       'compras.cotacoes.gerenciar',
       'compras.cotacoes.editar_respostas',
       'compras.cotacoes.salvar_rascunho',
+      'compras.cotacoes.cancelar',
       'compras.cotacoes.encerrar',
       'compras.cotacoes.reabrir',
       'compras.fornecedores.visualizar',
@@ -249,6 +250,33 @@ export function canAlterarQuantidadeSolicitacaoCompra(user) {
     ]);
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEditarApropriacoesSolicitacao(user) {
+  if (!canAccessSolicitacoes(user)) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'solicitacoes.apropriacoes.editar');
+  }
+  return false;
+}
+
+export function canEditarApropriacoesItemSolicitacaoCompra(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.solicitacoes.editar_apropriacoes_itens');
+  }
+  return false;
+}
+
+export function canEditarApropriacoesItemCompraDireta(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.compra_direta.editar_apropriacoes_itens');
+  }
+  return false;
 }
 
 export function canEncaminharCompraSolicitacoes(user) {
@@ -486,6 +514,16 @@ export function canReabrirComprasCotacoes(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'compras.cotacoes.reabrir');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canCancelarComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.cotacoes.cancelar');
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }

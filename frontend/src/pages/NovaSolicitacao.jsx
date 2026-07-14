@@ -1321,6 +1321,7 @@ export default function NovaSolicitacao() {
       const params = new URLSearchParams();
       params.set('obra_id', String(form.obra_id));
       params.set('tipo_solicitacao_id', String(form.tipo_solicitacao_id));
+      params.set('area_responsavel', String(form.area_responsavel));
       params.set('origem', 'nova-solicitacao');
       navigate(`/solicitacoes-compra-direta/nova?${params.toString()}`);
       return;

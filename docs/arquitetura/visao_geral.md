@@ -2,114 +2,34 @@
 
 ## Topologia
 
-- frontend React/Vite consumindo API REST
-- backend Node.js/Express concentrando validacao, autorizacao e regras
-- MySQL como persistencia principal
-- S3 para anexos e comprovantes com leitura por URL assinada
+- React/Vite no frontend web;
+- Expo/React Native no aplicativo mobile;
+- API REST Node.js/Express;
+- Sequelize e MySQL;
+- S3 para arquivos privados;
+- EC2, PM2 e Nginx no backend;
+- Vercel no frontend.
 
-## Principios Arquiteturais
+## Responsabilidades
 
-- backend como fonte de verdade
-- single-tenant por instalacao
-- multiempresa dentro da instalacao
-- validacao critica no servidor
-- migrations controladas
-- configuracao por `.env` e por runtime config
-- modulos habilitaveis e desabilitaveis por configuracao central, sem acoplar um fluxo ao outro
-- core operacional separado de camada experimental/lab
-- dado operacional critico nao deve depender de fallback, inferencia ou simulacao
-- relatorios devem demonstrar inconsistencia de dados em vez de preencher lacunas por suposicao
+O frontend cuida de navegacao, formularios e apresentacao. O backend cuida de autenticacao, autorizacao, validacao, regras de negocio, transacoes, auditoria, persistencia e integracoes.
 
-## Posicionamento Arquitetural Atual
+O banco persiste o estado oficial. Relatorios e dashboards devem derivar de dados rastreaveis e mostrar inconsistencias em vez de inventar valores.
 
-O FLUXY entrou na fase de consolidacao operacional e institucionalizacao.
+## Inicializacao
 
-O repositorio atual deve ser tratado como sistema institucional single-tenant por instalacao, com suporte a multiempresa, holding, intercompany, obras e centros de custo dentro da mesma instalacao.
+`backend/server.js` valida o ambiente, executa `runMigrations()`, carrega configuracoes e inicia a API. O bootstrap legado com `sequelize.sync()` so pode ocorrer mediante flag excepcional e nao faz parte do runtime normal.
 
-O repositorio atual nao deve ser convertido em SaaS multi-tenant com base compartilhada. Caso o modelo multi-tenant seja retomado no futuro, ele deve nascer em nova geracao arquitetural, baseada nas regras estabilizadas e na experiencia operacional acumulada.
+## Modularidade
 
-O documento oficial desta mudanca e `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`.
+Os modulos sao controlados pela chave `MODULOS_HABILITADOS` de `ConfiguracaoSistema`. O catalogo, os valores padrao e as dependencias ficam em `backend/src/services/moduleConfigService.js`; o backend aplica `requireEnabledModule` nas rotas e o frontend recebe `modulos_habilitados` na sessao.
 
-## Camadas
+Dependencias declaradas devem ser aplicadas tanto no frontend quanto no backend. Desabilitar um modulo nao remove suas colunas, rotas ou tabelas e nao transfere a propriedade de seus dados para outro dominio.
 
-### Frontend
+Por compatibilidade, uma chave de modulo desconhecida e considerada habilitada no backend. O frontend tambem considera habilitado quando a sessao nao contem lista de modulos ou quando a chave nao existe nela. Portanto, todo novo modulo precisa ser incluido no catalogo, exposto na sessao, protegido no backend e frontend e coberto pela validacao documental. Esse comportamento de compatibilidade nao deve ser usado como mecanismo de habilitacao.
 
-Responsavel por:
+O inventario do runtime e os componentes descontinuados ainda presentes no codigo estao em `ESTADO_RUNTIME_E_LEGADOS.md`.
 
-- navegacao
-- experiencia visual
-- formulacao e exibicao de dados
-- chamadas a API
+## Regra de mudanca
 
-Nao e autoridade para:
-
-- permissoes
-- escopo de obra
-- valores financeiros finais
-- status criticos
-
-### Backend
-
-Responsavel por:
-
-- autenticacao e autorizacao
-- validacao de input
-- regras de negocio
-- auditoria e logs
-- persistencia
-- emissao de PDF
-- upload controlado
-
-### Banco de dados
-
-Responsavel por:
-
-- persistir dados operacionais
-- manter historico e rastreabilidade
-- suportar consultas de relatorio, dashboard e conciliacao
-
-## Inicializacao da Aplicacao
-
-`backend/server.js` executa:
-
-1. validacao de ambiente
-2. migrations pendentes
-3. carga das configuracoes de runtime
-4. subida da API
-
-Nao existe dependencia de `sync({ alter: true })`.
-
-A migration historica `202603280001_legacy_schema_bootstrap.js` preserva compatibilidade com bancos antigos, mas nao executa `sequelize.sync()` por padrao. Qualquer bootstrap legado com `sync()` exige a variavel explicita `ALLOW_LEGACY_SCHEMA_BOOTSTRAP_SYNC=true` e deve ser tratado como operacao excepcional e controlada.
-
-## Modularidade de Produto
-
-O FLUXY usa configuracao central de modulos habilitados para controlar menu, rotas e disponibilidade funcional por instalacao.
-
-Principios para novos modulos:
-
-- cada modulo deve possuir chave propria de habilitacao
-- backend deve proteger rotas do modulo
-- frontend deve ocultar menu e telas quando o modulo estiver desabilitado
-- integracoes opcionais, como boleto bancario, devem ficar em modulo ou submodulo separado quando houver dependencia de homologacao externa
-
-## Core Operacional e Lab
-
-### Core Operacional
-
-Inclui solicitacoes, compras, financeiro, obras, contratos, apropriacoes, RH/DP, SST, fiscal operacional, integracoes criticas, seguranca, auditoria e permissoes.
-
-Mudancas no core exigem:
-
-- regra de negocio clara;
-- validacao no backend;
-- revisao de permissoes;
-- migration controlada quando houver banco;
-- teste/build aplicavel;
-- atualizacao documental;
-- orientacao de deploy e rollback quando houver risco.
-
-### Camada Experimental / Lab
-
-Inclui IA, Fluxy Experience, WebXR, 3D, automacoes avancadas e prototipos de integracoes.
-
-Essa camada deve ser desacoplada do core, preferencialmente por modulo, feature flag ou configuracao, sem comprometer rotinas operacionais criticas.
+Antes de alterar uma tabela, status, endpoint ou permissao, consulte o mapa de modulos, a propriedade dos dados e o documento canonico do dominio. Mudancas transversais exigem teste em todos os consumidores identificados.

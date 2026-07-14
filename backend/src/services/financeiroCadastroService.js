@@ -557,11 +557,24 @@ async function atualizarFormaPagamentoFinanceira(req, formaId, payload = {}) {
   return forma;
 }
 
+function buildCartaoContaInclude() {
+  return [{
+    model: ContaBancaria,
+    as: 'contaBancaria',
+    attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id'],
+    include: [{
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: ['id', 'codigo', 'nome', 'razao_social']
+    }]
+  }];
+}
+
 async function listarCartoesFinanceiros(req) {
   await assertFinanceAccess(req);
 
   return CartaoFinanceiro.findAll({
-    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }],
+    include: buildCartaoContaInclude(),
     order: [['nome', 'ASC']]
   });
 }
@@ -575,7 +588,7 @@ async function criarCartaoFinanceiro(req, payload = {}) {
 
   const cartao = await CartaoFinanceiro.create(data);
   return CartaoFinanceiro.findByPk(cartao.id, {
-    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+    include: buildCartaoContaInclude()
   });
 }
 
@@ -594,7 +607,7 @@ async function atualizarCartaoFinanceiro(req, cartaoId, payload = {}) {
   data.atualizado_por = req.user?.id || null;
   await cartao.update(data);
   return CartaoFinanceiro.findByPk(cartao.id, {
-    include: [{ model: ContaBancaria, as: 'contaBancaria', attributes: ['id', 'nome', 'banco', 'agencia', 'conta'] }]
+    include: buildCartaoContaInclude()
   });
 }
 

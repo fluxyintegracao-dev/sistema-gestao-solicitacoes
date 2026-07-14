@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const XLSX = require('xlsx');
 const { Op } = require('sequelize');
 const {
   CategoriaFinanceira,
@@ -11,6 +10,7 @@ const {
   sequelize
 } = require('../models');
 const { getFinanceiroObraScopeIds } = require('./authorizationService');
+const { excelSerialDateToDate, sheetToArrayRows } = require('../utils/excelWorkbook');
 
 const MAX_IMPORT_ROWS = 5000;
 
@@ -115,10 +115,8 @@ function parseDateOnly(value) {
   }
 
   if (typeof value === 'number') {
-    const parsed = XLSX.SSF.parse_date_code(value);
-    if (parsed && parsed.y && parsed.m && parsed.d) {
-      return `${parsed.y}-${pad(parsed.m)}-${pad(parsed.d)}`;
-    }
+    const parsed = excelSerialDateToDate(value);
+    return parsed ? formatDateOnly(parsed) : null;
   }
 
   const text = String(value).trim();
@@ -143,25 +141,21 @@ function hashObject(payload) {
     .digest('hex');
 }
 
-function readWorkbookRows(file) {
+async function readWorkbookRows(file) {
   if (!file?.buffer) {
     throw createHttpError(400, 'Arquivo da importacao e obrigatorio.');
   }
 
-  const workbook = XLSX.read(file.buffer, {
-    type: 'buffer',
-    cellDates: true
-  });
-  const sheetName = workbook.SheetNames[0];
-  if (!sheetName) {
-    throw createHttpError(400, 'A planilha nao possui abas para importacao.');
-  }
-
-  return XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], {
-    header: 1,
+  const rows = await sheetToArrayRows(file.buffer, {
+    filename: file.originalname,
     raw: true,
     defval: ''
   });
+  if (!rows.length) {
+    throw createHttpError(400, 'A planilha nao possui abas para importacao.');
+  }
+
+  return rows;
 }
 
 function findHeaderRow(rows) {
@@ -380,7 +374,7 @@ function buildLinhaPayload({ row, columns, defaults, metadata, lookups, rowNumbe
 }
 
 async function previewImportacaoCustosHistoricos(req, defaultsPayload = {}) {
-  const rows = readWorkbookRows(req.file);
+  const rows = await readWorkbookRows(req.file);
   const headerRowIndex = findHeaderRow(rows);
   if (headerRowIndex < 0) {
     throw createHttpError(400, 'Nao foi possivel localizar o cabecalho da planilha.');

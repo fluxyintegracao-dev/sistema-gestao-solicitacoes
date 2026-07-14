@@ -1,62 +1,28 @@
-# Contexto - Visao Geral
+# Contexto Atual do FLUXY
 
-O FLUXY e uma plataforma operacional institucional, orientada por solicitacoes, criada a partir de uma operacao real de construcao civil e evoluida para sustentar rotinas criticas da empresa.
+O FLUXY e o sistema operacional institucional da empresa. Ele centraliza processos que antes dependiam de planilhas, mensagens e controles isolados, mantendo uma trilha unica de dados, responsabilidades e decisoes.
 
-A direcao atual do produto nao e mais expansao funcional acelerada. O projeto entrou na fase de consolidacao operacional e institucionalizacao, com foco em estabilidade, governanca, seguranca, testes, documentacao, rastreabilidade e reducao de dependencia do fundador tecnico.
+## Objetivos
 
-O reposicionamento oficial esta documentado em `docs/REPOSICIONAMENTO_ESTRATEGICO_FLUXY.md`.
+- dar continuidade aos fluxos operacionais entre setores;
+- manter rastreabilidade de solicitacoes, compras, titulos e documentos;
+- consolidar custos e informacoes por empresa, obra e apropriacao;
+- reduzir duplicidade de lancamentos e controles paralelos;
+- oferecer informacao confiavel para operacao, conferencia e governanca.
 
-## Tese do Produto
+## Principios
 
-Empresas pequenas e medias, especialmente construtoras, costumam operar com combinacao de:
+- solicitacao como hub operacional;
+- backend como fonte de verdade;
+- multiempresa dentro da instalacao institucional;
+- dados compartilhados com um dominio proprietario definido;
+- permissoes validadas no servidor;
+- historico e auditoria para acoes sensiveis;
+- modulos isolados por configuracao, sem dependencias ocultas;
+- estabilidade acima de expansao funcional sem validacao.
 
-- planilhas
-- WhatsApp
-- processos internos pouco rastreaveis
-- ERPs tradicionais com alto atrito operacional
+## Escopo atual
 
-O FLUXY resolve isso com um fluxo unico e rastreavel, centrado na solicitacao.
+O sistema cobre solicitacoes, obras, contratos, parceiros, compras, cotacoes, pedidos, financeiro, conciliacao, provisionamento, comercial operacional, CRM, RH/DP, SST, fiscal, documentos, comunicacao, treinamento e governanca.
 
-## Proposta de Valor
-
-- centralizar solicitacoes, compras, pagamentos, recebimentos e custo por obra
-- reduzir dependencias de controles paralelos
-- manter implantacao simples por cliente
-- entregar visibilidade operacional sem complexidade de ERP pesado
-- evoluir por modulos, sem exigir que todo cliente use todos os fluxos
-
-## Publico Alvo Atual
-
-- operacao interna da empresa
-- diretorias e liderancas setoriais
-- areas administrativas, obras, compras, financeiro, RH/DP, fiscal, contratos e SST
-- equipes futuras de suporte, implantacao, manutencao e governanca
-
-## Principios do Produto
-
-- simplicidade operacional acima de sofisticacao desnecessaria
-- backend como autoridade para regras criticas
-- single-tenant por instalacao
-- multiempresa dentro da instalacao
-- solicitacao como hub dos fluxos
-- rastreabilidade por historico, logs e auditoria
-- core operacional protegido contra experimentos de alto risco
-- camada experimental separada para IA, WebXR, 3D e automacoes avancadas
-
-## Pilares Funcionais
-
-- solicitacoes setoriais
-- compras e cotacoes
-- parceiros
-- apropriacao por obra
-- financeiro
-- comercial e carteira de recebimentos para clientes finais da construtora
-- conciliacao OFX
-- gestao de obras
-- dashboards e relatorios
-
-## Posicionamento Comercial
-
-O FLUXY nao deve ser tratado neste momento como SaaS multi-tenant amplo ou produto massificado.
-
-A expansao comercial futura deve ser controlada, preferencialmente em modelo single tenant por cliente, somente depois de maturidade em estabilidade, testes, documentacao, suporte, deploy e governanca.
+Nem todos os modulos precisam estar habilitados simultaneamente. Quando um modulo estiver desabilitado, o frontend deve ocultar seus fluxos e o backend deve recusar suas operacoes sem quebrar os demais dominios.

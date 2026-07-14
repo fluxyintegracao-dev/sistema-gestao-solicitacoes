@@ -1,4 +1,3 @@
-const XLSX = require('xlsx');
 const { Contrato, ContratoCredor, Parceiro, ParceiroCategoria } = require('../models');
 const {
   atualizarParceiro,
@@ -12,6 +11,7 @@ const {
   resolverCamposNovaSolicitacao
 } = require('../services/novaSolicitacaoCamposConfig');
 const { responderErroController } = require('../utils/controllerError');
+const { createWorkbookBuffer, sheetToJsonRows } = require('../utils/excelWorkbook');
 
 const PLANILHA_COLUNAS = [
   ['cpf_cnpj', 'CPF/CNPJ'],
@@ -210,7 +210,7 @@ function mapRowToPayload(row = {}) {
   };
 }
 
-function montarWorkbookParceiros(parceiros = [], categorias = []) {
+async function montarWorkbookParceiros(parceiros = [], categorias = []) {
   const header = PLANILHA_COLUNAS.map(([, label]) => label);
   const rows = parceiros.map((parceiro) => {
     const categoriasTexto = Array.isArray(parceiro.categorias)
@@ -228,12 +228,6 @@ function montarWorkbookParceiros(parceiros = [], categorias = []) {
     return PLANILHA_COLUNAS.map(([key]) => values[key] ?? '');
   });
 
-  const workbook = XLSX.utils.book_new();
-  const sheet = XLSX.utils.aoa_to_sheet([header, ...rows]);
-  sheet['!cols'] = PLANILHA_COLUNAS.map(([key]) => ({
-    wch: key === 'categorias' ? 34 : key.includes('pix') ? 24 : 18
-  }));
-
   const instrucoes = [
     ['Campo', 'Orientacao'],
     ['CPF/CNPJ', 'Obrigatorio. Mantenha como texto para preservar zeros a esquerda.'],
@@ -242,16 +236,23 @@ function montarWorkbookParceiros(parceiros = [], categorias = []) {
     ['PIX tipo', 'Valores aceitos: CPF, CNPJ, EMAIL, TELEFONE, ALEATORIA.'],
     ['Importacao', 'Se o CPF/CNPJ ja existir, o sistema atualiza o cadastro e as categorias.']
   ];
-  const categoriasSheet = XLSX.utils.aoa_to_sheet([
-    ['Categorias cadastradas'],
-    ...categorias.map((categoria) => [categoria.nome])
+  return createWorkbookBuffer([
+    {
+      name: 'Pessoas',
+      rows: [header, ...rows],
+      columns: PLANILHA_COLUNAS.map(([key]) => ({
+        wch: key === 'categorias' ? 34 : key.includes('pix') ? 24 : 18
+      }))
+    },
+    { name: 'Instrucoes', rows: instrucoes },
+    {
+      name: 'Categorias',
+      rows: [
+        ['Categorias cadastradas'],
+        ...categorias.map((categoria) => [categoria.nome])
+      ]
+    }
   ]);
-
-  XLSX.utils.book_append_sheet(workbook, sheet, 'Pessoas');
-  XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
-  XLSX.utils.book_append_sheet(workbook, categoriasSheet, 'Categorias');
-
-  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
 }
 
 function responderXlsx(res, buffer, filename) {
@@ -392,6 +393,23 @@ module.exports = {
     }
   },
 
+  async createCredorCompraDireta(req, res) {
+    try {
+      const parceiro = await criarParceiro({
+        ...req.body,
+        fornecedor: true,
+        cliente: false,
+        corretor: false,
+        testemunha: false,
+        ativo: true
+      });
+
+      return res.status(201).json(parceiro);
+    } catch (error) {
+      return responderErroController(res, error, 'Erro ao cadastrar credor da compra direta', { status: 400 });
+    }
+  },
+
   async update(req, res) {
     try {
       const parceiro = await atualizarParceiro(req.params.id, req.body || {});
@@ -408,7 +426,7 @@ module.exports = {
         where: { ativo: true },
         order: [['nome', 'ASC']]
       });
-      const buffer = montarWorkbookParceiros([], categorias);
+      const buffer = await montarWorkbookParceiros([], categorias);
       return responderXlsx(res, buffer, 'modelo-importacao-pessoas.xlsx');
     } catch (error) {
       console.error(error);
@@ -432,7 +450,7 @@ module.exports = {
         }),
         ParceiroCategoria.findAll({ where: { ativo: true }, order: [['nome', 'ASC']] })
       ]);
-      const buffer = montarWorkbookParceiros(parceiros, categorias);
+      const buffer = await montarWorkbookParceiros(parceiros, categorias);
       return responderXlsx(res, buffer, 'pessoas-cadastradas.xlsx');
     } catch (error) {
       console.error(error);
@@ -447,10 +465,11 @@ module.exports = {
         return res.status(400).json({ error: 'Envie uma planilha XLSX ou CSV.' });
       }
 
-      const workbook = XLSX.read(file.buffer, { type: 'buffer', cellDates: false });
-      const sheetName = workbook.SheetNames[0];
-      const sheet = workbook.Sheets[sheetName];
-      const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+      const rows = await sheetToJsonRows(file.buffer, {
+        filename: file.originalname,
+        defval: '',
+        raw: false
+      });
 
       const resultado = {
         importados: 0,

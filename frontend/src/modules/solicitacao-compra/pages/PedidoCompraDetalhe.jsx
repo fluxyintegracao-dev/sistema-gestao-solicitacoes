@@ -426,6 +426,13 @@ export default function PedidoCompraDetalhe() {
   const [salvandoComentario, setSalvandoComentario] = useState(false);
   const [anexandoEspelho, setAnexandoEspelho] = useState(false);
   const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
+  const [cancelamentoPedidoForm, setCancelamentoPedidoForm] = useState({
+    motivo: '',
+    cancelar_cotacao: true,
+    cancelar_solicitacao_compra: true,
+    cancelar_solicitacao_principal: false
+  });
   const [reabrindoCotacao, setReabrindoCotacao] = useState(false);
   const [itensSelecionadosCancelamento, setItensSelecionadosCancelamento] = useState([]);
   const [cancelandoItens, setCancelandoItens] = useState(false);
@@ -1114,14 +1121,17 @@ export default function PedidoCompraDetalhe() {
   }
 
   async function handleCancelarPedido() {
-    const confirmou = window.confirm(
-      'Cancelar este pedido? O historico sera preservado e um novo evento de cancelamento sera registrado. Se houver titulo financeiro ou frete vinculado, o sistema bloqueara a acao.'
-    );
-    if (!confirmou) return;
+    setCancelamentoPedidoForm({
+      motivo: '',
+      cancelar_cotacao: true,
+      cancelar_solicitacao_compra: true,
+      cancelar_solicitacao_principal: false
+    });
+    setModalCancelamentoAberto(true);
+  }
 
-    const motivo = window.prompt('Informe o motivo do cancelamento do pedido.');
-    if (motivo === null) return;
-    const motivoNormalizado = motivo.trim();
+  async function confirmarCancelamentoPedido() {
+    const motivoNormalizado = String(cancelamentoPedidoForm.motivo || '').trim();
     if (!motivoNormalizado) {
       alert('Informe o motivo do cancelamento do pedido.');
       return;
@@ -1129,9 +1139,15 @@ export default function PedidoCompraDetalhe() {
 
     try {
       setCancelandoPedido(true);
-      const data = await cancelarPedidoCompra(id, { motivo: motivoNormalizado });
+      const data = await cancelarPedidoCompra(id, {
+        motivo: motivoNormalizado,
+        cancelar_cotacao: cancelamentoPedidoForm.cancelar_cotacao,
+        cancelar_solicitacao_compra: cancelamentoPedidoForm.cancelar_solicitacao_compra,
+        cancelar_solicitacao_principal: cancelamentoPedidoForm.cancelar_solicitacao_principal
+      });
       setPedido(data || null);
-      alert('Pedido cancelado e historico da solicitacao atualizado.');
+      setModalCancelamentoAberto(false);
+      alert('Cancelamento registrado. O historico da solicitacao foi atualizado.');
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao cancelar pedido');
@@ -1308,7 +1324,7 @@ export default function PedidoCompraDetalhe() {
                 className="input"
                 value={pedido.status || ''}
                 onChange={(event) => handleAtualizarStatus(event.target.value)}
-                disabled={!podeAlterarStatusPedido || savingStatus}
+                disabled={!podeAlterarStatusPedido || savingStatus || pedidoCancelado}
               >
                 {statusSelectOptions.map((status) => (
                   <option key={status.codigo} value={status.codigo}>
@@ -1328,9 +1344,11 @@ export default function PedidoCompraDetalhe() {
             <button type="button" className="btn btn-outline" onClick={handleBaixarPdf} disabled={baixandoPdf}>
               {baixandoPdf ? 'Gerando PDF...' : 'Baixar PDF'}
             </button>
-            <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
-              {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
-            </button>
+            {!pedidoCancelado ? (
+              <button type="button" className="btn btn-primary" onClick={handleEnviarPedido} disabled={enviandoPedido}>
+                {enviandoPedido ? 'Preparando envio...' : 'Enviar pedido'}
+              </button>
+            ) : null}
             {podeReabrirCotacao ? (
               <button
                 type="button"
@@ -1346,7 +1364,7 @@ export default function PedidoCompraDetalhe() {
                 type="button"
                 className="btn btn-outline"
                 onClick={handleCancelarPedido}
-                disabled={pedidoBloqueado || cancelandoPedido}
+                disabled={pedidoCancelado || cancelandoPedido}
               >
                 {cancelandoPedido ? 'Cancelando...' : 'Cancelar pedido'}
               </button>
@@ -1440,7 +1458,7 @@ export default function PedidoCompraDetalhe() {
                   Custo rateado nos itens para acompanhamento da obra.
                 </p>
               </div>
-              {podeRegistrarFretePedido ? (
+              {podeRegistrarFretePedido && !pedidoCancelado ? (
                 <button
                   type="button"
                   className="btn btn-outline"
@@ -2063,6 +2081,135 @@ export default function PedidoCompraDetalhe() {
                   </button>
                 ) : null}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {modalCancelamentoAberto ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4" style={{ background: 'rgba(0, 0, 0, 0.45)' }}>
+          <div
+            className="w-full rounded-2xl border"
+            style={{
+              background: 'var(--ui-surface)',
+              borderColor: 'var(--ui-border)',
+              boxShadow: '0 30px 60px rgba(0,0,0,0.2)',
+              maxWidth: '720px'
+            }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>
+                  Cancelar pedido
+                </h2>
+                <p className="mt-1 text-xs" style={{ color: 'var(--c-muted)' }}>
+                  O historico sera preservado. Se houver titulo financeiro ou frete com titulo, o sistema bloqueara a acao.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setModalCancelamentoAberto(false)}
+                disabled={cancelandoPedido}
+              >
+                Fechar
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <label className="grid gap-2 text-sm font-medium">
+                Motivo do cancelamento *
+                <textarea
+                  className="input min-h-[96px]"
+                  value={cancelamentoPedidoForm.motivo}
+                  onChange={(event) => setCancelamentoPedidoForm((current) => ({
+                    ...current,
+                    motivo: event.target.value
+                  }))}
+                  placeholder="Explique por que este pedido esta sendo cancelado."
+                  disabled={cancelandoPedido}
+                />
+              </label>
+
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface-muted)] p-3">
+                <p className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>
+                  Alcance do cancelamento
+                </p>
+                <div className="mt-3 grid gap-3">
+                  <label className="flex items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={cancelamentoPedidoForm.cancelar_cotacao}
+                      onChange={(event) => setCancelamentoPedidoForm((current) => ({
+                        ...current,
+                        cancelar_cotacao: event.target.checked
+                      }))}
+                      disabled={cancelandoPedido}
+                    />
+                    <span>
+                      <strong>Cancelar cotacao vinculada</strong>
+                      <span className="block text-xs text-[var(--c-muted)]">
+                        Marca os links/respostas da cotacao como cancelados e evita nova interacao no fluxo.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={cancelamentoPedidoForm.cancelar_solicitacao_compra}
+                      onChange={(event) => setCancelamentoPedidoForm((current) => ({
+                        ...current,
+                        cancelar_solicitacao_compra: event.target.checked
+                      }))}
+                      disabled={cancelandoPedido}
+                    />
+                    <span>
+                      <strong>Cancelar solicitacao de compra</strong>
+                      <span className="block text-xs text-[var(--c-muted)]">
+                        Remove a SC do painel de delegacao, mantendo a consulta nas telas historicas.
+                      </span>
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={cancelamentoPedidoForm.cancelar_solicitacao_principal}
+                      onChange={(event) => setCancelamentoPedidoForm((current) => ({
+                        ...current,
+                        cancelar_solicitacao_principal: event.target.checked
+                      }))}
+                      disabled={cancelandoPedido}
+                    />
+                    <span>
+                      <strong>Cancelar tambem a solicitacao principal</strong>
+                      <span className="block text-xs text-[var(--c-muted)]">
+                        Use somente quando a solicitacao normal nao deve seguir em nenhum outro setor.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => setModalCancelamentoAberto(false)}
+                  disabled={cancelandoPedido}
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={confirmarCancelamentoPedido}
+                  disabled={cancelandoPedido}
+                >
+                  {cancelandoPedido ? 'Cancelando...' : 'Confirmar cancelamento'}
+                </button>
               </div>
             </div>
           </div>

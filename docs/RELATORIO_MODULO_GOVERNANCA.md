@@ -111,7 +111,7 @@ GET  /governanca/export?type=dashboard&format=csv|xlsx|pdf
     "caixa_cnab": "habilitado",
     "fiscal": "habilitado",
     "sst": "habilitado",
-    "esocial": "controlado"
+    "sst_escopo": "documental simplificado"
   }
 }
 ```

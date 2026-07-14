@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 const { Op } = require('sequelize');
-const XLSX = require('xlsx');
 const {
   Anexo,
   Apropriacao,
@@ -25,10 +24,12 @@ const {
   SolicitacaoCompraAlocacao,
   SolicitacaoCompraRespostaItem,
   StatusArea,
+  TituloFinanceiro,
   TipoSolicitacao,
   Unidade,
   User
 } = require('../models');
+const { createWorkbookBuffer, sheetToJsonRows } = require('../utils/excelWorkbook');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const gerarCodigoSolicitacao = require('../services/solicitacao/gerarCodigo');
 const { normalizeOriginalName } = require('../utils/fileName');
@@ -37,6 +38,7 @@ const { normalizeTipoSolicitacaoBehavior, normalizeTipoSolicitacaoCodigo } = req
 const {
   buildCotacaoItemKey,
   carregarSolicitacaoCompraCompleta,
+  isSolicitacaoCompraTerminal,
   gerarTokenCotacao,
   montarUrlCotacaoPublica,
   normalizeText: normalizeTextCompra,
@@ -67,6 +69,8 @@ const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
   canAlterarQuantidadeSolicitacaoCompra,
+  canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
   canEncerrarComprasCotacoes,
   canManageComprasCotacoes,
@@ -502,6 +506,10 @@ function isStatusSolicitacaoCompraLiberadoParaCompras(status) {
   return normalizado.startsWith('PEDIDO_');
 }
 
+function isSolicitacaoCompraCancelada(solicitacao) {
+  return ['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(solicitacao?.status));
+}
+
 async function isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction = null) {
   if (isStatusSolicitacaoCompraLiberadoParaCompras(solicitacao?.status)) {
     return true;
@@ -555,6 +563,7 @@ function podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao) {
 }
 
 async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction = null) {
+  if (isSolicitacaoCompraCancelada(solicitacao)) return true;
   if (await isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction)) return true;
   if (isSuperadmin(usuario)) return true;
   if (Number(solicitacao?.solicitante_id || 0) > 0 && Number(solicitacao.solicitante_id) === Number(usuario?.id)) {
@@ -614,6 +623,8 @@ async function carregarSolicitacaoCompra(id) {
               'solicitacao_compra_item_id',
               'solicitacao_compra_item_manual_id',
               'disponivel',
+              'status_disponibilidade',
+              'data_chegada',
               'preco',
               'prazo',
               'observacao',
@@ -772,15 +783,12 @@ function buildCompraDiretaImportMap(items, getKey, fallback = null) {
   return fallback || map;
 }
 
-function normalizeCompraDiretaImportedRows(buffer) {
-  const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: false });
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  if (!sheet) {
-    return [];
-  }
-
-  const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+async function normalizeCompraDiretaImportedRows(file) {
+  const rawRows = await sheetToJsonRows(file.buffer, {
+    filename: file.originalname,
+    defval: '',
+    raw: false
+  });
   return rawRows.map((raw) => {
     const normalized = {};
     Object.entries(raw || {}).forEach(([key, value]) => {
@@ -1031,23 +1039,47 @@ function cotacaoFornecedorIncluiItem(cotacaoFornecedor, item) {
 }
 
 function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
-  const itensPorKey = new Map(
-    (itensCotaveis || []).map((item) => [buildCotacaoItemKey(item.item_tipo, item.item_referencia_id), item])
-  );
-  const payload = Array.isArray(itensPayload) && itensPayload.length
+  const itensPorKey = new Map();
+  (itensCotaveis || []).forEach((item) => {
+    const tipo = normalizeTextCompra(item.item_tipo);
+    const referenciaId = Number(item.item_referencia_id);
+    if (referenciaId > 0) {
+      itensPorKey.set(buildCotacaoItemKey(tipo, referenciaId), item);
+    }
+    const itemCadastradoId = Number(item.solicitacao_compra_item_id || (tipo === 'CADASTRADO' ? item.id : null));
+    if (itemCadastradoId > 0) {
+      itensPorKey.set(buildCotacaoItemKey('CADASTRADO', itemCadastradoId), item);
+    }
+    const itemManualId = Number(item.solicitacao_compra_item_manual_id || (tipo === 'MANUAL' ? item.id : null));
+    if (itemManualId > 0) {
+      itensPorKey.set(buildCotacaoItemKey('MANUAL', itemManualId), item);
+    }
+  });
+
+  const payload = Array.isArray(itensPayload)
     ? itensPayload
     : itensCotaveis;
   const selecionados = [];
   const selecionadosKeys = new Set();
 
   payload.forEach((item) => {
-    const key = buildCotacaoItemKey(item.item_tipo, item.item_referencia_id);
+    const tipo = normalizeTextCompra(item.item_tipo);
+    const keysPossiveis = [
+      item.item_key,
+      buildCotacaoItemKey(tipo, item.item_referencia_id),
+      item.solicitacao_compra_item_id ? buildCotacaoItemKey('CADASTRADO', item.solicitacao_compra_item_id) : null,
+      item.solicitacao_compra_item_manual_id ? buildCotacaoItemKey('MANUAL', item.solicitacao_compra_item_manual_id) : null
+    ].filter(Boolean);
+
+    const key = keysPossiveis.find((itemKey) => itensPorKey.has(itemKey));
     const itemBase = itensPorKey.get(key);
     if (!itemBase) {
-      throw new Error('Item invalido informado para envio da cotacao.');
+      const itemInformado = item.item_key || buildCotacaoItemKey(tipo, item.item_referencia_id);
+      throw new Error(`Item ${itemInformado} nao pertence a esta solicitacao de compra.`);
     }
-    if (selecionadosKeys.has(key)) return;
-    selecionadosKeys.add(key);
+    const keyBase = buildCotacaoItemKey(itemBase.item_tipo, itemBase.item_referencia_id);
+    if (selecionadosKeys.has(keyBase)) return;
+    selecionadosKeys.add(keyBase);
     selecionados.push({
       item_tipo: itemBase.item_tipo,
       solicitacao_compra_item_id: itemBase.item_tipo === 'CADASTRADO' ? itemBase.item_referencia_id : null,
@@ -1062,9 +1094,127 @@ function normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis) {
   return selecionados;
 }
 
+async function normalizarItensSelecionadosCotacaoSeguro({
+  itensPayload,
+  itensCotaveis,
+  solicitacaoCompraId,
+  transaction
+}) {
+  try {
+    return normalizarItensSelecionadosCotacao(itensPayload, itensCotaveis);
+  } catch (error) {
+    const payload = Array.isArray(itensPayload) ? itensPayload : [];
+    if (!payload.length) {
+      throw error;
+    }
+
+    const idsItens = [];
+    const idsItensManuais = [];
+
+    payload.forEach((item) => {
+      const tipo = normalizeTextCompra(item.item_tipo);
+      const referenciaId = Number(item.solicitacao_compra_item_id || item.item_referencia_id);
+      const referenciaManualId = Number(item.solicitacao_compra_item_manual_id || item.item_referencia_id);
+
+      if (tipo === 'CADASTRADO' && referenciaId > 0) {
+        idsItens.push(referenciaId);
+      }
+      if (tipo === 'MANUAL' && referenciaManualId > 0) {
+        idsItensManuais.push(referenciaManualId);
+      }
+    });
+
+    const [itens, itensManuais] = await Promise.all([
+      idsItens.length
+        ? SolicitacaoCompraItem.findAll({
+            where: {
+              id: { [Op.in]: [...new Set(idsItens)] },
+              solicitacao_compra_id: solicitacaoCompraId
+            },
+            attributes: ['id'],
+            transaction
+          })
+        : [],
+      idsItensManuais.length
+        ? SolicitacaoCompraItemManual.findAll({
+            where: {
+              id: { [Op.in]: [...new Set(idsItensManuais)] },
+              solicitacao_compra_id: solicitacaoCompraId
+            },
+            attributes: ['id'],
+            transaction
+          })
+        : []
+    ]);
+
+    const itensCotaveisValidados = [
+      ...itens.map((item) => ({
+        item_tipo: 'CADASTRADO',
+        item_referencia_id: Number(item.id)
+      })),
+      ...itensManuais.map((item) => ({
+        item_tipo: 'MANUAL',
+        item_referencia_id: Number(item.id)
+      }))
+    ];
+
+    if (!itensCotaveisValidados.length) {
+      throw error;
+    }
+
+    return normalizarItensSelecionadosCotacao(payload, itensCotaveisValidados);
+  }
+}
+
+function selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveis) {
+  if (Array.isArray(entry?.itens) && entry.itens.length > 0) {
+    return entry.itens;
+  }
+  if (Array.isArray(itensPayload) && itensPayload.length > 0) {
+    return itensPayload;
+  }
+  if ((itensCotaveis || []).length === 1) {
+    return itensCotaveis;
+  }
+  return Array.isArray(entry?.itens) ? entry.itens : itensPayload;
+}
+
+async function carregarItensCotaveisDiretos(solicitacaoCompraId, transaction) {
+  const [itens, itensManuais] = await Promise.all([
+    SolicitacaoCompraItem.findAll({
+      where: { solicitacao_compra_id: solicitacaoCompraId },
+      attributes: ['id'],
+      transaction
+    }),
+    SolicitacaoCompraItemManual.findAll({
+      where: { solicitacao_compra_id: solicitacaoCompraId },
+      attributes: ['id'],
+      transaction
+    })
+  ]);
+
+  return [
+    ...itens.map((item) => ({
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: Number(item.id)
+    })),
+    ...itensManuais.map((item) => ({
+      item_tipo: 'MANUAL',
+      item_referencia_id: Number(item.id)
+    }))
+  ];
+}
+
 function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
-  const fornecedores = (solicitacao.fornecedores || []).map((cotacaoFornecedor) => ({
+  const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
+    (cotacaoFornecedor) => !['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(cotacaoFornecedor.status))
+  );
+  const fornecedorTemRespostaValida = (cotacaoFornecedor) => {
+    const status = normalizeTextCompra(cotacaoFornecedor.status);
+    return Boolean(cotacaoFornecedor.respondido_em) || ['RESPONDIDO', 'FINALIZADA'].includes(status);
+  };
+  const fornecedores = fornecedoresAtivos.map((cotacaoFornecedor) => ({
     id: cotacaoFornecedor.id,
     fornecedor_id: cotacaoFornecedor.fornecedor?.id || cotacaoFornecedor.fornecedor_compra_id,
     nome: cotacaoFornecedor.fornecedor?.nome || '-',
@@ -1083,8 +1233,8 @@ function montarComparativoSolicitacao(solicitacao) {
   }));
 
   const itensComparativo = itens.map((item) => {
-    const respostas = (solicitacao.fornecedores || [])
-      .filter((cotacaoFornecedor) => normalizeTextCompra(cotacaoFornecedor.status) === 'RESPONDIDO')
+    const respostas = fornecedoresAtivos
+      .filter(fornecedorTemRespostaValida)
       .filter((cotacaoFornecedor) => cotacaoFornecedorIncluiItem(cotacaoFornecedor, item))
       .map((cotacaoFornecedor) => {
       const resposta = (cotacaoFornecedor.respostas || []).find((entry) => {
@@ -1902,10 +2052,10 @@ module.exports = {
         ['Limite', `A importacao aceita no maximo ${COMPRA_DIRETA_IMPORT_MAX_ITEMS} itens por arquivo.`]
       ];
 
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(linhasModelo), 'Itens');
-      XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet(instrucoes), 'Instrucoes');
-      const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+      const buffer = await createWorkbookBuffer([
+        { name: 'Itens', rows: linhasModelo },
+        { name: 'Instrucoes', rows: instrucoes }
+      ]);
 
       return responderXlsx(res, buffer, 'modelo-itens-compra-direta.xlsx');
     } catch (error) {
@@ -1928,7 +2078,7 @@ module.exports = {
         return res.status(400).json({ error: 'Selecione a obra antes de importar os itens.' });
       }
 
-      const rows = normalizeCompraDiretaImportedRows(req.file.buffer)
+      const rows = (await normalizeCompraDiretaImportedRows(req.file))
         .filter((row) => Object.values(row).some((value) => String(value || '').trim()));
 
       if (!rows.length) {
@@ -2262,6 +2412,204 @@ module.exports = {
     }
   },
 
+  async cancelar(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao de compra nao encontrada.' });
+      }
+
+      const obraIdsEscopo = Object.prototype.hasOwnProperty.call(req, 'compraScopeObraIds')
+        ? req.compraScopeObraIds
+        : undefined;
+
+      if (!(await validarEscopoEncaminhamentoCompra(usuario, solicitacao, res, {
+        obraIdsEscopo,
+        recursoPreValidado: true
+      }))) {
+        await transaction.rollback();
+        return;
+      }
+
+      const statusAtual = normalizeTextCompra(solicitacao.status);
+      if (['CANCELADA', 'CANCELADO', 'INATIVA'].includes(statusAtual)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Esta solicitacao de compra ja esta cancelada ou inativa.' });
+      }
+
+      const pedidosVinculados = await PedidoCompra.count({
+        where: { solicitacao_compra_id: solicitacao.id },
+        transaction
+      });
+
+      if (pedidosVinculados > 0) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Esta solicitacao ja possui pedido gerado. Cancele pelo pedido para preservar financeiro, cotacao e historico.'
+        });
+      }
+
+      const motivo = String(req.body?.motivo || '').trim();
+      if (!motivo) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o motivo do cancelamento.' });
+      }
+
+      const cancelarCotacao = req.body?.cancelar_cotacao === true;
+      const cancelarSolicitacaoPrincipal = req.body?.cancelar_solicitacao_principal === true;
+      const codigoCompra = solicitacao.codigo || `SC-${String(solicitacao.id).padStart(5, '0')}`;
+      const agora = new Date();
+
+      const solicitacaoPrincipal = solicitacao.solicitacao_principal_id
+        ? await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, { transaction })
+        : null;
+
+      async function registrarHistoricoPrincipal({ acao, statusAnterior, statusNovo, descricao, metadata }) {
+        if (!solicitacaoPrincipal) return;
+
+        await Historico.create({
+          solicitacao_id: solicitacaoPrincipal.id,
+          usuario_responsavel_id: usuario.id,
+          setor: usuario.setor_id || null,
+          acao,
+          status_anterior: statusAnterior || solicitacaoPrincipal.status_global || null,
+          status_novo: statusNovo || solicitacaoPrincipal.status_global || null,
+          descricao,
+          metadata: JSON.stringify(metadata || {})
+        }, { transaction });
+      }
+
+      if (cancelarCotacao) {
+        await SolicitacaoCompraFornecedor.update(
+          { status: 'CANCELADA' },
+          {
+            where: {
+              solicitacao_compra_id: solicitacao.id,
+              status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+            },
+            transaction
+          }
+        );
+
+        await registrarLogSolicitacaoCompra({
+          solicitacaoCompraId: solicitacao.id,
+          usuarioId: usuario.id,
+          tipoAcao: 'COTACAO_CANCELADA',
+          descricao: `Cotacao vinculada cancelada. Motivo: ${motivo}`,
+          transaction
+        });
+
+        await registrarHistoricoPrincipal({
+          acao: 'COTACAO_COMPRA_CANCELADA',
+          descricao: `Cotacao da solicitacao de compra ${codigoCompra} cancelada. Motivo: ${motivo}`,
+          metadata: {
+            solicitacao_compra_id: solicitacao.id,
+            codigo_compra: codigoCompra,
+            motivo,
+            origem: 'cancelamento_solicitacao_compra'
+          }
+        });
+      }
+
+      const statusAnteriorCompra = solicitacao.status;
+      await solicitacao.update({
+        status: 'CANCELADA',
+        encerrado_em: agora,
+        observacoes: [
+          solicitacao.observacoes,
+          `Cancelada em ${agora.toISOString()} pelo usuario #${usuario.id}. Motivo: ${motivo}`
+        ].filter(Boolean).join('\n')
+      }, { transaction });
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'SOLICITACAO_COMPRA_CANCELADA',
+        descricao: `Solicitacao de compra cancelada. Motivo: ${motivo}`,
+        transaction
+      });
+
+      await registrarHistoricoPrincipal({
+        acao: 'SOLICITACAO_COMPRA_CANCELADA',
+        statusAnterior: statusAnteriorCompra,
+        statusNovo: 'CANCELADA',
+        descricao: `Solicitacao de compra ${codigoCompra} cancelada. Motivo: ${motivo}`,
+        metadata: {
+          solicitacao_compra_id: solicitacao.id,
+          codigo_compra: codigoCompra,
+          motivo,
+          cancelou_cotacao: cancelarCotacao,
+          cancelou_solicitacao_principal: cancelarSolicitacaoPrincipal
+        }
+      });
+
+      if (cancelarSolicitacaoPrincipal) {
+        if (!solicitacaoPrincipal) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao ha solicitacao principal vinculada para cancelar.'
+          });
+        }
+
+        const titulosVinculados = await TituloFinanceiro.count({
+          where: {
+            solicitacao_id: solicitacaoPrincipal.id,
+            deleted_at: null
+          },
+          transaction
+        });
+
+        if (titulosVinculados > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'A solicitacao principal possui titulo financeiro vinculado. Cancele apenas a compra ou trate os titulos antes de cancelar a solicitacao.'
+          });
+        }
+
+        const statusAnteriorPrincipal = solicitacaoPrincipal.status_global;
+        await solicitacaoPrincipal.update({
+          status_global: 'CANCELADA'
+        }, { transaction });
+
+        await Historico.create({
+          solicitacao_id: solicitacaoPrincipal.id,
+          usuario_responsavel_id: usuario.id,
+          setor: usuario.setor_id || null,
+          acao: 'SOLICITACAO_CANCELADA_POR_COMPRA',
+          status_anterior: statusAnteriorPrincipal,
+          status_novo: 'CANCELADA',
+          descricao: `Solicitacao principal cancelada a partir do cancelamento da compra ${codigoCompra}. Motivo: ${motivo}`,
+          metadata: JSON.stringify({
+            solicitacao_compra_id: solicitacao.id,
+            codigo_compra: codigoCompra,
+            motivo
+          })
+        }, { transaction });
+      }
+
+      await transaction.commit();
+
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao cancelar solicitacao de compra' });
+    }
+  },
+
   async encaminharParaCompras(req, res) {
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 
@@ -2352,6 +2700,41 @@ module.exports = {
     }
   },
 
+  async showCompraDiretaPorSolicitacao(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const vinculada = await SolicitacaoCompra.findOne({
+        where: {
+          solicitacao_principal_id: Number(req.params.solicitacaoId),
+          origem: 'COMPRA_DIRETA'
+        },
+        attributes: ['id'],
+        order: [['createdAt', 'DESC']]
+      });
+
+      if (!vinculada) {
+        return res.status(404).json({ error: 'Compra direta vinculada nao encontrada' });
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(vinculada.id);
+
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
+      return res.json(solicitacao);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar compra direta vinculada' });
+    }
+  },
+
   async atualizarQuantidadeItem(req, res) {
     const transaction = await SolicitacaoCompra.sequelize.transaction();
 
@@ -2376,6 +2759,11 @@ module.exports = {
       if (isSolicitacaoCompraDireta(solicitacao)) {
         await transaction.rollback();
         return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
+      if (['CANCELADA', 'CANCELADO'].includes(String(solicitacao.status || '').toUpperCase())) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Solicitacao de compra cancelada nao permite alterar itens.' });
       }
 
       if (isCompraAguardandoDiretoria(solicitacao)) {
@@ -2469,6 +2857,213 @@ module.exports = {
       await transaction.rollback();
       console.error(error);
       return res.status(500).json({ error: 'Erro ao atualizar quantidade do item da solicitacao de compra' });
+    }
+  },
+
+  async atualizarApropriacoesItem(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const compraDireta = isSolicitacaoCompraDireta(solicitacao);
+      if (['CANCELADA', 'CANCELADO'].includes(String(solicitacao.status || '').toUpperCase())) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Solicitacao de compra cancelada nao permite alterar apropriacoes.' });
+      }
+      const podeEditar = compraDireta
+        ? await canEditarApropriacoesItemCompraDireta(usuario)
+        : await canEditarApropriacoesItemSolicitacaoCompra(usuario);
+
+      if (!podeEditar) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para alterar apropriacoes dos itens.' });
+      }
+
+      if (!compraDireta && isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!compraDireta && !(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (compraDireta && solicitacao.solicitacao_principal_id) {
+        const totalTitulos = await TituloFinanceiro.count({
+          where: { solicitacao_id: Number(solicitacao.solicitacao_principal_id) },
+          transaction
+        });
+
+        if (totalTitulos > 0) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Nao e possivel alterar apropriacoes de compra direta com titulo financeiro ja criado.'
+          });
+        }
+      }
+
+      if (!compraDireta) {
+        const pedidos = await PedidoCompra.findAll({
+          where: { solicitacao_compra_id: Number(solicitacao.id) },
+          attributes: ['id', 'status'],
+          transaction
+        });
+
+        for (const pedido of pedidos) {
+          const pedidoTemEdicaoBloqueada = await isPedidoCompraStatusLocked(pedido.status);
+          if (String(pedido.status || '').toUpperCase() !== 'CANCELADO' && pedidoTemEdicaoBloqueada) {
+            await transaction.rollback();
+            return res.status(400).json({
+              error: 'Nao e possivel alterar apropriacoes quando existe pedido fechado. Reabra o pedido para ajustar a cotacao.'
+            });
+          }
+        }
+      }
+
+      const itemTipo = String(req.body?.item_tipo || '').toUpperCase();
+      const ItemModel = itemTipo === 'MANUAL' ? SolicitacaoCompraItemManual : SolicitacaoCompraItem;
+      const ApropriacaoModel = itemTipo === 'MANUAL'
+        ? SolicitacaoCompraItemManualApropriacao
+        : SolicitacaoCompraItemApropriacao;
+      const foreignKey = itemTipo === 'MANUAL'
+        ? 'solicitacao_compra_item_manual_id'
+        : 'solicitacao_compra_item_id';
+
+      const item = await ItemModel.findOne({
+        where: {
+          id: Number(req.params.itemId),
+          solicitacao_compra_id: Number(solicitacao.id)
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+
+      if (!item) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Item da solicitacao de compra nao encontrado' });
+      }
+
+      const rateiosEntrada = Array.isArray(req.body?.apropriacoes) && req.body.apropriacoes.length > 0
+        ? req.body.apropriacoes
+        : [{ apropriacao_id: req.body?.apropriacao_id, quantidade_apropriada: item.quantidade }];
+      const rateios = extrairRateiosPayload({
+        apropriacoes: rateiosEntrada,
+        quantidade: item.quantidade,
+        apropriacao_id: req.body?.apropriacao_id
+      });
+
+      const validacaoRateio = validarRateiosPayload({
+        rateios,
+        quantidadeTotal: item.quantidade
+      });
+      if (!validacaoRateio.ok) {
+        await transaction.rollback();
+        return res.status(400).json({ error: validacaoRateio.mensagem || 'Rateio de apropriacoes invalido.' });
+      }
+
+      const mapaApropriacoes = await carregarMapaApropriacoes({
+        obraId: solicitacao.obra_id,
+        itens: [{ apropriacoes: rateios }],
+        transaction
+      });
+
+      for (const rateio of rateios) {
+        const apropriacao = mapaApropriacoes.get(Number(rateio.apropriacao_id));
+        if (!apropriacao) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Uma ou mais apropriacoes nao pertencem a obra da solicitacao.' });
+        }
+        if (apropriacao.ativo === false) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Uma ou mais apropriacoes selecionadas estao inativas.' });
+        }
+        if (apropriacao.somadora === true) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: 'Uma ou mais apropriacoes selecionadas sao somadoras. Selecione apenas apropriacoes analiticas.'
+          });
+        }
+      }
+
+      const apropriacoesAnteriores = await ApropriacaoModel.findAll({
+        where: { [foreignKey]: Number(item.id) },
+        attributes: ['apropriacao_id', 'quantidade_apropriada'],
+        transaction
+      });
+
+      await item.update({ apropriacao_id: Number(rateios[0].apropriacao_id) }, { transaction });
+      await ApropriacaoModel.destroy({
+        where: { [foreignKey]: Number(item.id) },
+        transaction
+      });
+      await ApropriacaoModel.bulkCreate(
+        rateios.map((rateio) => ({
+          [foreignKey]: Number(item.id),
+          apropriacao_id: Number(rateio.apropriacao_id),
+          quantidade_apropriada: Number(rateio.quantidade_apropriada || 0)
+        })),
+        { transaction }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'ITEM_APROPRIACOES_ATUALIZADAS',
+        descricao: `Apropriacoes do item ${item.id} atualizadas`,
+        metadados: {
+          item_id: item.id,
+          item_tipo: itemTipo,
+          apropriacoes_anteriores: apropriacoesAnteriores.map((row) => row.toJSON()),
+          apropriacoes_novas: rateios,
+          motivo: req.body?.motivo || null
+        },
+        transaction
+      });
+
+      if (solicitacao.solicitacao_principal_id) {
+        await Historico.create(
+          {
+            solicitacao_id: solicitacao.solicitacao_principal_id,
+            usuario_responsavel_id: usuario.id,
+            setor: usuario.setor_id,
+            acao: 'ITEM_APROPRIACOES_ATUALIZADAS',
+            descricao: `Apropriacoes do item ${item.id} atualizadas na ${solicitacao.codigo || `SC-${String(solicitacao.id).padStart(5, '0')}`}. Motivo: ${req.body?.motivo || '-'}`,
+            metadata: JSON.stringify({
+              solicitacao_compra_id: solicitacao.id,
+              item_id: item.id,
+              item_tipo: itemTipo,
+              apropriacoes_anteriores: apropriacoesAnteriores.map((row) => row.toJSON()),
+              apropriacoes_novas: rateios
+            })
+          },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json(atualizada);
+    } catch (error) {
+      await transaction.rollback();
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao atualizar apropriacoes do item da solicitacao de compra' });
     }
   },
 
@@ -3074,7 +3669,10 @@ module.exports = {
         return res.status(403).json({ error: 'Apenas compras pode enviar cotacoes para fornecedores' });
       }
 
-      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
+      const solicitacao = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
       if (!solicitacao) {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
@@ -3085,9 +3683,11 @@ module.exports = {
         return responderCompraDiretaForaDoFluxoCompras(res);
       }
 
-      if (normalizeTextCompra(solicitacao.status) === 'ENCERRADO') {
+      if (isSolicitacaoCompraTerminal(solicitacao.status)) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Solicitacao encerrada nao aceita novo envio para fornecedores' });
+        return res.status(400).json({
+          error: `Solicitacao de compra ${normalizeTextCompra(solicitacao.status)} nao aceita novo envio para fornecedores.`
+        });
       }
 
       if (isCompraAguardandoDiretoria(solicitacao)) {
@@ -3144,13 +3744,19 @@ module.exports = {
         return res.status(400).json({ error: 'Selecione ao menos um fornecedor' });
       }
 
-      let itensSelecionadosCotacao = [];
+      let itensCotaveisSolicitacao = [];
       try {
         const solicitacaoCompleta = await carregarSolicitacaoCompraCompleta(solicitacao.id);
-        itensSelecionadosCotacao = normalizarItensSelecionadosCotacao(
-          itensPayload,
-          obterItensCotaveis(solicitacaoCompleta || {})
-        );
+        itensCotaveisSolicitacao = obterItensCotaveis(solicitacaoCompleta || {});
+
+        if (!itensCotaveisSolicitacao.length) {
+          const solicitacaoComItens = await carregarSolicitacaoCompra(solicitacao.id);
+          itensCotaveisSolicitacao = obterItensCotaveis(solicitacaoComItens || {});
+        }
+        if (!itensCotaveisSolicitacao.length) {
+          itensCotaveisSolicitacao = await carregarItensCotaveisDiretos(solicitacao.id, transaction);
+        }
+
       } catch (error) {
         await transaction.rollback();
         return res.status(400).json({ error: error.message || 'Itens invalidos para envio da cotacao.' });
@@ -3212,6 +3818,21 @@ module.exports = {
         }
         fornecedoresProcessados.add(fornecedorKey);
 
+        let itensSelecionadosCotacao = [];
+        try {
+          itensSelecionadosCotacao = await normalizarItensSelecionadosCotacaoSeguro({
+            itensPayload: selecionarPayloadItensCotacao(entry, itensPayload, itensCotaveisSolicitacao),
+            itensCotaveis: itensCotaveisSolicitacao,
+            solicitacaoCompraId: solicitacao.id,
+            transaction
+          });
+        } catch (error) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: error.message || `Itens invalidos para o fornecedor ${fornecedor.nome}.`
+          });
+        }
+
         let vinculacao = await SolicitacaoCompraFornecedor.findOne({
           where: {
             solicitacao_compra_id: solicitacao.id,
@@ -3232,10 +3853,40 @@ module.exports = {
             { transaction }
           );
         } else {
+          const reativandoCotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(
+            normalizeTextCompra(vinculacao.status)
+          );
+
+          if (reativandoCotacaoCancelada) {
+            await SolicitacaoCompraRespostaItem.update(
+              { deleted_at: new Date() },
+              {
+                where: {
+                  solicitacao_compra_fornecedor_id: vinculacao.id,
+                  deleted_at: null
+                },
+                transaction
+              }
+            );
+          }
+
           await vinculacao.update(
             {
               status: 'ENVIADO',
-              enviado_em: new Date()
+              enviado_em: new Date(),
+              ...(reativandoCotacaoCancelada
+                ? {
+                    token: gerarTokenCotacao(),
+                    visualizado_em: null,
+                    respondido_em: null,
+                    valor_minimo_pedido: null,
+                    desconto_total: 0,
+                    condicao_pagamento: null,
+                    prazo_entrega: null,
+                    observacao_resposta: null,
+                    pdf_resposta_url: null
+                  }
+                : {})
             },
             { transaction }
           );
@@ -3415,6 +4066,21 @@ module.exports = {
         return res.status(403).json({ error: 'Apenas compras pode encerrar a cotacao' });
       }
 
+      const solicitacaoTravada = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!solicitacaoTravada) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+      if (isSolicitacaoCompraTerminal(solicitacaoTravada.status)) {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: `Solicitacao de compra ${normalizeTextCompra(solicitacaoTravada.status)} nao pode ser encerrada novamente.`
+        });
+      }
+
       const solicitacao = await carregarSolicitacaoCompra(req.params.id);
       if (!solicitacao) {
         await transaction.rollback();
@@ -3481,8 +4147,7 @@ module.exports = {
         await resposta.update({ vencedor: true }, { transaction });
       }
 
-      const solicitacaoDb = await SolicitacaoCompra.findByPk(req.params.id, { transaction });
-      await solicitacaoDb.update(
+      await solicitacaoTravada.update(
         {
           status: 'ENCERRADO',
           encerrado_em: new Date()
@@ -3491,7 +4156,7 @@ module.exports = {
       );
 
       await registrarLogSolicitacaoCompra({
-        solicitacaoCompraId: solicitacaoDb.id,
+        solicitacaoCompraId: solicitacaoTravada.id,
         usuarioId: usuario.id,
         tipoAcao: 'ENCERRAMENTO',
         descricao: normalizeTextCompra(solicitacao.status) === 'ENCERRADO'
@@ -3507,15 +4172,35 @@ module.exports = {
       });
 
       await gerarPedidosDosVencedores({
-        solicitacaoId: solicitacaoDb.id,
+        solicitacaoId: solicitacaoTravada.id,
         usuarioId: usuario.id,
         vencedores,
         transaction
       });
 
       await fecharPedidosDaSolicitacaoCompraAutomaticamente({
-        solicitacaoId: solicitacaoDb.id,
+        solicitacaoId: solicitacaoTravada.id,
         usuarioId: usuario.id,
+        transaction
+      });
+
+      await SolicitacaoCompraFornecedor.update(
+        { status: 'FINALIZADA' },
+        {
+          where: {
+            solicitacao_compra_id: solicitacaoTravada.id,
+            status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+          },
+          transaction
+        }
+      );
+
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacaoTravada.id,
+        usuarioId: usuario.id,
+        tipoAcao: 'COTACAO_FINALIZADA',
+        descricao: 'Cotacoes dos fornecedores finalizadas apos fechamento dos pedidos',
+        metadados: { origem: 'ENCERRAMENTO_COTACAO' },
         transaction
       });
 

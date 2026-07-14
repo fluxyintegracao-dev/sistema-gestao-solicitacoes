@@ -166,6 +166,18 @@ const COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS = [
   ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS
 ];
 
+const SOLICITACOES_APROPRIACOES_EDIT_KEYS = [
+  'solicitacoes.apropriacoes.editar'
+];
+
+const COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS = [
+  'compras.solicitacoes.editar_apropriacoes_itens'
+];
+
+const COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS = [
+  'compras.compra_direta.editar_apropriacoes_itens'
+];
+
 const COMPRAS_SOLICITACOES_ENCAMINHAR_KEYS = [
   'compras.solicitacoes.encaminhar_compras',
   'compras.solicitacoes.gerenciar'
@@ -240,6 +252,7 @@ const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.gerenciar',
   'compras.cotacoes.editar_respostas',
   'compras.cotacoes.salvar_rascunho',
+  'compras.cotacoes.cancelar',
   'compras.cotacoes.encerrar',
   'compras.cotacoes.reabrir',
   'compras.relatorios.visualizar',
@@ -263,6 +276,10 @@ const COMPRAS_COTACOES_ENCERRAR_KEYS = [
 
 const COMPRAS_COTACOES_REABRIR_KEYS = [
   'compras.cotacoes.reabrir'
+];
+
+const COMPRAS_COTACOES_CANCELAR_KEYS = [
+  'compras.cotacoes.cancelar'
 ];
 
 const COMPRAS_DELEGACAO_VIEW_KEYS = [
@@ -359,6 +376,8 @@ const COMPRAS_PERMISSION_KEYS = [
   ...COMPRAS_SOLICITACOES_MANAGE_KEYS,
   ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS,
   ...COMPRAS_SOLICITACOES_EDIT_QUANTIDADE_KEYS,
+  ...COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS,
+  ...COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS,
   ...COMPRAS_SOLICITACOES_DELETE_KEYS,
   ...COMPRAS_PEDIDOS_VIEW_KEYS,
   ...COMPRAS_PEDIDOS_MANAGE_KEYS,
@@ -1631,6 +1650,42 @@ async function canAlterarQuantidadeSolicitacaoCompra(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canEditarApropriacoesSolicitacao(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SOLICITACOES_APROPRIACOES_EDIT_KEYS);
+  }
+
+  return false;
+}
+
+async function canEditarApropriacoesItemSolicitacaoCompra(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS);
+  }
+
+  return false;
+}
+
+async function canEditarApropriacoesItemCompraDireta(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS);
+  }
+
+  return false;
+}
+
 async function canEncaminharCompraSolicitacoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1935,6 +1990,18 @@ async function canReabrirComprasCotacoes(user) {
 
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, COMPRAS_COTACOES_REABRIR_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canCancelarComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_CANCELAR_KEYS);
   }
 
   return canManageComprasCotacoes(user);
@@ -2834,6 +2901,7 @@ module.exports = {
   canManageComprasPedidos,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes,
+  canCancelarComprasCotacoes,
   canReabrirComprasPedidos,
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,
@@ -2883,6 +2951,9 @@ module.exports = {
   canManageCompraSolicitacoes,
   canEncaminharCompraSolicitacoes,
   canDeleteCompraSolicitacoes,
+  canEditarApropriacoesItemCompraDireta,
+  canEditarApropriacoesItemSolicitacaoCompra,
+  canEditarApropriacoesSolicitacao,
   canViewComprasCotacoes,
   canViewAllComprasScope,
   canViewCompraSolicitacoes,

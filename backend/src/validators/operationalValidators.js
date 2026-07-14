@@ -430,6 +430,59 @@ function validateCompraEnviarBody(body = {}) {
     throw new ValidationError('Quantidade de fornecedores excede o limite permitido.');
   }
 
+  const normalizarItemCotacao = (entry, index, contexto = 'Item') => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ValidationError(`${contexto} ${index + 1} invalido.`);
+    }
+
+    ensureAllowedKeys(
+      entry,
+      ['item_tipo', 'item_referencia_id', 'item_key', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
+      `${contexto} ${index + 1}`
+    );
+
+    const itemKeyParts = String(entry.item_key || '').split(':');
+    const tipoPeloItemKey = itemKeyParts.length === 2 ? itemKeyParts[0] : null;
+    const referenciaPeloItemKey = itemKeyParts.length === 2 ? itemKeyParts[1] : null;
+    const itemTipo = parseOptionalText(entry.item_tipo || tipoPeloItemKey, 'Tipo do item', 20, { required: true }).toUpperCase();
+    if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+      throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
+    }
+
+    const solicitacaoCompraItemId = parseInteger(entry.solicitacao_compra_item_id, `${contexto} ${index + 1}`, {
+      positiveOnly: true
+    });
+    const solicitacaoCompraItemManualId = parseInteger(entry.solicitacao_compra_item_manual_id, `${contexto} ${index + 1}`, {
+      positiveOnly: true
+    });
+    const referenciaInformada =
+      entry.item_referencia_id ||
+      referenciaPeloItemKey ||
+      (itemTipo === 'CADASTRADO' ? solicitacaoCompraItemId : solicitacaoCompraItemManualId);
+
+    return {
+      item_tipo: itemTipo,
+      item_referencia_id: parseInteger(referenciaInformada, `${contexto} ${index + 1}`, { required: true, positiveOnly: true }),
+      item_key: parseOptionalText(entry.item_key, 'Chave do item', 80),
+      solicitacao_compra_item_id: solicitacaoCompraItemId,
+      solicitacao_compra_item_manual_id: solicitacaoCompraItemManualId
+    };
+  };
+
+  const normalizarItensCotacao = (itensPayload, contexto) => {
+    if (itensPayload === undefined) return undefined;
+    if (!Array.isArray(itensPayload)) {
+      throw new ValidationError(`Selecione ao menos um item para ${contexto}.`);
+    }
+    if (itensPayload.length === 0) return [];
+
+    if (itensPayload.length > 500) {
+      throw new ValidationError('Quantidade de itens excede o limite permitido.');
+    }
+
+    return itensPayload.map((entry, index) => normalizarItemCotacao(entry, index, 'Item'));
+  };
+
   const fornecedores = body.fornecedores.map((entry, index) => {
     if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
       throw new ValidationError(`Fornecedor ${index + 1} invalido.`);
@@ -437,7 +490,7 @@ function validateCompraEnviarBody(body = {}) {
 
     ensureAllowedKeys(
       entry,
-      ['fornecedor_id', 'parceiro_id', 'nome', 'cnpj', 'documento', 'email', 'whatsapp', 'contato'],
+      ['fornecedor_id', 'parceiro_id', 'nome', 'cnpj', 'documento', 'email', 'whatsapp', 'contato', 'itens'],
       `Fornecedor ${index + 1}`
     );
 
@@ -464,50 +517,135 @@ function validateCompraEnviarBody(body = {}) {
       cnpj,
       email,
       whatsapp,
-      contato
+      contato,
+      itens: normalizarItensCotacao(entry.itens, `o fornecedor ${index + 1}`)
     };
   });
 
-  let itens = null;
+  let itens;
   if (body.itens !== undefined) {
-    if (!Array.isArray(body.itens) || body.itens.length === 0) {
-      throw new ValidationError('Selecione ao menos um item para cotacao.');
-    }
-
-    if (body.itens.length > 500) {
-      throw new ValidationError('Quantidade de itens excede o limite permitido.');
-    }
-
-    itens = body.itens.map((entry, index) => {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
-        throw new ValidationError(`Item ${index + 1} invalido.`);
-      }
-
-      ensureAllowedKeys(
-        entry,
-        ['item_tipo', 'item_referencia_id', 'solicitacao_compra_item_id', 'solicitacao_compra_item_manual_id'],
-        `Item ${index + 1}`
-      );
-
-      const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
-      if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
-        throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
-      }
-
-      const referenciaInformada =
-        entry.item_referencia_id ||
-        (itemTipo === 'CADASTRADO' ? entry.solicitacao_compra_item_id : entry.solicitacao_compra_item_manual_id);
-
-      return {
-        item_tipo: itemTipo,
-        item_referencia_id: parseInteger(referenciaInformada, `Item ${index + 1}`, { required: true, positiveOnly: true })
-      };
-    });
+    itens = normalizarItensCotacao(body.itens, 'cotacao');
   }
 
+  return itens === undefined
+    ? { fornecedores }
+    : { fornecedores, itens };
+}
+
+function validateCompraCotacaoCancelBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo'], 'Cancelamento da cotacao');
+
   return {
-    fornecedores,
-    itens
+    motivo: parseOptionalText(body.motivo, 'Motivo do cancelamento', 5000, { required: true })
+  };
+}
+
+function validateCompraCotacaoRespostaInternaParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'cotacaoId'], 'Cotacao da solicitacao de compra');
+  return {
+    id: parseInteger(params.id, 'Solicitacao de compra', { required: true, positiveOnly: true }),
+    cotacaoId: parseInteger(params.cotacaoId, 'Cotacao', { required: true, positiveOnly: true })
+  };
+}
+
+function validateCompraCotacaoRespostaInternaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'itens',
+      'valor_minimo_pedido',
+      'desconto_total',
+      'condicao_pagamento',
+      'prazo_entrega',
+      'observacao_resposta',
+      'finalizar'
+    ],
+    'Resposta interna da cotacao'
+  );
+
+  if (!Array.isArray(body.itens) || body.itens.length === 0) {
+    throw new ValidationError('Informe ao menos um item da resposta.');
+  }
+  if (body.itens.length > 500) {
+    throw new ValidationError('Quantidade de itens da resposta excede o limite permitido.');
+  }
+
+  const itens = body.itens.map((entry, index) => {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new ValidationError(`Item ${index + 1} da resposta invalido.`);
+    }
+
+    ensureAllowedKeys(
+      entry,
+      [
+        'item_tipo',
+        'item_referencia_id',
+        'status_disponibilidade',
+        'disponivel',
+        'preco',
+        'prazo',
+        'data_chegada',
+        'observacao',
+        'quantidade_minima_item'
+      ],
+      `Item ${index + 1} da resposta`
+    );
+
+    const itemTipo = parseOptionalText(entry.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+    if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+      throw new ValidationError(`Tipo do item ${index + 1} invalido.`);
+    }
+
+    const statusDisponibilidade = parseOptionalText(
+      entry.status_disponibilidade || (entry.disponivel === false ? 'NAO_TEM' : 'DISPONIVEL'),
+      'Disponibilidade',
+      20,
+      { required: true }
+    ).toUpperCase();
+    if (!['DISPONIVEL', 'NAO_TEM', 'PARA_CHEGAR'].includes(statusDisponibilidade)) {
+      throw new ValidationError(`Disponibilidade do item ${index + 1} invalida.`);
+    }
+
+    return {
+      item_tipo: itemTipo,
+      item_referencia_id: parseInteger(entry.item_referencia_id, `Item ${index + 1}`, {
+        required: true,
+        positiveOnly: true
+      }),
+      status_disponibilidade: statusDisponibilidade,
+      disponivel: statusDisponibilidade !== 'NAO_TEM',
+      preco: parseDecimal(entry.preco, `Preco do item ${index + 1}`, {
+        min: 0,
+        scale: 10,
+        brazilianFormat: true
+      }),
+      prazo: parseOptionalText(entry.prazo, `Prazo do item ${index + 1}`, 120),
+      data_chegada: parseDateOnly(entry.data_chegada, `Data de chegada do item ${index + 1}`),
+      observacao: parseOptionalText(entry.observacao, `Observacao do item ${index + 1}`, 5000),
+      quantidade_minima_item: parseDecimal(
+        entry.quantidade_minima_item,
+        `Quantidade minima do item ${index + 1}`,
+        { min: 0, scale: 3, brazilianFormat: true }
+      )
+    };
+  });
+
+  return {
+    itens,
+    valor_minimo_pedido: parseDecimal(body.valor_minimo_pedido, 'Valor minimo do pedido', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }),
+    desconto_total: parseDecimal(body.desconto_total, 'Desconto concedido', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }) || 0,
+    condicao_pagamento: parseOptionalText(body.condicao_pagamento, 'Condicao de pagamento', 5000),
+    prazo_entrega: parseOptionalText(body.prazo_entrega, 'Prazo de entrega', 120),
+    observacao_resposta: parseOptionalText(body.observacao_resposta, 'Observacao da resposta', 5000),
+    finalizar: body.finalizar !== false
   };
 }
 
@@ -875,6 +1013,26 @@ function validateCompraSolicitacaoItemQuantidadeBody(body = {}) {
   };
 }
 
+function validateCompraSolicitacaoItemApropriacoesBody(body = {}) {
+  ensureAllowedKeys(body, ['item_tipo', 'apropriacao_id', 'apropriacoes', 'motivo'], 'Atualizacao de apropriacoes do item da solicitacao de compra');
+
+  const itemTipo = parseOptionalText(body.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+  if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
+    throw new ValidationError('Tipo do item invalido.');
+  }
+
+  if (!Array.isArray(body.apropriacoes) && !body.apropriacao_id) {
+    throw new ValidationError('Informe ao menos uma apropriacao para o item.');
+  }
+
+  return {
+    item_tipo: itemTipo,
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao', { required: false }),
+    apropriacoes: Array.isArray(body.apropriacoes) ? body.apropriacoes : undefined,
+    motivo: parseOptionalText(body.motivo, 'Motivo da alteracao', 1000, { required: true })
+  };
+}
+
 function validateCompraSolicitacaoInativarMassaBody(body = {}) {
   ensureAllowedKeys(body, ['solicitacao_ids'], 'Inativacao em massa de solicitacoes de compra');
 
@@ -898,12 +1056,44 @@ function validateCompraSolicitacaoEncaminharComprasMassaBody(body = {}) {
 }
 
 function validateCompraPedidoCancelBody(body = {}) {
-  ensureAllowedKeys(body, ['motivo', 'itens', 'item_ids'], 'Cancelamento do pedido');
+  ensureAllowedKeys(
+    body,
+    [
+      'motivo',
+      'itens',
+      'item_ids',
+      'cancelar_cotacao',
+      'cancelar_solicitacao_compra',
+      'cancelar_solicitacao_principal'
+    ],
+    'Cancelamento do pedido'
+  );
 
   return {
     motivo: parseOptionalText(body.motivo, 'Motivo', 5000),
     itens: Array.isArray(body.itens) ? body.itens : undefined,
-    item_ids: Array.isArray(body.item_ids) ? body.item_ids : undefined
+    item_ids: Array.isArray(body.item_ids) ? body.item_ids : undefined,
+    cancelar_cotacao: body.cancelar_cotacao === true,
+    cancelar_solicitacao_compra: body.cancelar_solicitacao_compra === true,
+    cancelar_solicitacao_principal: body.cancelar_solicitacao_principal === true
+  };
+}
+
+function validateCompraSolicitacaoCancelBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'motivo',
+      'cancelar_cotacao',
+      'cancelar_solicitacao_principal'
+    ],
+    'Cancelamento da solicitacao de compra'
+  );
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo', 5000, { required: true }),
+    cancelar_cotacao: body.cancelar_cotacao === true,
+    cancelar_solicitacao_principal: body.cancelar_solicitacao_principal === true
   };
 }
 
@@ -1166,6 +1356,16 @@ function validateSolicitacaoStatusBody(body = {}) {
   };
 }
 
+function validateSolicitacaoApropriacoesBody(body = {}) {
+  ensureAllowedKeys(body, ['apropriacao_id', 'apropriacoes_rateio', 'motivo'], 'Atualizacao de apropriacoes da solicitacao');
+
+  return {
+    apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao', { required: false }),
+    apropriacoes_rateio: Array.isArray(body.apropriacoes_rateio) ? body.apropriacoes_rateio : undefined,
+    motivo: parseOptionalText(body.motivo, 'Motivo da alteracao', 1000, { required: true })
+  };
+}
+
 function validateSolicitacaoPedidoBody(body = {}) {
   ensureAllowedKeys(body, ['numero_pedido'], 'Atualizacao de pedido');
 
@@ -1284,6 +1484,9 @@ module.exports = {
     validateCompraCreateBody,
     validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
+  validateCompraCotacaoCancelBody,
+  validateCompraCotacaoRespostaInternaBody,
+  validateCompraCotacaoRespostaInternaParams,
   validateCompraEnviarBody,
   validateCompraIntegrarBody,
   validateCompraPedidoCreateBody,
@@ -1292,6 +1495,7 @@ module.exports = {
   validateCompraPedidoItemParams,
   validateSolicitacaoPedidoCompraPdfParams,
   validateCompraPedidoCancelBody,
+  validateCompraSolicitacaoCancelBody,
   validateCompraPedidoComentarioBody,
   validateCompraCotacaoComentarioBody,
   validateCompraPedidoEspelhoBody,
@@ -1303,6 +1507,7 @@ module.exports = {
   validateCompraPedidoStatusBatchBody,
   validateCompraSolicitacaoItemQuantidadeBody,
   validateCompraSolicitacaoItemQuantidadeParams,
+  validateCompraSolicitacaoItemApropriacoesBody,
   validateCompraSolicitacaoInativarMassaBody,
   validateCompraSolicitacaoEncaminharComprasMassaBody,
   validateCompraPedidoItemUpdateBody,
@@ -1327,6 +1532,7 @@ module.exports = {
   validateSolicitacaoArquivarMassaBody,
   validateSolicitacaoComentarioBody,
   validateSolicitacaoCreateBody,
+  validateSolicitacaoApropriacoesBody,
   validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
   validateSolicitacaoDataVencimentoBody,

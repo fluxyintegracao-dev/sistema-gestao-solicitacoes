@@ -5,6 +5,7 @@ const {
   atualizarStatusPedido,
   atualizarStatusPedidosEmLote,
   anexarEspelhoFornecedorPedido,
+  cancelarFluxoPedidoCompra,
   cancelarPedidoCompra,
   cancelarPedidoItens,
   criarPedidoParaFornecedor,
@@ -560,10 +561,19 @@ module.exports = {
         return;
       }
 
-      await cancelarPedidoCompra({
+      const cancelarFluxo = Boolean(
+        req.body?.cancelar_cotacao ||
+        req.body?.cancelar_solicitacao_compra ||
+        req.body?.cancelar_solicitacao_principal
+      );
+
+      await (cancelarFluxo ? cancelarFluxoPedidoCompra : cancelarPedidoCompra)({
         pedidoId: req.params.id,
         motivo: req.body?.motivo,
         usuarioId: usuario.id,
+        cancelarCotacao: req.body?.cancelar_cotacao,
+        cancelarSolicitacaoCompra: req.body?.cancelar_solicitacao_compra,
+        cancelarSolicitacaoPrincipal: req.body?.cancelar_solicitacao_principal,
         transaction
       });
 
@@ -747,9 +757,9 @@ module.exports = {
         return;
       }
 
-      if (!(await canCancelarFreteComprasPedidos(usuario))) {
+      if (!(await canRegistrarFreteComprasPedidos(usuario))) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Acesso negado para cancelar frete do pedido' });
+        return res.status(403).json({ error: 'Acesso negado para registrar frete do pedido' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {

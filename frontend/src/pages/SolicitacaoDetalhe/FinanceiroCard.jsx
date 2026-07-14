@@ -6,6 +6,7 @@ import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
 import { textMatchesSearchTerms } from '../../utils/search';
+import CategoriaFinanceiraAutocomplete from '../../components/ui/CategoriaFinanceiraAutocomplete';
 import {
   gerarContaPorSolicitacao,
   getCartoesFinanceiros,
@@ -242,11 +243,12 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(solicitacao, valor = '') {
+function createPagamento(solicitacao, valor = '', categoriaFinanceiraId = '') {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
     parceiro_nome: solicitacao?.parceiro?.nome || '',
+    categoria_financeira_id: categoriaFinanceiraId ? String(categoriaFinanceiraId) : '',
     valor,
     data_vencimento: solicitacao?.data_vencimento || today(),
     competencia_data: '',
@@ -766,7 +768,14 @@ export default function FinanceiroCard({
   useEffect(() => {
     if (selectedCategory && !isCategoriaCompativel(selectedCategory, form.tipo)) {
       setSelectedCategory(null);
-      setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+      setForm((current) => ({
+        ...current,
+        categoria_financeira_id: '',
+        pagamentos: (current.pagamentos || []).map((pagamento) => ({
+          ...pagamento,
+          categoria_financeira_id: ''
+        }))
+      }));
       setCategoriaSearch('');
     }
   }, [form.tipo, selectedCategory]);
@@ -775,12 +784,12 @@ export default function FinanceiroCard({
     return titulos.reduce((acc, item) => acc + Number(item.valor_original || 0), 0);
   }, [titulos]);
 
-  const categoriasFiltradas = useMemo(() => {
-    return categorias.filter((categoria) => {
-      if (!isCategoriaCompativel(categoria, form.tipo)) {
-        return false;
-      }
+  const categoriasCompativeis = useMemo(() => {
+    return categorias.filter((categoria) => isCategoriaCompativel(categoria, form.tipo));
+  }, [categorias, form.tipo]);
 
+  const categoriasFiltradas = useMemo(() => {
+    return categoriasCompativeis.filter((categoria) => {
       if (!categoriaSearch.trim()) {
         return true;
       }
@@ -794,7 +803,7 @@ export default function FinanceiroCard({
         categoria.classificacao_gerencial
       ], categoriaSearch);
     });
-  }, [categoriaSearch, categorias, form.tipo]);
+  }, [categoriaSearch, categoriasCompativeis]);
 
   function getFormaPagamento(formaPagamentoId) {
     return formasPagamento.find((item) => String(item.id) === String(formaPagamentoId)) || null;
@@ -851,11 +860,16 @@ export default function FinanceiroCard({
   }, [categoriaSearch, categoriasFiltradas, selectedCategory]);
 
   function selecionarCategoria(categoria) {
+    const categoriaId = categoria?.id ? String(categoria.id) : '';
     setSelectedCategory(categoria);
     setCategoriaSearch(categoria?.nome || '');
     setForm((current) => ({
       ...current,
-      categoria_financeira_id: categoria?.id ? String(categoria.id) : ''
+      categoria_financeira_id: categoriaId,
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: categoriaId
+      }))
     }));
     setCategoriaModalOpen(false);
   }
@@ -863,7 +877,14 @@ export default function FinanceiroCard({
   function limparCategoria() {
     setSelectedCategory(null);
     setCategoriaSearch('');
-    setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+    setForm((current) => ({
+      ...current,
+      categoria_financeira_id: '',
+      pagamentos: (current.pagamentos || []).map((pagamento) => ({
+        ...pagamento,
+        categoria_financeira_id: ''
+      }))
+    }));
   }
 
   function updatePagamento(index, changes) {
@@ -983,7 +1004,11 @@ export default function FinanceiroCard({
       ...current,
       pagamentos: [
         ...(current.pagamentos || []),
-        createPagamento({ ...solicitacao, parceiro: selectedPartner || solicitacao?.parceiro })
+        createPagamento(
+          { ...solicitacao, parceiro: selectedPartner || solicitacao?.parceiro },
+          '',
+          current.categoria_financeira_id
+        )
       ]
     }));
   }
@@ -998,6 +1023,7 @@ export default function FinanceiroCard({
           pagamentos: [
             {
               ...primeiroPagamento,
+              categoria_financeira_id: primeiroPagamento.categoria_financeira_id || current.categoria_financeira_id,
               valor: primeiroPagamento.valor || current.valor,
               parcelas: Array.isArray(primeiroPagamento.parcelas) ? primeiroPagamento.parcelas : []
             }
@@ -1010,7 +1036,12 @@ export default function FinanceiroCard({
   function removerPagamento(index) {
     setForm((current) => {
       const pagamentos = (current.pagamentos || []).filter((_, itemIndex) => itemIndex !== index);
-      return { ...current, pagamentos: pagamentos.length ? pagamentos : [createPagamento(solicitacao, current.valor)] };
+      return {
+        ...current,
+        pagamentos: pagamentos.length
+          ? pagamentos
+          : [createPagamento(solicitacao, current.valor, current.categoria_financeira_id)]
+      };
     });
   }
 
@@ -1091,6 +1122,10 @@ export default function FinanceiroCard({
 
       if (geracaoMultiplaTitulos && !pagamento.parceiro_id) {
         return `Selecione o ${parceiroRoleLabel} do titulo ${pagamentoIndex + 1}.`;
+      }
+
+      if (geracaoMultiplaTitulos && !(pagamento.categoria_financeira_id || form.categoria_financeira_id)) {
+        return `Selecione a categoria financeira do titulo ${pagamentoIndex + 1}.`;
       }
 
       if (valorPagamento <= 0) {
@@ -1195,7 +1230,9 @@ export default function FinanceiroCard({
         impostos: impostosPayload,
         considera_dre: isCategoriaClassificadaParaDre(selectedCategory),
         intercompany: Boolean(form.intercompany),
-        empresa_contraparte_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
+        empresa_contraparte_id: form.intercompany
+          ? Number(form.tipo === 'PAGAR' ? form.empresa_origem_id : form.empresa_destino_id) || undefined
+          : undefined,
         empresa_origem_id: form.intercompany && form.empresa_origem_id ? Number(form.empresa_origem_id) : undefined,
         empresa_destino_id: form.intercompany && form.empresa_destino_id ? Number(form.empresa_destino_id) : undefined,
         tipo_intercompany: form.intercompany ? form.tipo_intercompany || undefined : undefined,
@@ -1216,6 +1253,7 @@ export default function FinanceiroCard({
           const usaDetalhe = formaUsaParcelasDetalhadas(forma);
           return {
             parceiro_id: geracaoMultiplaTitulos ? pagamento.parceiro_id || undefined : undefined,
+            categoria_financeira_id: pagamento.categoria_financeira_id || form.categoria_financeira_id || undefined,
             valor: usaDetalhe ? undefined : pagamento.valor,
             forma_pagamento_id: pagamento.forma_pagamento_id || undefined,
             cartao_id: pagamento.cartao_id || undefined,
@@ -1775,7 +1813,14 @@ export default function FinanceiroCard({
                         setCategoriaSearch(event.target.value);
                         if (selectedCategory) {
                           setSelectedCategory(null);
-                          setForm((current) => ({ ...current, categoria_financeira_id: '' }));
+                          setForm((current) => ({
+                            ...current,
+                            categoria_financeira_id: '',
+                            pagamentos: (current.pagamentos || []).map((pagamento) => ({
+                              ...pagamento,
+                              categoria_financeira_id: ''
+                            }))
+                          }));
                         }
                       }}
                     />
@@ -1960,6 +2005,9 @@ export default function FinanceiroCard({
                   />
                   Movimentacao entre empresas do grupo
                 </label>
+                <div className="text-xs text-[var(--c-muted)]">
+                  Use esta configuracao manual para pagamentos sem cartao. Em pagamentos com cartao, o sistema usa automaticamente a empresa da conta vinculada ao cartao em cada titulo.
+                </div>
                 {form.intercompany && (
                   <div className="grid gap-3 md:grid-cols-2">
                     <select
@@ -2046,6 +2094,14 @@ export default function FinanceiroCard({
                   const usaDetalhe = formaUsaParcelasDetalhadas(forma);
                   const usaCartao = isFormaCartao(forma);
                   const cartoesFiltrados = cartoes.filter((item) => item.ativo !== false && cartaoCompativelComForma(item, forma));
+                  const cartaoSelecionado = cartoesFiltrados.find((item) => String(item.id) === String(pagamento.cartao_id));
+                  const empresaContaCartao = cartaoSelecionado?.contaBancaria?.empresa;
+                  const empresaTitulo = empresasGrupo.find((item) => String(item.id) === String(form.empresa_id));
+                  const cartaoEntreEmpresas = Boolean(
+                    empresaContaCartao?.id
+                    && empresaTitulo?.id
+                    && String(empresaContaCartao.id) !== String(empresaTitulo.id)
+                  );
 
                   return (
                     <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
@@ -2066,6 +2122,18 @@ export default function FinanceiroCard({
                           pagamentoIndex={pagamentoIndex}
                           tipo={form.tipo}
                           onSelect={selecionarParceiroPagamento}
+                        />
+                      )}
+
+                      {geracaoMultiplaTitulos && (
+                        <CategoriaFinanceiraAutocomplete
+                          label="Categoria financeira deste titulo"
+                          value={pagamento.categoria_financeira_id || form.categoria_financeira_id || ''}
+                          options={categoriasCompativeis}
+                          onChange={(categoriaId) => updatePagamento(pagamentoIndex, {
+                            categoria_financeira_id: categoriaId
+                          })}
+                          helperText="A categoria deste titulo sera aplicada a todas as parcelas geradas nele."
                         />
                       )}
 
@@ -2155,24 +2223,37 @@ export default function FinanceiroCard({
                       </div>
 
                       {forma?.exige_cartao && (
-                        <label className="text-sm">
-                          <span className="mb-1 block text-slate-500">Cartao previsto</span>
-                          <select
-                            className="input w-full"
-                            value={pagamento.cartao_id || ''}
-                            onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
-                          >
-                            <option value="">Informar na baixa</option>
-                            {cartoesFiltrados.map((cartao) => (
-                              <option key={cartao.id} value={cartao.id}>
-                                {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)})
-                              </option>
-                            ))}
-                          </select>
-                          <span className="mt-1 block text-xs text-slate-500">
-                            Opcional; a fatura sera vinculada na baixa do titulo.
-                          </span>
-                        </label>
+                        <div className="space-y-2">
+                          <label className="text-sm">
+                            <span className="mb-1 block text-slate-500">Cartao utilizado</span>
+                            <select
+                              className="input w-full"
+                              value={pagamento.cartao_id || ''}
+                              onChange={(event) => updatePagamento(pagamentoIndex, { cartao_id: event.target.value })}
+                            >
+                              <option value="">Selecione o cartao</option>
+                              {cartoesFiltrados.map((cartao) => {
+                                const empresaCartao = cartao?.contaBancaria?.empresa?.nome;
+                                return (
+                                  <option key={cartao.id} value={cartao.id}>
+                                    {cartao.nome} {cartao.ultimos_digitos ? `- final ${cartao.ultimos_digitos}` : ''} ({labelTipoCartao(cartao.tipo)}){empresaCartao ? ` - ${empresaCartao}` : ''}
+                                  </option>
+                                );
+                              })}
+                            </select>
+                            <span className="mt-1 block text-xs text-slate-500">
+                              A conta vinculada ao cartao define a empresa que realizou o pagamento.
+                            </span>
+                          </label>
+
+                          {cartaoSelecionado && (
+                            <div className={`rounded-lg border px-3 py-2 text-xs ${cartaoEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-emerald-200 bg-emerald-50 text-emerald-900'}`}>
+                              {cartaoEntreEmpresas
+                                ? `Entre empresas automatico: ${empresaContaCartao?.nome || 'empresa do cartao'} paga titulo de ${empresaTitulo?.nome || 'empresa da obra'}. O titulo e a classificacao gerencial permanecem na empresa da obra.`
+                                : `Pagamento na mesma empresa do titulo: ${empresaTitulo?.nome || empresaContaCartao?.nome || 'empresa da obra'}.`}
+                            </div>
+                          )}
+                        </div>
                       )}
 
                       {usaDetalhe && (

@@ -71,7 +71,8 @@ function CurrencyInput({
   disabled,
   className,
   casasDecimais = 2,
-  preservarEscala = false
+  preservarEscala = false,
+  zeroComoVazio = false
 }) {
   const [focused, setFocused] = useState(false);
 
@@ -86,12 +87,17 @@ function CurrencyInput({
       inputMode="decimal"
       value={
         focused
-          ? normalizarDecimalEditavel(value, casasDecimais)
+          ? (zeroComoVazio && Number(String(value || '0').replace(',', '.')) === 0
+              ? ''
+              : normalizarDecimalEditavel(value, casasDecimais))
           : formatarMoeda(value, { casasDecimaisMaximas: casasDecimais, preservarEscala })
       }
       disabled={disabled}
       placeholder={focused ? '0,00' : 'R$ 0,00'}
-      onFocus={() => setFocused(true)}
+      onFocus={(event) => {
+        setFocused(true);
+        window.requestAnimationFrame(() => event.target.select());
+      }}
       onBlur={() => setFocused(false)}
       onChange={handleChange}
     />
@@ -423,7 +429,7 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
-  const respostaFinalizada = String(statusCotacao).toUpperCase() === 'RESPONDIDO';
+  const respostaFinalizada = ['RESPONDIDO', 'FINALIZADA'].includes(String(statusCotacao).toUpperCase());
   const cotacaoReaberta = String(statusCotacao).toUpperCase() === 'REABERTA';
   const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(
@@ -461,7 +467,9 @@ export default function CotacaoFornecedorPublica() {
 
           {dados.somente_leitura && (
             <div className="mb-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800">
-              Esta cotacao ja foi encerrada e esta apenas para consulta.
+              {['CANCELADA', 'CANCELADO'].includes(String(dados.cotacao?.status || '').toUpperCase())
+                ? 'Esta cotacao foi cancelada e esta disponivel apenas para consulta.'
+                : 'Esta cotacao ja foi encerrada e esta apenas para consulta.'}
             </div>
           )}
 
@@ -514,6 +522,7 @@ export default function CotacaoFornecedorPublica() {
                 value={descontoTotal}
                 disabled={formularioBloqueado}
                 onChange={setDescontoTotal}
+                zeroComoVazio
               />
             </div>
             <div>

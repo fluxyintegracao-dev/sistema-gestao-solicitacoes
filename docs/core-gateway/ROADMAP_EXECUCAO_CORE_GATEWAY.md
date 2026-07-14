@@ -119,7 +119,7 @@ Validar:
 - logs;
 - auditoria;
 - presigned URLs;
-- segregacao por cliente;
+- segregacao pelo escopo autorizado do usuario do portal;
 - dados sensiveis;
 - bloqueio de endpoints internos.
 

@@ -9,7 +9,7 @@ Guia rapido para colaboradores e agentes automatizados.
 - Evitar mudancas destrutivas.
 - Sempre explicar as alteracoes.
 - Mudancas de frontend devem priorizar estabilidade operacional: antes de alterar telas, botoes, menus, filtros, tabelas ou fluxos, mapear quais acoes, permissoes, endpoints e regras de negocio dependem daquele trecho.
-- O padrao visual do Fluxy deve ser de sistema operacional/SaaS: compacto, escaneavel, utilitario e consistente. Evitar excesso de cards, botoes grandes sem necessidade, decoracao visual sem funcao e alteracoes esteticas que reduzam densidade util ou clareza.
+- O padrao visual do Fluxy deve ser de sistema corporativo operacional: compacto, escaneavel, utilitario e consistente. Evitar excesso de cards, botoes grandes sem necessidade, decoracao visual sem funcao e alteracoes esteticas que reduzam densidade util ou clareza.
 - Nao aplicar automaticamente padroes visuais genericos de landing page, hero, grids de cards ou botoes primarios em excesso nas telas internas do sistema.
 - Em ajustes de UI, preservar a logica existente dos botoes e fluxos. Se uma mudanca visual puder afetar clique, navegacao, permissao, envio de formulario, status, anexos, financeiro, compras ou solicitacoes, validar o comportamento antes de considerar concluido.
 - Preferir evoluir o frontend com componentes e padroes reutilizaveis, como filtros, tabelas, botoes de acao, toolbars e shells de pagina, em vez de correcoes isoladas que aumentem risco de efeito cascata.
@@ -20,6 +20,7 @@ Guia rapido para colaboradores e agentes automatizados.
 2. Pedir confirmacao antes de alteracoes grandes.
 3. Ler `docs/COLABORACAO_CODEX.md` antes de iniciar trabalho compartilhado entre dois agentes.
 4. Em sessoes com mais de um repositorio no mesmo workspace, ler `docs/COLABORACAO_WORKSPACE.md` e registrar ownership em `docs/workspace/OWNERSHIP_ATIVO.md`.
+5. Antes de pausar um fluxo sensivel ainda nao commitado, criar ou atualizar o handoff correspondente em `docs/handoffs/`, informando arquivos alterados, validacoes executadas, riscos e proximo passo exato.
 
 ## Estado Atual (resumo das mudancas feitas)
 
@@ -96,11 +97,12 @@ Guia rapido para colaboradores e agentes automatizados.
   - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
 - sistema de permissoes de areas por usuario:
   - registro central em `backend/src/constants/moduloPermissoes.js`
-  - 8 modulos, 33 permissoes no formato `modulo.area.acao`
+  - 18 grupos, 80 areas e 268 permissoes no formato `modulo.area.acao`
   - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
   - sessao do usuario: campo `areas_permissoes`
   - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`
   - UI: Configuracoes > Permissoes de Areas por Usuario (`/permissoes-areas`)
+  - o grupo SST ainda contem permissoes de funcionalidades legadas; nao ampliar esse conjunto antes da simplificacao descrita em `docs/sst/PLANO_SIMPLIFICACAO_SEGURA.md`
 
 ## Checklist de Deploy
 - Backend: `git pull` -> `npm install` (backend) -> `pm2 restart backend-solicitacoes --update-env`.

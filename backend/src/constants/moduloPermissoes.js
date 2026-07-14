@@ -114,7 +114,8 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'solicitacoes.acoes.ver_aba_financeiro', label: 'Ver aba Financeiro', descricao: 'Exibe a aba de títulos financeiros dentro de uma solicitação.' },
           { key: 'solicitacoes.acoes.alterar_status_qualquer_setor', label: 'Alterar status em qualquer setor', descricao: 'Permite alterar o status de solicitações em outros setores usando os status do setor do próprio usuário.' },
           { key: 'solicitacoes.acoes.alterar_valor', label: 'Alterar valor da solicitação', descricao: 'Permite editar o valor financeiro da solicitação sem exigir perfil administrativo do GEO.' },
-          { key: 'solicitacoes.acoes.alterar_data_vencimento', label: 'Alterar data de vencimento', descricao: 'Permite editar a data de vencimento da solicitação sem exigir perfil administrativo do GEO.' }
+          { key: 'solicitacoes.acoes.alterar_data_vencimento', label: 'Alterar data de vencimento', descricao: 'Permite editar a data de vencimento da solicitação sem exigir perfil administrativo do GEO.' },
+          { key: 'solicitacoes.apropriacoes.editar', label: 'Editar apropriações', descricao: 'Permite alterar a apropriação principal e o rateio de apropriações da solicitação, mantendo auditoria.' }
         ]
       },
       {
@@ -166,7 +167,15 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.solicitacoes.encaminhar_compras', label: 'Enviar para Compras', descricao: 'Encaminhar solicitacoes de compra antigas ou fora do fluxo para a fila do setor de Compras.' },
           { key: 'compras.solicitacoes.editar_itens', label: 'Editar itens da solicitacao', descricao: 'Editar itens operacionais da solicitacao de compra sem encerrar cotacao.' },
           { key: 'compras.solicitacoes.editar_quantidade', label: 'Alterar quantidade solicitada', descricao: 'Alterar quantidade solicitada dos itens com auditoria.' },
+          { key: 'compras.solicitacoes.editar_apropriacoes_itens', label: 'Alterar apropriações dos itens', descricao: 'Alterar apropriações dos itens da solicitação de compra com auditoria, sem liberar encerramento da cotação.' },
           { key: 'compras.solicitacoes.gerar_pedidos', label: 'Gerar pedidos pela cotacao', descricao: 'Gerar pedidos de compra a partir da cotacao encerrada.' }
+        ]
+      },
+      {
+        key: 'compras.compra_direta',
+        label: 'Compra Direta',
+        permissoes: [
+          { key: 'compras.compra_direta.editar_apropriacoes_itens', label: 'Alterar apropriações dos itens', descricao: 'Alterar apropriações dos itens de compra direta com auditoria, sem alterar visualização de solicitações.' }
         ]
       },
       {
@@ -221,6 +230,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.cotacoes.gerenciar', label: 'Gerenciar cotacoes', descricao: 'Criar, editar e operar cotacoes sem encerrar ou reabrir.' },
           { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
           { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
+          { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotacao', descricao: 'Cancelar uma cotacao aberta, com ou sem respostas, mantendo a auditoria.' },
           { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Definir vencedores e gerar pedidos.' },
           { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
         ]

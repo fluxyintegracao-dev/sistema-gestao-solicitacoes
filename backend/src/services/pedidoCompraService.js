@@ -21,7 +21,11 @@ const {
   Unidade,
   User
 } = require('../models');
-const { registrarLogSolicitacaoCompra } = require('./comprasCotacao');
+const {
+  isSolicitacaoCompraCancelada,
+  normalizeText: normalizeCotacaoText,
+  registrarLogSolicitacaoCompra
+} = require('./comprasCotacao');
 const {
   findPedidoCompraStatusConfig,
   getPedidoCompraStatusConfig,
@@ -202,8 +206,9 @@ function buildItemKeyFromPedidoItem(item) {
 }
 
 function fornecedorRespondeuCotacao(vinculacaoFornecedor) {
+  const status = normalizeText(vinculacaoFornecedor?.status);
   return Boolean(vinculacaoFornecedor?.respondido_em) ||
-    normalizeText(vinculacaoFornecedor?.status) === 'RESPONDIDO';
+    ['RESPONDIDO', 'FINALIZADA'].includes(status);
 }
 
 function isSolicitacaoCompraEncerrada(solicitacao) {
@@ -1091,6 +1096,9 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
   }
+  if (isSolicitacaoCompraCancelada(solicitacao.status) || normalizeCotacaoText(solicitacao.status) === 'RECUSADO') {
+    throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
+  }
 
   const alocacoes = await persistirAlocacoesSolicitacao({
     solicitacao,
@@ -1417,6 +1425,9 @@ async function criarPedidoParaFornecedor({ solicitacaoId, fornecedorCompraId, us
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
   }
+  if (isSolicitacaoCompraCancelada(solicitacao.status) || normalizeCotacaoText(solicitacao.status) === 'RECUSADO') {
+    throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
+  }
 
   const vinculacaoFornecedor = (solicitacao.fornecedores || []).find(
     (item) => Number(item.fornecedor_compra_id) === Number(fornecedorCompraId)
@@ -1518,6 +1529,7 @@ async function listarPedidos({
   return pedidos.filter((pedido) => {
     if (!filtro) return true;
     const haystack = [
+      buildPedidoCodigo(pedido.id),
       pedido.fornecedor?.nome,
       pedido.solicitacao?.numero_sienge,
       pedido.obra?.nome,
@@ -1993,6 +2005,9 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
   if (statusAnterior === statusConfig.codigo) {
     return pedido;
   }
+  if (isPedidoCancelado(statusAnterior)) {
+    throw new Error('Pedido cancelado nao pode ter o status alterado.');
+  }
 
   await pedido.update(
     {
@@ -2103,7 +2118,12 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     transaction,
     lock: transaction?.LOCK?.UPDATE
   });
-  await assertPedidoEditavel(pedido, transaction);
+  if (!pedido) {
+    throw new Error('Pedido de compra nao encontrado.');
+  }
+  if (isPedidoCancelado(pedido.status)) {
+    throw new Error('Pedido de compra ja esta cancelado.');
+  }
   const motivoNormalizado = String(motivo || '').trim();
   if (!motivoNormalizado) {
     throw new Error('Informe o motivo do cancelamento do pedido.');
@@ -2163,13 +2183,32 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     { where: { pedido_compra_id: pedido.id, status: 'ATIVA' }, transaction }
   );
 
+  const [fretesCancelados] = await PedidoCompraFrete.update(
+    { status_financeiro: 'CANCELADO' },
+    {
+      where: {
+        pedido_compra_id: pedido.id,
+        titulo_financeiro_id: null,
+        [Op.or]: [
+          { status_financeiro: { [Op.ne]: 'CANCELADO' } },
+          { status_financeiro: null }
+        ]
+      },
+      transaction
+    }
+  );
+
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: pedido.solicitacao_compra_id,
     usuarioId,
     fornecedorCompraId: pedido.fornecedor_compra_id,
     tipoAcao: 'PEDIDO_CANCELADO',
     descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
-    metadados: { pedido_compra_id: pedido.id, motivo: motivoNormalizado },
+    metadados: {
+      pedido_compra_id: pedido.id,
+      motivo: motivoNormalizado,
+      fretes_cancelados: Number(fretesCancelados || 0)
+    },
     transaction
   });
 
@@ -2182,11 +2221,177 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     descricao: `${buildPedidoCodigo(pedido.id)} cancelado: ${motivoNormalizado}`,
     statusAnterior,
     statusNovo: 'CANCELADO',
-    metadados: { motivo: motivoNormalizado },
+    metadados: {
+      motivo: motivoNormalizado,
+      fretes_cancelados: Number(fretesCancelados || 0)
+    },
     transaction
   });
 
   return recalcularPedidoPorId(pedido.id, transaction);
+}
+
+async function cancelarFluxoPedidoCompra({
+  pedidoId,
+  motivo,
+  usuarioId,
+  cancelarCotacao = false,
+  cancelarSolicitacaoCompra = false,
+  cancelarSolicitacaoPrincipal = false,
+  transaction
+}) {
+  const motivoNormalizado = String(motivo || '').trim();
+  if (!motivoNormalizado) {
+    throw new Error('Informe o motivo do cancelamento do pedido.');
+  }
+
+  const pedidoCancelado = await cancelarPedidoCompra({
+    pedidoId,
+    motivo: motivoNormalizado,
+    usuarioId,
+    transaction
+  });
+
+  const solicitacaoCompra = await SolicitacaoCompra.findByPk(Number(pedidoCancelado.solicitacao_compra_id), {
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+
+  if (!solicitacaoCompra) {
+    return pedidoCancelado;
+  }
+
+  if (cancelarCotacao) {
+    await SolicitacaoCompraFornecedor.update(
+      {
+        status: 'CANCELADA'
+      },
+      {
+        where: {
+          solicitacao_compra_id: solicitacaoCompra.id,
+          status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+        },
+        transaction
+      }
+    );
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: solicitacaoCompra.id,
+      usuarioId,
+      tipoAcao: 'COTACAO_CANCELADA',
+      descricao: `Cotacao cancelada junto com ${buildPedidoCodigo(pedidoCancelado.id)}: ${motivoNormalizado}`,
+      metadados: {
+        pedido_compra_id: pedidoCancelado.id,
+        motivo: motivoNormalizado
+      },
+      transaction
+    });
+
+    await registrarHistoricoCompraNaSolicitacaoPrincipal({
+      solicitacao: solicitacaoCompra,
+      usuarioId,
+      acao: 'COTACAO_COMPRA_CANCELADA',
+      descricao: `Cotacao da ${solicitacaoCompra.codigo || `SC-${String(solicitacaoCompra.id).padStart(5, '0')}`} cancelada: ${motivoNormalizado}`,
+      statusAnterior: solicitacaoCompra.status,
+      statusNovo: cancelarSolicitacaoCompra ? 'CANCELADA' : solicitacaoCompra.status,
+      metadados: {
+        pedido_compra_id: pedidoCancelado.id,
+        motivo: motivoNormalizado
+      },
+      transaction
+    });
+  }
+
+  if (cancelarSolicitacaoCompra) {
+    const statusAnteriorCompra = solicitacaoCompra.status;
+    await solicitacaoCompra.update(
+      {
+        status: 'CANCELADA',
+        encerrado_em: new Date()
+      },
+      { transaction }
+    );
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: solicitacaoCompra.id,
+      usuarioId,
+      tipoAcao: 'SOLICITACAO_COMPRA_CANCELADA',
+      descricao: `${solicitacaoCompra.codigo || `SC-${String(solicitacaoCompra.id).padStart(5, '0')}`} cancelada junto com ${buildPedidoCodigo(pedidoCancelado.id)}: ${motivoNormalizado}`,
+      metadados: {
+        pedido_compra_id: pedidoCancelado.id,
+        motivo: motivoNormalizado
+      },
+      transaction
+    });
+
+    await registrarHistoricoCompraNaSolicitacaoPrincipal({
+      solicitacao: solicitacaoCompra,
+      usuarioId,
+      acao: 'SOLICITACAO_COMPRA_CANCELADA',
+      descricao: `${solicitacaoCompra.codigo || `SC-${String(solicitacaoCompra.id).padStart(5, '0')}`} cancelada: ${motivoNormalizado}`,
+      statusAnterior: statusAnteriorCompra,
+      statusNovo: 'CANCELADA',
+      metadados: {
+        pedido_compra_id: pedidoCancelado.id,
+        motivo: motivoNormalizado
+      },
+      transaction
+    });
+  }
+
+  if (cancelarSolicitacaoPrincipal) {
+    const solicitacaoPrincipalId = Number(solicitacaoCompra.solicitacao_principal_id || 0);
+    if (solicitacaoPrincipalId) {
+      const titulosAtivos = await TituloFinanceiro.count({
+        where: {
+          solicitacao_id: solicitacaoPrincipalId,
+          deleted_at: null
+        },
+        transaction
+      });
+
+      if (titulosAtivos > 0) {
+        throw new Error('A solicitacao principal possui titulo financeiro vinculado. Cancele apenas o pedido/compra ou trate o financeiro antes.');
+      }
+
+      const solicitacaoPrincipal = await Solicitacao.findByPk(solicitacaoPrincipalId, {
+        transaction,
+        lock: transaction?.LOCK?.UPDATE
+      });
+
+      if (solicitacaoPrincipal && normalizeText(solicitacaoPrincipal.status_global) !== 'CANCELADA') {
+        const statusAnteriorPrincipal = solicitacaoPrincipal.status_global;
+        await solicitacaoPrincipal.update(
+          {
+            status_global: 'CANCELADA'
+          },
+          { transaction }
+        );
+
+        await Historico.create(
+          {
+            solicitacao_id: solicitacaoPrincipal.id,
+            usuario_responsavel_id: usuarioId || null,
+            setor: 'COMPRAS',
+            acao: 'SOLICITACAO_CANCELADA_POR_COMPRA',
+            status_anterior: statusAnteriorPrincipal || null,
+            status_novo: 'CANCELADA',
+            observacao: `Solicitacao cancelada junto com ${buildPedidoCodigo(pedidoCancelado.id)}: ${motivoNormalizado}`,
+            descricao: `Solicitacao cancelada junto com ${buildPedidoCodigo(pedidoCancelado.id)}: ${motivoNormalizado}`,
+            metadata: JSON.stringify({
+              tipo: 'CANCELAMENTO_FLUXO_COMPRA',
+              pedido_compra_id: pedidoCancelado.id,
+              solicitacao_compra_id: solicitacaoCompra.id,
+              motivo: motivoNormalizado
+            })
+          },
+          { transaction }
+        );
+      }
+    }
+  }
+
+  return recalcularPedidoPorId(pedidoCancelado.id, transaction);
 }
 
 async function cancelarPedidoItens({ pedidoId, itens = [], motivo, usuarioId, transaction }) {
@@ -2667,6 +2872,7 @@ module.exports = {
   atualizarStatusPedido,
   atualizarStatusPedidosEmLote,
   anexarEspelhoFornecedorPedido,
+  cancelarFluxoPedidoCompra,
   cancelarPedidoCompra,
   cancelarPedidoItens,
   criarPedidoParaFornecedor,

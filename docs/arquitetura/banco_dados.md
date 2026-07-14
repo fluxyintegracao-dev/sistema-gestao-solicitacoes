@@ -2,7 +2,7 @@
 
 ## Modelo Geral
 
-- uma base por cliente
+- uma base institucional para o ambiente, com suporte a multiempresa
 - MySQL como banco principal
 - migrations registradas em `schema_migrations`
 - ajustes legados idempotentes ainda executados no bootstrap do backend
@@ -37,12 +37,17 @@
 - `solicitacao_compra_itens`
 - `solicitacao_compra_itens_manuais`
 - `solicitacao_compra_item_apropriacoes`
+- `solicitacao_compra_item_manual_apropriacoes`
 - `solicitacao_compra_fornecedores`
+- `solicitacao_compra_fornecedor_itens`
 - `solicitacao_compra_resposta_itens`
+- `solicitacao_compra_alocacoes`
 - `solicitacao_compra_logs`
 - `pedidos_compra`
 - `pedido_compra_itens`
 - `pedido_compra_item_logs`
+- `pedido_compra_fretes`
+- `pedido_compra_frete_rateios`
 
 ### Obras e apropriacoes
 

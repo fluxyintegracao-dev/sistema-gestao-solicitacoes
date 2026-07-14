@@ -115,6 +115,20 @@ export async function getSolicitacaoResumoLista(id) {
   return res.json();
 }
 
+export async function atualizarApropriacoesSolicitacao(id, data) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/apropriacoes`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao atualizar apropriacoes da solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function updateStatusSolicitacao(id, status) {
   const res = await fetch(`${API_URL}/solicitacoes/${id}/status`, {
     method: 'PATCH',
