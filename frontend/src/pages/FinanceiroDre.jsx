@@ -39,6 +39,15 @@ const DRE_ESTRUTURADA_COLUMNS = [
   { key: 'valor', width: 180, minWidth: 140 }
 ];
 
+const DRE_CALCULATED_ROW_CODES = new Set([
+  'receita_liquida',
+  'lucro_bruto',
+  'ebitda',
+  'ebit',
+  'resultado_antes_impostos',
+  'lucro_prejuizo_liquido'
+]);
+
 const LINHAS_COLUMNS = [
   { key: 'linha', width: 280, minWidth: 190 },
   { key: 'titulos', width: 110, minWidth: 90 },
@@ -670,28 +679,39 @@ export default function FinanceiroDre() {
                   {(relatorio?.demonstrativo || []).length ? (relatorio.demonstrativo.map((linha) => {
                     const destaque = ['subtotal', 'total'].includes(linha.tipo);
                     const rowKey = String(linha.codigo);
-                    const expanded = expandedDreRow === rowKey;
+                    const expandable = !DRE_CALCULATED_ROW_CODES.has(rowKey);
+                    const expanded = expandable && expandedDreRow === rowKey;
                     const toggle = () => setExpandedDreRow((current) => (current === rowKey ? null : rowKey));
                     return (
                       <Fragment key={rowKey}>
                         <tr
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={expanded}
-                          className="cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                          role={expandable ? 'button' : undefined}
+                          tabIndex={expandable ? 0 : undefined}
+                          aria-expanded={expandable ? expanded : undefined}
+                          className={expandable
+                            ? 'cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500'
+                            : ''}
                           style={destaque ? { background: 'rgba(37, 99, 235, 0.06)' } : null}
-                          title={expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria'}
-                          onClick={toggle}
-                          onKeyDown={(event) => toggleOnKeyboard(event, toggle)}
+                          title={expandable
+                            ? (expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria')
+                            : undefined}
+                          onClick={expandable ? toggle : undefined}
+                          onKeyDown={expandable ? (event) => toggleOnKeyboard(event, toggle) : undefined}
                         >
                           <td className={destaque ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-text)]'}>
-                            <DreExpandLabel expanded={expanded}>{linha.label}</DreExpandLabel>
+                            {expandable ? (
+                              <DreExpandLabel expanded={expanded}>{linha.label}</DreExpandLabel>
+                            ) : (
+                              <div className="pl-6">{linha.label}</div>
+                            )}
                           </td>
                           <td className="text-right font-semibold" style={{ color: metricColor(linha.valor) }}>
                             {formatCurrency(linha.valor)}
                           </td>
                         </tr>
-                        {expanded ? <DreCategoriasDetalhe categorias={linha.categorias} colSpan={2} /> : null}
+                        {expandable && expanded
+                          ? <DreCategoriasDetalhe categorias={linha.categorias} colSpan={2} />
+                          : null}
                       </Fragment>
                     );
                   })) : (
