@@ -425,7 +425,7 @@ export default function SolicitacaoDetalhe() {
     return [
       ...itens.map((item) => ({
         ...item,
-        item_tipo: 'INSUMO',
+        item_tipo: 'CADASTRADO',
         descricao: item?.insumo?.nome || item?.descricao || `Item #${item?.id || ''}`,
         unidade_label: item?.unidade?.sigla || item?.unidade?.nome || item?.unidade_sigla || ''
       })),

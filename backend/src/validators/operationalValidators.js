@@ -998,10 +998,17 @@ function validateCompraSolicitacaoItemQuantidadeParams(params = {}) {
   };
 }
 
+function parseCompraSolicitacaoItemTipo(value) {
+  const itemTipo = parseOptionalText(value, 'Tipo do item', 20, { required: true }).toUpperCase();
+
+  // Compra Direta usava INSUMO no frontend para representar o item cadastrado.
+  return itemTipo === 'INSUMO' ? 'CADASTRADO' : itemTipo;
+}
+
 function validateCompraSolicitacaoItemQuantidadeBody(body = {}) {
   ensureAllowedKeys(body, ['item_tipo', 'quantidade', 'motivo'], 'Atualizacao de quantidade do item da solicitacao de compra');
 
-  const itemTipo = parseOptionalText(body.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+  const itemTipo = parseCompraSolicitacaoItemTipo(body.item_tipo);
   if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
     throw new ValidationError('Tipo do item invalido.');
   }
@@ -1016,7 +1023,7 @@ function validateCompraSolicitacaoItemQuantidadeBody(body = {}) {
 function validateCompraSolicitacaoItemApropriacoesBody(body = {}) {
   ensureAllowedKeys(body, ['item_tipo', 'apropriacao_id', 'apropriacoes', 'motivo'], 'Atualizacao de apropriacoes do item da solicitacao de compra');
 
-  const itemTipo = parseOptionalText(body.item_tipo, 'Tipo do item', 20, { required: true }).toUpperCase();
+  const itemTipo = parseCompraSolicitacaoItemTipo(body.item_tipo);
   if (!['CADASTRADO', 'MANUAL'].includes(itemTipo)) {
     throw new ValidationError('Tipo do item invalido.');
   }
