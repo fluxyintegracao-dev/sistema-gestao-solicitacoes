@@ -1954,6 +1954,89 @@ function addToMap(map, key, seed, amount, countField = 'titulos') {
   return item;
 }
 
+function getDreCategoriaKey(categoria = {}) {
+  if (categoria.id !== null && categoria.id !== undefined) {
+    return `ID:${categoria.id}`;
+  }
+
+  return `SEM_ID:${categoria.codigo || categoria.nome || 'SEM_CATEGORIA'}`;
+}
+
+function addDreCategoria(aggregate, categoria, linha, amount, countField = 'titulos') {
+  if (!aggregate || !categoria) return;
+
+  if (!(aggregate.__categorias instanceof Map)) {
+    aggregate.__categorias = new Map();
+  }
+
+  const categoriaKey = getDreCategoriaKey(categoria);
+  const item = addToMap(aggregate.__categorias, categoriaKey, {
+    categoria_key: categoriaKey,
+    categoria_id: categoria.id || null,
+    codigo: categoria.codigo || null,
+    nome: categoria.nome || 'Categoria sem nome',
+    tipo: categoria.tipo || null,
+    grupo: linha.grupo || null,
+    subgrupo: linha.subgrupo || null,
+    ordem: linha.ordem ?? 999
+  }, amount, countField);
+
+  item.valor = roundCurrency(item.valor);
+}
+
+function normalizeDreCategorias(categorias) {
+  const values = categorias instanceof Map
+    ? Array.from(categorias.values())
+    : Array.isArray(categorias) ? categorias : [];
+
+  return values
+    .map((categoria) => ({
+      ...categoria,
+      valor: roundCurrency(categoria.valor || 0),
+      titulos: Number(categoria.titulos || 0),
+      movimentos: Number(categoria.movimentos || 0)
+    }))
+    .sort((a, b) => (
+      Number(a.ordem || 999) - Number(b.ordem || 999) ||
+      String(a.codigo || '').localeCompare(String(b.codigo || '')) ||
+      String(a.nome || '').localeCompare(String(b.nome || ''))
+    ));
+}
+
+function normalizeDreAggregate(item = {}) {
+  const { __categorias, ...rest } = item;
+  return {
+    ...rest,
+    valor: roundCurrency(rest.valor || 0),
+    categorias: normalizeDreCategorias(__categorias || rest.categorias)
+  };
+}
+
+function mergeDreCategorias(...listas) {
+  const merged = new Map();
+
+  for (const lista of listas) {
+    for (const categoria of normalizeDreCategorias(lista)) {
+      const key = categoria.categoria_key || getDreCategoriaKey(categoria);
+      if (!merged.has(key)) {
+        merged.set(key, {
+          ...categoria,
+          categoria_key: key,
+          valor: 0,
+          titulos: 0,
+          movimentos: 0
+        });
+      }
+      const target = merged.get(key);
+      target.valor += Number(categoria.valor || 0);
+      target.titulos += Number(categoria.titulos || 0);
+      target.movimentos += Number(categoria.movimentos || 0);
+    }
+  }
+
+  return normalizeDreCategorias(merged);
+}
+
 const DRE_NATUREZA_POR_GRUPO = {
   'Receita operacional bruta': 'receita_bruta',
   'Deducoes da receita bruta': 'deducoes_receita',
@@ -1980,13 +2063,14 @@ function sumDreNatureza(totais, naturezas = []) {
   return roundCurrency(naturezas.reduce((sum, natureza) => sum + Number(totais[natureza] || 0), 0));
 }
 
-function buildDreRow({ codigo, label, valor, tipo = 'grupo', ordem }) {
+function buildDreRow({ codigo, label, valor, tipo = 'grupo', ordem, categorias = [] }) {
   return {
     codigo,
     label,
     valor: roundCurrency(valor),
     tipo,
-    ordem
+    ordem,
+    categorias: normalizeDreCategorias(categorias)
   };
 }
 
@@ -2001,10 +2085,15 @@ function buildDreDemonstrativo(linhas = []) {
     resultado_financeiro: 0,
     impostos_resultado: 0
   };
+  const categoriasPorNatureza = new Map();
 
   for (const linha of linhas) {
     const natureza = getDreNatureza(linha);
     totais[natureza] = roundCurrency(Number(totais[natureza] || 0) + Number(linha.valor || 0));
+    categoriasPorNatureza.set(
+      natureza,
+      mergeDreCategorias(categoriasPorNatureza.get(natureza), linha.categorias)
+    );
   }
 
   const receitaBruta = sumDreNatureza(totais, ['receita_bruta']);
@@ -2023,23 +2112,41 @@ function buildDreDemonstrativo(linhas = []) {
   const lucroPrejuizoLiquido = roundCurrency(resultadoAntesImpostos + impostosResultado);
   const margemEbitda = receitaLiquida > 0 ? Number(((ebitda / receitaLiquida) * 100).toFixed(2)) : null;
   const margemLiquida = receitaLiquida > 0 ? Number(((lucroPrejuizoLiquido / receitaLiquida) * 100).toFixed(2)) : null;
+  const categoriasReceitaBruta = categoriasPorNatureza.get('receita_bruta') || [];
+  const categoriasDeducoesReceita = categoriasPorNatureza.get('deducoes_receita') || [];
+  const categoriasReceitaLiquida = mergeDreCategorias(categoriasReceitaBruta, categoriasDeducoesReceita);
+  const categoriasCustos = categoriasPorNatureza.get('custos') || [];
+  const categoriasLucroBruto = mergeDreCategorias(categoriasReceitaLiquida, categoriasCustos);
+  const categoriasDespesasOperacionais = categoriasPorNatureza.get('despesas_operacionais') || [];
+  const categoriasOutrasOperacionais = categoriasPorNatureza.get('outras_operacionais') || [];
+  const categoriasEbitda = mergeDreCategorias(
+    categoriasLucroBruto,
+    categoriasDespesasOperacionais,
+    categoriasOutrasOperacionais
+  );
+  const categoriasDepreciacao = categoriasPorNatureza.get('depreciacao_amortizacao') || [];
+  const categoriasEbit = mergeDreCategorias(categoriasEbitda, categoriasDepreciacao);
+  const categoriasResultadoFinanceiro = categoriasPorNatureza.get('resultado_financeiro') || [];
+  const categoriasResultadoAntesImpostos = mergeDreCategorias(categoriasEbit, categoriasResultadoFinanceiro);
+  const categoriasImpostos = categoriasPorNatureza.get('impostos_resultado') || [];
+  const categoriasResultadoLiquido = mergeDreCategorias(categoriasResultadoAntesImpostos, categoriasImpostos);
 
   return {
     linhas: [
-      buildDreRow({ codigo: 'receita_bruta', label: 'Receita operacional bruta', valor: receitaBruta, ordem: 100 }),
-      buildDreRow({ codigo: 'deducoes_receita', label: '(-) Deducoes da receita bruta', valor: deducoesReceita, ordem: 120 }),
-      buildDreRow({ codigo: 'receita_liquida', label: '= Receita liquida', valor: receitaLiquida, tipo: 'subtotal', ordem: 190 }),
-      buildDreRow({ codigo: 'custos', label: '(-) Custos diretos e operacionais', valor: custos, ordem: 200 }),
-      buildDreRow({ codigo: 'lucro_bruto', label: '= Lucro bruto', valor: lucroBruto, tipo: 'subtotal', ordem: 290 }),
-      buildDreRow({ codigo: 'despesas_operacionais', label: '(-) Despesas operacionais', valor: despesasOperacionais, ordem: 400 }),
-      buildDreRow({ codigo: 'outras_operacionais', label: '+/- Outras receitas e despesas operacionais', valor: outrasOperacionais, ordem: 650 }),
-      buildDreRow({ codigo: 'ebitda', label: '= EBITDA', valor: ebitda, tipo: 'subtotal', ordem: 690 }),
-      buildDreRow({ codigo: 'depreciacao_amortizacao', label: '(-) Depreciacao e amortizacao', valor: depreciacaoAmortizacao, ordem: 695 }),
-      buildDreRow({ codigo: 'ebit', label: '= Resultado operacional (EBIT)', valor: ebit, tipo: 'subtotal', ordem: 699 }),
-      buildDreRow({ codigo: 'resultado_financeiro', label: '+/- Resultado financeiro', valor: resultadoFinanceiro, ordem: 700 }),
-      buildDreRow({ codigo: 'resultado_antes_impostos', label: '= Resultado antes de IRPJ/CSLL', valor: resultadoAntesImpostos, tipo: 'subtotal', ordem: 790 }),
-      buildDreRow({ codigo: 'impostos_resultado', label: '(-) IRPJ e CSLL', valor: impostosResultado, ordem: 850 }),
-      buildDreRow({ codigo: 'lucro_prejuizo_liquido', label: '= Lucro/Prejuizo liquido', valor: lucroPrejuizoLiquido, tipo: 'total', ordem: 990 })
+      buildDreRow({ codigo: 'receita_bruta', label: 'Receita operacional bruta', valor: receitaBruta, ordem: 100, categorias: categoriasReceitaBruta }),
+      buildDreRow({ codigo: 'deducoes_receita', label: '(-) Deducoes da receita bruta', valor: deducoesReceita, ordem: 120, categorias: categoriasDeducoesReceita }),
+      buildDreRow({ codigo: 'receita_liquida', label: '= Receita liquida', valor: receitaLiquida, tipo: 'subtotal', ordem: 190, categorias: categoriasReceitaLiquida }),
+      buildDreRow({ codigo: 'custos', label: '(-) Custos diretos e operacionais', valor: custos, ordem: 200, categorias: categoriasCustos }),
+      buildDreRow({ codigo: 'lucro_bruto', label: '= Lucro bruto', valor: lucroBruto, tipo: 'subtotal', ordem: 290, categorias: categoriasLucroBruto }),
+      buildDreRow({ codigo: 'despesas_operacionais', label: '(-) Despesas operacionais', valor: despesasOperacionais, ordem: 400, categorias: categoriasDespesasOperacionais }),
+      buildDreRow({ codigo: 'outras_operacionais', label: '+/- Outras receitas e despesas operacionais', valor: outrasOperacionais, ordem: 650, categorias: categoriasOutrasOperacionais }),
+      buildDreRow({ codigo: 'ebitda', label: '= EBITDA', valor: ebitda, tipo: 'subtotal', ordem: 690, categorias: categoriasEbitda }),
+      buildDreRow({ codigo: 'depreciacao_amortizacao', label: '(-) Depreciacao e amortizacao', valor: depreciacaoAmortizacao, ordem: 695, categorias: categoriasDepreciacao }),
+      buildDreRow({ codigo: 'ebit', label: '= Resultado operacional (EBIT)', valor: ebit, tipo: 'subtotal', ordem: 699, categorias: categoriasEbit }),
+      buildDreRow({ codigo: 'resultado_financeiro', label: '+/- Resultado financeiro', valor: resultadoFinanceiro, ordem: 700, categorias: categoriasResultadoFinanceiro }),
+      buildDreRow({ codigo: 'resultado_antes_impostos', label: '= Resultado antes de IRPJ/CSLL', valor: resultadoAntesImpostos, tipo: 'subtotal', ordem: 790, categorias: categoriasResultadoAntesImpostos }),
+      buildDreRow({ codigo: 'impostos_resultado', label: '(-) IRPJ e CSLL', valor: impostosResultado, ordem: 850, categorias: categoriasImpostos }),
+      buildDreRow({ codigo: 'lucro_prejuizo_liquido', label: '= Lucro/Prejuizo liquido', valor: lucroPrejuizoLiquido, tipo: 'total', ordem: 990, categorias: categoriasResultadoLiquido })
     ],
     metricas: {
       receita_bruta: receitaBruta,
@@ -2063,7 +2170,7 @@ function buildDreDemonstrativo(linhas = []) {
 }
 
 function sortDreLinhas(linhas = []) {
-  return Array.from(linhas).sort((a, b) => (
+  return Array.from(linhas).map(normalizeDreAggregate).sort((a, b) => (
     Number(a.ordem || 999) - Number(b.ordem || 999) ||
     String(a.grupo).localeCompare(String(b.grupo)) ||
     String(a.subgrupo || '').localeCompare(String(b.subgrupo || ''))
@@ -2076,26 +2183,28 @@ function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
   const empresasMap = new Map();
   const empresaLinhasMaps = new Map();
 
-  function addDreValue({ linha, signedValue, empresaId, countField }) {
+  function addDreValue({ linha, categoria, signedValue, empresaId, countField }) {
     const empresa = empresaId ? empresasById.get(empresaId) : null;
     const empresaKey = empresaId ? String(empresaId) : 'SEM_EMPRESA';
     const linhaKey = `${linha.grupo}::${linha.subgrupo || ''}`;
-    addToMap(linhasMap, linhaKey, {
+    const linhaResumo = addToMap(linhasMap, linhaKey, {
       linha_key: linhaKey,
       grupo: linha.grupo,
       subgrupo: linha.subgrupo,
       ordem: linha.ordem
     }, signedValue, countField);
+    addDreCategoria(linhaResumo, categoria, linha, signedValue, countField);
 
     if (!empresaLinhasMaps.has(empresaKey)) {
       empresaLinhasMaps.set(empresaKey, new Map());
     }
-    addToMap(empresaLinhasMaps.get(empresaKey), linhaKey, {
+    const empresaLinhaResumo = addToMap(empresaLinhasMaps.get(empresaKey), linhaKey, {
       linha_key: linhaKey,
       grupo: linha.grupo,
       subgrupo: linha.subgrupo,
       ordem: linha.ordem
     }, signedValue, countField);
+    addDreCategoria(empresaLinhaResumo, categoria, linha, signedValue, countField);
 
     const empresaResumo = addToMap(empresasMap, empresaKey, {
       empresa_id: empresaId,
@@ -2110,6 +2219,7 @@ function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
       despesas: 0,
       resultado: 0
     }, 0, countField);
+    addDreCategoria(empresaResumo, categoria, linha, signedValue, countField);
 
     if (signedValue >= 0) {
       empresaResumo.receitas += signedValue;
@@ -2131,7 +2241,13 @@ function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
       : baseSignedValue;
     const empresaId = titulo.empresa_id ? Number(titulo.empresa_id) : null;
 
-    addDreValue({ linha, signedValue, empresaId, countField: 'titulos' });
+    addDreValue({
+      linha,
+      categoria: titulo.categoriaFinanceira,
+      signedValue,
+      empresaId,
+      countField: 'titulos'
+    });
   }
 
   for (const movimento of movimentosAvulsos) {
@@ -2142,7 +2258,7 @@ function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
     const rawValue = Number(movimento.valor_quitacao || movimento.valor || 0);
     const signedValue = isCategoriaRedutora(categoria) ? Math.abs(rawValue) : -Math.abs(rawValue);
     const empresaId = movimento.empresa_id ? Number(movimento.empresa_id) : null;
-    addDreValue({ linha, signedValue, empresaId, countField: 'movimentos' });
+    addDreValue({ linha, categoria, signedValue, empresaId, countField: 'movimentos' });
   }
 
   const linhas = sortDreLinhas(linhasMap.values());
@@ -2153,7 +2269,7 @@ function summarizeDreRows(titulos = [], empresas = [], movimentosAvulsos = []) {
       const empresaDre = buildDreDemonstrativo(empresaLinhas);
 
       return {
-        ...empresaResumo,
+        ...normalizeDreAggregate(empresaResumo),
         receitas: roundCurrency(empresaResumo.receitas),
         despesas: roundCurrency(empresaResumo.despesas),
         resultado: empresaDre.metricas.lucro_prejuizo_liquido,
@@ -2279,7 +2395,7 @@ async function gerarDreGerencial(req, filters = {}) {
       {
         model: CategoriaFinanceira,
         as: 'categoriaFinanceira',
-        attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+        attributes: ['id', 'codigo', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
         required: false
       }
     ],
@@ -2324,7 +2440,7 @@ async function gerarDreGerencial(req, filters = {}) {
           {
             model: CategoriaFinanceira,
             as: 'categoriaFinanceira',
-            attributes: ['id', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
+            attributes: ['id', 'codigo', 'nome', 'tipo', 'dre_grupo', 'dre_subgrupo', 'dre_ordem', 'considera_dre'],
             required: true
           }
         ],
@@ -3112,6 +3228,48 @@ function indexDreEmpresas(empresas = []) {
   return new Map(empresas.map((empresa) => [String(empresa.empresa_id || 'SEM_EMPRESA'), empresa]));
 }
 
+function buildDreComparativoCategorias(categoriasOperacionais = [], categoriasFinais = []) {
+  const operacionais = new Map(
+    normalizeDreCategorias(categoriasOperacionais).map((categoria) => [categoria.categoria_key, categoria])
+  );
+  const finais = new Map(
+    normalizeDreCategorias(categoriasFinais).map((categoria) => [categoria.categoria_key, categoria])
+  );
+  const keys = new Set([...operacionais.keys(), ...finais.keys()]);
+
+  return Array.from(keys)
+    .map((key) => {
+      const operacional = operacionais.get(key);
+      const final = finais.get(key);
+      const base = operacional || final;
+      const resultadoOperacional = Number(operacional?.valor || 0);
+      const resultadoFinal = Number(final?.valor || 0);
+
+      return {
+        categoria_key: key,
+        categoria_id: base?.categoria_id || null,
+        codigo: base?.codigo || null,
+        nome: base?.nome || 'Categoria sem nome',
+        tipo: base?.tipo || null,
+        grupo: base?.grupo || null,
+        subgrupo: base?.subgrupo || null,
+        ordem: base?.ordem ?? 999,
+        resultado_operacional_proprio: roundCurrency(resultadoOperacional),
+        intercompany_liquido: roundCurrency(resultadoFinal - resultadoOperacional),
+        resultado_final: roundCurrency(resultadoFinal),
+        titulos_operacionais: Number(operacional?.titulos || 0),
+        titulos_finais: Number(final?.titulos || 0),
+        movimentos_operacionais: Number(operacional?.movimentos || 0),
+        movimentos_finais: Number(final?.movimentos || 0)
+      };
+    })
+    .sort((a, b) => (
+      Number(a.ordem || 999) - Number(b.ordem || 999) ||
+      String(a.codigo || '').localeCompare(String(b.codigo || '')) ||
+      String(a.nome || '').localeCompare(String(b.nome || ''))
+    ));
+}
+
 function buildDreEmpresaComparativoItem(empresa, finalPorEmpresa) {
   const key = String(empresa.empresa_id || 'SEM_EMPRESA');
   const finalEmpresa = finalPorEmpresa.get(key) || empresa;
@@ -3141,7 +3299,8 @@ function buildDreEmpresaComparativoItem(empresa, finalPorEmpresa) {
     margem_final: finalEmpresa.margem_liquida ?? finalEmpresa.margem_resultado ?? null,
     dependencia_grupo: dependenciaGrupo,
     titulos_operacionais: Number(empresa.titulos || 0),
-    titulos_finais: Number(finalEmpresa.titulos || 0)
+    titulos_finais: Number(finalEmpresa.titulos || 0),
+    categorias: buildDreComparativoCategorias(empresa.categorias, finalEmpresa.categorias)
   };
 }
 

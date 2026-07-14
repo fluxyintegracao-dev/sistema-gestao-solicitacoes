@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { HiChevronDown, HiChevronRight } from 'react-icons/hi2';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getDreComparativoEmpresasFinanceiro, getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
@@ -109,6 +110,98 @@ function metricColor(value) {
   return Number(value || 0) >= 0 ? '#15803d' : '#b91c1c';
 }
 
+function toggleOnKeyboard(event, callback) {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  event.preventDefault();
+  callback();
+}
+
+function DreExpandLabel({ expanded, children }) {
+  const Icon = expanded ? HiChevronDown : HiChevronRight;
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className="h-4 w-4 shrink-0 text-[var(--c-muted)]" aria-hidden="true" />
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+function DreCategoriasDetalhe({ categorias, colSpan, comparativo = false }) {
+  const lista = Array.isArray(categorias) ? categorias : [];
+
+  return (
+    <tr className="bg-slate-50/80">
+      <td colSpan={colSpan} className="!px-4 !py-3">
+        {lista.length === 0 ? (
+          <div className="text-xs text-[var(--c-muted)]">Nenhuma categoria financeira compõe esta linha.</div>
+        ) : (
+          <div className="overflow-x-auto rounded-md border border-[var(--c-border)] bg-white">
+            <table className="min-w-full text-xs">
+              <thead className="bg-slate-50 text-[var(--c-muted)]">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold uppercase">Categoria financeira</th>
+                  {comparativo ? (
+                    <>
+                      <th className="px-3 py-2 text-right font-semibold uppercase">Resultado próprio</th>
+                      <th className="px-3 py-2 text-right font-semibold uppercase">Entre empresas</th>
+                      <th className="px-3 py-2 text-right font-semibold uppercase">Resultado final</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-3 py-2 text-right font-semibold uppercase">Registros</th>
+                      <th className="px-3 py-2 text-right font-semibold uppercase">Valor</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {lista.map((categoria) => {
+                  const key = categoria.categoria_key || categoria.categoria_id || `${categoria.codigo}-${categoria.nome}`;
+                  const registros = Number(categoria.titulos || 0) + Number(categoria.movimentos || 0);
+                  return (
+                    <tr key={key}>
+                      <td className="px-3 py-2">
+                        <span className="font-medium text-[var(--c-text)]">
+                          {[categoria.codigo, categoria.nome].filter(Boolean).join(' - ') || 'Categoria sem nome'}
+                        </span>
+                        {(categoria.grupo || categoria.subgrupo) ? (
+                          <span className="ml-2 text-[var(--c-muted)]">
+                            {[categoria.grupo, categoria.subgrupo].filter(Boolean).join(' / ')}
+                          </span>
+                        ) : null}
+                      </td>
+                      {comparativo ? (
+                        <>
+                          <td className="px-3 py-2 text-right" style={{ color: metricColor(categoria.resultado_operacional_proprio) }}>
+                            {formatCurrency(categoria.resultado_operacional_proprio)}
+                          </td>
+                          <td className="px-3 py-2 text-right" style={{ color: metricColor(categoria.intercompany_liquido) }}>
+                            {formatCurrency(categoria.intercompany_liquido)}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold" style={{ color: metricColor(categoria.resultado_final) }}>
+                            {formatCurrency(categoria.resultado_final)}
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="px-3 py-2 text-right text-[var(--c-muted)]">{registros}</td>
+                          <td className="px-3 py-2 text-right font-semibold" style={{ color: metricColor(categoria.valor) }}>
+                            {formatCurrency(categoria.valor)}
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+}
+
 function DreComparativoCard({ comparativo }) {
   const serie = Array.isArray(comparativo?.serie) ? comparativo.serie : [];
   const maxAbs = Math.max(1, ...serie.map((item) => Math.abs(Number(item.lucro_prejuizo_liquido || 0))));
@@ -210,6 +303,7 @@ function DreComparativoCard({ comparativo }) {
 function DreComparativoEmpresasCard({ comparativo }) {
   const empresas = Array.isArray(comparativo?.empresas) ? comparativo.empresas : [];
   const maxAbs = Math.max(1, ...empresas.map((empresa) => Math.abs(Number(empresa.resultado_final || 0))));
+  const [expandedEmpresa, setExpandedEmpresa] = useState(null);
 
   return (
     <section className="card sol-surface-card app-table-shell">
@@ -268,33 +362,49 @@ function DreComparativoEmpresasCard({ comparativo }) {
               {empresas.map((empresa) => {
                 const resultadoFinal = Number(empresa.resultado_final || 0);
                 const barWidth = Math.max(8, Math.round((Math.abs(resultadoFinal) / maxAbs) * 100));
+                const rowKey = String(empresa.empresa_id || 'sem-empresa');
+                const expanded = expandedEmpresa === rowKey;
+                const toggle = () => setExpandedEmpresa((current) => (current === rowKey ? null : rowKey));
                 return (
-                  <tr key={empresa.empresa_id || 'sem-empresa'}>
-                    <td>
-                      <div className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</div>
-                      <div className="mt-1 h-1.5 rounded-full bg-slate-100">
-                        <div
-                          className={`h-1.5 rounded-full ${resultadoFinal >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                          style={{ width: `${barWidth}%` }}
-                        />
-                      </div>
-                    </td>
-                    <td>
-                      <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
-                      {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
-                      {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
-                    </td>
-                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
-                      {formatCurrency(empresa.resultado_operacional_proprio)}
-                    </td>
-                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.intercompany_liquido) }}>
-                      {formatCurrency(empresa.intercompany_liquido)}
-                    </td>
-                    <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_final) }}>
-                      {formatCurrency(empresa.resultado_final)}
-                    </td>
-                    <td className="text-right">{formatPercent(empresa.dependencia_grupo)}</td>
-                  </tr>
+                  <Fragment key={rowKey}>
+                    <tr
+                      role="button"
+                      tabIndex={0}
+                      aria-expanded={expanded}
+                      className="cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                      title={expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria'}
+                      onClick={toggle}
+                      onKeyDown={(event) => toggleOnKeyboard(event, toggle)}
+                    >
+                      <td>
+                        <DreExpandLabel expanded={expanded}>
+                          <div className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</div>
+                          <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                            <div
+                              className={`h-1.5 rounded-full ${resultadoFinal >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                              style={{ width: `${barWidth}%` }}
+                            />
+                          </div>
+                        </DreExpandLabel>
+                      </td>
+                      <td>
+                        <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
+                        {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
+                        {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                      </td>
+                      <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_operacional_proprio) }}>
+                        {formatCurrency(empresa.resultado_operacional_proprio)}
+                      </td>
+                      <td className="text-right font-semibold" style={{ color: metricColor(empresa.intercompany_liquido) }}>
+                        {formatCurrency(empresa.intercompany_liquido)}
+                      </td>
+                      <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado_final) }}>
+                        {formatCurrency(empresa.resultado_final)}
+                      </td>
+                      <td className="text-right">{formatPercent(empresa.dependencia_grupo)}</td>
+                    </tr>
+                    {expanded ? <DreCategoriasDetalhe categorias={empresa.categorias} colSpan={6} comparativo /> : null}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -315,6 +425,9 @@ export default function FinanceiroDre() {
   const [comparativoEmpresas, setComparativoEmpresas] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [expandedDreRow, setExpandedDreRow] = useState(null);
+  const [expandedLinha, setExpandedLinha] = useState(null);
+  const [expandedEmpresaResultado, setExpandedEmpresaResultado] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -399,11 +512,17 @@ export default function FinanceiroDre() {
 
   function aplicarFiltros(event) {
     event.preventDefault();
+    setExpandedDreRow(null);
+    setExpandedLinha(null);
+    setExpandedEmpresaResultado(null);
     setAppliedFilters(filters);
   }
 
   function limparFiltros() {
     setFilters(DEFAULT_FILTERS);
+    setExpandedDreRow(null);
+    setExpandedLinha(null);
+    setExpandedEmpresaResultado(null);
     setAppliedFilters(DEFAULT_FILTERS);
   }
 
@@ -550,15 +669,30 @@ export default function FinanceiroDre() {
                 <tbody>
                   {(relatorio?.demonstrativo || []).length ? (relatorio.demonstrativo.map((linha) => {
                     const destaque = ['subtotal', 'total'].includes(linha.tipo);
+                    const rowKey = String(linha.codigo);
+                    const expanded = expandedDreRow === rowKey;
+                    const toggle = () => setExpandedDreRow((current) => (current === rowKey ? null : rowKey));
                     return (
-                      <tr key={linha.codigo} style={destaque ? { background: 'rgba(37, 99, 235, 0.06)' } : null}>
-                        <td className={destaque ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-text)]'}>
-                          {linha.label}
-                        </td>
-                        <td className="text-right font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(linha.valor)}
-                        </td>
-                      </tr>
+                      <Fragment key={rowKey}>
+                        <tr
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={expanded}
+                          className="cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                          style={destaque ? { background: 'rgba(37, 99, 235, 0.06)' } : null}
+                          title={expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria'}
+                          onClick={toggle}
+                          onKeyDown={(event) => toggleOnKeyboard(event, toggle)}
+                        >
+                          <td className={destaque ? 'font-semibold text-[var(--c-text)]' : 'text-[var(--c-text)]'}>
+                            <DreExpandLabel expanded={expanded}>{linha.label}</DreExpandLabel>
+                          </td>
+                          <td className="text-right font-semibold" style={{ color: metricColor(linha.valor) }}>
+                            {formatCurrency(linha.valor)}
+                          </td>
+                        </tr>
+                        {expanded ? <DreCategoriasDetalhe categorias={linha.categorias} colSpan={2} /> : null}
+                      </Fragment>
                     );
                   })) : (
                     <tr><td colSpan={2} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
@@ -588,20 +722,38 @@ export default function FinanceiroDre() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(relatorio?.linhas || []).length ? (relatorio.linhas.map((linha) => (
-                      <tr key={linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`}>
-                        <td>
-                          <div className="font-medium text-[var(--c-text)]">{linha.grupo}</div>
-                          {linha.subgrupo && (
-                            <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
-                          )}
-                        </td>
-                        <td className="text-right">{linha.titulos}</td>
-                        <td className="text-right font-semibold" style={{ color: Number(linha.valor || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(linha.valor)}
-                        </td>
-                      </tr>
-                    ))) : (
+                    {(relatorio?.linhas || []).length ? (relatorio.linhas.map((linha) => {
+                      const rowKey = String(linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`);
+                      const expanded = expandedLinha === rowKey;
+                      const toggle = () => setExpandedLinha((current) => (current === rowKey ? null : rowKey));
+                      return (
+                        <Fragment key={rowKey}>
+                          <tr
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={expanded}
+                            className="cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                            title={expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria'}
+                            onClick={toggle}
+                            onKeyDown={(event) => toggleOnKeyboard(event, toggle)}
+                          >
+                            <td>
+                              <DreExpandLabel expanded={expanded}>
+                                <div className="font-medium text-[var(--c-text)]">{linha.grupo}</div>
+                                {linha.subgrupo && (
+                                  <div className="text-xs text-[var(--c-muted)]">{linha.subgrupo}</div>
+                                )}
+                              </DreExpandLabel>
+                            </td>
+                            <td className="text-right">{linha.titulos}</td>
+                            <td className="text-right font-semibold" style={{ color: metricColor(linha.valor) }}>
+                              {formatCurrency(linha.valor)}
+                            </td>
+                          </tr>
+                          {expanded ? <DreCategoriasDetalhe categorias={linha.categorias} colSpan={3} /> : null}
+                        </Fragment>
+                      );
+                    })) : (
                       <tr><td colSpan={3} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado.</td></tr>
                     )}
                   </tbody>
@@ -631,24 +783,42 @@ export default function FinanceiroDre() {
                     </tr>
                   </thead>
                   <tbody>
-                    {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => (
-                      <tr key={empresa.empresa_id || 'sem-empresa'}>
-                        <td className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                        <td>
-                          <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
-                          {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
-                          {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
-                        </td>
-                        <td className="text-right">{formatCurrency(empresa.receita_liquida)}</td>
-                        <td className="text-right font-semibold" style={{ color: Number(empresa.ebitda || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(empresa.ebitda)}
-                        </td>
-                        <td className="text-right font-semibold" style={{ color: Number((empresa.lucro_prejuizo_liquido ?? empresa.resultado) || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(empresa.lucro_prejuizo_liquido ?? empresa.resultado)}
-                        </td>
-                        <td className="text-right">{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
-                      </tr>
-                    ))) : (
+                    {(relatorio?.empresas || []).length ? (relatorio.empresas.map((empresa) => {
+                      const rowKey = String(empresa.empresa_id || 'sem-empresa');
+                      const expanded = expandedEmpresaResultado === rowKey;
+                      const toggle = () => setExpandedEmpresaResultado((current) => (current === rowKey ? null : rowKey));
+                      return (
+                        <Fragment key={rowKey}>
+                          <tr
+                            role="button"
+                            tabIndex={0}
+                            aria-expanded={expanded}
+                            className="cursor-pointer hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+                            title={expanded ? 'Ocultar composição por categoria' : 'Exibir composição por categoria'}
+                            onClick={toggle}
+                            onKeyDown={(event) => toggleOnKeyboard(event, toggle)}
+                          >
+                            <td className="font-medium text-[var(--c-text)]">
+                              <DreExpandLabel expanded={expanded}>{empresa.empresa_nome}</DreExpandLabel>
+                            </td>
+                            <td>
+                              <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
+                              {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
+                              {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                            </td>
+                            <td className="text-right">{formatCurrency(empresa.receita_liquida)}</td>
+                            <td className="text-right font-semibold" style={{ color: metricColor(empresa.ebitda) }}>
+                              {formatCurrency(empresa.ebitda)}
+                            </td>
+                            <td className="text-right font-semibold" style={{ color: metricColor(empresa.lucro_prejuizo_liquido ?? empresa.resultado) }}>
+                              {formatCurrency(empresa.lucro_prejuizo_liquido ?? empresa.resultado)}
+                            </td>
+                            <td className="text-right">{formatPercent(empresa.margem_liquida ?? empresa.margem_resultado)}</td>
+                          </tr>
+                          {expanded ? <DreCategoriasDetalhe categorias={empresa.categorias} colSpan={6} /> : null}
+                        </Fragment>
+                      );
+                    })) : (
                       <tr><td colSpan={6} className="text-center text-[var(--c-muted)]">Nenhuma empresa com movimento.</td></tr>
                     )}
                   </tbody>
