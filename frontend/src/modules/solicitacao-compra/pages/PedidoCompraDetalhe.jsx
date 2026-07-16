@@ -1424,6 +1424,14 @@ export default function PedidoCompraDetalhe() {
                   SC-{String(pedido.solicitacao_compra_id).padStart(5, '0')}
                 </div>
               </div>
+              {pedido.fechamento ? (
+                <div>
+                  <div className="text-[var(--c-muted)]">Rodada de fechamento</div>
+                  <div className="font-semibold">
+                    {pedido.fechamento.numero_rodada} - {String(pedido.fechamento.tipo || '').toLowerCase()}
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <div className="text-[var(--c-muted)]">Valor total</div>
                 <div className="font-semibold">{formatMoney(pedido.valor_total)}</div>

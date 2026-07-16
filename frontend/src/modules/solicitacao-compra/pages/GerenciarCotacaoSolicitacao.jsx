@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArrowTopRightOnSquare,
@@ -30,6 +30,7 @@ import { buscarParceiros, listarCategoriasParceiro } from '../../../services/par
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canFecharParcialComprasCotacoes,
   canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes
@@ -52,6 +53,12 @@ function fmt(data) {
 
 function fmtStatus(status) {
   return String(status || '-').replace(/_/g, ' ').toUpperCase();
+}
+
+function criarChaveIdempotenciaFechamento(solicitacaoId) {
+  const sufixo = window.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `cotacao-${solicitacaoId}-${sufixo}`;
 }
 
 function fmtMoeda(valor) {
@@ -122,6 +129,7 @@ function clsStatus(status) {
   if (v === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
   if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
+  if (v === 'FECHAMENTO_PARCIAL') return 'app-status-pill bg-amber-100 text-amber-800';
   if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
@@ -1315,6 +1323,10 @@ function SecaoComparativo({
     return (item.respostas || []).reduce((acc, resp) => acc + getQuantidadeAlocada(resp.resposta_item_id), 0);
   }
 
+  function getSaldoDisponivelItem(item) {
+    return parseNumeroCompra(item?.saldo_disponivel ?? item?.quantidade);
+  }
+
   // Agrega totais por fornecedor para o ranking top 3
   const rankingFornecedores = useMemo(() => {
     if (!comparativo?.itens?.length) return [];
@@ -1327,7 +1339,7 @@ function SecaoComparativo({
         if (!resp.fornecedor_id || !resp.disponivel || !resp.preco) return;
         const fId = resp.fornecedor_id;
         const quantidadeGanha = getQuantidadeAlocada(resp.resposta_item_id);
-        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || parseNumeroCompra(item.quantidade));
+        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || getSaldoDisponivelItem(item));
 
         if (!totaisFornecedor[fId]) {
           totaisFornecedor[fId] = {
@@ -1351,8 +1363,8 @@ function SecaoComparativo({
           resposta_item_id: resp.resposta_item_id,
           nome: item.nome,
           unidade: item.unidade,
-          quantidade: quantidadeGanha || item.quantidade,
-          quantidade_solicitada: item.quantidade,
+          quantidade: quantidadeGanha || getSaldoDisponivelItem(item),
+          quantidade_solicitada: item.quantidade_atual ?? item.quantidade,
           preco: resp.preco,
           prazo: resp.prazo,
           especificacao: item.especificacao,
@@ -1445,9 +1457,9 @@ function SecaoComparativo({
 
     const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
     const isVencedor = quantidadeAlocada > 0;
-    const podeSelecionar = podeEncerrar && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const saldoDisponivel = getSaldoDisponivelItem(item);
+    const podeSelecionar = podeEncerrar && saldoDisponivel > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
     const precoUnitario = parseNumeroCompra(resposta.preco);
-    const quantidadeItem = parseNumeroCompra(item.quantidade);
 
     return (
       <td
@@ -1458,7 +1470,7 @@ function SecaoComparativo({
           <div className="min-w-0">
             <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
             <div className="text-[11px] text-[var(--c-muted)]">
-              Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
+              Total saldo: {resposta.preco ? fmtMoeda(precoUnitario * saldoDisponivel) : '-'}
             </div>
           </div>
           <button
@@ -1499,7 +1511,7 @@ function SecaoComparativo({
               onVencedorChange({
                 item,
                 resposta,
-                quantidade: event.target.checked ? item.quantidade : 0
+                quantidade: event.target.checked ? saldoDisponivel : 0
               });
             }}
           />
@@ -1672,8 +1684,10 @@ function SecaoComparativo({
                   <tbody>
                     {comparativo.itens.map((item) => {
                       const totalAlocadoItem = getTotalAlocadoItem(item);
-                      const quantidadeItem = parseNumeroCompra(item.quantidade);
-                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      const quantidadeItem = parseNumeroCompra(item.quantidade_atual ?? item.quantidade);
+                      const quantidadeFechada = parseNumeroCompra(item.quantidade_fechada);
+                      const saldoDisponivel = getSaldoDisponivelItem(item);
+                      const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr key={buildItemKey(item)}>
                           <td className="sticky left-0 z-10 min-w-[260px] bg-white px-3 py-2 align-top">
@@ -1684,12 +1698,12 @@ function SecaoComparativo({
                             </div>
                             {podeEncerrar ? (
                               <div className={`mt-1 text-[11px] ${excedeu ? 'text-red-700' : 'text-[var(--c-muted)]'}`}>
-                                Selecionado: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                                Rodada: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> | Fechado: {formatNumeroCompra(quantidadeFechada)} | Saldo: {formatNumeroCompra(saldoDisponivel)} {item.unidade || ''}
                               </div>
                             ) : null}
                           </td>
                           <td className="sticky left-[260px] z-10 min-w-[110px] bg-white px-3 py-2 text-right align-top font-semibold">
-                            {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                            {formatNumeroCompra(quantidadeItem)} {item.unidade || ''}
                           </td>
                           {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}
                         </tr>
@@ -1714,12 +1728,12 @@ function SecaoComparativo({
                 <div>
                   <div className="text-sm font-semibold">{item.nome}</div>
                   <div className="text-xs text-[var(--c-muted)]">
-                    {item.quantidade} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
+                    {formatNumeroCompra(item.quantidade_atual ?? item.quantidade)} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
                   {podeEncerrar ? (
                     <div className="mt-1 text-xs text-[var(--c-muted)]">
-                      Selecionado: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                      Rodada: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> | Fechado: {formatNumeroCompra(item.quantidade_fechada)} | Saldo: {formatNumeroCompra(getSaldoDisponivelItem(item))} {item.unidade || ''}
                     </div>
                   ) : null}
                 </div>
@@ -1737,7 +1751,7 @@ function SecaoComparativo({
                       <th>Fornecedor</th>
                       <th>Disponivel</th>
                       <th>Preco unit.</th>
-                      <th>Total item</th>
+                      <th>Total saldo</th>
                       <th>Prazo</th>
                       <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
@@ -1750,8 +1764,8 @@ function SecaoComparativo({
                       const quantidadeAlocada = getQuantidadeAlocada(resp.resposta_item_id);
                       const isVencedor = quantidadeAlocada > 0;
                       const totalAlocadoItem = getTotalAlocadoItem(item);
-                      const quantidadeItem = parseNumeroCompra(item.quantidade);
-                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      const saldoDisponivel = getSaldoDisponivelItem(item);
+                      const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
@@ -1765,7 +1779,7 @@ function SecaoComparativo({
                           </td>
                           <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
                           <td className="font-medium">
-                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * parseNumeroCompra(item.quantidade || 0)) : '-'}
+                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * saldoDisponivel) : '-'}
                           </td>
                           <td>{resp.prazo || '-'}</td>
                           <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
@@ -1777,13 +1791,13 @@ function SecaoComparativo({
                                 <input
                                   type="checkbox"
                                   checked={isVencedor}
-                                  disabled={!podeEncerrar || !resp.disponivel || !resp.preco}
+                                  disabled={!podeEncerrar || saldoDisponivel <= 0 || !resp.disponivel || !resp.preco}
                                   onChange={(event) => {
                                     const checked = event.target.checked;
                                     onVencedorChange({
                                       item,
                                       resposta: resp,
-                                      quantidade: checked ? item.quantidade : 0
+                                      quantidade: checked ? getSaldoDisponivelItem(item) : 0
                                     });
                                   }}
                                 />
@@ -1819,7 +1833,7 @@ function SecaoComparativo({
                   ? 'Atualizando...'
                   : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
                     ? 'Atualizar vencedores e pedidos'
-                    : 'Encerrar Cotacao e Definir Vencedores'}
+                    : 'Gerar pedidos selecionados'}
               </button>
             </div>
           )}
@@ -1878,8 +1892,10 @@ export default function GerenciarCotacaoSolicitacao() {
   const [itensSelecionadosEnvio, setItensSelecionadosEnvio] = useState({});
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
+  const encerramentoIdempotencyRef = useRef(null);
 
   const podeComprar = canOperateComprasCotacoes(user);
+  const podeFecharParcialCotacao = canFecharParcialComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
   const podeCancelarCotacao = canCancelarComprasCotacoes(user);
@@ -1962,18 +1978,7 @@ export default function GerenciarCotacaoSolicitacao() {
         const dataComparativo = await obterComparativoSolicitacaoCompra(id);
         setComparativo(dataComparativo || null);
 
-        const vencedoresAtuais = {};
-        (dataComparativo?.itens || []).forEach((item) => {
-          (item.respostas || [])
-            .filter((r) => r.vencedor && r.resposta_item_id)
-            .forEach((respostaVencedora) => {
-              vencedoresAtuais[String(respostaVencedora.resposta_item_id)] = {
-                resposta_item_id: Number(respostaVencedora.resposta_item_id),
-                quantidade_alocada: parseNumeroCompra(respostaVencedora.quantidade_alocada || item.quantidade)
-              };
-            });
-        });
-        setVencedoresSelecionados(vencedoresAtuais);
+        setVencedoresSelecionados({});
       } else {
         setComparativo(null);
         setVencedoresSelecionados({});
@@ -2427,20 +2432,24 @@ export default function GerenciarCotacaoSolicitacao() {
       if (!alocacoes.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
 
       const errosQuantidade = [];
+      let saldoTotalAntes = 0;
+      let saldoTotalDepois = 0;
       itens.forEach((item) => {
         const totalItem = (item.respostas || []).reduce((acc, resp) => {
           const selecionado = vencedoresSelecionados[String(resp.resposta_item_id)];
           return acc + parseNumeroCompra(selecionado?.quantidade_alocada);
         }, 0);
-        const quantidadeItem = parseNumeroCompra(item.quantidade);
-        if (totalItem > quantidadeItem + 0.0001) {
-          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas a cotacao solicitou ${formatNumeroCompra(quantidadeItem)} ${item.unidade || ''}.`);
+        const saldoItem = parseNumeroCompra(item.saldo_disponivel ?? item.quantidade);
+        saldoTotalAntes += saldoItem;
+        saldoTotalDepois += Math.max(0, saldoItem - totalItem);
+        if (totalItem > saldoItem + 0.0001) {
+          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas o saldo disponivel e ${formatNumeroCompra(saldoItem)} ${item.unidade || ''}.`);
         }
       });
 
       if (errosQuantidade.length) {
         alert([
-          'A quantidade marcada para compra ultrapassa a quantidade solicitada na cotacao.',
+          'A quantidade marcada para compra ultrapassa o saldo disponivel da cotacao.',
           '',
           'Ajuste os itens abaixo antes de atualizar os vencedores:',
           ...errosQuantidade
@@ -2448,13 +2457,62 @@ export default function GerenciarCotacaoSolicitacao() {
         return;
       }
 
+      if (saldoTotalAntes <= 0.0001) {
+        alert('Nao existe saldo de itens disponivel para uma nova rodada de fechamento.');
+        return;
+      }
+
+      const fechamentoParcial = saldoTotalDepois > 0.0001;
+      let justificativa = '';
+      if (fechamentoParcial) {
+        if (!podeFecharParcialCotacao) {
+          alert('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
+          return;
+        }
+        const confirmado = window.confirm([
+          'Nem todo o saldo da cotacao foi selecionado.',
+          '',
+          `Saldo atual: ${formatNumeroCompra(saldoTotalAntes)}`,
+          `Saldo que permanecera aberto: ${formatNumeroCompra(saldoTotalDepois)}`,
+          '',
+          'Deseja gerar os pedidos selecionados e manter o restante aberto para uma proxima rodada?'
+        ].join('\n'));
+        if (!confirmado) return;
+
+        justificativa = String(window.prompt('Informe a justificativa obrigatoria do fechamento parcial:') || '').trim();
+        if (!justificativa) {
+          alert('A justificativa e obrigatoria para o fechamento parcial.');
+          return;
+        }
+      } else if (!podeEncerrarCotacao) {
+        alert('A selecao consome todo o saldo e exige permissao para encerrar definitivamente a cotacao.');
+        return;
+      } else if (!window.confirm('Todo o saldo foi selecionado. Confirmar o encerramento definitivo da cotacao e a geracao dos pedidos finais?')) {
+        return;
+      }
+
       setEncerrando(true);
-      await encerrarSolicitacaoCompra(id, { alocacoes });
+      if (!encerramentoIdempotencyRef.current) {
+        encerramentoIdempotencyRef.current = criarChaveIdempotenciaFechamento(id);
+      }
+      const resultado = await encerrarSolicitacaoCompra(
+        id,
+        {
+          alocacoes,
+          fechamento_parcial_confirmado: fechamentoParcial,
+          justificativa: fechamentoParcial ? justificativa : null
+        },
+        { idempotencyKey: encerramentoIdempotencyRef.current }
+      );
+      encerramentoIdempotencyRef.current = null;
       await carregarTudo();
-      alert(String(solicitacao?.status || '').toUpperCase() === 'ENCERRADO'
-        ? 'Vencedores e pedidos atualizados. Abrindo a tela de pedidos.'
-        : 'Cotacao encerrada e pedidos gerados. Abrindo a tela de pedidos.');
-      navigate('/pedidos-compra');
+      const fechamentoResultado = resultado?.fechamento_resultado || {};
+      if (fechamentoResultado.final) {
+        alert('Cotacao encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
+        navigate('/pedidos-compra');
+      } else {
+        alert(`Rodada parcial concluida. Os pedidos selecionados foram fechados e o saldo ${formatNumeroCompra(fechamentoResultado.saldo_restante)} permanece aberto.`);
+      }
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao encerrar cotacao');
@@ -2886,7 +2944,7 @@ export default function GerenciarCotacaoSolicitacao() {
             comparativo={comparativo}
             solicitacao={solicitacao}
             podeComprar={podeOperarFluxo}
-            podeEncerrar={podeEncerrarCotacao && !fluxoTerminal}
+            podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
             podeEditarResposta={podeOperarFluxo}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}

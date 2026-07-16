@@ -50,6 +50,10 @@ function classNameStatus(status) {
     return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-700';
   }
 
+  if (valor === 'FECHAMENTO_PARCIAL') {
+    return 'app-status-pill compra-status-pill compra-status-warning bg-amber-100 text-amber-800';
+  }
+
   if (valor === 'FINALIZADA' || valor === 'ENCERRADO') {
     return 'app-status-pill compra-status-pill compra-status-muted bg-slate-100 text-slate-700';
   }
@@ -347,6 +351,7 @@ export default function SolicitacoesCompra() {
             <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
               <option value="">Todos</option>
               <option value="ENVIADO">Enviado</option>
+              <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
               <option value="ENCERRADO">Encerrado</option>
             </select>
           </label>

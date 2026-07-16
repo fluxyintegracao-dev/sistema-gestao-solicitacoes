@@ -1,6 +1,9 @@
 const assert = require('assert');
 
-const { validateCompraEnviarBody } = require('../src/validators/operationalValidators');
+const {
+  validateCompraEncerrarBody,
+  validateCompraEnviarBody
+} = require('../src/validators/operationalValidators');
 
 function itemSelecionado() {
   return {
@@ -43,7 +46,20 @@ function validarItensGlobaisLegados() {
   assert.strictEqual(segundaValidacao.itens[0].item_referencia_id, 71);
 }
 
+function validarFechamentoParcial() {
+  const resultado = validateCompraEncerrarBody({
+    alocacoes: [{ resposta_item_id: 10, quantidade_alocada: '8,235' }],
+    fechamento_parcial_confirmado: true,
+    justificativa: 'Entrega parcial priorizada pela obra.'
+  });
+
+  assert.strictEqual(resultado.fechamento_parcial_confirmado, true);
+  assert.strictEqual(resultado.justificativa, 'Entrega parcial priorizada pela obra.');
+  assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 8.235);
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
+validarFechamentoParcial();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');

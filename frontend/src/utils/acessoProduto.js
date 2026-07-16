@@ -166,6 +166,7 @@ export function canAccessCompras(user) {
       'compras.cotacoes.editar_respostas',
       'compras.cotacoes.salvar_rascunho',
       'compras.cotacoes.cancelar',
+      'compras.cotacoes.fechar_parcial',
       'compras.cotacoes.encerrar',
       'compras.cotacoes.reabrir',
       'compras.fornecedores.visualizar',
@@ -462,6 +463,7 @@ export function canViewComprasCotacoes(user) {
       'compras.cotacoes.gerenciar',
       'compras.cotacoes.editar_respostas',
       'compras.cotacoes.salvar_rascunho',
+      'compras.cotacoes.fechar_parcial',
       'compras.cotacoes.encerrar',
       'compras.cotacoes.reabrir',
       'compras.relatorios.visualizar',
@@ -501,6 +503,20 @@ export function canEncerrarComprasCotacoes(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasAnyPermissao(user, [
+      'compras.cotacoes.encerrar',
+      'compras.solicitacoes.gerar_pedidos'
+    ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canFecharParcialComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'compras.cotacoes.fechar_parcial',
       'compras.cotacoes.encerrar',
       'compras.solicitacoes.gerar_pedidos'
     ]);

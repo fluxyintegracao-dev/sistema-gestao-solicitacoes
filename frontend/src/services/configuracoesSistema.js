@@ -6,7 +6,8 @@ const COMPRAS_COTACOES_PERMISSOES_DETALHADAS = [
   { key: 'compras.cotacoes.editar_respostas', label: 'Editar respostas', descricao: 'Preencher, ajustar e salvar respostas de cotacao.' },
   { key: 'compras.cotacoes.salvar_rascunho', label: 'Salvar rascunho', descricao: 'Salvar respostas parciais sem encerrar cotacao.' },
   { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotacao', descricao: 'Cancelar uma cotacao aberta, com ou sem respostas, mantendo a auditoria.' },
-  { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Definir vencedores e gerar pedidos.' },
+  { key: 'compras.cotacoes.fechar_parcial', label: 'Fechar parcialmente', descricao: 'Gerar pedidos dos itens selecionados e manter o saldo da cotacao aberto.' },
+  { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Gerar os pedidos finais e encerrar definitivamente a cotacao.' },
   { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
 ];
 

@@ -11,6 +11,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.INTEGER,
         allowNull: false
       },
+      fechamento_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
       resposta_item_id: {
         type: DataTypes.INTEGER,
         allowNull: false
@@ -35,6 +39,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(14, 3),
         allowNull: false,
         defaultValue: 0
+      },
+      quantidade_referencia: {
+        type: DataTypes.DECIMAL(14, 3),
+        allowNull: true
       },
       preco_unitario: {
         type: DataTypes.DECIMAL(14, 2),

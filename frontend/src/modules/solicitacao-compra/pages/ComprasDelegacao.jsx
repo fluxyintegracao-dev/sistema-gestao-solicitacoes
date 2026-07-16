@@ -55,6 +55,9 @@ function isPedidoFechadoComFornecedor(pedido) {
 }
 
 function isCompraOcultaDelegacaoPorPedidos(solicitacao) {
+  if (normalizeStatus(solicitacao?.status) === 'FECHAMENTO_PARCIAL') {
+    return false;
+  }
   const pedidos = Array.isArray(solicitacao?.pedidos) ? solicitacao.pedidos : [];
   const ativos = pedidos.filter((pedido) => !isPedidoCancelado(pedido));
   return ativos.length > 0 && ativos.every(isPedidoFechadoComFornecedor);

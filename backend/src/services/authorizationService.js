@@ -253,6 +253,7 @@ const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.editar_respostas',
   'compras.cotacoes.salvar_rascunho',
   'compras.cotacoes.cancelar',
+  'compras.cotacoes.fechar_parcial',
   'compras.cotacoes.encerrar',
   'compras.cotacoes.reabrir',
   'compras.relatorios.visualizar',
@@ -272,6 +273,11 @@ const COMPRAS_COTACOES_OPERATE_KEYS = [
 const COMPRAS_COTACOES_ENCERRAR_KEYS = [
   'compras.cotacoes.encerrar',
   'compras.solicitacoes.gerar_pedidos'
+];
+
+const COMPRAS_COTACOES_FECHAR_PARCIAL_KEYS = [
+  'compras.cotacoes.fechar_parcial',
+  ...COMPRAS_COTACOES_ENCERRAR_KEYS
 ];
 
 const COMPRAS_COTACOES_REABRIR_KEYS = [
@@ -1983,6 +1989,25 @@ async function canEncerrarComprasCotacoes(user) {
   return canManageComprasCotacoes(user);
 }
 
+async function canFecharParcialComprasCotacoes(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_COTACOES_FECHAR_PARCIAL_KEYS);
+  }
+
+  return canManageComprasCotacoes(user);
+}
+
+async function canFecharComprasCotacoes(user) {
+  return (
+    (await canFecharParcialComprasCotacoes(user)) ||
+    (await canEncerrarComprasCotacoes(user))
+  );
+}
+
 async function canReabrirComprasCotacoes(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -2896,6 +2921,8 @@ module.exports = {
   canEditarItensComprasPedidos,
   canEditarItensSolicitacaoCompra,
   canEncerrarComprasCotacoes,
+  canFecharComprasCotacoes,
+  canFecharParcialComprasCotacoes,
   canManageComprasCotacoes,
   canManageComprasFornecedores,
   canManageComprasPedidos,

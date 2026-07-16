@@ -401,10 +401,13 @@ export async function obterComparativoSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao buscar comparativo da solicitacao');
 }
 
-export async function encerrarSolicitacaoCompra(id, data) {
+export async function encerrarSolicitacaoCompra(id, data, { idempotencyKey = null } = {}) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/encerrar`, {
     method: 'PATCH',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+    }),
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao encerrar solicitacao de compra');

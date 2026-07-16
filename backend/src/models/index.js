@@ -140,6 +140,7 @@ db.SolicitacaoCompraFornecedor = require('./SolicitacaoCompraFornecedor')(sequel
 db.SolicitacaoCompraFornecedorItem = require('./SolicitacaoCompraFornecedorItem')(sequelize, Sequelize);
 db.SolicitacaoCompraRespostaItem = require('./SolicitacaoCompraRespostaItem')(sequelize, Sequelize);
 db.SolicitacaoCompraAlocacao = require('./SolicitacaoCompraAlocacao')(sequelize, Sequelize);
+db.SolicitacaoCompraFechamento = require('./SolicitacaoCompraFechamento')(sequelize, Sequelize);
 db.SolicitacaoCompraLog = require('./SolicitacaoCompraLog')(sequelize, Sequelize);
 db.PedidoCompra = require('./PedidoCompra')(sequelize, Sequelize);
 db.PedidoCompraItem = require('./PedidoCompraItem')(sequelize, Sequelize);
@@ -2129,6 +2130,27 @@ db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompra, {
   as: 'solicitacao'
 });
 
+db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraFechamento, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'fechamentos',
+  onDelete: 'CASCADE'
+});
+
+db.SolicitacaoCompraFechamento.belongsTo(db.SolicitacaoCompra, {
+  foreignKey: 'solicitacao_compra_id',
+  as: 'solicitacao'
+});
+
+db.SolicitacaoCompraFechamento.hasMany(db.SolicitacaoCompraAlocacao, {
+  foreignKey: 'fechamento_id',
+  as: 'alocacoes'
+});
+
+db.SolicitacaoCompraAlocacao.belongsTo(db.SolicitacaoCompraFechamento, {
+  foreignKey: 'fechamento_id',
+  as: 'fechamento'
+});
+
 db.SolicitacaoCompraRespostaItem.hasMany(db.SolicitacaoCompraAlocacao, {
   foreignKey: 'resposta_item_id',
   as: 'alocacoes'
@@ -2167,6 +2189,16 @@ db.SolicitacaoCompra.hasMany(db.PedidoCompra, {
 db.PedidoCompra.belongsTo(db.SolicitacaoCompra, {
   foreignKey: 'solicitacao_compra_id',
   as: 'solicitacao'
+});
+
+db.SolicitacaoCompraFechamento.hasMany(db.PedidoCompra, {
+  foreignKey: 'fechamento_id',
+  as: 'pedidos'
+});
+
+db.PedidoCompra.belongsTo(db.SolicitacaoCompraFechamento, {
+  foreignKey: 'fechamento_id',
+  as: 'fechamento'
 });
 
 db.Obra.hasMany(db.PedidoCompra, {
