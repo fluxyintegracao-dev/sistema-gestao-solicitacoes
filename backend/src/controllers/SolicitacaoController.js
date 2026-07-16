@@ -1478,7 +1478,8 @@ module.exports = {
         tipo_solicitacao_id,
         page,
         limit,
-        apenas_obras
+        apenas_obras,
+        apenas_status
       } = req.query;
       const erroDatas = validarDatasConsultaSolicitacoes({
         data_registro,
@@ -1494,6 +1495,9 @@ module.exports = {
       const paginacaoSolicitada = true;
       const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
         String(apenas_obras || '').trim().toLowerCase()
+      );
+      const apenasStatusSolicitados = ['1', 'true', 'sim'].includes(
+        String(apenas_status || '').trim().toLowerCase()
       );
       const paginaAtual = parsePositiveInt(page, 1);
       const limitePorPagina = parseSolicitacoesPageSize(limit);
@@ -1525,6 +1529,9 @@ module.exports = {
 
       if (listarArquivadas) {
         if (idsOcultos.length === 0) {
+          if (apenasObrasSolicitadas || apenasStatusSolicitados) {
+            return res.json([]);
+          }
           if (!paginacaoSolicitada) {
             return res.json([]);
           }
@@ -2162,6 +2169,12 @@ module.exports = {
         }));
       };
 
+      const listarStatusDistinct = (statusValores) => Array.from(new Set(
+        (statusValores || [])
+          .map(item => String(item || '').trim())
+          .filter(Boolean)
+      )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
       const usuarioComRegraMistaPorTipo =
         perfil === 'USUARIO' &&
         !adminGEO &&
@@ -2170,7 +2183,7 @@ module.exports = {
       if (usuarioComRegraMistaPorTipo) {
         const solicitacoesFiltro = await Solicitacao.findAll({
           where,
-          attributes: ['id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id', 'criado_por', 'createdAt'],
+          attributes: ['id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id', 'criado_por', 'status_global', 'createdAt'],
           order: [['createdAt', 'DESC']]
         });
         let resultadoFiltro = solicitacoesFiltro.map(item => item.toJSON());
@@ -2220,6 +2233,12 @@ module.exports = {
           return res.json(await listarObrasDistinct(obraIdsVisiveis));
         }
 
+        if (apenasStatusSolicitados) {
+          return res.json(listarStatusDistinct(
+            resultadoFiltro.map(item => item.status_global)
+          ));
+        }
+
         const idsPagina = (paginacaoSolicitada
           ? resultadoFiltro.slice(offset, offset + limitePorPagina)
           : resultadoFiltro
@@ -2248,6 +2267,19 @@ module.exports = {
           const obraIdsVisiveis = solicitacoesComObra.map(item => Number(item.obra_id));
 
           return res.json(await listarObrasDistinct(obraIdsVisiveis));
+        }
+
+        if (apenasStatusSolicitados) {
+          const solicitacoesComStatus = await Solicitacao.findAll({
+            where,
+            attributes: ['status_global'],
+            group: ['status_global'],
+            raw: true
+          });
+
+          return res.json(listarStatusDistinct(
+            solicitacoesComStatus.map(item => item.status_global)
+          ));
         }
 
         totalRegistros = await Solicitacao.count({ where });
@@ -2292,6 +2324,20 @@ module.exports = {
         query: {
           ...req.query,
           apenas_obras: '1'
+        }
+      },
+      res
+    );
+  },
+
+  async statusVisiveis(req, res) {
+    return module.exports.index(
+      {
+        ...req,
+        query: {
+          ...req.query,
+          status: undefined,
+          apenas_status: '1'
         }
       },
       res
