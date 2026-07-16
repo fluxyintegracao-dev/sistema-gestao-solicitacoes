@@ -1262,6 +1262,7 @@ const allowIntegracaoSiengeConfigManage = permit({
 
 router.post('/solicitacoes', validateRequest({ body: validateSolicitacaoCreateBody }), SolicitacaoController.create);
 router.get('/solicitacoes/filtros/obras', SolicitacaoController.obrasVisiveis);
+router.get('/solicitacoes/filtros/status', SolicitacaoController.statusVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
 router.get('/solicitacoes/relatorios/operacional', allowSolicitacoesRelatorioOperacional, RelatorioSolicitacoesController.operacional);

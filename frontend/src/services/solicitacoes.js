@@ -48,6 +48,23 @@ export async function getObrasVisiveisSolicitacoes(params = {}) {
   return res.json();
 }
 
+export async function getStatusVisiveisSolicitacoes(params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const url = query
+    ? `${API_URL}/solicitacoes/filtros/status?${query}`
+    : `${API_URL}/solicitacoes/filtros/status`;
+
+  const res = await fetch(url, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao buscar status visiveis das solicitacoes', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
 export async function obterRelatorioSolicitacoesOperacional(params = {}) {
   const query = new URLSearchParams();
   Object.entries(params || {}).forEach(([key, value]) => {

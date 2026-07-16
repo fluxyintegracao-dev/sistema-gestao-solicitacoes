@@ -32,7 +32,8 @@ import {
   desarquivarSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
   getSolicitacaoResumoLista,
-  getObrasVisiveisSolicitacoes
+  getObrasVisiveisSolicitacoes,
+  getStatusVisiveisSolicitacoes
 } from '../../services/solicitacoes';
 import {
   getTitulosPrioridadePorSolicitacoes,
@@ -256,9 +257,12 @@ export default function Solicitacoes({ arquivadas = false }) {
   useEffect(() => {
     carregarSetores();
     carregarTiposSolicitacao();
-    carregarStatusOptions();
     carregarPermissoes();
   }, []);
+
+  useEffect(() => {
+    carregarStatusOptions();
+  }, [arquivadas, user?.id]);
 
   useEffect(() => {
     carregarObrasOptions();
@@ -266,14 +270,6 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   useEffect(() => {
     setResponsaveisOptions(extrairOpcoesResponsaveis(solicitacoes));
-  }, [solicitacoes]);
-
-  useEffect(() => {
-    const statusDaPagina = (Array.isArray(solicitacoes) ? solicitacoes : [])
-      .map(item => item?.status_global)
-      .filter(Boolean);
-    if (!statusDaPagina.length) return;
-    setStatusOptions(prev => montarStatusOptions(prev, statusDaPagina, STATUS_AUTOMATICOS_SOLICITACAO));
   }, [solicitacoes]);
 
   async function carregarTiposSolicitacao() {
@@ -328,17 +324,40 @@ export default function Solicitacoes({ arquivadas = false }) {
   }
 
   async function carregarStatusOptions() {
+    let statusVisiveis = null;
+    let statusCadastrados = [];
+
     try {
-      const data = await getStatusSetor();
-      const lista = Array.isArray(data) ? data : [];
-      const statusCadastrados = lista
-        .filter(item => item?.ativo)
-        .map(item => item?.nome);
-      setStatusOptions(montarStatusOptions(statusCadastrados, STATUS_AUTOMATICOS_SOLICITACAO));
+      const data = await getStatusVisiveisSolicitacoes(
+        arquivadas ? { arquivadas: '1' } : {}
+      );
+      statusVisiveis = Array.isArray(data) ? data : [];
     } catch (error) {
       console.error(error);
-      setStatusOptions(montarStatusOptions(STATUS_AUTOMATICOS_SOLICITACAO));
     }
+
+    try {
+      const data = await getStatusSetor();
+      statusCadastrados = (Array.isArray(data) ? data : [])
+        .filter(item => item?.ativo)
+        .map(item => item?.nome);
+    } catch (error) {
+      console.error(error);
+    }
+
+    const catalogo = montarStatusOptions(
+      statusCadastrados,
+      STATUS_AUTOMATICOS_SOLICITACAO,
+      statusVisiveis || []
+    );
+
+    if (statusVisiveis === null) {
+      setStatusOptions(catalogo);
+      return;
+    }
+
+    const statusVisiveisSet = new Set(statusVisiveis.map(normalizarStatus));
+    setStatusOptions(catalogo.filter(item => statusVisiveisSet.has(item.value)));
   }
 
   async function carregarPermissoes() {
