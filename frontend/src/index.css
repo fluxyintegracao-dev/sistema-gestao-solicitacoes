@@ -4040,6 +4040,23 @@ a:hover {
   max-width: 1380px;
 }
 
+.page.page-compra-nova.cotacao-gestao-page {
+  max-width: min(1640px, calc(100vw - 2rem));
+}
+
+.cotacao-scroll-region {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.app-table-shell.cotacao-scroll-region {
+  overflow-x: auto;
+}
+
 .cotacao-publica-page {
   background:
     radial-gradient(circle at 14% 10%, rgba(63, 98, 143, 0.06), transparent 30%),

@@ -157,7 +157,7 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'email', width: 250, minWidth: 160 },
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 190, minWidth: 170 }
+  { key: 'acoes', width: 230, minWidth: 220 }
 ];
 
 const CONDICOES_PAGAMENTO_COTACAO = [
@@ -954,9 +954,9 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="cotacao-fornecedores-panel rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(320px,0.85fr)_minmax(240px,0.42fr)_300px]">
-            <div className="grid content-start gap-2.5">
+        <div className="cotacao-fornecedores-panel min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
+          <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.5fr)] 2xl:grid-cols-[minmax(420px,1fr)_minmax(260px,0.45fr)_minmax(280px,320px)]">
+            <div className="grid min-w-0 content-start gap-2.5">
               {/* Selecao por categoria */}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -1008,7 +1008,7 @@ function SecaoEnvioFornecedores({
                     </span>
                   )}
                 </div>
-                <div className="mb-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_190px_auto]">
+                <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_190px_auto]">
                   <div className="relative">
                     <input
                       className="input"
@@ -1106,7 +1106,7 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="cotacao-fornecedores-selecionados grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="cotacao-fornecedores-selecionados grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-[var(--c-text)]">Fornecedores selecionados</div>
@@ -1148,7 +1148,7 @@ function SecaoEnvioFornecedores({
               )}
             </div>
 
-            <div className="cotacao-fornecedor-rapido grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="cotacao-fornecedor-rapido grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 xl:col-span-2 2xl:col-span-1 dark:bg-slate-950/65">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
                 <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
@@ -1183,7 +1183,7 @@ function SecaoEnvioFornecedores({
           </div>
 
           {fornecedoresSelecionados.length > 0 && (
-            <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="mt-4 min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--c-text)]">Itens por fornecedor</div>
@@ -1204,8 +1204,13 @@ function SecaoEnvioFornecedores({
                   Selecione ao menos um item para: {fornecedoresSemItens.map((fornecedor) => fornecedor.nome).join(', ')}.
                 </div>
               )}
-              <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
-                <table className="min-w-[980px] w-full text-left text-xs">
+              <div
+                className="cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-[var(--c-border)] pb-2"
+                role="region"
+                aria-label="Itens por fornecedor"
+                tabIndex={0}
+              >
+                <table className="w-max min-w-[980px] text-left text-xs">
                   <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     <tr>
                       <th className="sticky left-0 z-10 min-w-[260px] bg-slate-100 px-3 py-2 dark:bg-slate-900">Item</th>
@@ -2788,11 +2793,16 @@ export default function GerenciarCotacaoSolicitacao() {
 
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-4 min-w-0 max-w-full">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--c-text)]">Cotações enviadas</h3>
-                <div className="app-table-shell overflow-x-auto">
+                <div
+                  className="app-table-shell cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain pb-2"
+                  role="region"
+                  aria-label="Cotações enviadas"
+                  tabIndex={0}
+                >
                   <ResizableTable
-                    className="table text-[11px]"
+                    className="table min-w-[1120px] text-[11px]"
                     columns={FORNECEDOR_LINK_COLUMNS}
                     storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
                   >
