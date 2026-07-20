@@ -791,8 +791,8 @@ export default function SolicitacaoCompraDetalheView() {
             <h2 className="font-semibold">Fornecedores vinculados</h2>
             <span className="text-sm text-[var(--c-muted)]">{solicitacao.fornecedores.length} cotacao(oes)</span>
           </div>
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
+          <div className="app-table-shell compras-responsive-table">
+            <table className="table min-w-[760px]">
               <thead>
                 <tr>
                   <th>Fornecedor</th>

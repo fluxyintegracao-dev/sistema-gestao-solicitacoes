@@ -1734,8 +1734,8 @@ export default function PedidoCompraDetalhe() {
             </div>
 
             {itensFiltrados.length ? (
-              <div className="mt-4 app-table-shell overflow-x-auto">
-                <table className="table">
+              <div className="mt-4 app-table-shell compras-responsive-table">
+                <table className="table min-w-[900px]">
                   <thead>
                     <tr>
                       {podeCancelarPedido ? <th className="w-10">Sel.</th> : null}

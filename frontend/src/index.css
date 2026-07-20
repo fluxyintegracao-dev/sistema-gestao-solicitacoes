@@ -9449,21 +9449,40 @@ body {
   scrollbar-gutter: stable;
 }
 
+.layout-shell .compras-responsive-table {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.layout-shell .compras-responsive-table > table {
+  width: max-content;
+  min-width: 100%;
+}
+
 .layout-shell .compras-table-wrapper-scroll {
   max-width: 100%;
   padding-bottom: 0.35rem;
 }
 
-.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar {
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar,
+.layout-shell .compras-responsive-table::-webkit-scrollbar {
   height: 0.72rem;
 }
 
-.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-track {
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-track,
+.layout-shell .compras-responsive-table::-webkit-scrollbar-track {
   border-radius: 999px;
   background: color-mix(in srgb, var(--shell-panel-strong, #fff) 82%, var(--shell-primary, #2563eb) 8%);
 }
 
-.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-thumb {
+.layout-shell .compras-table-wrapper-scroll::-webkit-scrollbar-thumb,
+.layout-shell .compras-responsive-table::-webkit-scrollbar-thumb {
   border: 3px solid transparent;
   border-radius: 999px;
   background: color-mix(in srgb, var(--shell-primary, #2563eb) 42%, var(--shell-border, #cbd5e1));
@@ -9708,28 +9727,30 @@ body {
   }
 }
 
-.dark .layout-shell .compras-table-wrapper {
-  background: rgba(15, 23, 42, 0.52);
+.dark .layout-shell .compras-table-wrapper,
+.dark .layout-shell .compras-responsive-table {
+  border-color: rgba(72, 118, 177, 0.45);
+  background: rgba(8, 30, 61, 0.72);
 }
 
 .dark .layout-shell .compras-data-table tbody tr:nth-child(even) {
-  background: rgba(30, 41, 59, 0.56);
+  background: rgba(17, 49, 88, 0.62);
 }
 
 .dark .layout-shell .compras-data-table tbody tr:hover {
-  background: color-mix(in srgb, var(--shell-primary, #60a5fa) 16%, rgba(15, 23, 42, 0.7));
+  background: color-mix(in srgb, var(--shell-primary, #60a5fa) 16%, rgba(12, 40, 75, 0.78));
 }
 
 .dark .layout-shell .compras-icon-action {
-  background: rgba(15, 23, 42, 0.86);
+  background: rgba(10, 34, 68, 0.88);
 }
 
 .dark .layout-shell .compras-data-table-solicitacoes th:last-child {
-  background: color-mix(in srgb, var(--shell-panel-strong, #0f172a) 82%, var(--shell-primary, #2563eb) 18%);
+  background: color-mix(in srgb, var(--shell-panel-strong, #0c284b) 82%, var(--shell-primary, #2563eb) 18%);
 }
 
 .dark .layout-shell .compras-data-table-solicitacoes td:last-child {
-  background: rgba(15, 23, 42, 0.9);
+  background: rgba(10, 34, 68, 0.92);
 }
 
 /* Tabelas densas compartilhadas para telas financeiras e diretoria */
@@ -10776,6 +10797,34 @@ body {
   min-width: 82rem;
 }
 
+.layout-shell .cotacao-condicao-option:hover {
+  background: #eff6ff;
+}
+
+.dark .layout-shell :is(.page-compra-nova, .compras-cotacoes-page, .compras-solicitacoes-page) {
+  --c-surface: rgba(9, 35, 69, 0.94);
+  --c-surface-soft: rgba(12, 44, 82, 0.82);
+  --c-border: rgba(72, 118, 177, 0.50);
+}
+
+.dark .layout-shell .cotacao-condicoes-options {
+  border-color: rgba(74, 126, 190, 0.60);
+  background: rgba(8, 30, 61, 0.98);
+}
+
+.dark .layout-shell .cotacao-condicao-option:hover {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.dark .layout-shell .cotacao-resposta-data-panel {
+  border-color: rgba(74, 126, 190, 0.50);
+  background: rgba(12, 40, 75, 0.82);
+}
+
+.dark .layout-shell .cotacao-resposta-data-field {
+  background: rgba(8, 30, 61, 0.78);
+}
+
 .dark .layout-shell .cotacao-gestao-page .cotacao-whatsapp-panel {
   border-color: rgba(16, 185, 129, 0.45) !important;
   background: rgba(6, 55, 47, 0.88) !important;
@@ -10792,18 +10841,18 @@ body {
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-autocomplete,
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido,
 .dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(13, 29, 50, 0.92) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(9, 35, 69, 0.94) !important;
   color: #e7edf7 !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido {
-  background: rgba(10, 23, 39, 0.94) !important;
+  background: rgba(10, 40, 76, 0.96) !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-empty {
   border-style: dashed;
-  background: rgba(7, 17, 30, 0.92) !important;
+  background: rgba(7, 29, 59, 0.92) !important;
   color: #aec1dc !important;
 }
 
@@ -10821,8 +10870,8 @@ body {
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea),
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
-  border-color: rgba(71, 101, 142, 0.84) !important;
-  background: rgba(19, 35, 58, 0.96) !important;
+  border-color: rgba(72, 118, 177, 0.72) !important;
+  background: rgba(13, 42, 78, 0.96) !important;
   color: #eef5ff !important;
   -webkit-text-fill-color: #eef5ff !important;
 }
@@ -10840,21 +10889,21 @@ body {
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-list .app-list-card,
 .dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl .rounded-lg {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(7, 17, 30, 0.62) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(7, 29, 59, 0.72) !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-count,
 .dark .layout-shell .cotacao-gestao-page .cotacao-ranking-pill {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(18, 36, 61, 0.92) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(12, 44, 82, 0.94) !important;
   color: #d9e7ff !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-ranking-card,
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-item {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(13, 29, 50, 0.92) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(9, 35, 69, 0.94) !important;
   color: #e7edf7 !important;
 }
 
@@ -10874,8 +10923,8 @@ body {
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .app-list-stack,
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .app-table-shell {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(7, 17, 30, 0.72) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(7, 29, 59, 0.82) !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table {
@@ -10885,8 +10934,8 @@ body {
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table thead,
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .table th {
-  border-color: rgba(71, 101, 142, 0.72) !important;
-  background: rgba(29, 48, 78, 0.92) !important;
+  border-color: rgba(72, 118, 177, 0.58) !important;
+  background: rgba(16, 52, 94, 0.94) !important;
   color: #b9c7dc !important;
 }
 
@@ -10896,7 +10945,7 @@ body {
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta {
-  background: rgba(15, 23, 42, 0.74) !important;
+  background: rgba(10, 38, 74, 0.86) !important;
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-resposta-vencedora {
@@ -10916,8 +10965,8 @@ body {
 }
 
 .dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel .input {
-  border-color: rgba(71, 101, 142, 0.84) !important;
-  background: rgba(19, 35, 58, 0.96) !important;
+  border-color: rgba(72, 118, 177, 0.72) !important;
+  background: rgba(13, 42, 78, 0.96) !important;
   color: #eef5ff !important;
   -webkit-text-fill-color: #eef5ff !important;
 }

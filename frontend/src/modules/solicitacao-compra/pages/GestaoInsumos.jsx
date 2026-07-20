@@ -243,7 +243,8 @@ export default function GestaoInsumos() {
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : (
-          <table className="table">
+          <div className="compras-responsive-table">
+          <table className="table min-w-[920px]">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -287,6 +288,7 @@ export default function GestaoInsumos() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 

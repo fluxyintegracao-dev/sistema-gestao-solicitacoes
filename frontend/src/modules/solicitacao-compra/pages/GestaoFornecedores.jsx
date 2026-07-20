@@ -367,8 +367,8 @@ export default function GestaoFornecedores() {
         ) : fornecedores.length === 0 ? (
           <div className="app-empty-card">Nenhum fornecedor encontrado. Ajuste os filtros ou cadastre um novo.</div>
         ) : (
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
+          <div className="app-table-shell compras-responsive-table">
+            <table className="table min-w-[980px]">
               <thead>
                 <tr>
                   <th>Nome</th>

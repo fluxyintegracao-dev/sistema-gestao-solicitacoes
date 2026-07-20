@@ -299,7 +299,7 @@ function ModalRespostaInternaCotacao({
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Condicao de pagamento *</span>
-              <div className="relative">
+              <div className="grid gap-2">
                 <input
                   className="input"
                   value={form.condicao_pagamento}
@@ -310,12 +310,12 @@ function ModalRespostaInternaCotacao({
                 />
                 {condicoesAbertas && (
                   <div
-                    className="absolute left-0 right-0 top-[calc(100%+4px)] z-[95] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-xl"
+                    className="cotacao-condicoes-options rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-sm"
                     onMouseDown={(event) => event.preventDefault()}
                   >
                     <div className="grid gap-1">
                       {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
-                        <label key={opcao} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                        <label key={opcao} className="cotacao-condicao-option flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm">
                           <input
                             type="checkbox"
                             checked={condicoesSelecionadas.has(opcao)}
@@ -334,8 +334,8 @@ function ModalRespostaInternaCotacao({
             </label>
           </div>
 
-          <div className="mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <label className="app-filter-field bg-white">
+          <div className="cotacao-resposta-data-panel mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+            <label className="cotacao-resposta-data-field app-filter-field bg-white">
               <span className="app-filter-label">Data chegada para todos</span>
               <input
                 className="input"
@@ -357,7 +357,7 @@ function ModalRespostaInternaCotacao({
             <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
           </label>
 
-          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--c-border)]">
+          <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
             <table className="table min-w-[980px] text-xs">
               <thead>
                 <tr>
@@ -621,8 +621,8 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                 </button>
               )}
             </div>
-            <div className="rounded-xl border border-[var(--c-border)] overflow-hidden">
-              <table className="table w-full">
+            <div className="compras-responsive-table rounded-xl border border-[var(--c-border)]">
+              <table className="table min-w-[720px] w-full">
                 <thead>
                   <tr>
                     {modoRemanejar && <th className="w-8"></th>}
@@ -1661,7 +1661,7 @@ function SecaoComparativo({
             )}
 
             {fornecedoresMapaVisiveis.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="compras-responsive-table">
                 <table className="table min-w-[980px] text-xs">
                   <thead>
                     <tr>
@@ -1749,8 +1749,8 @@ function SecaoComparativo({
                 )}
               </div>
 
-              <div className="app-table-shell overflow-x-auto">
-                <table className="table text-xs">
+              <div className="app-table-shell compras-responsive-table">
+                <table className="table min-w-[980px] text-xs">
                   <thead>
                     <tr>
                       <th>Fornecedor</th>
