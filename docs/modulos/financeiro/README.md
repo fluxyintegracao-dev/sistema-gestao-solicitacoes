@@ -13,6 +13,22 @@ Financeiro e dono de titulos a pagar/receber, parcelas financeiras, movimentos, 
 - status e saldo derivam dos movimentos ativos;
 - edicao de titulo movimentado possui restricoes e auditoria.
 
+## Importacao em massa de contas a pagar
+
+A importacao em massa esta implementada no repositorio e depende da migration `202607200001_financeiro_titulos_importacao.js` no ambiente de destino. O fluxo e exclusivo para `PAGAR`: o usuario exporta o modelo versionado em Contas a Pagar, envia o `.xlsx`, revisa o preview persistido e confirma a criacao atomica.
+
+- permissao especifica `financeiro.titulos.importar`;
+- `obra_id` define obra, empresa, DRE e apropriacao principal do titulo;
+- o credor e global e pode representar colaborador cadastrado em outra empresa;
+- a aba de referencias informa se o credor possui favorecido bancario/PIX pronto; a ausencia gera aviso no preview, sem impedir o titulo, mas bloqueia seu uso em lote bancario ate a regularizacao;
+- referencias sao revalidadas no preview e na confirmacao;
+- parcelas, rateios e impostos usam abas relacionadas por `chave_importacao`;
+- formulas, macros, linhas ocultas e colunas ocultas com dados sao rejeitadas;
+- confirmacao exige `Idempotency-Key`, bloqueio transacional e rollback integral em erro;
+- titulos recebem origem `IMPORTACAO` e nao criam baixas, movimentos, intents, faturas ou vinculos operacionais.
+
+Detalhes tecnicos e cenarios de aceite estao em [`PLANO_IMPORTACAO_TITULOS_PAGAR.md`](./PLANO_IMPORTACAO_TITULOS_PAGAR.md).
+
 ## Baixa e estorno
 
 - baixa pode ser parcial ou total;

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HiOutlineAdjustmentsHorizontal,
+  HiOutlineArrowDownTray,
+  HiOutlineArrowUpTray,
   HiOutlineDocumentChartBar,
   HiOutlineDocumentText,
   HiOutlineEye,
@@ -23,14 +25,16 @@ import {
   getFormasPagamentoFinanceiras,
   getTitulosFinanceiros,
   excluirTitulosFinanceirosEmMassa,
+  exportarModeloImportacaoTitulosPagar,
   importarCodigosBarrasTitulos
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { normalizeCurrencyTyping } from '../utils/formatters';
-import { canDeleteTitulosFinanceiros } from '../utils/acessoProduto';
+import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros } from '../utils/acessoProduto';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
+import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -599,6 +603,7 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
 export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
   const canDeleteTitulos = canDeleteTitulosFinanceiros(user);
+  const canImportTitulos = canImportTitulosFinanceiros(user);
   const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
     ? String(tipoFixo).toUpperCase()
     : null;
@@ -650,6 +655,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [fretesPendentes, setFretesPendentes] = useState([]);
   const [loadingFretesPendentes, setLoadingFretesPendentes] = useState(false);
   const [erroFretesPendentes, setErroFretesPendentes] = useState('');
+  const [importPanelOpen, setImportPanelOpen] = useState(false);
+  const [exportingModel, setExportingModel] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1664,6 +1671,27 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
   }
 
+  async function exportarModeloImportacao() {
+    if (exportingModel) return;
+    setExportingModel(true);
+    setError('');
+    try {
+      const { blob, filename } = await exportarModeloImportacaoTitulosPagar();
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.message || 'Erro ao exportar modelo de contas a pagar.');
+    } finally {
+      setExportingModel(false);
+    }
+  }
+
   function persistVisibleFilters(nextIds) {
     const normalized = nextIds.length > 0 ? nextIds : DEFAULT_VISIBLE_FILTER_IDS;
     setVisibleFilterIds(normalized);
@@ -1899,6 +1927,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           <p className="page-subtitle">{pageSubtitle}</p>
         </div>
         <div className="app-page-actions">
+          {fixedTipo === 'PAGAR' && canImportTitulos && (
+            <>
+              <button type="button" className="btn btn-outline btn-sm" onClick={exportarModeloImportacao} disabled={exportingModel}>
+                <HiOutlineArrowDownTray className="h-4 w-4" />
+                {exportingModel ? 'Exportando...' : 'Exportar modelo'}
+              </button>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setImportPanelOpen((current) => !current)}>
+                <HiOutlineArrowUpTray className="h-4 w-4" />
+                Importar planilha
+              </button>
+            </>
+          )}
           <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">
             <HiOutlineDocumentChartBar className="h-4 w-4" />
             Relatorios
@@ -1915,6 +1955,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </Link>
         </div>
       </div>
+
+      {fixedTipo === 'PAGAR' && canImportTitulos && importPanelOpen && (
+        <FinanceiroTitulosImportacaoPanel
+          onClose={() => setImportPanelOpen(false)}
+          onConfirmed={() => {
+            setAppliedFilters((current) => (current ? { ...current } : current));
+            setSelectedTituloIds([]);
+          }}
+        />
+      )}
 
       <form className="card sol-surface-card app-toolbar-card" onSubmit={submitFilters}>
         <div className="flex flex-col gap-4">

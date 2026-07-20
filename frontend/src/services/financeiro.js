@@ -542,6 +542,58 @@ export async function criarTituloFinanceiro(data) {
   return parseJson(response, 'Erro ao criar titulo financeiro');
 }
 
+export async function exportarModeloImportacaoTitulosPagar() {
+  const response = await fetch(`${API_URL}/financeiro/titulos/importacoes/modelo`, {
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    try {
+      const parsed = JSON.parse(text);
+      throw new Error(parsed?.error || 'Erro ao exportar modelo de contas a pagar');
+    } catch (error) {
+      if (error instanceof SyntaxError) throw new Error(text || 'Erro ao exportar modelo de contas a pagar');
+      throw error;
+    }
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('Content-Disposition') || '';
+  const match = disposition.match(/filename="?([^";]+)"?/i);
+  return { blob, filename: match?.[1] || 'modelo-importacao-contas-a-pagar.xlsx' };
+}
+
+export async function criarPreviewImportacaoTitulosPagar(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetch(`${API_URL}/financeiro/titulos/importacoes/preview`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return parseJson(response, 'Erro ao validar planilha de contas a pagar');
+}
+
+export async function getImportacaoTitulosPagar(id) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/importacoes/${id}`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao consultar importacao de contas a pagar');
+}
+
+export async function confirmarImportacaoTitulosPagar(id, { aceitarAvisos = false, idempotencyKey } = {}) {
+  const response = await fetch(`${API_URL}/financeiro/titulos/importacoes/${id}/confirmar`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey || crypto.randomUUID()
+    }),
+    body: JSON.stringify({ aceitar_avisos: aceitarAvisos })
+  });
+  return parseJson(response, 'Erro ao confirmar importacao de contas a pagar');
+}
+
 export async function atualizarTituloFinanceiro(id, data) {
   const response = await fetch(`${API_URL}/financeiro/titulos/${id}`, {
     method: 'PATCH',

@@ -275,6 +275,7 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'financeiro.titulos.visualizar', label: 'Visualizar títulos', descricao: 'Ver lista e detalhes dos títulos a pagar e a receber.' },
           { key: 'financeiro.titulos.criar', label: 'Criar conta manual', descricao: 'Abrir novo título financeiro manualmente.' },
+          { key: 'financeiro.titulos.importar', label: 'Importar contas a pagar', descricao: 'Exportar o modelo, validar e confirmar títulos a pagar por planilha.' },
           { key: 'financeiro.titulos.baixar', label: 'Registrar baixa / pagamento', descricao: 'Quitar ou baixar parcialmente um título.' },
           { key: 'financeiro.titulos.excluir', label: 'Excluir títulos', descricao: 'Excluir logicamente títulos abertos sem movimentos financeiros ativos.' },
           { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' },
