@@ -129,7 +129,6 @@ const Configuracoes = lazy(() => import('./pages/Configuracoes'));
 const ConfiguracoesSuporte = lazy(() => import('./pages/ConfiguracoesSuporte'));
 const ConfiguracoesVisibilidadeUi = lazy(() => import('./pages/ConfiguracoesVisibilidadeUi'));
 const EmpresasGrupo = lazy(() => import('./pages/EmpresasGrupo'));
-const AprovacaoDiretoria = lazy(() => import('./pages/AprovacaoDiretoria'));
 const TiposSubContrato = lazy(() => import('./pages/TiposSubContrato'));
 const StatusSetor = lazy(() => import('./pages/StatusSetor'));
 const Perfil = lazy(() => import('./pages/Perfil'));
@@ -835,7 +834,6 @@ export default function App() {
         <Route path="configuracoes-suporte" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesSuporte /></ConfiguracoesAreaRoute>} />
         <Route path="configuracoes-visibilidade-ui" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesVisibilidadeUi /></ConfiguracoesAreaRoute>} />
         <Route path="empresas-grupo" element={<ConfiguracoesAreaRoute area="cadastros"><EmpresasGrupo /></ConfiguracoesAreaRoute>} />
-        <Route path="aprovacao-diretoria" element={<ConfiguracoesAreaRoute area="status_vinculos"><AprovacaoDiretoria /></ConfiguracoesAreaRoute>} />
         <Route path="tipos-sub-contrato" element={<ConfiguracoesAreaRoute area="cadastros"><TiposSubContrato /></ConfiguracoesAreaRoute>} />
         <Route path="status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><StatusSetor /></ConfiguracoesAreaRoute>} />
         <Route path="permissoes-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><PermissoesSetor /></ConfiguracoesAreaRoute>} />

@@ -650,7 +650,11 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
 }
 
 function validateCompraEncerrarBody(body = {}) {
-  ensureAllowedKeys(body, ['vencedores', 'alocacoes'], 'Encerramento da cotacao');
+  ensureAllowedKeys(
+    body,
+    ['vencedores', 'alocacoes', 'fechamento_parcial_confirmado', 'justificativa'],
+    'Encerramento da cotacao'
+  );
 
   const entradas = Array.isArray(body.alocacoes) && body.alocacoes.length
     ? body.alocacoes
@@ -665,6 +669,11 @@ function validateCompraEncerrarBody(body = {}) {
   }
 
   return {
+    fechamento_parcial_confirmado: parseBoolean(
+      body.fechamento_parcial_confirmado,
+      'Confirmacao do fechamento parcial'
+    ) || false,
+    justificativa: parseOptionalText(body.justificativa, 'Justificativa', 2000),
     vencedores: entradas.map((entry, index) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         throw new ValidationError(`Vencedor ${index + 1} invalido.`);

@@ -1406,7 +1406,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           {itens.length === 0 ? (
             <div className="compra-itens-empty py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
           ) : (
-            <div className="overflow-x-auto compra-itens-table-wrap">
+            <div className="compras-responsive-table compra-itens-table-wrap">
               <table className="table compra-itens-table">
                 <thead>
                   <tr>

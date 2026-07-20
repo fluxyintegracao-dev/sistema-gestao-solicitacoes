@@ -45,6 +45,7 @@ function formatarStatus(status) {
 function statusClass(status) {
   const value = String(status || '').toUpperCase();
   if (value === 'ENCERRADO') return 'app-status-pill bg-slate-100 text-slate-700';
+  if (value === 'FECHAMENTO_PARCIAL') return 'app-status-pill bg-amber-100 text-amber-800';
   if (value === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
@@ -790,8 +791,8 @@ export default function SolicitacaoCompraDetalheView() {
             <h2 className="font-semibold">Fornecedores vinculados</h2>
             <span className="text-sm text-[var(--c-muted)]">{solicitacao.fornecedores.length} cotacao(oes)</span>
           </div>
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
+          <div className="app-table-shell compras-responsive-table">
+            <table className="table min-w-[760px]">
               <thead>
                 <tr>
                   <th>Fornecedor</th>

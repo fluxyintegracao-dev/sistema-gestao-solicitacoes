@@ -62,10 +62,6 @@ const {
 } = require('../services/compraApropriacao');
 const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
 const {
-  obterConfiguracaoAprovacaoDiretoria,
-  obterDiretoriaParaObra
-} = require('../services/aprovacaoDiretoriaConfig');
-const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
   canAlterarQuantidadeSolicitacaoCompra,
@@ -73,6 +69,7 @@ const {
   canEditarApropriacoesItemSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
   canEncerrarComprasCotacoes,
+  canFecharParcialComprasCotacoes,
   canManageComprasCotacoes,
   canManageComprasDelegacao,
   canOperateComprasCotacoes,
@@ -418,29 +415,25 @@ async function buscarSetorGerenciaProcessos(transaction) {
   return resolveSetorPersistenciaValue(setor, 'GERENCIA DE PROCESSOS');
 }
 
-async function montarFluxoAprovacaoCompra({ obra, transaction }) {
+async function montarFluxoAprovacaoCompra({ transaction }) {
   const setorCompras = await buscarSetorCompras(transaction);
-  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
-  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
-    usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorCompras,
-    diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorCompras : null
+    usaFluxoDiretoria: false,
+    areaResponsavel: setorCompras,
+    diretoriaFluxoCodigo: null,
+    setorDestinoPosAprovacao: null
   };
 }
 
-async function montarFluxoAprovacaoCompraDireta({ obra, transaction }) {
+async function montarFluxoAprovacaoCompraDireta({ transaction }) {
   const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
-  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
-  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
-    usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorGerenciaProcessos,
-    diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorGerenciaProcessos : null
+    usaFluxoDiretoria: false,
+    areaResponsavel: setorGerenciaProcessos,
+    diretoriaFluxoCodigo: null,
+    setorDestinoPosAprovacao: null
   };
 }
 
@@ -500,7 +493,7 @@ function isSetorComprasValue(value) {
 
 function isStatusSolicitacaoCompraLiberadoParaCompras(status) {
   const normalizado = normalizeFluxoTokenCompra(status);
-  if (['LIBERADO_PARA_COMPRA', 'LIBERADO', 'COTACAO', 'COTACAO_ENVIADA', 'EM_COTACAO', 'ENCERRADO', 'FINALIZADA'].includes(normalizado)) {
+  if (['LIBERADO_PARA_COMPRA', 'LIBERADO', 'COTACAO', 'COTACAO_ENVIADA', 'EM_COTACAO', 'FECHAMENTO_PARCIAL', 'ENCERRADO', 'FINALIZADA'].includes(normalizado)) {
     return true;
   }
   return normalizado.startsWith('PEDIDO_');
@@ -1270,6 +1263,12 @@ function montarComparativoSolicitacao(solicitacao) {
     });
 
     const disponiveis = respostas.filter((resposta) => resposta.disponivel && Number(resposta.preco) > 0);
+    const quantidadeAtual = Number(item.quantidade || 0);
+    const quantidadeFechada = respostas.reduce(
+      (total, resposta) => total + Number(resposta.quantidade_alocada || 0),
+      0
+    );
+    const saldoDisponivel = Math.max(0, quantidadeAtual - quantidadeFechada);
     const melhor = disponiveis.reduce((acc, atual) => {
       if (!acc) return atual;
       return Number(atual.preco) < Number(acc.preco) ? atual : acc;
@@ -1277,6 +1276,9 @@ function montarComparativoSolicitacao(solicitacao) {
 
     return {
       ...item,
+      quantidade_atual: quantidadeAtual,
+      quantidade_fechada: quantidadeFechada,
+      saldo_disponivel: saldoDisponivel,
       melhor_preco: melhor
         ? {
             fornecedor_id: melhor.fornecedor_id,
@@ -2781,22 +2783,6 @@ module.exports = {
         return;
       }
 
-      const pedidos = await PedidoCompra.findAll({
-        where: { solicitacao_compra_id: Number(solicitacao.id) },
-        attributes: ['id', 'status'],
-        transaction
-      });
-
-      for (const pedido of pedidos) {
-        const pedidoTemEdicaoBloqueada = await isPedidoCompraStatusLocked(pedido.status);
-        if (String(pedido.status || '').toUpperCase() !== 'CANCELADO' && pedidoTemEdicaoBloqueada) {
-          await transaction.rollback();
-          return res.status(400).json({
-            error: 'Nao e possivel alterar quantidade quando existe pedido fechado. Reabra o pedido para ajustar a cotacao.'
-          });
-        }
-      }
-
       const itemTipo = String(req.body?.item_tipo || '').toUpperCase();
       const ItemModel = itemTipo === 'MANUAL' ? SolicitacaoCompraItemManual : SolicitacaoCompraItem;
       const item = await ItemModel.findOne({
@@ -2823,6 +2809,52 @@ module.exports = {
       if (!Number.isFinite(quantidadeNova) || quantidadeNova <= 0) {
         await transaction.rollback();
         return res.status(400).json({ error: 'Quantidade invalida' });
+      }
+
+      const pedidos = await PedidoCompra.findAll({
+        where: { solicitacao_compra_id: Number(solicitacao.id) },
+        attributes: ['id', 'status'],
+        transaction
+      });
+      let existePedidoFechado = false;
+      for (const pedido of pedidos) {
+        const pedidoTemEdicaoBloqueada = await isPedidoCompraStatusLocked(pedido.status);
+        if (String(pedido.status || '').toUpperCase() !== 'CANCELADO' && pedidoTemEdicaoBloqueada) {
+          existePedidoFechado = true;
+          break;
+        }
+      }
+
+      if (existePedidoFechado && normalizeTextCompra(solicitacao.status) !== 'FECHAMENTO_PARCIAL') {
+        await transaction.rollback();
+        return res.status(400).json({
+          error: 'Nao e possivel alterar quantidade quando a cotacao esta encerrada. Reabra o pedido para ajustar a cotacao.'
+        });
+      }
+
+      if (existePedidoFechado) {
+        const campoItemAlocacao = itemTipo === 'MANUAL'
+          ? 'solicitacao_compra_item_manual_id'
+          : 'solicitacao_compra_item_id';
+        const alocacoesAtivas = await SolicitacaoCompraAlocacao.findAll({
+          where: {
+            solicitacao_compra_id: Number(solicitacao.id),
+            [campoItemAlocacao]: Number(item.id),
+            status: 'ATIVA'
+          },
+          attributes: ['quantidade_alocada'],
+          transaction
+        });
+        const quantidadeJaFechada = alocacoesAtivas.reduce(
+          (total, alocacao) => total + Number(alocacao.quantidade_alocada || 0),
+          0
+        );
+        if (quantidadeNova + 0.0001 < quantidadeJaFechada) {
+          await transaction.rollback();
+          return res.status(400).json({
+            error: `A quantidade atual nao pode ser menor que a quantidade ja fechada (${quantidadeJaFechada}).`
+          });
+        }
       }
 
       const valorUnitario = Number(item.valor_unitario || 0);
@@ -3295,16 +3327,12 @@ module.exports = {
         : await buscarTipoSolicitacaoCompra(transaction);
       const fluxoCompra = compraDireta
         ? await montarFluxoAprovacaoCompraDireta({
-            obra,
             transaction
           })
         : await montarFluxoAprovacaoCompra({
-            obra,
             transaction
           });
-      const statusInicialCompra = fluxoCompra.usaFluxoDiretoria
-        ? 'AGUARDANDO_DIRETORIA'
-        : (compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA');
+      const statusInicialCompra = compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA';
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
@@ -4061,9 +4089,13 @@ module.exports = {
         return;
       }
 
-      if (!(await canEncerrarComprasCotacoes(usuario))) {
+      const [podeFecharParcial, podeEncerrarDefinitivamente] = await Promise.all([
+        canFecharParcialComprasCotacoes(usuario),
+        canEncerrarComprasCotacoes(usuario)
+      ]);
+      if (!podeFecharParcial && !podeEncerrarDefinitivamente) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas compras pode encerrar a cotacao' });
+        return res.status(403).json({ error: 'Acesso negado para gerar pedidos da cotacao.' });
       }
 
       const solicitacaoTravada = await SolicitacaoCompra.findByPk(req.params.id, {
@@ -4074,10 +4106,10 @@ module.exports = {
         await transaction.rollback();
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
-      if (isSolicitacaoCompraTerminal(solicitacaoTravada.status)) {
+      if (['CANCELADA', 'CANCELADO', 'RECUSADO'].includes(normalizeTextCompra(solicitacaoTravada.status))) {
         await transaction.rollback();
         return res.status(400).json({
-          error: `Solicitacao de compra ${normalizeTextCompra(solicitacaoTravada.status)} nao pode ser encerrada novamente.`
+          error: `Solicitacao de compra ${normalizeTextCompra(solicitacaoTravada.status)} nao permite gerar pedidos.`
         });
       }
 
@@ -4116,18 +4148,33 @@ module.exports = {
       }
 
       const cotacaoFornecedorIds = (solicitacao.fornecedores || []).map((item) => item.id);
-      await SolicitacaoCompraRespostaItem.update(
-        { vencedor: false },
-        {
-          where: {
-            solicitacao_compra_fornecedor_id: {
-              [Op.in]: cotacaoFornecedorIds.length ? cotacaoFornecedorIds : [0]
-            },
-            deleted_at: null
-          },
-          transaction
-        }
-      );
+      const resultadoFechamento = await gerarPedidosDosVencedores({
+        solicitacaoId: solicitacaoTravada.id,
+        usuarioId: usuario.id,
+        vencedores,
+        idempotencyKey: req.get('Idempotency-Key') || null,
+        justificativa: req.body?.justificativa,
+        fechamentoParcialConfirmado: req.body?.fechamento_parcial_confirmado === true,
+        permitirParcial: podeFecharParcial,
+        permitirFinal: podeEncerrarDefinitivamente,
+        transaction
+      });
+
+      if (resultadoFechamento.replay) {
+        await transaction.commit();
+        res.setHeader('X-Idempotent-Replay', 'true');
+        const atualizadaReplay = await carregarSolicitacaoCompra(req.params.id);
+        return res.json({
+          ...atualizadaReplay.toJSON(),
+          fechamento_resultado: {
+            fechamento: resultadoFechamento.fechamento,
+            pedidos: resultadoFechamento.pedidos,
+            saldo_restante: resultadoFechamento.saldo_restante,
+            final: resultadoFechamento.final,
+            replay: true
+          }
+        });
+      }
 
       for (const entry of vencedores) {
         const resposta = await SolicitacaoCompraRespostaItem.findOne({
@@ -4147,22 +4194,28 @@ module.exports = {
         await resposta.update({ vencedor: true }, { transaction });
       }
 
-      await solicitacaoTravada.update(
-        {
-          status: 'ENCERRADO',
-          encerrado_em: new Date()
-        },
-        { transaction }
-      );
+      const statusAnterior = solicitacaoTravada.status;
+      const statusNovo = resultadoFechamento.final ? 'ENCERRADO' : 'FECHAMENTO_PARCIAL';
+      await solicitacaoTravada.update({
+        status: statusNovo,
+        encerrado_em: resultadoFechamento.final ? new Date() : null
+      }, { transaction });
 
       await registrarLogSolicitacaoCompra({
         solicitacaoCompraId: solicitacaoTravada.id,
         usuarioId: usuario.id,
-        tipoAcao: 'ENCERRAMENTO',
-        descricao: normalizeTextCompra(solicitacao.status) === 'ENCERRADO'
-          ? 'Cotacao reencerrada com vencedores atualizados'
-          : 'Cotacao encerrada com vencedores definidos',
+        tipoAcao: resultadoFechamento.final ? 'ENCERRAMENTO' : 'FECHAMENTO_PARCIAL',
+        descricao: resultadoFechamento.final
+          ? 'Cotacao encerrada com o saldo integralmente alocado'
+          : `Rodada ${resultadoFechamento.fechamento.numero_rodada} fechada parcialmente`,
         metadados: {
+          fechamento_id: resultadoFechamento.fechamento.id,
+          numero_rodada: resultadoFechamento.fechamento.numero_rodada,
+          tipo_fechamento: resultadoFechamento.fechamento.tipo,
+          status_anterior: statusAnterior,
+          status_novo: statusNovo,
+          saldo_restante: resultadoFechamento.saldo_restante,
+          justificativa: resultadoFechamento.fechamento.justificativa || null,
           vencedores: vencedores.map((item) => ({
             resposta_item_id: item.resposta_item_id,
             quantidade_alocada: item.quantidade_alocada ?? null
@@ -4171,46 +4224,59 @@ module.exports = {
         transaction
       });
 
-      await gerarPedidosDosVencedores({
-        solicitacaoId: solicitacaoTravada.id,
-        usuarioId: usuario.id,
-        vencedores,
-        transaction
-      });
-
       await fecharPedidosDaSolicitacaoCompraAutomaticamente({
         solicitacaoId: solicitacaoTravada.id,
+        pedidoIds: resultadoFechamento.pedidos.map((pedido) => pedido.id),
         usuarioId: usuario.id,
         transaction
       });
 
-      await SolicitacaoCompraFornecedor.update(
-        { status: 'FINALIZADA' },
-        {
-          where: {
-            solicitacao_compra_id: solicitacaoTravada.id,
-            status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+      if (resultadoFechamento.final) {
+        await SolicitacaoCompraFornecedor.update(
+          { status: 'FINALIZADA' },
+          {
+            where: {
+              solicitacao_compra_id: solicitacaoTravada.id,
+              status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+            },
+            transaction
+          }
+        );
+
+        await registrarLogSolicitacaoCompra({
+          solicitacaoCompraId: solicitacaoTravada.id,
+          usuarioId: usuario.id,
+          tipoAcao: 'COTACAO_FINALIZADA',
+          descricao: 'Cotacoes dos fornecedores finalizadas apos fechamento integral dos pedidos',
+          metadados: {
+            origem: 'ENCERRAMENTO_COTACAO',
+            fechamento_id: resultadoFechamento.fechamento.id
           },
           transaction
-        }
-      );
-
-      await registrarLogSolicitacaoCompra({
-        solicitacaoCompraId: solicitacaoTravada.id,
-        usuarioId: usuario.id,
-        tipoAcao: 'COTACAO_FINALIZADA',
-        descricao: 'Cotacoes dos fornecedores finalizadas apos fechamento dos pedidos',
-        metadados: { origem: 'ENCERRAMENTO_COTACAO' },
-        transaction
-      });
+        });
+      }
 
       await transaction.commit();
       const atualizada = await carregarSolicitacaoCompra(req.params.id);
-      return res.json(atualizada);
+      return res.json({
+        ...atualizada.toJSON(),
+        fechamento_resultado: {
+          fechamento: resultadoFechamento.fechamento,
+          pedidos: resultadoFechamento.pedidos,
+          saldo_restante: resultadoFechamento.saldo_restante,
+          final: resultadoFechamento.final,
+          replay: false
+        }
+      });
     } catch (error) {
       await transaction.rollback();
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao encerrar a cotacao' });
+      const statusCode = Number(error?.statusCode || (error?.name === 'Error' ? 400 : 500));
+      return res.status(statusCode).json({
+        error: statusCode < 500 ? error.message : 'Erro ao encerrar a cotacao',
+        code: error?.code || undefined,
+        saldo_restante: error?.saldo_restante ?? undefined
+      });
     }
   },
 

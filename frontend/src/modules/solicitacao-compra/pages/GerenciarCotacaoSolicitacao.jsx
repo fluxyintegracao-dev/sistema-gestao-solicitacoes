@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArrowTopRightOnSquare,
@@ -30,6 +30,7 @@ import { buscarParceiros, listarCategoriasParceiro } from '../../../services/par
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canFecharParcialComprasCotacoes,
   canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
   canReabrirComprasCotacoes
@@ -52,6 +53,12 @@ function fmt(data) {
 
 function fmtStatus(status) {
   return String(status || '-').replace(/_/g, ' ').toUpperCase();
+}
+
+function criarChaveIdempotenciaFechamento(solicitacaoId) {
+  const sufixo = window.crypto?.randomUUID?.()
+    || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  return `cotacao-${solicitacaoId}-${sufixo}`;
 }
 
 function fmtMoeda(valor) {
@@ -122,6 +129,7 @@ function clsStatus(status) {
   if (v === 'FINALIZADA') return 'app-status-pill bg-slate-100 text-slate-700';
   if (['RECUSADO', 'CANCELADA', 'CANCELADO', 'INATIVA'].includes(v)) return 'app-status-pill bg-red-100 text-red-700';
   if (v === 'AGUARDANDO_DIRETORIA') return 'app-status-pill bg-amber-100 text-amber-700';
+  if (v === 'FECHAMENTO_PARCIAL') return 'app-status-pill bg-amber-100 text-amber-800';
   if (v === 'RASCUNHO') return 'app-status-pill bg-amber-100 text-amber-700';
   if (v === 'REABERTA') return 'app-status-pill bg-blue-100 text-blue-700';
   return 'app-status-pill bg-blue-100 text-blue-700';
@@ -149,7 +157,7 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'email', width: 250, minWidth: 160 },
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 190, minWidth: 170 }
+  { key: 'acoes', width: 230, minWidth: 220 }
 ];
 
 const CONDICOES_PAGAMENTO_COTACAO = [
@@ -291,7 +299,7 @@ function ModalRespostaInternaCotacao({
             </label>
             <label className="app-filter-field">
               <span className="app-filter-label">Condicao de pagamento *</span>
-              <div className="relative">
+              <div className="grid gap-2">
                 <input
                   className="input"
                   value={form.condicao_pagamento}
@@ -302,12 +310,12 @@ function ModalRespostaInternaCotacao({
                 />
                 {condicoesAbertas && (
                   <div
-                    className="absolute left-0 right-0 top-[calc(100%+4px)] z-[95] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-xl"
+                    className="cotacao-condicoes-options rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-2 shadow-sm"
                     onMouseDown={(event) => event.preventDefault()}
                   >
                     <div className="grid gap-1">
                       {CONDICOES_PAGAMENTO_COTACAO.map((opcao) => (
-                        <label key={opcao} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-slate-50">
+                        <label key={opcao} className="cotacao-condicao-option flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm">
                           <input
                             type="checkbox"
                             checked={condicoesSelecionadas.has(opcao)}
@@ -326,8 +334,8 @@ function ModalRespostaInternaCotacao({
             </label>
           </div>
 
-          <div className="mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <label className="app-filter-field bg-white">
+          <div className="cotacao-resposta-data-panel mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
+            <label className="cotacao-resposta-data-field app-filter-field bg-white">
               <span className="app-filter-label">Data chegada para todos</span>
               <input
                 className="input"
@@ -349,7 +357,7 @@ function ModalRespostaInternaCotacao({
             <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
           </label>
 
-          <div className="mt-4 overflow-x-auto rounded-lg border border-[var(--c-border)]">
+          <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
             <table className="table min-w-[980px] text-xs">
               <thead>
                 <tr>
@@ -613,8 +621,8 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                 </button>
               )}
             </div>
-            <div className="rounded-xl border border-[var(--c-border)] overflow-hidden">
-              <table className="table w-full">
+            <div className="compras-responsive-table rounded-xl border border-[var(--c-border)]">
+              <table className="table min-w-[720px] w-full">
                 <thead>
                   <tr>
                     {modoRemanejar && <th className="w-8"></th>}
@@ -946,9 +954,9 @@ function SecaoEnvioFornecedores({
 
       {/* Adicionar novos fornecedores */}
       {solicitacao.status !== 'ENCERRADO' && (
-        <div className="cotacao-fornecedores-panel rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
-          <div className="grid items-start gap-4 xl:grid-cols-[minmax(320px,0.85fr)_minmax(240px,0.42fr)_300px]">
-            <div className="grid content-start gap-2.5">
+        <div className="cotacao-fornecedores-panel min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-slate-50/70 p-3 dark:bg-slate-950/55">
+          <div className="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(260px,0.5fr)] 2xl:grid-cols-[minmax(420px,1fr)_minmax(260px,0.45fr)_minmax(280px,320px)]">
+            <div className="grid min-w-0 content-start gap-2.5">
               {/* Selecao por categoria */}
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -1000,7 +1008,7 @@ function SecaoEnvioFornecedores({
                     </span>
                   )}
                 </div>
-                <div className="mb-2 grid gap-2 md:grid-cols-[minmax(0,1fr)_190px_auto]">
+                <div className="mb-2 grid gap-2 lg:grid-cols-[minmax(0,1fr)_190px_auto]">
                   <div className="relative">
                     <input
                       className="input"
@@ -1098,7 +1106,7 @@ function SecaoEnvioFornecedores({
               </div>
             </div>
 
-            <div className="cotacao-fornecedores-selecionados grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="cotacao-fornecedores-selecionados grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-[var(--c-text)]">Fornecedores selecionados</div>
@@ -1140,7 +1148,7 @@ function SecaoEnvioFornecedores({
               )}
             </div>
 
-            <div className="cotacao-fornecedor-rapido grid content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="cotacao-fornecedor-rapido grid min-w-0 content-start gap-2.5 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 xl:col-span-2 2xl:col-span-1 dark:bg-slate-950/65">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Cadastro rapido</div>
                 <div className="text-xs text-[var(--c-muted)]">Inclua um fornecedor novo sem sair da cotacao.</div>
@@ -1175,7 +1183,7 @@ function SecaoEnvioFornecedores({
           </div>
 
           {fornecedoresSelecionados.length > 0 && (
-            <div className="mt-4 rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
+            <div className="mt-4 min-w-0 max-w-full rounded-xl border border-[var(--c-border)] bg-white/85 p-3 dark:bg-slate-950/65">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--c-text)]">Itens por fornecedor</div>
@@ -1196,8 +1204,13 @@ function SecaoEnvioFornecedores({
                   Selecione ao menos um item para: {fornecedoresSemItens.map((fornecedor) => fornecedor.nome).join(', ')}.
                 </div>
               )}
-              <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
-                <table className="min-w-[980px] w-full text-left text-xs">
+              <div
+                className="cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain rounded-lg border border-[var(--c-border)] pb-2"
+                role="region"
+                aria-label="Itens por fornecedor"
+                tabIndex={0}
+              >
+                <table className="w-max min-w-[980px] text-left text-xs">
                   <thead className="bg-slate-100 text-[10px] uppercase tracking-wide text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                     <tr>
                       <th className="sticky left-0 z-10 min-w-[260px] bg-slate-100 px-3 py-2 dark:bg-slate-900">Item</th>
@@ -1315,6 +1328,10 @@ function SecaoComparativo({
     return (item.respostas || []).reduce((acc, resp) => acc + getQuantidadeAlocada(resp.resposta_item_id), 0);
   }
 
+  function getSaldoDisponivelItem(item) {
+    return parseNumeroCompra(item?.saldo_disponivel ?? item?.quantidade);
+  }
+
   // Agrega totais por fornecedor para o ranking top 3
   const rankingFornecedores = useMemo(() => {
     if (!comparativo?.itens?.length) return [];
@@ -1327,7 +1344,7 @@ function SecaoComparativo({
         if (!resp.fornecedor_id || !resp.disponivel || !resp.preco) return;
         const fId = resp.fornecedor_id;
         const quantidadeGanha = getQuantidadeAlocada(resp.resposta_item_id);
-        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || parseNumeroCompra(item.quantidade));
+        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || getSaldoDisponivelItem(item));
 
         if (!totaisFornecedor[fId]) {
           totaisFornecedor[fId] = {
@@ -1351,8 +1368,8 @@ function SecaoComparativo({
           resposta_item_id: resp.resposta_item_id,
           nome: item.nome,
           unidade: item.unidade,
-          quantidade: quantidadeGanha || item.quantidade,
-          quantidade_solicitada: item.quantidade,
+          quantidade: quantidadeGanha || getSaldoDisponivelItem(item),
+          quantidade_solicitada: item.quantidade_atual ?? item.quantidade,
           preco: resp.preco,
           prazo: resp.prazo,
           especificacao: item.especificacao,
@@ -1445,9 +1462,9 @@ function SecaoComparativo({
 
     const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
     const isVencedor = quantidadeAlocada > 0;
-    const podeSelecionar = podeEncerrar && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const saldoDisponivel = getSaldoDisponivelItem(item);
+    const podeSelecionar = podeEncerrar && saldoDisponivel > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
     const precoUnitario = parseNumeroCompra(resposta.preco);
-    const quantidadeItem = parseNumeroCompra(item.quantidade);
 
     return (
       <td
@@ -1458,7 +1475,7 @@ function SecaoComparativo({
           <div className="min-w-0">
             <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
             <div className="text-[11px] text-[var(--c-muted)]">
-              Total: {resposta.preco ? fmtMoeda(precoUnitario * quantidadeItem) : '-'}
+              Total saldo: {resposta.preco ? fmtMoeda(precoUnitario * saldoDisponivel) : '-'}
             </div>
           </div>
           <button
@@ -1499,7 +1516,7 @@ function SecaoComparativo({
               onVencedorChange({
                 item,
                 resposta,
-                quantidade: event.target.checked ? item.quantidade : 0
+                quantidade: event.target.checked ? saldoDisponivel : 0
               });
             }}
           />
@@ -1644,7 +1661,7 @@ function SecaoComparativo({
             )}
 
             {fornecedoresMapaVisiveis.length > 0 ? (
-              <div className="overflow-x-auto">
+              <div className="compras-responsive-table">
                 <table className="table min-w-[980px] text-xs">
                   <thead>
                     <tr>
@@ -1672,8 +1689,10 @@ function SecaoComparativo({
                   <tbody>
                     {comparativo.itens.map((item) => {
                       const totalAlocadoItem = getTotalAlocadoItem(item);
-                      const quantidadeItem = parseNumeroCompra(item.quantidade);
-                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      const quantidadeItem = parseNumeroCompra(item.quantidade_atual ?? item.quantidade);
+                      const quantidadeFechada = parseNumeroCompra(item.quantidade_fechada);
+                      const saldoDisponivel = getSaldoDisponivelItem(item);
+                      const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr key={buildItemKey(item)}>
                           <td className="sticky left-0 z-10 min-w-[260px] bg-white px-3 py-2 align-top">
@@ -1684,12 +1703,12 @@ function SecaoComparativo({
                             </div>
                             {podeEncerrar ? (
                               <div className={`mt-1 text-[11px] ${excedeu ? 'text-red-700' : 'text-[var(--c-muted)]'}`}>
-                                Selecionado: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                                Rodada: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> | Fechado: {formatNumeroCompra(quantidadeFechada)} | Saldo: {formatNumeroCompra(saldoDisponivel)} {item.unidade || ''}
                               </div>
                             ) : null}
                           </td>
                           <td className="sticky left-[260px] z-10 min-w-[110px] bg-white px-3 py-2 text-right align-top font-semibold">
-                            {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                            {formatNumeroCompra(quantidadeItem)} {item.unidade || ''}
                           </td>
                           {fornecedoresMapaVisiveis.map((fornecedor) => renderCelulaFornecedorMapa(item, fornecedor))}
                         </tr>
@@ -1714,12 +1733,12 @@ function SecaoComparativo({
                 <div>
                   <div className="text-sm font-semibold">{item.nome}</div>
                   <div className="text-xs text-[var(--c-muted)]">
-                    {item.quantidade} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
+                    {formatNumeroCompra(item.quantidade_atual ?? item.quantidade)} {item.unidade} - {item.item_tipo === 'MANUAL' ? 'Manual' : 'Cadastrado'}
                     {item.especificacao ? ` - ${item.especificacao}` : ''}
                   </div>
                   {podeEncerrar ? (
                     <div className="mt-1 text-xs text-[var(--c-muted)]">
-                      Selecionado: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> de {formatNumeroCompra(item.quantidade)} {item.unidade || ''}
+                      Rodada: <strong>{formatNumeroCompra(getTotalAlocadoItem(item))}</strong> | Fechado: {formatNumeroCompra(item.quantidade_fechada)} | Saldo: {formatNumeroCompra(getSaldoDisponivelItem(item))} {item.unidade || ''}
                     </div>
                   ) : null}
                 </div>
@@ -1730,14 +1749,14 @@ function SecaoComparativo({
                 )}
               </div>
 
-              <div className="app-table-shell overflow-x-auto">
-                <table className="table text-xs">
+              <div className="app-table-shell compras-responsive-table">
+                <table className="table min-w-[980px] text-xs">
                   <thead>
                     <tr>
                       <th>Fornecedor</th>
                       <th>Disponivel</th>
                       <th>Preco unit.</th>
-                      <th>Total item</th>
+                      <th>Total saldo</th>
                       <th>Prazo</th>
                       <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
@@ -1750,8 +1769,8 @@ function SecaoComparativo({
                       const quantidadeAlocada = getQuantidadeAlocada(resp.resposta_item_id);
                       const isVencedor = quantidadeAlocada > 0;
                       const totalAlocadoItem = getTotalAlocadoItem(item);
-                      const quantidadeItem = parseNumeroCompra(item.quantidade);
-                      const excedeu = totalAlocadoItem > quantidadeItem + 0.0001;
+                      const saldoDisponivel = getSaldoDisponivelItem(item);
+                      const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
@@ -1765,7 +1784,7 @@ function SecaoComparativo({
                           </td>
                           <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
                           <td className="font-medium">
-                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * parseNumeroCompra(item.quantidade || 0)) : '-'}
+                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * saldoDisponivel) : '-'}
                           </td>
                           <td>{resp.prazo || '-'}</td>
                           <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
@@ -1777,13 +1796,13 @@ function SecaoComparativo({
                                 <input
                                   type="checkbox"
                                   checked={isVencedor}
-                                  disabled={!podeEncerrar || !resp.disponivel || !resp.preco}
+                                  disabled={!podeEncerrar || saldoDisponivel <= 0 || !resp.disponivel || !resp.preco}
                                   onChange={(event) => {
                                     const checked = event.target.checked;
                                     onVencedorChange({
                                       item,
                                       resposta: resp,
-                                      quantidade: checked ? item.quantidade : 0
+                                      quantidade: checked ? getSaldoDisponivelItem(item) : 0
                                     });
                                   }}
                                 />
@@ -1819,7 +1838,7 @@ function SecaoComparativo({
                   ? 'Atualizando...'
                   : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
                     ? 'Atualizar vencedores e pedidos'
-                    : 'Encerrar Cotacao e Definir Vencedores'}
+                    : 'Gerar pedidos selecionados'}
               </button>
             </div>
           )}
@@ -1878,8 +1897,10 @@ export default function GerenciarCotacaoSolicitacao() {
   const [itensSelecionadosEnvio, setItensSelecionadosEnvio] = useState({});
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
+  const encerramentoIdempotencyRef = useRef(null);
 
   const podeComprar = canOperateComprasCotacoes(user);
+  const podeFecharParcialCotacao = canFecharParcialComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
   const podeCancelarCotacao = canCancelarComprasCotacoes(user);
@@ -1962,18 +1983,7 @@ export default function GerenciarCotacaoSolicitacao() {
         const dataComparativo = await obterComparativoSolicitacaoCompra(id);
         setComparativo(dataComparativo || null);
 
-        const vencedoresAtuais = {};
-        (dataComparativo?.itens || []).forEach((item) => {
-          (item.respostas || [])
-            .filter((r) => r.vencedor && r.resposta_item_id)
-            .forEach((respostaVencedora) => {
-              vencedoresAtuais[String(respostaVencedora.resposta_item_id)] = {
-                resposta_item_id: Number(respostaVencedora.resposta_item_id),
-                quantidade_alocada: parseNumeroCompra(respostaVencedora.quantidade_alocada || item.quantidade)
-              };
-            });
-        });
-        setVencedoresSelecionados(vencedoresAtuais);
+        setVencedoresSelecionados({});
       } else {
         setComparativo(null);
         setVencedoresSelecionados({});
@@ -2427,20 +2437,24 @@ export default function GerenciarCotacaoSolicitacao() {
       if (!alocacoes.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
 
       const errosQuantidade = [];
+      let saldoTotalAntes = 0;
+      let saldoTotalDepois = 0;
       itens.forEach((item) => {
         const totalItem = (item.respostas || []).reduce((acc, resp) => {
           const selecionado = vencedoresSelecionados[String(resp.resposta_item_id)];
           return acc + parseNumeroCompra(selecionado?.quantidade_alocada);
         }, 0);
-        const quantidadeItem = parseNumeroCompra(item.quantidade);
-        if (totalItem > quantidadeItem + 0.0001) {
-          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas a cotacao solicitou ${formatNumeroCompra(quantidadeItem)} ${item.unidade || ''}.`);
+        const saldoItem = parseNumeroCompra(item.saldo_disponivel ?? item.quantidade);
+        saldoTotalAntes += saldoItem;
+        saldoTotalDepois += Math.max(0, saldoItem - totalItem);
+        if (totalItem > saldoItem + 0.0001) {
+          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas o saldo disponivel e ${formatNumeroCompra(saldoItem)} ${item.unidade || ''}.`);
         }
       });
 
       if (errosQuantidade.length) {
         alert([
-          'A quantidade marcada para compra ultrapassa a quantidade solicitada na cotacao.',
+          'A quantidade marcada para compra ultrapassa o saldo disponivel da cotacao.',
           '',
           'Ajuste os itens abaixo antes de atualizar os vencedores:',
           ...errosQuantidade
@@ -2448,13 +2462,62 @@ export default function GerenciarCotacaoSolicitacao() {
         return;
       }
 
+      if (saldoTotalAntes <= 0.0001) {
+        alert('Nao existe saldo de itens disponivel para uma nova rodada de fechamento.');
+        return;
+      }
+
+      const fechamentoParcial = saldoTotalDepois > 0.0001;
+      let justificativa = '';
+      if (fechamentoParcial) {
+        if (!podeFecharParcialCotacao) {
+          alert('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
+          return;
+        }
+        const confirmado = window.confirm([
+          'Nem todo o saldo da cotacao foi selecionado.',
+          '',
+          `Saldo atual: ${formatNumeroCompra(saldoTotalAntes)}`,
+          `Saldo que permanecera aberto: ${formatNumeroCompra(saldoTotalDepois)}`,
+          '',
+          'Deseja gerar os pedidos selecionados e manter o restante aberto para uma proxima rodada?'
+        ].join('\n'));
+        if (!confirmado) return;
+
+        justificativa = String(window.prompt('Informe a justificativa obrigatoria do fechamento parcial:') || '').trim();
+        if (!justificativa) {
+          alert('A justificativa e obrigatoria para o fechamento parcial.');
+          return;
+        }
+      } else if (!podeEncerrarCotacao) {
+        alert('A selecao consome todo o saldo e exige permissao para encerrar definitivamente a cotacao.');
+        return;
+      } else if (!window.confirm('Todo o saldo foi selecionado. Confirmar o encerramento definitivo da cotacao e a geracao dos pedidos finais?')) {
+        return;
+      }
+
       setEncerrando(true);
-      await encerrarSolicitacaoCompra(id, { alocacoes });
+      if (!encerramentoIdempotencyRef.current) {
+        encerramentoIdempotencyRef.current = criarChaveIdempotenciaFechamento(id);
+      }
+      const resultado = await encerrarSolicitacaoCompra(
+        id,
+        {
+          alocacoes,
+          fechamento_parcial_confirmado: fechamentoParcial,
+          justificativa: fechamentoParcial ? justificativa : null
+        },
+        { idempotencyKey: encerramentoIdempotencyRef.current }
+      );
+      encerramentoIdempotencyRef.current = null;
       await carregarTudo();
-      alert(String(solicitacao?.status || '').toUpperCase() === 'ENCERRADO'
-        ? 'Vencedores e pedidos atualizados. Abrindo a tela de pedidos.'
-        : 'Cotacao encerrada e pedidos gerados. Abrindo a tela de pedidos.');
-      navigate('/pedidos-compra');
+      const fechamentoResultado = resultado?.fechamento_resultado || {};
+      if (fechamentoResultado.final) {
+        alert('Cotacao encerrada e pedidos finais gerados. Abrindo a tela de pedidos.');
+        navigate('/pedidos-compra');
+      } else {
+        alert(`Rodada parcial concluida. Os pedidos selecionados foram fechados e o saldo ${formatNumeroCompra(fechamentoResultado.saldo_restante)} permanece aberto.`);
+      }
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao encerrar cotacao');
@@ -2730,11 +2793,16 @@ export default function GerenciarCotacaoSolicitacao() {
 
             {/* Lista de fornecedores vinculados */}
             {solicitacao.fornecedores?.length > 0 && (
-              <div className="mt-4">
+              <div className="mt-4 min-w-0 max-w-full">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--c-text)]">Cotações enviadas</h3>
-                <div className="app-table-shell overflow-x-auto">
+                <div
+                  className="app-table-shell cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain pb-2"
+                  role="region"
+                  aria-label="Cotações enviadas"
+                  tabIndex={0}
+                >
                   <ResizableTable
-                    className="table text-[11px]"
+                    className="table min-w-[1120px] text-[11px]"
                     columns={FORNECEDOR_LINK_COLUMNS}
                     storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
                   >
@@ -2886,7 +2954,7 @@ export default function GerenciarCotacaoSolicitacao() {
             comparativo={comparativo}
             solicitacao={solicitacao}
             podeComprar={podeOperarFluxo}
-            podeEncerrar={podeEncerrarCotacao && !fluxoTerminal}
+            podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
             podeEditarResposta={podeOperarFluxo}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}

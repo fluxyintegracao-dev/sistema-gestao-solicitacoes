@@ -139,7 +139,7 @@ module.exports = {
 
       const obraIdsEscopo = await getUserObraScopeIds(req.user);
 
-      const whereCompra = { status: 'ENCERRADO' };
+      const whereCompra = { status: { [Op.in]: ['ENCERRADO', 'FECHAMENTO_PARCIAL'] } };
       if (Array.isArray(obraIdsEscopo)) {
         if (obraIdsEscopo.length === 0) {
           return res.json({ last_purchase_price: null });

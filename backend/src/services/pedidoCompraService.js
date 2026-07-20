@@ -12,6 +12,7 @@ const {
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraAlocacao,
+  SolicitacaoCompraFechamento,
   SolicitacaoCompraFornecedor,
   Insumo,
   SolicitacaoCompraItem,
@@ -55,7 +56,7 @@ function roundQty(value) {
 }
 
 function roundPedidoQty(value) {
-  return Number(asNumber(value).toFixed(2));
+  return Number(asNumber(value).toFixed(3));
 }
 
 function calcularRateiosMonetarios(valorTotal, bases = []) {
@@ -276,7 +277,7 @@ async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, sol
     return new Map();
   }
 
-  const whereCompra = { status: 'ENCERRADO' };
+  const whereCompra = { status: { [Op.in]: ['ENCERRADO', 'FECHAMENTO_PARCIAL'] } };
   if (Number(solicitacaoCompraIdIgnorar) > 0) {
     whereCompra.id = { [Op.ne]: Number(solicitacaoCompraIdIgnorar) };
   }
@@ -953,7 +954,148 @@ async function adicionarRespostasAoPedido({
   return recalcularPedidoPorId(pedido.id, transaction);
 }
 
-function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
+function montarMapaSaldosSolicitacao(solicitacao) {
+  const saldos = new Map();
+
+  for (const item of solicitacao?.itens || []) {
+    const key = buildRespostaKey('CADASTRADO', item.id);
+    saldos.set(key, {
+      item_key: key,
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: Number(item.id),
+      descricao: item.insumo?.nome || `Item ${item.id}`,
+      quantidade_atual: roundQty(item.quantidade),
+      quantidade_fechada: 0,
+      saldo: 0
+    });
+  }
+
+  for (const item of solicitacao?.itensManuais || []) {
+    const key = buildRespostaKey('MANUAL', item.id);
+    saldos.set(key, {
+      item_key: key,
+      item_tipo: 'MANUAL',
+      item_referencia_id: Number(item.id),
+      descricao: item.nome_manual || `Item manual ${item.id}`,
+      quantidade_atual: roundQty(item.quantidade),
+      quantidade_fechada: 0,
+      saldo: 0
+    });
+  }
+
+  for (const alocacao of solicitacao?.alocacoes || []) {
+    if (normalizeText(alocacao.status) !== 'ATIVA') continue;
+    const itemReferenciaId = Number(
+      alocacao.solicitacao_compra_item_id || alocacao.solicitacao_compra_item_manual_id || 0
+    );
+    const key = buildRespostaKey(alocacao.item_tipo, itemReferenciaId);
+    const registro = saldos.get(key);
+    if (!registro) continue;
+    registro.quantidade_fechada = roundQty(
+      registro.quantidade_fechada + asNumber(alocacao.quantidade_alocada)
+    );
+  }
+
+  for (const registro of saldos.values()) {
+    registro.saldo = roundQty(Math.max(0, registro.quantidade_atual - registro.quantidade_fechada));
+  }
+
+  return saldos;
+}
+
+async function obterSaldosSolicitacaoCompra(solicitacaoId, transaction) {
+  const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction, { incluirPedidos: false });
+  if (!solicitacao) {
+    throw new Error('Solicitacao de compra nao encontrada.');
+  }
+  return [...montarMapaSaldosSolicitacao(solicitacao).values()];
+}
+
+async function sincronizarStatusSolicitacaoCompraPorSaldo({
+  solicitacaoId,
+  usuarioId = null,
+  forcarRevisao = false,
+  transaction
+}) {
+  const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction, { incluirPedidos: true });
+  if (!solicitacao || isSolicitacaoCompraCancelada(solicitacao.status)) {
+    return solicitacao;
+  }
+
+  const saldos = [...montarMapaSaldosSolicitacao(solicitacao).values()];
+  const quantidadeFechada = roundQty(saldos.reduce((sum, item) => sum + item.quantidade_fechada, 0));
+  const saldoRestante = roundQty(saldos.reduce((sum, item) => sum + item.saldo, 0));
+  const pedidosAtivos = (solicitacao.pedidos || []).filter((pedido) => !isPedidoCancelado(pedido.status));
+  const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
+  const todosPedidosFechados = pedidosAtivos.length > 0 && pedidosAtivos.every((pedido) => (
+    isPedidoFechadoComFornecedorStatus(pedido.status, statusFechado)
+  ));
+
+  let proximoStatus = 'ENVIADO';
+  let encerradoEm = null;
+  if (quantidadeFechada > 0) {
+    if (!forcarRevisao && saldoRestante <= 0.0001 && todosPedidosFechados) {
+      proximoStatus = 'ENCERRADO';
+      encerradoEm = solicitacao.encerrado_em || new Date();
+    } else {
+      proximoStatus = 'FECHAMENTO_PARCIAL';
+    }
+  }
+
+  const encerramentoMudou = Boolean(solicitacao.encerrado_em) !== Boolean(encerradoEm);
+  if (
+    normalizeText(solicitacao.status) !== normalizeText(proximoStatus) ||
+    encerramentoMudou
+  ) {
+    const statusAnterior = solicitacao.status;
+    await solicitacao.update({ status: proximoStatus, encerrado_em: encerradoEm }, { transaction });
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: solicitacao.id,
+      usuarioId,
+      tipoAcao: 'STATUS_SINCRONIZADO_POR_SALDO',
+      descricao: `Status da compra sincronizado de ${statusAnterior || '-'} para ${proximoStatus}`,
+      metadados: {
+        status_anterior: statusAnterior || null,
+        status_novo: proximoStatus,
+        quantidade_fechada: quantidadeFechada,
+        saldo_restante: saldoRestante,
+        forcar_revisao: Boolean(forcarRevisao)
+      },
+      transaction
+    });
+  }
+
+  return solicitacao;
+}
+
+async function sincronizarStatusFechamentoPorPedido(pedido, transaction) {
+  const fechamentoId = Number(pedido?.fechamento_id || 0);
+  if (!fechamentoId) return null;
+
+  const fechamento = await SolicitacaoCompraFechamento.findByPk(fechamentoId, { transaction });
+  if (!fechamento) return null;
+
+  const [pedidos, totalAlocacoes, alocacoesAtivas] = await Promise.all([
+    PedidoCompra.findAll({ where: { fechamento_id: fechamentoId }, transaction }),
+    SolicitacaoCompraAlocacao.count({ where: { fechamento_id: fechamentoId }, transaction }),
+    SolicitacaoCompraAlocacao.count({
+      where: { fechamento_id: fechamentoId, status: 'ATIVA' },
+      transaction
+    })
+  ]);
+  const cancelados = pedidos.filter((item) => isPedidoCancelado(item.status)).length;
+  const status = totalAlocacoes > 0 && alocacoesAtivas === 0
+    ? 'CANCELADO'
+    : (cancelados > 0 || alocacoesAtivas < totalAlocacoes)
+      ? 'PARCIALMENTE_CANCELADO'
+      : 'CONCLUIDO';
+  if (normalizeText(fechamento.status) !== normalizeText(status)) {
+    await fechamento.update({ status }, { transaction });
+  }
+  return fechamento;
+}
+
+function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais = null) {
   const todasRespostas = [];
   for (const vinculacaoFornecedor of solicitacao.fornecedores || []) {
     for (const resposta of vinculacaoFornecedor.respostas || []) {
@@ -970,6 +1112,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
       .filter(({ resposta }) => resposta.vencedor)
       .map(({ resposta }) => ({ resposta_item_id: resposta.id }));
 
+  const mapaSaldos = saldosAtuais || montarMapaSaldosSolicitacao(solicitacao);
   const alocacoes = [];
   const totaisPorItem = new Map();
 
@@ -994,23 +1137,24 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
       throw new Error('Item da resposta vencedora nao foi encontrado.');
     }
 
+    const itemKey = buildItemKeyFromResposta(resposta);
     const quantidadeBase = roundQty(baseItem.quantidade_solicitada);
+    const saldoItem = mapaSaldos.get(itemKey)?.saldo ?? quantidadeBase;
     const quantidadeEntrada =
       entrada?.quantidade_alocada ??
       entrada?.quantidade ??
       entrada?.quantidade_pedido ??
-      quantidadeBase;
+      saldoItem;
     const quantidadeAlocada = roundQty(quantidadeEntrada);
 
     if (quantidadeAlocada <= 0) {
       throw new Error('Quantidade alocada deve ser maior que zero.');
     }
 
-    const itemKey = buildItemKeyFromResposta(resposta);
     const totalAtual = roundQty((totaisPorItem.get(itemKey) || 0) + quantidadeAlocada);
-    if (totalAtual > quantidadeBase) {
+    if (totalAtual > roundQty(saldoItem)) {
       throw new Error(
-        `A quantidade definida para comprar do item "${baseItem.descricao}" ultrapassa a quantidade solicitada na cotacao. Solicitado: ${quantidadeBase}. Marcado: ${totalAtual}. Ajuste a quantidade antes de atualizar os vencedores.`
+        `A quantidade definida para comprar do item "${baseItem.descricao}" ultrapassa o saldo disponivel. Quantidade atual: ${quantidadeBase}. Ja fechada: ${roundQty(quantidadeBase - saldoItem)}. Saldo: ${roundQty(saldoItem)}. Marcado nesta rodada: ${totalAtual}.`
       );
     }
 
@@ -1021,6 +1165,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
       baseItem,
       itemKey,
       quantidade_alocada: quantidadeAlocada,
+      quantidade_referencia: quantidadeBase,
       preco_unitario: roundMoney(resposta.preco),
       valor_total: roundMoney(quantidadeAlocada * asNumber(resposta.preco))
     });
@@ -1035,8 +1180,19 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
     porFornecedor.get(fornecedorId).push(alocacao);
   }
 
-  for (const grupo of porFornecedor.values()) {
-    const descontoTotal = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
+  const descontosAtivosPorFornecedor = new Map();
+  for (const alocacao of solicitacao?.alocacoes || []) {
+    if (normalizeText(alocacao.status) !== 'ATIVA') continue;
+    const fornecedorId = Number(alocacao.fornecedor_compra_id || 0);
+    descontosAtivosPorFornecedor.set(
+      fornecedorId,
+      roundMoney((descontosAtivosPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.desconto_rateado))
+    );
+  }
+
+  for (const [fornecedorId, grupo] of porFornecedor.entries()) {
+    const descontoCotacao = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
+    const descontoTotal = roundMoney(Math.max(0, descontoCotacao - (descontosAtivosPorFornecedor.get(fornecedorId) || 0)));
     const bases = grupo.map((alocacao) => alocacao.valor_total);
     const descontos = calcularRateiosMonetarios(descontoTotal, bases);
     grupo.forEach((alocacao, index) => {
@@ -1049,34 +1205,20 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = []) {
   return alocacoes;
 }
 
-async function persistirAlocacoesSolicitacao({ solicitacao, alocacoes, usuarioId, transaction }) {
-  await SolicitacaoCompraAlocacao.update(
-    {
-      status: 'SUBSTITUIDA',
-      cancelado_em: new Date(),
-      cancelado_por: usuarioId || null,
-      motivo_cancelamento: 'Cotacao reencerrada com nova selecao de vencedores'
-    },
-    {
-      where: {
-        solicitacao_compra_id: solicitacao.id,
-        status: 'ATIVA'
-      },
-      transaction
-    }
-  );
-
+async function persistirAlocacoesSolicitacao({ solicitacao, fechamento, alocacoes, usuarioId, transaction }) {
   const criadas = [];
   for (const alocacao of alocacoes) {
     const criada = await SolicitacaoCompraAlocacao.create(
       {
         solicitacao_compra_id: solicitacao.id,
+        fechamento_id: fechamento?.id || null,
         resposta_item_id: alocacao.resposta.id,
         fornecedor_compra_id: alocacao.vinculacaoFornecedor.fornecedor_compra_id,
         item_tipo: alocacao.baseItem.item_tipo,
         solicitacao_compra_item_id: alocacao.baseItem.solicitacao_compra_item_id,
         solicitacao_compra_item_manual_id: alocacao.baseItem.solicitacao_compra_item_manual_id,
         quantidade_alocada: alocacao.quantidade_alocada,
+        quantidade_referencia: alocacao.quantidade_referencia,
         preco_unitario: alocacao.preco_unitario,
         valor_total: alocacao.valor_total,
         desconto_rateado: alocacao.desconto_rateado || 0,
@@ -1091,7 +1233,75 @@ async function persistirAlocacoesSolicitacao({ solicitacao, alocacoes, usuarioId
   return criadas;
 }
 
-async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores = [], transaction }) {
+async function criarPedidoPorFornecedorRodada({
+  solicitacao,
+  fechamento,
+  vinculacaoFornecedor,
+  descontoTotal,
+  usuarioId,
+  transaction
+}) {
+  const pedido = await PedidoCompra.create(
+    {
+      solicitacao_compra_id: solicitacao.id,
+      fechamento_id: fechamento.id,
+      obra_id: solicitacao.obra_id,
+      fornecedor_compra_id: vinculacaoFornecedor.fornecedor_compra_id,
+      criado_por: usuarioId || null,
+      status: 'ABERTO',
+      origem: 'COTACAO',
+      valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
+      desconto_total: roundMoney(descontoTotal),
+      atingiu_pedido_minimo: true,
+      observacoes: `Rodada ${fechamento.numero_rodada} - fechamento ${String(fechamento.tipo).toLowerCase()}`
+    },
+    { transaction }
+  );
+
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: solicitacao.id,
+    usuarioId,
+    fornecedorCompraId: vinculacaoFornecedor.fornecedor_compra_id,
+    tipoAcao: 'PEDIDO_GERADO_RODADA',
+    descricao: `${buildPedidoCodigo(pedido.id)} gerado na rodada ${fechamento.numero_rodada}`,
+    metadados: {
+      pedido_compra_id: pedido.id,
+      fechamento_id: fechamento.id,
+      numero_rodada: fechamento.numero_rodada,
+      tipo_fechamento: fechamento.tipo
+    },
+    transaction
+  });
+
+  await registrarHistoricoPedidoNaSolicitacaoPrincipal({
+    solicitacao,
+    pedido,
+    usuarioId,
+    acao: 'PEDIDO_COMPRA_GERADO',
+    descricao: `${buildPedidoCodigo(pedido.id)} gerado na rodada ${fechamento.numero_rodada} para ${vinculacaoFornecedor.fornecedor?.nome || vinculacaoFornecedor.fornecedor_compra_id}`,
+    statusNovo: pedido.status,
+    metadados: {
+      fechamento_id: fechamento.id,
+      numero_rodada: fechamento.numero_rodada,
+      tipo_fechamento: fechamento.tipo
+    },
+    transaction
+  });
+
+  return pedido;
+}
+
+async function gerarPedidosDosVencedores({
+  solicitacaoId,
+  usuarioId,
+  vencedores = [],
+  idempotencyKey = null,
+  justificativa = null,
+  fechamentoParcialConfirmado = false,
+  permitirParcial = false,
+  permitirFinal = false,
+  transaction
+}) {
   const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction);
   if (!solicitacao) {
     throw new Error('Solicitacao de compra nao encontrada.');
@@ -1100,9 +1310,106 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
     throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
   }
 
+  const scopeIdempotencia = idempotencyKey
+    ? `SC:${Number(solicitacaoId)}:${String(idempotencyKey).trim().slice(0, 140)}`
+    : null;
+  if (scopeIdempotencia) {
+    const existente = await SolicitacaoCompraFechamento.findOne({
+      where: { idempotency_key: scopeIdempotencia },
+      transaction
+    });
+    if (existente) {
+      const pedidosExistentes = await PedidoCompra.findAll({
+        where: { fechamento_id: existente.id },
+        transaction
+      });
+      const saldosAtuais = montarMapaSaldosSolicitacao(solicitacao);
+      const saldoRestanteAtual = [...saldosAtuais.values()].reduce(
+        (total, item) => roundQty(total + item.saldo),
+        0
+      );
+      return {
+        fechamento: existente,
+        replay: true,
+        pedidos: pedidosExistentes,
+        saldo_restante: saldoRestanteAtual,
+        final: normalizeText(existente.tipo) === 'FINAL'
+      };
+    }
+  }
+
+  const saldosAntes = montarMapaSaldosSolicitacao(solicitacao);
+  const normalizadas = montarAlocacoesNormalizadas(solicitacao, vencedores, saldosAntes);
+  if (!normalizadas.length) {
+    throw Object.assign(new Error('Selecione ao menos um item com quantidade para gerar os pedidos.'), {
+      statusCode: 400,
+      code: 'COMPRA_FECHAMENTO_SEM_ITENS'
+    });
+  }
+  const selecionadoPorItem = new Map();
+  normalizadas.forEach((alocacao) => {
+    selecionadoPorItem.set(
+      alocacao.itemKey,
+      roundQty((selecionadoPorItem.get(alocacao.itemKey) || 0) + alocacao.quantidade_alocada)
+    );
+  });
+  const saldoRestante = [...saldosAntes.values()].reduce((total, item) => (
+    roundQty(total + Math.max(0, item.saldo - (selecionadoPorItem.get(item.item_key) || 0)))
+  ), 0);
+  const tipoFechamento = saldoRestante > 0.0001 ? 'PARCIAL' : 'FINAL';
+
+  if (tipoFechamento === 'PARCIAL') {
+    if (!permitirParcial) {
+      throw Object.assign(new Error('Acesso negado para realizar fechamento parcial da cotacao.'), {
+        statusCode: 403,
+        code: 'COMPRA_FECHAMENTO_PARCIAL_SEM_PERMISSAO'
+      });
+    }
+    if (!fechamentoParcialConfirmado) {
+      throw Object.assign(new Error('Confirme o fechamento parcial para gerar somente os pedidos selecionados.'), {
+        statusCode: 409,
+        code: 'COMPRA_FECHAMENTO_PARCIAL_REQUER_CONFIRMACAO',
+        saldo_restante: saldoRestante
+      });
+    }
+    if (!String(justificativa || '').trim()) {
+      throw Object.assign(new Error('Informe a justificativa do fechamento parcial.'), {
+        statusCode: 400,
+        code: 'COMPRA_FECHAMENTO_PARCIAL_REQUER_JUSTIFICATIVA'
+      });
+    }
+  } else if (!permitirFinal) {
+    throw Object.assign(new Error('Acesso negado para encerrar definitivamente a cotacao.'), {
+      statusCode: 403,
+      code: 'COMPRA_FECHAMENTO_FINAL_SEM_PERMISSAO'
+    });
+  }
+
+  const ultimaRodada = await SolicitacaoCompraFechamento.findOne({
+    where: { solicitacao_compra_id: solicitacao.id },
+    order: [['numero_rodada', 'DESC']],
+    transaction
+  });
+  const fechamento = await SolicitacaoCompraFechamento.create(
+    {
+      solicitacao_compra_id: solicitacao.id,
+      numero_rodada: Number(ultimaRodada?.numero_rodada || 0) + 1,
+      tipo: tipoFechamento,
+      status: 'CONCLUIDO',
+      idempotency_key: scopeIdempotencia,
+      quantidade_total: roundQty(normalizadas.reduce((sum, item) => sum + item.quantidade_alocada, 0)),
+      valor_total: roundMoney(normalizadas.reduce((sum, item) => sum + item.valor_total, 0)),
+      justificativa: String(justificativa || '').trim() || null,
+      criado_por: usuarioId || null,
+      fechado_em: new Date()
+    },
+    { transaction }
+  );
+
   const alocacoes = await persistirAlocacoesSolicitacao({
     solicitacao,
-    alocacoes: montarAlocacoesNormalizadas(solicitacao, vencedores),
+    fechamento,
+    alocacoes: normalizadas,
     usuarioId,
     transaction
   });
@@ -1124,33 +1431,15 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
     grupo.registrosAlocacao.push(alocacao.registro);
   }
 
-  const fornecedoresSelecionados = new Set([...porFornecedor.keys()].map((id) => Number(id)));
-  const pedidosExistentes = await PedidoCompra.findAll({
-    where: { solicitacao_compra_id: solicitacao.id },
-    include: [{ model: PedidoCompraItem, as: 'itens' }],
-    transaction
-  });
-
-  for (const pedidoExistente of pedidosExistentes) {
-    const fornecedorId = Number(pedidoExistente.fornecedor_compra_id || 0);
-    if (fornecedoresSelecionados.has(fornecedorId) || normalizeText(pedidoExistente.status) === 'CANCELADO') {
-      continue;
-    }
-
-    await inativarPedidoSemItensPorAtualizacao({
-      pedido: pedidoExistente,
-      usuarioId,
-      transaction,
-      motivo: 'Fornecedor sem itens vencedores apos atualizacao da cotacao'
-    });
-  }
-
+  const pedidosCriados = [];
   for (const grupo of porFornecedor.values()) {
     if (!grupo.respostaItemIds.length) continue;
 
-    const pedido = await obterOuCriarPedidoPorFornecedor({
+    const pedido = await criarPedidoPorFornecedorRodada({
       solicitacao,
+      fechamento,
       vinculacaoFornecedor: grupo.vinculacaoFornecedor,
+      descontoTotal: grupo.registrosAlocacao.reduce((sum, registro) => sum + asNumber(registro.desconto_rateado), 0),
       usuarioId,
       transaction
     });
@@ -1164,9 +1453,10 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
       usuarioId,
       acaoLog: 'GERADO_DA_COTACAO',
       descricaoLog: 'Item gerado a partir da cotacao encerrada',
-      sincronizarItensSelecionados: true,
+      sincronizarItensSelecionados: false,
       transaction
     });
+    pedidosCriados.push(pedidoAtualizado);
 
     const itensPorResposta = new Map(
       (pedidoAtualizado?.itens || [])
@@ -1185,6 +1475,14 @@ async function gerarPedidosDosVencedores({ solicitacaoId, usuarioId, vencedores 
       );
     }
   }
+
+  return {
+    fechamento,
+    replay: false,
+    pedidos: pedidosCriados,
+    saldo_restante: saldoRestante,
+    final: tipoFechamento === 'FINAL'
+  };
 }
 
 async function getPedidoStatusFechadoFornecedorConfig() {
@@ -1244,10 +1542,21 @@ function isPedidoFechadoComFornecedorStatus(status, statusFechado) {
   );
 }
 
-async function fecharPedidosDaSolicitacaoCompraAutomaticamente({ solicitacaoId, usuarioId, transaction }) {
+async function fecharPedidosDaSolicitacaoCompraAutomaticamente({
+  solicitacaoId,
+  pedidoIds = null,
+  usuarioId,
+  transaction
+}) {
   const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
+  const idsNormalizados = Array.isArray(pedidoIds)
+    ? [...new Set(pedidoIds.map(Number).filter((id) => id > 0))]
+    : null;
   const pedidos = await PedidoCompra.findAll({
-    where: { solicitacao_compra_id: Number(solicitacaoId) },
+    where: {
+      solicitacao_compra_id: Number(solicitacaoId),
+      ...(idsNormalizados ? { id: { [Op.in]: idsNormalizados.length ? idsNormalizados : [0] } } : {})
+    },
     transaction
   });
 
@@ -1303,6 +1612,9 @@ async function fecharPedidosDaSolicitacaoCompraAutomaticamente({ solicitacaoId, 
 }
 
 async function isSolicitacaoCompraComPedidosFechadosComFornecedor(solicitacao) {
+  if (normalizeText(solicitacao?.status) === 'FECHAMENTO_PARCIAL') {
+    return false;
+  }
   const statusFechado = await getPedidoStatusFechadoFornecedorConfig();
   const pedidos = Array.isArray(solicitacao?.pedidos)
     ? solicitacao.pedidos
@@ -1364,7 +1676,7 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
   if (solicitacao && cotacaoEncerrada) {
     await solicitacao.update(
       {
-        status: 'ENVIADO',
+        status: 'FECHAMENTO_PARCIAL',
         encerrado_em: null
       },
       { transaction }
@@ -1414,6 +1726,13 @@ async function reabrirPedidoParaCotacao({ pedidoId, usuarioId, motivo, transacti
       origem: 'REABERTURA_COTACAO',
       cotacao_reaberta: cotacaoEncerrada
     },
+    transaction
+  });
+
+  await sincronizarStatusSolicitacaoCompraPorSaldo({
+    solicitacaoId: pedido.solicitacao_compra_id,
+    usuarioId,
+    forcarRevisao: true,
     transaction
   });
 
@@ -1664,6 +1983,12 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
       },
       { model: User, as: 'criador', attributes: ['id', 'nome', 'email'] },
       { model: User, as: 'responsavel', attributes: ['id', 'nome', 'email'] },
+      {
+        model: SolicitacaoCompraFechamento,
+        as: 'fechamento',
+        attributes: ['id', 'numero_rodada', 'tipo', 'status', 'justificativa'],
+        required: false
+      },
         {
           model: SolicitacaoCompra,
           as: 'solicitacao',
@@ -2039,7 +2364,7 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
   const isStatusFinal = Boolean(statusConfig.bloqueia_edicao) || ['ENCERRADO', 'CANCELADO'].includes(statusConfig.codigo);
   const statusSolicitacaoCompra = `PEDIDO_${statusConfig.codigo}`;
 
-  if (solicitacao) {
+  if (solicitacao && !pedido.fechamento_id) {
     await SolicitacaoCompra.update(
       { status: statusSolicitacaoCompra },
       { where: { id: solicitacao.id }, transaction }
@@ -2051,6 +2376,13 @@ async function atualizarStatusPedido({ pedidoId, status, usuarioId, transaction 
         { where: { id: solicitacao.solicitacao_principal_id }, transaction }
       );
     }
+  } else if (solicitacao) {
+    await sincronizarStatusSolicitacaoCompraPorSaldo({
+      solicitacaoId: solicitacao.id,
+      usuarioId,
+      forcarRevisao: !statusConfig.bloqueia_edicao,
+      transaction
+    });
   }
 
   await registrarHistoricoPedidoNaSolicitacaoPrincipal({
@@ -2111,6 +2443,44 @@ async function assertPedidoSemVinculoFinanceiroParaCancelamento(pedidoId, transa
   if (alocacoesComTitulo > 0 || fretesComTitulo > 0) {
     throw new Error('Este pedido possui titulo financeiro vinculado. Estorne ou cancele o financeiro antes de cancelar o pedido.');
   }
+}
+
+async function assertItensPedidoSemVinculoFinanceiroParaCancelamento(itemIds = [], transaction) {
+  const ids = [...new Set((Array.isArray(itemIds) ? itemIds : [itemIds])
+    .map(Number)
+    .filter((itemId) => itemId > 0))];
+  if (!ids.length) return;
+
+  const alocacoesComTitulo = await SolicitacaoCompraAlocacao.count({
+    where: {
+      pedido_compra_item_id: { [Op.in]: ids },
+      titulo_financeiro_id: { [Op.ne]: null },
+      status: 'ATIVA'
+    },
+    transaction
+  });
+
+  if (alocacoesComTitulo > 0) {
+    throw new Error('Um ou mais itens selecionados possuem titulo financeiro vinculado. Trate o financeiro antes de cancelar ou remanejar.');
+  }
+}
+
+async function cancelarFretesPendentesSemTituloDoPedido(pedidoId, transaction) {
+  const [fretesCancelados] = await PedidoCompraFrete.update(
+    { status_financeiro: 'CANCELADO' },
+    {
+      where: {
+        pedido_compra_id: Number(pedidoId),
+        titulo_financeiro_id: null,
+        [Op.or]: [
+          { status_financeiro: { [Op.ne]: 'CANCELADO' } },
+          { status_financeiro: null }
+        ]
+      },
+      transaction
+    }
+  );
+  return Number(fretesCancelados || 0);
 }
 
 async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }) {
@@ -2183,20 +2553,7 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
     { where: { pedido_compra_id: pedido.id, status: 'ATIVA' }, transaction }
   );
 
-  const [fretesCancelados] = await PedidoCompraFrete.update(
-    { status_financeiro: 'CANCELADO' },
-    {
-      where: {
-        pedido_compra_id: pedido.id,
-        titulo_financeiro_id: null,
-        [Op.or]: [
-          { status_financeiro: { [Op.ne]: 'CANCELADO' } },
-          { status_financeiro: null }
-        ]
-      },
-      transaction
-    }
-  );
+  const fretesCancelados = await cancelarFretesPendentesSemTituloDoPedido(pedido.id, transaction);
 
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: pedido.solicitacao_compra_id,
@@ -2225,6 +2582,13 @@ async function cancelarPedidoCompra({ pedidoId, motivo, usuarioId, transaction }
       motivo: motivoNormalizado,
       fretes_cancelados: Number(fretesCancelados || 0)
     },
+    transaction
+  });
+
+  await sincronizarStatusFechamentoPorPedido(pedido, transaction);
+  await sincronizarStatusSolicitacaoCompraPorSaldo({
+    solicitacaoId: pedido.solicitacao_compra_id,
+    usuarioId,
     transaction
   });
 
@@ -2405,11 +2769,33 @@ async function cancelarPedidoItens({ pedidoId, itens = [], motivo, usuarioId, tr
   }
 
   const motivoNormalizado = String(motivo || '').trim();
-  const pedido = await PedidoCompra.findByPk(Number(pedidoId), { transaction });
-  const itensPedido = await PedidoCompraItem.findAll({
-    where: { pedido_compra_id: Number(pedidoId), id: { [Op.in]: ids } },
-    transaction
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
   });
+  const itensAtivosAntes = await PedidoCompraItem.findAll({
+    where: { pedido_compra_id: Number(pedidoId), removido: false },
+    attributes: ['id'],
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+  const itensPedido = await PedidoCompraItem.findAll({
+    where: { pedido_compra_id: Number(pedidoId), id: { [Op.in]: ids }, removido: false },
+    transaction,
+    lock: transaction?.LOCK?.UPDATE
+  });
+
+  if (!itensPedido.length) {
+    throw new Error('Nenhum item ativo selecionado foi encontrado no pedido.');
+  }
+
+  const idsSelecionados = itensPedido.map((item) => Number(item.id));
+  const cancelaPedidoInteiro = itensAtivosAntes.length > 0 && idsSelecionados.length === itensAtivosAntes.length;
+  if (cancelaPedidoInteiro) {
+    await assertPedidoSemVinculoFinanceiroParaCancelamento(pedidoId, transaction);
+  } else {
+    await assertItensPedidoSemVinculoFinanceiroParaCancelamento(idsSelecionados, transaction);
+  }
 
   for (const item of itensPedido) {
     if (item.removido) continue;
@@ -2450,6 +2836,25 @@ async function cancelarPedidoItens({ pedidoId, itens = [], motivo, usuarioId, tr
   }
 
   if (pedido && itensPedido.length) {
+    const itensAtivosRestantes = await PedidoCompraItem.count({
+      where: { pedido_compra_id: Number(pedidoId), removido: false },
+      transaction
+    });
+    if (itensAtivosRestantes === 0) {
+      await pedido.update(
+        {
+          status: 'CANCELADO',
+          cancelado_por: usuarioId || null,
+          cancelado_em: new Date(),
+          encerrado_em: new Date(),
+          motivo_cancelamento: motivoNormalizado || null
+        },
+        { transaction }
+      );
+    }
+    const fretesCancelados = itensAtivosRestantes === 0
+      ? await cancelarFretesPendentesSemTituloDoPedido(pedidoId, transaction)
+      : 0;
     const solicitacao = await SolicitacaoCompra.findByPk(pedido.solicitacao_compra_id, { transaction });
     await registrarHistoricoPedidoNaSolicitacaoPrincipal({
       solicitacao,
@@ -2461,8 +2866,18 @@ async function cancelarPedidoItens({ pedidoId, itens = [], motivo, usuarioId, tr
         : `${buildPedidoCodigo(pedido.id)} teve item(ns) cancelado(s)`,
       metadados: {
         itens_ids: itensPedido.map((item) => item.id),
-        motivo: motivoNormalizado || null
+        motivo: motivoNormalizado || null,
+        pedido_sem_itens_ativos: itensAtivosRestantes === 0,
+        status_pedido: itensAtivosRestantes === 0 ? 'CANCELADO' : pedido.status,
+        fretes_cancelados: fretesCancelados
       },
+      transaction
+    });
+
+    await sincronizarStatusFechamentoPorPedido(pedido, transaction);
+    await sincronizarStatusSolicitacaoCompraPorSaldo({
+      solicitacaoId: pedido.solicitacao_compra_id,
+      usuarioId,
       transaction
     });
   }
@@ -2757,6 +3172,8 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
     throw new Error('Quantidade remanejada invalida para o item de origem.');
   }
 
+  await assertItensPedidoSemVinculoFinanceiroParaCancelamento([itemOrigem.id], transaction);
+
   const solicitacao = await carregarSolicitacaoPedidos(pedidoOrigem.solicitacao_compra_id, transaction);
   const respostaDestino = (solicitacao?.fornecedores || [])
     .flatMap((fornecedor) => (fornecedor.respostas || []).map((resposta) => ({ fornecedor, resposta })))
@@ -2882,6 +3299,7 @@ module.exports = {
   isSolicitacaoCompraComPedidosFechadosComFornecedor,
   listarAuditoriaItensPedido,
   listarPedidos,
+  obterSaldosSolicitacaoCompra,
   obterPedidoDetalhe,
   reabrirPedidoParaCotacao,
   registrarComentarioPedido,

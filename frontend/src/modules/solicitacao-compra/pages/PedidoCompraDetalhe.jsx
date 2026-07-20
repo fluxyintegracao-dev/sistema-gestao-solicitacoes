@@ -1424,6 +1424,14 @@ export default function PedidoCompraDetalhe() {
                   SC-{String(pedido.solicitacao_compra_id).padStart(5, '0')}
                 </div>
               </div>
+              {pedido.fechamento ? (
+                <div>
+                  <div className="text-[var(--c-muted)]">Rodada de fechamento</div>
+                  <div className="font-semibold">
+                    {pedido.fechamento.numero_rodada} - {String(pedido.fechamento.tipo || '').toLowerCase()}
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <div className="text-[var(--c-muted)]">Valor total</div>
                 <div className="font-semibold">{formatMoney(pedido.valor_total)}</div>
@@ -1726,8 +1734,8 @@ export default function PedidoCompraDetalhe() {
             </div>
 
             {itensFiltrados.length ? (
-              <div className="mt-4 app-table-shell overflow-x-auto">
-                <table className="table">
+              <div className="mt-4 app-table-shell compras-responsive-table">
+                <table className="table min-w-[900px]">
                   <thead>
                     <tr>
                       {podeCancelarPedido ? <th className="w-10">Sel.</th> : null}

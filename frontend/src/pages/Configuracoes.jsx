@@ -202,11 +202,6 @@ const SECOES_CONFIG = [
         permissionArea: 'solicitacoes'
       },
       {
-        title: 'Aprovacao por Diretoria',
-        description: 'Configure a diretoria que recebe primeiro as solicitacoes conforme a classificacao da obra.',
-        to: '/aprovacao-diretoria'
-      },
-      {
         title: 'Acesso a Prioridades Diretoria',
         description: 'Defina se o usuario ve todos os lotes de prioridade ou apenas diretorias especificas.',
         to: '/usuarios-acesso-prioridade-diretoria'

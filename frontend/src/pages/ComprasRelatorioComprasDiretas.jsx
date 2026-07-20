@@ -97,8 +97,8 @@ function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = '
           {subtitle ? <p className="muted-text">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="table-wrapper">
-        <table className="table compact-table">
+      <div className="table-wrapper compras-responsive-table">
+        <table className="table compact-table min-w-[980px]">
           <thead>
             <tr>
               <th>Nome</th>

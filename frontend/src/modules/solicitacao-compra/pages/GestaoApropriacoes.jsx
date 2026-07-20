@@ -398,7 +398,8 @@ export default function GestaoApropriacoes() {
         ) : loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : (
-          <table className="table">
+          <div className="compras-responsive-table">
+          <table className="table min-w-[760px]">
             <thead>
               <tr>
                 <th className="w-12">
@@ -452,6 +453,7 @@ export default function GestaoApropriacoes() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>
