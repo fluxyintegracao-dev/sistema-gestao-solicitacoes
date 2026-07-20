@@ -62,10 +62,10 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | Coluna | Obrigatoria | Regra |
 |---|---|---|
 | `chave_importacao` | sim | identificador unico dentro do arquivo, sem reutilizacao |
-| `empresa_codigo` | sim | codigo operacional da empresa listado em `REFERENCIAS`; usado com `obra_codigo` para desambiguar a obra |
-| `obra_codigo` | sim | codigo informado no cadastro da obra e listado em `REFERENCIAS`; nunca recebe o ID do banco |
-| `credor_cpf_cnpj` | sim | CPF/CNPJ visivel no cadastro e listado em `REFERENCIAS`; aceita valor com ou sem mascara |
-| `categoria_nome` | sim | nome exatamente como exibido em `REFERENCIAS`, incluindo o prefixo numerico quando existir |
+| `empresa_codigo` | sim | codigo operacional da empresa listado em `EMPRESAS`; usado com `obra_codigo` para desambiguar a obra |
+| `obra_codigo` | sim | codigo informado no cadastro da obra e listado em `OBRAS`; nunca recebe o ID do banco |
+| `credor_cpf_cnpj` | sim | CPF/CNPJ visivel no cadastro e listado em `CREDORES`; aceita valor com ou sem mascara |
+| `categoria_nome` | sim | nome exatamente como exibido em `CATEGORIAS`, incluindo o prefixo numerico quando existir |
 | `forma_pagamento_codigo` | sim | forma ativa, sem cartao na primeira versao |
 | `status` | nao | `ABERTO` por padrao; aceita `PREVISAO` |
 | `descricao` | sim | ate 255 caracteres |
@@ -75,14 +75,14 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | `data_vencimento` | sim | vencimento base ou da parcela unica |
 | `competencia_data` | sim | competencia economica usada pela DRE |
 | `considera_dre` | nao | `SIM` por padrao; exige categoria classificada na DRE |
-| `apropriacao_codigo` | nao | codigo operacional listado em `REFERENCIAS`, resolvido dentro da obra informada; nao usar junto com rateios multiplos |
+| `apropriacao_codigo` | nao | codigo operacional listado em `APROPRIACOES`, resolvido dentro da obra informada; nao usar junto com rateios multiplos |
 | `observacoes` | nao | ate 4.000 caracteres |
 | `forma_cobranca` | nao | `BOLETO`, `PIX` ou `OUTROS` |
 | `banco_cobranca` | nao | codigo bancario quando conhecido |
 | `linha_digitavel` | nao | armazenada para pagamento, sem executar baixa |
 | `codigo_barras` | nao | armazenado para pagamento, sem executar baixa |
 
-Nomes, CPF/CNPJ e descricoes aparecem na aba `REFERENCIAS`. A obra e resolvida pela combinacao normalizada de `empresa_codigo` + `obra_codigo`, pois `obra.codigo` isolado nao e unico no schema atual. Se essa combinacao estiver duplicada no cadastro, a linha e bloqueada para regularizacao. Depois da resolucao, o backend usa o ID interno da obra e deriva `empresa_id` de `obra.empresa_grupo_id`; o codigo da empresa nao permite forcar uma empresa diferente da vinculada a obra. Quando informada, a apropriacao e resolvida pela combinacao da obra ja validada com `apropriacao_codigo`. O credor e resolvido pelo CPF/CNPJ normalizado e a categoria pelo nome visivel normalizado. Documentos ou nomes duplicados sao bloqueados para evitar escolha arbitraria. Somente depois dessas resolucoes o backend usa os IDs internos no servico de dominio.
+Nomes, CPF/CNPJ e descricoes aparecem nas abas especializadas de consulta. A obra e resolvida pela combinacao normalizada de `empresa_codigo` + `obra_codigo`, pois `obra.codigo` isolado nao e unico no schema atual. Se essa combinacao estiver duplicada no cadastro, a linha e bloqueada para regularizacao. Depois da resolucao, o backend usa o ID interno da obra e deriva `empresa_id` de `obra.empresa_grupo_id`; o codigo da empresa nao permite forcar uma empresa diferente da vinculada a obra. Quando informada, a apropriacao e resolvida pela combinacao da obra ja validada com `apropriacao_codigo`. O credor e resolvido pelo CPF/CNPJ normalizado e a categoria pelo nome visivel normalizado. Documentos ou nomes duplicados sao bloqueados para evitar escolha arbitraria. Somente depois dessas resolucoes o backend usa os IDs internos no servico de dominio.
 
 Em importacoes de salarios, o colaborador pode estar cadastrado em empresa diferente da empresa da obra. Essa divergencia nao gera erro: a obra continua definindo `obra_id`, `empresa_id`, DRE e quais apropriacoes podem receber o custo, enquanto o parceiro vinculado ao colaborador e apenas o credor/favorecido. A importacao nao deve alterar `empresa_grupo_id` ou `obra_id` do cadastro de RH. Se o colaborador ainda nao possuir parceiro financeiro ativo e elegivel para `PAGAR`, a linha deve ser bloqueada para regularizacao cadastral, sem criar ou converter parceiros silenciosamente durante a importacao.
 
@@ -135,17 +135,21 @@ Todas as linhas do mesmo titulo usam o mesmo tipo. A soma deve fechar 100% ou o 
 
 O backend recalcula `valor_bruto`, `valor_impostos` e `valor_liquido`; valores calculados nao sao aceitos como verdade apenas porque vieram da planilha.
 
-### Aba `REFERENCIAS`
+### Abas de consulta e referencias
 
-Gerada para o usuario e protegida contra edicao acidental, contendo somente:
+O modelo `1.4` separa os cadastros em abas protegidas contra edicao acidental, com cabecalho congelado e filtro habilitado:
 
-- obras dentro do escopo financeiro do usuario, com `empresa_codigo`, nome da empresa, `obra_codigo` e nome da obra; obras sem os dois codigos nao ficam elegiveis para a importacao;
-- credores ativos elegiveis para contas a pagar, com `credor_cpf_cnpj`, nome e indicador `favorecido_bancario` (`PRONTO` ou `PENDENTE`), sem ID interno;
-- categorias ativas compativeis com `PAGAR`, com `categoria_nome`, tipo e grupo DRE, sem ID interno;
-- formas de pagamento ativas permitidas pela primeira versao, excluindo as que exigem cartao ou cheque;
-- apropriacoes analiticas ativas das obras visiveis, com `apropriacao_empresa_codigo`, `apropriacao_obra_codigo`, `apropriacao_codigo` e descricao; o ID interno da apropriacao nao e exportado.
+- `EMPRESAS`: empresas derivadas das obras dentro do escopo financeiro do usuario, com `empresa_codigo` e nome;
+- `OBRAS`: obras ativas e visiveis, com `empresa_codigo`, nome da empresa, `obra_codigo` e nome da obra; obras sem os dois codigos nao ficam elegiveis;
+- `APROPRIACOES`: apropriacoes analiticas e ativas das obras visiveis, com empresa, obra, `apropriacao_codigo` e descricao, ordenadas para facilitar a consulta por obra;
+- `CREDORES`: parceiros ativos elegiveis para contas a pagar, com `credor_cpf_cnpj`, nome e indicador `favorecido_bancario` (`PRONTO` ou `PENDENTE`);
+- `CATEGORIAS`: categorias ativas compativeis com `PAGAR`, contendo nome, tipo e grupo DRE;
+- `FORMAS_PAGAMENTO`: formas ativas permitidas, excluindo as que exigem cartao ou cheque;
+- `DOMINIOS`: valores fechados aceitos para status, DRE, forma de cobranca, tipo de rateio e natureza do imposto.
 
-Listas suspensas podem usar essa aba, mas o backend sempre revalida as referencias na confirmacao.
+O usuario pode usar a pesquisa e os filtros do Excel para localizar rapidamente codigos e nomes. As listas suspensas de `TITULOS`, `RATEIOS` e `IMPOSTOS` usam nomes definidos apontando para essas abas. A lista de apropriacoes funciona como auxilio de preenchimento; a combinacao com a obra continua sendo validada pelo backend para impedir apropriacao de outra obra.
+
+As referencias sao um retrato dos cadastros e permissoes no momento da exportacao. O preenchimento local nao consulta o backend e nao gera carga adicional para os outros usuarios. Cadastros criados depois exigem a exportacao de um novo modelo. Nenhum ID interno e exportado, e todas as referencias sao revalidadas no preview e na confirmacao.
 
 ## Fluxo tecnico
 
@@ -264,7 +268,7 @@ A mesma entrega deve avaliar se a rota individual `POST /financeiro/titulos` pas
 
 1. Servico de criacao manual adaptado para aceitar transacao externa e origem controlada.
 2. Migration, models e constraints da importacao criados.
-3. Gerador versionado do modelo XLSX e aba de referencias por escopo criados.
+3. Gerador versionado do modelo XLSX e abas especializadas de referencias por escopo criados.
 4. Parser, normalizacao, preview persistido e erros por linha implementados.
 5. Confirmacao atomica, idempotencia, nova verificacao de duplicidade e auditoria implementadas.
 6. Permissao e guards especificos adicionados.

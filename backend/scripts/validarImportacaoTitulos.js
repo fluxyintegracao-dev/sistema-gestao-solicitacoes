@@ -12,7 +12,10 @@ const {
 
 async function main() {
   const references = {
-    obras: [{ id: 1, codigo: 'OB-001', nome: 'Obra Modelo', empresa_grupo_id: 1, empresaGrupo: { id: 1, codigo: 'EMP-1', nome: 'Empresa Modelo' } }],
+    obras: [
+      { id: 2, codigo: 'OB-010', nome: 'Obra Secundaria', empresa_grupo_id: 2, empresaGrupo: { id: 2, codigo: 'EMP-2', nome: 'Empresa Secundaria' } },
+      { id: 1, codigo: 'OB-001', nome: 'Obra Modelo', empresa_grupo_id: 1, empresaGrupo: { id: 1, codigo: 'EMP-1', nome: 'Empresa Modelo' } }
+    ],
     credores: [{
       id: 10,
       nome: 'Credor Modelo',
@@ -23,7 +26,10 @@ async function main() {
     }],
     categorias: [{ id: 20, nome: '2.01.02.01 - Salarios', tipo: 'PAGAR', dre_grupo: 'DESPESAS OPERACIONAIS', ativo: true }],
     formasPagamento: [{ id: 30, codigo: 'PIX', nome: 'PIX', tipo: 'PIX', ativo: true }],
-    apropriacoes: [{ id: 100, obra_id: 1, codigo: '1.01', descricao: 'Mao de obra', ativo: true, somadora: false }]
+    apropriacoes: [
+      { id: 101, obra_id: 2, codigo: '2.01', descricao: 'Material', ativo: true, somadora: false },
+      { id: 100, obra_id: 1, codigo: '1.01', descricao: 'Mao de obra', ativo: true, somadora: false }
+    ]
   };
   const req = { user: { id: 1, perfil: 'SUPERADMIN' } };
   const buffer = await gerarModeloImportacao(req, { references, skipAudit: true });
@@ -32,22 +38,33 @@ async function main() {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   assert.strictEqual(workbook.subject, `Versao ${TEMPLATE_VERSION}`);
-  ['INSTRUCOES', 'TITULOS', 'PARCELAS', 'RATEIOS', 'IMPOSTOS', 'REFERENCIAS'].forEach((name) => {
+  [
+    'INSTRUCOES', 'TITULOS', 'PARCELAS', 'RATEIOS', 'IMPOSTOS',
+    'EMPRESAS', 'OBRAS', 'APROPRIACOES', 'CREDORES', 'CATEGORIAS',
+    'FORMAS_PAGAMENTO', 'DOMINIOS'
+  ].forEach((name) => {
     assert(workbook.getWorksheet(name), `Aba ${name} ausente.`);
   });
-  assert(workbook.getWorksheet('TITULOS').getCell('B2').dataValidation, 'Lista de obras nao configurada.');
-  assert(workbook.getWorksheet('TITULOS').getCell('C2').dataValidation, 'Lista de codigos de obra nao configurada.');
-  assert(workbook.getWorksheet('TITULOS').getCell('F2').dataValidation, 'Lista de formas de pagamento nao configurada.');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('A2').value, 'EMP-1');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('C2').value, 'OB-001');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('E2').value, '000.000.000-00');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('G2').value, 'PRONTO');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('H2').value, '2.01.02.01 - Salarios');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('M2').value, 'EMP-1');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('N2').value, 'OB-001');
-  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('O2').value, '1.01');
+  assert.strictEqual(workbook.getWorksheet('TITULOS').getCell('B2').dataValidation.formulae[0], 'LISTA_EMPRESAS');
+  assert.strictEqual(workbook.getWorksheet('TITULOS').getCell('C2').dataValidation.formulae[0], 'LISTA_OBRAS');
+  assert.strictEqual(workbook.getWorksheet('TITULOS').getCell('F2').dataValidation.formulae[0], 'LISTA_FORMAS_PAGAMENTO');
+  assert.strictEqual(workbook.getWorksheet('TITULOS').getCell('O2').dataValidation.formulae[0], 'LISTA_APROPRIACOES');
+  assert.strictEqual(workbook.getWorksheet('EMPRESAS').getCell('A2').value, 'EMP-1');
+  assert.strictEqual(workbook.getWorksheet('EMPRESAS').getCell('A3').value, 'EMP-2');
+  assert.strictEqual(workbook.getWorksheet('OBRAS').getCell('C2').value, 'OB-001');
+  assert.strictEqual(workbook.getWorksheet('CREDORES').getCell('A2').value, '000.000.000-00');
+  assert.strictEqual(workbook.getWorksheet('CREDORES').getCell('C2').value, 'PRONTO');
+  assert.strictEqual(workbook.getWorksheet('CATEGORIAS').getCell('A2').value, '2.01.02.01 - Salarios');
+  assert.strictEqual(workbook.getWorksheet('FORMAS_PAGAMENTO').getCell('A2').value, 'PIX');
+  assert.strictEqual(workbook.getWorksheet('APROPRIACOES').getCell('A2').value, 'EMP-1');
+  assert.strictEqual(workbook.getWorksheet('APROPRIACOES').getCell('C2').value, 'OB-001');
+  assert.strictEqual(workbook.getWorksheet('APROPRIACOES').getCell('E2').value, '1.01');
+  assert.strictEqual(workbook.getWorksheet('DOMINIOS').getCell('A2').value, 'ABERTO');
+  assert.strictEqual(workbook.getWorksheet('DOMINIOS').getCell('A3').value, 'PREVISAO');
   ['credor_id', 'categoria_id', 'apropriacao_id'].forEach((header) => {
-    assert(!workbook.getWorksheet('REFERENCIAS').getRow(1).values.includes(header), `ID interno ${header} foi exposto no modelo.`);
+    ['EMPRESAS', 'OBRAS', 'APROPRIACOES', 'CREDORES', 'CATEGORIAS', 'FORMAS_PAGAMENTO', 'DOMINIOS'].forEach((sheetName) => {
+      assert(!workbook.getWorksheet(sheetName).getRow(1).values.includes(header), `ID interno ${header} foi exposto na aba ${sheetName}.`);
+    });
   });
 
   const mappedReferences = __testables.buildReferenceMaps(references);
@@ -58,26 +75,26 @@ async function main() {
   );
   const ambiguousReferences = __testables.buildReferenceMaps({
     ...references,
-    obras: [...references.obras, { ...references.obras[0], id: 2 }]
+    obras: [...references.obras, { ...references.obras[1], id: 3 }]
   });
   assert.throws(
     () => __testables.resolveObraByCodigos(ambiguousReferences, 'EMP-1', 'OB-001'),
     /combinacao empresa_codigo \+ obra_codigo esta duplicada/
   );
   assert.strictEqual(
-    __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[0], '1.01').id,
+    __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[1], '1.01').id,
     100
   );
   assert.throws(
-    () => __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[0], '9.99'),
+    () => __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[1], '9.99'),
     /apropriacao_codigo inexistente/
   );
   const ambiguousApropriacoes = __testables.buildReferenceMaps({
     ...references,
-    apropriacoes: [...references.apropriacoes, { ...references.apropriacoes[0], id: 101 }]
+    apropriacoes: [...references.apropriacoes, { ...references.apropriacoes[1], id: 102 }]
   });
   assert.throws(
-    () => __testables.resolveApropriacaoByCodigo(ambiguousApropriacoes, references.obras[0], '1.01'),
+    () => __testables.resolveApropriacaoByCodigo(ambiguousApropriacoes, references.obras[1], '1.01'),
     /apropriacao_codigo esta duplicado/
   );
   assert.strictEqual(__testables.resolveCredorByCpfCnpj(mappedReferences, '000.000.000-00').id, 10);

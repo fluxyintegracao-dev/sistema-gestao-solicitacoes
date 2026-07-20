@@ -9,8 +9,8 @@
 ## Estado da implementacao
 
 - Implementacao inicial commitada em `14220d2` e aplicada no ambiente dev em 2026-07-20, inclusive a migration `202607200001_financeiro_titulos_importacao.js`.
-- Ajuste do modelo para eliminar tambem `credor_id` e `categoria_id` esta em desenvolvimento local, sem commit ou deploy.
-- O ajuste usa `empresa_codigo`, `obra_codigo`, `credor_cpf_cnpj`, `categoria_nome` e `apropriacao_codigo`, nao exige nova migration e gera o modelo XLSX versao `1.3`.
+- O modelo usa `empresa_codigo`, `obra_codigo`, `credor_cpf_cnpj`, `categoria_nome` e `apropriacao_codigo`, nao exige nova migration e passa a gerar o XLSX versao `1.4`.
+- A versao `1.4` esta em desenvolvimento local, sem commit ou deploy, e substitui a aba consolidada `REFERENCIAS` por abas especializadas para pesquisa e filtro.
 - Producao nao recebeu a migration nem o recurso nesta sessao.
 
 ## Regras implementadas
@@ -24,7 +24,8 @@
 - Combinacao inexistente, fora do escopo, sem codigos cadastrados ou duplicada bloqueia a linha.
 - O colaborador precisa possuir parceiro financeiro ativo marcado como fornecedor ou corretor; a importacao nao cria ou converte parceiros automaticamente.
 - Credor sem favorecido bancario/PIX completo gera aviso confirmavel. O titulo pode ser criado, mas permanece inelegivel para lote bancario ate a regularizacao.
-- Modelo possui abas `INSTRUCOES`, `TITULOS`, `PARCELAS`, `RATEIOS`, `IMPOSTOS` e `REFERENCIAS`.
+- Modelo possui abas operacionais `INSTRUCOES`, `TITULOS`, `PARCELAS`, `RATEIOS` e `IMPOSTOS`, alem das consultas `EMPRESAS`, `OBRAS`, `APROPRIACOES`, `CREDORES`, `CATEGORIAS`, `FORMAS_PAGAMENTO` e `DOMINIOS`.
+- As abas de consulta sao protegidas, filtraveis e contêm apenas referencias atuais e permitidas ao usuario no momento da exportacao; as listas suspensas usam nomes definidos do Excel e o backend continua revalidando tudo.
 - Preview reusa as validacoes do cadastro manual dentro de transacao revertida e persiste erros/avisos por linha.
 - Confirmacao revalida estado e duplicidade, usa `Idempotency-Key`, bloqueio transacional e rollback integral.
 - Formulas, macros, ZIP64, expansao ZIP desproporcional, paths internos inseguros, linhas ocultas e colunas ocultas com dados sao rejeitados.
@@ -72,11 +73,11 @@
 - `npm run build` no frontend: aprovado.
 - `node --check` nos novos servicos, controller e migration: aprovado.
 - Carga completa de models e rotas: aprovada.
-- Modelo XLSX importado, inspecionado e renderizado com as seis abas; nenhuma formula com erro encontrada e layout aprovado.
+- Modelo XLSX `1.4` gerado, reimportado, inspecionado e renderizado em todas as doze abas; nomes definidos e listas suspensas foram preservados, nenhuma formula com erro foi encontrada e o layout foi aprovado.
 
 ## Riscos e homologacao obrigatoria
 
-- No ambiente dev a migration base ja foi aplicada; para o ajuste da versao `1.3`, atualizar o codigo e reiniciar somente `backend-dev`.
+- No ambiente dev a migration base ja foi aplicada; para o ajuste da versao `1.4`, atualizar o codigo e reiniciar somente `backend-dev`.
 - Conceder `financeiro.titulos.importar` somente ao grupo piloto e validar que usuarios sem a permissao nao veem nem acessam os endpoints.
 - Homologar com massa real de salarios, incluindo colaborador de empresa diferente da obra, parcelamento, impostos, rateio e favorecido bancario pendente.
 - Confirmar em banco que os titulos importados aparecem em Contas a Pagar, DRE, fluxo previsto, Resultado de Obras e selecao de lote bancario, sem gerar movimentos ou pagamentos.

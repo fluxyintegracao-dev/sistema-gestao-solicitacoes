@@ -22,7 +22,7 @@ const {
 const { criarTituloManual } = require('./tituloFinanceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
-const TEMPLATE_VERSION = '1.3';
+const TEMPLATE_VERSION = '1.4';
 const MAX_TITULOS = 500;
 const MAX_TOTAL_ROWS = 5000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -572,6 +572,41 @@ function applyValidation(worksheet, columnNumber, formula1, rowEnd = MAX_TITULOS
   }
 }
 
+function setupReferenceSheet(workbook, name, headers, widths, rows) {
+  const worksheet = workbook.addWorksheet(name, {
+    views: [{ state: 'frozen', ySplit: 1, showGridLines: false }]
+  });
+  worksheet.addRow(headers);
+  worksheet.autoFilter = { from: 'A1', to: `${worksheet.getColumn(headers.length).letter}1` };
+  applyHeaderStyle(worksheet.getRow(1));
+  worksheet.columns.forEach((column, index) => {
+    column.width = widths[index] || 18;
+    column.numFmt = '@';
+  });
+  rows.forEach((values) => {
+    const row = worksheet.addRow(values);
+    row.font = { name: 'Aptos', size: 10, color: { argb: 'FF263746' } };
+    row.alignment = { vertical: 'middle' };
+  });
+  return worksheet;
+}
+
+function addDefinedList(workbook, name, sheetName, columnLetter, itemCount) {
+  const lastRow = Math.max(itemCount + 1, 2);
+  workbook.definedNames.add(`'${sheetName}'!$${columnLetter}$2:$${columnLetter}$${lastRow}`, name);
+}
+
+function compareReferenceRows(left, right, indexes) {
+  for (const index of indexes) {
+    const comparison = String(left[index] || '').localeCompare(String(right[index] || ''), 'pt-BR', {
+      numeric: true,
+      sensitivity: 'base'
+    });
+    if (comparison !== 0) return comparison;
+  }
+  return 0;
+}
+
 async function gerarModeloImportacao(req, { references = null, skipAudit = false } = {}) {
   await assertImportPermission(req);
   const refs = references || await getReferenceData(req.user);
@@ -594,9 +629,10 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
     ['Objetivo', 'Criar titulos PAGAR em massa. A planilha nunca registra baixa, movimento bancario ou pagamento.'],
     ['Chave principal', 'Use uma chave_importacao unica por titulo logico, por exemplo FOLHA-2026-07-0001.'],
     ['Obra e empresa', 'Informe empresa_codigo e obra_codigo exatamente como cadastrados. A combinacao resolve a obra; a empresa real do titulo continua sendo derivada dessa obra.'],
-    ['Apropriacao', 'Quando utilizada, informe apropriacao_codigo da aba REFERENCIAS. O backend resolve o cadastro dentro da obra informada; IDs internos nao fazem parte do modelo.'],
-    ['Credor', 'Informe credor_cpf_cnpj da aba REFERENCIAS. Pontuacao e mascara sao opcionais. O parceiro precisa estar ativo e elegivel para contas a pagar.'],
-    ['Categoria', 'Informe categoria_nome exatamente como exibido na aba REFERENCIAS. Nomes duplicados no cadastro bloqueiam a importacao ate regularizacao.'],
+    ['Referencias', 'Consulte as abas EMPRESAS, OBRAS, APROPRIACOES, CREDORES, CATEGORIAS, FORMAS_PAGAMENTO e DOMINIOS. Use os filtros ou a pesquisa do Excel para localizar os valores.'],
+    ['Apropriacao', 'Quando utilizada, informe apropriacao_codigo da aba APROPRIACOES. Filtre por empresa_codigo e obra_codigo; o backend valida se a apropriacao pertence a obra. IDs internos nao fazem parte do modelo.'],
+    ['Credor', 'Informe credor_cpf_cnpj da aba CREDORES. Pontuacao e mascara sao opcionais. O parceiro precisa estar ativo e elegivel para contas a pagar.'],
+    ['Categoria', 'Informe categoria_nome exatamente como exibido na aba CATEGORIAS. Nomes duplicados no cadastro bloqueiam a importacao ate regularizacao.'],
     ['Datas', 'Use datas reais do Excel ou AAAA-MM-DD.'],
     ['Valores', 'Use numeros positivos. Nao inclua R$ como texto. Parcelas devem somar valor_total.'],
     ['Abas filhas', 'PARCELAS, RATEIOS e IMPOSTOS se relacionam pela chave_importacao. Deixe-as vazias quando nao forem necessarias.'],
@@ -607,7 +643,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   ];
   instructionRows.forEach((values, index) => {
     const row = instrucoes.addRow(values);
-    row.height = [3, 4, 5, 6].includes(index) ? 46 : 34;
+    row.height = [3, 4, 5, 6, 7].includes(index) ? 46 : 34;
     row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF173B57' } };
     row.getCell(2).font = { name: 'Aptos', size: 10, color: { argb: 'FF263746' } };
     row.eachCell((cell) => {
@@ -648,61 +684,80 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   impostos.getColumn(7).numFmt = '#,##0.00;[Red](#,##0.00);-';
   [1, 2, 3, 4, 8].forEach((column) => { impostos.getColumn(column).numFmt = '@'; });
 
-  const referencias = workbook.addWorksheet('REFERENCIAS', { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
-  const refHeaders = [
-    'empresa_codigo', 'empresa_nome', 'obra_codigo', 'obra_nome',
-    'credor_cpf_cnpj', 'credor_nome', 'favorecido_bancario',
-    'categoria_nome', 'categoria_tipo', 'dre_grupo',
-    'forma_codigo', 'forma_nome',
-    'apropriacao_empresa_codigo', 'apropriacao_obra_codigo',
-    'apropriacao_codigo', 'apropriacao_descricao'
-  ];
-  referencias.addRow(refHeaders);
-  applyHeaderStyle(referencias.getRow(1));
-  referencias.columns.forEach((column, index) => {
-    column.width = [20, 30, 20, 36, 22, 36, 22, 38, 18, 24, 20, 30, 24, 24, 22, 42][index] || 18;
-  });
   const obraByIdReferencia = new Map(refs.obras.map((obra) => [Number(obra.id), obra]));
-  const maxRefRows = Math.max(refs.obras.length, refs.credores.length, refs.categorias.length, refs.formasPagamento.length, refs.apropriacoes.length, 1);
-  for (let index = 0; index < maxRefRows; index += 1) {
-    const obra = refs.obras[index];
-    const credor = refs.credores[index];
-    const categoria = refs.categorias[index];
-    const forma = refs.formasPagamento[index];
-    const apropriacao = refs.apropriacoes[index];
-    const apropriacaoObra = apropriacao ? obraByIdReferencia.get(Number(apropriacao.obra_id)) : null;
-    const beneficiary = credor?.paymentBeneficiaries?.find((item) => item.ativo !== false && item.pix_tipo_chave && item.pix_chave);
-    referencias.addRow([
-      obra?.empresaGrupo?.codigo || null, obra?.empresaGrupo?.nome || null, obra?.codigo || null, obra?.nome || null,
-      formatCpfCnpj(credor?.cpf_cnpj), credor?.nome || null, credor ? (beneficiary ? 'PRONTO' : 'PENDENTE') : null,
-      categoria?.nome || null, categoria?.tipo || null, categoria?.dre_grupo || null,
-      forma?.codigo || null, forma?.nome || null,
-      apropriacaoObra?.empresaGrupo?.codigo || null, apropriacaoObra?.codigo || null,
-      apropriacao?.codigo || null, apropriacao?.descricao || null
-    ]);
-  }
-  referencias.columns.forEach((column) => { column.numFmt = '@'; });
+  const empresasByCodigo = new Map();
+  refs.obras.forEach((obra) => {
+    const codigo = normalizeUpper(obra?.empresaGrupo?.codigo, 60);
+    if (codigo && !empresasByCodigo.has(codigo)) {
+      empresasByCodigo.set(codigo, [obra.empresaGrupo.codigo, obra.empresaGrupo.nome || null]);
+    }
+  });
+  const empresasRows = Array.from(empresasByCodigo.values()).sort((a, b) => String(a[0]).localeCompare(String(b[0]), 'pt-BR'));
+  const obrasRows = refs.obras.map((obra) => [
+    obra.empresaGrupo?.codigo || null, obra.empresaGrupo?.nome || null, obra.codigo || null, obra.nome || null
+  ]).sort((left, right) => compareReferenceRows(left, right, [0, 2, 3]));
+  const apropriacoesRows = refs.apropriacoes.map((apropriacao) => {
+    const obra = obraByIdReferencia.get(Number(apropriacao.obra_id));
+    return [
+      obra?.empresaGrupo?.codigo || null, obra?.empresaGrupo?.nome || null,
+      obra?.codigo || null, obra?.nome || null,
+      apropriacao.codigo || null, apropriacao.descricao || null
+    ];
+  }).sort((left, right) => compareReferenceRows(left, right, [0, 2, 4]));
+  const credoresRows = refs.credores.map((credor) => {
+    const beneficiary = credor.paymentBeneficiaries?.find((item) => item.ativo !== false && item.pix_tipo_chave && item.pix_chave);
+    return [formatCpfCnpj(credor.cpf_cnpj), credor.nome || null, beneficiary ? 'PRONTO' : 'PENDENTE'];
+  });
+  const categoriasRows = refs.categorias.map((categoria) => [categoria.nome || null, categoria.tipo || null, categoria.dre_grupo || null]);
+  const formasRows = refs.formasPagamento.map((forma) => [forma.codigo || null, forma.nome || null]);
+  const dominiosRows = [
+    ['ABERTO', 'SIM', 'BOLETO', 'PERCENTUAL', 'RETENCAO'],
+    ['PREVISAO', 'NAO', 'PIX', 'VALOR', 'ACRESCIMO'],
+    [null, null, 'OUTROS', null, null]
+  ];
 
-  const obraEnd = Math.max(refs.obras.length + 1, 2);
-  const credorEnd = Math.max(refs.credores.length + 1, 2);
-  const categoriaEnd = Math.max(refs.categorias.length + 1, 2);
-  const formaEnd = Math.max(refs.formasPagamento.length + 1, 2);
-  const apropriacaoEnd = Math.max(refs.apropriacoes.length + 1, 2);
-  applyValidation(titulos, 2, `REFERENCIAS!$A$2:$A$${obraEnd}`);
-  applyValidation(titulos, 3, `REFERENCIAS!$C$2:$C$${obraEnd}`);
-  applyValidation(titulos, 4, `REFERENCIAS!$E$2:$E$${credorEnd}`);
-  applyValidation(titulos, 5, `REFERENCIAS!$H$2:$H$${categoriaEnd}`);
-  applyValidation(titulos, 6, `REFERENCIAS!$K$2:$K$${formaEnd}`);
-  applyValidation(titulos, 7, '"ABERTO,PREVISAO"');
-  applyValidation(titulos, 14, '"SIM,NAO"');
-  applyValidation(titulos, 15, `REFERENCIAS!$O$2:$O$${apropriacaoEnd}`);
-  applyValidation(titulos, 17, '"BOLETO,PIX,OUTROS"');
-  applyValidation(rateios, 2, `REFERENCIAS!$A$2:$A$${obraEnd}`, MAX_TOTAL_ROWS + 1);
-  applyValidation(rateios, 3, `REFERENCIAS!$C$2:$C$${obraEnd}`, MAX_TOTAL_ROWS + 1);
-  applyValidation(rateios, 4, `REFERENCIAS!$O$2:$O$${apropriacaoEnd}`, MAX_TOTAL_ROWS + 1);
-  applyValidation(rateios, 5, '"PERCENTUAL,VALOR"', MAX_TOTAL_ROWS + 1);
-  applyValidation(impostos, 4, '"RETENCAO,ACRESCIMO"', MAX_TOTAL_ROWS + 1);
-  await referencias.protect('', { selectLockedCells: true, selectUnlockedCells: true });
+  const referenceSheets = [
+    setupReferenceSheet(workbook, 'EMPRESAS', ['empresa_codigo', 'empresa_nome'], [20, 36], empresasRows),
+    setupReferenceSheet(workbook, 'OBRAS', ['empresa_codigo', 'empresa_nome', 'obra_codigo', 'obra_nome'], [20, 36, 20, 42], obrasRows),
+    setupReferenceSheet(workbook, 'APROPRIACOES', ['empresa_codigo', 'empresa_nome', 'obra_codigo', 'obra_nome', 'apropriacao_codigo', 'apropriacao_descricao'], [20, 36, 20, 42, 22, 48], apropriacoesRows),
+    setupReferenceSheet(workbook, 'CREDORES', ['credor_cpf_cnpj', 'credor_nome', 'favorecido_bancario'], [22, 42, 24], credoresRows),
+    setupReferenceSheet(workbook, 'CATEGORIAS', ['categoria_nome', 'categoria_tipo', 'dre_grupo'], [42, 20, 30], categoriasRows),
+    setupReferenceSheet(workbook, 'FORMAS_PAGAMENTO', ['forma_codigo', 'forma_nome'], [24, 36], formasRows),
+    setupReferenceSheet(workbook, 'DOMINIOS', ['status', 'considera_dre', 'forma_cobranca', 'tipo_rateio', 'natureza_imposto'], [20, 20, 22, 22, 24], dominiosRows)
+  ];
+
+  addDefinedList(workbook, 'LISTA_EMPRESAS', 'EMPRESAS', 'A', empresasRows.length);
+  addDefinedList(workbook, 'LISTA_OBRAS', 'OBRAS', 'C', refs.obras.length);
+  addDefinedList(workbook, 'LISTA_CREDORES', 'CREDORES', 'A', refs.credores.length);
+  addDefinedList(workbook, 'LISTA_CATEGORIAS', 'CATEGORIAS', 'A', refs.categorias.length);
+  addDefinedList(workbook, 'LISTA_FORMAS_PAGAMENTO', 'FORMAS_PAGAMENTO', 'A', refs.formasPagamento.length);
+  addDefinedList(workbook, 'LISTA_APROPRIACOES', 'APROPRIACOES', 'E', refs.apropriacoes.length);
+  addDefinedList(workbook, 'LISTA_STATUS', 'DOMINIOS', 'A', 2);
+  addDefinedList(workbook, 'LISTA_SIM_NAO', 'DOMINIOS', 'B', 2);
+  addDefinedList(workbook, 'LISTA_FORMAS_COBRANCA', 'DOMINIOS', 'C', 3);
+  addDefinedList(workbook, 'LISTA_TIPOS_RATEIO', 'DOMINIOS', 'D', 2);
+  addDefinedList(workbook, 'LISTA_NATUREZAS_IMPOSTO', 'DOMINIOS', 'E', 2);
+
+  applyValidation(titulos, 2, 'LISTA_EMPRESAS');
+  applyValidation(titulos, 3, 'LISTA_OBRAS');
+  applyValidation(titulos, 4, 'LISTA_CREDORES');
+  applyValidation(titulos, 5, 'LISTA_CATEGORIAS');
+  applyValidation(titulos, 6, 'LISTA_FORMAS_PAGAMENTO');
+  applyValidation(titulos, 7, 'LISTA_STATUS');
+  applyValidation(titulos, 14, 'LISTA_SIM_NAO');
+  applyValidation(titulos, 15, 'LISTA_APROPRIACOES');
+  applyValidation(titulos, 17, 'LISTA_FORMAS_COBRANCA');
+  applyValidation(rateios, 2, 'LISTA_EMPRESAS', MAX_TOTAL_ROWS + 1);
+  applyValidation(rateios, 3, 'LISTA_OBRAS', MAX_TOTAL_ROWS + 1);
+  applyValidation(rateios, 4, 'LISTA_APROPRIACOES', MAX_TOTAL_ROWS + 1);
+  applyValidation(rateios, 5, 'LISTA_TIPOS_RATEIO', MAX_TOTAL_ROWS + 1);
+  applyValidation(impostos, 4, 'LISTA_NATUREZAS_IMPOSTO', MAX_TOTAL_ROWS + 1);
+  await Promise.all(referenceSheets.map((sheet) => sheet.protect('', {
+    selectLockedCells: true,
+    selectUnlockedCells: true,
+    autoFilter: true,
+    spinCount: 1000
+  })));
 
   const buffer = await workbook.xlsx.writeBuffer();
   if (!skipAudit) {
