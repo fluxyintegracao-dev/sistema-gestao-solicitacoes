@@ -57,7 +57,7 @@ A baixa e semiautomatica:
 
 ### Fase 3 - Execucao mockada e baixa semiautomatica
 
-- dupla aprovacao por usuarios diferentes;
+- uma aprovacao por usuario diferente do criador do lote;
 - bloqueio para o criador aprovar o proprio lote;
 - MFA step-up para aprovar e enviar;
 - job persistente em `payment_jobs`;
@@ -270,7 +270,7 @@ Rotas internas FLUXY adicionadas:
 
 Fluxo real BB:
 
-1. lote e criado e aprovado por duas pessoas;
+1. lote e criado e recebe uma aprovacao de usuario diferente do criador;
 2. usuario financeiro informa MFA e envia pelo botao `Enviar ao BB`;
 3. backend cria job `BB_SUBMIT_PIX_BATCH`;
 4. provider monta payload `RequisicaoPOSTLotePagamentosTransferenciaPix`;

@@ -189,8 +189,9 @@ function validateRoutesAndCriticalGuards() {
     'Guarda contra aprovacao pelo criador nao encontrada.'
   );
   assert(
-    approvalService.includes('approvals >= 2'),
-    'Guarda de dupla aprovacao nao encontrada.'
+    approvalService.includes('const REQUIRED_PAYMENT_BATCH_APPROVALS = 1')
+      && approvalService.includes('approvals >= REQUIRED_PAYMENT_BATCH_APPROVALS'),
+    'Regra vigente de uma aprovacao nao encontrada.'
   );
   assert(
     executionService.includes('verifyMfaStepUp'),
