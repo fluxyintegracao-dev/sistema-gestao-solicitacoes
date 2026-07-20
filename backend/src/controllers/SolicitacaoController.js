@@ -2364,7 +2364,6 @@ module.exports = {
         parceiro_id,
         apropriacao_id,
         area_responsavel,
-        diretoria_fluxo_codigo,
         codigo_contrato,
         contrato_id,
         data_vencimento,
@@ -2399,20 +2398,6 @@ module.exports = {
         return res.status(400).json({ error: 'Obra/Centro de custo informado nao foi encontrado.' });
       }
       const registroSelecionadoEhObra = isObraCentroCusto(obraSelecionada.tipo_centro_custo);
-
-      const configAprovacaoDiretoria = await obterConfiguracaoAprovacaoDiretoria();
-      const diretoriaConfiguradaObra = obterDiretoriaParaObra(
-        obraSelecionada,
-        configAprovacaoDiretoria.diretoriasPorClassificacao
-      );
-      const diretoriaSolicitada = normalizarTokenSetor(diretoria_fluxo_codigo);
-      const diretoriaFluxoCodigo = diretoriaConfiguradaObra || diretoriaSolicitada;
-      if (diretoriaSolicitada && diretoriaConfiguradaObra && diretoriaSolicitada !== diretoriaConfiguradaObra) {
-        return res.status(400).json({
-          error: 'Diretoria de aprovacao nao corresponde a classificacao da obra selecionada.'
-        });
-      }
-      const usarFluxoDiretoria = Boolean(diretoriaFluxoCodigo);
 
       const regrasAreasPorSetor = await obterRegrasAreasPorSetorOrigem();
       const areaUsuario = await obterAreaUsuario(req);
@@ -2857,10 +2842,10 @@ module.exports = {
         tipo_sub_id: campoVisivel('subtipo') ? (tipo_sub_id || null) : null,
         descricao: campoVisivel('descricao') ? descricao : '',
         valor: valorPersistido,
-        area_responsavel: usarFluxoDiretoria ? diretoriaFluxoCodigo : areaResponsavelPersistida,
-        fluxo_aprovacao_diretoria: usarFluxoDiretoria,
-        diretoria_fluxo_codigo: usarFluxoDiretoria ? diretoriaFluxoCodigo : null,
-        setor_destino_pos_aprovacao: usarFluxoDiretoria ? areaResponsavelPersistida : null,
+        area_responsavel: areaResponsavelPersistida,
+        fluxo_aprovacao_diretoria: false,
+        diretoria_fluxo_codigo: null,
+        setor_destino_pos_aprovacao: null,
         codigo_contrato: campoVisivel('contrato') ? codigo_contrato : null,
         contrato_id: campoVisivel('contrato') ? (contrato_id || null) : null,
         data_vencimento: campoVisivel('data_vencimento') ? (data_vencimento || null) : null,
@@ -2896,9 +2881,9 @@ module.exports = {
         metadata: {
           obra_id,
           tipo_solicitacao_id,
-          area_responsavel: usarFluxoDiretoria ? diretoriaFluxoCodigo : areaResponsavelPersistida,
-          setor_destino_pos_aprovacao: usarFluxoDiretoria ? areaResponsavelPersistida : null,
-          diretoria_fluxo_codigo: usarFluxoDiretoria ? diretoriaFluxoCodigo : null,
+          area_responsavel: areaResponsavelPersistida,
+          setor_destino_pos_aprovacao: null,
+          diretoria_fluxo_codigo: null,
           parceiro_id: parceiro?.id || null,
           apropriacao_id: apropriacao?.id || null
         }
@@ -2938,16 +2923,10 @@ module.exports = {
       if (campoVisivel('ref_contrato_abertura') && ref_contrato_abertura) {
         metadata.ref_contrato_abertura = String(ref_contrato_abertura).trim();
       }
-      if (usarFluxoDiretoria) {
-        metadata.fluxo_aprovacao_diretoria = true;
-        metadata.diretoria_fluxo_codigo = diretoriaFluxoCodigo;
-        metadata.setor_destino_pos_aprovacao = areaResponsavelPersistida;
-      }
-
       await Historico.create({
         solicitacao_id: solicitacao.id,
         usuario_responsavel_id: usuarioId,
-        setor: usarFluxoDiretoria ? diretoriaFluxoCodigo : areaUsuario,
+        setor: areaUsuario,
         acao: 'SOLICITACAO_CRIADA',
         status_novo: 'PENDENTE',
         descricao: descricaoHistorico,

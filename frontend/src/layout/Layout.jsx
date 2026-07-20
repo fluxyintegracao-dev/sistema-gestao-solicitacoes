@@ -586,7 +586,6 @@ export default function Layout() {
     if (configuracoesAccess) {
       addGroup('Configurações', [
         item('/configuracoes', 'Configurações', HiOutlineCog6Tooth),
-        configuracoesStatusVinculosAccess ? item('/aprovacao-diretoria', 'Aprovacao Diretoria', HiOutlineAdjustmentsHorizontal) : null,
         configuracoesStatusVinculosAccess ? item('/usuarios-acesso-prioridade-diretoria', 'Acesso Prioridades', HiOutlineUsers) : null,
         configuracoesStatusVinculosAccess ? item('/usuarios-envio-qualquer-setor', 'Envio Livre por Usuario', HiOutlineUsers) : null,
         configuracoesStatusVinculosAccess ? item('/tipos-compartilhados-setor', 'Tipos Compartilhados', HiOutlineClipboardDocumentList) : null,

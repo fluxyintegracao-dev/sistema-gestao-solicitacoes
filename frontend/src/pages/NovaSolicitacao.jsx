@@ -9,7 +9,7 @@ import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos } from '../services/contratos';
 import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
-import { getAprovacaoDiretoria, getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
@@ -127,7 +127,6 @@ export default function NovaSolicitacao() {
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
   const [camposNovaSolicitacaoConfig, setCamposNovaSolicitacaoConfig] = useState({ regras: {} });
   const [automacaoDestinoConfig, setAutomacaoDestinoConfig] = useState({ destinos_disponiveis: [], regras: {} });
-  const [aprovacaoDiretoriaConfig, setAprovacaoDiretoriaConfig] = useState({ diretorias: {}, destinos: {} });
   const [tiposSub, setTiposSub] = useState([]);
   const [contratos, setContratos] = useState([]);
   const [contratosRef, setContratosRef] = useState([]);
@@ -163,7 +162,6 @@ export default function NovaSolicitacao() {
     contrato_id: '',
     codigo_contrato: '',
     area_responsavel: '',
-    diretoria_fluxo_codigo: '',
     descricao: '',
     itens_apropriacao: '',
     ref_contrato_abertura: '',
@@ -186,11 +184,10 @@ export default function NovaSolicitacao() {
       setTipos(await getTiposSolicitacao());
       setSetores(await getSetores());
       try {
-        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgAprovacaoDiretoria, cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
+        const [cfg, cfgSetorOrigem, cfgTiposPorSetor, cfgCamposNovaSolicitacao, cfgAutomacaoDestino] = await Promise.all([
           getAreasObra(),
           getAreasPorSetorOrigem(),
           getTiposSolicitacaoPorSetor(),
-          getAprovacaoDiretoria(),
           getCamposNovaSolicitacao(),
           getAutomacaoDestinoNovaSolicitacao()
         ]);
@@ -205,10 +202,6 @@ export default function NovaSolicitacao() {
             ? cfgTiposPorSetor.regras
             : {}
         );
-        setAprovacaoDiretoriaConfig({
-          diretorias: cfgAprovacaoDiretoria?.diretorias || {},
-          destinos: cfgAprovacaoDiretoria?.destinos || {}
-        });
         setCamposNovaSolicitacaoConfig({
           regras: cfgCamposNovaSolicitacao?.regras && typeof cfgCamposNovaSolicitacao.regras === 'object'
             ? cfgCamposNovaSolicitacao.regras
@@ -222,7 +215,6 @@ export default function NovaSolicitacao() {
         setTiposPorSetorConfig({});
         setCamposNovaSolicitacaoConfig({ regras: {} });
         setAutomacaoDestinoConfig({ destinos_disponiveis: [], regras: {} });
-        setAprovacaoDiretoriaConfig({ diretorias: {}, destinos: {} });
       }
     }
     load();
@@ -390,7 +382,6 @@ export default function NovaSolicitacao() {
       ...prev,
       obra_id: '',
       area_responsavel: '',
-      diretoria_fluxo_codigo: '',
       apropriacao_id: '',
       tipo_solicitacao_id: '',
       tipo_sub_id: '',
@@ -1243,14 +1234,6 @@ export default function NovaSolicitacao() {
   }
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
-  const classificacaoObraSelecionada = String(
-    obraSelecionadaEhObra
-      ? obraSelecionada?.classificacao || obraSelecionada?.classificacao_obra || ''
-      : ''
-  ).trim().toUpperCase();
-  const diretoriaSugerida = classificacaoObraSelecionada
-    ? aprovacaoDiretoriaConfig?.diretorias?.[classificacaoObraSelecionada] || ''
-    : '';
   const tiposFiltradosPorSetor = useMemo(() => {
     const setorKey = String(form.area_responsavel || '').trim().toUpperCase();
     if (!setorKey) return [];
@@ -1297,19 +1280,6 @@ export default function NovaSolicitacao() {
       setForm(prev => ({ ...prev, tipo_solicitacao_id: '', tipo_sub_id: '' }));
     }
   }, [form.area_responsavel, form.tipo_solicitacao_id, tiposFiltradosPorSetor]);
-
-  useEffect(() => {
-    if (!form.obra_id) {
-      if (form.diretoria_fluxo_codigo) {
-        setForm(prev => ({ ...prev, diretoria_fluxo_codigo: '' }));
-      }
-      return;
-    }
-    setForm(prev => {
-      if (prev.diretoria_fluxo_codigo === diretoriaSugerida) return prev;
-      return { ...prev, diretoria_fluxo_codigo: diretoriaSugerida || '' };
-    });
-  }, [form.obra_id, form.diretoria_fluxo_codigo, diretoriaSugerida]);
 
   useEffect(() => {
     if (!form.obra_id || !form.area_responsavel || !form.tipo_solicitacao_id) return;
@@ -1488,7 +1458,7 @@ export default function NovaSolicitacao() {
           </>
           )}
 
-          <label className="grid gap-1 text-sm lg:col-span-4">
+          <label className="grid gap-1 text-sm lg:col-span-6">
             Área Responsável
             <select
               name="area_responsavel"
@@ -1514,29 +1484,7 @@ export default function NovaSolicitacao() {
             )}
           </label>
 
-          <label className="grid gap-1 text-sm lg:col-span-4">
-            Diretoria de aprovação
-            <select
-              name="diretoria_fluxo_codigo"
-              onChange={handleChange}
-              className="input input-sm"
-              value={form.diretoria_fluxo_codigo}
-              disabled={!form.obra_id || !diretoriaSugerida}
-            >
-              <option value="">
-                {!form.obra_id
-                  ? 'Selecione a obra/centro de custo primeiro'
-                  : diretoriaSugerida
-                    ? 'Selecione'
-                    : 'Sem diretoria configurada'}
-              </option>
-              {diretoriaSugerida && (
-                <option value={diretoriaSugerida}>{diretoriaSugerida}</option>
-              )}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm lg:col-span-4">
+          <label className="grid gap-1 text-sm lg:col-span-6">
             Tipo de Solicitação
             <select
               name="tipo_solicitacao_id"

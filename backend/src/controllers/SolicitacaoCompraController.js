@@ -62,10 +62,6 @@ const {
 } = require('../services/compraApropriacao');
 const { getRuntimeInstallationConfig } = require('../services/runtimeConfig');
 const {
-  obterConfiguracaoAprovacaoDiretoria,
-  obterDiretoriaParaObra
-} = require('../services/aprovacaoDiretoriaConfig');
-const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
   canAlterarQuantidadeSolicitacaoCompra,
@@ -419,29 +415,25 @@ async function buscarSetorGerenciaProcessos(transaction) {
   return resolveSetorPersistenciaValue(setor, 'GERENCIA DE PROCESSOS');
 }
 
-async function montarFluxoAprovacaoCompra({ obra, transaction }) {
+async function montarFluxoAprovacaoCompra({ transaction }) {
   const setorCompras = await buscarSetorCompras(transaction);
-  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
-  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
-    usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorCompras,
-    diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorCompras : null
+    usaFluxoDiretoria: false,
+    areaResponsavel: setorCompras,
+    diretoriaFluxoCodigo: null,
+    setorDestinoPosAprovacao: null
   };
 }
 
-async function montarFluxoAprovacaoCompraDireta({ obra, transaction }) {
+async function montarFluxoAprovacaoCompraDireta({ transaction }) {
   const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
-  const configuracao = await obterConfiguracaoAprovacaoDiretoria();
-  const diretoria = obterDiretoriaParaObra(obra, configuracao.diretoriasPorClassificacao);
 
   return {
-    usaFluxoDiretoria: Boolean(diretoria),
-    areaResponsavel: diretoria || setorGerenciaProcessos,
-    diretoriaFluxoCodigo: diretoria || null,
-    setorDestinoPosAprovacao: diretoria ? setorGerenciaProcessos : null
+    usaFluxoDiretoria: false,
+    areaResponsavel: setorGerenciaProcessos,
+    diretoriaFluxoCodigo: null,
+    setorDestinoPosAprovacao: null
   };
 }
 
@@ -3335,16 +3327,12 @@ module.exports = {
         : await buscarTipoSolicitacaoCompra(transaction);
       const fluxoCompra = compraDireta
         ? await montarFluxoAprovacaoCompraDireta({
-            obra,
             transaction
           })
         : await montarFluxoAprovacaoCompra({
-            obra,
             transaction
           });
-      const statusInicialCompra = fluxoCompra.usaFluxoDiretoria
-        ? 'AGUARDANDO_DIRETORIA'
-        : (compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA');
+      const statusInicialCompra = compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA';
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
