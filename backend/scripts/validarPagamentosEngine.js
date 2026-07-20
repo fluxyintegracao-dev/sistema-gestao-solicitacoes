@@ -370,7 +370,7 @@ function validateBancoDoBrasilSandboxProvider() {
   assert.strictEqual(retryPayload.numeroRequisicao, 123004);
 
   const health = bancoDoBrasilSandboxProvider.getHealth();
-  assert.strictEqual(health.env, 'sandbox');
+  assert.strictEqual(health.env, env.bbPaymentsEnv);
   assert.strictEqual(health.sandboxRealEnabled, Boolean(env.bbSandboxRealEnabled));
 }
 
