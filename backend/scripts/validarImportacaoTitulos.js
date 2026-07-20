@@ -41,6 +41,10 @@ async function main() {
   assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('A2').value, 'EMP-1');
   assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('C2').value, 'OB-001');
   assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('H2').value, 'PRONTO');
+  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('N2').value, 'EMP-1');
+  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('O2').value, 'OB-001');
+  assert.strictEqual(workbook.getWorksheet('REFERENCIAS').getCell('P2').value, '1.01');
+  assert(!workbook.getWorksheet('REFERENCIAS').getRow(1).values.includes('apropriacao_id'), 'ID interno da apropriacao foi exposto no modelo.');
 
   const mappedReferences = __testables.buildReferenceMaps(references);
   assert.strictEqual(__testables.resolveObraByCodigos(mappedReferences, 'emp-1', 'ob-001').id, 1);
@@ -56,11 +60,27 @@ async function main() {
     () => __testables.resolveObraByCodigos(ambiguousReferences, 'EMP-1', 'OB-001'),
     /combinacao empresa_codigo \+ obra_codigo esta duplicada/
   );
+  assert.strictEqual(
+    __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[0], '1.01').id,
+    100
+  );
+  assert.throws(
+    () => __testables.resolveApropriacaoByCodigo(mappedReferences, references.obras[0], '9.99'),
+    /apropriacao_codigo inexistente/
+  );
+  const ambiguousApropriacoes = __testables.buildReferenceMaps({
+    ...references,
+    apropriacoes: [...references.apropriacoes, { ...references.apropriacoes[0], id: 101 }]
+  });
+  assert.throws(
+    () => __testables.resolveApropriacaoByCodigo(ambiguousApropriacoes, references.obras[0], '1.01'),
+    /apropriacao_codigo esta duplicado/
+  );
 
   const titles = workbook.getWorksheet('TITULOS');
   titles.addRow([
     'TESTE-001', 'EMP-1', 'OB-001', 10, 20, 'PIX', 'ABERTO', 'Salario de teste', 'FOLHA-2026-07', 1000,
-    new Date(2026, 6, 20), new Date(2026, 6, 25), new Date(2026, 6, 1), 'SIM', 100,
+    new Date(2026, 6, 20), new Date(2026, 6, 25), new Date(2026, 6, 1), 'SIM', '1.01',
     'Linha de teste', 'PIX', '', '', ''
   ]);
   const filledBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
@@ -69,7 +89,23 @@ async function main() {
   assert.strictEqual(parsed.sheets.TITULOS[0].payload.chave_importacao, 'TESTE-001');
   assert.strictEqual(parsed.sheets.TITULOS[0].payload.empresa_codigo, 'EMP-1');
   assert.strictEqual(parsed.sheets.TITULOS[0].payload.obra_codigo, 'OB-001');
+  assert.strictEqual(parsed.sheets.TITULOS[0].payload.apropriacao_codigo, '1.01');
   assert(parsed.sheets.TITULOS[0].payload.data_emissao instanceof Date, 'Data de emissao nao foi preservada como data do Excel.');
+  const normalized = __testables.normalizeTituloRow(
+    parsed.sheets.TITULOS[0],
+    { PARCELAS: new Map(), RATEIOS: new Map(), IMPOSTOS: new Map() },
+    mappedReferences,
+    []
+  );
+  assert.strictEqual(normalized.errors.length, 0);
+  assert.strictEqual(normalized.payload.apropriacao_id, 100, 'Codigo da apropriacao nao foi convertido para o ID interno.');
+  assert.strictEqual(normalized.payload.apropriacao_codigo, undefined, 'Codigo operacional vazou para o payload de dominio.');
+
+  const oldHeaderWorkbook = new ExcelJS.Workbook();
+  await oldHeaderWorkbook.xlsx.load(buffer);
+  oldHeaderWorkbook.getWorksheet('TITULOS').getCell('O1').value = 'apropriacao_id';
+  const oldHeaderBuffer = Buffer.from(await oldHeaderWorkbook.xlsx.writeBuffer());
+  await assert.rejects(() => parseWorkbook(oldHeaderBuffer), /colunas desconhecidas: apropriacao_id/);
 
   titles.getCell('H2').value = { formula: '="formula proibida"', result: 'formula proibida' };
   const formulaBuffer = Buffer.from(await workbook.xlsx.writeBuffer());

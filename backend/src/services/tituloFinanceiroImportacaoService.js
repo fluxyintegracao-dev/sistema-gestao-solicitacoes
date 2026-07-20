@@ -22,7 +22,7 @@ const {
 const { criarTituloManual } = require('./tituloFinanceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
-const TEMPLATE_VERSION = '1.1';
+const TEMPLATE_VERSION = '1.2';
 const MAX_TITULOS = 500;
 const MAX_TOTAL_ROWS = 5000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -36,7 +36,7 @@ const ALLOWED_HEADERS = {
     'chave_importacao', 'empresa_codigo', 'obra_codigo', 'credor_id', 'categoria_id',
     'forma_pagamento_codigo', 'status', 'descricao', 'numero_documento', 'valor_total',
     'data_emissao', 'data_vencimento', 'competencia_data', 'considera_dre',
-    'apropriacao_id', 'observacoes', 'forma_cobranca', 'banco_cobranca',
+    'apropriacao_codigo', 'observacoes', 'forma_cobranca', 'banco_cobranca',
     'linha_digitavel', 'codigo_barras'
   ],
   PARCELAS: [
@@ -44,7 +44,7 @@ const ALLOWED_HEADERS = {
     'linha_digitavel', 'codigo_barras', 'observacoes'
   ],
   RATEIOS: [
-    'chave_importacao', 'empresa_codigo', 'obra_codigo', 'apropriacao_id',
+    'chave_importacao', 'empresa_codigo', 'obra_codigo', 'apropriacao_codigo',
     'tipo_rateio', 'percentual', 'valor_rateio', 'observacoes'
   ],
   IMPOSTOS: [
@@ -127,6 +127,47 @@ function resolveObraByCodigos(refs, empresaCodigo, obraCodigo, label = 'Obra') {
   const resolved = refs.obraByCodigoComposto.get(key);
   if (!resolved) {
     throw createHttpError(400, `${label}: combinacao empresa_codigo + obra_codigo inexistente, inativa, incompleta ou fora do seu escopo.`);
+  }
+  return resolved;
+}
+
+function buildApropriacaoLookupKey(obraId, apropriacaoCodigo) {
+  const obra = Number(obraId);
+  const apropriacao = normalizeUpper(apropriacaoCodigo, 255);
+  return Number.isInteger(obra) && obra > 0 && apropriacao
+    ? JSON.stringify([obra, apropriacao])
+    : null;
+}
+
+function buildApropriacaoLookup(apropriacoes = []) {
+  const apropriacaoByObraECodigo = new Map();
+  const apropriacaoCodigosAmbiguos = new Set();
+  apropriacoes.forEach((apropriacao) => {
+    const key = buildApropriacaoLookupKey(apropriacao?.obra_id, apropriacao?.codigo);
+    if (!key) return;
+    if (apropriacaoByObraECodigo.has(key)) {
+      apropriacaoByObraECodigo.delete(key);
+      apropriacaoCodigosAmbiguos.add(key);
+      return;
+    }
+    if (!apropriacaoCodigosAmbiguos.has(key)) apropriacaoByObraECodigo.set(key, apropriacao);
+  });
+  return { apropriacaoByObraECodigo, apropriacaoCodigosAmbiguos };
+}
+
+function resolveApropriacaoByCodigo(refs, obra, apropriacaoCodigo, label = 'Apropriacao', { required = false } = {}) {
+  const codigo = normalizeUpper(apropriacaoCodigo, 255);
+  if (!codigo) {
+    if (required) throw createHttpError(400, `${label}: codigo e obrigatorio.`);
+    return null;
+  }
+  const key = buildApropriacaoLookupKey(obra?.id, codigo);
+  if (refs.apropriacaoCodigosAmbiguos.has(key)) {
+    throw createHttpError(400, `${label}: apropriacao_codigo esta duplicado na obra informada e precisa ser regularizado.`);
+  }
+  const resolved = refs.apropriacaoByObraECodigo.get(key);
+  if (!resolved) {
+    throw createHttpError(400, `${label}: apropriacao_codigo inexistente, inativo, somador ou pertencente a outra obra.`);
   }
   return resolved;
 }
@@ -469,6 +510,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
     ['Objetivo', 'Criar titulos PAGAR em massa. A planilha nunca registra baixa, movimento bancario ou pagamento.'],
     ['Chave principal', 'Use uma chave_importacao unica por titulo logico, por exemplo FOLHA-2026-07-0001.'],
     ['Obra e empresa', 'Informe empresa_codigo e obra_codigo exatamente como cadastrados. A combinacao resolve a obra; a empresa real do titulo continua sendo derivada dessa obra.'],
+    ['Apropriacao', 'Quando utilizada, informe apropriacao_codigo da aba REFERENCIAS. O backend resolve o cadastro dentro da obra informada; IDs internos nao fazem parte do modelo.'],
     ['Credor', 'Informe credor_id da aba REFERENCIAS. O parceiro precisa estar ativo e elegivel para contas a pagar. A coluna favorecido_bancario indica se o credor esta pronto para lote PIX.'],
     ['Datas', 'Use datas reais do Excel ou AAAA-MM-DD.'],
     ['Valores', 'Use numeros positivos. Nao inclua R$ como texto. Parcelas devem somar valor_total.'],
@@ -480,7 +522,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   ];
   instructionRows.forEach((values, index) => {
     const row = instrucoes.addRow(values);
-    row.height = index === 3 ? 46 : 34;
+    row.height = [3, 4].includes(index) ? 46 : 34;
     row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF173B57' } };
     row.getCell(2).font = { name: 'Aptos', size: 10, color: { argb: 'FF263746' } };
     row.eachCell((cell) => {
@@ -498,8 +540,8 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   });
   titulos.getColumn(10).numFmt = '#,##0.00;[Red](#,##0.00);-';
   [11, 12, 13].forEach((column) => { titulos.getColumn(column).numFmt = 'yyyy-mm-dd'; });
-  [1, 2, 3, 6, 7, 8, 9, 14, 16, 17, 18, 19, 20].forEach((column) => { titulos.getColumn(column).numFmt = '@'; });
-  [4, 5, 15].forEach((column) => { titulos.getColumn(column).numFmt = '0'; });
+  [1, 2, 3, 6, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20].forEach((column) => { titulos.getColumn(column).numFmt = '@'; });
+  [4, 5].forEach((column) => { titulos.getColumn(column).numFmt = '0'; });
 
   const parcelas = workbook.addWorksheet('PARCELAS');
   setupDataSheet(parcelas, ALLOWED_HEADERS.PARCELAS, { chave_importacao: 25, numero_documento: 22, linha_digitavel: 34, codigo_barras: 34, observacoes: 42 });
@@ -513,8 +555,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   setupDataSheet(rateios, ALLOWED_HEADERS.RATEIOS, { chave_importacao: 25, empresa_codigo: 20, obra_codigo: 20, observacoes: 42 });
   rateios.getColumn(6).numFmt = '0.00';
   rateios.getColumn(7).numFmt = '#,##0.00;[Red](#,##0.00);-';
-  [1, 2, 3, 5, 8].forEach((column) => { rateios.getColumn(column).numFmt = '@'; });
-  rateios.getColumn(4).numFmt = '0';
+  [1, 2, 3, 4, 5, 8].forEach((column) => { rateios.getColumn(column).numFmt = '@'; });
 
   const impostos = workbook.addWorksheet('IMPOSTOS');
   setupDataSheet(impostos, ALLOWED_HEADERS.IMPOSTOS, { chave_importacao: 25, tipo_imposto: 18, descricao: 28, observacoes: 42 });
@@ -529,13 +570,13 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
     'credor_id', 'credor_nome', 'cpf_cnpj', 'favorecido_bancario',
     'categoria_id', 'categoria_nome', 'dre_grupo',
     'forma_codigo', 'forma_nome',
-    'apropriacao_id', 'apropriacao_empresa_codigo', 'apropriacao_obra_codigo',
+    'apropriacao_empresa_codigo', 'apropriacao_obra_codigo',
     'apropriacao_codigo', 'apropriacao_descricao'
   ];
   referencias.addRow(refHeaders);
   applyHeaderStyle(referencias.getRow(1));
   referencias.columns.forEach((column, index) => {
-    column.width = [20, 30, 20, 36, 12, 36, 20, 22, 12, 36, 24, 20, 30, 15, 24, 24, 22, 42][index] || 18;
+    column.width = [20, 30, 20, 36, 12, 36, 20, 22, 12, 36, 24, 20, 30, 24, 24, 22, 42][index] || 18;
   });
   const obraByIdReferencia = new Map(refs.obras.map((obra) => [Number(obra.id), obra]));
   const maxRefRows = Math.max(refs.obras.length, refs.credores.length, refs.categorias.length, refs.formasPagamento.length, refs.apropriacoes.length, 1);
@@ -552,14 +593,13 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
       credor?.id || null, credor?.nome || null, credor?.cpf_cnpj || null, credor ? (beneficiary ? 'PRONTO' : 'PENDENTE') : null,
       categoria?.id || null, categoria?.nome || null, categoria?.dre_grupo || null,
       forma?.codigo || null, forma?.nome || null,
-      apropriacao?.id || null, apropriacaoObra?.empresaGrupo?.codigo || null, apropriacaoObra?.codigo || null,
+      apropriacaoObra?.empresaGrupo?.codigo || null, apropriacaoObra?.codigo || null,
       apropriacao?.codigo || null, apropriacao?.descricao || null
     ]);
   }
   referencias.getColumn(5).numFmt = '0';
   referencias.getColumn(9).numFmt = '0';
-  referencias.getColumn(14).numFmt = '0';
-  [1, 2, 3, 4, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18].forEach((column) => { referencias.getColumn(column).numFmt = '@'; });
+  [1, 2, 3, 4, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17].forEach((column) => { referencias.getColumn(column).numFmt = '@'; });
 
   const obraEnd = Math.max(refs.obras.length + 1, 2);
   const credorEnd = Math.max(refs.credores.length + 1, 2);
@@ -573,11 +613,11 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   applyValidation(titulos, 6, `REFERENCIAS!$L$2:$L$${formaEnd}`);
   applyValidation(titulos, 7, '"ABERTO,PREVISAO"');
   applyValidation(titulos, 14, '"SIM,NAO"');
-  applyValidation(titulos, 15, `REFERENCIAS!$N$2:$N$${apropriacaoEnd}`);
+  applyValidation(titulos, 15, `REFERENCIAS!$P$2:$P$${apropriacaoEnd}`);
   applyValidation(titulos, 17, '"BOLETO,PIX,OUTROS"');
   applyValidation(rateios, 2, `REFERENCIAS!$A$2:$A$${obraEnd}`, MAX_TOTAL_ROWS + 1);
   applyValidation(rateios, 3, `REFERENCIAS!$C$2:$C$${obraEnd}`, MAX_TOTAL_ROWS + 1);
-  applyValidation(rateios, 4, `REFERENCIAS!$N$2:$N$${apropriacaoEnd}`, MAX_TOTAL_ROWS + 1);
+  applyValidation(rateios, 4, `REFERENCIAS!$P$2:$P$${apropriacaoEnd}`, MAX_TOTAL_ROWS + 1);
   applyValidation(rateios, 5, '"PERCENTUAL,VALOR"', MAX_TOTAL_ROWS + 1);
   applyValidation(impostos, 4, '"RETENCAO,ACRESCIMO"', MAX_TOTAL_ROWS + 1);
   await referencias.protect('', { selectLockedCells: true, selectUnlockedCells: true });
@@ -663,13 +703,8 @@ function normalizeTituloRow(row, childMaps, refs, globalErrors) {
     const dataVencimento = parseDate(raw.data_vencimento, 'Data de vencimento', { required: true });
     const competenciaData = parseDate(raw.competencia_data, 'Competencia', { required: true });
     const consideraDre = parseBoolean(raw.considera_dre, true);
-    const apropriacaoId = parseInteger(raw.apropriacao_id, 'Apropriacao');
-    if (apropriacaoId) {
-      const apropriacao = refs.apropriacaoById.get(apropriacaoId);
-      if (!apropriacao || Number(apropriacao.obra_id) !== obraId) {
-        throw createHttpError(400, 'Apropriacao inexistente, somadora, inativa ou pertencente a outra obra.');
-      }
-    }
+    const apropriacao = resolveApropriacaoByCodigo(refs, obra, raw.apropriacao_codigo);
+    const apropriacaoId = apropriacao ? Number(apropriacao.id) : null;
 
     const parcelRows = childMaps.PARCELAS.get(key) || [];
     const parcelas = parcelRows.map(({ rowNumber: childRow, payload: item }) => {
@@ -701,9 +736,14 @@ function normalizeTituloRow(row, childMaps, refs, globalErrors) {
       try {
         const rateioObra = resolveObraByCodigos(refs, item.empresa_codigo, item.obra_codigo, 'Obra do rateio');
         const rateioObraId = Number(rateioObra.id);
-        const rateioApropriacaoId = parseInteger(item.apropriacao_id, 'Apropriacao do rateio', { required: true });
-        const rateioApropriacao = refs.apropriacaoById.get(rateioApropriacaoId);
-        if (!rateioApropriacao || Number(rateioApropriacao.obra_id) !== rateioObraId) throw createHttpError(400, 'Apropriacao do rateio nao pertence a obra informada.');
+        const rateioApropriacao = resolveApropriacaoByCodigo(
+          refs,
+          rateioObra,
+          item.apropriacao_codigo,
+          'Apropriacao do rateio',
+          { required: true }
+        );
+        const rateioApropriacaoId = Number(rateioApropriacao.id);
         const tipoRateio = normalizeUpper(item.tipo_rateio, 20);
         if (!['PERCENTUAL', 'VALOR'].includes(tipoRateio)) throw createHttpError(400, 'Tipo de rateio deve ser PERCENTUAL ou VALOR.');
         return {
@@ -719,7 +759,7 @@ function normalizeTituloRow(row, childMaps, refs, globalErrors) {
         return null;
       }
     }).filter(Boolean);
-    if (rateios.length && apropriacaoId) addLineError(errors, 'TITULOS', rowNumber, 'apropriacao_id', 'Nao informe apropriacao principal quando houver rateios.');
+    if (rateios.length && apropriacaoId) addLineError(errors, 'TITULOS', rowNumber, 'apropriacao_codigo', 'Nao informe apropriacao principal quando houver rateios.');
     if (rateios.length && new Set(rateios.map((item) => item.tipo_rateio)).size > 1) addLineError(errors, 'RATEIOS', rowNumber, 'tipo_rateio', 'Todos os rateios da chave devem usar o mesmo tipo.');
 
     const impostoRows = childMaps.IMPOSTOS.get(key) || [];
@@ -836,13 +876,14 @@ async function addDuplicateWarnings(items, userId, fileHash) {
 
 function buildReferenceMaps(refs) {
   const obraLookup = buildObraLookup(refs.obras);
+  const apropriacaoLookup = buildApropriacaoLookup(refs.apropriacoes);
   return {
     ...refs,
     ...obraLookup,
+    ...apropriacaoLookup,
     credorById: new Map(refs.credores.map((item) => [Number(item.id), item])),
     categoriaById: new Map(refs.categorias.map((item) => [Number(item.id), item])),
-    formaByCodigo: new Map(refs.formasPagamento.map((item) => [String(item.codigo).toUpperCase(), item])),
-    apropriacaoById: new Map(refs.apropriacoes.map((item) => [Number(item.id), item]))
+    formaByCodigo: new Map(refs.formasPagamento.map((item) => [String(item.codigo).toUpperCase(), item]))
   };
 }
 
@@ -1026,7 +1067,12 @@ async function confirmarImportacao(req, importacaoId, { idempotencyKey, aceitarA
 
 module.exports = {
   TEMPLATE_VERSION,
-  __testables: { buildReferenceMaps, resolveObraByCodigos },
+  __testables: {
+    buildReferenceMaps,
+    normalizeTituloRow,
+    resolveObraByCodigos,
+    resolveApropriacaoByCodigo
+  },
   criarPreviewImportacao,
   confirmarImportacao,
   carregarImportacao,

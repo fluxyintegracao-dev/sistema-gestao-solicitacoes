@@ -18,7 +18,8 @@ Financeiro e dono de titulos a pagar/receber, parcelas financeiras, movimentos, 
 A importacao em massa esta implementada no repositorio e depende da migration `202607200001_financeiro_titulos_importacao.js` no ambiente de destino. O fluxo e exclusivo para `PAGAR`: o usuario exporta o modelo versionado em Contas a Pagar, envia o `.xlsx`, revisa o preview persistido e confirma a criacao atomica.
 
 - permissao especifica `financeiro.titulos.importar`;
-- `empresa_codigo` + `obra_codigo` identificam a obra pela referencia operacional conhecida pelo usuario; o backend resolve o ID interno e deriva da obra a empresa, a DRE e a apropriacao principal do titulo;
+- `empresa_codigo` + `obra_codigo` identificam a obra pela referencia operacional conhecida pelo usuario; `apropriacao_codigo`, quando informado, identifica a apropriacao dentro dessa obra; o backend resolve os IDs internos e deriva da obra a empresa e a DRE do titulo;
+- o modelo de importacao nao expoe IDs internos de obra ou apropriacao e bloqueia codigos duplicados, inativos, somadores, fora do escopo ou vinculados a outra obra;
 - o credor e global e pode representar colaborador cadastrado em outra empresa;
 - a aba de referencias informa se o credor possui favorecido bancario/PIX pronto; a ausencia gera aviso no preview, sem impedir o titulo, mas bloqueia seu uso em lote bancario ate a regularizacao;
 - referencias sao revalidadas no preview e na confirmacao;
