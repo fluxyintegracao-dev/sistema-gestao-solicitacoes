@@ -15,7 +15,7 @@ O objetivo e permitir que um usuario autorizado importe contas a pagar por plani
 - nenhuma baixa, movimento financeiro, conciliacao, intent de pagamento ou emissao de boleto e criada na importacao;
 - cartoes, baixa automatica, faturas de cartao, intercompany, transferencia interna, cheques e multiplas formas de pagamento ficam fora da primeira versao;
 - uma forma de pagamento ativa e obrigatoria por titulo logico;
-- `empresa_codigo` + `obra_codigo` identificam de forma operacional uma unica obra; `apropriacao_codigo` identifica a apropriacao dentro dessa obra; IDs internos de obra e apropriacao nunca sao exigidos do usuario;
+- `empresa_codigo` + `obra_codigo` identificam de forma operacional uma unica obra; `apropriacao_codigo` identifica a apropriacao dentro dessa obra; `credor_cpf_cnpj` e `categoria_nome` usam valores visiveis nas telas; nenhum ID interno e exigido do usuario;
 - a obra resolvida define a empresa e o contexto permitido para a apropriacao principal do titulo, inclusive quando o credor for um colaborador cadastrado em outra empresa do grupo;
 - o vinculo empresarial do colaborador nao restringe a importacao: para o Financeiro ele participa como parceiro/credor global;
 - parcelas, rateios e impostos podem ser informados em abas proprias;
@@ -30,8 +30,8 @@ Essas restricoes evitam que uma planilha gere movimentos bancarios, efeitos entr
 | Dominio consumidor | Campo/regra que nao pode faltar | Risco se importado incorretamente |
 |---|---|---|
 | Empresas e Obras | combinacao unica e ativa de `empresa_codigo` + `obra_codigo`; empresa do titulo derivada de `obra.empresa_grupo_id` | consolidacao e escopo por empresa incorretos |
-| Parceiros e colaboradores | credor ativo marcado como fornecedor ou corretor; colaborador pode pertencer a empresa diferente da obra, desde que possua parceiro/credor financeiro valido | cadastro de RH sem correspondente financeiro bloqueia; favorecido bancario incompleto gera aviso e deixa o titulo inelegivel para lote ate regularizacao |
-| Categorias e DRE | categoria ativa, compativel com `PAGAR`; `competencia_data`; `considera_dre` e `dre_grupo` coerentes | DRE ausente ou classificada na linha errada |
+| Parceiros e colaboradores | `credor_cpf_cnpj` unico, credor ativo marcado como fornecedor ou corretor; colaborador pode pertencer a empresa diferente da obra | cadastro de RH sem correspondente financeiro bloqueia; documento duplicado bloqueia; favorecido bancario incompleto gera aviso |
+| Categorias e DRE | `categoria_nome` visivel e nao ambiguo; categoria ativa, compativel com `PAGAR`; `competencia_data`; `considera_dre` e `dre_grupo` coerentes | DRE ausente ou classificada na linha errada |
 | Apropriacoes e rateios | `apropriacao_codigo` unico dentro da obra, analitico e ativo; rateio fecha 100% ou o valor total informado e e escalado para o liquido calculado | custo atribuido a centro errado |
 | Fluxo de caixa | vencimento, status e saldo inicial corretos | previsao de caixa incorreta |
 | Impostos | natureza, base, aliquota e valor; liquido recalculado pelo backend | saldo e pagamento divergentes do documento |
@@ -64,8 +64,8 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | `chave_importacao` | sim | identificador unico dentro do arquivo, sem reutilizacao |
 | `empresa_codigo` | sim | codigo operacional da empresa listado em `REFERENCIAS`; usado com `obra_codigo` para desambiguar a obra |
 | `obra_codigo` | sim | codigo informado no cadastro da obra e listado em `REFERENCIAS`; nunca recebe o ID do banco |
-| `credor_id` | sim | ID listado em `REFERENCIAS`; parceiro ativo e elegivel para `PAGAR` |
-| `categoria_id` | sim | ID listado em `REFERENCIAS`; categoria ativa e compativel com `PAGAR` |
+| `credor_cpf_cnpj` | sim | CPF/CNPJ visivel no cadastro e listado em `REFERENCIAS`; aceita valor com ou sem mascara |
+| `categoria_nome` | sim | nome exatamente como exibido em `REFERENCIAS`, incluindo o prefixo numerico quando existir |
 | `forma_pagamento_codigo` | sim | forma ativa, sem cartao na primeira versao |
 | `status` | nao | `ABERTO` por padrao; aceita `PREVISAO` |
 | `descricao` | sim | ate 255 caracteres |
@@ -82,7 +82,7 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | `linha_digitavel` | nao | armazenada para pagamento, sem executar baixa |
 | `codigo_barras` | nao | armazenado para pagamento, sem executar baixa |
 
-Nomes, CPF/CNPJ e descricoes aparecem na aba `REFERENCIAS`. A obra e resolvida pela combinacao normalizada de `empresa_codigo` + `obra_codigo`, pois `obra.codigo` isolado nao e unico no schema atual. Se essa combinacao estiver duplicada no cadastro, a linha e bloqueada para regularizacao. Depois da resolucao, o backend usa o ID interno da obra e deriva `empresa_id` de `obra.empresa_grupo_id`; o codigo da empresa nao permite forcar uma empresa diferente da vinculada a obra. Quando informada, a apropriacao e resolvida pela combinacao da obra ja validada com `apropriacao_codigo`. Codigo ausente, duplicado dentro da obra, somador, inativo ou pertencente a outra obra bloqueia a linha. Credor e categoria continuam sendo resolvidos pelos IDs selecionaveis da aba de referencias, e a forma de pagamento pelo codigo funcional.
+Nomes, CPF/CNPJ e descricoes aparecem na aba `REFERENCIAS`. A obra e resolvida pela combinacao normalizada de `empresa_codigo` + `obra_codigo`, pois `obra.codigo` isolado nao e unico no schema atual. Se essa combinacao estiver duplicada no cadastro, a linha e bloqueada para regularizacao. Depois da resolucao, o backend usa o ID interno da obra e deriva `empresa_id` de `obra.empresa_grupo_id`; o codigo da empresa nao permite forcar uma empresa diferente da vinculada a obra. Quando informada, a apropriacao e resolvida pela combinacao da obra ja validada com `apropriacao_codigo`. O credor e resolvido pelo CPF/CNPJ normalizado e a categoria pelo nome visivel normalizado. Documentos ou nomes duplicados sao bloqueados para evitar escolha arbitraria. Somente depois dessas resolucoes o backend usa os IDs internos no servico de dominio.
 
 Em importacoes de salarios, o colaborador pode estar cadastrado em empresa diferente da empresa da obra. Essa divergencia nao gera erro: a obra continua definindo `obra_id`, `empresa_id`, DRE e quais apropriacoes podem receber o custo, enquanto o parceiro vinculado ao colaborador e apenas o credor/favorecido. A importacao nao deve alterar `empresa_grupo_id` ou `obra_id` do cadastro de RH. Se o colaborador ainda nao possuir parceiro financeiro ativo e elegivel para `PAGAR`, a linha deve ser bloqueada para regularizacao cadastral, sem criar ou converter parceiros silenciosamente durante a importacao.
 
@@ -140,8 +140,8 @@ O backend recalcula `valor_bruto`, `valor_impostos` e `valor_liquido`; valores c
 Gerada para o usuario e protegida contra edicao acidental, contendo somente:
 
 - obras dentro do escopo financeiro do usuario, com `empresa_codigo`, nome da empresa, `obra_codigo` e nome da obra; obras sem os dois codigos nao ficam elegiveis para a importacao;
-- credores ativos elegiveis para contas a pagar, com ID, nome, CPF/CNPJ e indicador `favorecido_bancario` (`PRONTO` ou `PENDENTE`);
-- categorias ativas compativeis com `PAGAR`, com ID, nome, indicador e grupo DRE;
+- credores ativos elegiveis para contas a pagar, com `credor_cpf_cnpj`, nome e indicador `favorecido_bancario` (`PRONTO` ou `PENDENTE`), sem ID interno;
+- categorias ativas compativeis com `PAGAR`, com `categoria_nome`, tipo e grupo DRE, sem ID interno;
 - formas de pagamento ativas permitidas pela primeira versao, excluindo as que exigem cartao ou cheque;
 - apropriacoes analiticas ativas das obras visiveis, com `apropriacao_empresa_codigo`, `apropriacao_obra_codigo`, `apropriacao_codigo` e descricao; o ID interno da apropriacao nao e exportado.
 
@@ -283,6 +283,8 @@ A mesma entrega deve avaliar se a rota individual `POST /financeiro/titulos` pas
 - categoria incompativel, inativa ou sem grupo DRE bloqueia quando aplicavel;
 - credor inexistente/inativo ou nao fornecedor/corretor bloqueia;
 - colaborador de outra empresa, mas com parceiro financeiro valido, pode ser credor sem alterar a empresa derivada da obra;
+- `credor_cpf_cnpj` com ou sem mascara resolve o mesmo parceiro; documento inexistente ou duplicado bloqueia a linha;
+- `categoria_nome` resolve uma unica categoria ativa de contas a pagar; nome inexistente ou duplicado bloqueia a linha;
 - colaborador sem parceiro/credor financeiro elegivel bloqueia a linha e nao e cadastrado automaticamente;
 - credor sem favorecido bancario/PIX completo gera aviso confirmavel: o titulo e criado, mas permanece inelegivel para lote bancario ate a regularizacao cadastral;
 - obra fora do escopo ou sem empresa bloqueia;

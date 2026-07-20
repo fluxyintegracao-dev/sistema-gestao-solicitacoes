@@ -3,7 +3,7 @@
 ## 2026-07-20 - Importacao em massa de contas a pagar
 
 - implementados modelo XLSX versionado, referencias por escopo, preview persistido e erros por linha;
-- modelo atualizado para a versao `1.2`, usando `empresa_codigo` + `obra_codigo` + `apropriacao_codigo` no lugar dos IDs internos de obra e apropriacao;
+- modelo atualizado para a versao `1.3`, usando `empresa_codigo`, `obra_codigo`, `credor_cpf_cnpj`, `categoria_nome` e `apropriacao_codigo`, sem expor IDs internos;
 - implementada confirmacao atomica com idempotencia, revalidacao e auditoria;
 - adicionados os comandos `Exportar modelo` e `Importar planilha` em Contas a Pagar;
 - definida a obra como origem da empresa e do custo, permitindo colaborador credor cadastrado em outra empresa;

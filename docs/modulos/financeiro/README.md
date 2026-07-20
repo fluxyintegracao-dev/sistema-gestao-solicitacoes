@@ -19,7 +19,8 @@ A importacao em massa esta implementada no repositorio e depende da migration `2
 
 - permissao especifica `financeiro.titulos.importar`;
 - `empresa_codigo` + `obra_codigo` identificam a obra pela referencia operacional conhecida pelo usuario; `apropriacao_codigo`, quando informado, identifica a apropriacao dentro dessa obra; o backend resolve os IDs internos e deriva da obra a empresa e a DRE do titulo;
-- o modelo de importacao nao expoe IDs internos de obra ou apropriacao e bloqueia codigos duplicados, inativos, somadores, fora do escopo ou vinculados a outra obra;
+- `credor_cpf_cnpj` identifica o parceiro pelo documento visivel na tela, com ou sem mascara, e `categoria_nome` usa o nome exibido no cadastro;
+- o modelo de importacao nao expoe IDs internos de obra, credor, categoria ou apropriacao e bloqueia referencias inexistentes, ambiguas, inativas ou fora do escopo;
 - o credor e global e pode representar colaborador cadastrado em outra empresa;
 - a aba de referencias informa se o credor possui favorecido bancario/PIX pronto; a ausencia gera aviso no preview, sem impedir o titulo, mas bloqueia seu uso em lote bancario ate a regularizacao;
 - referencias sao revalidadas no preview e na confirmacao;

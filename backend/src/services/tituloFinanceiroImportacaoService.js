@@ -22,7 +22,7 @@ const {
 const { criarTituloManual } = require('./tituloFinanceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
-const TEMPLATE_VERSION = '1.2';
+const TEMPLATE_VERSION = '1.3';
 const MAX_TITULOS = 500;
 const MAX_TOTAL_ROWS = 5000;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -33,7 +33,7 @@ const REQUIRED_SHEETS = ['TITULOS', 'PARCELAS', 'RATEIOS', 'IMPOSTOS'];
 const IMPORTABLE_SHEETS = new Set(REQUIRED_SHEETS);
 const ALLOWED_HEADERS = {
   TITULOS: [
-    'chave_importacao', 'empresa_codigo', 'obra_codigo', 'credor_id', 'categoria_id',
+    'chave_importacao', 'empresa_codigo', 'obra_codigo', 'credor_cpf_cnpj', 'categoria_nome',
     'forma_pagamento_codigo', 'status', 'descricao', 'numero_documento', 'valor_total',
     'data_emissao', 'data_vencimento', 'competencia_data', 'considera_dre',
     'apropriacao_codigo', 'observacoes', 'forma_cobranca', 'banco_cobranca',
@@ -91,6 +91,30 @@ function normalizeText(value, maxLength = 4000) {
 function normalizeUpper(value, maxLength = 80) {
   const text = normalizeText(value, maxLength);
   return text ? text.toUpperCase() : null;
+}
+
+function normalizeLookupText(value, maxLength = 255) {
+  const text = normalizeUpper(value, maxLength);
+  return text
+    ? text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ')
+    : null;
+}
+
+function normalizeCpfCnpj(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  return digits || null;
+}
+
+function formatCpfCnpj(value) {
+  const digits = normalizeCpfCnpj(value);
+  if (!digits) return null;
+  if (digits.length === 11) {
+    return digits.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+  }
+  if (digits.length === 14) {
+    return digits.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  }
+  return digits;
 }
 
 function buildObraLookupKey(empresaCodigo, obraCodigo) {
@@ -169,6 +193,60 @@ function resolveApropriacaoByCodigo(refs, obra, apropriacaoCodigo, label = 'Apro
   if (!resolved) {
     throw createHttpError(400, `${label}: apropriacao_codigo inexistente, inativo, somador ou pertencente a outra obra.`);
   }
+  return resolved;
+}
+
+function buildCredorLookup(credores = []) {
+  const credorByCpfCnpj = new Map();
+  const credorDocumentosAmbiguos = new Set();
+  credores.forEach((credor) => {
+    const key = normalizeCpfCnpj(credor?.cpf_cnpj);
+    if (!key) return;
+    if (credorByCpfCnpj.has(key)) {
+      credorByCpfCnpj.delete(key);
+      credorDocumentosAmbiguos.add(key);
+      return;
+    }
+    if (!credorDocumentosAmbiguos.has(key)) credorByCpfCnpj.set(key, credor);
+  });
+  return { credorByCpfCnpj, credorDocumentosAmbiguos };
+}
+
+function resolveCredorByCpfCnpj(refs, value) {
+  const key = normalizeCpfCnpj(value);
+  if (!key) throw createHttpError(400, 'CPF/CNPJ do credor e obrigatorio.');
+  if (refs.credorDocumentosAmbiguos.has(key)) {
+    throw createHttpError(400, 'CPF/CNPJ do credor esta duplicado no cadastro e precisa ser regularizado.');
+  }
+  const resolved = refs.credorByCpfCnpj.get(key);
+  if (!resolved) throw createHttpError(400, 'Credor inexistente, inativo ou inelegivel para contas a pagar.');
+  return resolved;
+}
+
+function buildCategoriaLookup(categorias = []) {
+  const categoriaByNome = new Map();
+  const categoriaNomesAmbiguos = new Set();
+  categorias.forEach((categoria) => {
+    const key = normalizeLookupText(categoria?.nome, 120);
+    if (!key) return;
+    if (categoriaByNome.has(key)) {
+      categoriaByNome.delete(key);
+      categoriaNomesAmbiguos.add(key);
+      return;
+    }
+    if (!categoriaNomesAmbiguos.has(key)) categoriaByNome.set(key, categoria);
+  });
+  return { categoriaByNome, categoriaNomesAmbiguos };
+}
+
+function resolveCategoriaByNome(refs, value) {
+  const key = normalizeLookupText(value, 120);
+  if (!key) throw createHttpError(400, 'Nome da categoria e obrigatorio.');
+  if (refs.categoriaNomesAmbiguos.has(key)) {
+    throw createHttpError(400, 'Nome da categoria esta duplicado no cadastro e precisa ser regularizado.');
+  }
+  const resolved = refs.categoriaByNome.get(key);
+  if (!resolved) throw createHttpError(400, 'Categoria inexistente, inativa ou incompativel com contas a pagar.');
   return resolved;
 }
 
@@ -454,7 +532,13 @@ async function getReferenceData(user) {
     return !forma.exige_cartao && !forma.exige_cheque && !forma.gera_fatura
       && !token.includes('CARTAO') && !token.includes('CHEQUE');
   });
-  return { obras, credores, categorias, formasPagamento: formasPermitidas, apropriacoes };
+  return {
+    obras,
+    credores: credores.filter((credor) => normalizeCpfCnpj(credor.cpf_cnpj)),
+    categorias,
+    formasPagamento: formasPermitidas,
+    apropriacoes
+  };
 }
 
 function applyHeaderStyle(row) {
@@ -511,7 +595,8 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
     ['Chave principal', 'Use uma chave_importacao unica por titulo logico, por exemplo FOLHA-2026-07-0001.'],
     ['Obra e empresa', 'Informe empresa_codigo e obra_codigo exatamente como cadastrados. A combinacao resolve a obra; a empresa real do titulo continua sendo derivada dessa obra.'],
     ['Apropriacao', 'Quando utilizada, informe apropriacao_codigo da aba REFERENCIAS. O backend resolve o cadastro dentro da obra informada; IDs internos nao fazem parte do modelo.'],
-    ['Credor', 'Informe credor_id da aba REFERENCIAS. O parceiro precisa estar ativo e elegivel para contas a pagar. A coluna favorecido_bancario indica se o credor esta pronto para lote PIX.'],
+    ['Credor', 'Informe credor_cpf_cnpj da aba REFERENCIAS. Pontuacao e mascara sao opcionais. O parceiro precisa estar ativo e elegivel para contas a pagar.'],
+    ['Categoria', 'Informe categoria_nome exatamente como exibido na aba REFERENCIAS. Nomes duplicados no cadastro bloqueiam a importacao ate regularizacao.'],
     ['Datas', 'Use datas reais do Excel ou AAAA-MM-DD.'],
     ['Valores', 'Use numeros positivos. Nao inclua R$ como texto. Parcelas devem somar valor_total.'],
     ['Abas filhas', 'PARCELAS, RATEIOS e IMPOSTOS se relacionam pela chave_importacao. Deixe-as vazias quando nao forem necessarias.'],
@@ -522,7 +607,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   ];
   instructionRows.forEach((values, index) => {
     const row = instrucoes.addRow(values);
-    row.height = [3, 4].includes(index) ? 46 : 34;
+    row.height = [3, 4, 5, 6].includes(index) ? 46 : 34;
     row.getCell(1).font = { name: 'Aptos', size: 10, bold: true, color: { argb: 'FF173B57' } };
     row.getCell(2).font = { name: 'Aptos', size: 10, color: { argb: 'FF263746' } };
     row.eachCell((cell) => {
@@ -534,14 +619,13 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
 
   const titulos = workbook.addWorksheet('TITULOS');
   setupDataSheet(titulos, ALLOWED_HEADERS.TITULOS, {
-    chave_importacao: 25, empresa_codigo: 20, obra_codigo: 20, credor_id: 12, categoria_id: 12,
+    chave_importacao: 25, empresa_codigo: 20, obra_codigo: 20, credor_cpf_cnpj: 22, categoria_nome: 38,
     forma_pagamento_codigo: 24, descricao: 42, numero_documento: 22,
     valor_total: 16, observacoes: 42, linha_digitavel: 34, codigo_barras: 34
   });
   titulos.getColumn(10).numFmt = '#,##0.00;[Red](#,##0.00);-';
   [11, 12, 13].forEach((column) => { titulos.getColumn(column).numFmt = 'yyyy-mm-dd'; });
-  [1, 2, 3, 6, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20].forEach((column) => { titulos.getColumn(column).numFmt = '@'; });
-  [4, 5].forEach((column) => { titulos.getColumn(column).numFmt = '0'; });
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16, 17, 18, 19, 20].forEach((column) => { titulos.getColumn(column).numFmt = '@'; });
 
   const parcelas = workbook.addWorksheet('PARCELAS');
   setupDataSheet(parcelas, ALLOWED_HEADERS.PARCELAS, { chave_importacao: 25, numero_documento: 22, linha_digitavel: 34, codigo_barras: 34, observacoes: 42 });
@@ -567,8 +651,8 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   const referencias = workbook.addWorksheet('REFERENCIAS', { views: [{ state: 'frozen', ySplit: 1, showGridLines: false }] });
   const refHeaders = [
     'empresa_codigo', 'empresa_nome', 'obra_codigo', 'obra_nome',
-    'credor_id', 'credor_nome', 'cpf_cnpj', 'favorecido_bancario',
-    'categoria_id', 'categoria_nome', 'dre_grupo',
+    'credor_cpf_cnpj', 'credor_nome', 'favorecido_bancario',
+    'categoria_nome', 'categoria_tipo', 'dre_grupo',
     'forma_codigo', 'forma_nome',
     'apropriacao_empresa_codigo', 'apropriacao_obra_codigo',
     'apropriacao_codigo', 'apropriacao_descricao'
@@ -576,7 +660,7 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   referencias.addRow(refHeaders);
   applyHeaderStyle(referencias.getRow(1));
   referencias.columns.forEach((column, index) => {
-    column.width = [20, 30, 20, 36, 12, 36, 20, 22, 12, 36, 24, 20, 30, 24, 24, 22, 42][index] || 18;
+    column.width = [20, 30, 20, 36, 22, 36, 22, 38, 18, 24, 20, 30, 24, 24, 22, 42][index] || 18;
   });
   const obraByIdReferencia = new Map(refs.obras.map((obra) => [Number(obra.id), obra]));
   const maxRefRows = Math.max(refs.obras.length, refs.credores.length, refs.categorias.length, refs.formasPagamento.length, refs.apropriacoes.length, 1);
@@ -590,16 +674,14 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
     const beneficiary = credor?.paymentBeneficiaries?.find((item) => item.ativo !== false && item.pix_tipo_chave && item.pix_chave);
     referencias.addRow([
       obra?.empresaGrupo?.codigo || null, obra?.empresaGrupo?.nome || null, obra?.codigo || null, obra?.nome || null,
-      credor?.id || null, credor?.nome || null, credor?.cpf_cnpj || null, credor ? (beneficiary ? 'PRONTO' : 'PENDENTE') : null,
-      categoria?.id || null, categoria?.nome || null, categoria?.dre_grupo || null,
+      formatCpfCnpj(credor?.cpf_cnpj), credor?.nome || null, credor ? (beneficiary ? 'PRONTO' : 'PENDENTE') : null,
+      categoria?.nome || null, categoria?.tipo || null, categoria?.dre_grupo || null,
       forma?.codigo || null, forma?.nome || null,
       apropriacaoObra?.empresaGrupo?.codigo || null, apropriacaoObra?.codigo || null,
       apropriacao?.codigo || null, apropriacao?.descricao || null
     ]);
   }
-  referencias.getColumn(5).numFmt = '0';
-  referencias.getColumn(9).numFmt = '0';
-  [1, 2, 3, 4, 6, 7, 8, 10, 11, 12, 13, 14, 15, 16, 17].forEach((column) => { referencias.getColumn(column).numFmt = '@'; });
+  referencias.columns.forEach((column) => { column.numFmt = '@'; });
 
   const obraEnd = Math.max(refs.obras.length + 1, 2);
   const credorEnd = Math.max(refs.credores.length + 1, 2);
@@ -609,15 +691,15 @@ async function gerarModeloImportacao(req, { references = null, skipAudit = false
   applyValidation(titulos, 2, `REFERENCIAS!$A$2:$A$${obraEnd}`);
   applyValidation(titulos, 3, `REFERENCIAS!$C$2:$C$${obraEnd}`);
   applyValidation(titulos, 4, `REFERENCIAS!$E$2:$E$${credorEnd}`);
-  applyValidation(titulos, 5, `REFERENCIAS!$I$2:$I$${categoriaEnd}`);
-  applyValidation(titulos, 6, `REFERENCIAS!$L$2:$L$${formaEnd}`);
+  applyValidation(titulos, 5, `REFERENCIAS!$H$2:$H$${categoriaEnd}`);
+  applyValidation(titulos, 6, `REFERENCIAS!$K$2:$K$${formaEnd}`);
   applyValidation(titulos, 7, '"ABERTO,PREVISAO"');
   applyValidation(titulos, 14, '"SIM,NAO"');
-  applyValidation(titulos, 15, `REFERENCIAS!$P$2:$P$${apropriacaoEnd}`);
+  applyValidation(titulos, 15, `REFERENCIAS!$O$2:$O$${apropriacaoEnd}`);
   applyValidation(titulos, 17, '"BOLETO,PIX,OUTROS"');
   applyValidation(rateios, 2, `REFERENCIAS!$A$2:$A$${obraEnd}`, MAX_TOTAL_ROWS + 1);
   applyValidation(rateios, 3, `REFERENCIAS!$C$2:$C$${obraEnd}`, MAX_TOTAL_ROWS + 1);
-  applyValidation(rateios, 4, `REFERENCIAS!$P$2:$P$${apropriacaoEnd}`, MAX_TOTAL_ROWS + 1);
+  applyValidation(rateios, 4, `REFERENCIAS!$O$2:$O$${apropriacaoEnd}`, MAX_TOTAL_ROWS + 1);
   applyValidation(rateios, 5, '"PERCENTUAL,VALOR"', MAX_TOTAL_ROWS + 1);
   applyValidation(impostos, 4, '"RETENCAO,ACRESCIMO"', MAX_TOTAL_ROWS + 1);
   await referencias.protect('', { selectLockedCells: true, selectUnlockedCells: true });
@@ -673,15 +755,13 @@ function normalizeTituloRow(row, childMaps, refs, globalErrors) {
     if (!key) throw createHttpError(400, 'Chave de importacao obrigatoria.');
     const obra = resolveObraByCodigos(refs, raw.empresa_codigo, raw.obra_codigo);
     const obraId = Number(obra.id);
-    const parceiroId = parseInteger(raw.credor_id, 'Credor', { required: true });
-    const categoriaId = parseInteger(raw.categoria_id, 'Categoria', { required: true });
+    const parceiro = resolveCredorByCpfCnpj(refs, raw.credor_cpf_cnpj);
+    const categoria = resolveCategoriaByNome(refs, raw.categoria_nome);
+    const parceiroId = Number(parceiro.id);
+    const categoriaId = Number(categoria.id);
     const formaCodigo = normalizeUpper(raw.forma_pagamento_codigo, 60);
     if (!formaCodigo) throw createHttpError(400, 'Forma de pagamento e obrigatoria.');
-    const parceiro = refs.credorById.get(parceiroId);
-    const categoria = refs.categoriaById.get(categoriaId);
     const forma = refs.formaByCodigo.get(formaCodigo);
-    if (!parceiro) throw createHttpError(400, 'Credor inexistente, inativo ou inelegivel para contas a pagar.');
-    if (!categoria) throw createHttpError(400, 'Categoria inexistente, inativa ou incompativel com contas a pagar.');
     if (!forma) throw createHttpError(400, 'Forma de pagamento inativa ou nao permitida nesta importacao.');
     const favorecidoPronto = Array.isArray(parceiro.paymentBeneficiaries)
       && parceiro.paymentBeneficiaries.some((item) => item.ativo !== false && item.pix_tipo_chave && item.pix_chave);
@@ -689,7 +769,7 @@ function normalizeTituloRow(row, childMaps, refs, globalErrors) {
       warnings.push({
         aba: 'TITULOS',
         linha: rowNumber,
-        coluna: 'credor_id',
+        coluna: 'credor_cpf_cnpj',
         mensagem: 'Credor sem favorecido bancario/PIX completo. O titulo pode ser importado, mas nao estara elegivel para lote bancario ate a regularizacao.'
       });
     }
@@ -877,12 +957,14 @@ async function addDuplicateWarnings(items, userId, fileHash) {
 function buildReferenceMaps(refs) {
   const obraLookup = buildObraLookup(refs.obras);
   const apropriacaoLookup = buildApropriacaoLookup(refs.apropriacoes);
+  const credorLookup = buildCredorLookup(refs.credores);
+  const categoriaLookup = buildCategoriaLookup(refs.categorias);
   return {
     ...refs,
     ...obraLookup,
     ...apropriacaoLookup,
-    credorById: new Map(refs.credores.map((item) => [Number(item.id), item])),
-    categoriaById: new Map(refs.categorias.map((item) => [Number(item.id), item])),
+    ...credorLookup,
+    ...categoriaLookup,
     formaByCodigo: new Map(refs.formasPagamento.map((item) => [String(item.codigo).toUpperCase(), item]))
   };
 }
@@ -1071,7 +1153,9 @@ module.exports = {
     buildReferenceMaps,
     normalizeTituloRow,
     resolveObraByCodigos,
-    resolveApropriacaoByCodigo
+    resolveApropriacaoByCodigo,
+    resolveCredorByCpfCnpj,
+    resolveCategoriaByNome
   },
   criarPreviewImportacao,
   confirmarImportacao,

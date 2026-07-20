@@ -9,8 +9,8 @@
 ## Estado da implementacao
 
 - Implementacao inicial commitada em `14220d2` e aplicada no ambiente dev em 2026-07-20, inclusive a migration `202607200001_financeiro_titulos_importacao.js`.
-- Ajuste do modelo para `empresa_codigo` + `obra_codigo` + `apropriacao_codigo` esta em desenvolvimento local, sem commit ou deploy.
-- O ajuste de codigos operacionais nao exige nova migration; depende de novo deploy do backend e da geracao de um modelo XLSX versao `1.2`.
+- Ajuste do modelo para eliminar tambem `credor_id` e `categoria_id` esta em desenvolvimento local, sem commit ou deploy.
+- O ajuste usa `empresa_codigo`, `obra_codigo`, `credor_cpf_cnpj`, `categoria_nome` e `apropriacao_codigo`, nao exige nova migration e gera o modelo XLSX versao `1.3`.
 - Producao nao recebeu a migration nem o recurso nesta sessao.
 
 ## Regras implementadas
@@ -18,7 +18,8 @@
 - O fluxo existe somente em Contas a Pagar.
 - O usuario informa `empresa_codigo` + `obra_codigo`; o backend resolve uma unica obra e somente entao usa seu ID interno.
 - O usuario informa `apropriacao_codigo` quando houver apropriacao principal ou rateio; o backend resolve o codigo dentro da obra ja validada e usa o ID somente no payload interno.
-- O modelo nao expoe IDs internos de obra ou apropriacao; apropriacao inexistente, inativa, somadora, de outra obra ou com codigo duplicado na mesma obra bloqueia a linha.
+- O usuario informa `credor_cpf_cnpj` e `categoria_nome`, ambos visiveis nas telas; mascara do documento e diferencas de caixa/acentuacao do nome sao normalizadas.
+- O modelo nao expoe IDs internos de obra, credor, categoria ou apropriacao; referencia inexistente, inativa, incompativel ou ambigua bloqueia a linha.
 - O codigo da empresa desambigua o codigo da obra, mas `empresa_id` do titulo continua derivado de `obra.empresa_grupo_id`; a empresa do cadastro do colaborador nao substitui a empresa derivada da obra.
 - Combinacao inexistente, fora do escopo, sem codigos cadastrados ou duplicada bloqueia a linha.
 - O colaborador precisa possuir parceiro financeiro ativo marcado como fornecedor ou corretor; a importacao nao cria ou converte parceiros automaticamente.
@@ -75,7 +76,7 @@
 
 ## Riscos e homologacao obrigatoria
 
-- No ambiente dev a migration ja foi aplicada; para o ajuste da versao `1.2`, atualizar o codigo e reiniciar somente `backend-dev`.
+- No ambiente dev a migration base ja foi aplicada; para o ajuste da versao `1.3`, atualizar o codigo e reiniciar somente `backend-dev`.
 - Conceder `financeiro.titulos.importar` somente ao grupo piloto e validar que usuarios sem a permissao nao veem nem acessam os endpoints.
 - Homologar com massa real de salarios, incluindo colaborador de empresa diferente da obra, parcelamento, impostos, rateio e favorecido bancario pendente.
 - Confirmar em banco que os titulos importados aparecem em Contas a Pagar, DRE, fluxo previsto, Resultado de Obras e selecao de lote bancario, sem gerar movimentos ou pagamentos.
@@ -84,5 +85,5 @@
 ## Proximo passo exato
 
 1. Revisar o diff e criar commit dedicado sem incluir alteracoes documentais ou arquivos nao relacionados que ja estavam no worktree.
-2. Atualizar o ambiente dev por `git pull --ff-only origin dev-v2`, executar `npm install` em `backend/` e reiniciar somente `backend-dev`; nao ha nova migration para a versao `1.2`.
+2. Atualizar o ambiente dev por `git pull --ff-only origin dev-v2`, executar `npm install` em `backend/` e reiniciar somente `backend-dev`; nao ha nova migration para a versao `1.3`.
 3. Publicar o frontend se necessario e executar a matriz de homologacao acima antes de liberar a permissao aos usuarios finais.
