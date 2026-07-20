@@ -8,15 +8,17 @@
 
 ## Estado da implementacao
 
-- Implementacao concluida localmente na branch `dev-v2`.
-- Nenhuma migration foi executada em banco compartilhado ou de producao nesta sessao.
-- Nenhum commit ou deploy foi realizado.
-- O recurso depende da migration `202607200001_financeiro_titulos_importacao.js` e da concessao da permissao `financeiro.titulos.importar` aos usuarios que utilizarao o fluxo.
+- Implementacao inicial commitada em `14220d2` e aplicada no ambiente dev em 2026-07-20, inclusive a migration `202607200001_financeiro_titulos_importacao.js`.
+- Ajuste do modelo para `empresa_codigo` + `obra_codigo` esta em desenvolvimento local, sem commit ou deploy.
+- O ajuste de codigos operacionais nao exige nova migration; depende de novo deploy do backend e da geracao de um modelo XLSX versao `1.1`.
+- Producao nao recebeu a migration nem o recurso nesta sessao.
 
 ## Regras implementadas
 
 - O fluxo existe somente em Contas a Pagar.
-- `obra_id` define `obra_id` e `empresa_id` do titulo; a empresa do cadastro do colaborador nao substitui a empresa derivada da obra.
+- O usuario informa `empresa_codigo` + `obra_codigo`; o backend resolve uma unica obra e somente entao usa seu ID interno.
+- O codigo da empresa desambigua o codigo da obra, mas `empresa_id` do titulo continua derivado de `obra.empresa_grupo_id`; a empresa do cadastro do colaborador nao substitui a empresa derivada da obra.
+- Combinacao inexistente, fora do escopo, sem codigos cadastrados ou duplicada bloqueia a linha.
 - O colaborador precisa possuir parceiro financeiro ativo marcado como fornecedor ou corretor; a importacao nao cria ou converte parceiros automaticamente.
 - Credor sem favorecido bancario/PIX completo gera aviso confirmavel. O titulo pode ser criado, mas permanece inelegivel para lote bancario ate a regularizacao.
 - Modelo possui abas `INSTRUCOES`, `TITULOS`, `PARCELAS`, `RATEIOS`, `IMPOSTOS` e `REFERENCIAS`.
@@ -71,7 +73,7 @@
 
 ## Riscos e homologacao obrigatoria
 
-- Aplicar primeiro em ambiente de desenvolvimento: executar `npm run migrate` dentro de `backend/` e reiniciar o backend.
+- No ambiente dev a migration ja foi aplicada; para o ajuste da versao `1.1`, atualizar o codigo e reiniciar somente `backend-dev`.
 - Conceder `financeiro.titulos.importar` somente ao grupo piloto e validar que usuarios sem a permissao nao veem nem acessam os endpoints.
 - Homologar com massa real de salarios, incluindo colaborador de empresa diferente da obra, parcelamento, impostos, rateio e favorecido bancario pendente.
 - Confirmar em banco que os titulos importados aparecem em Contas a Pagar, DRE, fluxo previsto, Resultado de Obras e selecao de lote bancario, sem gerar movimentos ou pagamentos.
@@ -80,5 +82,5 @@
 ## Proximo passo exato
 
 1. Revisar o diff e criar commit dedicado sem incluir alteracoes documentais ou arquivos nao relacionados que ja estavam no worktree.
-2. Em desenvolvimento, executar `cd backend` e `npm run migrate`.
-3. Reiniciar o backend, publicar o frontend e executar a matriz de homologacao acima antes de liberar a permissao aos usuarios finais.
+2. Atualizar o ambiente dev por `git pull --ff-only origin dev-v2`, executar `npm install` em `backend/` e reiniciar somente `backend-dev`; nao ha nova migration para a versao `1.1`.
+3. Publicar o frontend se necessario e executar a matriz de homologacao acima antes de liberar a permissao aos usuarios finais.

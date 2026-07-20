@@ -15,7 +15,8 @@ O objetivo e permitir que um usuario autorizado importe contas a pagar por plani
 - nenhuma baixa, movimento financeiro, conciliacao, intent de pagamento ou emissao de boleto e criada na importacao;
 - cartoes, baixa automatica, faturas de cartao, intercompany, transferencia interna, cheques e multiplas formas de pagamento ficam fora da primeira versao;
 - uma forma de pagamento ativa e obrigatoria por titulo logico;
-- a obra informada define a empresa e a apropriacao principal do titulo, inclusive quando o credor for um colaborador cadastrado em outra empresa do grupo;
+- `empresa_codigo` + `obra_codigo` identificam de forma operacional uma unica obra; o ID interno nunca e exigido do usuario;
+- a obra resolvida define a empresa e a apropriacao principal do titulo, inclusive quando o credor for um colaborador cadastrado em outra empresa do grupo;
 - o vinculo empresarial do colaborador nao restringe a importacao: para o Financeiro ele participa como parceiro/credor global;
 - parcelas, rateios e impostos podem ser informados em abas proprias;
 - importacao com erro nao permite confirmacao;
@@ -28,7 +29,7 @@ Essas restricoes evitam que uma planilha gere movimentos bancarios, efeitos entr
 
 | Dominio consumidor | Campo/regra que nao pode faltar | Risco se importado incorretamente |
 |---|---|---|
-| Empresas e Obras | obra valida e empresa ativa derivada de `obra.empresa_grupo_id` | consolidacao e escopo por empresa incorretos |
+| Empresas e Obras | combinacao unica e ativa de `empresa_codigo` + `obra_codigo`; empresa do titulo derivada de `obra.empresa_grupo_id` | consolidacao e escopo por empresa incorretos |
 | Parceiros e colaboradores | credor ativo marcado como fornecedor ou corretor; colaborador pode pertencer a empresa diferente da obra, desde que possua parceiro/credor financeiro valido | cadastro de RH sem correspondente financeiro bloqueia; favorecido bancario incompleto gera aviso e deixa o titulo inelegivel para lote ate regularizacao |
 | Categorias e DRE | categoria ativa, compativel com `PAGAR`; `competencia_data`; `considera_dre` e `dre_grupo` coerentes | DRE ausente ou classificada na linha errada |
 | Apropriacoes e rateios | apropriacao analitica, ativa e da mesma obra; rateio fecha 100% ou o valor total informado e e escalado para o liquido calculado | custo atribuido a centro errado |
@@ -61,7 +62,8 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | Coluna | Obrigatoria | Regra |
 |---|---|---|
 | `chave_importacao` | sim | identificador unico dentro do arquivo, sem reutilizacao |
-| `obra_id` | sim | ID listado em `REFERENCIAS`; obra acessivel ao usuario e empresa derivada da obra |
+| `empresa_codigo` | sim | codigo operacional da empresa listado em `REFERENCIAS`; usado com `obra_codigo` para desambiguar a obra |
+| `obra_codigo` | sim | codigo informado no cadastro da obra e listado em `REFERENCIAS`; nunca recebe o ID do banco |
 | `credor_id` | sim | ID listado em `REFERENCIAS`; parceiro ativo e elegivel para `PAGAR` |
 | `categoria_id` | sim | ID listado em `REFERENCIAS`; categoria ativa e compativel com `PAGAR` |
 | `forma_pagamento_codigo` | sim | forma ativa, sem cartao na primeira versao |
@@ -73,14 +75,14 @@ Uma linha representa um titulo logico antes do desdobramento em parcelas.
 | `data_vencimento` | sim | vencimento base ou da parcela unica |
 | `competencia_data` | sim | competencia economica usada pela DRE |
 | `considera_dre` | nao | `SIM` por padrao; exige categoria classificada na DRE |
-| `apropriacao_codigo` | nao | apropriacao unica; nao usar junto com rateios multiplos |
+| `apropriacao_id` | nao | ID selecionavel na aba `REFERENCIAS`; nao usar junto com rateios multiplos |
 | `observacoes` | nao | ate 4.000 caracteres |
 | `forma_cobranca` | nao | `BOLETO`, `PIX` ou `OUTROS` |
 | `banco_cobranca` | nao | codigo bancario quando conhecido |
 | `linha_digitavel` | nao | armazenada para pagamento, sem executar baixa |
 | `codigo_barras` | nao | armazenado para pagamento, sem executar baixa |
 
-Nomes, CPF/CNPJ e descricoes aparecem na aba `REFERENCIAS`, mas a resolucao usa `obra_id`, `credor_id`, `categoria_id` e `forma_pagamento_codigo`. `obra.codigo` nao e unico no schema atual, a categoria nao possui codigo proprio e CPF/CNPJ isolado pode ser ambiguo. A empresa nao pode ser escolhida manualmente: ela vem da obra.
+Nomes, CPF/CNPJ e descricoes aparecem na aba `REFERENCIAS`. A obra e resolvida pela combinacao normalizada de `empresa_codigo` + `obra_codigo`, pois `obra.codigo` isolado nao e unico no schema atual. Se essa combinacao estiver duplicada no cadastro, a linha e bloqueada para regularizacao. Depois da resolucao, o backend usa o ID interno da obra e deriva `empresa_id` de `obra.empresa_grupo_id`; o codigo da empresa nao permite forcar uma empresa diferente da vinculada a obra. Credor e categoria continuam sendo resolvidos pelos IDs selecionaveis da aba de referencias, e a forma de pagamento pelo codigo funcional.
 
 Em importacoes de salarios, o colaborador pode estar cadastrado em empresa diferente da empresa da obra. Essa divergencia nao gera erro: a obra continua definindo `obra_id`, `empresa_id`, DRE e apropriacao do custo, enquanto o parceiro vinculado ao colaborador e apenas o credor/favorecido. A importacao nao deve alterar `empresa_grupo_id` ou `obra_id` do cadastro de RH. Se o colaborador ainda nao possuir parceiro financeiro ativo e elegivel para `PAGAR`, a linha deve ser bloqueada para regularizacao cadastral, sem criar ou converter parceiros silenciosamente durante a importacao.
 
@@ -108,14 +110,15 @@ Numeros repetidos, lacunas ou soma divergente bloqueiam a importacao. O backend 
 | Coluna | Regra |
 |---|---|
 | `chave_importacao` | referencia uma linha de `TITULOS` |
-| `obra_id` | ID de obra acessivel ao usuario |
+| `empresa_codigo` | codigo operacional da empresa da obra |
+| `obra_codigo` | codigo informado no cadastro da obra |
 | `apropriacao_id` | ID de apropriacao analitica, ativa e pertencente a obra informada |
 | `tipo_rateio` | `PERCENTUAL` ou `VALOR` |
 | `percentual` | obrigatorio no rateio percentual |
 | `valor_rateio` | obrigatorio no rateio por valor |
 | `observacoes` | opcional |
 
-Todas as linhas do mesmo titulo usam o mesmo tipo. A soma deve fechar 100% ou o valor liquido do titulo. Se esta aba possuir linhas para uma chave, `apropriacao_codigo` da aba `TITULOS` deve ficar vazio.
+Todas as linhas do mesmo titulo usam o mesmo tipo. A soma deve fechar 100% ou o valor liquido do titulo. Se esta aba possuir linhas para uma chave, `apropriacao_id` da aba `TITULOS` deve ficar vazio.
 
 ### Aba `IMPOSTOS`
 
@@ -136,7 +139,7 @@ O backend recalcula `valor_bruto`, `valor_impostos` e `valor_liquido`; valores c
 
 Gerada para o usuario e protegida contra edicao acidental, contendo somente:
 
-- obras dentro do escopo financeiro do usuario e suas empresas;
+- obras dentro do escopo financeiro do usuario, com `empresa_codigo`, nome da empresa, `obra_codigo` e nome da obra; obras sem os dois codigos nao ficam elegiveis para a importacao;
 - credores ativos elegiveis para contas a pagar, com ID, nome, CPF/CNPJ e indicador `favorecido_bancario` (`PRONTO` ou `PENDENTE`);
 - categorias ativas compativeis com `PAGAR`, com ID, nome, indicador e grupo DRE;
 - formas de pagamento ativas permitidas pela primeira versao, excluindo as que exigem cartao ou cheque;
@@ -271,6 +274,8 @@ A mesma entrega deve avaliar se a rota individual `POST /financeiro/titulos` pas
 ## Cenarios minimos de aceite
 
 - modelo contem apenas referencias acessiveis ao usuario;
+- `empresa_codigo` + `obra_codigo` validos resolvem uma unica obra sem exigir ID de banco do usuario;
+- combinacao inexistente, fora do escopo ou duplicada bloqueia a linha;
 - titulo simples valido e criado com empresa derivada da obra;
 - `PREVISAO` e `ABERTO` alimentam corretamente a previsao financeira;
 - categoria incompativel, inativa ou sem grupo DRE bloqueia quando aplicavel;
