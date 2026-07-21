@@ -502,6 +502,8 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         'disponivel',
         'preco',
         'prazo',
+        'data_chegada',
+        'observacao',
         'quantidade_minima_item'
       ],
       transaction

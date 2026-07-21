@@ -303,8 +303,8 @@ export default function GestaoFornecedores() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
+    <div className="page solicitacoes-page w-full min-w-0 max-w-full overflow-x-hidden">
+      <div className="card sol-surface-card app-toolbar-card min-w-0 max-w-full">
         <div className="app-page-header-row">
           <div>
             <h1 className="page-title">Fornecedores</h1>
@@ -325,39 +325,39 @@ export default function GestaoFornecedores() {
       </div>
 
       {/* Filtros */}
-      <div className="card sol-surface-card solicitacoes-filtros app-filters-card mt-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_200px_200px_auto_auto]">
+      <div className="card sol-surface-card solicitacoes-filtros app-filters-card mt-4 min-w-0 max-w-full">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-center">
           <input
-            className="input"
+            className="input min-w-0 sm:col-span-2 xl:col-span-4"
             placeholder="Buscar por nome, CNPJ ou email..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && carregar()}
           />
-          <select className="input" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+          <select className="input min-w-0 xl:col-span-2" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
             <option value="">Todos os estados</option>
             {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => (
               <option key={uf} value={uf}>{uf}</option>
             ))}
           </select>
           <input
-            className="input"
+            className="input min-w-0 xl:col-span-3"
             placeholder="Filtrar por categoria..."
             value={filtroCategoria}
             onChange={(e) => setFiltroCategoria(e.target.value)}
           />
-          <label className="flex items-center gap-2 text-sm text-[var(--c-muted)] whitespace-nowrap">
+          <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm text-[var(--c-muted)] xl:col-span-2">
             <input type="checkbox" checked={incluirInativos} onChange={(e) => setIncluirInativos(e.target.checked)} />
             Incluir inativos
           </label>
-          <button type="button" className="btn btn-outline" onClick={carregar} disabled={loading}>
+          <button type="button" className="btn btn-outline justify-center xl:col-span-1" onClick={carregar} disabled={loading}>
             {loading ? 'Buscando...' : 'Buscar'}
           </button>
         </div>
       </div>
 
       {/* Tabela */}
-      <div className="card sol-surface-card mt-4">
+      <div className="card sol-surface-card mt-4 min-w-0 max-w-full overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-[var(--c-muted)]">{fornecedores.length} fornecedor(es)</span>
         </div>
@@ -367,8 +367,9 @@ export default function GestaoFornecedores() {
         ) : fornecedores.length === 0 ? (
           <div className="app-empty-card">Nenhum fornecedor encontrado. Ajuste os filtros ou cadastre um novo.</div>
         ) : (
-          <div className="app-table-shell compras-responsive-table">
-            <table className="table min-w-[980px]">
+          <div className="app-table-shell min-w-0 max-w-full overflow-hidden">
+            <div className="compras-responsive-table min-w-0 max-w-full pb-2">
+              <table className="table min-w-[1120px]">
               <thead>
                 <tr>
                   <th>Nome</th>
@@ -384,7 +385,7 @@ export default function GestaoFornecedores() {
               <tbody>
                 {fornecedores.map((f) => (
                   <tr key={f.id} className={!f.ativo ? 'opacity-50' : ''}>
-                    <td className="font-medium">
+                    <td className="max-w-[260px] font-medium">
                       {f.nome}
                       {f.contato && <div className="text-xs text-[var(--c-muted)]">{f.contato}</div>}
                     </td>
@@ -401,7 +402,7 @@ export default function GestaoFornecedores() {
                         </a>
                       ) : '-'}
                     </td>
-                    <td>{f.email || '-'}</td>
+                    <td className="max-w-[240px] break-words">{f.email || '-'}</td>
                     <td>
                       {[f.cidade, f.estado].filter(Boolean).join(' / ') || '-'}
                     </td>
@@ -424,7 +425,7 @@ export default function GestaoFornecedores() {
                     </td>
                     {canManage && (
                       <td>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 whitespace-nowrap">
                           <button
                             type="button"
                             className="btn btn-outline"
@@ -447,7 +448,8 @@ export default function GestaoFornecedores() {
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
       </div>

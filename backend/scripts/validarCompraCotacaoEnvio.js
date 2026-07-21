@@ -1,6 +1,7 @@
 const assert = require('assert');
 
 const {
+  validateCompraCotacaoRespostaInternaBody,
   validateCompraEncerrarBody,
   validateCompraEnviarBody
 } = require('../src/validators/operationalValidators');
@@ -58,8 +59,25 @@ function validarFechamentoParcial() {
   assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 8.235);
 }
 
+function validarDataChegadaRespostaInterna() {
+  const resultado = validateCompraCotacaoRespostaInternaBody({
+    itens: [{
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: 71,
+      status_disponibilidade: 'PARA_CHEGAR',
+      preco: '28,84',
+      data_chegada: '2026-07-30'
+    }],
+    finalizar: true
+  });
+
+  assert.strictEqual(resultado.itens[0].data_chegada, '2026-07-30');
+  assert.strictEqual(resultado.itens[0].status_disponibilidade, 'PARA_CHEGAR');
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
+validarDataChegadaRespostaInterna();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');
