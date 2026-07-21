@@ -74,18 +74,17 @@ function validarFechamentoExcedenteAuditavel() {
   assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 12.5);
 }
 
-function validarDataChegadaRespostaInterna() {
+function validarPrazoGeralRespostaInterna() {
   const resultado = validateCompraCotacaoRespostaInternaBody({
     itens: [{
       item_tipo: 'CADASTRADO',
       item_referencia_id: 71,
-      status_disponibilidade: 'PARA_CHEGAR',
+      status_disponibilidade: 'DISPONIVEL',
       preco: '28,84',
       quantidade_disponivel: '25,500',
       ipi_valor: '12,34',
       icms_valor: '45,67',
-      st_valor: '8,90',
-      data_chegada: '2026-07-30'
+      st_valor: '8,90'
     }],
     prazo_entrega_dias: 7,
     prazo_entrega_tipo: 'DIAS_UTEIS',
@@ -98,8 +97,7 @@ function validarDataChegadaRespostaInterna() {
     finalizar: true
   });
 
-  assert.strictEqual(resultado.itens[0].data_chegada, '2026-07-30');
-  assert.strictEqual(resultado.itens[0].status_disponibilidade, 'PARA_CHEGAR');
+  assert.strictEqual(resultado.itens[0].status_disponibilidade, 'DISPONIVEL');
   assert.strictEqual(resultado.itens[0].quantidade_disponivel, 25.5);
   assert.strictEqual(resultado.itens[0].ipi_valor, 12.34);
   assert.strictEqual(resultado.itens[0].icms_valor, 45.67);
@@ -112,10 +110,27 @@ function validarDataChegadaRespostaInterna() {
   assert.strictEqual(resultado.frete_data_vencimento, '2026-08-10');
 }
 
+function validarCompatibilidadeDataChegadaLegada() {
+  const resultado = validateCompraCotacaoRespostaInternaBody({
+    itens: [{
+      item_tipo: 'CADASTRADO',
+      item_referencia_id: 71,
+      status_disponibilidade: 'PARA_CHEGAR',
+      preco: '28,84',
+      quantidade_disponivel: '25,500',
+      data_chegada: '2026-07-30'
+    }],
+    finalizar: false
+  });
+
+  assert.strictEqual(resultado.itens[0].data_chegada, '2026-07-30');
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
 validarFechamentoExcedenteAuditavel();
-validarDataChegadaRespostaInterna();
+validarPrazoGeralRespostaInterna();
+validarCompatibilidadeDataChegadaLegada();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');

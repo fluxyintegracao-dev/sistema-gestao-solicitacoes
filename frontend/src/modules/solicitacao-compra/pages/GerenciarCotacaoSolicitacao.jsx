@@ -242,7 +242,6 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
         ipi_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.ipi_valor, 2), 2),
         icms_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.icms_valor, 2), 2),
         st_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.st_valor, 2), 2),
-        data_chegada: resposta?.data_chegada || '',
         observacao: resposta?.observacao || ''
       };
     })
@@ -264,16 +263,10 @@ function ModalRespostaInternaCotacao({
   salvando,
   onChange,
   onChangeItem,
-  onAplicarDataChegadaTodos,
   onSalvar,
   onFechar
 }) {
   const [condicoesAbertas, setCondicoesAbertas] = useState(false);
-  const [dataChegadaTodos, setDataChegadaTodos] = useState(() => {
-    const datas = (form?.itens || []).map((item) => String(item.data_chegada || '').trim());
-    if (!datas.length || datas.some((data) => !data)) return '';
-    return new Set(datas).size === 1 ? datas[0] : '';
-  });
   if (!cotacao || !form) return null;
 
   const condicoesSelecionadas = new Set(
@@ -420,31 +413,13 @@ function ModalRespostaInternaCotacao({
             </div>
           </div>
 
-          <div className="cotacao-resposta-data-panel mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <label className="cotacao-resposta-data-field app-filter-field bg-white">
-              <span className="app-filter-label">Data chegada para todos</span>
-              <input
-                className="input"
-                type="date"
-                value={dataChegadaTodos}
-                onChange={(event) => {
-                  setDataChegadaTodos(event.target.value);
-                  onAplicarDataChegadaTodos(event.target.value);
-                }}
-              />
-            </label>
-            <div className="self-center text-xs text-[var(--c-muted)]">
-              Use este campo para aplicar uma previsao unica de chegada a todos os itens da resposta. Cada item ainda pode ser ajustado individualmente.
-            </div>
-          </div>
-
           <label className="mt-3 block">
             <span className="app-filter-label">Observacao geral</span>
             <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
           </label>
 
           <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
-            <table className="table min-w-[1480px] text-xs">
+            <table className="table min-w-[1340px] text-xs">
               <thead>
                 <tr>
                   <th>Item</th>
@@ -456,7 +431,6 @@ function ModalRespostaInternaCotacao({
                   <th>ICMS</th>
                   <th>ST</th>
                   <th>Qtd. min.</th>
-                  <th>Data chegada</th>
                   <th>Observacao</th>
                 </tr>
               </thead>
@@ -484,7 +458,6 @@ function ModalRespostaInternaCotacao({
                       </td>
                     ))}
                     <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} /></td>
-                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} /></td>
                     <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
                   </tr>
                 ))}
@@ -1526,12 +1499,11 @@ function SecaoComparativo({
 
         <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
           <span className="font-semibold text-emerald-700">Disponivel: {formatNumeroCompra(quantidadeDisponivelFornecedor)}</span>
-          <span>Prazo geral: {resposta.prazo_entrega_fornecedor || '-'}</span>
+          <span>Prazo entrega: {resposta.prazo_entrega_fornecedor || '-'}</span>
           <span>IPI: {fmtMoeda(resposta.ipi_valor)}</span>
           <span>ICMS: {fmtMoeda(resposta.icms_valor)}</span>
           <span>ST: {fmtMoeda(resposta.st_valor)}</span>
           <span>Qtd. min.: {resposta.quantidade_minima_item || '-'}</span>
-          <span>Chegada: {fmt(resposta.data_chegada)}</span>
           <span className="col-span-2 truncate" title={resposta.condicao_pagamento || ''}>
             Cond.: {resposta.condicao_pagamento || '-'}
           </span>
@@ -1768,7 +1740,7 @@ function SecaoComparativo({
                       <th>ST</th>
                       <th>DIFAL</th>
                       <th>Frete</th>
-                      <th>Prazo geral</th>
+                      <th>Prazo entrega</th>
                       <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
                       <th>Observacao</th>
@@ -2270,13 +2242,6 @@ export default function GerenciarCotacaoSolicitacao() {
     }));
   }
 
-  function aplicarDataChegadaRespostaInterna(value) {
-    setFormRespostaInterna((atual) => ({
-      ...atual,
-      itens: atual.itens.map((item) => ({ ...item, data_chegada: value }))
-    }));
-  }
-
   async function handleSalvarRespostaInterna(finalizar) {
     if (!formRespostaInterna || !cotacaoRespostaInterna) return;
     if (finalizar && (
@@ -2352,7 +2317,6 @@ export default function GerenciarCotacaoSolicitacao() {
           ipi_valor: normalizarMoedaCotacaoParaEnvio(item.ipi_valor) || 0,
           icms_valor: normalizarMoedaCotacaoParaEnvio(item.icms_valor) || 0,
           st_valor: normalizarMoedaCotacaoParaEnvio(item.st_valor) || 0,
-          data_chegada: item.data_chegada || null,
           observacao: item.observacao || null
         }))
       });
@@ -3043,7 +3007,6 @@ export default function GerenciarCotacaoSolicitacao() {
         salvando={salvandoRespostaInterna}
         onChange={alterarRespostaInterna}
         onChangeItem={alterarItemRespostaInterna}
-        onAplicarDataChegadaTodos={aplicarDataChegadaRespostaInterna}
         onSalvar={handleSalvarRespostaInterna}
         onFechar={() => {
           if (salvandoRespostaInterna) return;

@@ -266,8 +266,7 @@ export default function CotacaoFornecedorPublica() {
                 ),
                 ipi_valor: normalizarDecimalDaApi(item.ipi_valor, 2),
                 icms_valor: normalizarDecimalDaApi(item.icms_valor, 2),
-                st_valor: normalizarDecimalDaApi(item.st_valor, 2),
-                data_chegada: item.data_chegada || ''
+                st_valor: normalizarDecimalDaApi(item.st_valor, 2)
               }))
           : []
       );
@@ -376,7 +375,6 @@ export default function CotacaoFornecedorPublica() {
         disponivel,
         preco: statusEfetivo === 'NAO_TEM' ? null : preco,
         prazo: null,
-        data_chegada: item.data_chegada || null,
         observacao: item.observacao,
         quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : quantidadeMinima,
         quantidade_disponivel: quantidadeDisponivel,
@@ -769,7 +767,7 @@ export default function CotacaoFornecedorPublica() {
         {/* Tabela */}
         <div className="sol-surface-card rounded-lg solicitacoes-table-shell solicitacoes-table-compact cotacao-publica-table-shell">
           <div className="solicitacoes-table-scroll scrollbar-thin" style={{ scrollbarGutter: 'stable both-edges' }}>
-            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1540px', fontSize: '11px' }}>
+            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1436px', fontSize: '11px' }}>
               <colgroup>
                 <col style={{ width: '220px' }} />
                 <col style={{ width: '88px' }} />
@@ -777,7 +775,6 @@ export default function CotacaoFornecedorPublica() {
                 <col style={{ width: '112px' }} />
                 <col style={{ width: '112px' }} />
                 <col style={{ width: '118px' }} />
-                <col style={{ width: '104px' }} />
                 <col style={{ width: '104px' }} />
                 <col style={{ width: '104px' }} />
                 <col style={{ width: '104px' }} />
@@ -795,7 +792,6 @@ export default function CotacaoFornecedorPublica() {
                   <th>IPI</th>
                   <th>ICMS</th>
                   <th>ST</th>
-                  <th>Data chegada</th>
                   <th>Qtd. min.</th>
                   <th>Observacao</th>
                 </tr>
@@ -859,16 +855,6 @@ export default function CotacaoFornecedorPublica() {
                           />
                         </td>
                       ))}
-                      <td>
-                        <input
-                          className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
-                          type="date"
-                          value={item.data_chegada || ''}
-                          disabled={formularioBloqueado}
-                          onChange={(e) => atualizarItem(index, 'data_chegada', e.target.value)}
-                          title="Data prevista de chegada"
-                        />
-                      </td>
                       <td>
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"

@@ -35,6 +35,7 @@
 - pode salvar rascunho antes do envio final;
 - informa preco unitario e quantidade disponivel por item; vazio ou zero significa que a oferta nao participa do comparativo;
 - o prazo de entrega e geral para a resposta e distingue dias corridos de dias uteis; nao existe prazo de entrega por item no fluxo vigente;
+- novas respostas nao informam nem exibem data de chegada por item; o campo legado `data_chegada` permanece no backend somente para compatibilidade historica e nao compoe o fluxo operacional atual;
 - IPI, ICMS e ST sao valores em reais fechados para toda a quantidade disponivel daquele item;
 - DIFAL e informado em reais no cabecalho e rateado proporcionalmente pelo valor das mercadorias efetivamente compradas;
 - os valores fiscais sao gerenciais para decisao e custo interno; a escrituracao contabil continua baseada na nota fiscal e na contabilidade;

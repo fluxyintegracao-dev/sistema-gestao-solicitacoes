@@ -14,6 +14,7 @@ O modulo administra fornecedores convidados, escopo de itens por fornecedor, tok
 - token permite somente acesso ao escopo daquela cotacao;
 - prazo pode ser configurado por fornecedor;
 - resposta registra preco unitario, quantidade disponivel, minimo por item, condicao de pagamento, prazo geral em dias corridos/uteis e observacoes;
+- a interface nao solicita nem exibe data de chegada por item; `data_chegada` continua aceito pelo backend apenas para preservar clientes e registros legados durante a transicao;
 - quantidade disponivel vazia ou zero remove a oferta daquele fornecedor do mapa comparativo sem remover a demanda original;
 - IPI, ICMS e ST sao valores gerenciais em reais por item para toda a quantidade disponivel informada, nao aliquotas;
 - DIFAL e um valor gerencial em reais no cabecalho da resposta e e rateado proporcionalmente pelo valor das mercadorias selecionadas;
