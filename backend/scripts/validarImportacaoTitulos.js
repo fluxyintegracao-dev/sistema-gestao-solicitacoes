@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const ExcelJS = require('exceljs');
+const { MODULO_PERMISSION_GROUPS } = require('../src/constants/moduloPermissoes');
 const {
   __testables,
   gerarModeloImportacao,
@@ -11,6 +12,12 @@ const {
 } = require('../src/services/tituloFinanceiroImportacaoService');
 
 async function main() {
+  const permissaoImportacao = MODULO_PERMISSION_GROUPS
+    .flatMap((modulo) => modulo.areas || [])
+    .flatMap((area) => area.permissoes || [])
+    .find((permissao) => permissao.key === 'financeiro.titulos.importar');
+  assert(permissaoImportacao, 'Permissao financeiro.titulos.importar ausente do registro de permissoes.');
+
   const references = {
     obras: [
       { id: 2, codigo: 'OB-010', nome: 'Obra Secundaria', empresa_grupo_id: 2, empresaGrupo: { id: 2, codigo: 'EMP-2', nome: 'Empresa Secundaria' } },

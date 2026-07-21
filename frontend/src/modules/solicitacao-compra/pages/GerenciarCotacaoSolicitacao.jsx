@@ -246,7 +246,11 @@ function ModalRespostaInternaCotacao({
   onFechar
 }) {
   const [condicoesAbertas, setCondicoesAbertas] = useState(false);
-  const [dataChegadaTodos, setDataChegadaTodos] = useState('');
+  const [dataChegadaTodos, setDataChegadaTodos] = useState(() => {
+    const datas = (form?.itens || []).map((item) => String(item.data_chegada || '').trim());
+    if (!datas.length || datas.some((data) => !data)) return '';
+    return new Set(datas).size === 1 ? datas[0] : '';
+  });
   if (!cotacao || !form) return null;
 
   const condicoesSelecionadas = new Set(
@@ -2968,6 +2972,7 @@ export default function GerenciarCotacaoSolicitacao() {
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
       <ModalRespostaInternaCotacao
+        key={cotacaoRespostaInterna?.id || 'resposta-interna-fechada'}
         cotacao={cotacaoRespostaInterna}
         form={formRespostaInterna}
         salvando={salvandoRespostaInterna}

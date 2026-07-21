@@ -1251,8 +1251,10 @@ function montarComparativoSolicitacao(solicitacao) {
         arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
         resposta_item_id: resposta?.id || null,
         disponivel: Boolean(resposta?.disponivel),
+        status_disponibilidade: resposta?.status_disponibilidade || null,
         preco: resposta?.preco ?? null,
         prazo: resposta?.prazo || '',
+        data_chegada: resposta?.data_chegada || null,
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
         quantidade_alocada: (resposta?.alocacoes || [])
