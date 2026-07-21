@@ -94,6 +94,9 @@ db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroRateio = require('./TituloFinanceiroRateio')(sequelize, Sequelize);
 db.TituloFinanceiroImposto = require('./TituloFinanceiroImposto')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
+db.FinanceiroTituloImportacao = require('./FinanceiroTituloImportacao')(sequelize, Sequelize);
+db.FinanceiroTituloImportacaoLinha = require('./FinanceiroTituloImportacaoLinha')(sequelize, Sequelize);
+db.FinanceiroTituloImportacaoResultado = require('./FinanceiroTituloImportacaoResultado')(sequelize, Sequelize);
 db.ChequeTerceiro = require('./ChequeTerceiro')(sequelize, Sequelize);
 db.FinanciamentoBancario = require('./FinanciamentoBancario')(sequelize, Sequelize);
 db.FinanciamentoBancarioParcela = require('./FinanciamentoBancarioParcela')(sequelize, Sequelize);
@@ -2752,6 +2755,56 @@ db.User.hasMany(db.TituloFinanceiro, {
 db.TituloFinanceiro.belongsTo(db.User, {
   foreignKey: 'criado_por',
   as: 'criadoPor'
+});
+
+db.User.hasMany(db.FinanceiroTituloImportacao, {
+  foreignKey: 'criado_por',
+  as: 'importacoesTitulosFinanceiros'
+});
+
+db.FinanceiroTituloImportacao.belongsTo(db.User, {
+  foreignKey: 'criado_por',
+  as: 'criadoPor'
+});
+
+db.FinanceiroTituloImportacao.hasMany(db.FinanceiroTituloImportacaoLinha, {
+  foreignKey: 'importacao_id',
+  as: 'linhas'
+});
+
+db.FinanceiroTituloImportacaoLinha.belongsTo(db.FinanceiroTituloImportacao, {
+  foreignKey: 'importacao_id',
+  as: 'importacao'
+});
+
+db.FinanceiroTituloImportacao.hasMany(db.FinanceiroTituloImportacaoResultado, {
+  foreignKey: 'importacao_id',
+  as: 'resultados'
+});
+
+db.FinanceiroTituloImportacaoResultado.belongsTo(db.FinanceiroTituloImportacao, {
+  foreignKey: 'importacao_id',
+  as: 'importacao'
+});
+
+db.FinanceiroTituloImportacaoLinha.hasMany(db.FinanceiroTituloImportacaoResultado, {
+  foreignKey: 'linha_id',
+  as: 'resultados'
+});
+
+db.FinanceiroTituloImportacaoResultado.belongsTo(db.FinanceiroTituloImportacaoLinha, {
+  foreignKey: 'linha_id',
+  as: 'linha'
+});
+
+db.TituloFinanceiro.hasOne(db.FinanceiroTituloImportacaoResultado, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'resultadoImportacao'
+});
+
+db.FinanceiroTituloImportacaoResultado.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'tituloFinanceiro'
 });
 
 db.TituloFinanceiro.hasMany(db.TituloFinanceiroRateio, {

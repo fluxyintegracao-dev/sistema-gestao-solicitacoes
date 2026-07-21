@@ -31,6 +31,7 @@ const FINANCEIRO_RELATORIOS_PERMISSION_KEYS = [
 const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.titulos.visualizar',
   'financeiro.titulos.criar',
+  'financeiro.titulos.importar',
   'financeiro.titulos.baixar',
   'financeiro.titulos.excluir',
   'financeiro.titulos.estornar',
@@ -1293,6 +1294,16 @@ async function canDeleteTitulosFinanceiros(user) {
 
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, ['financeiro.titulos.excluir']);
+  }
+
+  return userHasFinanceiroSector(user);
+}
+
+async function canImportTitulosFinanceiros(user) {
+  if (isBusinessAdmin(user)) return true;
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, ['financeiro.titulos.importar']);
   }
 
   return userHasFinanceiroSector(user);
@@ -2875,6 +2886,7 @@ module.exports = {
   canAccessFinanceiroRelatorios,
   canViewSolicitacaoFinanceiro,
   canDeleteTitulosFinanceiros,
+  canImportTitulosFinanceiros,
   canAccessFiscal,
   canAccessSst,
   canAccessTreinamento,

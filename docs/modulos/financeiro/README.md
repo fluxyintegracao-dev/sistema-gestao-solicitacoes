@@ -13,6 +13,25 @@ Financeiro e dono de titulos a pagar/receber, parcelas financeiras, movimentos, 
 - status e saldo derivam dos movimentos ativos;
 - edicao de titulo movimentado possui restricoes e auditoria.
 
+## Importacao em massa de contas a pagar
+
+A importacao em massa esta implementada no repositorio e depende da migration `202607200001_financeiro_titulos_importacao.js` no ambiente de destino. O fluxo e exclusivo para `PAGAR`: o usuario exporta o modelo versionado em Contas a Pagar, envia o `.xlsx`, revisa o preview persistido e confirma a criacao atomica.
+
+- permissao especifica `financeiro.titulos.importar`;
+- `empresa_codigo` + `obra_codigo` identificam a obra pela referencia operacional conhecida pelo usuario; `apropriacao_codigo`, quando informado, identifica a apropriacao dentro dessa obra; o backend resolve os IDs internos e deriva da obra a empresa e a DRE do titulo;
+- `credor_cpf_cnpj` identifica o parceiro pelo documento visivel na tela, com ou sem mascara, e `categoria_nome` usa o nome exibido no cadastro;
+- o modelo de importacao nao expoe IDs internos de obra, credor, categoria ou apropriacao e bloqueia referencias inexistentes, ambiguas, inativas ou fora do escopo;
+- o credor e global e pode representar colaborador cadastrado em outra empresa;
+- o modelo `1.4` separa as referencias em `EMPRESAS`, `OBRAS`, `APROPRIACOES`, `CREDORES`, `CATEGORIAS`, `FORMAS_PAGAMENTO` e `DOMINIOS`, todas com filtro e pesquisa do Excel; `CREDORES` informa se o favorecido bancario/PIX esta pronto;
+- as listas suspensas usam essas abas, mas a planilha representa um retrato dos cadastros no momento da exportacao; para incluir referencias criadas depois, o usuario deve exportar um novo modelo;
+- referencias sao revalidadas no preview e na confirmacao;
+- parcelas, rateios e impostos usam abas relacionadas por `chave_importacao`;
+- formulas, macros, linhas ocultas e colunas ocultas com dados sao rejeitadas;
+- confirmacao exige `Idempotency-Key`, bloqueio transacional e rollback integral em erro;
+- titulos recebem origem `IMPORTACAO` e nao criam baixas, movimentos, intents, faturas ou vinculos operacionais.
+
+Detalhes tecnicos e cenarios de aceite estao em [`PLANO_IMPORTACAO_TITULOS_PAGAR.md`](./PLANO_IMPORTACAO_TITULOS_PAGAR.md).
+
 ## Baixa e estorno
 
 - baixa pode ser parcial ou total;

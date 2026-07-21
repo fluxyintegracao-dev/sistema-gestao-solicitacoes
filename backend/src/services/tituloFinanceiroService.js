@@ -2557,7 +2557,13 @@ async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
   }
 }
 
-async function criarTituloManual(req, payload = {}) {
+async function criarTituloManual(req, payload = {}, options = {}) {
+  const {
+    transaction: externalTransaction = null,
+    origemTitulo = 'MANUAL',
+    registrarSeguranca = true,
+    retornarTitulosCriados = false
+  } = options;
   await assertFinanceAccess(req);
 
   const tipo = normalizarTipoTitulo(payload.tipo || 'PAGAR');
@@ -2680,7 +2686,8 @@ async function criarTituloManual(req, payload = {}) {
 
   const impostosResumo = normalizarImpostosTitulo(payload, valorOriginal);
   const rateiosTitulo = await normalizarRateiosTitulo(req, payload, obra, apropriacao, valorOriginal);
-  const transaction = await sequelize.transaction();
+  const ownsTransaction = !externalTransaction;
+  const transaction = externalTransaction || await sequelize.transaction();
   const titulosCriados = [];
   const baixasCartaoNoAto = [];
   const origemFreteId = Number(payload.origem_frete_id || 0);
@@ -2728,7 +2735,7 @@ async function criarTituloManual(req, payload = {}) {
           data_compra: pagamento.dataCompra,
           competencia_data: resolverCompetenciaTitulo(payload),
           considera_dre: payload.considera_dre !== false,
-          origem_titulo: 'MANUAL',
+          origem_titulo: origemTitulo,
           tipo,
           status: statusTitulo,
           descricao: descricaoParcela || descricaoPadraoTituloManual(tipo),
@@ -2843,61 +2850,74 @@ async function criarTituloManual(req, payload = {}) {
       }
     }
 
-    await transaction.commit();
+    if (ownsTransaction) {
+      await transaction.commit();
+    }
   } catch (error) {
-    await transaction.rollback();
+    if (ownsTransaction) {
+      await transaction.rollback();
+    }
     throw error;
   }
 
-  await registrarEventoSeguranca({
-    req,
-    usuarioId: req.user?.id || null,
-    tipoEvento: 'FINANCIAL_TITLE_CREATED',
-    recursoTipo: 'TITULO_FINANCEIRO',
-    recursoId: titulosCriados[0]?.id || null,
-    status: 'SUCCESS',
-    descricao: titulosCriados.length > 1 ? 'Titulos financeiros criados manualmente' : 'Titulo financeiro criado manualmente',
-    metadata: {
-      origem: 'MANUAL',
-      origem_frete_id: origemFreteId || null,
-      obra_id: obra.id,
-      parceiro_id: titulosCriados[0]?.parceiro_id || parceiro.id,
-      tipo,
-      valor_original: roundCurrency(valorOriginal),
-      quantidade_titulos: titulosCriados.length,
-      pagamentos: pagamentos.map((pagamento) => ({
-        valor: pagamento.totalPagamento,
-        parceiro_id: pagamento.parceiro.id,
-        quantidade_parcelas: pagamento.quantidadeParcelas,
-        grupo_parcelamento_id: pagamento.grupoParcelamentoId,
-        forma_pagamento_id: pagamento.formaPagamento?.id || null,
-        cartao_id: pagamento.payload.cartao_id || null
-      }))
-    }
-  });
-
-  if (baixasCartaoNoAto.length > 0) {
+  if (registrarSeguranca) {
     await registrarEventoSeguranca({
       req,
       usuarioId: req.user?.id || null,
-      tipoEvento: 'FINANCIAL_CARD_SETTLED_ON_CREATE',
+      tipoEvento: 'FINANCIAL_TITLE_CREATED',
       recursoTipo: 'TITULO_FINANCEIRO',
       recursoId: titulosCriados[0]?.id || null,
       status: 'SUCCESS',
-      descricao: 'Titulo financeiro baixado automaticamente por cartao no ato da criacao',
+      descricao: titulosCriados.length > 1 ? 'Titulos financeiros criados manualmente' : 'Titulo financeiro criado manualmente',
       metadata: {
-        origem: 'MANUAL',
-        quantidade_movimentos: baixasCartaoNoAto.length,
-        movimentos: baixasCartaoNoAto.map((baixa) => ({
-          movimento_id: baixa.movimento.id,
-          cartao_id: baixa.cartao.id,
-          tipo_cartao: baixa.tipoCartao,
-          conta_bancaria_id: baixa.conta.id,
-          valor: baixa.valorBaixa,
-          data_movimento: baixa.dataBaixa
+        origem: origemTitulo,
+        origem_frete_id: origemFreteId || null,
+        obra_id: obra.id,
+        parceiro_id: titulosCriados[0]?.parceiro_id || parceiro.id,
+        tipo,
+        valor_original: roundCurrency(valorOriginal),
+        quantidade_titulos: titulosCriados.length,
+        pagamentos: pagamentos.map((pagamento) => ({
+          valor: pagamento.totalPagamento,
+          parceiro_id: pagamento.parceiro.id,
+          quantidade_parcelas: pagamento.quantidadeParcelas,
+          grupo_parcelamento_id: pagamento.grupoParcelamentoId,
+          forma_pagamento_id: pagamento.formaPagamento?.id || null,
+          cartao_id: pagamento.payload.cartao_id || null
         }))
       }
     });
+
+    if (baixasCartaoNoAto.length > 0) {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'FINANCIAL_CARD_SETTLED_ON_CREATE',
+        recursoTipo: 'TITULO_FINANCEIRO',
+        recursoId: titulosCriados[0]?.id || null,
+        status: 'SUCCESS',
+        descricao: 'Titulo financeiro baixado automaticamente por cartao no ato da criacao',
+        metadata: {
+          origem: origemTitulo,
+          quantidade_movimentos: baixasCartaoNoAto.length,
+          movimentos: baixasCartaoNoAto.map((baixa) => ({
+            movimento_id: baixa.movimento.id,
+            cartao_id: baixa.cartao.id,
+            tipo_cartao: baixa.tipoCartao,
+            conta_bancaria_id: baixa.conta.id,
+            valor: baixa.valorBaixa,
+            data_movimento: baixa.dataBaixa
+          }))
+        }
+      });
+    }
+  }
+
+  if (retornarTitulosCriados) {
+    return {
+      titulo: titulosCriados[0] || null,
+      titulos: titulosCriados
+    };
   }
 
   const tituloCompleto = await carregarTituloPorId(req, titulosCriados[0].id);

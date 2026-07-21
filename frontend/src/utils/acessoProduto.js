@@ -611,6 +611,7 @@ export function canAccessFinanceiro(user) {
     return hasAnyPermissao(user, [
       'financeiro.titulos.visualizar',
       'financeiro.titulos.criar',
+      'financeiro.titulos.importar',
       'financeiro.titulos.baixar',
       'financeiro.titulos.excluir',
       'financeiro.titulos.estornar',
@@ -819,6 +820,15 @@ export function canDeleteTitulosFinanceiros(user) {
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
     return hasPermissao(user, 'financeiro.titulos.excluir');
+  }
+  return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
+}
+
+export function canImportTitulosFinanceiros(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'financeiro.titulos.importar');
   }
   return userHasSetorCapability(user, 'eh_setor_financeiro') || normalizeToken(user?.perfil) === 'FINANCEIRO';
 }

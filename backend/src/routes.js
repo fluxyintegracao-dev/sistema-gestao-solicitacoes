@@ -240,6 +240,7 @@ const {
   canCreateProvisoes,
   canAccessFinanceiro,
   canAccessFinanceiroRelatorio,
+  canImportTitulosFinanceiros,
   canViewSolicitacaoFinanceiro,
   canAccessTreinamento,
   canAccessComprovantes,
@@ -378,6 +379,7 @@ const FormaPagamentoFinanceiraController = require('./controllers/FormaPagamento
 const CartaoFinanceiroController = require('./controllers/CartaoFinanceiroController');
 const FaturaCartaoFinanceiroController = require('./controllers/FaturaCartaoFinanceiroController');
 const TituloFinanceiroController = require('./controllers/TituloFinanceiroController');
+const TituloFinanceiroImportacaoController = require('./controllers/TituloFinanceiroImportacaoController');
 const FinanciamentoBancarioController = require('./controllers/FinanciamentoBancarioController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
@@ -581,6 +583,15 @@ const allowFinanceiro = permit({
     (await canAccessFinanceiro(req.user))
       ? true
       : 'Acesso negado para o modulo financeiro'
+  )
+});
+
+const allowTituloImportar = permit({
+  resource: 'FINANCEIRO_TITULOS_IMPORTAR',
+  custom: async (req) => (
+    (await canImportTitulosFinanceiros(req.user))
+      ? true
+      : 'Acesso negado para importar titulos financeiros'
   )
 });
 
@@ -1657,6 +1668,10 @@ router.post('/financeiro/financiamentos-bancarios/:id/gerar-titulos', allowFinan
 router.patch('/financeiro/financiamentos-bancarios/parcelas/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Parcela do financiamento bancario') }), FinanciamentoBancarioController.atualizarParcela);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
+router.get('/financeiro/titulos/importacoes/modelo', allowTituloImportar, TituloFinanceiroImportacaoController.modelo);
+router.post('/financeiro/titulos/importacoes/preview', allowTituloImportar, uploadRateLimit, uploadComprovantes.single('file'), TituloFinanceiroImportacaoController.preview);
+router.get('/financeiro/titulos/importacoes/:id', allowTituloImportar, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.show);
+router.post('/financeiro/titulos/importacoes/:id/confirmar', allowTituloImportar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.confirmar);
 router.get('/financeiro/fretes-pedidos/pendentes', allowFinanceiro, PedidoCompraController.fretesPendentesFinanceiro);
 router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
 router.post('/financeiro/titulos/excluir-em-massa', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.excluirEmMassa);

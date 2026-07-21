@@ -1,5 +1,23 @@
 # Changelog Documental e Operacional
 
+## 2026-07-20 - Importacao em massa de contas a pagar
+
+- implementados modelo XLSX versionado, referencias por escopo, preview persistido e erros por linha;
+- modelo atualizado para a versao `1.3`, usando `empresa_codigo`, `obra_codigo`, `credor_cpf_cnpj`, `categoria_nome` e `apropriacao_codigo`, sem expor IDs internos;
+- implementada confirmacao atomica com idempotencia, revalidacao e auditoria;
+- adicionados os comandos `Exportar modelo` e `Importar planilha` em Contas a Pagar;
+- definida a obra como origem da empresa e do custo, permitindo colaborador credor cadastrado em outra empresa;
+- adicionada `financeiro.titulos.importar`, elevando o catalogo para 270 permissoes;
+- registrada a migration obrigatoria `202607200001_financeiro_titulos_importacao.js`.
+
+## 2026-07-20 - Alinhamento do runtime e plano de importacao financeira
+
+- atualizadas as metricas para 18 grupos, 80 areas e 269 permissoes;
+- documentado que novas solicitacoes e compras seguem diretamente para o setor operacional, mantendo o fluxo de diretoria somente como compatibilidade de registros antigos;
+- documentadas rodadas de fechamento parcial/final de cotacoes, saldo remanescente, idempotencia e vinculo dos pedidos ao fechamento;
+- alinhado o motor de pagamentos a uma aprovacao por usuario diferente do criador do lote;
+- registrado o plano seguro para importacao em massa de contas a pagar, sem implementacao de runtime nesta etapa.
+
 ## 2026-07-13 - Revalidacao documental contra o runtime
 
 - catalogo de modulos, registro de permissoes, rotas, controladores, guards do frontend e mudancas recentes foram confrontados com os documentos canonicos;
