@@ -35,9 +35,11 @@ O modulo administra fornecedores convidados, escopo de itens por fornecedor, tok
 - fechamento parcial exige permissao `compras.cotacoes.fechar_parcial`, confirmacao explicita e justificativa;
 - enquanto houver saldo, a solicitacao permanece em `FECHAMENTO_PARCIAL` e pode receber novas rodadas;
 - fechamento final exige permissao de encerramento, consome todo o saldo elegivel e muda a solicitacao para `ENCERRADO`;
+- encerramento sem pedido exige `compras.cotacoes.encerrar_sem_pedido`, confirmacao e justificativa; cria uma rodada `SEM_PEDIDO`, registra a quantidade nao comprada, preserva pedidos anteriores e nao cria alocacoes nem novos pedidos;
+- o fluxo `SEM_PEDIDO` e distinto do cancelamento da cotacao e da geracao de pedidos selecionados, que permanecem inalterados;
 - pedidos e alocacoes de uma nova rodada sao acrescentados e nunca substituem os gerados anteriormente;
 - a chave de idempotencia e escopada pela solicitacao e impede repetir a mesma rodada;
-- cotacoes nao canceladas recebem `FINALIZADA` somente na rodada final;
+- cotacoes nao canceladas recebem `FINALIZADA` na rodada final ou no encerramento sem pedido, bloqueando novas respostas pelos links publicos;
 - usuario autorizado apenas ao fechamento parcial nao pode consumir todo o saldo;
 - a quantidade fechada pode superar a solicitada somente ate a disponibilidade declarada pelo fornecedor;
 - todo excedente exige confirmacao e justificativa obrigatoria, gravadas no fechamento e no log para auditoria;

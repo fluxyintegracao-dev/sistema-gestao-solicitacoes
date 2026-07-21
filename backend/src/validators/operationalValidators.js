@@ -765,6 +765,34 @@ function validateCompraEncerrarBody(body = {}) {
   };
 }
 
+function validateCompraEncerrarSemPedidoBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['confirmado', 'justificativa'],
+    'Encerramento da cotacao sem pedido'
+  );
+
+  const confirmado = parseBoolean(
+    body.confirmado,
+    'Confirmacao do encerramento sem pedido'
+  ) || false;
+  if (!confirmado) {
+    throw new ValidationError('Confirme que o saldo restante nao sera comprado.');
+  }
+
+  const justificativa = parseOptionalText(
+    body.justificativa,
+    'Justificativa',
+    2000,
+    { required: true }
+  );
+  if (justificativa.length < 10) {
+    throw new ValidationError('A justificativa deve possuir ao menos 10 caracteres.');
+  }
+
+  return { confirmado: true, justificativa };
+}
+
 function validateCompraPedidoQuery(query = {}) {
   ensureAllowedKeys(query, ['obra_id', 'solicitacao_id', 'status', 'q'], 'Consulta de pedidos de compra');
 
@@ -1566,6 +1594,7 @@ module.exports = {
     validateCompraCreateBody,
     validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
+  validateCompraEncerrarSemPedidoBody,
   validateCompraCotacaoCancelBody,
   validateCompraCotacaoRespostaInternaBody,
   validateCompraCotacaoRespostaInternaParams,

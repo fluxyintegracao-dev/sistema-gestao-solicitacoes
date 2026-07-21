@@ -9,6 +9,7 @@ module.exports = (sequelize, DataTypes) => {
       status: { type: DataTypes.STRING(30), allowNull: false, defaultValue: 'CONCLUIDO' },
       idempotency_key: { type: DataTypes.STRING(180), allowNull: true },
       quantidade_total: { type: DataTypes.DECIMAL(14, 3), allowNull: false, defaultValue: 0 },
+      quantidade_nao_comprada: { type: DataTypes.DECIMAL(14, 3), allowNull: false, defaultValue: 0 },
       valor_total: { type: DataTypes.DECIMAL(14, 2), allowNull: false, defaultValue: 0 },
       justificativa: { type: DataTypes.TEXT, allowNull: true },
       quantidade_excedente: { type: DataTypes.DECIMAL(14, 3), allowNull: false, defaultValue: 0 },

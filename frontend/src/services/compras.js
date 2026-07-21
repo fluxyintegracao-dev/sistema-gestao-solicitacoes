@@ -413,6 +413,18 @@ export async function encerrarSolicitacaoCompra(id, data, { idempotencyKey = nul
   return handleJsonResponse(response, 'Erro ao encerrar solicitacao de compra');
 }
 
+export async function encerrarSolicitacaoCompraSemPedido(id, data, { idempotencyKey = null } = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/encerrar-sem-pedido`, {
+    method: 'PATCH',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao encerrar cotacao sem gerar pedido');
+}
+
 export async function listarPedidosCompra(params = {}) {
   const query = buildQueryString(params);
   const url = query

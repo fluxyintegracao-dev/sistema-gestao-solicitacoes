@@ -168,6 +168,7 @@ export function canAccessCompras(user) {
       'compras.cotacoes.cancelar',
       'compras.cotacoes.fechar_parcial',
       'compras.cotacoes.encerrar',
+      'compras.cotacoes.encerrar_sem_pedido',
       'compras.cotacoes.reabrir',
       'compras.fornecedores.visualizar',
       'compras.fornecedores.gerenciar',
@@ -508,6 +509,16 @@ export function canEncerrarComprasCotacoes(user) {
     ]);
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canEncerrarSemPedidoComprasCotacoes(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.cotacoes.encerrar_sem_pedido');
+  }
+  return false;
 }
 
 export function canFecharParcialComprasCotacoes(user) {

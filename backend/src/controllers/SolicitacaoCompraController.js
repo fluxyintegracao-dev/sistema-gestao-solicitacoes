@@ -49,6 +49,7 @@ const {
   criarOuAtualizarFornecedorCentralizado
 } = require('../services/comprasFornecedorService');
 const {
+  encerrarSaldoSolicitacaoCompraSemPedido,
   fecharPedidosDaSolicitacaoCompraAutomaticamente,
   gerarPedidosDosVencedores,
   isSolicitacaoCompraComPedidosFechadosComFornecedor
@@ -69,6 +70,7 @@ const {
   canEditarApropriacoesItemSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
   canEncerrarComprasCotacoes,
+  canEncerrarSemPedidoComprasCotacoes,
   canFecharParcialComprasCotacoes,
   canManageComprasCotacoes,
   canManageComprasDelegacao,
@@ -4324,6 +4326,93 @@ module.exports = {
         code: error?.code || undefined,
         saldo_restante: error?.saldo_restante ?? undefined,
         quantidade_excedente: error?.quantidade_excedente ?? undefined
+      });
+    }
+  },
+
+  async encerrarSemPedido(req, res) {
+    const transaction = await SolicitacaoCompra.sequelize.transaction();
+
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) {
+        await transaction.rollback();
+        return;
+      }
+
+      if (!(await canEncerrarSemPedidoComprasCotacoes(usuario))) {
+        await transaction.rollback();
+        return res.status(403).json({ error: 'Acesso negado para encerrar a cotacao sem gerar pedido.' });
+      }
+
+      const solicitacaoTravada = await SolicitacaoCompra.findByPk(req.params.id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!solicitacaoTravada) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        await transaction.rollback();
+        return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction))) {
+        await transaction.rollback();
+        return responderCompraAguardandoLiberacao(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
+      }
+
+      const resultado = await encerrarSaldoSolicitacaoCompraSemPedido({
+        solicitacaoId: solicitacaoTravada.id,
+        usuarioId: usuario.id,
+        idempotencyKey: req.get('Idempotency-Key') || null,
+        justificativa: req.body.justificativa,
+        transaction
+      });
+
+      await transaction.commit();
+      if (resultado.replay) {
+        res.setHeader('X-Idempotent-Replay', 'true');
+      }
+
+      const atualizada = await carregarSolicitacaoCompra(req.params.id);
+      return res.json({
+        ...atualizada.toJSON(),
+        encerramento_sem_pedido_resultado: {
+          fechamento: resultado.fechamento,
+          quantidade_nao_comprada: resultado.quantidade_nao_comprada,
+          pedidos_preservados: resultado.pedidos_preservados,
+          itens_saldo: resultado.itens_saldo,
+          replay: resultado.replay
+        }
+      });
+    } catch (error) {
+      if (!transaction.finished) {
+        await transaction.rollback();
+      }
+      console.error(error);
+      const statusCode = Number(error?.statusCode || (error?.name === 'Error' ? 400 : 500));
+      return res.status(statusCode).json({
+        error: statusCode < 500 ? error.message : 'Erro ao encerrar a cotacao sem gerar pedido',
+        code: error?.code || undefined
       });
     }
   },

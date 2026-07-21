@@ -3,8 +3,10 @@ const assert = require('assert');
 const {
   validateCompraCotacaoRespostaInternaBody,
   validateCompraEncerrarBody,
+  validateCompraEncerrarSemPedidoBody,
   validateCompraEnviarBody
 } = require('../src/validators/operationalValidators');
+const { ALL_PERMISSION_KEYS } = require('../src/constants/moduloPermissoes');
 
 function itemSelecionado() {
   return {
@@ -74,6 +76,32 @@ function validarFechamentoExcedenteAuditavel() {
   assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 12.5);
 }
 
+function validarEncerramentoSemPedido() {
+  const resultado = validateCompraEncerrarSemPedidoBody({
+    confirmado: true,
+    justificativa: 'O saldo restante nao sera mais necessario para a obra.'
+  });
+
+  assert.strictEqual(resultado.confirmado, true);
+  assert.strictEqual(
+    resultado.justificativa,
+    'O saldo restante nao sera mais necessario para a obra.'
+  );
+  assert.throws(
+    () => validateCompraEncerrarSemPedidoBody({ confirmado: false, justificativa: 'Motivo suficientemente detalhado.' }),
+    /Confirme que o saldo restante nao sera comprado/
+  );
+  assert.throws(
+    () => validateCompraEncerrarSemPedidoBody({ confirmado: true, justificativa: 'Curto' }),
+    /ao menos 10 caracteres/
+  );
+}
+
+function validarPermissaoEncerramentoSemPedido() {
+  assert.strictEqual(ALL_PERMISSION_KEYS.has('compras.cotacoes.encerrar_sem_pedido'), true);
+  assert.strictEqual(ALL_PERMISSION_KEYS.size, 271);
+}
+
 function validarPrazoGeralRespostaInterna() {
   const resultado = validateCompraCotacaoRespostaInternaBody({
     itens: [{
@@ -130,6 +158,8 @@ validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
 validarFechamentoExcedenteAuditavel();
+validarEncerramentoSemPedido();
+validarPermissaoEncerramentoSemPedido();
 validarPrazoGeralRespostaInterna();
 validarCompatibilidadeDataChegadaLegada();
 

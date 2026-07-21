@@ -233,6 +233,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotacao', descricao: 'Cancelar uma cotacao aberta, com ou sem respostas, mantendo a auditoria.' },
           { key: 'compras.cotacoes.fechar_parcial', label: 'Fechar parcialmente', descricao: 'Gerar pedidos dos itens selecionados e manter o saldo da cotacao aberto.' },
           { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Gerar os pedidos finais e encerrar definitivamente a cotacao.' },
+          { key: 'compras.cotacoes.encerrar_sem_pedido', label: 'Encerrar sem pedido', descricao: 'Encerrar definitivamente a cotacao descartando o saldo restante sem gerar novos pedidos.' },
           { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
         ]
       },

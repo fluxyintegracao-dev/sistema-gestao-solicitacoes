@@ -992,6 +992,7 @@ function montarMapaSaldosSolicitacao(solicitacao) {
       item_tipo: 'CADASTRADO',
       item_referencia_id: Number(item.id),
       descricao: item.insumo?.nome || `Item ${item.id}`,
+      unidade: item.unidade?.sigla || null,
       quantidade_atual: roundQty(item.quantidade),
       quantidade_fechada: 0,
       saldo: 0
@@ -1005,6 +1006,7 @@ function montarMapaSaldosSolicitacao(solicitacao) {
       item_tipo: 'MANUAL',
       item_referencia_id: Number(item.id),
       descricao: item.nome_manual || `Item manual ${item.id}`,
+      unidade: item.unidade_sigla_manual || null,
       quantidade_atual: roundQty(item.quantidade),
       quantidade_fechada: 0,
       saldo: 0
@@ -1437,7 +1439,6 @@ async function gerarPedidosDosVencedores({
   if (isSolicitacaoCompraCancelada(solicitacao.status) || normalizeCotacaoText(solicitacao.status) === 'RECUSADO') {
     throw new Error('Solicitacao de compra cancelada ou recusada nao permite gerar pedidos.');
   }
-
   const scopeIdempotencia = idempotencyKey
     ? `SC:${Number(solicitacaoId)}:${String(idempotencyKey).trim().slice(0, 140)}`
     : null;
@@ -1464,6 +1465,13 @@ async function gerarPedidosDosVencedores({
         final: normalizeText(existente.tipo) === 'FINAL'
       };
     }
+  }
+
+  if (['ENCERRADO', 'INATIVA'].includes(normalizeText(solicitacao.status))) {
+    throw Object.assign(new Error('Solicitacao de compra encerrada nao permite gerar novos pedidos.'), {
+      statusCode: 409,
+      code: 'COMPRA_COTACAO_JA_ENCERRADA'
+    });
   }
 
   const saldosAntes = montarMapaSaldosSolicitacao(solicitacao);
@@ -1675,6 +1683,176 @@ async function gerarPedidosDosVencedores({
     pedidos: pedidosCriados,
     saldo_restante: saldoRestante,
     final: tipoFechamento === 'FINAL'
+  };
+}
+
+async function encerrarSaldoSolicitacaoCompraSemPedido({
+  solicitacaoId,
+  usuarioId,
+  idempotencyKey = null,
+  justificativa,
+  transaction
+}) {
+  const solicitacao = await carregarSolicitacaoPedidos(solicitacaoId, transaction, { incluirPedidos: true });
+  if (!solicitacao) {
+    throw Object.assign(new Error('Solicitacao de compra nao encontrada.'), {
+      statusCode: 404,
+      code: 'COMPRA_SOLICITACAO_NAO_ENCONTRADA'
+    });
+  }
+
+  const scopeIdempotencia = idempotencyKey
+    ? `SC:${Number(solicitacaoId)}:SEM_PEDIDO:${String(idempotencyKey).trim().slice(0, 120)}`
+    : null;
+  const saldos = [...montarMapaSaldosSolicitacao(solicitacao).values()]
+    .filter((item) => item.saldo > 0.0001);
+  const saldoTotal = roundQty(saldos.reduce((total, item) => total + item.saldo, 0));
+  const itensSaldo = saldos.map((item) => ({
+    item_tipo: item.item_tipo,
+    item_referencia_id: item.item_referencia_id,
+    descricao: item.descricao,
+    unidade: item.unidade || null,
+    quantidade_solicitada: item.quantidade_atual,
+    quantidade_comprada: item.quantidade_fechada,
+    quantidade_nao_comprada: item.saldo
+  }));
+  const pedidosPreservados = (solicitacao.pedidos || []).filter(
+    (pedido) => !isPedidoCancelado(pedido.status)
+  ).length;
+
+  if (scopeIdempotencia) {
+    const existente = await SolicitacaoCompraFechamento.findOne({
+      where: { idempotency_key: scopeIdempotencia },
+      transaction
+    });
+    if (existente) {
+      return {
+        fechamento: existente,
+        itens_saldo: itensSaldo,
+        quantidade_nao_comprada: roundQty(existente.quantidade_nao_comprada),
+        pedidos_preservados: pedidosPreservados,
+        replay: true
+      };
+    }
+  }
+
+  if (normalizeText(solicitacao.origem) === 'COMPRA_DIRETA') {
+    throw Object.assign(new Error('Compra direta nao utiliza encerramento de cotacao sem pedido.'), {
+      statusCode: 400,
+      code: 'COMPRA_DIRETA_FORA_COTACAO'
+    });
+  }
+
+  const statusAtual = normalizeText(solicitacao.status);
+  if (['CANCELADA', 'CANCELADO', 'INATIVA', 'RECUSADO', 'ENCERRADO'].includes(statusAtual)) {
+    throw Object.assign(new Error(`Solicitacao de compra ${statusAtual || 'sem status'} nao permite encerramento sem pedido.`), {
+      statusCode: statusAtual === 'ENCERRADO' ? 409 : 400,
+      code: statusAtual === 'ENCERRADO' ? 'COMPRA_COTACAO_JA_ENCERRADA' : 'COMPRA_COTACAO_STATUS_INVALIDO'
+    });
+  }
+
+  const cotacoesAtivas = (solicitacao.fornecedores || []).filter(
+    (cotacao) => !['CANCELADA', 'CANCELADO', 'FINALIZADA'].includes(normalizeText(cotacao.status))
+  );
+  if (!cotacoesAtivas.length) {
+    throw Object.assign(new Error('Nao existe cotacao ativa para encerrar sem pedido.'), {
+      statusCode: 400,
+      code: 'COMPRA_COTACAO_ATIVA_NAO_ENCONTRADA'
+    });
+  }
+
+  if (saldoTotal <= 0.0001) {
+    throw Object.assign(new Error('Nao existe saldo restante para encerrar sem pedido.'), {
+      statusCode: 409,
+      code: 'COMPRA_COTACAO_SEM_SALDO'
+    });
+  }
+
+  const ultimaRodada = await SolicitacaoCompraFechamento.findOne({
+    where: { solicitacao_compra_id: solicitacao.id },
+    order: [['numero_rodada', 'DESC']],
+    transaction
+  });
+  const agora = new Date();
+  const statusAnterior = solicitacao.status;
+  const fechamento = await SolicitacaoCompraFechamento.create(
+    {
+      solicitacao_compra_id: solicitacao.id,
+      numero_rodada: Number(ultimaRodada?.numero_rodada || 0) + 1,
+      tipo: 'SEM_PEDIDO',
+      status: 'CONCLUIDO',
+      idempotency_key: scopeIdempotencia,
+      quantidade_total: 0,
+      quantidade_nao_comprada: saldoTotal,
+      valor_total: 0,
+      justificativa: String(justificativa || '').trim(),
+      quantidade_excedente: 0,
+      justificativa_excedente: null,
+      criado_por: usuarioId || null,
+      fechado_em: agora
+    },
+    { transaction }
+  );
+
+  await solicitacao.update(
+    { status: 'ENCERRADO', encerrado_em: agora },
+    { transaction }
+  );
+
+  await SolicitacaoCompraFornecedor.update(
+    { status: 'FINALIZADA' },
+    {
+      where: {
+        solicitacao_compra_id: solicitacao.id,
+        status: { [Op.notIn]: ['CANCELADA', 'CANCELADO'] }
+      },
+      transaction
+    }
+  );
+
+  await registrarLogSolicitacaoCompra({
+    solicitacaoCompraId: solicitacao.id,
+    usuarioId,
+    tipoAcao: 'ENCERRAMENTO_SEM_PEDIDO',
+    descricao: `Cotacao encerrada sem novos pedidos. Saldo nao comprado: ${saldoTotal}.`,
+    metadados: {
+      fechamento_id: fechamento.id,
+      numero_rodada: fechamento.numero_rodada,
+      tipo_fechamento: fechamento.tipo,
+      status_anterior: statusAnterior,
+      status_novo: 'ENCERRADO',
+      quantidade_nao_comprada: saldoTotal,
+      pedidos_preservados: pedidosPreservados,
+      justificativa: fechamento.justificativa,
+      itens: itensSaldo
+    },
+    transaction
+  });
+
+  await registrarHistoricoCompraNaSolicitacaoPrincipal({
+    solicitacao,
+    usuarioId,
+    acao: 'COTACAO_ENCERRADA_SEM_PEDIDO',
+    descricao: `Cotacao encerrada sem gerar novos pedidos. Saldo nao comprado: ${saldoTotal}.`,
+    statusAnterior,
+    statusNovo: 'ENCERRADO',
+    metadados: {
+      fechamento_id: fechamento.id,
+      numero_rodada: fechamento.numero_rodada,
+      quantidade_nao_comprada: saldoTotal,
+      pedidos_preservados: pedidosPreservados,
+      justificativa: fechamento.justificativa,
+      itens: itensSaldo
+    },
+    transaction
+  });
+
+  return {
+    fechamento,
+    itens_saldo: itensSaldo,
+    quantidade_nao_comprada: saldoTotal,
+    pedidos_preservados: pedidosPreservados,
+    replay: false
   };
 }
 
@@ -3495,6 +3673,7 @@ module.exports = {
   cancelarPedidoItens,
   criarPedidoParaFornecedor,
   delegarSolicitacaoCompra,
+  encerrarSaldoSolicitacaoCompraSemPedido,
   fecharPedidosDaSolicitacaoCompraAutomaticamente,
   gerarPedidosDosVencedores,
   isSolicitacaoCompraComPedidosFechadosComFornecedor,

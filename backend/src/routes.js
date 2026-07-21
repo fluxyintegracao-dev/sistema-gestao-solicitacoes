@@ -45,6 +45,7 @@ const {
   validateCompraCreateBody,
   validateCompraDiretaCreateBody,
   validateCompraEncerrarBody,
+  validateCompraEncerrarSemPedidoBody,
   validateCompraCotacaoCancelBody,
   validateCompraCotacaoRespostaInternaBody,
   validateCompraCotacaoRespostaInternaParams,
@@ -248,6 +249,7 @@ const {
   canCreateComercialContratos,
   canCreateCrmLeads,
   canEditarItensComprasPedidos,
+  canEncerrarSemPedidoComprasCotacoes,
   canFecharComprasCotacoes,
   canExportCrmLeads,
   canGenerateBoletos,
@@ -828,6 +830,11 @@ const allowComprasCotacoesEncerrar = allowPaymentAction(
   'COMPRAS_COTACOES_ENCERRAR',
   canFecharComprasCotacoes,
   'Acesso negado para gerar pedidos da cotacao de compra'
+);
+const allowComprasCotacoesEncerrarSemPedido = allowPaymentAction(
+  'COMPRAS_COTACOES_ENCERRAR_SEM_PEDIDO',
+  canEncerrarSemPedidoComprasCotacoes,
+  'Acesso negado para encerrar a cotacao sem gerar pedido'
 );
 const allowComprasCotacoesReabrir = allowPaymentAction(
   'COMPRAS_COTACOES_REABRIR',
@@ -1786,6 +1793,7 @@ router.patch('/compras/solicitacoes/:id/liberar', allowCompraSolicitacoesManage,
 router.post('/compras/solicitacoes/:id/enviar', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEnviarBody }), requireCompraAccess, SolicitacaoCompraController.enviarParaFornecedores);
 router.patch('/compras/solicitacoes/:id/recusar', allowCompraSolicitacoesManage, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.recusar);
 router.patch('/compras/solicitacoes/:id/encerrar', allowComprasCotacoesEncerrar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarBody }), requireCompraAccess, SolicitacaoCompraController.encerrar);
+router.patch('/compras/solicitacoes/:id/encerrar-sem-pedido', requireEnabledModule('COTACOES'), allowComprasCotacoesEncerrarSemPedido, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraEncerrarSemPedidoBody }), requireCompraAccess, SolicitacaoCompraController.encerrarSemPedido);
 router.patch('/compras/solicitacoes/:id/itens/:itemId/quantidade', allowCompraSolicitacoesAlterarQuantidade, criticalRateLimit, validateRequest({ params: validateCompraSolicitacaoItemQuantidadeParams, body: validateCompraSolicitacaoItemQuantidadeBody }), requireCompraAccess, SolicitacaoCompraController.atualizarQuantidadeItem);
 router.patch('/compras/solicitacoes/:id/itens/:itemId/apropriacoes', allowCompraSolicitacoesCreateFlowRead, criticalRateLimit, validateRequest({ params: validateCompraSolicitacaoItemQuantidadeParams, body: validateCompraSolicitacaoItemApropriacoesBody }), requireCompraAccess, SolicitacaoCompraController.atualizarApropriacoesItem);
 router.post('/compras/solicitacoes/:id/comentarios', allowCompraSolicitacoesManage, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra'), body: validateCompraCotacaoComentarioBody }), requireCompraAccess, SolicitacaoCompraController.comentar);

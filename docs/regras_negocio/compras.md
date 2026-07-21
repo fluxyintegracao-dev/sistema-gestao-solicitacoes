@@ -50,10 +50,13 @@
 - comprador escolhe vencedor e quantidade por item;
 - uma rodada parcial gera somente os pedidos e alocacoes das quantidades escolhidas, preservando o saldo restante em `FECHAMENTO_PARCIAL`;
 - a rodada final consome todo o saldo elegivel e leva a solicitacao a `ENCERRADO`;
+- o encerramento sem pedido e um fluxo independente: exige a permissao `compras.cotacoes.encerrar_sem_pedido`, confirmacao e justificativa, preserva pedidos anteriores e encerra o saldo remanescente sem criar pedido, alocacao, frete ou efeito financeiro;
+- cancelar cotacao e gerar pedidos selecionados mantem seus comportamentos existentes e nao sao substituidos pelo encerramento sem pedido;
 - rodadas sao registradas em `SolicitacaoCompraFechamento` e novos pedidos/alocacoes sao acrescentados sem substituir os anteriores;
 - e permitido fechar acima da quantidade solicitada, limitado a quantidade ainda disponivel na resposta do fornecedor;
 - fechamento excedente exige confirmacao e justificativa obrigatoria, preservadas no fechamento e no log para auditoria;
 - fechamento deve ser transacional e idempotente e nao pode gerar os mesmos pedidos novamente.
+- uma solicitacao ja encerrada nao aceita geracao posterior de pedidos; se o cancelamento de pedido anterior devolver novo saldo, a sincronizacao operacional pode retornar a compra para `FECHAMENTO_PARCIAL` com auditoria.
 
 ## Pedido
 

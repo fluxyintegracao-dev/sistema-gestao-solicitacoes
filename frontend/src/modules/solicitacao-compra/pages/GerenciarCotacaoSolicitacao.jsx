@@ -15,6 +15,7 @@ import {
   comentarSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
+  encerrarSolicitacaoCompraSemPedido,
   enviarSolicitacaoCompraParaFornecedores,
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
@@ -30,6 +31,7 @@ import { buscarParceiros, listarCategoriasParceiro } from '../../../services/par
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canEncerrarSemPedidoComprasCotacoes,
   canFecharParcialComprasCotacoes,
   canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
@@ -478,6 +480,115 @@ function ModalRespostaInternaCotacao({
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
           <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
           <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEncerrarSemPedido({
+  aberto,
+  resumo,
+  justificativa,
+  confirmado,
+  processando,
+  onJustificativaChange,
+  onConfirmadoChange,
+  onConfirmar,
+  onFechar
+}) {
+  if (!aberto) return null;
+
+  const itens = Array.isArray(resumo?.itens) ? resumo.itens : [];
+  const justificativaValida = String(justificativa || '').trim().length >= 10;
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="encerrar-sem-pedido-titulo">
+      <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-xl border border-red-200 bg-[var(--c-surface)] shadow-2xl dark:border-red-900/70">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
+          <div className="min-w-0">
+            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold text-[var(--c-text)]">Encerrar cotacao sem gerar pedido?</h2>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--c-muted)]">
+              O saldo abaixo sera encerrado definitivamente. Pedidos ja gerados permanecem inalterados.
+            </p>
+          </div>
+          <button type="button" className="compras-icon-action shrink-0" onClick={onFechar} disabled={processando} title="Fechar" aria-label="Fechar">
+            <HiOutlineXMark />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Saldo acumulado</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{formatNumeroCompra(resumo?.saldoTotal)}</strong>
+              <span className="mt-0.5 block text-[10px] text-[var(--c-muted)]">Detalhado por item e unidade</span>
+            </div>
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Itens com saldo</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{itens.length}</strong>
+            </div>
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Pedidos preservados</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{resumo?.pedidosPreservados || 0}</strong>
+            </div>
+          </div>
+
+          {Number(resumo?.selecoesAtuais || 0) > 0 ? (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              Existem {resumo.selecoesAtuais} selecoes de compra marcadas na tela. Elas serao ignoradas e nenhum novo pedido sera gerado.
+            </div>
+          ) : null}
+
+          <div className="mt-4 overflow-hidden rounded-lg border border-[var(--c-border)]">
+            <div className="border-b border-[var(--c-border)] bg-slate-50 px-3 py-2 text-xs font-semibold text-[var(--c-text)] dark:bg-slate-950/50">
+              Itens que nao serao comprados
+            </div>
+            <div className="max-h-48 divide-y divide-[var(--c-border)] overflow-y-auto">
+              {itens.map((item) => (
+                <div key={`${item.item_tipo}-${item.item_referencia_id}`} className="flex items-start justify-between gap-4 px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-[var(--c-text)]" title={item.nome}>{item.nome}</strong>
+                    <span className="text-[var(--c-muted)]">Comprado: {formatNumeroCompra(item.quantidadeFechada)} {item.unidade || ''}</span>
+                  </div>
+                  <span className="shrink-0 font-semibold text-red-700 dark:text-red-300">Saldo: {formatNumeroCompra(item.saldo)} {item.unidade || ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="app-filter-label">Justificativa obrigatoria</span>
+            <textarea
+              className="input mt-1 min-h-[96px] w-full"
+              maxLength={2000}
+              value={justificativa}
+              disabled={processando}
+              onChange={(event) => onJustificativaChange(event.target.value)}
+              placeholder="Explique por que o saldo restante nao sera comprado."
+            />
+            <span className={`mt-1 block text-[11px] ${justificativaValida ? 'text-emerald-700' : 'text-[var(--c-muted)]'}`}>
+              Minimo de 10 caracteres. {String(justificativa || '').trim().length}/2000
+            </span>
+          </label>
+
+          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 px-3 py-3 text-sm text-red-900 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
+            <input
+              className="mt-0.5"
+              type="checkbox"
+              checked={confirmado}
+              disabled={processando}
+              onChange={(event) => onConfirmadoChange(event.target.checked)}
+            />
+            <span>Confirmo que o saldo restante nao sera comprado e que nenhum novo pedido deve ser gerado.</span>
+          </label>
+        </div>
+
+        <div className="app-page-actions justify-end border-t border-[var(--c-border)] px-4 py-4 sm:px-5">
+          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={processando}>Voltar</button>
+          <button type="button" className="btn btn-danger" onClick={onConfirmar} disabled={processando || !confirmado || !justificativaValida}>
+            {processando ? 'Encerrando...' : 'Encerrar sem gerar pedido'}
+          </button>
         </div>
       </div>
     </div>
@@ -1366,13 +1477,16 @@ function SecaoComparativo({
   solicitacao,
   podeComprar,
   podeEncerrar,
+  podeEncerrarSemPedido,
   podeEditarResposta,
   vencedoresSelecionados,
   onVencedorChange,
   onEditarRespostaFornecedor,
   onRemanejamentoAplicado,
   onEncerrar,
-  encerrando
+  onEncerrarSemPedido,
+  encerrando,
+  encerrandoSemPedido
 }) {
   const [modoVisualizacao, setModoVisualizacao] = useState('cards');
   const [painelFornecedoresAberto, setPainelFornecedoresAberto] = useState(false);
@@ -1824,15 +1938,27 @@ function SecaoComparativo({
         </div>
         )}
 
-          {podeEncerrar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
+          {(podeEncerrar || podeEncerrarSemPedido) && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
-              <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando}>
-                {encerrando
-                  ? 'Atualizando...'
-                  : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
-                    ? 'Atualizar vencedores e pedidos'
-                    : 'Gerar pedidos selecionados'}
-              </button>
+              {podeEncerrarSemPedido ? (
+                <button
+                  type="button"
+                  className="btn btn-outline border-red-300 text-red-700 hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
+                  onClick={onEncerrarSemPedido}
+                  disabled={encerrando || encerrandoSemPedido}
+                >
+                  {encerrandoSemPedido ? 'Encerrando...' : 'Encerrar sem pedido'}
+                </button>
+              ) : null}
+              {podeEncerrar ? (
+                <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando || encerrandoSemPedido}>
+                  {encerrando
+                    ? 'Atualizando...'
+                    : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
+                      ? 'Atualizar vencedores e pedidos'
+                      : 'Gerar pedidos selecionados'}
+                </button>
+              ) : null}
             </div>
           )}
       </div>
@@ -1867,6 +1993,10 @@ export default function GerenciarCotacaoSolicitacao() {
   const [formRespostaInterna, setFormRespostaInterna] = useState(null);
   const [salvandoRespostaInterna, setSalvandoRespostaInterna] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
+  const [modalEncerrarSemPedido, setModalEncerrarSemPedido] = useState(false);
+  const [justificativaEncerrarSemPedido, setJustificativaEncerrarSemPedido] = useState('');
+  const [confirmadoEncerrarSemPedido, setConfirmadoEncerrarSemPedido] = useState(false);
+  const [encerrandoSemPedido, setEncerrandoSemPedido] = useState(false);
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
@@ -1875,12 +2005,39 @@ export default function GerenciarCotacaoSolicitacao() {
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
   const encerramentoIdempotencyRef = useRef(null);
+  const encerramentoSemPedidoIdempotencyRef = useRef(null);
 
   const podeComprar = canOperateComprasCotacoes(user);
   const podeFecharParcialCotacao = canFecharParcialComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
+  const podeEncerrarSemPedidoCotacao = canEncerrarSemPedidoComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
   const podeCancelarCotacao = canCancelarComprasCotacoes(user);
+  const resumoEncerramentoSemPedido = useMemo(() => {
+    const itens = (comparativo?.itens || [])
+      .map((item) => ({
+        item_tipo: item.item_tipo,
+        item_referencia_id: item.item_referencia_id,
+        nome: item.nome || item.descricao || `Item ${item.item_referencia_id || ''}`,
+        unidade: item.unidade || '',
+        quantidadeFechada: parseNumeroCompra(item.quantidade_fechada),
+        saldo: parseNumeroCompra(item.saldo_disponivel ?? item.quantidade)
+      }))
+      .filter((item) => item.saldo > 0.0001);
+    const pedidosPreservados = (solicitacao?.pedidos || []).filter(
+      (pedido) => normalizeText(pedido.status) !== 'cancelado'
+    ).length;
+    const selecoesAtuais = Object.values(vencedoresSelecionados).filter(
+      (entry) => Number(entry?.resposta_item_id) > 0 && parseNumeroCompra(entry?.quantidade_alocada) > 0
+    ).length;
+
+    return {
+      itens,
+      saldoTotal: itens.reduce((total, item) => total + item.saldo, 0),
+      pedidosPreservados,
+      selecoesAtuais
+    };
+  }, [comparativo, solicitacao, vencedoresSelecionados]);
 
   async function carregarFornecedores() {
     try {
@@ -2421,6 +2578,62 @@ export default function GerenciarCotacaoSolicitacao() {
 
       return next;
     });
+  }
+
+  function abrirEncerramentoSemPedido() {
+    if (resumoEncerramentoSemPedido.saldoTotal <= 0.0001) {
+      alert('Nao existe saldo restante para encerrar sem pedido.');
+      return;
+    }
+    setJustificativaEncerrarSemPedido('');
+    setConfirmadoEncerrarSemPedido(false);
+    encerramentoSemPedidoIdempotencyRef.current = null;
+    setModalEncerrarSemPedido(true);
+  }
+
+  function fecharModalEncerramentoSemPedido() {
+    if (encerrandoSemPedido) return;
+    setModalEncerrarSemPedido(false);
+    setJustificativaEncerrarSemPedido('');
+    setConfirmadoEncerrarSemPedido(false);
+    encerramentoSemPedidoIdempotencyRef.current = null;
+  }
+
+  async function confirmarEncerramentoSemPedido() {
+    const justificativa = justificativaEncerrarSemPedido.trim();
+    if (justificativa.length < 10) {
+      alert('Informe uma justificativa com pelo menos 10 caracteres.');
+      return;
+    }
+    if (!confirmadoEncerrarSemPedido) {
+      alert('Confirme que o saldo restante nao sera comprado.');
+      return;
+    }
+
+    try {
+      setEncerrandoSemPedido(true);
+      if (!encerramentoSemPedidoIdempotencyRef.current) {
+        encerramentoSemPedidoIdempotencyRef.current = criarChaveIdempotenciaFechamento(`${id}-sem-pedido`);
+      }
+      const resultado = await encerrarSolicitacaoCompraSemPedido(
+        id,
+        { confirmado: true, justificativa },
+        { idempotencyKey: encerramentoSemPedidoIdempotencyRef.current }
+      );
+      encerramentoSemPedidoIdempotencyRef.current = null;
+      setModalEncerrarSemPedido(false);
+      setJustificativaEncerrarSemPedido('');
+      setConfirmadoEncerrarSemPedido(false);
+      setVencedoresSelecionados({});
+      await carregarTudo();
+      const detalhes = resultado?.encerramento_sem_pedido_resultado || {};
+      alert(`Cotacao encerrada sem gerar novos pedidos. Saldo nao comprado: ${formatNumeroCompra(detalhes.quantidade_nao_comprada)}.`);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao encerrar cotacao sem gerar pedido');
+    } finally {
+      setEncerrandoSemPedido(false);
+    }
   }
 
   async function handleEncerrar() {
@@ -2988,18 +3201,32 @@ export default function GerenciarCotacaoSolicitacao() {
             solicitacao={solicitacao}
             podeComprar={podeOperarFluxo}
             podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
+            podeEncerrarSemPedido={podeEncerrarSemPedidoCotacao && !fluxoTerminal && cotacoesAtivas.length > 0 && resumoEncerramentoSemPedido.saldoTotal > 0.0001}
             podeEditarResposta={podeOperarFluxo}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
             onEditarRespostaFornecedor={abrirRespostaInternaPorId}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
             onEncerrar={handleEncerrar}
+            onEncerrarSemPedido={abrirEncerramentoSemPedido}
             encerrando={encerrando}
+            encerrandoSemPedido={encerrandoSemPedido}
           />
         </div>
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
+      <ModalEncerrarSemPedido
+        aberto={modalEncerrarSemPedido}
+        resumo={resumoEncerramentoSemPedido}
+        justificativa={justificativaEncerrarSemPedido}
+        confirmado={confirmadoEncerrarSemPedido}
+        processando={encerrandoSemPedido}
+        onJustificativaChange={setJustificativaEncerrarSemPedido}
+        onConfirmadoChange={setConfirmadoEncerrarSemPedido}
+        onConfirmar={confirmarEncerramentoSemPedido}
+        onFechar={fecharModalEncerramentoSemPedido}
+      />
       <ModalRespostaInternaCotacao
         key={cotacaoRespostaInterna?.id || 'resposta-interna-fechada'}
         cotacao={cotacaoRespostaInterna}
