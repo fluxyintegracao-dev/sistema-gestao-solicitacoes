@@ -111,6 +111,29 @@ import {
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
 
+const COMPRAS_RESPONSIVE_ROUTES = [
+  '/solicitacoes-compra',
+  '/solicitacoes-compra-direta',
+  '/pedidos-compra',
+  '/compras/delegacao',
+  '/compras/relatorios',
+  '/relatorios/administrativos',
+  '/gestao-apropriacoes',
+  '/gestao-insumos',
+  '/gestao-unidades',
+  '/gestao-categorias',
+  '/gestao-fornecedores',
+  '/cotacoes',
+  '/configuracoes-cotacao',
+  '/configuracoes-status-pedidos-compra'
+];
+
+function isComprasResponsiveRoute(pathname = '') {
+  return COMPRAS_RESPONSIVE_ROUTES.some((route) => (
+    pathname === route || pathname.startsWith(`${route}/`)
+  ));
+}
+
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
@@ -132,6 +155,7 @@ export default function Layout() {
   });
   const [suporteWhatsappUrl, setSuporteWhatsappUrl] = useState(null);
   const nativeApp = isNativeApp();
+  const comprasResponsiveRoute = isComprasResponsiveRoute(location.pathname);
 
   const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
 
@@ -884,7 +908,7 @@ export default function Layout() {
         )}
 
         <main className={`layout-main flex-1 min-w-0 transition-colors duration-200 ${nativeApp ? 'layout-main-native' : ''}`}>
-          <div className="layout-content-shell">
+          <div className={`layout-content-shell ${comprasResponsiveRoute ? 'compras-responsive-scope' : ''}`}>
             <header className={`topbar-shell ${nativeApp ? 'topbar-shell-native' : ''}`}>
               <div className="topbar-leading">
                 <button

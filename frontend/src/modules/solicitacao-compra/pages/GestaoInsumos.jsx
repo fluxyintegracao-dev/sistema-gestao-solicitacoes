@@ -235,7 +235,7 @@ export default function GestaoInsumos() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card compras-adaptive-list">
         <div className="card-header">
           <h2 className="font-semibold">Insumos cadastrados</h2>
         </div>
@@ -290,6 +290,29 @@ export default function GestaoInsumos() {
           </table>
           </div>
         )}
+        {!loading && insumosFiltrados.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Insumos cadastrados">
+            {insumosFiltrados.map((item) => (
+              <article key={`mobile-${item.id}`} className="compras-mobile-record">
+                <div className="compras-mobile-record-head">
+                  <div className="compras-mobile-record-title">
+                    <strong>{item.nome}</strong>
+                    <span>{item.codigo || 'Sem codigo'}</span>
+                  </div>
+                </div>
+                <div className="compras-mobile-record-grid">
+                  <div className="compras-mobile-field"><span>Unidade</span><strong>{item.unidade_manual || item.unidade?.sigla || item.unidade?.nome || '-'}</strong></div>
+                  <div className="compras-mobile-field"><span>Categoria</span><strong>{item.categoria?.nome || '-'}</strong></div>
+                  <div className="compras-mobile-field"><span>Descricao</span><strong>{item.descricao || '-'}</strong></div>
+                </div>
+                <div className="compras-mobile-record-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => abrirEdicao(item)}>Editar</button>
+                  <button type="button" className="btn btn-danger" onClick={() => handleExcluir(item.id)}>Excluir</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {modalAberto && (

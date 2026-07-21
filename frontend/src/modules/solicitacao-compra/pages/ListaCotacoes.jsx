@@ -35,6 +35,7 @@ export default function ListaCotacoes() {
   const [cotacoes, setCotacoes] = useState([]);
   const [obras, setObras] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [filtros, setFiltros] = useState({ q: '', status: '', obra_id: '' });
 
   async function carregar() {
@@ -88,64 +89,74 @@ export default function ListaCotacoes() {
             <h2 className="font-semibold text-[var(--c-text)]">Filtros</h2>
             <p className="text-sm text-[var(--c-muted)]">Filtre por fornecedor, obra ou status da cotacao.</p>
           </div>
-        </div>
-
-        <div className="app-filters-grid">
-          <label className="app-filter-field">
-            <span className="app-filter-label">Busca</span>
-            <input
-              className="input"
-              placeholder="Fornecedor ou titulo da solicitacao"
-              value={filtros.q}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
-              onKeyDown={(e) => e.key === 'Enter' && carregar()}
-            />
-          </label>
-
-          <label className="app-filter-field">
-            <span className="app-filter-label">Status</span>
-            <select
-              className="input"
-              value={filtros.status}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, status: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              <option value="ENVIADO">Enviado</option>
-              <option value="VISUALIZADO">Visualizado</option>
-              <option value="RESPONDIDO">Respondido</option>
-              <option value="FINALIZADA">Finalizada</option>
-              <option value="CANCELADO">Cancelado</option>
-            </select>
-          </label>
-
-          <label className="app-filter-field">
-            <span className="app-filter-label">Obra</span>
-            <select
-              className="input"
-              value={filtros.obra_id}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, obra_id: e.target.value }))}
-            >
-              <option value="">Todas as obras</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="app-page-actions justify-end">
           <button
             type="button"
-            className="btn btn-outline"
-            onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
+            className="btn btn-outline compras-mobile-filter-toggle"
+            aria-expanded={filtrosVisiveis}
+            onClick={() => setFiltrosVisiveis((atual) => !atual)}
           >
-            Limpar
+            {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
-            {loading ? 'Buscando...' : 'Buscar'}
-          </button>
+        </div>
+
+        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
+          <div className="app-filters-grid">
+            <label className="app-filter-field">
+              <span className="app-filter-label">Busca</span>
+              <input
+                className="input"
+                placeholder="Fornecedor ou titulo da solicitacao"
+                value={filtros.q}
+                onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
+                onKeyDown={(e) => e.key === 'Enter' && carregar()}
+              />
+            </label>
+
+            <label className="app-filter-field">
+              <span className="app-filter-label">Status</span>
+              <select
+                className="input"
+                value={filtros.status}
+                onChange={(e) => setFiltros((prev) => ({ ...prev, status: e.target.value }))}
+              >
+                <option value="">Todos</option>
+                <option value="ENVIADO">Enviado</option>
+                <option value="VISUALIZADO">Visualizado</option>
+                <option value="RESPONDIDO">Respondido</option>
+                <option value="FINALIZADA">Finalizada</option>
+                <option value="CANCELADO">Cancelado</option>
+              </select>
+            </label>
+
+            <label className="app-filter-field">
+              <span className="app-filter-label">Obra</span>
+              <select
+                className="input"
+                value={filtros.obra_id}
+                onChange={(e) => setFiltros((prev) => ({ ...prev, obra_id: e.target.value }))}
+              >
+                <option value="">Todas as obras</option>
+                {obras.map((obra) => (
+                  <option key={obra.id} value={obra.id}>
+                    {obra.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="app-page-actions justify-end">
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
+            >
+              Limpar
+            </button>
+            <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
+              {loading ? 'Buscando...' : 'Buscar'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -164,7 +175,7 @@ export default function ListaCotacoes() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card compras-table-card">
+      <div className="mt-4 card sol-surface-card compras-table-card compras-adaptive-list">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Lista de cotacoes</h2>
           <span className="text-sm text-[var(--c-muted)]">{cotacoes.length} registro(s)</span>
@@ -259,6 +270,45 @@ export default function ListaCotacoes() {
             </table>
           </div>
         )}
+        {!loading && cotacoes.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Cotacoes">
+            {cotacoes.map((cotacao) => {
+              const codigoCotacao = String(cotacao.id).padStart(5, '0');
+              const solicitacaoCodigo = cotacao.solicitacao
+                ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}`
+                : '-';
+
+              return (
+                <article key={`mobile-${cotacao.id}`} className="compras-mobile-record">
+                  <div className="compras-mobile-record-head">
+                    <div className="compras-mobile-record-title">
+                      <strong>{cotacao.fornecedor?.nome || '-'}</strong>
+                      <span>Cotacao {codigoCotacao} · {solicitacaoCodigo}</span>
+                    </div>
+                    <StatusBadge status={cotacao.status} />
+                  </div>
+                  <div className="compras-mobile-record-grid">
+                    <div className="compras-mobile-field"><span>Obra</span><strong>{cotacao.solicitacao?.obra?.nome || '-'}</strong></div>
+                    <div className="compras-mobile-field"><span>Enviado em</span><strong>{formatDate(cotacao.enviado_em)}</strong></div>
+                    <div className="compras-mobile-field"><span>Prazo</span><strong>{formatDate(cotacao.prazo_resposta)}</strong></div>
+                    <div className="compras-mobile-field"><span>Valor minimo</span><strong>{formatMoney(cotacao.valor_minimo_pedido)}</strong></div>
+                    <div className="compras-mobile-field"><span>Condicao</span><strong>{cotacao.condicao_pagamento || '-'}</strong></div>
+                  </div>
+                  <div className="compras-mobile-record-actions">
+                    {cotacao.solicitacao?.id ? (
+                      <button type="button" className="btn btn-primary" onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}>
+                        Editar cotacao
+                      </button>
+                    ) : null}
+                    <a href={`/cotacao/${cotacao.token}`} target="_blank" rel="noreferrer" className="btn btn-outline">
+                      Portal do fornecedor
+                    </a>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );
