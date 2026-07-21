@@ -622,13 +622,25 @@ async function carregarSolicitacaoCompra(id) {
               'prazo',
               'observacao',
               'quantidade_minima_item',
+              'quantidade_disponivel',
+              'ipi_valor',
+              'icms_valor',
+              'st_valor',
               'vencedor'
             ],
             include: [
               {
                 model: SolicitacaoCompraAlocacao,
                 as: 'alocacoes',
-                attributes: ['id', 'quantidade_alocada', 'status']
+                attributes: [
+                  'id',
+                  'quantidade_alocada',
+                  'ipi_rateado',
+                  'icms_rateado',
+                  'st_rateado',
+                  'difal_rateado',
+                  'status'
+                ]
               }
             ]
           }
@@ -1215,6 +1227,14 @@ function montarComparativoSolicitacao(solicitacao) {
     whatsapp: cotacaoFornecedor.fornecedor?.whatsapp || '',
     valor_minimo_pedido: cotacaoFornecedor.valor_minimo_pedido ?? null,
     prazo_entrega: cotacaoFornecedor.prazo_entrega || '',
+    prazo_entrega_dias: cotacaoFornecedor.prazo_entrega_dias ?? null,
+    prazo_entrega_tipo: cotacaoFornecedor.prazo_entrega_tipo || null,
+    difal_valor: Number(cotacaoFornecedor.difal_valor || 0),
+    frete_tipo: cotacaoFornecedor.frete_tipo || 'SEM_FRETE',
+    frete_valor: Number(cotacaoFornecedor.frete_valor || 0),
+    frete_data_vencimento: cotacaoFornecedor.frete_data_vencimento || null,
+    frete_transportador_nome: cotacaoFornecedor.frete_transportador_nome || '',
+    frete_transportador_cpf_cnpj: cotacaoFornecedor.frete_transportador_cpf_cnpj || '',
     condicao_pagamento: cotacaoFornecedor.condicao_pagamento || '',
     observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
     arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
@@ -1247,22 +1267,43 @@ function montarComparativoSolicitacao(solicitacao) {
         status_fornecedor: cotacaoFornecedor.status,
         condicao_pagamento: cotacaoFornecedor.condicao_pagamento || '',
         prazo_entrega_fornecedor: cotacaoFornecedor.prazo_entrega || '',
+        difal_valor: Number(cotacaoFornecedor.difal_valor || 0),
+        frete_tipo: cotacaoFornecedor.frete_tipo || 'SEM_FRETE',
+        frete_valor: Number(cotacaoFornecedor.frete_valor || 0),
+        frete_data_vencimento: cotacaoFornecedor.frete_data_vencimento || null,
         observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
         arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
         resposta_item_id: resposta?.id || null,
-        disponivel: Boolean(resposta?.disponivel),
+        disponivel: Boolean(resposta?.disponivel) && Number(
+          resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : 0)
+        ) > 0,
         status_disponibilidade: resposta?.status_disponibilidade || null,
         preco: resposta?.preco ?? null,
-        prazo: resposta?.prazo || '',
+        prazo: '',
         data_chegada: resposta?.data_chegada || null,
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
+        quantidade_disponivel: Number(
+          resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : 0)
+        ),
+        ipi_valor: Number(resposta?.ipi_valor || 0),
+        icms_valor: Number(resposta?.icms_valor || 0),
+        st_valor: Number(resposta?.st_valor || 0),
+        valor_total_cotado: resposta
+          ? arredondarMoeda(
+              Number(resposta.quantidade_disponivel ?? (resposta.disponivel ? item.quantidade : 0))
+              * Number(resposta.preco || 0)
+              + Number(resposta.ipi_valor || 0)
+              + Number(resposta.icms_valor || 0)
+              + Number(resposta.st_valor || 0)
+            )
+          : 0,
         quantidade_alocada: (resposta?.alocacoes || [])
           .filter((alocacao) => String(alocacao.status || '').toUpperCase() === 'ATIVA')
           .reduce((acc, alocacao) => acc + Number(alocacao.quantidade_alocada || 0), 0),
         vencedor: Boolean(resposta?.vencedor)
       };
-    });
+    }).filter((resposta) => resposta.quantidade_disponivel > 0 && Number(resposta.preco || 0) > 0);
 
     const disponiveis = respostas.filter((resposta) => resposta.disponivel && Number(resposta.preco) > 0);
     const quantidadeAtual = Number(item.quantidade || 0);
@@ -4157,6 +4198,8 @@ module.exports = {
         idempotencyKey: req.get('Idempotency-Key') || null,
         justificativa: req.body?.justificativa,
         fechamentoParcialConfirmado: req.body?.fechamento_parcial_confirmado === true,
+        fechamentoExcedenteConfirmado: req.body?.fechamento_excedente_confirmado === true,
+        justificativaExcedente: req.body?.justificativa_excedente,
         permitirParcial: podeFecharParcial,
         permitirFinal: podeEncerrarDefinitivamente,
         transaction
@@ -4218,6 +4261,8 @@ module.exports = {
           status_novo: statusNovo,
           saldo_restante: resultadoFechamento.saldo_restante,
           justificativa: resultadoFechamento.fechamento.justificativa || null,
+          quantidade_excedente: Number(resultadoFechamento.fechamento.quantidade_excedente || 0),
+          justificativa_excedente: resultadoFechamento.fechamento.justificativa_excedente || null,
           vencedores: vencedores.map((item) => ({
             resposta_item_id: item.resposta_item_id,
             quantidade_alocada: item.quantidade_alocada ?? null
@@ -4277,7 +4322,8 @@ module.exports = {
       return res.status(statusCode).json({
         error: statusCode < 500 ? error.message : 'Erro ao encerrar a cotacao',
         code: error?.code || undefined,
-        saldo_restante: error?.saldo_restante ?? undefined
+        saldo_restante: error?.saldo_restante ?? undefined,
+        quantidade_excedente: error?.quantidade_excedente ?? undefined
       });
     }
   },

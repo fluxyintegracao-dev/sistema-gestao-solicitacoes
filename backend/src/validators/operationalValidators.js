@@ -557,6 +557,14 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
       'desconto_total',
       'condicao_pagamento',
       'prazo_entrega',
+      'prazo_entrega_dias',
+      'prazo_entrega_tipo',
+      'difal_valor',
+      'frete_tipo',
+      'frete_valor',
+      'frete_data_vencimento',
+      'frete_transportador_nome',
+      'frete_transportador_cpf_cnpj',
       'observacao_resposta',
       'finalizar'
     ],
@@ -586,7 +594,11 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
         'prazo',
         'data_chegada',
         'observacao',
-        'quantidade_minima_item'
+        'quantidade_minima_item',
+        'quantidade_disponivel',
+        'ipi_valor',
+        'icms_valor',
+        'st_valor'
       ],
       `Item ${index + 1} da resposta`
     );
@@ -626,7 +638,27 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
         entry.quantidade_minima_item,
         `Quantidade minima do item ${index + 1}`,
         { min: 0, scale: 3, brazilianFormat: true }
-      )
+      ),
+      quantidade_disponivel: parseDecimal(
+        entry.quantidade_disponivel,
+        `Quantidade disponivel do item ${index + 1}`,
+        { min: 0, scale: 3, brazilianFormat: true }
+      ),
+      ipi_valor: parseDecimal(entry.ipi_valor, `IPI do item ${index + 1}`, {
+        min: 0,
+        scale: 2,
+        brazilianFormat: true
+      }) || 0,
+      icms_valor: parseDecimal(entry.icms_valor, `ICMS do item ${index + 1}`, {
+        min: 0,
+        scale: 2,
+        brazilianFormat: true
+      }) || 0,
+      st_valor: parseDecimal(entry.st_valor, `ST do item ${index + 1}`, {
+        min: 0,
+        scale: 2,
+        brazilianFormat: true
+      }) || 0
     };
   });
 
@@ -644,6 +676,24 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
     }) || 0,
     condicao_pagamento: parseOptionalText(body.condicao_pagamento, 'Condicao de pagamento', 5000),
     prazo_entrega: parseOptionalText(body.prazo_entrega, 'Prazo de entrega', 120),
+    prazo_entrega_dias: parseInteger(body.prazo_entrega_dias, 'Prazo de entrega em dias', {
+      positiveOnly: true
+    }),
+    prazo_entrega_tipo: parseOptionalText(body.prazo_entrega_tipo, 'Tipo de prazo de entrega', 20),
+    difal_valor: parseDecimal(body.difal_valor, 'DIFAL', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }) || 0,
+    frete_tipo: parseOptionalText(body.frete_tipo, 'Tipo de frete', 20),
+    frete_valor: parseDecimal(body.frete_valor, 'Valor do frete', {
+      min: 0,
+      scale: 2,
+      brazilianFormat: true
+    }) || 0,
+    frete_data_vencimento: parseDateOnly(body.frete_data_vencimento, 'Data para pagamento do frete'),
+    frete_transportador_nome: parseOptionalText(body.frete_transportador_nome, 'Transportador', 255),
+    frete_transportador_cpf_cnpj: parseOptionalText(body.frete_transportador_cpf_cnpj, 'CPF/CNPJ do transportador', 30),
     observacao_resposta: parseOptionalText(body.observacao_resposta, 'Observacao da resposta', 5000),
     finalizar: body.finalizar !== false
   };
@@ -652,7 +702,14 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
 function validateCompraEncerrarBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['vencedores', 'alocacoes', 'fechamento_parcial_confirmado', 'justificativa'],
+    [
+      'vencedores',
+      'alocacoes',
+      'fechamento_parcial_confirmado',
+      'justificativa',
+      'fechamento_excedente_confirmado',
+      'justificativa_excedente'
+    ],
     'Encerramento da cotacao'
   );
 
@@ -674,6 +731,15 @@ function validateCompraEncerrarBody(body = {}) {
       'Confirmacao do fechamento parcial'
     ) || false,
     justificativa: parseOptionalText(body.justificativa, 'Justificativa', 2000),
+    fechamento_excedente_confirmado: parseBoolean(
+      body.fechamento_excedente_confirmado,
+      'Confirmacao do fechamento acima da quantidade solicitada'
+    ) || false,
+    justificativa_excedente: parseOptionalText(
+      body.justificativa_excedente,
+      'Justificativa da quantidade excedente',
+      2000
+    ),
     vencedores: entradas.map((entry, index) => {
       if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
         throw new ValidationError(`Vencedor ${index + 1} invalido.`);

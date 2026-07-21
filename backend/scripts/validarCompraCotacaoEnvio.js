@@ -59,6 +59,21 @@ function validarFechamentoParcial() {
   assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 8.235);
 }
 
+function validarFechamentoExcedenteAuditavel() {
+  const resultado = validateCompraEncerrarBody({
+    alocacoes: [{ resposta_item_id: 10, quantidade_alocada: '12,500' }],
+    fechamento_excedente_confirmado: true,
+    justificativa_excedente: 'Compra adicional para reduzir uma nova rodada de cotacao.'
+  });
+
+  assert.strictEqual(resultado.fechamento_excedente_confirmado, true);
+  assert.strictEqual(
+    resultado.justificativa_excedente,
+    'Compra adicional para reduzir uma nova rodada de cotacao.'
+  );
+  assert.strictEqual(resultado.vencedores[0].quantidade_alocada, 12.5);
+}
+
 function validarDataChegadaRespostaInterna() {
   const resultado = validateCompraCotacaoRespostaInternaBody({
     itens: [{
@@ -66,18 +81,41 @@ function validarDataChegadaRespostaInterna() {
       item_referencia_id: 71,
       status_disponibilidade: 'PARA_CHEGAR',
       preco: '28,84',
+      quantidade_disponivel: '25,500',
+      ipi_valor: '12,34',
+      icms_valor: '45,67',
+      st_valor: '8,90',
       data_chegada: '2026-07-30'
     }],
+    prazo_entrega_dias: 7,
+    prazo_entrega_tipo: 'DIAS_UTEIS',
+    difal_valor: '21,00',
+    frete_tipo: 'TERCEIRO',
+    frete_valor: '150,00',
+    frete_data_vencimento: '2026-08-10',
+    frete_transportador_nome: 'Transportador opcional',
+    frete_transportador_cpf_cnpj: '12.345.678/0001-90',
     finalizar: true
   });
 
   assert.strictEqual(resultado.itens[0].data_chegada, '2026-07-30');
   assert.strictEqual(resultado.itens[0].status_disponibilidade, 'PARA_CHEGAR');
+  assert.strictEqual(resultado.itens[0].quantidade_disponivel, 25.5);
+  assert.strictEqual(resultado.itens[0].ipi_valor, 12.34);
+  assert.strictEqual(resultado.itens[0].icms_valor, 45.67);
+  assert.strictEqual(resultado.itens[0].st_valor, 8.9);
+  assert.strictEqual(resultado.prazo_entrega_dias, 7);
+  assert.strictEqual(resultado.prazo_entrega_tipo, 'DIAS_UTEIS');
+  assert.strictEqual(resultado.difal_valor, 21);
+  assert.strictEqual(resultado.frete_tipo, 'TERCEIRO');
+  assert.strictEqual(resultado.frete_valor, 150);
+  assert.strictEqual(resultado.frete_data_vencimento, '2026-08-10');
 }
 
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
+validarFechamentoExcedenteAuditavel();
 validarDataChegadaRespostaInterna();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');

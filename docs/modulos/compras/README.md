@@ -27,9 +27,12 @@ Compras e dono da solicitacao de compra, origem normal/direta, itens, quantidade
 
 1. usuario cria a compra;
 2. itens e apropriacoes sao validados;
-3. quando configurada, a diretoria aprova ou rejeita;
-4. a aprovacao habilita a cotacao diretamente, sem integracao externa nem liberacao manual adicional;
-5. cancelamento posterior precisa verificar cotacoes, pedidos, fiscal e financeiro.
+3. compra normal nasce em `LIBERADO_PARA_COMPRA` e segue diretamente para Compras;
+4. compra direta nasce em `ENVIADO` e segue para Gerencia de Processos;
+5. nao existe aprovacao previa por diretoria para novos registros;
+6. cancelamento posterior precisa verificar cotacoes, pedidos, fiscal e financeiro.
+
+Campos e rotas de diretoria ainda presentes no backend atendem somente compras antigas formalmente marcadas com esse fluxo e nao definem a criacao vigente.
 
 As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/solicitacoes/:id/liberar` respondem `410`. O codigo depois desse retorno e legado inacessivel e nao define a regra vigente.
 
@@ -38,13 +41,15 @@ As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/so
 - parceiro fornece solicitante/fornecedor quando aplicavel;
 - Obras fornece apropriacoes;
 - Solicitacoes pode ser origem, sem perder sua propria trilha;
-- Cotacoes consome a compra aprovada/liberada pelo fluxo interno;
+- Cotacoes consome a compra normal liberada diretamente para Compras;
 - Fiscal e Financeiro consomem pedidos e obrigacoes posteriores, nao o rascunho da compra.
 
 ## Idempotencia
 
 Criacao, encaminhamento, aprovacao, cancelamento e envio para cotacao devem impedir repeticao concorrente. O backend deve revalidar status em transacao; o frontend bloqueia multiplos cliques.
 
+No fechamento de cotacao, a mesma chave de idempotencia nao pode repetir pedidos, alocacoes nem frete pago a terceiro. Quantidade acima da solicitada exige justificativa auditavel e nunca pode ultrapassar a disponibilidade declarada pelo fornecedor.
+
 ## Mudanca segura
 
-Testar compra normal e direta, credor, itens cadastrados/manuais, importacao, rateio, edicao de apropriacoes, permissoes, aprovacao, cancelamento, cotacao, pedido, relatorios de compras e registros de origem.
+Testar compra normal e direta, destinos iniciais, compatibilidade de registros antigos, credor, itens cadastrados/manuais, importacao, rateio, edicao de apropriacoes, permissoes, cancelamento, cotacao, pedido, relatorios de compras e registros de origem.

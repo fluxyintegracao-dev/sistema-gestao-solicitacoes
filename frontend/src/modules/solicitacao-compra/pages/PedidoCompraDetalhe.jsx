@@ -1430,11 +1430,48 @@ export default function PedidoCompraDetalhe() {
                   <div className="font-semibold">
                     {pedido.fechamento.numero_rodada} - {String(pedido.fechamento.tipo || '').toLowerCase()}
                   </div>
+                  {Number(pedido.fechamento.quantidade_excedente || 0) > 0 ? (
+                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      <div className="font-semibold">
+                        Quantidade excedente autorizada: {formatQuantityLabel(pedido.fechamento.quantidade_excedente)}
+                      </div>
+                      <div className="mt-1">Justificativa: {pedido.fechamento.justificativa_excedente || '-'}</div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div>
                 <div className="text-[var(--c-muted)]">Valor total</div>
                 <div className="font-semibold">{formatMoney(pedido.valor_total)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Mercadorias</div>
+                <div className="font-semibold">{formatMoney(pedido.valor_mercadorias)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">IPI + ICMS + ST</div>
+                <div className="font-semibold">{formatMoney(pedido.valor_tributos)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">DIFAL rateado</div>
+                <div className="font-semibold">{formatMoney(pedido.difal_total)}</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Frete informado na cotacao</div>
+                <div className="font-semibold">
+                  {pedido.frete_tipo_cotacao === 'TERCEIRO'
+                    ? `Pago a terceiro - ${formatMoney(pedido.frete_valor_cotacao)}`
+                    : (pedido.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido nos precos' : 'Sem frete')}
+                </div>
+                {pedido.frete_data_vencimento ? (
+                  <div className="text-xs text-[var(--c-muted)]">Vencimento: {formatDate(pedido.frete_data_vencimento)}</div>
+                ) : null}
+                {pedido.frete_transportador_nome || pedido.frete_transportador_cpf_cnpj ? (
+                  <div className="text-xs text-[var(--c-muted)]">
+                    Transportador: {pedido.frete_transportador_nome || 'Nao informado'}
+                    {pedido.frete_transportador_cpf_cnpj ? ` - ${pedido.frete_transportador_cpf_cnpj}` : ''}
+                  </div>
+                ) : null}
               </div>
               <div>
                 <div className="text-[var(--c-muted)]">Itens ativos</div>
@@ -1783,6 +1820,11 @@ export default function PedidoCompraDetalhe() {
                               <span>
                                 Var.: <span className={`font-semibold ${getVariationTextClass(precoContext.variacaoUltimaCompra)}`}>{formatVariationPercent(precoContext.variacaoUltimaCompra)}</span>
                               </span>
+                              <span>Mercadoria: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.valor_mercadoria)}</span></span>
+                              <span>IPI: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.ipi_valor)}</span></span>
+                              <span>ICMS: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.icms_valor)}</span></span>
+                              <span>ST: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.st_valor)}</span></span>
+                              <span>DIFAL: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.difal_rateado)}</span></span>
                             </div>
                           </td>
                           <td>{item.origem || '-'}</td>

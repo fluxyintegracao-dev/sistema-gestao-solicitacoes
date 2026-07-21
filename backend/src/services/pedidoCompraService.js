@@ -33,6 +33,7 @@ const {
   isPedidoCompraStatusLocked,
   normalizeStatusCode
 } = require('./pedidoCompraStatusConfig');
+const { registrarFretePedido } = require('./pedidoCompraFreteService');
 
 function normalizeText(value) {
   return String(value || '')
@@ -394,6 +395,10 @@ async function carregarSolicitacaoPedidos(id, transaction, { incluirPedidos = tr
             'prazo',
             'observacao',
             'quantidade_minima_item',
+            'quantidade_disponivel',
+            'ipi_valor',
+            'icms_valor',
+            'st_valor',
             'vencedor'
           ]
         }
@@ -520,6 +525,9 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
       {
         status: 'CANCELADO',
         valor_total: 0,
+        valor_mercadorias: 0,
+        valor_tributos: 0,
+        difal_total: 0,
         atingiu_pedido_minimo: true,
         cancelado_em: pedido.cancelado_em || new Date(),
         motivo_cancelamento: pedido.motivo_cancelamento || 'Pedido sem itens ativos apos atualizacao da cotacao',
@@ -544,22 +552,36 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
     roundMoney(asNumber(item.quantidade_pedido) * asNumber(item.preco_unitario))
   );
   const descontosRateados = calcularRateiosMonetarios(pedido.desconto_total, valoresBrutos);
+  let valorMercadorias = 0;
+  let valorTributos = 0;
+  let valorDifal = 0;
 
   for (const [index, item] of itensAtivos.entries()) {
     const descontoRateado = descontosRateados[index] || 0;
-    const valorItem = roundMoney(Math.max(0, valoresBrutos[index] - descontoRateado));
+    const tributosItem = roundMoney(
+      asNumber(item.ipi_valor) + asNumber(item.icms_valor) + asNumber(item.st_valor)
+    );
+    const difalItem = roundMoney(item.difal_rateado);
+    const valorItem = roundMoney(
+      Math.max(0, valoresBrutos[index] - descontoRateado) + tributosItem + difalItem
+    );
     if (
       roundMoney(item.valor_total) !== valorItem ||
-      roundMoney(item.desconto_rateado) !== descontoRateado
+      roundMoney(item.desconto_rateado) !== descontoRateado ||
+      roundMoney(item.valor_mercadoria) !== valoresBrutos[index]
     ) {
       await item.update(
         {
           valor_total: valorItem,
-          desconto_rateado: descontoRateado
+          desconto_rateado: descontoRateado,
+          valor_mercadoria: valoresBrutos[index]
         },
         { transaction }
       );
     }
+    valorMercadorias += valoresBrutos[index];
+    valorTributos += tributosItem;
+    valorDifal += difalItem;
     valorTotal += valorItem;
   }
 
@@ -570,6 +592,9 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
   await pedido.update(
     {
       valor_total: valorTotal,
+      valor_mercadorias: roundMoney(valorMercadorias),
+      valor_tributos: roundMoney(valorTributos),
+      difal_total: roundMoney(valorDifal),
       atingiu_pedido_minimo: atingiuPedidoMinimo
     },
     { transaction }
@@ -633,6 +658,9 @@ async function inativarPedidoSemItensPorAtualizacao({ pedido, usuarioId, transac
     {
       status: 'CANCELADO',
       valor_total: 0,
+      valor_mercadorias: 0,
+      valor_tributos: 0,
+      difal_total: 0,
       atingiu_pedido_minimo: true,
       cancelado_por: usuarioId || null,
       cancelado_em: pedidoCompleto.cancelado_em || agora,
@@ -1095,7 +1123,7 @@ async function sincronizarStatusFechamentoPorPedido(pedido, transaction) {
   return fechamento;
 }
 
-function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais = null) {
+function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais = null, options = {}) {
   const todasRespostas = [];
   for (const vinculacaoFornecedor of solicitacao.fornecedores || []) {
     for (const resposta of vinculacaoFornecedor.respostas || []) {
@@ -1115,6 +1143,24 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
   const mapaSaldos = saldosAtuais || montarMapaSaldosSolicitacao(solicitacao);
   const alocacoes = [];
   const totaisPorItem = new Map();
+  const alocadoAnteriorPorResposta = new Map();
+  const tributosAnterioresPorResposta = new Map();
+  for (const alocacao of solicitacao?.alocacoes || []) {
+    if (normalizeText(alocacao.status) !== 'ATIVA') continue;
+    const respostaId = Number(alocacao.resposta_item_id || 0);
+    alocadoAnteriorPorResposta.set(
+      respostaId,
+      roundQty((alocadoAnteriorPorResposta.get(respostaId) || 0) + asNumber(alocacao.quantidade_alocada))
+    );
+    const atual = tributosAnterioresPorResposta.get(respostaId) || { ipi: 0, icms: 0, st: 0 };
+    tributosAnterioresPorResposta.set(respostaId, {
+      ipi: roundMoney(atual.ipi + asNumber(alocacao.ipi_rateado)),
+      icms: roundMoney(atual.icms + asNumber(alocacao.icms_rateado)),
+      st: roundMoney(atual.st + asNumber(alocacao.st_rateado))
+    });
+  }
+  const alocadoRodadaPorResposta = new Map();
+  const tributosRodadaPorResposta = new Map();
 
   for (const entrada of entradas) {
     const respostaItemId = Number(entrada?.resposta_item_id || entrada?.id || 0);
@@ -1151,14 +1197,48 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       throw new Error('Quantidade alocada deve ser maior que zero.');
     }
 
-    const totalAtual = roundQty((totaisPorItem.get(itemKey) || 0) + quantidadeAlocada);
-    if (totalAtual > roundQty(saldoItem)) {
+    const quantidadeDisponivel = roundQty(
+      resposta.quantidade_disponivel ?? (resposta.disponivel ? quantidadeBase : 0)
+    );
+    const quantidadeJaAlocadaResposta = roundQty(
+      (alocadoAnteriorPorResposta.get(respostaItemId) || 0)
+      + (alocadoRodadaPorResposta.get(respostaItemId) || 0)
+    );
+    const disponibilidadeRestante = roundQty(Math.max(0, quantidadeDisponivel - quantidadeJaAlocadaResposta));
+    if (quantidadeAlocada > disponibilidadeRestante) {
       throw new Error(
-        `A quantidade definida para comprar do item "${baseItem.descricao}" ultrapassa o saldo disponivel. Quantidade atual: ${quantidadeBase}. Ja fechada: ${roundQty(quantidadeBase - saldoItem)}. Saldo: ${roundQty(saldoItem)}. Marcado nesta rodada: ${totalAtual}.`
+        `A quantidade definida para o fornecedor no item "${baseItem.descricao}" ultrapassa a quantidade disponivel. Disponivel na resposta: ${quantidadeDisponivel}. Ja alocada: ${quantidadeJaAlocadaResposta}. Saldo do fornecedor: ${disponibilidadeRestante}.`
+      );
+    }
+
+    const totalAtual = roundQty((totaisPorItem.get(itemKey) || 0) + quantidadeAlocada);
+    if (totalAtual > roundQty(saldoItem) && options.permitirExcedente !== true) {
+      throw new Error(
+        `A quantidade definida para comprar do item "${baseItem.descricao}" ultrapassa o saldo solicitado. Confirme o fechamento excedente e informe a justificativa. Quantidade atual: ${quantidadeBase}. Ja fechada: ${roundQty(quantidadeBase - saldoItem)}. Saldo: ${roundQty(saldoItem)}. Marcado nesta rodada: ${totalAtual}.`
       );
     }
 
     totaisPorItem.set(itemKey, totalAtual);
+    alocadoRodadaPorResposta.set(
+      respostaItemId,
+      roundQty((alocadoRodadaPorResposta.get(respostaItemId) || 0) + quantidadeAlocada)
+    );
+    const tributosAnteriores = tributosAnterioresPorResposta.get(respostaItemId) || { ipi: 0, icms: 0, st: 0 };
+    const tributosRodada = tributosRodadaPorResposta.get(respostaItemId) || { ipi: 0, icms: 0, st: 0 };
+    const percentualQuantidade = quantidadeDisponivel > 0 ? quantidadeAlocada / quantidadeDisponivel : 0;
+    const ratearTributo = (total, anterior, rodada) => roundMoney(Math.min(
+      Math.max(0, asNumber(total) - anterior - rodada),
+      asNumber(total) * percentualQuantidade
+    ));
+    const ipiRateado = ratearTributo(resposta.ipi_valor, tributosAnteriores.ipi, tributosRodada.ipi);
+    const icmsRateado = ratearTributo(resposta.icms_valor, tributosAnteriores.icms, tributosRodada.icms);
+    const stRateado = ratearTributo(resposta.st_valor, tributosAnteriores.st, tributosRodada.st);
+    tributosRodadaPorResposta.set(respostaItemId, {
+      ipi: roundMoney(tributosRodada.ipi + ipiRateado),
+      icms: roundMoney(tributosRodada.icms + icmsRateado),
+      st: roundMoney(tributosRodada.st + stRateado)
+    });
+    const valorMercadoria = roundMoney(quantidadeAlocada * asNumber(resposta.preco));
     alocacoes.push({
       resposta,
       vinculacaoFornecedor,
@@ -1167,7 +1247,12 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       quantidade_alocada: quantidadeAlocada,
       quantidade_referencia: quantidadeBase,
       preco_unitario: roundMoney(resposta.preco),
-      valor_total: roundMoney(quantidadeAlocada * asNumber(resposta.preco))
+      valor_mercadoria: valorMercadoria,
+      ipi_rateado: ipiRateado,
+      icms_rateado: icmsRateado,
+      st_rateado: stRateado,
+      difal_rateado: 0,
+      valor_total: roundMoney(valorMercadoria + ipiRateado + icmsRateado + stRateado)
     });
   }
 
@@ -1181,6 +1266,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
   }
 
   const descontosAtivosPorFornecedor = new Map();
+  const difalAtivoPorFornecedor = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
     const fornecedorId = Number(alocacao.fornecedor_compra_id || 0);
@@ -1188,9 +1274,38 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       fornecedorId,
       roundMoney((descontosAtivosPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.desconto_rateado))
     );
+    difalAtivoPorFornecedor.set(
+      fornecedorId,
+      roundMoney((difalAtivoPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.difal_rateado))
+    );
   }
 
   for (const [fornecedorId, grupo] of porFornecedor.entries()) {
+    const vinculacaoFornecedor = grupo[0]?.vinculacaoFornecedor;
+    const difalCotacao = roundMoney(vinculacaoFornecedor?.difal_valor);
+    const difalAnterior = roundMoney(difalAtivoPorFornecedor.get(fornecedorId) || 0);
+    const difalRestante = roundMoney(Math.max(0, difalCotacao - difalAnterior));
+    const baseCotada = roundMoney((vinculacaoFornecedor?.respostas || []).reduce((sum, resposta) => {
+      if (!resposta.disponivel || asNumber(resposta.preco) <= 0) return sum;
+      const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
+      const quantidadeDisponivel = roundQty(
+        resposta.quantidade_disponivel ?? (resposta.disponivel ? baseItem?.quantidade_solicitada : 0)
+      );
+      return sum + quantidadeDisponivel * asNumber(resposta.preco);
+    }, 0));
+    const basesDifal = grupo.map((alocacao) => alocacao.valor_mercadoria);
+    const difalDaRodada = baseCotada > 0
+      ? roundMoney(Math.min(
+          difalRestante,
+          difalCotacao * (basesDifal.reduce((sum, valor) => sum + asNumber(valor), 0) / baseCotada)
+        ))
+      : 0;
+    const difalRateadoItens = calcularRateiosMonetarios(difalDaRodada, basesDifal);
+    grupo.forEach((alocacao, index) => {
+      alocacao.difal_rateado = difalRateadoItens[index] || 0;
+      alocacao.valor_total = roundMoney(asNumber(alocacao.valor_total) + alocacao.difal_rateado);
+    });
+
     const descontoCotacao = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
     const descontoTotal = roundMoney(Math.max(0, descontoCotacao - (descontosAtivosPorFornecedor.get(fornecedorId) || 0)));
     const bases = grupo.map((alocacao) => alocacao.valor_total);
@@ -1222,6 +1337,10 @@ async function persistirAlocacoesSolicitacao({ solicitacao, fechamento, alocacoe
         preco_unitario: alocacao.preco_unitario,
         valor_total: alocacao.valor_total,
         desconto_rateado: alocacao.desconto_rateado || 0,
+        ipi_rateado: alocacao.ipi_rateado || 0,
+        icms_rateado: alocacao.icms_rateado || 0,
+        st_rateado: alocacao.st_rateado || 0,
+        difal_rateado: alocacao.difal_rateado || 0,
         status: 'ATIVA',
         criado_por: usuarioId || null
       },
@@ -1252,6 +1371,13 @@ async function criarPedidoPorFornecedorRodada({
       origem: 'COTACAO',
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
       desconto_total: roundMoney(descontoTotal),
+      prazo_entrega_dias: vinculacaoFornecedor.prazo_entrega_dias || null,
+      prazo_entrega_tipo: vinculacaoFornecedor.prazo_entrega_tipo || null,
+      frete_tipo_cotacao: vinculacaoFornecedor.frete_tipo || 'SEM_FRETE',
+      frete_valor_cotacao: roundMoney(vinculacaoFornecedor.frete_valor),
+      frete_data_vencimento: vinculacaoFornecedor.frete_data_vencimento || null,
+      frete_transportador_nome: vinculacaoFornecedor.frete_transportador_nome || null,
+      frete_transportador_cpf_cnpj: vinculacaoFornecedor.frete_transportador_cpf_cnpj || null,
       atingiu_pedido_minimo: true,
       observacoes: `Rodada ${fechamento.numero_rodada} - fechamento ${String(fechamento.tipo).toLowerCase()}`
     },
@@ -1298,6 +1424,8 @@ async function gerarPedidosDosVencedores({
   idempotencyKey = null,
   justificativa = null,
   fechamentoParcialConfirmado = false,
+  fechamentoExcedenteConfirmado = false,
+  justificativaExcedente = null,
   permitirParcial = false,
   permitirFinal = false,
   transaction
@@ -1339,7 +1467,9 @@ async function gerarPedidosDosVencedores({
   }
 
   const saldosAntes = montarMapaSaldosSolicitacao(solicitacao);
-  const normalizadas = montarAlocacoesNormalizadas(solicitacao, vencedores, saldosAntes);
+  const normalizadas = montarAlocacoesNormalizadas(solicitacao, vencedores, saldosAntes, {
+    permitirExcedente: fechamentoExcedenteConfirmado === true
+  });
   if (!normalizadas.length) {
     throw Object.assign(new Error('Selecione ao menos um item com quantidade para gerar os pedidos.'), {
       statusCode: 400,
@@ -1353,6 +1483,26 @@ async function gerarPedidosDosVencedores({
       roundQty((selecionadoPorItem.get(alocacao.itemKey) || 0) + alocacao.quantidade_alocada)
     );
   });
+  const quantidadeExcedente = roundQty([...selecionadoPorItem.entries()].reduce((total, [itemKey, quantidade]) => {
+    const saldo = roundQty(saldosAntes.get(itemKey)?.saldo || 0);
+    return total + Math.max(0, roundQty(quantidade - saldo));
+  }, 0));
+  if (quantidadeExcedente > 0) {
+    if (!fechamentoExcedenteConfirmado) {
+      throw Object.assign(new Error('Confirme o fechamento acima da quantidade solicitada.'), {
+        statusCode: 409,
+        code: 'COMPRA_FECHAMENTO_EXCEDENTE_REQUER_CONFIRMACAO',
+        quantidade_excedente: quantidadeExcedente
+      });
+    }
+    if (!String(justificativaExcedente || '').trim()) {
+      throw Object.assign(new Error('Informe a justificativa para comprar acima da quantidade solicitada.'), {
+        statusCode: 400,
+        code: 'COMPRA_FECHAMENTO_EXCEDENTE_REQUER_JUSTIFICATIVA',
+        quantidade_excedente: quantidadeExcedente
+      });
+    }
+  }
   const saldoRestante = [...saldosAntes.values()].reduce((total, item) => (
     roundQty(total + Math.max(0, item.saldo - (selecionadoPorItem.get(item.item_key) || 0)))
   ), 0);
@@ -1400,6 +1550,10 @@ async function gerarPedidosDosVencedores({
       quantidade_total: roundQty(normalizadas.reduce((sum, item) => sum + item.quantidade_alocada, 0)),
       valor_total: roundMoney(normalizadas.reduce((sum, item) => sum + item.valor_total, 0)),
       justificativa: String(justificativa || '').trim() || null,
+      quantidade_excedente: quantidadeExcedente,
+      justificativa_excedente: quantidadeExcedente > 0
+        ? String(justificativaExcedente || '').trim()
+        : null,
       criado_por: usuarioId || null,
       fechado_em: new Date()
     },
@@ -1456,8 +1610,6 @@ async function gerarPedidosDosVencedores({
       sincronizarItensSelecionados: false,
       transaction
     });
-    pedidosCriados.push(pedidoAtualizado);
-
     const itensPorResposta = new Map(
       (pedidoAtualizado?.itens || [])
         .map((item) => [Number(item.resposta_item_id || 0), item])
@@ -1473,7 +1625,48 @@ async function gerarPedidosDosVencedores({
         },
         { transaction }
       );
+      if (itemPedido) {
+        await itemPedido.update(
+          {
+            valor_mercadoria: roundMoney(registro.quantidade_alocada * registro.preco_unitario),
+            ipi_valor: roundMoney(registro.ipi_rateado),
+            icms_valor: roundMoney(registro.icms_rateado),
+            st_valor: roundMoney(registro.st_rateado),
+            difal_rateado: roundMoney(registro.difal_rateado)
+          },
+          { transaction }
+        );
+      }
     }
+
+    const pedidoComCustos = await recalcularPedidoPorId(pedido.id, transaction);
+    if (
+      normalizeText(grupo.vinculacaoFornecedor.frete_tipo) === 'TERCEIRO'
+      && roundMoney(grupo.vinculacaoFornecedor.frete_valor) > 0
+    ) {
+      await registrarFretePedido({
+        pedidoId: pedido.id,
+        payload: {
+          tipo: 'TERCEIRO',
+          momento: 'FECHAMENTO',
+          criterio_rateio: 'VALOR_ITENS',
+          valor_total: roundMoney(grupo.vinculacaoFornecedor.frete_valor),
+          data_vencimento: grupo.vinculacaoFornecedor.frete_data_vencimento,
+          origem_cotacao_fornecedor_id: grupo.vinculacaoFornecedor.id,
+          dados_pagamento: {
+            transportador_nome: grupo.vinculacaoFornecedor.frete_transportador_nome || null,
+            transportador_cpf_cnpj: grupo.vinculacaoFornecedor.frete_transportador_cpf_cnpj || null,
+            origem: 'COTACAO_FORNECEDOR'
+          },
+          observacoes: `Frete informado na cotacao do fornecedor ${grupo.vinculacaoFornecedor.fornecedor?.nome || grupo.vinculacaoFornecedor.fornecedor_compra_id}`
+        },
+        usuarioId,
+        idempotencyKey: `COTACAO:${grupo.vinculacaoFornecedor.id}:FRETE`,
+        permitirSemCredor: true,
+        transaction
+      });
+    }
+    pedidosCriados.push(pedidoComCustos);
   }
 
   return {
@@ -1986,7 +2179,15 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
       {
         model: SolicitacaoCompraFechamento,
         as: 'fechamento',
-        attributes: ['id', 'numero_rodada', 'tipo', 'status', 'justificativa'],
+        attributes: [
+          'id',
+          'numero_rodada',
+          'tipo',
+          'status',
+          'justificativa',
+          'quantidade_excedente',
+          'justificativa_excedente'
+        ],
         required: false
       },
         {

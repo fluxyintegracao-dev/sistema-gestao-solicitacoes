@@ -7,7 +7,8 @@
 - cada item precisa de apropriacao valida e o rateio deve fechar a quantidade solicitada;
 - apropriacoes pertencem a Obras e sao referenciadas por Compras;
 - alteracao de quantidade ou apropriacao depois da criacao exige permissao especifica, validacao de escopo e auditoria;
-- quando ha aprovacao por diretoria, a compra aguarda essa etapa; depois de aprovada segue diretamente para cotacao;
+- novas compras nao passam por aprovacao da diretoria: a normal nasce `LIBERADO_PARA_COMPRA` em Compras e a direta nasce `ENVIADO` em Gerencia de Processos;
+- campos e endpoints de diretoria permanecem somente para compatibilidade de registros antigos ja marcados com esse fluxo;
 - os endpoints antigos de integracao e liberacao manual respondem `410` e nao fazem parte do fluxo vigente.
 
 ## Compra Direta
@@ -20,7 +21,7 @@
 
 ## Cotacao
 
-- fica disponivel quando a solicitacao esta liberada pelo fluxo interno ou aprovada pela diretoria;
+- fica disponivel quando a solicitacao normal esta liberada para Compras;
 - fornecedores podem ser:
   - parceiros fornecedores
   - fornecedores avulsos;
@@ -32,7 +33,13 @@
 
 - fornecedor responde por token publico;
 - pode salvar rascunho antes do envio final;
-- pode informar preco, prazo, disponibilidade, minimo por item e minimo do pedido;
+- informa preco unitario e quantidade disponivel por item; vazio ou zero significa que a oferta nao participa do comparativo;
+- o prazo de entrega e geral para a resposta e distingue dias corridos de dias uteis; nao existe prazo de entrega por item no fluxo vigente;
+- IPI, ICMS e ST sao valores em reais fechados para toda a quantidade disponivel daquele item;
+- DIFAL e informado em reais no cabecalho e rateado proporcionalmente pelo valor das mercadorias efetivamente compradas;
+- os valores fiscais sao gerenciais para decisao e custo interno; a escrituracao contabil continua baseada na nota fiscal e na contabilidade;
+- frete pode ser sem frete, embutido ou pago a terceiro; para terceiro, valor e data de pagamento sao obrigatorios, enquanto transportador e CPF/CNPJ sao opcionais;
+- pode informar minimo por item, minimo do pedido e desconto total;
 - respostas podem ser enviadas pela pagina ou por arquivos suportados pelo fluxo;
 - status, visualizacao e resposta ficam rastreados;
 - resposta interna exige permissao propria e preserva o escopo da cotacao do fornecedor.
@@ -40,8 +47,12 @@
 ## Encerramento
 
 - comprador escolhe vencedor e quantidade por item;
-- encerramento gera os pedidos dos vencedores, fecha os pedidos automaticamente e marca as cotacoes nao canceladas como finalizadas;
-- encerramento deve ser transacional e nao pode gerar os mesmos pedidos novamente.
+- uma rodada parcial gera somente os pedidos e alocacoes das quantidades escolhidas, preservando o saldo restante em `FECHAMENTO_PARCIAL`;
+- a rodada final consome todo o saldo elegivel e leva a solicitacao a `ENCERRADO`;
+- rodadas sao registradas em `SolicitacaoCompraFechamento` e novos pedidos/alocacoes sao acrescentados sem substituir os anteriores;
+- e permitido fechar acima da quantidade solicitada, limitado a quantidade ainda disponivel na resposta do fornecedor;
+- fechamento excedente exige confirmacao e justificativa obrigatoria, preservadas no fechamento e no log para auditoria;
+- fechamento deve ser transacional e idempotente e nao pode gerar os mesmos pedidos novamente.
 
 ## Pedido
 
@@ -50,6 +61,8 @@
 - toda edicao manual de preco e quantidade precisa gerar log;
 - status configuravel ou cotacao encerrada pode bloquear alteracao posterior;
 - cancelamento e frete possuem regras e permissoes separadas.
+- IPI, ICMS, ST e DIFAL rateados compoem o valor gerencial do item e do pedido;
+- frete pago a terceiro gera pendencia para Contas a Pagar; se a cotacao nao identificar o transportador, o Financeiro define o credor ao gerar o titulo.
 
 ## Cancelamento e preservacao
 

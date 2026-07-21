@@ -1016,7 +1016,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     const parceiroId = frete.parceiro_id || frete.parceiro?.id || frete.fornecedor?.parceiro_id;
     if (parceiroId) {
       params.set('parceiro_id', String(parceiroId));
-      params.set('parceiro_nome', frete.parceiro?.nome || frete.fornecedor?.nome || '');
+      params.set(
+        'parceiro_nome',
+        frete.parceiro?.nome
+          || frete.fornecedor?.nome
+          || frete.dados_pagamento?.transportador_nome
+          || ''
+      );
     }
 
     return `/financeiro/titulos/novo?${params.toString()}`;
@@ -2205,8 +2211,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         </td>
                         <td className="px-3 py-2 text-[var(--c-muted)]">{frete.obra?.nome || '-'}</td>
                         <td className="px-3 py-2">
-                          <div className="font-medium text-[var(--c-text)]">{frete.parceiro?.nome || frete.fornecedor?.nome || '-'}</div>
-                          <div className="text-[10px] text-[var(--c-muted)]">{frete.parceiro?.cpf_cnpj || frete.fornecedor?.cnpj || ''}</div>
+                          <div className="font-medium text-[var(--c-text)]">
+                            {frete.parceiro?.nome || frete.fornecedor?.nome || frete.dados_pagamento?.transportador_nome || 'Credor a definir'}
+                          </div>
+                          <div className="text-[10px] text-[var(--c-muted)]">
+                            {frete.parceiro?.cpf_cnpj || frete.fornecedor?.cnpj || frete.dados_pagamento?.transportador_cpf_cnpj || ''}
+                          </div>
                         </td>
                         <td className="px-3 py-2 whitespace-nowrap text-[var(--c-text)]">{formatDate(frete.data_vencimento)}</td>
                         <td className="px-3 py-2 text-right font-semibold tabular-nums text-[var(--c-text)]">

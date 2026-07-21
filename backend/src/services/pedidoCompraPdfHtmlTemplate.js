@@ -241,7 +241,20 @@ function buildViewModel(pedido, options = {}) {
       obraEndereco: buildObraEndereco(pedido?.obra),
       notaFiscalInfo: buildNotaFiscalInfo(pedido),
       condicaoPagamento: withFallback(pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento),
-      prazoEntrega: withFallback(pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega),
+      prazoEntrega: withFallback(
+        pedido?.prazo_entrega_dias
+          ? `${pedido.prazo_entrega_dias} ${pedido.prazo_entrega_tipo === 'DIAS_UTEIS' ? 'dias uteis' : 'dias corridos'}`
+          : (pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega)
+      ),
+      valorMercadorias: formatMoneyBr(pedido?.valor_mercadorias),
+      valorTributos: formatMoneyBr(pedido?.valor_tributos),
+      difalTotal: formatMoneyBr(pedido?.difal_total),
+      freteTipo: withFallback(
+        pedido?.frete_tipo_cotacao === 'TERCEIRO'
+          ? 'Pago a terceiro'
+          : (pedido?.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido' : 'Sem frete')
+      ),
+      freteValor: formatMoneyBr(pedido?.frete_valor_cotacao),
       valorTotal: formatMoneyBr(pedido?.valor_total),
       pedidoMinimo: pedido?.valor_minimo_pedido ? formatMoneyBr(pedido.valor_minimo_pedido) : '-',
       atingiuPedidoMinimo: Boolean(pedido?.atingiu_pedido_minimo),
@@ -791,6 +804,22 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
                 <div class="doc-financial__item">
                   <span class="doc-financial__label">Encerrado em</span>
                   <span class="doc-financial__value">${escapeHtml(h.encerradoEm)}</span>
+                </div>
+                <div class="doc-financial__item">
+                  <span class="doc-financial__label">Mercadorias</span>
+                  <span class="doc-financial__value">${escapeHtml(h.valorMercadorias)}</span>
+                </div>
+                <div class="doc-financial__item">
+                  <span class="doc-financial__label">IPI + ICMS + ST</span>
+                  <span class="doc-financial__value">${escapeHtml(h.valorTributos)}</span>
+                </div>
+                <div class="doc-financial__item">
+                  <span class="doc-financial__label">DIFAL rateado</span>
+                  <span class="doc-financial__value">${escapeHtml(h.difalTotal)}</span>
+                </div>
+                <div class="doc-financial__item">
+                  <span class="doc-financial__label">Frete da cotacao</span>
+                  <span class="doc-financial__value">${escapeHtml(h.freteTipo)} · ${escapeHtml(h.freteValor)}</span>
                 </div>
               </div>
               <div>

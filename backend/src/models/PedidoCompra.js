@@ -51,6 +51,50 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      valor_mercadorias: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      valor_tributos: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      difal_total: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      prazo_entrega_dias: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      prazo_entrega_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      frete_tipo_cotacao: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+      },
+      frete_valor_cotacao: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      frete_data_vencimento: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      frete_transportador_nome: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      frete_transportador_cpf_cnpj: {
+        type: DataTypes.STRING(30),
+        allowNull: true
+      },
       atingiu_pedido_minimo: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

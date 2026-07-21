@@ -65,6 +65,21 @@ function formatarMoeda(valor, { casasDecimaisMaximas = 2, preservarEscala = fals
   }).format(num);
 }
 
+function numeroCotacao(valor) {
+  const raw = String(valor ?? '').trim().replace(/[^\d,.-]/g, '');
+  const parsed = Number(raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function calcularTotalItemCotacao(item) {
+  return (
+    numeroCotacao(item?.preco) * numeroCotacao(item?.quantidade_disponivel)
+    + numeroCotacao(item?.ipi_valor)
+    + numeroCotacao(item?.icms_valor)
+    + numeroCotacao(item?.st_valor)
+  );
+}
+
 function CurrencyInput({
   value,
   onChange,
@@ -103,12 +118,6 @@ function CurrencyInput({
     />
   );
 }
-
-const OPCOES_DISPONIBILIDADE = [
-  { value: 'DISPONIVEL', label: 'Disponivel' },
-  { value: 'NAO_TEM', label: 'Nao tem' },
-  { value: 'PARA_CHEGAR', label: 'Para chegar' }
-];
 
 const FORMAS_PAGAMENTO = [
   { value: 'PIX', label: 'PIX' },
@@ -231,7 +240,14 @@ export default function CotacaoFornecedorPublica() {
   const [valorMinimoPedido, setValorMinimoPedido] = useState('');
   const [descontoTotal, setDescontoTotal] = useState('');
   const [condicoesPagamento, setCondicoesPagamento] = useState(() => criarCondicoesPagamentoVazias());
-  const [prazoEntrega, setPrazoEntrega] = useState('');
+  const [prazoEntregaDias, setPrazoEntregaDias] = useState('');
+  const [prazoEntregaTipo, setPrazoEntregaTipo] = useState('DIAS_CORRIDOS');
+  const [difalValor, setDifalValor] = useState('');
+  const [freteTipo, setFreteTipo] = useState('SEM_FRETE');
+  const [freteValor, setFreteValor] = useState('');
+  const [freteDataVencimento, setFreteDataVencimento] = useState('');
+  const [freteTransportadorNome, setFreteTransportadorNome] = useState('');
+  const [freteTransportadorCpfCnpj, setFreteTransportadorCpfCnpj] = useState('');
   const [observacaoResposta, setObservacaoResposta] = useState('');
 
   async function carregar() {
@@ -244,7 +260,13 @@ export default function CotacaoFornecedorPublica() {
             ? data.itens.map((item) => ({
                 ...item,
                 preco: normalizarDecimalDaApi(item.preco, 10),
-                status_disponibilidade: item.status_disponibilidade || 'DISPONIVEL',
+                quantidade_disponivel: normalizarDecimalDaApi(
+                  item.quantidade_disponivel ?? (item.disponivel ? item.quantidade : ''),
+                  3
+                ),
+                ipi_valor: normalizarDecimalDaApi(item.ipi_valor, 2),
+                icms_valor: normalizarDecimalDaApi(item.icms_valor, 2),
+                st_valor: normalizarDecimalDaApi(item.st_valor, 2),
                 data_chegada: item.data_chegada || ''
               }))
           : []
@@ -252,7 +274,14 @@ export default function CotacaoFornecedorPublica() {
       setValorMinimoPedido(data?.cotacao?.valor_minimo_pedido ?? '');
       setDescontoTotal(data?.cotacao?.desconto_total ?? '');
       setCondicoesPagamento(parseCondicoesPagamento(data?.cotacao?.condicao_pagamento ?? ''));
-      setPrazoEntrega(data?.cotacao?.prazo_entrega ?? '');
+      setPrazoEntregaDias(data?.cotacao?.prazo_entrega_dias ?? '');
+      setPrazoEntregaTipo(data?.cotacao?.prazo_entrega_tipo || 'DIAS_CORRIDOS');
+      setDifalValor(data?.cotacao?.difal_valor ?? '');
+      setFreteTipo(data?.cotacao?.frete_tipo || 'SEM_FRETE');
+      setFreteValor(data?.cotacao?.frete_valor ?? '');
+      setFreteDataVencimento(data?.cotacao?.frete_data_vencimento || '');
+      setFreteTransportadorNome(data?.cotacao?.frete_transportador_nome || '');
+      setFreteTransportadorCpfCnpj(data?.cotacao?.frete_transportador_cpf_cnpj || '');
       setObservacaoResposta(data?.cotacao?.observacao_resposta ?? '');
     } catch (error) {
       console.error(error);
@@ -268,18 +297,9 @@ export default function CotacaoFornecedorPublica() {
     setItens((atual) =>
       atual.map((item, i) => {
         if (i !== index) return item;
-        const cotacaoReaberta = String(dados?.cotacao?.status || '').toUpperCase() === 'REABERTA';
-        const camposQueReativam = ['preco', 'prazo', 'quantidade_minima_item', 'observacao'];
-        const deveReativarItem =
-          cotacaoReaberta
-          && String(item.status_disponibilidade || '').toUpperCase() === 'NAO_TEM'
-          && camposQueReativam.includes(campo)
-          && String(valor ?? '').trim() !== '';
-
         return {
           ...item,
-          [campo]: valor,
-          ...(deveReativarItem ? { status_disponibilidade: 'DISPONIVEL' } : {})
+          [campo]: valor
         };
       })
     );
@@ -310,8 +330,23 @@ export default function CotacaoFornecedorPublica() {
       return false;
     }
 
-    if (!String(prazoEntrega || '').trim()) {
-      alert('Informe o prazo de entrega do pedido antes de enviar a resposta.');
+    if (!Number.isInteger(Number(prazoEntregaDias)) || Number(prazoEntregaDias) <= 0) {
+      alert('Informe o prazo de entrega em dias inteiros maiores que zero.');
+      return false;
+    }
+
+    if (!['DIAS_CORRIDOS', 'DIAS_UTEIS'].includes(prazoEntregaTipo)) {
+      alert('Selecione se o prazo considera dias corridos ou uteis.');
+      return false;
+    }
+
+    if (freteTipo === 'TERCEIRO' && numeroCotacao(freteValor) <= 0) {
+      alert('Informe o valor do frete pago a terceiro.');
+      return false;
+    }
+
+    if (freteTipo === 'TERCEIRO' && !freteDataVencimento) {
+      alert('Informe a data para pagamento do frete pago a terceiro.');
       return false;
     }
 
@@ -328,23 +363,26 @@ export default function CotacaoFornecedorPublica() {
     };
 
     const itensPayload = itens.map((item) => {
-      const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
       const preco = normalizarNumeroResposta(item.preco);
+      const quantidadeDisponivel = normalizarNumeroResposta(item.quantidade_disponivel) || 0;
       const quantidadeMinima = normalizarNumeroResposta(item.quantidade_minima_item);
-      const deveMarcarIndisponivel =
-        finalizar && statusDisp !== 'NAO_TEM' && (preco === null || preco <= 0);
-      const statusEfetivo = deveMarcarIndisponivel ? 'NAO_TEM' : statusDisp;
+      const disponivel = quantidadeDisponivel > 0 && preco !== null && preco > 0;
+      const statusEfetivo = disponivel ? 'DISPONIVEL' : 'NAO_TEM';
 
       return {
         item_tipo: item.item_tipo,
         item_referencia_id: item.item_referencia_id,
         status_disponibilidade: statusEfetivo,
-        disponivel: statusEfetivo !== 'NAO_TEM',
+        disponivel,
         preco: statusEfetivo === 'NAO_TEM' ? null : preco,
-        prazo: item.prazo,
-        data_chegada: statusEfetivo === 'PARA_CHEGAR' ? item.data_chegada : null,
+        prazo: null,
+        data_chegada: item.data_chegada || null,
         observacao: item.observacao,
-        quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : quantidadeMinima
+        quantidade_minima_item: statusEfetivo === 'NAO_TEM' ? null : quantidadeMinima,
+        quantidade_disponivel: quantidadeDisponivel,
+        ipi_valor: normalizarNumeroResposta(item.ipi_valor) || 0,
+        icms_valor: normalizarNumeroResposta(item.icms_valor) || 0,
+        st_valor: normalizarNumeroResposta(item.st_valor) || 0
       };
     });
 
@@ -353,7 +391,14 @@ export default function CotacaoFornecedorPublica() {
       valor_minimo_pedido: valorMinimoPedido,
       desconto_total: descontoTotal,
       condicao_pagamento: montarCondicaoPagamento(condicoesPagamento),
-      prazo_entrega: prazoEntrega,
+      prazo_entrega_dias: Number(prazoEntregaDias) || null,
+      prazo_entrega_tipo: prazoEntregaTipo,
+      difal_valor: difalValor,
+      frete_tipo: freteTipo,
+      frete_valor: freteTipo === 'SEM_FRETE' ? 0 : freteValor,
+      frete_data_vencimento: freteTipo === 'TERCEIRO' ? freteDataVencimento : null,
+      frete_transportador_nome: freteTransportadorNome,
+      frete_transportador_cpf_cnpj: freteTransportadorCpfCnpj,
       observacao_resposta: observacaoResposta
     };
   }
@@ -430,11 +475,23 @@ export default function CotacaoFornecedorPublica() {
   const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
   const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
   const respostaFinalizada = ['RESPONDIDO', 'FINALIZADA'].includes(String(statusCotacao).toUpperCase());
-  const cotacaoReaberta = String(statusCotacao).toUpperCase() === 'REABERTA';
   const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(
-    (item) => (item.status_disponibilidade || 'DISPONIVEL') !== 'NAO_TEM'
+    (item) => numeroCotacao(item.quantidade_disponivel) > 0 && numeroCotacao(item.preco) > 0
   ).length;
+  const valorMercadorias = itens.reduce(
+    (total, item) => total + numeroCotacao(item.preco) * numeroCotacao(item.quantidade_disponivel),
+    0
+  );
+  const valorTributos = itens.reduce(
+    (total, item) => total + numeroCotacao(item.ipi_valor) + numeroCotacao(item.icms_valor) + numeroCotacao(item.st_valor),
+    0
+  );
+  const valorFreteAdicional = freteTipo === 'TERCEIRO' ? numeroCotacao(freteValor) : 0;
+  const valorTotalProposta = Math.max(
+    0,
+    valorMercadorias + valorTributos + numeroCotacao(difalValor) + valorFreteAdicional - numeroCotacao(descontoTotal)
+  );
 
   return (
     <div className="cotacao-publica-page solicitacoes-page min-h-screen px-3 py-4">
@@ -525,20 +582,88 @@ export default function CotacaoFornecedorPublica() {
                 zeroComoVazio
               />
             </div>
+            <div className="col-span-2 sm:col-span-1 lg:col-span-2">
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Prazo de entrega *</p>
+              <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)] gap-1.5">
+                <input
+                  className="input h-7 text-xs px-2 w-full"
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={prazoEntregaDias}
+                  disabled={formularioBloqueado}
+                  onChange={(e) => setPrazoEntregaDias(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Dias"
+                />
+                <select
+                  className="input h-7 text-xs px-2 w-full"
+                  value={prazoEntregaTipo}
+                  disabled={formularioBloqueado}
+                  onChange={(e) => setPrazoEntregaTipo(e.target.value)}
+                >
+                  <option value="DIAS_CORRIDOS">Dias corridos</option>
+                  <option value="DIAS_UTEIS">Dias uteis</option>
+                </select>
+              </div>
+            </div>
             <div>
-              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">Prazo entrega *</p>
-              <input
+              <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] mb-0.5">DIFAL</p>
+              <CurrencyInput
                 className="input h-7 text-xs px-2 w-full"
-                type="text"
-                value={prazoEntrega}
+                value={difalValor}
                 disabled={formularioBloqueado}
-                onChange={(e) => setPrazoEntrega(e.target.value)}
-                placeholder="Ex.: 7 dias"
+                onChange={setDifalValor}
+                zeroComoVazio
               />
             </div>
             <div>
               <p className="text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">Enviado em</p>
               <p className="text-xs font-semibold">{formatarData(dados.cotacao?.enviado_em)}</p>
+            </div>
+            <div className="col-span-2 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-2 sm:col-span-3 lg:col-span-6">
+              <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
+                  Frete
+                  <select
+                    className="input h-7 px-2 text-xs normal-case"
+                    value={freteTipo}
+                    disabled={formularioBloqueado}
+                    onChange={(event) => setFreteTipo(event.target.value)}
+                  >
+                    <option value="SEM_FRETE">Sem frete</option>
+                    <option value="EMBUTIDO">Embutido no preco</option>
+                    <option value="TERCEIRO">Pago a terceiro</option>
+                  </select>
+                </label>
+                {freteTipo !== 'SEM_FRETE' ? (
+                  <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
+                    Valor do frete {freteTipo === 'TERCEIRO' ? '*' : ''}
+                    <CurrencyInput
+                      className="input h-7 px-2 text-xs normal-case"
+                      value={freteValor}
+                      disabled={formularioBloqueado}
+                      onChange={setFreteValor}
+                      zeroComoVazio
+                    />
+                  </label>
+                ) : null}
+                {freteTipo === 'TERCEIRO' ? (
+                  <>
+                    <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
+                      Data para pagamento *
+                      <input className="input h-7 px-2 text-xs normal-case" type="date" value={freteDataVencimento} disabled={formularioBloqueado} onChange={(event) => setFreteDataVencimento(event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
+                      Transportador (opcional)
+                      <input className="input h-7 px-2 text-xs normal-case" value={freteTransportadorNome} disabled={formularioBloqueado} onChange={(event) => setFreteTransportadorNome(event.target.value)} />
+                    </label>
+                    <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] sm:col-start-2 lg:col-start-4">
+                      CPF/CNPJ (opcional)
+                      <input className="input h-7 px-2 text-xs normal-case" inputMode="numeric" value={freteTransportadorCpfCnpj} disabled={formularioBloqueado} onChange={(event) => setFreteTransportadorCpfCnpj(event.target.value.replace(/\D/g, '').slice(0, 14))} />
+                    </label>
+                  </>
+                ) : null}
+              </div>
             </div>
             <div className="col-span-2 sm:col-span-3 lg:col-span-6">
               <div className="flex items-center justify-between gap-2">
@@ -644,15 +769,19 @@ export default function CotacaoFornecedorPublica() {
         {/* Tabela */}
         <div className="sol-surface-card rounded-lg solicitacoes-table-shell solicitacoes-table-compact cotacao-publica-table-shell">
           <div className="solicitacoes-table-scroll scrollbar-thin" style={{ scrollbarGutter: 'stable both-edges' }}>
-            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1180px', fontSize: '11px' }}>
+            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1540px', fontSize: '11px' }}>
               <colgroup>
                 <col style={{ width: '220px' }} />
                 <col style={{ width: '88px' }} />
                 <col style={{ width: '88px' }} />
                 <col style={{ width: '112px' }} />
                 <col style={{ width: '112px' }} />
-                <col style={{ width: '80px' }} />
-                <col style={{ width: '152px' }} />
+                <col style={{ width: '118px' }} />
+                <col style={{ width: '104px' }} />
+                <col style={{ width: '104px' }} />
+                <col style={{ width: '104px' }} />
+                <col style={{ width: '104px' }} />
+                <col style={{ width: '118px' }} />
                 <col style={{ width: 'auto' }} />
               </colgroup>
               <thead>
@@ -661,24 +790,22 @@ export default function CotacaoFornecedorPublica() {
                   <th>Qtd./Un.</th>
                   <th>Necessario</th>
                   <th>Preco unit.</th>
-                  <th>Prazo entrega</th>
+                  <th>Qtd. disponivel</th>
+                  <th>Valor total</th>
+                  <th>IPI</th>
+                  <th>ICMS</th>
+                  <th>ST</th>
+                  <th>Data chegada</th>
                   <th>Qtd. min.</th>
-                  <th>Disponibilidade</th>
                   <th>Observacao</th>
                 </tr>
               </thead>
 
               <tbody>
-                {itens.map((item, index) => {
-                  const statusDisp = item.status_disponibilidade || 'DISPONIVEL';
-                  const isParaChegar = statusDisp === 'PARA_CHEGAR';
-                  const isNaoTem = statusDisp === 'NAO_TEM';
-                  const bloqueiaPorIndisponivel = isNaoTem && !cotacaoReaberta;
-
-                  return (
+                {itens.map((item, index) => (
                     <tr
                       key={`${item.item_tipo}-${item.item_referencia_id}`}
-                      className={`cotacao-publica-table-row${bloqueiaPorIndisponivel ? ' opacity-50' : ''}`}
+                      className="cotacao-publica-table-row"
                     >
                       <td>
                         <div className="cotacao-publica-cell-description">
@@ -700,9 +827,9 @@ export default function CotacaoFornecedorPublica() {
                       </td>
                       <td>
                         <CurrencyInput
-                          className={`input cotacao-publica-table-input h-6 text-[11px] px-1.5${bloqueiaPorIndisponivel ? ' pointer-events-none' : ''}`}
-                          value={bloqueiaPorIndisponivel ? '' : item.preco}
-                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
+                          className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
+                          value={item.preco}
+                          disabled={formularioBloqueado}
                           casasDecimais={10}
                           preservarEscala
                           onChange={(val) => atualizarItem(index, 'preco', val)}
@@ -711,10 +838,35 @@ export default function CotacaoFornecedorPublica() {
                       <td>
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                          value={item.prazo}
-                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
-                          onChange={(e) => atualizarItem(index, 'prazo', e.target.value)}
-                          placeholder="Ex.: 7 dias"
+                          inputMode="decimal"
+                          value={item.quantidade_disponivel}
+                          disabled={formularioBloqueado}
+                          onChange={(e) => atualizarItem(index, 'quantidade_disponivel', sanitizarDecimalInput(e.target.value, 3))}
+                          placeholder="0"
+                        />
+                      </td>
+                      <td className="font-semibold text-[var(--c-fg)]">
+                        {formatarMoeda(calcularTotalItemCotacao(item))}
+                      </td>
+                      {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
+                        <td key={campo}>
+                          <CurrencyInput
+                            className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                            value={item[campo]}
+                            disabled={formularioBloqueado}
+                            onChange={(valor) => atualizarItem(index, campo, valor)}
+                            zeroComoVazio
+                          />
+                        </td>
+                      ))}
+                      <td>
+                        <input
+                          className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                          type="date"
+                          value={item.data_chegada || ''}
+                          disabled={formularioBloqueado}
+                          onChange={(e) => atualizarItem(index, 'data_chegada', e.target.value)}
+                          title="Data prevista de chegada"
                         />
                       </td>
                       <td>
@@ -725,35 +877,11 @@ export default function CotacaoFornecedorPublica() {
                           min="0"
                           step="1"
                           inputMode="decimal"
-                          value={bloqueiaPorIndisponivel ? '' : item.quantidade_minima_item}
-                          disabled={formularioBloqueado || bloqueiaPorIndisponivel}
+                          value={item.quantidade_minima_item}
+                          disabled={formularioBloqueado}
                           onChange={(e) => atualizarItem(index, 'quantidade_minima_item', e.target.value)}
                           placeholder="Opcional"
                         />
-                      </td>
-                      <td>
-                        <div className="flex flex-col gap-1">
-                          <select
-                            className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                            value={statusDisp}
-                            disabled={formularioBloqueado}
-                            onChange={(e) => atualizarItem(index, 'status_disponibilidade', e.target.value)}
-                          >
-                            {OPCOES_DISPONIBILIDADE.map((op) => (
-                              <option key={op.value} value={op.value}>{op.label}</option>
-                            ))}
-                          </select>
-                          {isParaChegar && (
-                            <input
-                              className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                              type="date"
-                              value={item.data_chegada || ''}
-                              disabled={formularioBloqueado}
-                              onChange={(e) => atualizarItem(index, 'data_chegada', e.target.value)}
-                              title="Data prevista de chegada"
-                            />
-                          )}
-                        </div>
                       </td>
                       <td>
                         <div className="flex min-w-0 items-start gap-2">
@@ -782,12 +910,11 @@ export default function CotacaoFornecedorPublica() {
                         </div>
                       </td>
                     </tr>
-                  );
-                })}
+                ))}
 
                 {itens.length === 0 && (
                   <tr>
-                    <td colSpan="8" className="cotacao-publica-table-empty text-xs">
+                    <td colSpan="12" className="cotacao-publica-table-empty text-xs">
                       Nenhum item disponivel para resposta.
                     </td>
                   </tr>
@@ -795,6 +922,15 @@ export default function CotacaoFornecedorPublica() {
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div className="mt-3 grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
+          <div><span className="block text-[var(--sol-text-soft)]">Mercadorias</span><strong>{formatarMoeda(valorMercadorias)}</strong></div>
+          <div><span className="block text-[var(--sol-text-soft)]">IPI + ICMS + ST</span><strong>{formatarMoeda(valorTributos)}</strong></div>
+          <div><span className="block text-[var(--sol-text-soft)]">DIFAL</span><strong>{formatarMoeda(numeroCotacao(difalValor))}</strong></div>
+          <div><span className="block text-[var(--sol-text-soft)]">Frete adicional</span><strong>{formatarMoeda(valorFreteAdicional)}</strong></div>
+          <div><span className="block text-[var(--sol-text-soft)]">Desconto</span><strong>- {formatarMoeda(numeroCotacao(descontoTotal))}</strong></div>
+          <div className="rounded-md bg-slate-900 px-2 py-1.5 text-white"><span className="block text-slate-300">Total estimado</span><strong>{formatarMoeda(valorTotalProposta)}</strong></div>
         </div>
 
       </div>
