@@ -346,6 +346,13 @@ export async function delegarSolicitacaoCompra(id, data = {}) {
   return handleJsonResponse(response, 'Erro ao delegar solicitacao de compra');
 }
 
+export async function listarUsuariosDelegacaoCompras() {
+  const response = await fetch(`${API_URL}/compras/delegacao/usuarios`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao carregar usuarios para delegacao de compras');
+}
+
 export async function comentarSolicitacaoCompra(id, data = {}) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/comentarios`, {
     method: 'POST',

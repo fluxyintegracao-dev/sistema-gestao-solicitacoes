@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { delegarSolicitacaoCompra, listarSolicitacoesCompra } from '../../../services/compras';
-import { API_URL, authHeaders } from '../../../services/api';
+import {
+  delegarSolicitacaoCompra,
+  listarSolicitacoesCompra,
+  listarUsuariosDelegacaoCompras
+} from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasDelegacao } from '../../../utils/acessoProduto';
 import { formatarDataLocalPtBr, parseDateSmart } from '../../../utils/dateLocal';
@@ -78,17 +81,6 @@ function renderMotivoRegistrado(label, motivo) {
   );
 }
 
-async function listarUsuariosParaDelegacao() {
-  const res = await fetch(`${API_URL}/usuarios-lista`, {
-    headers: authHeaders()
-  });
-  const data = await res.json().catch(() => null);
-  if (!res.ok) {
-    throw new Error(data?.error || 'Erro ao carregar usuarios para delegacao');
-  }
-  return Array.isArray(data) ? data : [];
-}
-
 export default function ComprasDelegacao() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -105,7 +97,7 @@ export default function ComprasDelegacao() {
       setLoading(true);
       const [dataSolicitacoes, dataUsuarios] = await Promise.all([
         listarSolicitacoesCompra({ contexto: 'delegacao' }),
-        listarUsuariosParaDelegacao()
+        podeGerenciarDelegacao ? listarUsuariosDelegacaoCompras() : Promise.resolve([])
       ]);
       const listaSolicitacoes = Array.isArray(dataSolicitacoes) ? dataSolicitacoes : [];
       setSolicitacoes(
@@ -115,7 +107,7 @@ export default function ComprasDelegacao() {
             Number(solicitacao.comprador_responsavel_id) === Number(user?.id)
           ))
       );
-      setUsuarios((Array.isArray(dataUsuarios) ? dataUsuarios : []).filter((usuario) => usuario.ativo !== false));
+      setUsuarios(Array.isArray(dataUsuarios) ? dataUsuarios : []);
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao carregar painel de delegacao de compras');
@@ -202,6 +194,15 @@ export default function ComprasDelegacao() {
       ? payload.motivo_delegacao_vencida
       : payload.motivo_atraso;
 
+    if (
+      podeGerenciarDelegacao
+      && String(payload.responsavel_id || '').trim()
+      && !usuarios.some((usuario) => Number(usuario.id) === Number(payload.responsavel_id))
+    ) {
+      alert('Selecione um usuario ativo vinculado ao setor de Compras ou remova o responsavel atual.');
+      return;
+    }
+
     if (prazoInfo.atrasado && !String(motivoObrigatorio || '').trim()) {
       alert(podeGerenciarDelegacao
         ? 'Informe o motivo para delegar com prazo ja vencido.'
@@ -278,6 +279,14 @@ export default function ComprasDelegacao() {
         {solicitacoesFiltradas.map((solicitacao) => {
           const edicao = getEdicao(solicitacao);
           const prazoInfo = getPrazoInfo({ ...solicitacao, prazo_compra: edicao.prazo_compra });
+          const responsavelSelecionadoId = Number(edicao.responsavel_id || 0);
+          const responsavelSelecionadoElegivel = usuarios.some(
+            (usuario) => Number(usuario.id) === responsavelSelecionadoId
+          );
+          const responsavelNaoListado = responsavelSelecionadoId > 0 && !responsavelSelecionadoElegivel;
+          const responsavelForaCompras = podeGerenciarDelegacao && responsavelNaoListado;
+          const responsavelForaComprasNome = solicitacao.compradorResponsavel?.nome
+            || `Usuario #${responsavelSelecionadoId}`;
 
           return (
             <div key={solicitacao.id} className="card sol-surface-card">
@@ -303,12 +312,28 @@ export default function ComprasDelegacao() {
                     disabled={!podeGerenciarDelegacao}
                   >
                     <option value="">Sem responsavel</option>
+                    {responsavelNaoListado ? (
+                      <option value={responsavelSelecionadoId} disabled>
+                        {responsavelForaComprasNome}
+                        {responsavelForaCompras ? ' - fora do setor de Compras (atribuicao anterior)' : ''}
+                      </option>
+                    ) : null}
                     {usuarios.map((usuario) => (
                       <option key={usuario.id} value={usuario.id}>
                         {usuario.nome} {usuario.setor ? `- ${usuario.setor}` : ''}
                       </option>
                     ))}
                   </select>
+                  {responsavelForaCompras && podeGerenciarDelegacao ? (
+                    <span className="text-xs font-normal text-amber-700">
+                      A atribuicao anterior foi preservada. Selecione um usuario de Compras ou remova o responsavel antes de salvar.
+                    </span>
+                  ) : null}
+                  {podeGerenciarDelegacao && !responsavelForaCompras ? (
+                    <span className="text-xs font-normal text-[var(--c-muted)]">
+                      Somente usuarios ativos vinculados ao setor de Compras.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="grid gap-2 text-sm font-medium">

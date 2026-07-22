@@ -68,6 +68,16 @@
 - IPI, ICMS, ST e DIFAL rateados compoem o valor gerencial do item e do pedido;
 - frete pago a terceiro gera pendencia para Contas a Pagar; se a cotacao nao identificar o transportador, o Financeiro define o credor ao gerar o titulo.
 
+## Delegacao
+
+- somente usuario ativo pertencente a um setor ativo marcado com `eh_setor_compras = true` pode ser escolhido como responsavel;
+- pertencimento considera tanto `users.setor_id` quanto os vinculos adicionais de `usuario_setores`, sem depender do nome, codigo ou ID fixo do setor;
+- `SUPERADMIN` continua fora da lista operacional de responsaveis, preservando o comportamento anterior da selecao;
+- consultar candidatos exige permissao de gerenciamento da Delegacao de Compras; usuarios com acesso apenas para registrar atraso nao carregam essa lista;
+- remover o responsavel continua permitido;
+- atribuicao historica que deixou de ser elegivel nao e apagada automaticamente: permanece identificada na tela e precisa ser substituida ou removida antes de um novo salvamento gerencial;
+- o backend valida novamente usuario, atividade e setor no momento da gravacao e replica o responsavel validado para a solicitacao e seus pedidos vinculados na mesma transacao.
+
 ## Cancelamento e preservacao
 
 - cancelamento de solicitacao exige motivo;

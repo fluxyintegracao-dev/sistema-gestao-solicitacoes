@@ -34,6 +34,7 @@ const {
   normalizeStatusCode
 } = require('./pedidoCompraStatusConfig');
 const { registrarFretePedido } = require('./pedidoCompraFreteService');
+const { validarResponsavelElegivelDelegacaoCompras } = require('./comprasDelegacaoService');
 
 function normalizeText(value) {
   return String(value || '')
@@ -3410,9 +3411,12 @@ async function delegarSolicitacaoCompra({
     throw new Error('Informe o motivo para delegar uma solicitacao com prazo ja vencido.');
   }
 
+  const responsavelElegivel = await validarResponsavelElegivelDelegacaoCompras(responsavelId, { transaction });
+  const responsavelNormalizado = responsavelElegivel?.id || null;
+
   await solicitacao.update(
     {
-      comprador_responsavel_id: responsavelId ? Number(responsavelId) : null,
+      comprador_responsavel_id: responsavelNormalizado,
       prazo_compra: prazoCompra || null,
       delegado_por: usuarioId || null,
       delegado_em: new Date(),
@@ -3427,7 +3431,7 @@ async function delegarSolicitacaoCompra({
   );
 
   const pedidoUpdate = {
-    atribuido_a: responsavelId ? Number(responsavelId) : null,
+    atribuido_a: responsavelNormalizado,
     prazo_finalizacao: prazoCompra || null,
     delegado_por: usuarioId || null,
     delegado_em: new Date()
@@ -3447,11 +3451,11 @@ async function delegarSolicitacaoCompra({
     solicitacaoCompraId: solicitacao.id,
     usuarioId,
     tipoAcao: 'DELEGACAO_COMPRA',
-    descricao: responsavelId
-      ? `Solicitacao atribuida ao usuario #${responsavelId}`
+    descricao: responsavelNormalizado
+      ? `Solicitacao atribuida ao usuario #${responsavelNormalizado}`
       : 'Responsavel de compras removido da solicitacao',
     metadados: {
-      responsavel_id: responsavelId || null,
+      responsavel_id: responsavelNormalizado,
       prazo_compra: prazoCompra || null,
       motivo_atraso: motivoNormalizado || null,
       motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || null

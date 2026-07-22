@@ -49,6 +49,7 @@ const {
   isPedidoCompraHtmlPdfAvailable
 } = require('../services/pedidoCompraPdfPuppeteer');
 const { canAccessSolicitacaoFile } = require('../services/fileAccessService');
+const { listarUsuariosElegiveisDelegacaoCompras } = require('../services/comprasDelegacaoService');
 
 async function carregarUsuarioCompras(userId) {
   if (!userId) {
@@ -866,6 +867,23 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErroController(res, error, 'Erro ao listar fretes pendentes do financeiro');
+    }
+  },
+
+  async usuariosDelegacao(req, res) {
+    try {
+      const usuario = await validarAcessoDelegacao(req, res);
+      if (!usuario) return;
+
+      if (!(await canManageComprasDelegacao(usuario))) {
+        return res.status(403).json({ error: 'Sem permissao para alterar a delegacao de compras.' });
+      }
+
+      const usuarios = await listarUsuariosElegiveisDelegacaoCompras();
+      return res.json(usuarios);
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao listar usuarios para delegacao de compras');
     }
   },
 
