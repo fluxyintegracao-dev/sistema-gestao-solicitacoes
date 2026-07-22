@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { canManageSstArea, canViewSstArea } from '../../../utils/acessoProduto';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useUiVisibility } from '../../../hooks/useUiVisibility';
@@ -16,7 +16,7 @@ import {
   sincronizarEventosVencimentoSst,
   uploadDocumentoSst
 } from '../services/sst';
-import { SST_RESOURCES } from '../constants/sstResources';
+import { isSstResourceVisible, SST_RESOURCES } from '../constants/sstResources';
 
 function getValue(row, path) {
   return String(path).split('.').reduce((acc, key) => acc?.[key], row) ?? '';
@@ -58,7 +58,7 @@ export default function SstCrudPage() {
   const [editing, setEditing] = useState(null);
   const [file, setFile] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [refs, setRefs] = useState({ empresas: [], obras: [], colaboradores: [], ambientes: [], riscos: [], agentes: [], asos: [] });
+  const [refs, setRefs] = useState({ empresas: [], obras: [], colaboradores: [], ambientes: [], riscos: [], agentes: [], asos: [], ltcats: [] });
   const [filters, setFilters] = useState({ empresa_id: '', obra_id: '', colaborador_id: '', status: '', search: '' });
   const [syncingEvents, setSyncingEvents] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -109,8 +109,9 @@ export default function SstCrudPage() {
       listarSst('ambientes', { limit: 200 }),
       listarSst('riscos', { limit: 200 }),
       listarSst('agentes', { limit: 200 }),
-      listarSst('aso', { limit: 200 })
-    ]).then(([empresasResult, obrasResult, colaboradoresResult, ambientesResult, riscosResult, agentesResult, asosResult]) => {
+      listarSst('aso', { limit: 200 }),
+      listarSst('ltcat', { limit: 200 })
+    ]).then(([empresasResult, obrasResult, colaboradoresResult, ambientesResult, riscosResult, agentesResult, asosResult, ltcatsResult]) => {
       if (!active) return;
       setRefs({
         empresas: empresasResult.status === 'fulfilled' && Array.isArray(empresasResult.value) ? empresasResult.value : [],
@@ -119,7 +120,8 @@ export default function SstCrudPage() {
         ambientes: ambientesResult.status === 'fulfilled' ? (ambientesResult.value.rows || []) : [],
         riscos: riscosResult.status === 'fulfilled' ? (riscosResult.value.rows || []) : [],
         agentes: agentesResult.status === 'fulfilled' ? (agentesResult.value.rows || []) : [],
-        asos: asosResult.status === 'fulfilled' ? (asosResult.value.rows || []) : []
+        asos: asosResult.status === 'fulfilled' ? (asosResult.value.rows || []) : [],
+        ltcats: ltcatsResult.status === 'fulfilled' ? (ltcatsResult.value.rows || []) : []
       });
     });
     return () => {
@@ -128,6 +130,10 @@ export default function SstCrudPage() {
   }, []);
 
   const columns = useMemo(() => config.columns || [], [config.columns]);
+
+  if (!isSstResourceVisible(resource)) {
+    return <Navigate to="/sst" replace />;
+  }
 
   if (!canView) {
     return (
@@ -497,4 +503,3 @@ export default function SstCrudPage() {
     </div>
   );
 }
-

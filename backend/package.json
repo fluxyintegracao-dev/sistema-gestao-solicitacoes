@@ -13,7 +13,8 @@
     "test:payments": "node scripts/validarPagamentosEngine.js",
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
     "test:importacao-titulos": "node scripts/validarImportacaoTitulos.js",
-    "test:docs": "node scripts/validarDocumentacao.js"
+    "test:docs": "node scripts/validarDocumentacao.js",
+    "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

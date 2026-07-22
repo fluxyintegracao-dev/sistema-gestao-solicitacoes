@@ -6,6 +6,11 @@ const {
   invalidatePermissoesAreasCache
 } = require('../services/authorizationService');
 const { normalizeModuloPermissaoList, MODULO_PERMISSION_GROUPS } = require('../constants/moduloPermissoes');
+const {
+  getVisiblePermissionRegistry,
+  isSstSimplifiedMode,
+  isVisibleSstPermissionKey
+} = require('../modules/sst/constants/sstSimplificationPolicy');
 
 const CHAVE = 'PERMISSOES_AREAS_USUARIOS';
 
@@ -58,6 +63,47 @@ function normalizePadroesSetorPerfil(input) {
   }, {});
 }
 
+function preserveHiddenSstPermissions(incoming = [], current = []) {
+  if (!isSstSimplifiedMode()) return incoming;
+
+  return normalizeModuloPermissaoList([
+    ...incoming,
+    ...current.filter((key) => !isVisibleSstPermissionKey(key))
+  ]);
+}
+
+function preserveHiddenSstPermissionsByUser(incoming = {}, current = {}) {
+  const result = { ...incoming };
+  const userIds = new Set([...Object.keys(incoming), ...Object.keys(current)]);
+
+  userIds.forEach((userId) => {
+    result[userId] = preserveHiddenSstPermissions(incoming[userId] || [], current[userId] || []);
+  });
+
+  return result;
+}
+
+function preserveHiddenSstPermissionsByProfile(incoming = {}, current = {}) {
+  const result = { ...incoming };
+  const sectorKeys = new Set([...Object.keys(incoming), ...Object.keys(current)]);
+
+  sectorKeys.forEach((sectorKey) => {
+    result[sectorKey] = { ...(incoming[sectorKey] || {}) };
+    const profiles = new Set([
+      ...Object.keys(incoming[sectorKey] || {}),
+      ...Object.keys(current[sectorKey] || {})
+    ]);
+    profiles.forEach((profile) => {
+      result[sectorKey][profile] = preserveHiddenSstPermissions(
+        incoming[sectorKey]?.[profile] || [],
+        current[sectorKey]?.[profile] || []
+      );
+    });
+  });
+
+  return result;
+}
+
 module.exports = {
   async get(req, res) {
     try {
@@ -73,17 +119,30 @@ module.exports = {
     try {
       const currentConfig = await getPermissoesAreasConfig();
 
-      const normalizedUsuarios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios')
+      let normalizedUsuarios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios')
         ? normalizeUsuarios(req.body?.usuarios)
         : currentConfig.usuarios || {};
 
-      const normalizedBloqueios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios_bloqueios')
+      let normalizedBloqueios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios_bloqueios')
         ? normalizeUsuarios(req.body?.usuarios_bloqueios)
         : currentConfig.usuarios_bloqueios || {};
 
-      const normalizedPadroes = Object.prototype.hasOwnProperty.call(req.body || {}, 'padroes_setor_perfil')
+      let normalizedPadroes = Object.prototype.hasOwnProperty.call(req.body || {}, 'padroes_setor_perfil')
         ? normalizePadroesSetorPerfil(req.body?.padroes_setor_perfil)
         : currentConfig.padroes_setor_perfil || {};
+
+      normalizedUsuarios = preserveHiddenSstPermissionsByUser(
+        normalizedUsuarios,
+        currentConfig.usuarios || {}
+      );
+      normalizedBloqueios = preserveHiddenSstPermissionsByUser(
+        normalizedBloqueios,
+        currentConfig.usuarios_bloqueios || {}
+      );
+      normalizedPadroes = preserveHiddenSstPermissionsByProfile(
+        normalizedPadroes,
+        currentConfig.padroes_setor_perfil || {}
+      );
 
       const valor = JSON.stringify({
         usuarios: normalizedUsuarios,
@@ -112,6 +171,6 @@ module.exports = {
   },
 
   async registry(req, res) {
-    return res.json(MODULO_PERMISSION_GROUPS);
+    return res.json(getVisiblePermissionRegistry(MODULO_PERMISSION_GROUPS));
   }
 };

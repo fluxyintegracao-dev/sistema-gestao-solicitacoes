@@ -194,6 +194,8 @@ db.FiscalAccountingBatchItem = require('../modules/fiscal/models/FiscalAccountin
 db.SstRisco = require('../modules/sst/models/SstRisco')(sequelize, Sequelize);
 db.SstAgenteNocivo = require('../modules/sst/models/SstAgenteNocivo')(sequelize, Sequelize);
 db.SstPgr = require('../modules/sst/models/SstPgr')(sequelize, Sequelize);
+db.SstLtcat = require('../modules/sst/models/SstLtcat')(sequelize, Sequelize);
+db.SstLtcatAvaliacao = require('../modules/sst/models/SstLtcatAvaliacao')(sequelize, Sequelize);
 db.SstPcmso = require('../modules/sst/models/SstPcmso')(sequelize, Sequelize);
 db.SstAso = require('../modules/sst/models/SstAso')(sequelize, Sequelize);
 db.SstExame = require('../modules/sst/models/SstExame')(sequelize, Sequelize);
@@ -3971,6 +3973,8 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
   db.SstRisco,
   db.SstAgenteNocivo,
   db.SstPgr,
+  db.SstLtcat,
+  db.SstLtcatAvaliacao,
   db.SstPcmso,
   db.SstAso,
   db.SstExame,
@@ -4032,6 +4036,8 @@ db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fisc
 
 db.SstRisco.hasMany(db.SstAgenteNocivo, { foreignKey: 'risco_id', as: 'agentes' });
 db.SstAgenteNocivo.belongsTo(db.SstRisco, { foreignKey: 'risco_id', as: 'risco' });
+db.SstLtcat.hasMany(db.SstLtcatAvaliacao, { foreignKey: 'ltcat_id', as: 'avaliacoes' });
+db.SstLtcatAvaliacao.belongsTo(db.SstLtcat, { foreignKey: 'ltcat_id', as: 'ltcat' });
 db.SstAmbienteTrabalho.hasMany(db.SstExposicao, { foreignKey: 'ambiente_id', as: 'exposicoes' });
 db.SstExposicao.belongsTo(db.SstAmbienteTrabalho, { foreignKey: 'ambiente_id', as: 'ambiente' });
 db.SstRisco.hasMany(db.SstExposicao, { foreignKey: 'risco_id', as: 'exposicoes' });

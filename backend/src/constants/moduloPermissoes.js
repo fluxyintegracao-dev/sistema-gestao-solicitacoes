@@ -790,6 +790,16 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'sst.ltcat',
+        label: 'LTCAT e Avaliacoes Quantitativas',
+        permissoes: [
+          { key: 'sst.ltcat.visualizar', label: 'Visualizar LTCAT', descricao: 'Consultar laudos tecnicos das condicoes ambientais de trabalho.' },
+          { key: 'sst.ltcat.gerenciar', label: 'Gerenciar LTCAT', descricao: 'Criar e atualizar laudos tecnicos das condicoes ambientais de trabalho.' },
+          { key: 'sst.avaliacoes_quantitativas.visualizar', label: 'Visualizar avaliacoes quantitativas', descricao: 'Consultar medicoes e avaliacoes quantitativas vinculadas ao LTCAT.' },
+          { key: 'sst.avaliacoes_quantitativas.gerenciar', label: 'Gerenciar avaliacoes quantitativas', descricao: 'Criar e atualizar medicoes e avaliacoes quantitativas vinculadas ao LTCAT.' }
+        ]
+      },
+      {
         key: 'sst.configuracoes',
         label: 'Configuracoes SST',
         permissoes: [
