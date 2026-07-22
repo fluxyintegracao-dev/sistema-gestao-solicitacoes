@@ -67,6 +67,10 @@ import {
   isBusinessAdmin,
   isSuperadmin
 } from './utils/acessoProduto';
+import {
+  SST_NAV,
+  SST_SIMPLIFIED_MODE
+} from './modules/sst/constants/sstResources';
 
 const Login = lazy(() => import('./pages/Login'));
 const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
@@ -580,8 +584,19 @@ function SstRoute({ children }) {
   return children;
 }
 
+function getSstSimplifiedEntry(user) {
+  const firstResource = SST_NAV.find(([resource]) => canViewSstArea(user, resource));
+  return firstResource ? `/sst/${firstResource[0]}` : '/';
+}
+
 function SstDashboardRoute({ children }) {
   const { user } = useAuth();
+  if (!canAccessSst(user)) {
+    return <Navigate to="/" replace />;
+  }
+  if (SST_SIMPLIFIED_MODE) {
+    return <Navigate to={getSstSimplifiedEntry(user)} replace />;
+  }
   if (!canViewSstDashboard(user)) {
     return <Navigate to="/" replace />;
   }
@@ -594,7 +609,18 @@ function SstAreaRoute({ area, children }) {
     return <Navigate to="/" replace />;
   }
   if (!canViewSstArea(user, area)) {
-    return <Navigate to="/sst" replace />;
+    return <Navigate to={SST_SIMPLIFIED_MODE ? getSstSimplifiedEntry(user) : '/sst'} replace />;
+  }
+  return children;
+}
+
+function SstLegacyRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessSst(user)) {
+    return <Navigate to="/" replace />;
+  }
+  if (SST_SIMPLIFIED_MODE) {
+    return <Navigate to={getSstSimplifiedEntry(user)} replace />;
   }
   return children;
 }
@@ -603,6 +629,9 @@ function SstConfigRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessSst(user)) {
     return <Navigate to="/" replace />;
+  }
+  if (SST_SIMPLIFIED_MODE) {
+    return <Navigate to={getSstSimplifiedEntry(user)} replace />;
   }
   if (!canManageSstArea(user, 'configuracoes')) {
     return <Navigate to="/sst" replace />;
@@ -927,7 +956,7 @@ export default function App() {
         <Route path="sst/producao" element={<SstDashboardRoute><SstProducaoMonitoramento /></SstDashboardRoute>} />
         <Route path="sst/observabilidade-avancada" element={<SstDashboardRoute><SstObservabilidadeAvancada /></SstDashboardRoute>} />
         <Route path="sst/timeline" element={<SstDashboardRoute><SstTimeline /></SstDashboardRoute>} />
-        <Route path="sst/esocial" element={<SstRoute><SstEsocial /></SstRoute>} />
+        <Route path="sst/esocial" element={<SstLegacyRoute><SstEsocial /></SstLegacyRoute>} />
         <Route path="sst/configuracoes" element={<SstConfigRoute><SstConfiguracoes /></SstConfigRoute>} />
         <Route path="sst/:resource" element={<SstRoute><SstCrudPage /></SstRoute>} />
 

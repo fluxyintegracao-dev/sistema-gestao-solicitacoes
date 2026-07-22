@@ -13,6 +13,10 @@ fluxos legados.
 - `VITE_SST_SIMPLIFIED_MODE=false` restaura a navegacao completa no frontend.
 - Recursos mantidos: PGR, PCMSO, ASO, exames, EPI, treinamentos, documentos,
   LTCAT e avaliacoes quantitativas.
+- O menu principal lista somente esses nove recursos enquanto o modo
+  simplificado estiver ativo.
+- A entrada `/sst`, dashboards, relatorios e o acesso direto ao eSocial legado
+  redirecionam para o primeiro recurso simplificado permitido ao usuario.
 - Recursos legados continuam disponiveis em modo de consulta historica.
 - Novas escritas em recursos legados retornam HTTP 410 com o codigo
   `SST_LEGACY_FLOW_DISABLED`.
@@ -34,6 +38,8 @@ fluxos legados.
 - `backend/src/modules/sst/models/SstLtcat.js`
 - `backend/src/modules/sst/models/SstLtcatAvaliacao.js`
 - `backend/src/controllers/PermissoesAreasController.js`
+- `frontend/src/App.jsx`
+- `frontend/src/layout/Layout.jsx`
 - `frontend/src/modules/sst/constants/sstResources.js`
 - `frontend/src/modules/sst/pages/SstCrudPage.jsx`
 
@@ -41,8 +47,9 @@ fluxos legados.
 
 - Smoke executavel: `cd backend && npm run test:smoke-sst`.
 - O smoke valida recursos mantidos, consulta historica, bloqueio de escrita
-  legada, registro das permissoes, modo reversivel e bootstrap dos models.
-- Validacoes concluidas em 21/07/2026:
+  legada, registro das permissoes, modo reversivel, bootstrap dos models e a
+  ligacao do modo simplificado ao menu e às rotas reais do frontend.
+- Validacoes concluidas em 22/07/2026:
   - `npm run test:smoke-sst`: aprovado;
   - verificacao sintatica dos arquivos alterados do backend: aprovada;
   - `npm run build` no frontend: aprovado;

@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert/strict');
+const fs = require('fs');
+const path = require('path');
 
 const originalMode = process.env.SST_SIMPLIFIED_MODE;
 
@@ -68,6 +70,22 @@ async function run() {
   assert.ok(completeKeys.some((key) => key.startsWith('sst.acidentes.')));
 
   process.env.SST_SIMPLIFIED_MODE = 'true';
+
+  const appSource = fs.readFileSync(
+    path.resolve(__dirname, '../../frontend/src/App.jsx'),
+    'utf8'
+  );
+  const layoutSource = fs.readFileSync(
+    path.resolve(__dirname, '../../frontend/src/layout/Layout.jsx'),
+    'utf8'
+  );
+
+  assert.match(appSource, /SST_SIMPLIFIED_MODE/);
+  assert.match(appSource, /function SstLegacyRoute/);
+  assert.match(appSource, /<SstLegacyRoute><SstEsocial \/><\/SstLegacyRoute>/);
+  assert.match(layoutSource, /SST_NAV\.map/);
+  assert.match(layoutSource, /sstAccess && SST_SIMPLIFIED_MODE/);
+
   const models = require('../src/models');
   assert.ok(models.SstLtcat, 'O model SstLtcat deve carregar no bootstrap.');
   assert.ok(models.SstLtcatAvaliacao, 'O model SstLtcatAvaliacao deve carregar no bootstrap.');
