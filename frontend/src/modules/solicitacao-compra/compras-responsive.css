@@ -103,6 +103,13 @@
   border-bottom: 1px solid var(--compras-line);
 }
 
+/* Modal operacional de rateio: mais vertical e sem ocupar toda a largura do desktop. */
+.compras-responsive-scope .page .compras-apropriacao-modal {
+  width: min(calc(100vw - 2rem), 64rem);
+  min-height: min(64vh, 32rem);
+  max-width: 64rem;
+}
+
 .compras-responsive-scope .app-page-header-row {
   min-width: 0;
   align-items: flex-start;
