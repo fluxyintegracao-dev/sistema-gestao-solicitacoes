@@ -25,7 +25,11 @@ Guia rapido para colaboradores e agentes automatizados.
 ## Estado Atual (resumo das mudancas feitas)
 
 ### Infra / Deploy
-- Backend roda em EC2 com PM2 (`backend-solicitacoes`) e Nginx proxy em `api.jrfluxy.com.br` para `127.0.0.1:8000`.
+- Os ambientes usam processos PM2 distintos na EC2:
+  - desenvolvimento (`dev-v2`): `backend-dev`;
+  - producao (`main`): `backend-solicitacoes`.
+- Nunca reiniciar `backend-solicitacoes` durante uma atualizacao exclusiva de dev; nunca reiniciar `backend-dev` durante um deploy exclusivo de producao.
+- O backend de producao usa Nginx proxy em `api.jrfluxy.com.br` para `127.0.0.1:8000`.
 - Frontend hospedado na Vercel (root `frontend/`).
 - Dominios configurados: `jrfluxy.com.br`, `www.jrfluxy.com.br`, `csc.jrfluxy.com.br` (apontando para Vercel).
 - CORS do backend ajustado para aceitar dominios Vercel (preview) e dominios customizados.
@@ -97,7 +101,7 @@ Guia rapido para colaboradores e agentes automatizados.
   - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
 - sistema de permissoes de areas por usuario:
   - registro central em `backend/src/constants/moduloPermissoes.js`
-  - 18 grupos, 80 areas e 270 permissoes no formato `modulo.area.acao`
+  - 18 grupos, 81 areas e 275 permissoes no formato `modulo.area.acao`
   - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
   - sessao do usuario: campo `areas_permissoes`
   - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`
@@ -105,7 +109,8 @@ Guia rapido para colaboradores e agentes automatizados.
   - o grupo SST ainda contem permissoes de funcionalidades legadas; nao ampliar esse conjunto antes da simplificacao descrita em `docs/sst/PLANO_SIMPLIFICACAO_SEGURA.md`
 
 ## Checklist de Deploy
-- Backend: `git pull` -> `npm install` (backend) -> `pm2 restart backend-solicitacoes --update-env`.
+- Backend dev (`dev-v2`): `git pull` -> `npm install` (backend) -> migrations/testes aplicaveis -> `pm2 restart backend-dev --update-env`.
+- Backend producao (`main`): `git pull` -> `npm install` (backend) -> migrations/testes aplicaveis -> `pm2 restart backend-solicitacoes --update-env`.
 - Frontend: `git push` -> Redeploy na Vercel (cache limpo).
 
 ## Observacoes

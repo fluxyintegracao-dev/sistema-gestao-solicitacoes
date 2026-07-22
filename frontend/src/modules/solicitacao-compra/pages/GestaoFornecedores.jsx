@@ -247,6 +247,7 @@ export default function GestaoFornecedores() {
   const [busca, setBusca] = useState('');
   const [filtroEstado, setFiltroEstado] = useState('');
   const [filtroCategoria, setFiltroCategoria] = useState('');
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [incluirInativos, setIncluirInativos] = useState(false);
 
   async function carregar() {
@@ -326,38 +327,54 @@ export default function GestaoFornecedores() {
 
       {/* Filtros */}
       <div className="card sol-surface-card solicitacoes-filtros app-filters-card mt-4 min-w-0 max-w-full">
-        <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-center">
-          <input
-            className="input min-w-0 sm:col-span-2 xl:col-span-4"
-            placeholder="Buscar por nome, CNPJ ou email..."
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && carregar()}
-          />
-          <select className="input min-w-0 xl:col-span-2" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
-            <option value="">Todos os estados</option>
-            {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => (
-              <option key={uf} value={uf}>{uf}</option>
-            ))}
-          </select>
-          <input
-            className="input min-w-0 xl:col-span-3"
-            placeholder="Filtrar por categoria..."
-            value={filtroCategoria}
-            onChange={(e) => setFiltroCategoria(e.target.value)}
-          />
-          <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm text-[var(--c-muted)] xl:col-span-2">
-            <input type="checkbox" checked={incluirInativos} onChange={(e) => setIncluirInativos(e.target.checked)} />
-            Incluir inativos
-          </label>
-          <button type="button" className="btn btn-outline justify-center xl:col-span-1" onClick={carregar} disabled={loading}>
-            {loading ? 'Buscando...' : 'Buscar'}
+        <div className="compras-filter-heading">
+          <div>
+            <h2 className="compras-filter-title">Filtros</h2>
+            <p className="compras-filter-subtitle">Localize fornecedores por identificacao, regiao ou categoria.</p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-outline compras-mobile-filter-toggle"
+            aria-expanded={filtrosVisiveis}
+            onClick={() => setFiltrosVisiveis((atual) => !atual)}
+          >
+            {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
           </button>
+        </div>
+        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-center">
+            <input
+              className="input min-w-0 sm:col-span-2 xl:col-span-4"
+              placeholder="Buscar por nome, CNPJ ou email..."
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && carregar()}
+            />
+            <select className="input min-w-0 xl:col-span-2" value={filtroEstado} onChange={(e) => setFiltroEstado(e.target.value)}>
+              <option value="">Todos os estados</option>
+              {['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'].map((uf) => (
+                <option key={uf} value={uf}>{uf}</option>
+              ))}
+            </select>
+            <input
+              className="input min-w-0 xl:col-span-3"
+              placeholder="Filtrar por categoria..."
+              value={filtroCategoria}
+              onChange={(e) => setFiltroCategoria(e.target.value)}
+            />
+            <label className="flex min-w-0 items-center gap-2 whitespace-nowrap text-sm text-[var(--c-muted)] xl:col-span-2">
+              <input type="checkbox" checked={incluirInativos} onChange={(e) => setIncluirInativos(e.target.checked)} />
+              Incluir inativos
+            </label>
+            <button type="button" className="btn btn-outline justify-center xl:col-span-1" onClick={carregar} disabled={loading}>
+              {loading ? 'Buscando...' : 'Buscar'}
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Tabela */}
-      <div className="card sol-surface-card mt-4 min-w-0 max-w-full overflow-hidden">
+      <div className="card sol-surface-card compras-adaptive-list mt-4 min-w-0 max-w-full overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <span className="text-sm text-[var(--c-muted)]">{fornecedores.length} fornecedor(es)</span>
         </div>
@@ -452,6 +469,42 @@ export default function GestaoFornecedores() {
             </div>
           </div>
         )}
+        {!loading && fornecedores.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Fornecedores">
+            {fornecedores.map((f) => (
+              <article key={`mobile-${f.id}`} className={`compras-mobile-record ${!f.ativo ? 'is-inactive' : ''}`}>
+                <div className="compras-mobile-record-head">
+                  <div className="compras-mobile-record-title">
+                    <strong>{f.nome}</strong>
+                    <span>{f.cnpj || 'CNPJ nao informado'}</span>
+                  </div>
+                  <span className={`app-status-pill ${f.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {f.ativo ? 'Ativo' : 'Inativo'}
+                  </span>
+                </div>
+                <div className="compras-mobile-record-grid">
+                  <div className="compras-mobile-field"><span>Contato</span><strong>{f.contato || '-'}</strong></div>
+                  <div className="compras-mobile-field"><span>Cidade / UF</span><strong>{[f.cidade, f.estado].filter(Boolean).join(' / ') || '-'}</strong></div>
+                  <div className="compras-mobile-field"><span>WhatsApp</span>{f.whatsapp ? <a href={whatsappLink(f.whatsapp)} target="_blank" rel="noopener noreferrer">{f.whatsapp}</a> : <strong>-</strong>}</div>
+                  <div className="compras-mobile-field"><span>Email</span><strong>{f.email || '-'}</strong></div>
+                  <div className="compras-mobile-field"><span>Categorias</span><strong>{Array.isArray(f.categoria_insumos) && f.categoria_insumos.length ? f.categoria_insumos.join(', ') : '-'}</strong></div>
+                </div>
+                {canManage ? (
+                  <div className="compras-mobile-record-actions">
+                    <button type="button" className="btn btn-outline" onClick={() => { setFornecedorEditando(f); setModalAberto(true); }}>
+                      Editar
+                    </button>
+                    {f.ativo ? (
+                      <button type="button" className="btn btn-danger" onClick={() => handleDesativar(f.id)}>
+                        Desativar
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {modalAberto && (

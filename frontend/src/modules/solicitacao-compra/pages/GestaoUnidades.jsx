@@ -208,7 +208,7 @@ export default function GestaoUnidades() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card compras-adaptive-list">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Unidades cadastradas</h2>
           <div className="flex gap-2">
@@ -269,6 +269,30 @@ export default function GestaoUnidades() {
           </table>
           </div>
         )}
+        {!loading && unidades.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Unidades cadastradas">
+            {unidades.map((item) => (
+              <article key={`mobile-${item.id}`} className="compras-mobile-record">
+                <div className="compras-mobile-record-head">
+                  <div className="compras-mobile-record-title">
+                    <strong>{item.nome}</strong>
+                    <span>Sigla: {item.sigla || '-'}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={selecionados.includes(item.id)}
+                    onChange={() => toggleSelecionado(item.id)}
+                    aria-label={`Selecionar unidade ${item.nome}`}
+                  />
+                </div>
+                <div className="compras-mobile-record-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>Editar</button>
+                  <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>Excluir</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

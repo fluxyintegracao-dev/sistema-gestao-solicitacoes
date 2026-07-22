@@ -1,0 +1,727 @@
+/*
+ * Compras responsive surface
+ *
+ * Camada visual isolada por rota. Nao altera navegacao, permissoes, payloads,
+ * chamadas de API ou regras de negocio do modulo.
+ */
+
+.compras-responsive-scope {
+  --compras-line: color-mix(in srgb, var(--shell-border, #cbd5e1) 82%, #7890ad);
+  --compras-line-strong: color-mix(in srgb, var(--shell-primary, #2458d6) 24%, var(--compras-line));
+  --compras-panel: color-mix(in srgb, var(--shell-panel-strong, #fdfefe) 98%, #eaf1fb);
+  --compras-panel-soft: color-mix(in srgb, var(--shell-panel, #f8fbff) 94%, #dfe9f7);
+  --compras-ink: var(--shell-text, #102442);
+  --compras-muted: var(--shell-muted, #61718b);
+  --compras-primary: var(--shell-primary, #2458d6);
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.compras-responsive-scope .topbar-shell {
+  min-width: 0;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border-color: var(--compras-line);
+  border-radius: 0.9rem;
+  background: var(--compras-panel);
+  box-shadow: 0 8px 22px rgba(30, 54, 91, 0.07);
+  backdrop-filter: none;
+}
+
+.compras-responsive-scope :is(.topbar-leading, .topbar-context, .topbar-title-row) {
+  min-width: 0;
+}
+
+.compras-responsive-scope .topbar-title {
+  overflow: hidden;
+  color: var(--compras-ink);
+  font-size: clamp(1.15rem, 1.7vw, 1.55rem);
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .topbar-subtitle {
+  max-width: 70ch;
+  overflow: hidden;
+  color: var(--compras-muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .topbar-status-chip {
+  min-height: 1.75rem;
+  padding-inline: 0.62rem;
+  font-size: 0.68rem;
+}
+
+.compras-responsive-scope .page {
+  container: compras-page / inline-size;
+  width: 100%;
+  min-width: 0;
+  max-width: 94rem;
+  margin-inline: auto;
+  gap: 0.9rem;
+}
+
+.compras-responsive-scope .page > *,
+.compras-responsive-scope .page :is(.grid, .flex, .card, .sol-surface-card, .app-toolbar-card, .app-filters-card, .app-table-shell, .sol-table-wrapper, .compras-responsive-table, .compras-table-wrapper) {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.compras-responsive-scope .page > [class*="mt-"] {
+  margin-top: 0 !important;
+}
+
+.compras-responsive-scope .app-page-header {
+  padding: 0 0.1rem 0.25rem;
+  border-bottom: 1px solid var(--compras-line);
+}
+
+.compras-responsive-scope :is(.card, .sol-surface-card, .app-toolbar-card, .app-table-shell, .config-section, .config-summary-card) {
+  border-color: var(--compras-line);
+  border-radius: 0.8rem;
+  background: var(--compras-panel);
+  box-shadow: 0 7px 18px rgba(30, 54, 91, 0.055);
+  backdrop-filter: none;
+}
+
+.compras-responsive-scope :is(.card, .sol-surface-card) {
+  padding: 0.9rem;
+}
+
+.compras-responsive-scope .card-header {
+  min-width: 0;
+  margin-bottom: 0.7rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid var(--compras-line);
+}
+
+/* Modal operacional de rateio: mais vertical e sem ocupar toda a largura do desktop. */
+.compras-responsive-scope .page .compras-apropriacao-modal {
+  width: min(calc(100vw - 2rem), 64rem);
+  min-height: min(64vh, 32rem);
+  max-width: 64rem;
+}
+
+.compras-responsive-scope .app-page-header-row {
+  min-width: 0;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.compras-responsive-scope .page-subtitle {
+  max-width: 76ch;
+  margin-top: 0.28rem;
+  color: var(--compras-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.compras-responsive-scope .app-page-actions {
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.compras-responsive-scope .btn {
+  min-height: 2.35rem;
+  padding: 0.48rem 0.78rem;
+  border-radius: 0.58rem;
+  font-size: 0.74rem;
+  box-shadow: none;
+}
+
+.compras-responsive-scope .btn:hover {
+  transform: none;
+}
+
+.compras-responsive-scope .app-toolbar-card,
+.compras-responsive-scope .solicitacoes-toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  border-color: var(--compras-line);
+  background: var(--compras-panel);
+}
+
+.compras-responsive-scope :is(.app-filters-card, .solicitacoes-filtros) {
+  border-color: var(--compras-line);
+  background: var(--compras-panel);
+}
+
+.compras-responsive-scope :is(.sol-filtros-head, .compras-filter-heading) {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.compras-responsive-scope :is(.sol-filtros-title, .compras-filter-title) {
+  margin: 0;
+  color: var(--compras-ink);
+  font-size: 0.9rem;
+  font-weight: 750;
+}
+
+.compras-responsive-scope :is(.sol-filtros-subtitle, .compras-filter-subtitle) {
+  margin: 0.16rem 0 0;
+  color: var(--compras-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.compras-responsive-scope :is(.sol-filtros-grid, .app-filters-grid) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12.5rem), 1fr));
+  gap: 0.65rem;
+}
+
+.compras-responsive-scope :is(.sol-filter-field, .app-filter-field) {
+  min-width: 0;
+  gap: 0.32rem;
+}
+
+.compras-responsive-scope :is(.sol-filter-label, .app-filter-label) {
+  color: var(--compras-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope :is(.input, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  border-color: var(--compras-line);
+  border-radius: 0.55rem;
+}
+
+.compras-responsive-scope :is(.input, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), select) {
+  min-height: 2.45rem;
+}
+
+.compras-responsive-scope .compras-filter-content {
+  display: contents;
+}
+
+.compras-responsive-scope .compras-mobile-filter-toggle {
+  display: none;
+}
+
+.compras-responsive-scope .app-summary-grid,
+.compras-responsive-scope .metric-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10.5rem), 1fr));
+  gap: 0.65rem;
+}
+
+.compras-responsive-scope :is(.app-summary-card, .dashboard-metric-card) {
+  min-width: 0;
+  min-height: 5.25rem;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid var(--compras-line);
+  border-radius: 0.7rem;
+  background: var(--compras-panel);
+  box-shadow: none;
+}
+
+.compras-responsive-scope :is(.app-summary-label, .dashboard-metric-label) {
+  color: var(--compras-muted);
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope :is(.app-summary-value, .dashboard-metric-value) {
+  margin-top: 0.38rem;
+  overflow-wrap: anywhere;
+  color: var(--compras-ink);
+  font-size: clamp(1.02rem, 2vw, 1.32rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.compras-responsive-scope .dashboard-metric-detail {
+  margin-top: 0.18rem;
+  color: var(--compras-muted);
+  font-size: 0.66rem;
+}
+
+.compras-responsive-scope :is(.compras-table-card, .app-table-shell, .sol-table-wrapper) {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.compras-responsive-scope :is(.compras-table-wrapper, .compras-responsive-table, .sol-table-wrapper > .sol-table, .app-table-shell > .table) {
+  max-width: 100%;
+}
+
+.compras-responsive-scope :is(.compras-table-wrapper, .compras-responsive-table, .sol-table-wrapper) {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.compras-responsive-scope :is(.compras-data-table, .table, .sol-table) th {
+  padding-block: 0.48rem;
+  color: var(--compras-muted);
+  font-size: 0.63rem;
+  letter-spacing: 0.065em;
+}
+
+.compras-responsive-scope :is(.compras-data-table, .table, .sol-table) td {
+  padding-block: 0.48rem;
+  font-size: 0.74rem;
+  line-height: 1.15rem;
+}
+
+.compras-responsive-scope .compras-table-wrapper::after,
+.compras-responsive-scope .compras-responsive-table::after,
+.compras-responsive-scope .sol-table-wrapper::after {
+  content: "Role horizontalmente para consultar todas as colunas";
+  position: sticky;
+  left: 0.65rem;
+  display: none;
+  width: max-content;
+  margin: 0.4rem 0.65rem 0.5rem;
+  color: var(--compras-muted);
+  font-size: 0.62rem;
+}
+
+.compras-responsive-scope .compras-mobile-list {
+  display: none;
+}
+
+.compras-responsive-scope .compras-mobile-record {
+  min-width: 0;
+  padding: 0.78rem;
+  border: 1px solid var(--compras-line);
+  border-radius: 0.68rem;
+  background: var(--compras-panel);
+}
+
+.compras-responsive-scope .compras-mobile-record.is-inactive {
+  opacity: 0.62;
+}
+
+.compras-responsive-scope .compras-mobile-record-head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.65rem;
+}
+
+.compras-responsive-scope .compras-mobile-record-title {
+  min-width: 0;
+}
+
+.compras-responsive-scope .compras-mobile-record-title > :is(strong, span) {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compras-responsive-scope .compras-mobile-record-title > strong {
+  color: var(--compras-ink);
+  font-size: 0.82rem;
+}
+
+.compras-responsive-scope .compras-mobile-record-title > span {
+  margin-top: 0.16rem;
+  color: var(--compras-muted);
+  font-size: 0.67rem;
+}
+
+.compras-responsive-scope .compras-mobile-record-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  margin-top: 0.72rem;
+}
+
+.compras-responsive-scope .compras-mobile-field {
+  min-width: 0;
+}
+
+.compras-responsive-scope .compras-mobile-field > span {
+  display: block;
+  color: var(--compras-muted);
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope .compras-mobile-field > :is(strong, a, div) {
+  display: block;
+  margin-top: 0.18rem;
+  overflow-wrap: anywhere;
+  color: var(--compras-ink);
+  font-size: 0.72rem;
+}
+
+.compras-responsive-scope .compras-mobile-record-actions {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--compras-line);
+}
+
+.compras-responsive-scope .compras-mobile-record-actions .btn {
+  flex: 1 1 auto;
+}
+
+.compras-responsive-scope .compras-icon-action {
+  border-radius: 0.5rem;
+}
+
+.compras-responsive-scope :is(.fixed, .absolute) {
+  max-width: 100vw;
+}
+
+.compras-responsive-scope :is(.break-all, .break-words) {
+  overflow-wrap: anywhere;
+}
+
+.compras-responsive-scope .cotacao-gestao-page,
+.compras-responsive-scope .compra-detalhe-page,
+.compras-responsive-scope .page-compra-nova {
+  width: 100%;
+  min-width: 0;
+  max-width: 94rem;
+  overflow-x: clip;
+}
+
+.compras-responsive-scope .cotacao-gestao-page :is(.cotacao-fornecedores-panel, .cotacao-comparativo-panel, .cotacao-ranking-card, .cotacao-comparativo-item) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.compras-responsive-scope .app-list-stack {
+  min-width: 0;
+}
+
+.compras-responsive-scope .app-list-card {
+  min-width: 0;
+  border-radius: 0.65rem;
+}
+
+.dark .compras-responsive-scope {
+  --compras-panel: color-mix(in srgb, var(--shell-panel-strong, #0c284b) 96%, #102d50);
+  --compras-panel-soft: color-mix(in srgb, var(--shell-panel, #0a2444) 92%, #16375f);
+  --compras-line: rgba(72, 118, 177, 0.48);
+  --compras-line-strong: rgba(96, 165, 250, 0.56);
+}
+
+.dark .compras-responsive-scope :is(.topbar-shell, .card, .sol-surface-card, .app-toolbar-card, .app-table-shell, .config-section, .config-summary-card, .app-summary-card, .dashboard-metric-card, .compras-mobile-record) {
+  background: var(--compras-panel);
+}
+
+/* Portal publico do fornecedor permanece fora do Layout autenticado. */
+.cotacao-publica-page {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+.cotacao-publica-page .cotacao-publica-shell {
+  width: min(100%, 82rem);
+  min-width: 0;
+  margin-inline: auto;
+}
+
+.cotacao-publica-page :is(.cotacao-publica-context, .cotacao-publica-summary-grid, .cotacao-publica-table-shell, .sol-surface-card) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+@container compras-page (max-width: 68rem) {
+  .compras-responsive-scope .app-toolbar-card {
+    align-items: flex-start;
+  }
+
+  .compras-responsive-scope .app-page-header-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compras-responsive-scope .app-page-actions {
+    justify-content: flex-start;
+  }
+
+  .compras-responsive-scope .app-summary-grid,
+  .compras-responsive-scope .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compras-responsive-scope .compras-table-wrapper::after,
+  .compras-responsive-scope .compras-responsive-table::after,
+  .compras-responsive-scope .sol-table-wrapper::after {
+    display: block;
+  }
+}
+
+@media (max-width: 1180px) and (min-width: 768px) {
+  .compras-responsive-scope .topbar-status-chip {
+    display: none;
+  }
+
+  .compras-responsive-scope .topbar-tray {
+    gap: 0.4rem;
+  }
+
+  .compras-responsive-scope .theme-toggle {
+    min-width: 2.45rem;
+    padding-inline: 0.65rem;
+  }
+}
+
+@media (max-width: 767px) {
+  .compras-responsive-scope {
+    padding: 0.7rem 0.65rem 1.1rem;
+  }
+
+  .compras-responsive-scope .topbar-shell {
+    top: 0.55rem;
+    flex-wrap: nowrap;
+    gap: 0.55rem;
+    padding: 0.68rem;
+    border-radius: 0.78rem;
+  }
+
+  .compras-responsive-scope .topbar-leading {
+    flex: 1 1 auto;
+    overflow: hidden;
+  }
+
+  .compras-responsive-scope .topbar-context {
+    overflow: hidden;
+  }
+
+  .compras-responsive-scope .topbar-breadcrumb {
+    max-width: 100%;
+    margin-bottom: 0.15rem;
+    overflow: hidden;
+    font-size: 0.58rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .compras-responsive-scope .topbar-title {
+    font-size: 1rem;
+  }
+
+  .compras-responsive-scope :is(.topbar-subtitle, .topbar-status-chip) {
+    display: none;
+  }
+
+  .compras-responsive-scope .topbar-tray {
+    width: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  .compras-responsive-scope .topbar-tray :is(.topbar-support-btn, .topbar-chat-btn) {
+    display: none;
+  }
+
+  .compras-responsive-scope .theme-toggle,
+  .compras-responsive-scope .topbar-menu-button {
+    width: 2.35rem;
+    min-width: 2.35rem;
+    height: 2.35rem;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .compras-responsive-scope .page {
+    gap: 0.7rem;
+  }
+
+  .compras-responsive-scope :is(.card, .sol-surface-card) {
+    padding: 0.72rem;
+    border-radius: 0.7rem;
+  }
+
+  .compras-responsive-scope .app-toolbar-card {
+    display: grid;
+  }
+
+  .compras-responsive-scope .app-toolbar-card .app-page-actions,
+  .compras-responsive-scope .solicitacoes-toolbar .app-page-actions {
+    width: 100%;
+  }
+
+  .compras-responsive-scope .app-toolbar-card .app-page-actions > .btn,
+  .compras-responsive-scope .solicitacoes-toolbar .app-page-actions > .btn {
+    flex: 1 1 calc(50% - 0.35rem);
+  }
+
+  .compras-responsive-scope :is(.sol-filtros-head, .compras-filter-heading) {
+    margin-bottom: 0;
+  }
+
+  .compras-responsive-scope .compras-mobile-filter-toggle {
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+
+  .compras-responsive-scope .compras-filter-content {
+    display: none;
+    margin-top: 0.75rem;
+  }
+
+  .compras-responsive-scope .compras-filter-content.is-open {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .compras-responsive-scope .compras-filter-content > :is(.sol-filtros-grid, .app-filters-grid) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compras-responsive-scope .compras-filter-content > .app-page-actions {
+    width: 100%;
+  }
+
+  .compras-responsive-scope .compras-filter-content > .app-page-actions .btn {
+    flex: 1 1 calc(50% - 0.3rem);
+  }
+
+  .compras-responsive-scope .app-summary-grid,
+  .compras-responsive-scope .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .compras-responsive-scope :is(.app-summary-card, .dashboard-metric-card) {
+    min-height: 4.75rem;
+    padding: 0.65rem;
+  }
+
+  .compras-responsive-scope .compras-adaptive-list .compras-table-wrapper,
+  .compras-responsive-scope .compras-adaptive-list .compras-responsive-table,
+  .compras-responsive-scope .compras-adaptive-list .app-table-shell {
+    display: none;
+  }
+
+  .compras-responsive-scope .compras-adaptive-list .compras-mobile-list {
+    display: grid;
+    gap: 0.55rem;
+  }
+
+  .compras-responsive-scope [class*="min-w-["] {
+    min-width: 0 !important;
+  }
+
+  .compras-responsive-scope [class*="max-w-["] {
+    max-width: 100% !important;
+  }
+
+  .compras-responsive-scope .modal-overlay {
+    align-items: stretch;
+  }
+
+  .compras-responsive-scope .modal-dialog {
+    width: 100%;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .compras-responsive-scope .modal-footer {
+    padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  }
+
+  .compras-responsive-scope [class~="fixed"][class~="inset-0"]:has(> .card) {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+
+  .compras-responsive-scope [class~="fixed"][class~="inset-0"] > .card {
+    width: 100% !important;
+    height: 100dvh;
+    max-width: none !important;
+    max-height: none !important;
+    overflow-y: auto;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .compras-responsive-scope [class~="fixed"][class~="inset-0"] > [class*="max-w-"] {
+    width: 100% !important;
+    min-height: 100dvh;
+    max-width: none !important;
+    max-height: 100dvh;
+    margin: 0 !important;
+    overflow-y: auto;
+    border-radius: 0 !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .compras-responsive-scope {
+    padding-inline: 0.5rem;
+  }
+
+  .compras-responsive-scope .topbar-shell {
+    padding-inline: 0.55rem;
+  }
+
+  .compras-responsive-scope .notification-trigger {
+    width: 2.25rem;
+    min-width: 2.25rem;
+  }
+
+  .compras-responsive-scope .compras-mobile-record-grid {
+    gap: 0.52rem;
+  }
+
+  .compras-responsive-scope .btn {
+    min-height: 2.5rem;
+  }
+
+  .cotacao-publica-page {
+    padding: 0.55rem !important;
+  }
+
+  .cotacao-publica-page :is(.cotacao-publica-context, .sol-surface-card) {
+    padding: 0.72rem;
+    border-radius: 0.7rem;
+  }
+
+  .cotacao-publica-page .cotacao-publica-summary-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compras-responsive-scope *,
+  .compras-responsive-scope *::before,
+  .compras-responsive-scope *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}

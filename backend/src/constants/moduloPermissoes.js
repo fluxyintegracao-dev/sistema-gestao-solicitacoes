@@ -233,6 +233,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.cotacoes.cancelar', label: 'Cancelar cotacao', descricao: 'Cancelar uma cotacao aberta, com ou sem respostas, mantendo a auditoria.' },
           { key: 'compras.cotacoes.fechar_parcial', label: 'Fechar parcialmente', descricao: 'Gerar pedidos dos itens selecionados e manter o saldo da cotacao aberto.' },
           { key: 'compras.cotacoes.encerrar', label: 'Encerrar cotacao', descricao: 'Gerar os pedidos finais e encerrar definitivamente a cotacao.' },
+          { key: 'compras.cotacoes.encerrar_sem_pedido', label: 'Encerrar sem pedido', descricao: 'Encerrar definitivamente a cotacao descartando o saldo restante sem gerar novos pedidos.' },
           { key: 'compras.cotacoes.reabrir', label: 'Reabrir cotacao', descricao: 'Reabrir cotacao respondida para novo envio com justificativa.' }
         ]
       },
@@ -786,6 +787,16 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'sst.esocial.assinar_xml', label: 'Assinar XML eSocial', descricao: 'Assinar XML com certificado A1 quando flags e dependencias estiverem habilitadas.' },
           { key: 'sst.esocial.enviar_restrita', label: 'Enviar producao restrita', descricao: 'Enviar lote ao ambiente de producao restrita, com producao oficial bloqueada.' },
           { key: 'sst.esocial.consultar_retorno', label: 'Consultar retorno eSocial', descricao: 'Consultar protocolo, recibo e rejeicoes do ambiente restrito.' }
+        ]
+      },
+      {
+        key: 'sst.ltcat',
+        label: 'LTCAT e Avaliacoes Quantitativas',
+        permissoes: [
+          { key: 'sst.ltcat.visualizar', label: 'Visualizar LTCAT', descricao: 'Consultar laudos tecnicos das condicoes ambientais de trabalho.' },
+          { key: 'sst.ltcat.gerenciar', label: 'Gerenciar LTCAT', descricao: 'Criar e atualizar laudos tecnicos das condicoes ambientais de trabalho.' },
+          { key: 'sst.avaliacoes_quantitativas.visualizar', label: 'Visualizar avaliacoes quantitativas', descricao: 'Consultar medicoes e avaliacoes quantitativas vinculadas ao LTCAT.' },
+          { key: 'sst.avaliacoes_quantitativas.gerenciar', label: 'Gerenciar avaliacoes quantitativas', descricao: 'Criar e atualizar medicoes e avaliacoes quantitativas vinculadas ao LTCAT.' }
         ]
       },
       {

@@ -90,6 +90,7 @@ export default function SolicitacoesCompra() {
   const [obraId, setObraId] = useState('');
   const [status, setStatus] = useState('');
   const [busca, setBusca] = useState('');
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [selecionadas, setSelecionadas] = useState([]);
   const podeInativar = canDeleteCompraSolicitacoes(user);
   const podeEncaminharCompras = canEncaminharCompraSolicitacoes(user);
@@ -329,46 +330,56 @@ export default function SolicitacoesCompra() {
               <span className="sol-filtros-soma-label">Total listado</span>
               <strong className="sol-filtros-soma-value">{solicitacoesFiltradas.length}</strong>
             </div>
+            <button
+              type="button"
+              className="btn btn-outline compras-mobile-filter-toggle"
+              aria-expanded={filtrosVisiveis}
+              onClick={() => setFiltrosVisiveis((atual) => !atual)}
+            >
+              {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
+            </button>
           </div>
         </div>
 
-        <div className="sol-filtros-grid">
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Obra</span>
-            <select className="input" value={obraId} onChange={(event) => setObraId(event.target.value)}>
-              <option value="">Todas</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.codigo ? `${obra.codigo} - ` : ''}
-                  {obra.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
+          <div className="sol-filtros-grid">
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Obra</span>
+              <select className="input" value={obraId} onChange={(event) => setObraId(event.target.value)}>
+                <option value="">Todas</option>
+                {obras.map((obra) => (
+                  <option key={obra.id} value={obra.id}>
+                    {obra.codigo ? `${obra.codigo} - ` : ''}
+                    {obra.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Status</span>
-            <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="">Todos</option>
-              <option value="ENVIADO">Enviado</option>
-              <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
-              <option value="ENCERRADO">Encerrado</option>
-            </select>
-          </label>
+            <label className="sol-filter-field">
+              <span className="sol-filter-label">Status</span>
+              <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="">Todos</option>
+                <option value="ENVIADO">Enviado</option>
+                <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
+                <option value="ENCERRADO">Encerrado</option>
+              </select>
+            </label>
 
-          <label className="sol-filter-field md:col-span-2">
-            <span className="sol-filter-label">Busca</span>
-            <input
-              className="input"
-              placeholder="Codigo, obra ou solicitante"
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-            />
-          </label>
+            <label className="sol-filter-field md:col-span-2">
+              <span className="sol-filter-label">Busca</span>
+              <input
+                className="input"
+                placeholder="Codigo, obra ou solicitante"
+                value={busca}
+                onChange={(event) => setBusca(event.target.value)}
+              />
+            </label>
+          </div>
         </div>
       </div>
 
-      <div className="card sol-surface-card compras-table-card">
+      <div className="card sol-surface-card compras-table-card compras-adaptive-list">
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : solicitacoesFiltradas.length === 0 ? (
@@ -489,6 +500,62 @@ export default function SolicitacoesCompra() {
             </ResizableTable>
           </div>
         )}
+        {!loading && solicitacoesFiltradas.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Solicitacoes de compra">
+            {solicitacoesFiltradas.map((solicitacao) => {
+              const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
+              const totalItens = (solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0);
+
+              return (
+                <article key={`mobile-${solicitacao.id}`} className="compras-mobile-record">
+                  <div className="compras-mobile-record-head">
+                    <div className="compras-mobile-record-title">
+                      <strong>{codigo}</strong>
+                      <span>{solicitacao.obra?.nome || '-'}</span>
+                    </div>
+                    <span className={classNameStatus(solicitacao.status)}>{formatarStatus(solicitacao.status)}</span>
+                  </div>
+                  <div className="compras-mobile-record-grid">
+                    <div className="compras-mobile-field"><span>Codigo da obra</span><strong>{solicitacao.obra?.codigo || '-'}</strong></div>
+                    <div className="compras-mobile-field"><span>Solicitante</span><strong>{solicitacao.solicitante?.nome || '-'}</strong></div>
+                    <div className="compras-mobile-field"><span>Itens</span><strong>{totalItens}</strong></div>
+                    <div className="compras-mobile-field"><span>Fornecedores</span><strong>{solicitacao.fornecedores?.length || 0}</strong></div>
+                    <div className="compras-mobile-field"><span>Necessario para</span><strong>{formatarData(solicitacao.necessario_para)}</strong></div>
+                    <div className="compras-mobile-field"><span>Criada em</span><strong>{formatarData(solicitacao.createdAt)}</strong></div>
+                  </div>
+                  <div className="compras-mobile-record-actions">
+                    {podeSelecionar ? (
+                      <label className="btn btn-outline">
+                        <input
+                          type="checkbox"
+                          checked={selecionadas.includes(Number(solicitacao.id))}
+                          onChange={() => toggleSelecionada(solicitacao.id)}
+                        />
+                        Selecionar
+                      </label>
+                    ) : null}
+                    <button type="button" className="btn btn-primary" onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}>
+                      Abrir detalhes
+                    </button>
+                    <button type="button" className="btn btn-outline" onClick={() => handleBaixarPdf(solicitacao.id)}>
+                      Baixar PDF
+                    </button>
+                    {podeEncaminharCompras ? (
+                      <button type="button" className="btn btn-outline" onClick={() => handleEncaminharCompras([solicitacao.id])} disabled={encaminhando}>
+                        Enviar para Compras
+                      </button>
+                    ) : null}
+                    {podeInativar ? (
+                      <button type="button" className="btn btn-danger" onClick={() => handleInativar([solicitacao.id])} disabled={inativando}>
+                        Inativar
+                      </button>
+                    ) : null}
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );

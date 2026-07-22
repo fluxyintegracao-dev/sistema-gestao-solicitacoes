@@ -108,8 +108,47 @@ import {
   isBusinessAdmin,
   isSuperadmin
 } from '../utils/acessoProduto';
+import {
+  SST_NAV,
+  SST_SIMPLIFIED_MODE
+} from '../modules/sst/constants/sstResources';
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
+
+const SST_SIMPLIFIED_ICONS = {
+  pgr: HiOutlineExclamationTriangle,
+  pcmso: HiOutlineClipboardDocumentCheck,
+  aso: HiOutlineClipboardDocumentCheck,
+  exames: HiOutlineDocumentText,
+  epi: HiOutlineShieldCheck,
+  treinamentos: HiOutlineUsers,
+  documentos: HiOutlineFolderOpen,
+  ltcat: HiOutlineBuildingOffice2,
+  avaliacoes_quantitativas: HiOutlineAdjustmentsHorizontal
+};
+
+const COMPRAS_RESPONSIVE_ROUTES = [
+  '/solicitacoes-compra',
+  '/solicitacoes-compra-direta',
+  '/pedidos-compra',
+  '/compras/delegacao',
+  '/compras/relatorios',
+  '/relatorios/administrativos',
+  '/gestao-apropriacoes',
+  '/gestao-insumos',
+  '/gestao-unidades',
+  '/gestao-categorias',
+  '/gestao-fornecedores',
+  '/cotacoes',
+  '/configuracoes-cotacao',
+  '/configuracoes-status-pedidos-compra'
+];
+
+function isComprasResponsiveRoute(pathname = '') {
+  return COMPRAS_RESPONSIVE_ROUTES.some((route) => (
+    pathname === route || pathname.startsWith(`${route}/`)
+  ));
+}
 
 export default function Layout() {
   const { user, logout } = useContext(AuthContext);
@@ -132,6 +171,7 @@ export default function Layout() {
   });
   const [suporteWhatsappUrl, setSuporteWhatsappUrl] = useState(null);
   const nativeApp = isNativeApp();
+  const comprasResponsiveRoute = isComprasResponsiveRoute(location.pathname);
 
   const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
 
@@ -517,7 +557,17 @@ export default function Layout() {
       ]);
     }
 
-    if (sstAccess) {
+    if (sstAccess && SST_SIMPLIFIED_MODE) {
+      addGroup('SST', SST_NAV.map(([resource, label]) => (
+        canViewSstArea(user, resource)
+          ? item(
+            `/sst/${resource}`,
+            label,
+            SST_SIMPLIFIED_ICONS[resource] || HiOutlineShieldCheck
+          )
+          : null
+      )));
+    } else if (sstAccess) {
       addGroup('SST', [
         sstDashboardAccess ? item('/sst', 'Dashboard SST', HiOutlineShieldCheck) : null,
         sstDashboardAccess ? item('/sst/relatorios/centro-operacional', 'Centro Operacional SST', HiOutlineSquares2X2) : null,
@@ -884,7 +934,7 @@ export default function Layout() {
         )}
 
         <main className={`layout-main flex-1 min-w-0 transition-colors duration-200 ${nativeApp ? 'layout-main-native' : ''}`}>
-          <div className="layout-content-shell">
+          <div className={`layout-content-shell ${comprasResponsiveRoute ? 'compras-responsive-scope' : ''}`}>
             <header className={`topbar-shell ${nativeApp ? 'topbar-shell-native' : ''}`}>
               <div className="topbar-leading">
                 <button

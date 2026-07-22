@@ -44,6 +44,25 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(14, 3),
         allowNull: true
       },
+      quantidade_disponivel: {
+        type: DataTypes.DECIMAL(14, 3),
+        allowNull: true
+      },
+      ipi_valor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      icms_valor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      st_valor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
       status_disponibilidade: {
         type: DataTypes.STRING(20),
         allowNull: true

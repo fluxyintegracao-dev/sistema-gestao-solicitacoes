@@ -1,3 +1,21 @@
+export const SST_SIMPLIFIED_MODE = import.meta.env.VITE_SST_SIMPLIFIED_MODE !== 'false';
+
+export const SST_SIMPLIFIED_RESOURCES = new Set([
+  'pgr',
+  'pcmso',
+  'aso',
+  'exames',
+  'epi',
+  'treinamentos',
+  'documentos',
+  'ltcat',
+  'avaliacoes_quantitativas'
+]);
+
+export const isSstResourceVisible = (resource) => (
+  !SST_SIMPLIFIED_MODE || SST_SIMPLIFIED_RESOURCES.has(String(resource || '').toLowerCase())
+);
+
 export const SST_RESOURCES = {
   riscos: {
     title: 'Riscos ocupacionais',
@@ -580,6 +598,47 @@ export const SST_RESOURCES = {
     ],
     columns: ['medico_responsavel', 'crm', 'vigencia_inicio', 'vigencia_fim', 'status']
   },
+  ltcat: {
+    title: 'LTCAT',
+    subtitle: 'Laudo Tecnico das Condicoes Ambientais do Trabalho.',
+    area: 'ltcat',
+    fields: [
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'codigo', label: 'Codigo' },
+      { key: 'titulo', label: 'Titulo', required: true },
+      { key: 'data_emissao', label: 'Emissao', type: 'date' },
+      { key: 'vigencia_inicio', label: 'Inicio', type: 'date' },
+      { key: 'vigencia_fim', label: 'Fim', type: 'date' },
+      { key: 'status', label: 'Status', options: ['RASCUNHO', 'ATIVO', 'VENCIDO', 'SUBSTITUIDO'] },
+      { key: 'responsavel_tecnico', label: 'Responsavel tecnico' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['codigo', 'titulo', 'data_emissao', 'vigencia_fim', 'status', 'responsavel_tecnico']
+  },
+  avaliacoes_quantitativas: {
+    title: 'Avaliacoes quantitativas',
+    subtitle: 'Medicoes ambientais vinculadas ao LTCAT.',
+    area: 'ltcat',
+    fields: [
+      { key: 'ltcat_id', label: 'LTCAT', type: 'selectRef', ref: 'ltcats', required: true },
+      { key: 'empresa_id', label: 'Empresa', type: 'selectRef', ref: 'empresas', required: true },
+      { key: 'obra_id', label: 'Obra/Centro', type: 'selectRef', ref: 'obras' },
+      { key: 'colaborador_id', label: 'Colaborador', type: 'selectRef', ref: 'colaboradores' },
+      { key: 'ambiente', label: 'Ambiente', required: true },
+      { key: 'agente', label: 'Agente', required: true },
+      { key: 'tipo_agente', label: 'Tipo do agente' },
+      { key: 'metodologia', label: 'Metodologia' },
+      { key: 'unidade_medida', label: 'Unidade de medida' },
+      { key: 'valor_medido', label: 'Valor medido', type: 'number' },
+      { key: 'limite_tolerancia', label: 'Limite de tolerancia', type: 'number' },
+      { key: 'nivel_acao', label: 'Nivel de acao', type: 'number' },
+      { key: 'resultado', label: 'Resultado' },
+      { key: 'data_avaliacao', label: 'Data da avaliacao', type: 'date' },
+      { key: 'observacoes', label: 'Observacoes', type: 'textarea' }
+    ],
+    columns: ['ltcat.titulo', 'ambiente', 'agente', 'valor_medido', 'unidade_medida', 'resultado', 'data_avaliacao']
+  },
   esocial: {
     title: 'Eventos eSocial SST',
     subtitle: 'Preparacao futura dos eventos S-2210, S-2220 e S-2240.',
@@ -612,13 +671,15 @@ export const SST_RESOURCES = {
   }
 };
 
-export const SST_NAV = [
+const SST_NAV_ALL = [
   ['riscos', 'Riscos'],
   ['agentes', 'Agentes'],
   ['ambientes', 'Ambientes'],
   ['exposicoes', 'Exposições'],
   ['pgr', 'PGR'],
   ['pcmso', 'PCMSO'],
+  ['ltcat', 'LTCAT'],
+  ['avaliacoes_quantitativas', 'Avaliacoes quantitativas'],
   ['aso', 'ASO'],
   ['exames', 'Exames'],
   ['epi', 'EPI'],
@@ -656,3 +717,7 @@ export const SST_NAV = [
   ['esocial', 'eSocial'],
   ['eventos', 'Eventos']
 ];
+
+export const SST_NAV = SST_SIMPLIFIED_MODE
+  ? SST_NAV_ALL.filter(([resource]) => SST_SIMPLIFIED_RESOURCES.has(resource))
+  : SST_NAV_ALL;

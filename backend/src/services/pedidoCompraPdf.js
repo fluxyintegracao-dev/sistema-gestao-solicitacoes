@@ -520,7 +520,9 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   const wC5  = Math.floor(tableW * 0.16);
   const wC6  = tableW - wC1 - wC2 - wC3 - wC4 - wC5;
   const atingiuColor = pedido?.atingiu_pedido_minimo ? '#15803d' : '#b45309';
-  const prazoEntrega = pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega || '-';
+  const prazoEntrega = pedido?.prazo_entrega_dias
+    ? `${pedido.prazo_entrega_dias} ${pedido.prazo_entrega_tipo === 'DIAS_UTEIS' ? 'dias uteis' : 'dias corridos'}`
+    : (pedido?.cotacaoFornecedor?.prazo_entrega || pedido?.prazo_entrega || '-');
 
   cell(tableX,                      wC1, r3y, rowH, 'Contato',      pedido?.fornecedor?.contato);
   cell(tableX + wC1,                wC2, r3y, rowH, 'WhatsApp',     pedido?.fornecedor?.whatsapp);
@@ -533,13 +535,28 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
     { bold: true, color: atingiuColor, drawRight: false });
   y += rowH;
 
-  // Linha 4: informacoes fiscais da obra
+  // Linha 4: composicao gerencial do custo da cotacao
   rowDivider(y);
   const r4y = y;
+  const wCost = Math.floor(tableW / 5);
+  const wCostLast = tableW - wCost * 4;
+  const freteDescricao = pedido?.frete_tipo_cotacao === 'TERCEIRO'
+    ? `Terceiro ${formatMoney(pedido?.frete_valor_cotacao)}`
+    : (pedido?.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido' : 'Sem frete');
+  cell(tableX, wCost, r4y, rowH, 'Mercadorias', formatMoney(pedido?.valor_mercadorias));
+  cell(tableX + wCost, wCost, r4y, rowH, 'IPI + ICMS + ST', formatMoney(pedido?.valor_tributos));
+  cell(tableX + wCost * 2, wCost, r4y, rowH, 'DIFAL rateado', formatMoney(pedido?.difal_total));
+  cell(tableX + wCost * 3, wCost, r4y, rowH, 'Desconto', formatMoney(pedido?.desconto_total));
+  cell(tableX + wCost * 4, wCostLast, r4y, rowH, 'Frete cotado', freteDescricao, { drawRight: false });
+  y += rowH;
+
+  // Linha 5: informacoes fiscais da obra
+  rowDivider(y);
+  const r5y = y;
   cell(
     tableX,
     tableW,
-    r4y,
+    r5y,
     rowH,
     'Informacoes para adicionar na Nota Fiscal',
     buildNotaFiscalInfo(pedido),

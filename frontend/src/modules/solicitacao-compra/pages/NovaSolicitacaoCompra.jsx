@@ -1695,7 +1695,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
       {modalApropriacaoIndex !== null && itemModalAtual && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
-          <div className="card max-h-[94vh] w-full max-w-[920px] overflow-y-auto">
+          <div className="card compras-apropriacao-modal flex max-h-[94vh] w-full flex-col overflow-y-auto">
             <div className="card-header flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="font-semibold">Apropriar item</h2>
@@ -1706,7 +1706,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
               <button type="button" className="btn btn-outline" onClick={fecharModalApropriacao}>Fechar</button>
             </div>
 
-            <div className="grid gap-4">
+            <div className="flex flex-1 flex-col gap-4">
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3">
                   <div className="text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">Total</div>
@@ -1756,7 +1756,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 ))}
               </div>
 
-              <div className="flex flex-wrap justify-between gap-2">
+              <div className="mt-auto flex flex-wrap justify-between gap-2 pt-4">
                 <button type="button" className="btn btn-outline" onClick={adicionarRateioModal}>
                   Adicionar apropriação
                 </button>

@@ -210,8 +210,11 @@ function gerarModeloCotacaoCsv(solicitacao, itensSelecionados = []) {
     'nome',
     'quantidade',
     'preco',
-    'prazo',
-    'disponivel',
+    'quantidade_disponivel',
+    'valor_total',
+    'ipi_valor',
+    'icms_valor',
+    'st_valor',
     'quantidade_minima_item',
     'valor_minimo_pedido'
   ];
@@ -220,6 +223,9 @@ function gerarModeloCotacaoCsv(solicitacao, itensSelecionados = []) {
       item.produto_id,
       item.nome,
       item.quantidade,
+      '',
+      '',
+      '',
       '',
       '',
       '',
@@ -236,11 +242,12 @@ function gerarModeloCotacaoCsv(solicitacao, itensSelecionados = []) {
 async function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
   const linhas = filtrarItensCotaveisPorSelecao(obterItensCotaveis(solicitacao), itensSelecionados);
   const header = [
-    'PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'PRAZO',
-    'DISPONIVEL', 'QUANTIDADE_MINIMA_ITEM', 'VALOR_MINIMO_PEDIDO'
+    'PRODUTO_ID', 'NOME', 'QUANTIDADE', 'PRECO', 'QUANTIDADE_DISPONIVEL',
+    'VALOR_TOTAL', 'IPI_VALOR', 'ICMS_VALOR', 'ST_VALOR',
+    'QUANTIDADE_MINIMA_ITEM', 'VALOR_MINIMO_PEDIDO'
   ];
   const rows = linhas.map((item) => [
-    item.produto_id, item.nome, item.quantidade, '', '', '', '', ''
+    item.produto_id, item.nome, item.quantidade, '', '', '', '', '', '', '', ''
   ]);
 
   return createWorkbookBuffer([
@@ -249,7 +256,8 @@ async function gerarModeloCotacaoXlsx(solicitacao, itensSelecionados = []) {
       rows: [header, ...rows],
       columns: [
         { wch: 12 }, { wch: 40 }, { wch: 12 }, { wch: 14 },
-        { wch: 16 }, { wch: 14 }, { wch: 22 }, { wch: 22 }
+        { wch: 24 }, { wch: 16 }, { wch: 14 }, { wch: 14 },
+        { wch: 14 }, { wch: 22 }, { wch: 22 }
       ]
     }
   ]);

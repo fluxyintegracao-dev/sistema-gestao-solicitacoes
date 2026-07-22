@@ -380,7 +380,7 @@ export default function GestaoApropriacoes() {
         </div>
       </div>
 
-      <div className="card">
+      <div className="card compras-adaptive-list">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Apropriacoes cadastradas</h2>
           <div className="flex gap-2">
@@ -455,6 +455,34 @@ export default function GestaoApropriacoes() {
           </table>
           </div>
         )}
+        {obraSelecionada && !loading && apropriacoes.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Apropriacoes cadastradas">
+            {apropriacoes.map((item) => (
+              <article key={`mobile-${item.id}`} className="compras-mobile-record">
+                <div className="compras-mobile-record-head">
+                  <div className="compras-mobile-record-title">
+                    <strong>{item.codigo}</strong>
+                    <span>{item.descricao || 'Sem descricao'}</span>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={selecionados.includes(item.id)}
+                    onChange={() => toggleSelecionado(item.id)}
+                    aria-label={`Selecionar apropriacao ${item.codigo}`}
+                  />
+                </div>
+                <div className="compras-mobile-record-grid">
+                  <div className="compras-mobile-field"><span>Tipo</span><strong>{item.somadora ? 'Somadora' : 'Analitica'}</strong></div>
+                  <div className="compras-mobile-field"><span>Apropriacao pai</span><strong>{item.apropriacao_pai?.codigo || '-'}</strong></div>
+                </div>
+                <div className="compras-mobile-record-actions">
+                  <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>Editar</button>
+                  <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>Excluir</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
     </div>
   );

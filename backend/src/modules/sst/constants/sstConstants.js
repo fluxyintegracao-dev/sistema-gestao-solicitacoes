@@ -109,6 +109,44 @@ const SST_RESOURCE_CONFIG = {
     ],
     requiredFields: ['empresa_id', 'medico_responsavel']
   },
+  ltcat: {
+    modelName: 'SstLtcat',
+    tableName: 'sst_ltcats',
+    area: 'ltcat',
+    label: 'LTCAT',
+    listOrder: [['data_emissao', 'DESC']],
+    createFields: [
+      'empresa_id', 'obra_id', 'codigo', 'titulo', 'data_emissao',
+      'vigencia_inicio', 'vigencia_fim', 'status', 'responsavel_tecnico',
+      'observacoes', 'documento_url', 'ativo'
+    ],
+    updateFields: [
+      'empresa_id', 'obra_id', 'codigo', 'titulo', 'data_emissao',
+      'vigencia_inicio', 'vigencia_fim', 'status', 'responsavel_tecnico',
+      'observacoes', 'documento_url', 'ativo'
+    ],
+    requiredFields: ['empresa_id', 'titulo']
+  },
+  avaliacoes_quantitativas: {
+    modelName: 'SstLtcatAvaliacao',
+    tableName: 'sst_ltcat_avaliacoes',
+    area: 'ltcat',
+    label: 'Avaliacao quantitativa',
+    listOrder: [['data_avaliacao', 'DESC']],
+    createFields: [
+      'ltcat_id', 'empresa_id', 'obra_id', 'colaborador_id', 'ambiente',
+      'agente', 'tipo_agente', 'metodologia', 'unidade_medida', 'valor_medido',
+      'limite_tolerancia', 'nivel_acao', 'resultado', 'data_avaliacao',
+      'observacoes', 'ativo'
+    ],
+    updateFields: [
+      'ltcat_id', 'empresa_id', 'obra_id', 'colaborador_id', 'ambiente',
+      'agente', 'tipo_agente', 'metodologia', 'unidade_medida', 'valor_medido',
+      'limite_tolerancia', 'nivel_acao', 'resultado', 'data_avaliacao',
+      'observacoes', 'ativo'
+    ],
+    requiredFields: ['ltcat_id', 'empresa_id', 'ambiente', 'agente']
+  },
   aso: {
     modelName: 'SstAso',
     tableName: 'sst_aso',

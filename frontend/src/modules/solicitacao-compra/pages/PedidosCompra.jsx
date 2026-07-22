@@ -56,6 +56,7 @@ export default function PedidosCompra() {
   const [obras, setObras] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [filtros, setFiltros] = useState({
     q: '',
     status: '',
@@ -118,65 +119,75 @@ export default function PedidosCompra() {
               Busque por fornecedor, obra, numero do pedido ou status da negociacao.
             </p>
           </div>
-        </div>
-
-        <div className="app-filters-grid">
-          <label className="app-filter-field">
-            <span className="app-filter-label">Busca geral</span>
-            <input
-              className="input"
-              placeholder="Fornecedor, obra ou pedido"
-              value={filtros.q}
-              onChange={(event) => setFiltros((atual) => ({ ...atual, q: event.target.value }))}
-            />
-          </label>
-
-          <label className="app-filter-field">
-            <span className="app-filter-label">Status</span>
-            <select
-              className="input"
-              value={filtros.status}
-              onChange={(event) => setFiltros((atual) => ({ ...atual, status: event.target.value }))}
-            >
-              <option value="">Todos os status</option>
-              {statusOptions
-                .filter((item) => item?.ativo !== false)
-                .map((status) => (
-                  <option key={status.codigo} value={status.codigo}>
-                    {status.nome}
-                  </option>
-                ))}
-            </select>
-          </label>
-
-          <label className="app-filter-field">
-            <span className="app-filter-label">Obra</span>
-            <select
-              className="input"
-              value={filtros.obra_id}
-              onChange={(event) => setFiltros((atual) => ({ ...atual, obra_id: event.target.value }))}
-            >
-              <option value="">Todas as obras</option>
-              {obras.map((obra) => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <div className="app-page-actions justify-end">
           <button
             type="button"
-            className="btn btn-outline"
-            onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
+            className="btn btn-outline compras-mobile-filter-toggle"
+            aria-expanded={filtrosVisiveis}
+            onClick={() => setFiltrosVisiveis((atual) => !atual)}
           >
-            Limpar filtros
+            {filtrosVisiveis ? 'Ocultar filtros' : 'Exibir filtros'}
           </button>
-          <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
-            {loading ? 'Buscando...' : 'Buscar'}
-          </button>
+        </div>
+
+        <div className={`compras-filter-content ${filtrosVisiveis ? 'is-open' : ''}`}>
+          <div className="app-filters-grid">
+            <label className="app-filter-field">
+              <span className="app-filter-label">Busca geral</span>
+              <input
+                className="input"
+                placeholder="Fornecedor, obra ou pedido"
+                value={filtros.q}
+                onChange={(event) => setFiltros((atual) => ({ ...atual, q: event.target.value }))}
+              />
+            </label>
+
+            <label className="app-filter-field">
+              <span className="app-filter-label">Status</span>
+              <select
+                className="input"
+                value={filtros.status}
+                onChange={(event) => setFiltros((atual) => ({ ...atual, status: event.target.value }))}
+              >
+                <option value="">Todos os status</option>
+                {statusOptions
+                  .filter((item) => item?.ativo !== false)
+                  .map((status) => (
+                    <option key={status.codigo} value={status.codigo}>
+                      {status.nome}
+                    </option>
+                  ))}
+              </select>
+            </label>
+
+            <label className="app-filter-field">
+              <span className="app-filter-label">Obra</span>
+              <select
+                className="input"
+                value={filtros.obra_id}
+                onChange={(event) => setFiltros((atual) => ({ ...atual, obra_id: event.target.value }))}
+              >
+                <option value="">Todas as obras</option>
+                {obras.map((obra) => (
+                  <option key={obra.id} value={obra.id}>
+                    {obra.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <div className="app-page-actions justify-end">
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setFiltros({ q: '', status: '', obra_id: '' })}
+            >
+              Limpar filtros
+            </button>
+            <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
+              {loading ? 'Buscando...' : 'Buscar'}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -191,7 +202,7 @@ export default function PedidosCompra() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card compras-table-card">
+      <div className="mt-4 card sol-surface-card compras-table-card compras-adaptive-list">
         <div className="card-header flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Lista de pedidos</h2>
           <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
@@ -271,6 +282,40 @@ export default function PedidosCompra() {
             </table>
           </div>
         )}
+        {!loading && pedidos.length > 0 ? (
+          <div className="compras-mobile-list" aria-label="Pedidos de compra">
+            {pedidos.map((pedido) => {
+              const itensAtivos = (pedido.itens || []).filter((item) => !item.removido).length;
+              const codigoPedido = `PC-${String(pedido.id).padStart(5, '0')}`;
+
+              return (
+                <article key={`mobile-${pedido.id}`} className="compras-mobile-record">
+                  <div className="compras-mobile-record-head">
+                    <div className="compras-mobile-record-title">
+                      <strong>{codigoPedido}</strong>
+                      <span>{pedido.fornecedor?.nome || '-'}</span>
+                    </div>
+                    <span className={statusClass(pedido.status, statusMap)}>
+                      {formatStatusLabel(pedido.status, statusMap)}
+                    </span>
+                  </div>
+                  <div className="compras-mobile-record-grid">
+                    <div className="compras-mobile-field"><span>Obra</span><strong>{pedido.obra?.nome || '-'}</strong></div>
+                    <div className="compras-mobile-field"><span>Solicitacao</span><strong>SC-{String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}</strong></div>
+                    <div className="compras-mobile-field"><span>Itens ativos</span><strong>{itensAtivos}</strong></div>
+                    <div className="compras-mobile-field"><span>Valor total</span><strong>{formatMoney(pedido.valor_total)}</strong></div>
+                    <div className="compras-mobile-field"><span>Pedido minimo</span><strong>{pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}</strong></div>
+                  </div>
+                  <div className="compras-mobile-record-actions">
+                    <button type="button" className="btn btn-outline" onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}>
+                      Abrir pedido
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
       </div>
     </div>
   );

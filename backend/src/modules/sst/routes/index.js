@@ -19,6 +19,7 @@ const {
 } = require('../validators/sstValidators');
 const { validateNumericIdParam } = require('../../../validators/securityValidators');
 const { SST_RESOURCE_CONFIG } = require('../constants/sstConstants');
+const { enforceSstSimplifiedMode } = require('../constants/sstSimplificationPolicy');
 
 const router = express.Router();
 
@@ -73,6 +74,8 @@ router.patch('/configuracoes', (req, res, next) => {
   req.params.resource = 'configuracoes';
   return next();
 }, allowSstResource('MANAGE'), SstController.updateConfig);
+
+router.use(enforceSstSimplifiedMode);
 router.get('/dashboard', allowSstDashboard, validateRequest({ query: validateSstQuery }), SstController.dashboard);
 router.get('/relatorio-operacional', allowSstDashboard, validateRequest({ query: validateSstQuery }), SstController.relatorioOperacional);
 router.get('/conformidade', allowSstDashboard, validateRequest({ query: validateSstQuery }), SstController.conformidade);

@@ -9,6 +9,7 @@ const {
   Obra,
   PedidoCompra,
   SolicitacaoCompra,
+  SolicitacaoCompraAlocacao,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraFornecedorItem,
   SolicitacaoCompraItem,
@@ -32,6 +33,10 @@ const {
   obterItensCotaveisDaCotacao,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
+const {
+  calcularNovaDisponibilidadeLiberada,
+  montarMapaAlocacoesAtivasPorFornecedorItem
+} = require('../services/comprasDisponibilidadeService');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const {
   canReabrirComprasCotacoes,
@@ -166,6 +171,72 @@ function normalizarDescontoTotal(value) {
   }
 
   return Number(normalized.toFixed(2));
+}
+
+function normalizarValorGerencial(value, label) {
+  if (value === '' || value === null || value === undefined) {
+    return 0;
+  }
+  const normalized = normalizarNumeroCotacao(value);
+  if (!Number.isFinite(normalized) || normalized < 0) {
+    throw new Error(`${label} invalido.`);
+  }
+  return Number(normalized.toFixed(2));
+}
+
+function normalizarPrazoEntrega(options = {}, isRascunho = false) {
+  const diasRaw = options.prazo_entrega_dias;
+  const tipoRaw = String(options.prazo_entrega_tipo || '').trim().toUpperCase();
+  const dias = diasRaw === '' || diasRaw === null || diasRaw === undefined
+    ? null
+    : Number(diasRaw);
+
+  if (dias !== null || tipoRaw) {
+    if (!Number.isInteger(dias) || dias <= 0) {
+      if (isRascunho && dias === null) {
+        return { dias: null, tipo: tipoRaw || null, texto: String(options.prazo_entrega || '').trim() || null };
+      }
+      throw new Error('Informe o prazo de entrega em dias inteiros maiores que zero.');
+    }
+    if (!['DIAS_CORRIDOS', 'DIAS_UTEIS'].includes(tipoRaw)) {
+      throw new Error('Selecione se o prazo de entrega considera dias corridos ou uteis.');
+    }
+    return {
+      dias,
+      tipo: tipoRaw,
+      texto: `${dias} ${dias === 1 ? 'dia' : 'dias'} ${tipoRaw === 'DIAS_UTEIS' ? 'uteis' : 'corridos'}`
+    };
+  }
+
+  const legado = String(options.prazo_entrega || '').trim();
+  if (!legado && !isRascunho) {
+    throw new Error('Informe o prazo de entrega.');
+  }
+  return { dias: null, tipo: null, texto: legado || null };
+}
+
+function normalizarFreteCotacao(options = {}, isRascunho = false) {
+  const tipo = String(options.frete_tipo || 'SEM_FRETE').trim().toUpperCase();
+  if (!['SEM_FRETE', 'EMBUTIDO', 'TERCEIRO'].includes(tipo)) {
+    throw new Error('Tipo de frete invalido.');
+  }
+
+  const valor = normalizarValorGerencial(options.frete_valor, 'Valor do frete');
+  const dataVencimento = options.frete_data_vencimento || null;
+  if (!isRascunho && tipo === 'TERCEIRO' && valor <= 0) {
+    throw new Error('Informe o valor do frete pago a terceiro.');
+  }
+  if (!isRascunho && tipo === 'TERCEIRO' && !dataVencimento) {
+    throw new Error('Informe a data para pagamento do frete pago a terceiro.');
+  }
+
+  return {
+    tipo,
+    valor: tipo === 'SEM_FRETE' ? 0 : valor,
+    dataVencimento: tipo === 'TERCEIRO' ? dataVencimento : null,
+    transportadorNome: String(options.frete_transportador_nome || '').trim() || null,
+    transportadorCpfCnpj: String(options.frete_transportador_cpf_cnpj || '').replace(/\D/g, '').slice(0, 30) || null
+  };
 }
 
 function normalizarNumeroCotacao(value) {
@@ -337,8 +408,16 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       visualizado_em: cotacaoFornecedor?.visualizado_em,
       respondido_em: cotacaoFornecedor?.respondido_em,
       prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
+      prazo_entrega_dias: cotacaoFornecedor?.prazo_entrega_dias ?? '',
+      prazo_entrega_tipo: cotacaoFornecedor?.prazo_entrega_tipo || '',
       valor_minimo_pedido: cotacaoFornecedor?.valor_minimo_pedido ?? '',
       desconto_total: cotacaoFornecedor?.desconto_total ?? 0,
+      difal_valor: cotacaoFornecedor?.difal_valor ?? 0,
+      frete_tipo: cotacaoFornecedor?.frete_tipo || 'SEM_FRETE',
+      frete_valor: cotacaoFornecedor?.frete_valor ?? 0,
+      frete_data_vencimento: cotacaoFornecedor?.frete_data_vencimento || '',
+      frete_transportador_nome: cotacaoFornecedor?.frete_transportador_nome || '',
+      frete_transportador_cpf_cnpj: cotacaoFornecedor?.frete_transportador_cpf_cnpj || '',
       condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
       observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
       pdf_resposta_url: arquivoRespostaUrl || null,
@@ -368,6 +447,10 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
         prazo: resposta?.prazo || '',
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? '',
+        quantidade_disponivel: resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : ''),
+        ipi_valor: resposta?.ipi_valor ?? 0,
+        icms_valor: resposta?.icms_valor ?? 0,
+        st_valor: resposta?.st_valor ?? 0,
         resposta_item_id: resposta?.id || null,
         vencedor: Boolean(resposta?.vencedor)
       };
@@ -386,12 +469,12 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   const isRascunho = options.rascunho === true;
   const valorMinimoPedido = normalizarValorMinimoPedido(options.valor_minimo_pedido);
   const descontoTotal = normalizarDescontoTotal(options.desconto_total);
+  const difalValor = normalizarValorGerencial(options.difal_valor, 'DIFAL');
   const condicaoPagamento = isRascunho
     ? String(options.condicao_pagamento || '').trim() || null
     : normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
-  const prazoEntrega = isRascunho
-    ? String(options.prazo_entrega || '').trim() || null
-    : normalizarCampoObrigatorio(options.prazo_entrega, 'o prazo de entrega');
+  const prazoEntrega = normalizarPrazoEntrega(options, isRascunho);
+  const frete = normalizarFreteCotacao(options, isRascunho);
   const observacaoResposta = String(options.observacao_resposta || '').trim() || null;
 
   for (const itemResposta of itensResposta) {
@@ -425,16 +508,29 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     }
 
     const quantidadeMinima = normalizarNumeroCotacao(itemResposta.quantidade_minima_item);
+    const temQuantidadeDisponivel = Object.prototype.hasOwnProperty.call(itemResposta, 'quantidade_disponivel');
+    const quantidadeDisponivelInformada = normalizarNumeroCotacao(itemResposta.quantidade_disponivel);
 
     if (quantidadeMinima !== null && (!Number.isFinite(quantidadeMinima) || quantidadeMinima < 0)) {
       throw new Error(`Quantidade minima invalida para o item ${itemBase.nome}`);
     }
 
+    if (quantidadeDisponivelInformada !== null && (!Number.isFinite(quantidadeDisponivelInformada) || quantidadeDisponivelInformada < 0)) {
+      throw new Error(`Quantidade disponivel invalida para o item ${itemBase.nome}`);
+    }
+
+    const quantidadeDisponivel = temQuantidadeDisponivel
+      ? Number((quantidadeDisponivelInformada || 0).toFixed(3))
+      : (statusDisponibilidade === 'NAO_TEM' ? 0 : Number(Number(itemBase.quantidade || 0).toFixed(3)));
+    const ipiValor = normalizarValorGerencial(itemResposta.ipi_valor, `IPI do item ${itemBase.nome}`);
+    const icmsValor = normalizarValorGerencial(itemResposta.icms_valor, `ICMS do item ${itemBase.nome}`);
+    const stValor = normalizarValorGerencial(itemResposta.st_valor, `ST do item ${itemBase.nome}`);
+
     const statusEfetivo = isRascunho
       ? statusDisponibilidade
       : (
           statusDisponibilidade !== 'NAO_TEM'
-            && (precoNormalizado === null || precoNormalizado <= 0)
+            && ((precoNormalizado === null || precoNormalizado <= 0) || quantidadeDisponivel <= 0)
             ? 'NAO_TEM'
             : statusDisponibilidade
         );
@@ -454,6 +550,10 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       prazo: itemResposta.prazo ? String(itemResposta.prazo).trim() : null,
       observacao: itemResposta.observacao ? String(itemResposta.observacao).trim() : null,
       quantidade_minima_item: disponivel ? quantidadeMinima : null,
+      quantidade_disponivel: disponivel ? quantidadeDisponivel : 0,
+      ipi_valor: disponivel ? ipiValor : 0,
+      icms_valor: disponivel ? icmsValor : 0,
+      st_valor: disponivel ? stValor : 0,
       vencedor: false
     });
   }
@@ -478,10 +578,17 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       throw new Error('Solicitacao de compra nao encontrada.');
     }
 
-    assertSolicitacaoCompraAceitaCotacao(
-      solicitacaoTravada,
-      isRascunho ? 'salvar rascunho' : 'registrar resposta'
-    );
+    const statusSolicitacaoAnterior = normalizeText(solicitacaoTravada.status);
+    const reaberturaControlada = statusSolicitacaoAnterior === 'ENCERRADO'
+      && options.permitir_reabertura_disponibilidade === true
+      && Boolean(usuarioInterno)
+      && !isRascunho;
+    if (!reaberturaControlada) {
+      assertSolicitacaoCompraAceitaCotacao(
+        solicitacaoTravada,
+        isRascunho ? 'salvar rascunho' : 'registrar resposta'
+      );
+    }
     assertCotacaoFornecedorAtiva(
       cotacaoTravada,
       isRascunho ? 'salvar rascunho' : 'registrar resposta'
@@ -504,11 +611,53 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         'prazo',
         'data_chegada',
         'observacao',
-        'quantidade_minima_item'
+        'quantidade_minima_item',
+        'quantidade_disponivel',
+        'ipi_valor',
+        'icms_valor',
+        'st_valor'
       ],
       transaction
     });
     const statusAnteriorCotacao = cotacaoTravada.status;
+    let reaberturaDisponibilidade = null;
+
+    if (reaberturaControlada) {
+      const alocacoesAtivasFornecedor = await SolicitacaoCompraAlocacao.findAll({
+        where: {
+          solicitacao_compra_id: solicitacaoTravada.id,
+          fornecedor_compra_id: cotacaoTravada.fornecedor_compra_id,
+          status: 'ATIVA'
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      const mapaAlocacoes = montarMapaAlocacoesAtivasPorFornecedorItem(alocacoesAtivasFornecedor);
+      const novaDisponibilidade = calcularNovaDisponibilidadeLiberada({
+        fornecedorCompraId: cotacaoTravada.fornecedor_compra_id,
+        respostasAnteriores,
+        respostasNovas: respostasPreparadas,
+        mapaAlocacoesFornecedorItem: mapaAlocacoes
+      });
+      const quantidadeLiberadaTotal = novaDisponibilidade.quantidade_liberada_total;
+      if (quantidadeLiberadaTotal <= 0) {
+        throw Object.assign(
+          new Error('A solicitacao esta encerrada. Para reabrir a cotacao, a edicao deve aumentar a quantidade disponivel de ao menos um item deste fornecedor.'),
+          { statusCode: 409, code: 'COMPRA_REABERTURA_SEM_NOVA_DISPONIBILIDADE' }
+        );
+      }
+
+      reaberturaDisponibilidade = {
+        status_anterior: solicitacaoTravada.status,
+        status_novo: 'FECHAMENTO_PARCIAL',
+        quantidade_liberada_total: quantidadeLiberadaTotal,
+        itens: novaDisponibilidade.itens
+      };
+      await solicitacaoTravada.update(
+        { status: 'FECHAMENTO_PARCIAL', encerrado_em: null },
+        { transaction }
+      );
+    }
 
     await SolicitacaoCompraRespostaItem.update(
       { deleted_at: new Date() },
@@ -528,8 +677,16 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       visualizado_em: cotacaoTravada.visualizado_em || new Date(),
       valor_minimo_pedido: valorMinimoPedido,
       desconto_total: descontoTotal,
+      difal_valor: difalValor,
       condicao_pagamento: condicaoPagamento,
-      prazo_entrega: prazoEntrega,
+      prazo_entrega: prazoEntrega.texto,
+      prazo_entrega_dias: prazoEntrega.dias,
+      prazo_entrega_tipo: prazoEntrega.tipo,
+      frete_tipo: frete.tipo,
+      frete_valor: frete.valor,
+      frete_data_vencimento: frete.dataVencimento,
+      frete_transportador_nome: frete.transportadorNome,
+      frete_transportador_cpf_cnpj: frete.transportadorCpfCnpj,
       observacao_resposta: observacaoResposta
     }, { transaction });
 
@@ -556,11 +713,33 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
         usuario_interno_id: usuarioInterno?.id || null,
         usuario_interno_nome: usuarioInterno?.nome || null,
+        condicao_pagamento: condicaoPagamento,
+        prazo_entrega_dias: prazoEntrega.dias,
+        prazo_entrega_tipo: prazoEntrega.tipo,
+        difal_valor: difalValor,
+        frete_tipo: frete.tipo,
+        frete_valor: frete.valor,
+        frete_data_vencimento: frete.dataVencimento,
+        frete_transportador_nome: frete.transportadorNome,
+        frete_transportador_cpf_cnpj: frete.transportadorCpfCnpj,
         respostas_anteriores: respostasAnteriores.map((item) => item.toJSON()),
-        respostas_novas: respostasPreparadas
+        respostas_novas: respostasPreparadas,
+        reabertura_por_nova_disponibilidade: reaberturaDisponibilidade
       },
       transaction
     });
+
+    if (reaberturaDisponibilidade) {
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacaoTravada.id,
+        usuarioId: usuarioInterno.id,
+        fornecedorCompraId: cotacaoTravada.fornecedor_compra_id,
+        tipoAcao: 'REABERTURA_POR_NOVA_DISPONIBILIDADE',
+        descricao: `Cotacao reaberta apos nova disponibilidade informada para ${cotacaoFornecedor.fornecedor?.nome || cotacaoTravada.fornecedor_compra_id}`,
+        metadados: reaberturaDisponibilidade,
+        transaction
+      });
+    }
 
     await transaction.commit();
   } catch (error) {
@@ -737,12 +916,13 @@ function drawPdfCotacaoTableHeader(doc, y, columns, metrics) {
 
 function measureCotacaoRowHeight(doc, item, columns) {
   const values = [
-    item.nome || '-',
+    `${item.nome || '-'}\nNecessario: ${formatarDataPublica(item.necessario_para)}`,
     formatarQuantidadePublica(item.quantidade, item.unidade),
-    formatarDataPublica(item.necessario_para),
     item.especificacao || '-',
     item.link_produto || item.arquivo_nome_original || '-',
     pdfMoneyPlaceholder(),
+    '',
+    '',
     '',
     '',
     '',
@@ -783,16 +963,17 @@ async function renderPdfCotacaoPublica(doc, cotacaoFornecedor) {
     bottom: doc.page.height - 34
   };
   const columns = [
-    { label: 'ITEM', width: 124 },
-    { label: 'QTD./UN.', width: 52, align: 'center' },
-    { label: 'NECESSARIO', width: 58, align: 'center' },
-    { label: 'ESPECIFICACAO', width: 150 },
-    { label: 'REFERENCIA', width: 104 },
-    { label: 'PRECO UNIT.', width: 56, align: 'center' },
-    { label: 'PRAZO', width: 48, align: 'center' },
-    { label: 'QTD. MIN.', width: 46, align: 'center' },
-    { label: 'DISP.', width: 40, align: 'center' },
-    { label: 'OBS.', width: 102 }
+    { label: 'ITEM', width: 120 },
+    { label: 'QTD. SOL.', width: 45, align: 'center' },
+    { label: 'ESPECIFICACAO', width: 100 },
+    { label: 'REFERENCIA', width: 75 },
+    { label: 'PRECO UNIT.', width: 52, align: 'center' },
+    { label: 'QTD. DISP.', width: 52, align: 'center' },
+    { label: 'TOTAL', width: 58, align: 'center' },
+    { label: 'IPI R$', width: 48, align: 'center' },
+    { label: 'ICMS R$', width: 48, align: 'center' },
+    { label: 'ST R$', width: 48, align: 'center' },
+    { label: 'OBS.', width: 140 }
   ];
 
   let pageNumber = 1;
@@ -810,12 +991,13 @@ async function renderPdfCotacaoPublica(doc, cotacaoFornecedor) {
 
     let x = metrics.left;
     const values = [
-      item.nome || '-',
+      `${item.nome || '-'}\nNecessario: ${formatarDataPublica(item.necessario_para)}`,
       formatarQuantidadePublica(item.quantidade, item.unidade),
-      formatarDataPublica(item.necessario_para),
       item.especificacao || '-',
       item.link_produto || item.arquivo_nome_original || '-',
       pdfMoneyPlaceholder(),
+      '',
+      '',
       '',
       '',
       '',
@@ -1000,6 +1182,14 @@ module.exports = {
         desconto_total: req.body?.desconto_total,
         condicao_pagamento: req.body?.condicao_pagamento,
         prazo_entrega: req.body?.prazo_entrega,
+        prazo_entrega_dias: req.body?.prazo_entrega_dias,
+        prazo_entrega_tipo: req.body?.prazo_entrega_tipo,
+        difal_valor: req.body?.difal_valor,
+        frete_tipo: req.body?.frete_tipo,
+        frete_valor: req.body?.frete_valor,
+        frete_data_vencimento: req.body?.frete_data_vencimento,
+        frete_transportador_nome: req.body?.frete_transportador_nome,
+        frete_transportador_cpf_cnpj: req.body?.frete_transportador_cpf_cnpj,
         observacao_resposta: req.body?.observacao_resposta,
         usuario_interno: usuarioInterno
       });
@@ -1034,6 +1224,14 @@ module.exports = {
         desconto_total: req.body?.desconto_total,
         condicao_pagamento: req.body?.condicao_pagamento,
         prazo_entrega: req.body?.prazo_entrega,
+        prazo_entrega_dias: req.body?.prazo_entrega_dias,
+        prazo_entrega_tipo: req.body?.prazo_entrega_tipo,
+        difal_valor: req.body?.difal_valor,
+        frete_tipo: req.body?.frete_tipo,
+        frete_valor: req.body?.frete_valor,
+        frete_data_vencimento: req.body?.frete_data_vencimento,
+        frete_transportador_nome: req.body?.frete_transportador_nome,
+        frete_transportador_cpf_cnpj: req.body?.frete_transportador_cpf_cnpj,
         observacao_resposta: req.body?.observacao_resposta,
         usuario_interno: usuarioInterno,
         rascunho: true
@@ -1173,7 +1371,10 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada.' });
       }
 
-      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'editar a resposta');
+      const solicitacaoEncerrada = normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO';
+      if (!solicitacaoEncerrada) {
+        assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'editar a resposta');
+      }
       assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'editar a resposta');
 
       await salvarRespostasCotacao(cotacaoFornecedor, req.body.itens, {
@@ -1181,9 +1382,18 @@ module.exports = {
         desconto_total: req.body.desconto_total,
         condicao_pagamento: req.body.condicao_pagamento,
         prazo_entrega: req.body.prazo_entrega,
+        prazo_entrega_dias: req.body.prazo_entrega_dias,
+        prazo_entrega_tipo: req.body.prazo_entrega_tipo,
+        difal_valor: req.body.difal_valor,
+        frete_tipo: req.body.frete_tipo,
+        frete_valor: req.body.frete_valor,
+        frete_data_vencimento: req.body.frete_data_vencimento,
+        frete_transportador_nome: req.body.frete_transportador_nome,
+        frete_transportador_cpf_cnpj: req.body.frete_transportador_cpf_cnpj,
         observacao_resposta: req.body.observacao_resposta,
         usuario_interno: req.user,
-        rascunho: req.body.finalizar === false
+        rascunho: req.body.finalizar === false,
+        permitir_reabertura_disponibilidade: solicitacaoEncerrada
       });
 
       const atualizada = await carregarCotacaoPorToken(cotacaoBase.token);

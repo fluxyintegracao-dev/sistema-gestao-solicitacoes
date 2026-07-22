@@ -15,6 +15,7 @@ import {
   comentarSolicitacaoCompra,
   criarFornecedorCompra,
   encerrarSolicitacaoCompra,
+  encerrarSolicitacaoCompraSemPedido,
   enviarSolicitacaoCompraParaFornecedores,
   listarFornecedoresCompra,
   obterComparativoSolicitacaoCompra,
@@ -30,6 +31,7 @@ import { buscarParceiros, listarCategoriasParceiro } from '../../../services/par
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canEncerrarComprasCotacoes,
+  canEncerrarSemPedidoComprasCotacoes,
   canFecharParcialComprasCotacoes,
   canCancelarComprasCotacoes,
   canOperateComprasCotacoes,
@@ -216,6 +218,14 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
     desconto_total: decimalApiParaInput(cotacaoFornecedor?.desconto_total, 2),
     condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
     prazo_entrega: cotacaoFornecedor?.prazo_entrega || '',
+    prazo_entrega_dias: cotacaoFornecedor?.prazo_entrega_dias || '',
+    prazo_entrega_tipo: cotacaoFornecedor?.prazo_entrega_tipo || 'DIAS_CORRIDOS',
+    difal_valor: decimalApiParaInput(cotacaoFornecedor?.difal_valor, 2),
+    frete_tipo: cotacaoFornecedor?.frete_tipo || 'SEM_FRETE',
+    frete_valor: decimalApiParaInput(cotacaoFornecedor?.frete_valor, 2),
+    frete_data_vencimento: cotacaoFornecedor?.frete_data_vencimento || '',
+    frete_transportador_nome: cotacaoFornecedor?.frete_transportador_nome || '',
+    frete_transportador_cpf_cnpj: cotacaoFornecedor?.frete_transportador_cpf_cnpj || '',
     observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
     itens: itensCotacao.map((item) => {
       const resposta = respostas.get(buildItemKey(item));
@@ -226,31 +236,40 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
         preco: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.preco, 10)),
         quantidade_original: decimalApiParaInput(item.quantidade, 6),
         quantidade_solicitada: decimalApiParaInput(item.quantidade, 6),
-        prazo: resposta?.prazo || '',
         quantidade_minima_item: decimalApiParaInput(resposta?.quantidade_minima_item, 3),
-        data_chegada: resposta?.data_chegada || '',
+        quantidade_disponivel: decimalApiParaInput(
+          resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : ''),
+          3
+        ),
+        ipi_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.ipi_valor, 2), 2),
+        icms_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.icms_valor, 2), 2),
+        st_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.st_valor, 2), 2),
         observacao: resposta?.observacao || ''
       };
     })
   };
 }
 
+function calcularTotalRespostaInternaItem(item) {
+  return (
+    parseNumeroCompra(item?.preco) * parseNumeroCompraDigitado(item?.quantidade_disponivel)
+    + parseNumeroCompra(item?.ipi_valor)
+    + parseNumeroCompra(item?.icms_valor)
+    + parseNumeroCompra(item?.st_valor)
+  );
+}
+
 function ModalRespostaInternaCotacao({
   cotacao,
   form,
   salvando,
+  solicitacaoEncerrada = false,
   onChange,
   onChangeItem,
-  onAplicarDataChegadaTodos,
   onSalvar,
   onFechar
 }) {
   const [condicoesAbertas, setCondicoesAbertas] = useState(false);
-  const [dataChegadaTodos, setDataChegadaTodos] = useState(() => {
-    const datas = (form?.itens || []).map((item) => String(item.data_chegada || '').trim());
-    if (!datas.length || datas.some((data) => !data)) return '';
-    return new Set(datas).size === 1 ? datas[0] : '';
-  });
   if (!cotacao || !form) return null;
 
   const condicoesSelecionadas = new Set(
@@ -258,6 +277,19 @@ function ModalRespostaInternaCotacao({
       const atual = String(form.condicao_pagamento || '').toLowerCase();
       return atual.split(/[;,]/).some((parte) => parte.trim() === opcao.toLowerCase());
     })
+  );
+  const valorMercadorias = form.itens.reduce(
+    (total, item) => total + parseNumeroCompra(item.preco) * parseNumeroCompraDigitado(item.quantidade_disponivel),
+    0
+  );
+  const valorTributos = form.itens.reduce(
+    (total, item) => total + parseNumeroCompra(item.ipi_valor) + parseNumeroCompra(item.icms_valor) + parseNumeroCompra(item.st_valor),
+    0
+  );
+  const freteAdicional = form.frete_tipo === 'TERCEIRO' ? parseNumeroCompra(form.frete_valor) : 0;
+  const valorTotalResposta = Math.max(
+    0,
+    valorMercadorias + valorTributos + parseNumeroCompra(form.difal_valor) + freteAdicional - parseNumeroCompra(form.desconto_total)
   );
 
   function alternarCondicao(opcao) {
@@ -288,7 +320,12 @@ function ModalRespostaInternaCotacao({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+          {solicitacaoEncerrada ? (
+            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
+            </div>
+          ) : null}
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
             <label className="app-filter-field">
               <span className="app-filter-label">Valor minimo do pedido</span>
               <input className="input" inputMode="decimal" value={form.valor_minimo_pedido} onChange={(e) => onChange('valor_minimo_pedido', sanitizeNumeroCompraInput(e.target.value))} />
@@ -298,10 +335,21 @@ function ModalRespostaInternaCotacao({
               <input className="input" inputMode="decimal" value={form.desconto_total} onFocus={(e) => e.target.select()} onChange={(e) => onChange('desconto_total', sanitizeNumeroCompraInput(e.target.value))} />
             </label>
             <label className="app-filter-field">
-              <span className="app-filter-label">Prazo de entrega *</span>
-              <input className="input" value={form.prazo_entrega} onChange={(e) => onChange('prazo_entrega', e.target.value)} />
+              <span className="app-filter-label">DIFAL</span>
+              <input className="input" inputMode="decimal" value={form.difal_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('difal_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
             </label>
             <label className="app-filter-field">
+              <span className="app-filter-label">Prazo de entrega *</span>
+              <input className="input" type="number" min="1" step="1" value={form.prazo_entrega_dias} onChange={(e) => onChange('prazo_entrega_dias', e.target.value.replace(/\D/g, ''))} />
+            </label>
+            <label className="app-filter-field">
+              <span className="app-filter-label">Tipo do prazo *</span>
+              <select className="input" value={form.prazo_entrega_tipo} onChange={(e) => onChange('prazo_entrega_tipo', e.target.value)}>
+                <option value="DIAS_CORRIDOS">Dias corridos</option>
+                <option value="DIAS_UTEIS">Dias uteis</option>
+              </select>
+            </label>
+            <label className="app-filter-field lg:col-span-2">
               <span className="app-filter-label">Condicao de pagamento *</span>
               <div className="grid gap-2">
                 <input
@@ -338,21 +386,38 @@ function ModalRespostaInternaCotacao({
             </label>
           </div>
 
-          <div className="cotacao-resposta-data-panel mt-3 grid gap-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 md:grid-cols-[220px_minmax(0,1fr)]">
-            <label className="cotacao-resposta-data-field app-filter-field bg-white">
-              <span className="app-filter-label">Data chegada para todos</span>
-              <input
-                className="input"
-                type="date"
-                value={dataChegadaTodos}
-                onChange={(event) => {
-                  setDataChegadaTodos(event.target.value);
-                  onAplicarDataChegadaTodos(event.target.value);
-                }}
-              />
-            </label>
-            <div className="self-center text-xs text-[var(--c-muted)]">
-              Use este campo para aplicar uma previsao unica de chegada a todos os itens da resposta. Cada item ainda pode ser ajustado individualmente.
+          <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Frete</span>
+                <select className="input" value={form.frete_tipo} onChange={(e) => onChange('frete_tipo', e.target.value)}>
+                  <option value="SEM_FRETE">Sem frete</option>
+                  <option value="EMBUTIDO">Embutido no preco</option>
+                  <option value="TERCEIRO">Pago a terceiro</option>
+                </select>
+              </label>
+              {form.frete_tipo !== 'SEM_FRETE' ? (
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Valor do frete {form.frete_tipo === 'TERCEIRO' ? '*' : ''}</span>
+                  <input className="input" inputMode="decimal" value={form.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
+                </label>
+              ) : null}
+              {form.frete_tipo === 'TERCEIRO' ? (
+                <>
+                  <label className="app-filter-field">
+                    <span className="app-filter-label">Data para pagamento *</span>
+                    <input className="input" type="date" value={form.frete_data_vencimento} onChange={(e) => onChange('frete_data_vencimento', e.target.value)} />
+                  </label>
+                  <label className="app-filter-field">
+                    <span className="app-filter-label">Transportador (opcional)</span>
+                    <input className="input" value={form.frete_transportador_nome} onChange={(e) => onChange('frete_transportador_nome', e.target.value)} />
+                  </label>
+                  <label className="app-filter-field md:col-start-2 lg:col-start-4">
+                    <span className="app-filter-label">CPF/CNPJ (opcional)</span>
+                    <input className="input" inputMode="numeric" value={form.frete_transportador_cpf_cnpj} onChange={(e) => onChange('frete_transportador_cpf_cnpj', e.target.value.replace(/\D/g, '').slice(0, 14))} />
+                  </label>
+                </>
+              ) : null}
             </div>
           </div>
 
@@ -362,16 +427,18 @@ function ModalRespostaInternaCotacao({
           </label>
 
           <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
-            <table className="table min-w-[980px] text-xs">
+            <table className="table min-w-[1340px] text-xs">
               <thead>
                 <tr>
                   <th>Item</th>
                   <th>Qtd. solic.</th>
-                  <th>Disponibilidade</th>
                   <th>Preco unit.</th>
-                  <th>Prazo</th>
+                  <th>Qtd. disponivel</th>
+                  <th>Valor total</th>
+                  <th>IPI</th>
+                  <th>ICMS</th>
+                  <th>ST</th>
                   <th>Qtd. min.</th>
-                  <th>Data chegada</th>
                   <th>Observacao</th>
                 </tr>
               </thead>
@@ -387,32 +454,151 @@ function ModalRespostaInternaCotacao({
                         className="input min-w-[105px]"
                         inputMode="decimal"
                         value={item.quantidade_solicitada}
+                        disabled={solicitacaoEncerrada}
+                        title={solicitacaoEncerrada ? 'A quantidade solicitada nao pode ser alterada durante a reabertura por disponibilidade.' : ''}
                         onChange={(e) => onChangeItem(index, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
                       />
                     </td>
-                    <td>
-                      <select className="input min-w-[130px]" value={item.status_disponibilidade} onChange={(e) => onChangeItem(index, 'status_disponibilidade', e.target.value)}>
-                        <option value="DISPONIVEL">Disponivel</option>
-                        <option value="NAO_TEM">Nao tem</option>
-                        <option value="PARA_CHEGAR">Para chegar</option>
-                      </select>
-                    </td>
-                    <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
-                    <td><input className="input min-w-[110px]" value={item.prazo} onChange={(e) => onChangeItem(index, 'prazo', e.target.value)} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
-                    <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} disabled={item.status_disponibilidade === 'NAO_TEM'} /></td>
-                    <td><input className="input min-w-[135px]" type="date" value={item.data_chegada} onChange={(e) => onChangeItem(index, 'data_chegada', e.target.value)} /></td>
+                    <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} /></td>
+                    <td><input className="input min-w-[115px]" inputMode="decimal" value={item.quantidade_disponivel} onChange={(e) => onChangeItem(index, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))} /></td>
+                    <td className="min-w-[120px] font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item))}</td>
+                    {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
+                      <td key={campo}>
+                        <input className="input min-w-[110px]" inputMode="decimal" value={item[campo]} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, campo, formatarMoedaCotacaoInput(e.target.value, 2))} />
+                      </td>
+                    ))}
+                    <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} /></td>
                     <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <div className="mt-3 grid gap-2 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
+            <div><span className="block text-[var(--c-muted)]">Mercadorias</span><strong>{fmtMoeda(valorMercadorias)}</strong></div>
+            <div><span className="block text-[var(--c-muted)]">IPI + ICMS + ST</span><strong>{fmtMoeda(valorTributos)}</strong></div>
+            <div><span className="block text-[var(--c-muted)]">DIFAL</span><strong>{fmtMoeda(parseNumeroCompra(form.difal_valor))}</strong></div>
+            <div><span className="block text-[var(--c-muted)]">Frete adicional</span><strong>{fmtMoeda(freteAdicional)}</strong></div>
+            <div><span className="block text-[var(--c-muted)]">Desconto</span><strong>- {fmtMoeda(parseNumeroCompra(form.desconto_total))}</strong></div>
+            <div className="rounded-md bg-slate-900 px-2 py-1.5 text-white"><span className="block text-slate-300">Total estimado</span><strong>{fmtMoeda(valorTotalResposta)}</strong></div>
+          </div>
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
-          <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          {!solicitacaoEncerrada ? (
+            <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          ) : null}
           <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalEncerrarSemPedido({
+  aberto,
+  resumo,
+  justificativa,
+  confirmado,
+  processando,
+  onJustificativaChange,
+  onConfirmadoChange,
+  onConfirmar,
+  onFechar
+}) {
+  if (!aberto) return null;
+
+  const itens = Array.isArray(resumo?.itens) ? resumo.itens : [];
+  const justificativaValida = String(justificativa || '').trim().length >= 10;
+
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="encerrar-sem-pedido-titulo">
+      <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-xl border border-red-200 bg-[var(--c-surface)] shadow-2xl dark:border-red-900/70">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
+          <div className="min-w-0">
+            <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold text-[var(--c-text)]">Encerrar cotacao sem gerar pedido?</h2>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--c-muted)]">
+              O saldo abaixo sera encerrado definitivamente. Pedidos ja gerados permanecem inalterados.
+            </p>
+          </div>
+          <button type="button" className="compras-icon-action shrink-0" onClick={onFechar} disabled={processando} title="Fechar" aria-label="Fechar">
+            <HiOutlineXMark />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Saldo acumulado</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{formatNumeroCompra(resumo?.saldoTotal)}</strong>
+              <span className="mt-0.5 block text-[10px] text-[var(--c-muted)]">Detalhado por item e unidade</span>
+            </div>
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Itens com saldo</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{itens.length}</strong>
+            </div>
+            <div className="rounded-lg border border-[var(--c-border)] bg-slate-50 px-3 py-2.5 dark:bg-slate-950/50">
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Pedidos preservados</span>
+              <strong className="mt-1 block text-base text-[var(--c-text)]">{resumo?.pedidosPreservados || 0}</strong>
+            </div>
+          </div>
+
+          {Number(resumo?.selecoesAtuais || 0) > 0 ? (
+            <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+              Existem {resumo.selecoesAtuais} selecoes de compra marcadas na tela. Elas serao ignoradas e nenhum novo pedido sera gerado.
+            </div>
+          ) : null}
+
+          <div className="mt-4 overflow-hidden rounded-lg border border-[var(--c-border)]">
+            <div className="border-b border-[var(--c-border)] bg-slate-50 px-3 py-2 text-xs font-semibold text-[var(--c-text)] dark:bg-slate-950/50">
+              Itens que nao serao comprados
+            </div>
+            <div className="max-h-48 divide-y divide-[var(--c-border)] overflow-y-auto">
+              {itens.map((item) => (
+                <div key={`${item.item_tipo}-${item.item_referencia_id}`} className="flex items-start justify-between gap-4 px-3 py-2 text-xs">
+                  <div className="min-w-0">
+                    <strong className="block truncate text-[var(--c-text)]" title={item.nome}>{item.nome}</strong>
+                    <span className="text-[var(--c-muted)]">Comprado: {formatNumeroCompra(item.quantidadeFechada)} {item.unidade || ''}</span>
+                  </div>
+                  <span className="shrink-0 font-semibold text-red-700 dark:text-red-300">Saldo: {formatNumeroCompra(item.saldo)} {item.unidade || ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="mt-4 block">
+            <span className="app-filter-label">Justificativa obrigatoria</span>
+            <textarea
+              className="input mt-1 min-h-[96px] w-full"
+              maxLength={2000}
+              value={justificativa}
+              disabled={processando}
+              onChange={(event) => onJustificativaChange(event.target.value)}
+              placeholder="Explique por que o saldo restante nao sera comprado."
+            />
+            <span className={`mt-1 block text-[11px] ${justificativaValida ? 'text-emerald-700' : 'text-[var(--c-muted)]'}`}>
+              Minimo de 10 caracteres. {String(justificativa || '').trim().length}/2000
+            </span>
+          </label>
+
+          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-red-200 bg-red-50/70 px-3 py-3 text-sm text-red-900 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200">
+            <input
+              className="mt-0.5"
+              type="checkbox"
+              checked={confirmado}
+              disabled={processando}
+              onChange={(event) => onConfirmadoChange(event.target.checked)}
+            />
+            <span>Confirmo que o saldo restante nao sera comprado e que nenhum novo pedido deve ser gerado.</span>
+          </label>
+        </div>
+
+        <div className="app-page-actions justify-end border-t border-[var(--c-border)] px-4 py-4 sm:px-5">
+          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={processando}>Voltar</button>
+          <button type="button" className="btn btn-danger" onClick={onConfirmar} disabled={processando || !confirmado || !justificativaValida}>
+            {processando ? 'Encerrando...' : 'Encerrar sem gerar pedido'}
+          </button>
         </div>
       </div>
     </div>
@@ -1301,15 +1487,17 @@ function SecaoComparativo({
   solicitacao,
   podeComprar,
   podeEncerrar,
+  podeEncerrarSemPedido,
   podeEditarResposta,
   vencedoresSelecionados,
   onVencedorChange,
   onEditarRespostaFornecedor,
   onRemanejamentoAplicado,
   onEncerrar,
-  encerrando
+  onEncerrarSemPedido,
+  encerrando,
+  encerrandoSemPedido
 }) {
-  const [modalFornecedor, setModalFornecedor] = useState(null); // { fornecedor, itensGanhos }
   const [modoVisualizacao, setModoVisualizacao] = useState('cards');
   const [painelFornecedoresAberto, setPainelFornecedoresAberto] = useState(false);
   const [fornecedoresVisiveis, setFornecedoresVisiveis] = useState({});
@@ -1336,67 +1524,21 @@ function SecaoComparativo({
     return parseNumeroCompra(item?.saldo_disponivel ?? item?.quantidade);
   }
 
-  // Agrega totais por fornecedor para o ranking top 3
-  const rankingFornecedores = useMemo(() => {
-    if (!comparativo?.itens?.length) return [];
+  function getSaldoDisponivelFornecedor(resposta) {
+    if (resposta?.saldo_disponivel_fornecedor !== undefined && resposta?.saldo_disponivel_fornecedor !== null) {
+      return parseNumeroCompra(resposta.saldo_disponivel_fornecedor);
+    }
+    return Math.max(
+      0,
+      parseNumeroCompra(resposta?.quantidade_disponivel) - parseNumeroCompra(resposta?.quantidade_alocada)
+    );
+  }
 
-    const totaisFornecedor = {};
-    const itensFornecedor = {};
-
-    comparativo.itens.forEach((item) => {
-      item.respostas.forEach((resp) => {
-        if (!resp.fornecedor_id || !resp.disponivel || !resp.preco) return;
-        const fId = resp.fornecedor_id;
-        const quantidadeGanha = getQuantidadeAlocada(resp.resposta_item_id);
-        const totalItem = parseNumeroCompra(resp.preco) * (quantidadeGanha || getSaldoDisponivelItem(item));
-
-        if (!totaisFornecedor[fId]) {
-          totaisFornecedor[fId] = {
-            fornecedor_id: fId,
-            fornecedor_nome: resp.fornecedor_nome,
-            fornecedor_whatsapp: resp.fornecedor_whatsapp || null,
-            fornecedor_email: resp.fornecedor_email || null,
-            fornecedor_compra_id: resp.fornecedor_compra_id || null,
-            total: 0,
-            itensGanhos: [],
-            itensRespondidos: 0,
-            vencedor_itens: 0
-          };
-        }
-        totaisFornecedor[fId].total += totalItem;
-        totaisFornecedor[fId].itensRespondidos += 1;
-
-        if (!itensFornecedor[fId]) itensFornecedor[fId] = [];
-        itensFornecedor[fId].push({
-          item_key: buildItemKey(item),
-          resposta_item_id: resp.resposta_item_id,
-          nome: item.nome,
-          unidade: item.unidade,
-          quantidade: quantidadeGanha || getSaldoDisponivelItem(item),
-          quantidade_solicitada: item.quantidade_atual ?? item.quantidade,
-          preco: resp.preco,
-          prazo: resp.prazo,
-          especificacao: item.especificacao,
-          respostasDestino: item.respostas || [],
-          ganhou: quantidadeGanha > 0
-        });
-
-        if (quantidadeGanha > 0) {
-          totaisFornecedor[fId].vencedor_itens += 1;
-        }
-      });
-    });
-
-    Object.keys(itensFornecedor).forEach((fId) => {
-      if (totaisFornecedor[fId]) {
-        totaisFornecedor[fId].itensGanhos = itensFornecedor[fId].filter((it) => it.ganhou);
-      }
-    });
-
-    return Object.values(totaisFornecedor)
-      .sort((a, b) => a.total - b.total)
-      .slice(0, 3);
-  }, [comparativo, vencedoresSelecionados]);
+  function getQuantidadeInicialSelecao(item, resposta) {
+    const saldoFornecedor = getSaldoDisponivelFornecedor(resposta);
+    const saldoItem = getSaldoDisponivelItem(item);
+    return saldoItem > 0 ? Math.min(saldoItem, saldoFornecedor) : saldoFornecedor;
+  }
 
   const fornecedoresMapa = useMemo(() => {
     const fornecedoresPorId = new Map();
@@ -1467,19 +1609,21 @@ function SecaoComparativo({
     const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
     const isVencedor = quantidadeAlocada > 0;
     const saldoDisponivel = getSaldoDisponivelItem(item);
-    const podeSelecionar = podeEncerrar && saldoDisponivel > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
-    const precoUnitario = parseNumeroCompra(resposta.preco);
+    const saldoDisponivelFornecedor = getSaldoDisponivelFornecedor(resposta);
+    const podeSelecionar = podeEncerrar && saldoDisponivelFornecedor > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const quantidadeDisponivelFornecedor = parseNumeroCompra(resposta.quantidade_disponivel);
+    const excedeuSolicitado = getTotalAlocadoItem(item) > saldoDisponivel + 0.0001;
 
     return (
       <td
         key={`${buildItemKey(item)}-${fornecedor.fornecedor_id}`}
-        className={`min-w-[270px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${isVencedor ? 'bg-emerald-50/80' : 'bg-white'}`}
+        className={`min-w-[270px] border-l border-[var(--c-border)] px-2 py-2 align-top text-xs ${excedeuSolicitado ? 'bg-amber-50' : (isVencedor ? 'bg-emerald-50/80' : 'bg-white')}`}
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="font-semibold text-[var(--c-text)]">{resposta.preco ? fmtMoeda(resposta.preco) : '-'}</div>
             <div className="text-[11px] text-[var(--c-muted)]">
-              Total saldo: {resposta.preco ? fmtMoeda(precoUnitario * saldoDisponivel) : '-'}
+              Total cotado: {resposta.preco ? fmtMoeda(resposta.valor_total_cotado) : '-'}
             </div>
           </div>
           <button
@@ -1495,12 +1639,15 @@ function SecaoComparativo({
         </div>
 
         <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
-          <span className={`font-semibold ${resposta.disponivel ? 'text-emerald-700' : 'text-red-700'}`}>
-            {resposta.disponivel ? 'Disponivel' : 'Nao tem'}
+          <span className="font-semibold text-emerald-700">Disponivel: {formatNumeroCompra(quantidadeDisponivelFornecedor)}</span>
+          <span className={saldoDisponivelFornecedor > 0 ? 'font-semibold text-blue-700' : 'text-slate-500'}>
+            Saldo fornecedor: {formatNumeroCompra(saldoDisponivelFornecedor)}
           </span>
-          <span>Prazo: {resposta.prazo || resposta.prazo_entrega_fornecedor || '-'}</span>
+          <span>Prazo entrega: {resposta.prazo_entrega_fornecedor || '-'}</span>
+          <span>IPI: {fmtMoeda(resposta.ipi_valor)}</span>
+          <span>ICMS: {fmtMoeda(resposta.icms_valor)}</span>
+          <span>ST: {fmtMoeda(resposta.st_valor)}</span>
           <span>Qtd. min.: {resposta.quantidade_minima_item || '-'}</span>
-          <span>Chegada: {fmt(resposta.data_chegada)}</span>
           <span className="col-span-2 truncate" title={resposta.condicao_pagamento || ''}>
             Cond.: {resposta.condicao_pagamento || '-'}
           </span>
@@ -1520,7 +1667,7 @@ function SecaoComparativo({
               onVencedorChange({
                 item,
                 resposta,
-                quantidade: event.target.checked ? saldoDisponivel : 0
+                quantidade: event.target.checked ? getQuantidadeInicialSelecao(item, resposta) : 0
               });
             }}
           />
@@ -1535,6 +1682,9 @@ function SecaoComparativo({
               quantidade: event.target.value
             })}
           />
+          {excedeuSolicitado ? (
+            <span className="text-[10px] font-semibold text-amber-700">Acima do solicitado</span>
+          ) : null}
         </div>
       </td>
     );
@@ -1584,48 +1734,6 @@ function SecaoComparativo({
           </div>
         </div>
 
-        {modoVisualizacao === 'cards' && rankingFornecedores.length > 0 && (
-          <div className="mb-3 grid gap-2 sm:grid-cols-3">
-            {rankingFornecedores.map((forn, idx) => (
-              <div
-                key={forn.fornecedor_id}
-                className={`cotacao-ranking-card grid gap-1.5 rounded-xl border px-3 py-2.5 ${idx === 0 ? 'cotacao-ranking-card-best border-emerald-300 bg-emerald-50' : 'border-[var(--c-border)] bg-slate-50/80'}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <span className={`text-lg font-bold leading-none ${idx === 0 ? 'text-emerald-600' : 'text-[var(--c-muted)]'}`}>
-                    {idx + 1}
-                  </span>
-                   <span className={`cotacao-ranking-pill app-status-pill text-xs ${idx === 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                    {idx === 0 ? 'Menor preco' : `${idx + 1}o lugar`}
-                  </span>
-                </div>
-                <div className="truncate text-sm font-semibold">{forn.fornecedor_nome}</div>
-                <div className="text-base font-bold text-[var(--c-text)]">{fmtMoeda(forn.total)}</div>
-                <div className="text-xs text-[var(--c-muted)]">
-                  {forn.itensRespondidos} item(ns) respondido(s) - {forn.vencedor_itens} ganhador(es)
-                </div>
-                {podeEncerrar && forn.itensGanhos.length > 0 && (
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline mt-1"
-                    onClick={() => setModalFornecedor({
-                      fornecedor: {
-                        nome: forn.fornecedor_nome,
-                        whatsapp: forn.fornecedor_whatsapp,
-                        email: forn.fornecedor_email,
-                        fornecedor_compra_id: forn.fornecedor_compra_id
-                      },
-                      itensGanhos: forn.itensGanhos
-                    })}
-                  >
-                    Ver itens ganhos e gerar pedido
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-
         {modoVisualizacao === 'mapa' && (
           <div className="mb-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] px-3 py-2">
@@ -1656,7 +1764,12 @@ function SecaoComparativo({
                         checked={visivel}
                         onChange={() => toggleFornecedorMapa(fornecedor.fornecedor_id)}
                       />
-                      <span className="min-w-0 flex-1 truncate font-semibold">{fornecedor.nome}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-semibold">{fornecedor.nome}</span>
+                        <span className="block text-[10px] text-[var(--c-muted)]">
+                          DIFAL {fmtMoeda(fornecedor.difal_valor)} · Frete {fornecedor.frete_tipo === 'TERCEIRO' ? `terceiro ${fmtMoeda(fornecedor.frete_valor)}` : (fornecedor.frete_tipo === 'EMBUTIDO' ? 'embutido' : 'sem frete')}
+                        </span>
+                      </span>
                       <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--c-muted)]">{fmtStatus(fornecedor.status)}</span>
                     </label>
                   );
@@ -1666,7 +1779,7 @@ function SecaoComparativo({
 
             {fornecedoresMapaVisiveis.length > 0 ? (
               <div className="compras-responsive-table">
-                <table className="table min-w-[980px] text-xs">
+                <table className="table min-w-[1420px] text-xs">
                   <thead>
                     <tr>
                       <th className="sticky left-0 z-20 min-w-[260px] bg-slate-100">Item</th>
@@ -1674,7 +1787,12 @@ function SecaoComparativo({
                       {fornecedoresMapaVisiveis.map((fornecedor) => (
                         <th key={fornecedor.fornecedor_id} className="min-w-[240px] border-l border-[var(--c-border)] bg-slate-100">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
+                            <span className="min-w-0">
+                              <span className="block truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
+                              <span className="block text-[9px] font-normal text-[var(--c-muted)]">
+                                DIFAL {fmtMoeda(fornecedor.difal_valor)} · {fornecedor.frete_tipo === 'TERCEIRO' ? `frete terceiro ${fmtMoeda(fornecedor.frete_valor)}` : (fornecedor.frete_tipo === 'EMBUTIDO' ? 'frete embutido' : 'sem frete')}
+                              </span>
+                            </span>
                             <button
                               type="button"
                               className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--c-border)] bg-white text-slate-600 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
@@ -1706,7 +1824,7 @@ function SecaoComparativo({
                               {item.especificacao ? ` - ${item.especificacao}` : ''}
                             </div>
                             {podeEncerrar ? (
-                              <div className={`mt-1 text-[11px] ${excedeu ? 'text-red-700' : 'text-[var(--c-muted)]'}`}>
+                              <div className={`mt-1 text-[11px] ${excedeu ? 'font-semibold text-amber-700' : 'text-[var(--c-muted)]'}`}>
                                 Rodada: <strong>{formatNumeroCompra(totalAlocadoItem)}</strong> | Fechado: {formatNumeroCompra(quantidadeFechada)} | Saldo: {formatNumeroCompra(saldoDisponivel)} {item.unidade || ''}
                               </div>
                             ) : null}
@@ -1754,14 +1872,19 @@ function SecaoComparativo({
               </div>
 
               <div className="app-table-shell compras-responsive-table">
-                <table className="table min-w-[980px] text-xs">
+                <table className="table min-w-[1180px] text-xs">
                   <thead>
                     <tr>
                       <th>Fornecedor</th>
-                      <th>Disponivel</th>
+                      <th>Qtd. disponivel</th>
                       <th>Preco unit.</th>
-                      <th>Total saldo</th>
-                      <th>Prazo</th>
+                      <th>Valor total</th>
+                      <th>IPI</th>
+                      <th>ICMS</th>
+                      <th>ST</th>
+                      <th>DIFAL</th>
+                      <th>Frete</th>
+                      <th>Prazo entrega</th>
                       <th>Cond. pag.</th>
                       <th>Qtd. min.</th>
                       <th>Observacao</th>
@@ -1778,19 +1901,25 @@ function SecaoComparativo({
                       return (
                         <tr
                           key={`${item.id}-${resp.fornecedor_id}`}
-                          className={`cotacao-comparativo-resposta ${isVencedor ? 'cotacao-comparativo-resposta-vencedora bg-emerald-50' : ''} ${excedeu ? 'cotacao-comparativo-resposta-excedida bg-red-50' : ''}`}
+                          className={`cotacao-comparativo-resposta ${isVencedor ? 'cotacao-comparativo-resposta-vencedora bg-emerald-50' : ''} ${excedeu ? 'cotacao-comparativo-resposta-excedida bg-amber-50' : ''}`}
                         >
                           <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
                           <td>
-                            <span className={`app-status-pill text-[11px] ${resp.disponivel ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
-                              {resp.disponivel ? 'Sim' : 'Nao'}
-                            </span>
+                            <span className="block font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</span>
+                            <span className="block text-[10px] text-blue-700">Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
                           </td>
                           <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
-                          <td className="font-medium">
-                            {resp.preco ? fmtMoeda(parseNumeroCompra(resp.preco) * saldoDisponivel) : '-'}
+                          <td className="font-medium">{resp.preco ? fmtMoeda(resp.valor_total_cotado) : '-'}</td>
+                          <td>{fmtMoeda(resp.ipi_valor)}</td>
+                          <td>{fmtMoeda(resp.icms_valor)}</td>
+                          <td>{fmtMoeda(resp.st_valor)}</td>
+                          <td>{fmtMoeda(resp.difal_valor)}</td>
+                          <td className="max-w-[130px] text-xs">
+                            {resp.frete_tipo === 'TERCEIRO'
+                              ? `Terceiro ${fmtMoeda(resp.frete_valor)}`
+                              : (resp.frete_tipo === 'EMBUTIDO' ? 'Embutido' : 'Sem frete')}
                           </td>
-                          <td>{resp.prazo || '-'}</td>
+                          <td>{resp.prazo_entrega_fornecedor || '-'}</td>
                           <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
                           <td>{resp.quantidade_minima_item || '-'}</td>
                           <td className="max-w-[160px] text-xs">{resp.observacao || '-'}</td>
@@ -1800,13 +1929,15 @@ function SecaoComparativo({
                                 <input
                                   type="checkbox"
                                   checked={isVencedor}
-                                  disabled={!podeEncerrar || saldoDisponivel <= 0 || !resp.disponivel || !resp.preco}
+                                  disabled={!podeEncerrar || getSaldoDisponivelFornecedor(resp) <= 0 || !resp.disponivel || !resp.preco}
                                   onChange={(event) => {
                                     const checked = event.target.checked;
                                     onVencedorChange({
                                       item,
                                       resposta: resp,
-                                      quantidade: checked ? getSaldoDisponivelItem(item) : 0
+                                      quantidade: checked
+                                        ? getQuantidadeInicialSelecao(item, resp)
+                                        : 0
                                     });
                                   }}
                                 />
@@ -1821,6 +1952,11 @@ function SecaoComparativo({
                                     quantidade: event.target.value
                                   })}
                                 />
+                                {excedeu ? (
+                                  <span className="text-[10px] font-semibold text-amber-700" title="Exige justificativa no fechamento">
+                                    Acima do solicitado
+                                  </span>
+                                ) : null}
                               </div>
                             ) : '-'}
                           </td>
@@ -1835,35 +1971,31 @@ function SecaoComparativo({
         </div>
         )}
 
-          {podeEncerrar && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
+          {(podeEncerrar || podeEncerrarSemPedido) && String(solicitacao.status || '').toUpperCase() !== 'RECUSADO' && (
             <div className="app-page-actions justify-end">
-              <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando}>
-                {encerrando
-                  ? 'Atualizando...'
-                  : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
-                    ? 'Atualizar vencedores e pedidos'
-                    : 'Gerar pedidos selecionados'}
-              </button>
+              {podeEncerrarSemPedido ? (
+                <button
+                  type="button"
+                  className="btn btn-outline border-red-300 text-red-700 hover:border-red-400 hover:bg-red-50 dark:border-red-800 dark:text-red-300 dark:hover:bg-red-950/40"
+                  onClick={onEncerrarSemPedido}
+                  disabled={encerrando || encerrandoSemPedido}
+                >
+                  {encerrandoSemPedido ? 'Encerrando...' : 'Encerrar sem pedido'}
+                </button>
+              ) : null}
+              {podeEncerrar ? (
+                <button type="button" className="btn btn-primary" onClick={onEncerrar} disabled={encerrando || encerrandoSemPedido}>
+                  {encerrando
+                    ? 'Atualizando...'
+                    : String(solicitacao.status || '').toUpperCase() === 'ENCERRADO'
+                      ? 'Atualizar vencedores e pedidos'
+                      : 'Gerar pedidos selecionados'}
+                </button>
+              ) : null}
             </div>
           )}
       </div>
 
-      {/* Modal de pedido final */}
-      {modalFornecedor && (
-        <ModalPedidoFinal
-          fornecedor={modalFornecedor.fornecedor}
-          itensGanhos={modalFornecedor.itensGanhos}
-          solicitacaoId={solicitacao?.id}
-          onRemanejamento={(payload) => {
-            onRemanejamentoAplicado?.(payload);
-            const totalItens = payload?.itens?.length || 0;
-            const fornecedorDestino = payload?.itens?.[0]?.destinoFornecedorNome || 'fornecedor destino';
-            alert(`${totalItens} item(ns) remanejado(s) para ${fornecedorDestino}. Confira as quantidades e clique em "Atualizar vencedores e pedidos" para gravar.`);
-            setModalFornecedor(null);
-          }}
-          onFechar={() => setModalFornecedor(null)}
-        />
-      )}
     </>
   );
 }
@@ -1894,6 +2026,10 @@ export default function GerenciarCotacaoSolicitacao() {
   const [formRespostaInterna, setFormRespostaInterna] = useState(null);
   const [salvandoRespostaInterna, setSalvandoRespostaInterna] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
+  const [modalEncerrarSemPedido, setModalEncerrarSemPedido] = useState(false);
+  const [justificativaEncerrarSemPedido, setJustificativaEncerrarSemPedido] = useState('');
+  const [confirmadoEncerrarSemPedido, setConfirmadoEncerrarSemPedido] = useState(false);
+  const [encerrandoSemPedido, setEncerrandoSemPedido] = useState(false);
   const [comentarioCotacao, setComentarioCotacao] = useState('');
   const [registrandoComentario, setRegistrandoComentario] = useState(false);
   const [fornecedoresSelecionados, setFornecedoresSelecionados] = useState([]);
@@ -1902,12 +2038,39 @@ export default function GerenciarCotacaoSolicitacao() {
   const [novoFornecedor, setNovoFornecedor] = useState({ nome: '', cnpj: '', email: '', whatsapp: '', contato: '' });
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
   const encerramentoIdempotencyRef = useRef(null);
+  const encerramentoSemPedidoIdempotencyRef = useRef(null);
 
   const podeComprar = canOperateComprasCotacoes(user);
   const podeFecharParcialCotacao = canFecharParcialComprasCotacoes(user);
   const podeEncerrarCotacao = canEncerrarComprasCotacoes(user);
+  const podeEncerrarSemPedidoCotacao = canEncerrarSemPedidoComprasCotacoes(user);
   const podeReabrirCotacaoFornecedor = canReabrirComprasCotacoes(user);
   const podeCancelarCotacao = canCancelarComprasCotacoes(user);
+  const resumoEncerramentoSemPedido = useMemo(() => {
+    const itens = (comparativo?.itens || [])
+      .map((item) => ({
+        item_tipo: item.item_tipo,
+        item_referencia_id: item.item_referencia_id,
+        nome: item.nome || item.descricao || `Item ${item.item_referencia_id || ''}`,
+        unidade: item.unidade || '',
+        quantidadeFechada: parseNumeroCompra(item.quantidade_fechada),
+        saldo: parseNumeroCompra(item.saldo_disponivel ?? item.quantidade)
+      }))
+      .filter((item) => item.saldo > 0.0001);
+    const pedidosPreservados = (solicitacao?.pedidos || []).filter(
+      (pedido) => normalizeText(pedido.status) !== 'cancelado'
+    ).length;
+    const selecoesAtuais = Object.values(vencedoresSelecionados).filter(
+      (entry) => Number(entry?.resposta_item_id) > 0 && parseNumeroCompra(entry?.quantidade_alocada) > 0
+    ).length;
+
+    return {
+      itens,
+      saldoTotal: itens.reduce((total, item) => total + item.saldo, 0),
+      pedidosPreservados,
+      selecoesAtuais
+    };
+  }, [comparativo, solicitacao, vencedoresSelecionados]);
 
   async function carregarFornecedores() {
     try {
@@ -2269,17 +2432,22 @@ export default function GerenciarCotacaoSolicitacao() {
     }));
   }
 
-  function aplicarDataChegadaRespostaInterna(value) {
-    setFormRespostaInterna((atual) => ({
-      ...atual,
-      itens: atual.itens.map((item) => ({ ...item, data_chegada: value }))
-    }));
-  }
-
   async function handleSalvarRespostaInterna(finalizar) {
     if (!formRespostaInterna || !cotacaoRespostaInterna) return;
-    if (finalizar && (!formRespostaInterna.condicao_pagamento.trim() || !formRespostaInterna.prazo_entrega.trim())) {
+    if (finalizar && (
+      !formRespostaInterna.condicao_pagamento.trim()
+      || !Number.isInteger(Number(formRespostaInterna.prazo_entrega_dias))
+      || Number(formRespostaInterna.prazo_entrega_dias) <= 0
+    )) {
       alert('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
+      return;
+    }
+    if (
+      finalizar
+      && formRespostaInterna.frete_tipo === 'TERCEIRO'
+      && (parseNumeroCompra(formRespostaInterna.frete_valor) <= 0 || !formRespostaInterna.frete_data_vencimento)
+    ) {
+      alert('Informe o valor e a data para pagamento do frete pago a terceiro.');
       return;
     }
 
@@ -2312,17 +2480,33 @@ export default function GerenciarCotacaoSolicitacao() {
         valor_minimo_pedido: formRespostaInterna.valor_minimo_pedido || null,
         desconto_total: formRespostaInterna.desconto_total || 0,
         condicao_pagamento: formRespostaInterna.condicao_pagamento,
-        prazo_entrega: formRespostaInterna.prazo_entrega,
+        prazo_entrega_dias: Number(formRespostaInterna.prazo_entrega_dias) || null,
+        prazo_entrega_tipo: formRespostaInterna.prazo_entrega_tipo,
+        difal_valor: normalizarMoedaCotacaoParaEnvio(formRespostaInterna.difal_valor) || 0,
+        frete_tipo: formRespostaInterna.frete_tipo,
+        frete_valor: formRespostaInterna.frete_tipo === 'SEM_FRETE'
+          ? 0
+          : normalizarMoedaCotacaoParaEnvio(formRespostaInterna.frete_valor) || 0,
+        frete_data_vencimento: formRespostaInterna.frete_tipo === 'TERCEIRO'
+          ? formRespostaInterna.frete_data_vencimento
+          : null,
+        frete_transportador_nome: formRespostaInterna.frete_transportador_nome,
+        frete_transportador_cpf_cnpj: formRespostaInterna.frete_transportador_cpf_cnpj,
         observacao_resposta: formRespostaInterna.observacao_resposta,
         finalizar,
         itens: formRespostaInterna.itens.map((item) => ({
           item_tipo: item.item_tipo,
           item_referencia_id: item.item_referencia_id,
-          status_disponibilidade: item.status_disponibilidade,
+          status_disponibilidade: parseNumeroCompraDigitado(item.quantidade_disponivel) > 0 && parseNumeroCompra(item.preco) > 0
+            ? 'DISPONIVEL'
+            : 'NAO_TEM',
           preco: normalizarMoedaCotacaoParaEnvio(item.preco),
-          prazo: item.prazo || null,
+          prazo: null,
           quantidade_minima_item: item.quantidade_minima_item || null,
-          data_chegada: item.data_chegada || null,
+          quantidade_disponivel: parseNumeroCompraDigitado(item.quantidade_disponivel),
+          ipi_valor: normalizarMoedaCotacaoParaEnvio(item.ipi_valor) || 0,
+          icms_valor: normalizarMoedaCotacaoParaEnvio(item.icms_valor) || 0,
+          st_valor: normalizarMoedaCotacaoParaEnvio(item.st_valor) || 0,
           observacao: item.observacao || null
         }))
       });
@@ -2429,6 +2613,62 @@ export default function GerenciarCotacaoSolicitacao() {
     });
   }
 
+  function abrirEncerramentoSemPedido() {
+    if (resumoEncerramentoSemPedido.saldoTotal <= 0.0001) {
+      alert('Nao existe saldo restante para encerrar sem pedido.');
+      return;
+    }
+    setJustificativaEncerrarSemPedido('');
+    setConfirmadoEncerrarSemPedido(false);
+    encerramentoSemPedidoIdempotencyRef.current = null;
+    setModalEncerrarSemPedido(true);
+  }
+
+  function fecharModalEncerramentoSemPedido() {
+    if (encerrandoSemPedido) return;
+    setModalEncerrarSemPedido(false);
+    setJustificativaEncerrarSemPedido('');
+    setConfirmadoEncerrarSemPedido(false);
+    encerramentoSemPedidoIdempotencyRef.current = null;
+  }
+
+  async function confirmarEncerramentoSemPedido() {
+    const justificativa = justificativaEncerrarSemPedido.trim();
+    if (justificativa.length < 10) {
+      alert('Informe uma justificativa com pelo menos 10 caracteres.');
+      return;
+    }
+    if (!confirmadoEncerrarSemPedido) {
+      alert('Confirme que o saldo restante nao sera comprado.');
+      return;
+    }
+
+    try {
+      setEncerrandoSemPedido(true);
+      if (!encerramentoSemPedidoIdempotencyRef.current) {
+        encerramentoSemPedidoIdempotencyRef.current = criarChaveIdempotenciaFechamento(`${id}-sem-pedido`);
+      }
+      const resultado = await encerrarSolicitacaoCompraSemPedido(
+        id,
+        { confirmado: true, justificativa },
+        { idempotencyKey: encerramentoSemPedidoIdempotencyRef.current }
+      );
+      encerramentoSemPedidoIdempotencyRef.current = null;
+      setModalEncerrarSemPedido(false);
+      setJustificativaEncerrarSemPedido('');
+      setConfirmadoEncerrarSemPedido(false);
+      setVencedoresSelecionados({});
+      await carregarTudo();
+      const detalhes = resultado?.encerramento_sem_pedido_resultado || {};
+      alert(`Cotacao encerrada sem gerar novos pedidos. Saldo nao comprado: ${formatNumeroCompra(detalhes.quantidade_nao_comprada)}.`);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao encerrar cotacao sem gerar pedido');
+    } finally {
+      setEncerrandoSemPedido(false);
+    }
+  }
+
   async function handleEncerrar() {
     try {
       const itens = comparativo?.itens || [];
@@ -2440,39 +2680,69 @@ export default function GerenciarCotacaoSolicitacao() {
         }));
       if (!alocacoes.length) { alert('Selecione ao menos um vencedor para encerrar.'); return; }
 
-      const errosQuantidade = [];
+      const itensExcedentes = [];
+      const errosDisponibilidadeFornecedor = [];
       let saldoTotalAntes = 0;
       let saldoTotalDepois = 0;
+      let quantidadeExcedenteTotal = 0;
       itens.forEach((item) => {
         const totalItem = (item.respostas || []).reduce((acc, resp) => {
           const selecionado = vencedoresSelecionados[String(resp.resposta_item_id)];
-          return acc + parseNumeroCompra(selecionado?.quantidade_alocada);
+          const quantidadeSelecionada = parseNumeroCompra(selecionado?.quantidade_alocada);
+          const saldoFornecedor = resp.saldo_disponivel_fornecedor !== undefined
+            ? parseNumeroCompra(resp.saldo_disponivel_fornecedor)
+            : Math.max(
+                0,
+                parseNumeroCompra(resp.quantidade_disponivel) - parseNumeroCompra(resp.quantidade_alocada)
+              );
+          if (quantidadeSelecionada > saldoFornecedor + 0.0001) {
+            errosDisponibilidadeFornecedor.push(
+              `- ${item.nome} / ${resp.fornecedor_nome}: marcado ${formatNumeroCompra(quantidadeSelecionada)}, disponivel ${formatNumeroCompra(saldoFornecedor)}.`
+            );
+          }
+          return acc + quantidadeSelecionada;
         }, 0);
         const saldoItem = parseNumeroCompra(item.saldo_disponivel ?? item.quantidade);
         saldoTotalAntes += saldoItem;
         saldoTotalDepois += Math.max(0, saldoItem - totalItem);
         if (totalItem > saldoItem + 0.0001) {
-          errosQuantidade.push(`- ${item.nome}: marcado ${formatNumeroCompra(totalItem)} ${item.unidade || ''}, mas o saldo disponivel e ${formatNumeroCompra(saldoItem)} ${item.unidade || ''}.`);
+          const excedente = totalItem - saldoItem;
+          quantidadeExcedenteTotal += excedente;
+          itensExcedentes.push(`- ${item.nome}: saldo antes da rodada ${formatNumeroCompra(saldoItem)}, compra nesta rodada ${formatNumeroCompra(totalItem)}, excedente ${formatNumeroCompra(excedente)} ${item.unidade || ''}.`);
         }
       });
 
-      if (errosQuantidade.length) {
+      if (errosDisponibilidadeFornecedor.length) {
         alert([
-          'A quantidade marcada para compra ultrapassa o saldo disponivel da cotacao.',
+          'A quantidade marcada ultrapassa a disponibilidade informada pelo fornecedor.',
           '',
-          'Ajuste os itens abaixo antes de atualizar os vencedores:',
-          ...errosQuantidade
+          ...errosDisponibilidadeFornecedor
         ].join('\n'));
-        return;
-      }
-
-      if (saldoTotalAntes <= 0.0001) {
-        alert('Nao existe saldo de itens disponivel para uma nova rodada de fechamento.');
         return;
       }
 
       const fechamentoParcial = saldoTotalDepois > 0.0001;
       let justificativa = '';
+      let justificativaExcedente = '';
+      if (itensExcedentes.length) {
+        const confirmadoExcedente = window.confirm([
+          'A compra possui quantidade acima da solicitada.',
+          '',
+          ...itensExcedentes,
+          '',
+          `Excedente total: ${formatNumeroCompra(quantidadeExcedenteTotal)}`,
+          'Deseja continuar e registrar a justificativa para auditoria?'
+        ].join('\n'));
+        if (!confirmadoExcedente) return;
+
+        justificativaExcedente = String(
+          window.prompt('Informe a justificativa obrigatoria para comprar acima da quantidade solicitada:') || ''
+        ).trim();
+        if (!justificativaExcedente) {
+          alert('A justificativa e obrigatoria para comprar acima da quantidade solicitada.');
+          return;
+        }
+      }
       if (fechamentoParcial) {
         if (!podeFecharParcialCotacao) {
           alert('Seu usuario nao possui permissao para fechar parcialmente a cotacao.');
@@ -2509,7 +2779,9 @@ export default function GerenciarCotacaoSolicitacao() {
         {
           alocacoes,
           fechamento_parcial_confirmado: fechamentoParcial,
-          justificativa: fechamentoParcial ? justificativa : null
+          justificativa: fechamentoParcial ? justificativa : null,
+          fechamento_excedente_confirmado: itensExcedentes.length > 0,
+          justificativa_excedente: itensExcedentes.length ? justificativaExcedente : null
         },
         { idempotencyKey: encerramentoIdempotencyRef.current }
       );
@@ -2584,6 +2856,8 @@ export default function GerenciarCotacaoSolicitacao() {
   const isAvulsa = solicitacao.origem === 'AVULSA';
   const statusSolicitacao = normalizeText(solicitacao.status);
   const fluxoTerminal = ['cancelada', 'cancelado', 'inativa', 'recusado', 'encerrado'].includes(statusSolicitacao);
+  const podeEditarRespostas = podeComprar
+    && (!fluxoTerminal || statusSolicitacao === 'encerrado');
   const cotacoesAtivas = (solicitacao.fornecedores || []).filter(
     (cotacao) => !['cancelada', 'cancelado'].includes(normalizeText(cotacao.status))
   );
@@ -2828,7 +3102,7 @@ export default function GerenciarCotacaoSolicitacao() {
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
                         const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
-                        const podeEditarResposta = podeOperarFluxo && !cotacaoCancelada;
+                        const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
                         const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
                           && !fluxoTerminal;
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
@@ -2959,26 +3233,40 @@ export default function GerenciarCotacaoSolicitacao() {
             solicitacao={solicitacao}
             podeComprar={podeOperarFluxo}
             podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
-            podeEditarResposta={podeOperarFluxo}
+            podeEncerrarSemPedido={podeEncerrarSemPedidoCotacao && !fluxoTerminal && cotacoesAtivas.length > 0 && resumoEncerramentoSemPedido.saldoTotal > 0.0001}
+            podeEditarResposta={podeEditarRespostas}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
             onEditarRespostaFornecedor={abrirRespostaInternaPorId}
             onRemanejamentoAplicado={handleAplicarRemanejamentoCotacao}
             onEncerrar={handleEncerrar}
+            onEncerrarSemPedido={abrirEncerramentoSemPedido}
             encerrando={encerrando}
+            encerrandoSemPedido={encerrandoSemPedido}
           />
         </div>
       </div>
 
       <CompraPreviewModal preview={previewArquivo} onClose={() => setPreviewArquivo(null)} />
+      <ModalEncerrarSemPedido
+        aberto={modalEncerrarSemPedido}
+        resumo={resumoEncerramentoSemPedido}
+        justificativa={justificativaEncerrarSemPedido}
+        confirmado={confirmadoEncerrarSemPedido}
+        processando={encerrandoSemPedido}
+        onJustificativaChange={setJustificativaEncerrarSemPedido}
+        onConfirmadoChange={setConfirmadoEncerrarSemPedido}
+        onConfirmar={confirmarEncerramentoSemPedido}
+        onFechar={fecharModalEncerramentoSemPedido}
+      />
       <ModalRespostaInternaCotacao
         key={cotacaoRespostaInterna?.id || 'resposta-interna-fechada'}
         cotacao={cotacaoRespostaInterna}
         form={formRespostaInterna}
         salvando={salvandoRespostaInterna}
+        solicitacaoEncerrada={statusSolicitacao === 'encerrado'}
         onChange={alterarRespostaInterna}
         onChangeItem={alterarItemRespostaInterna}
-        onAplicarDataChegadaTodos={aplicarDataChegadaRespostaInterna}
         onSalvar={handleSalvarRespostaInterna}
         onFechar={() => {
           if (salvandoRespostaInterna) return;

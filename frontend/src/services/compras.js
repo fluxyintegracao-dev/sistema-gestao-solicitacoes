@@ -346,6 +346,13 @@ export async function delegarSolicitacaoCompra(id, data = {}) {
   return handleJsonResponse(response, 'Erro ao delegar solicitacao de compra');
 }
 
+export async function listarUsuariosDelegacaoCompras() {
+  const response = await fetch(`${API_URL}/compras/delegacao/usuarios`, {
+    headers: authHeaders()
+  });
+  return handleJsonResponse(response, 'Erro ao carregar usuarios para delegacao de compras');
+}
+
 export async function comentarSolicitacaoCompra(id, data = {}) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/comentarios`, {
     method: 'POST',
@@ -411,6 +418,18 @@ export async function encerrarSolicitacaoCompra(id, data, { idempotencyKey = nul
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao encerrar solicitacao de compra');
+}
+
+export async function encerrarSolicitacaoCompraSemPedido(id, data, { idempotencyKey = null } = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/encerrar-sem-pedido`, {
+    method: 'PATCH',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+    }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao encerrar cotacao sem gerar pedido');
 }
 
 export async function listarPedidosCompra(params = {}) {
