@@ -9,6 +9,7 @@ const {
   Obra,
   PedidoCompra,
   SolicitacaoCompra,
+  SolicitacaoCompraAlocacao,
   SolicitacaoCompraFornecedor,
   SolicitacaoCompraFornecedorItem,
   SolicitacaoCompraItem,
@@ -32,6 +33,10 @@ const {
   obterItensCotaveisDaCotacao,
   registrarLogSolicitacaoCompra
 } = require('../services/comprasCotacao');
+const {
+  calcularNovaDisponibilidadeLiberada,
+  montarMapaAlocacoesAtivasPorFornecedorItem
+} = require('../services/comprasDisponibilidadeService');
 const { getPresignedUrl, uploadToS3 } = require('../services/s3');
 const {
   canReabrirComprasCotacoes,
@@ -573,10 +578,17 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       throw new Error('Solicitacao de compra nao encontrada.');
     }
 
-    assertSolicitacaoCompraAceitaCotacao(
-      solicitacaoTravada,
-      isRascunho ? 'salvar rascunho' : 'registrar resposta'
-    );
+    const statusSolicitacaoAnterior = normalizeText(solicitacaoTravada.status);
+    const reaberturaControlada = statusSolicitacaoAnterior === 'ENCERRADO'
+      && options.permitir_reabertura_disponibilidade === true
+      && Boolean(usuarioInterno)
+      && !isRascunho;
+    if (!reaberturaControlada) {
+      assertSolicitacaoCompraAceitaCotacao(
+        solicitacaoTravada,
+        isRascunho ? 'salvar rascunho' : 'registrar resposta'
+      );
+    }
     assertCotacaoFornecedorAtiva(
       cotacaoTravada,
       isRascunho ? 'salvar rascunho' : 'registrar resposta'
@@ -608,6 +620,44 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       transaction
     });
     const statusAnteriorCotacao = cotacaoTravada.status;
+    let reaberturaDisponibilidade = null;
+
+    if (reaberturaControlada) {
+      const alocacoesAtivasFornecedor = await SolicitacaoCompraAlocacao.findAll({
+        where: {
+          solicitacao_compra_id: solicitacaoTravada.id,
+          fornecedor_compra_id: cotacaoTravada.fornecedor_compra_id,
+          status: 'ATIVA'
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      const mapaAlocacoes = montarMapaAlocacoesAtivasPorFornecedorItem(alocacoesAtivasFornecedor);
+      const novaDisponibilidade = calcularNovaDisponibilidadeLiberada({
+        fornecedorCompraId: cotacaoTravada.fornecedor_compra_id,
+        respostasAnteriores,
+        respostasNovas: respostasPreparadas,
+        mapaAlocacoesFornecedorItem: mapaAlocacoes
+      });
+      const quantidadeLiberadaTotal = novaDisponibilidade.quantidade_liberada_total;
+      if (quantidadeLiberadaTotal <= 0) {
+        throw Object.assign(
+          new Error('A solicitacao esta encerrada. Para reabrir a cotacao, a edicao deve aumentar a quantidade disponivel de ao menos um item deste fornecedor.'),
+          { statusCode: 409, code: 'COMPRA_REABERTURA_SEM_NOVA_DISPONIBILIDADE' }
+        );
+      }
+
+      reaberturaDisponibilidade = {
+        status_anterior: solicitacaoTravada.status,
+        status_novo: 'FECHAMENTO_PARCIAL',
+        quantidade_liberada_total: quantidadeLiberadaTotal,
+        itens: novaDisponibilidade.itens
+      };
+      await solicitacaoTravada.update(
+        { status: 'FECHAMENTO_PARCIAL', encerrado_em: null },
+        { transaction }
+      );
+    }
 
     await SolicitacaoCompraRespostaItem.update(
       { deleted_at: new Date() },
@@ -673,10 +723,23 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         frete_transportador_nome: frete.transportadorNome,
         frete_transportador_cpf_cnpj: frete.transportadorCpfCnpj,
         respostas_anteriores: respostasAnteriores.map((item) => item.toJSON()),
-        respostas_novas: respostasPreparadas
+        respostas_novas: respostasPreparadas,
+        reabertura_por_nova_disponibilidade: reaberturaDisponibilidade
       },
       transaction
     });
+
+    if (reaberturaDisponibilidade) {
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacaoTravada.id,
+        usuarioId: usuarioInterno.id,
+        fornecedorCompraId: cotacaoTravada.fornecedor_compra_id,
+        tipoAcao: 'REABERTURA_POR_NOVA_DISPONIBILIDADE',
+        descricao: `Cotacao reaberta apos nova disponibilidade informada para ${cotacaoFornecedor.fornecedor?.nome || cotacaoTravada.fornecedor_compra_id}`,
+        metadados: reaberturaDisponibilidade,
+        transaction
+      });
+    }
 
     await transaction.commit();
   } catch (error) {
@@ -1308,7 +1371,10 @@ module.exports = {
         return res.status(404).json({ error: 'Cotacao nao encontrada.' });
       }
 
-      assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'editar a resposta');
+      const solicitacaoEncerrada = normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO';
+      if (!solicitacaoEncerrada) {
+        assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'editar a resposta');
+      }
       assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'editar a resposta');
 
       await salvarRespostasCotacao(cotacaoFornecedor, req.body.itens, {
@@ -1326,7 +1392,8 @@ module.exports = {
         frete_transportador_cpf_cnpj: req.body.frete_transportador_cpf_cnpj,
         observacao_resposta: req.body.observacao_resposta,
         usuario_interno: req.user,
-        rascunho: req.body.finalizar === false
+        rascunho: req.body.finalizar === false,
+        permitir_reabertura_disponibilidade: solicitacaoEncerrada
       });
 
       const atualizada = await carregarCotacaoPorToken(cotacaoBase.token);

@@ -34,6 +34,8 @@
 - fornecedor responde por token publico;
 - pode salvar rascunho antes do envio final;
 - informa preco unitario e quantidade disponivel por item; vazio ou zero significa que a oferta nao participa do comparativo;
+- a quantidade disponivel representa a capacidade total vigente do fornecedor para o item na cotacao, e nao uma quantidade incremental por edicao;
+- o saldo compravel do fornecedor e calculado por `fornecedor + item`: quantidade disponivel vigente menos todas as alocacoes ativas ja compradas desse fornecedor para o mesmo item, mesmo que a resposta tenha sido versionada e recebido outro ID;
 - o prazo de entrega e geral para a resposta e distingue dias corridos de dias uteis; nao existe prazo de entrega por item no fluxo vigente;
 - novas respostas nao informam nem exibem data de chegada por item; o campo legado `data_chegada` permanece no backend somente para compatibilidade historica e nao compoe o fluxo operacional atual;
 - IPI, ICMS e ST sao valores em reais fechados para toda a quantidade disponivel daquele item;
@@ -56,7 +58,11 @@
 - e permitido fechar acima da quantidade solicitada, limitado a quantidade ainda disponivel na resposta do fornecedor;
 - fechamento excedente exige confirmacao e justificativa obrigatoria, preservadas no fechamento e no log para auditoria;
 - fechamento deve ser transacional e idempotente e nao pode gerar os mesmos pedidos novamente.
-- uma solicitacao ja encerrada nao aceita geracao posterior de pedidos; se o cancelamento de pedido anterior devolver novo saldo, a sincronizacao operacional pode retornar a compra para `FECHAMENTO_PARCIAL` com auditoria.
+- uma solicitacao encerrada nao aceita geracao posterior de pedidos enquanto permanecer `ENCERRADO`;
+- a edicao interna de uma resposta encerrada pode reabrir a solicitacao para `FECHAMENTO_PARCIAL` somente quando aumentar efetivamente o saldo disponivel de ao menos um item daquele fornecedor; salvar rascunho e alterar a quantidade originalmente solicitada permanecem bloqueados nesse caso;
+- a reabertura registra fornecedor, usuario, disponibilidade anterior e nova, quantidade ja comprada e saldo liberado; o link publico do fornecedor continua sem poder alterar cotacao encerrada;
+- depois da reabertura, a nova compra continua limitada ao saldo do fornecedor e, quando ultrapassa a quantidade originalmente solicitada, exige confirmacao e justificativa de excedente;
+- se o cancelamento de pedido anterior devolver novo saldo, a sincronizacao operacional tambem pode retornar a compra para `FECHAMENTO_PARCIAL` com auditoria.
 
 ## Pedido
 

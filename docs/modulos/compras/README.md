@@ -58,6 +58,8 @@ Criacao, encaminhamento, aprovacao, cancelamento e envio para cotacao devem impe
 
 No fechamento de cotacao, a mesma chave de idempotencia nao pode repetir pedidos, alocacoes nem frete pago a terceiro. Quantidade acima da solicitada exige justificativa auditavel e nunca pode ultrapassar a disponibilidade declarada pelo fornecedor.
 
+A disponibilidade e acumulada por fornecedor e item, sem depender do ID versionado da resposta. Uma edicao interna que aumente a capacidade total do fornecedor pode reabrir uma solicitacao `ENCERRADO` para `FECHAMENTO_PARCIAL`; o sistema abate tudo que ja foi comprado daquele fornecedor para o item e libera somente a diferenca real. A resposta publica continua bloqueada depois do encerramento.
+
 ## Mudanca segura
 
 Testar compra normal e direta, destinos iniciais, compatibilidade de registros antigos, credor, itens cadastrados/manuais, importacao, rateio, edicao de apropriacoes, permissoes, cancelamento, cotacao, pedido, relatorios de compras e registros de origem.

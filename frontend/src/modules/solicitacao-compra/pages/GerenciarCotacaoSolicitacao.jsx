@@ -263,6 +263,7 @@ function ModalRespostaInternaCotacao({
   cotacao,
   form,
   salvando,
+  solicitacaoEncerrada = false,
   onChange,
   onChangeItem,
   onSalvar,
@@ -319,6 +320,11 @@ function ModalRespostaInternaCotacao({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {solicitacaoEncerrada ? (
+            <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
+            </div>
+          ) : null}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
             <label className="app-filter-field">
               <span className="app-filter-label">Valor minimo do pedido</span>
@@ -448,6 +454,8 @@ function ModalRespostaInternaCotacao({
                         className="input min-w-[105px]"
                         inputMode="decimal"
                         value={item.quantidade_solicitada}
+                        disabled={solicitacaoEncerrada}
+                        title={solicitacaoEncerrada ? 'A quantidade solicitada nao pode ser alterada durante a reabertura por disponibilidade.' : ''}
                         onChange={(e) => onChangeItem(index, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
                       />
                     </td>
@@ -478,7 +486,9 @@ function ModalRespostaInternaCotacao({
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
-          <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          {!solicitacaoEncerrada ? (
+            <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+          ) : null}
           <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
         </div>
       </div>
@@ -1514,6 +1524,22 @@ function SecaoComparativo({
     return parseNumeroCompra(item?.saldo_disponivel ?? item?.quantidade);
   }
 
+  function getSaldoDisponivelFornecedor(resposta) {
+    if (resposta?.saldo_disponivel_fornecedor !== undefined && resposta?.saldo_disponivel_fornecedor !== null) {
+      return parseNumeroCompra(resposta.saldo_disponivel_fornecedor);
+    }
+    return Math.max(
+      0,
+      parseNumeroCompra(resposta?.quantidade_disponivel) - parseNumeroCompra(resposta?.quantidade_alocada)
+    );
+  }
+
+  function getQuantidadeInicialSelecao(item, resposta) {
+    const saldoFornecedor = getSaldoDisponivelFornecedor(resposta);
+    const saldoItem = getSaldoDisponivelItem(item);
+    return saldoItem > 0 ? Math.min(saldoItem, saldoFornecedor) : saldoFornecedor;
+  }
+
   const fornecedoresMapa = useMemo(() => {
     const fornecedoresPorId = new Map();
     (comparativo?.fornecedores || []).forEach((fornecedor) => {
@@ -1583,7 +1609,8 @@ function SecaoComparativo({
     const quantidadeAlocada = getQuantidadeAlocada(resposta.resposta_item_id);
     const isVencedor = quantidadeAlocada > 0;
     const saldoDisponivel = getSaldoDisponivelItem(item);
-    const podeSelecionar = podeEncerrar && saldoDisponivel > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
+    const saldoDisponivelFornecedor = getSaldoDisponivelFornecedor(resposta);
+    const podeSelecionar = podeEncerrar && saldoDisponivelFornecedor > 0 && resposta.resposta_item_id && resposta.disponivel && resposta.preco;
     const quantidadeDisponivelFornecedor = parseNumeroCompra(resposta.quantidade_disponivel);
     const excedeuSolicitado = getTotalAlocadoItem(item) > saldoDisponivel + 0.0001;
 
@@ -1613,6 +1640,9 @@ function SecaoComparativo({
 
         <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
           <span className="font-semibold text-emerald-700">Disponivel: {formatNumeroCompra(quantidadeDisponivelFornecedor)}</span>
+          <span className={saldoDisponivelFornecedor > 0 ? 'font-semibold text-blue-700' : 'text-slate-500'}>
+            Saldo fornecedor: {formatNumeroCompra(saldoDisponivelFornecedor)}
+          </span>
           <span>Prazo entrega: {resposta.prazo_entrega_fornecedor || '-'}</span>
           <span>IPI: {fmtMoeda(resposta.ipi_valor)}</span>
           <span>ICMS: {fmtMoeda(resposta.icms_valor)}</span>
@@ -1637,7 +1667,7 @@ function SecaoComparativo({
               onVencedorChange({
                 item,
                 resposta,
-                quantidade: event.target.checked ? Math.min(saldoDisponivel, quantidadeDisponivelFornecedor) : 0
+                quantidade: event.target.checked ? getQuantidadeInicialSelecao(item, resposta) : 0
               });
             }}
           />
@@ -1874,7 +1904,10 @@ function SecaoComparativo({
                           className={`cotacao-comparativo-resposta ${isVencedor ? 'cotacao-comparativo-resposta-vencedora bg-emerald-50' : ''} ${excedeu ? 'cotacao-comparativo-resposta-excedida bg-amber-50' : ''}`}
                         >
                           <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
-                          <td className="font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</td>
+                          <td>
+                            <span className="block font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</span>
+                            <span className="block text-[10px] text-blue-700">Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
+                          </td>
                           <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
                           <td className="font-medium">{resp.preco ? fmtMoeda(resp.valor_total_cotado) : '-'}</td>
                           <td>{fmtMoeda(resp.ipi_valor)}</td>
@@ -1896,14 +1929,14 @@ function SecaoComparativo({
                                 <input
                                   type="checkbox"
                                   checked={isVencedor}
-                                  disabled={!podeEncerrar || saldoDisponivel <= 0 || !resp.disponivel || !resp.preco}
+                                  disabled={!podeEncerrar || getSaldoDisponivelFornecedor(resp) <= 0 || !resp.disponivel || !resp.preco}
                                   onChange={(event) => {
                                     const checked = event.target.checked;
                                     onVencedorChange({
                                       item,
                                       resposta: resp,
                                       quantidade: checked
-                                        ? Math.min(getSaldoDisponivelItem(item), parseNumeroCompra(resp.quantidade_disponivel))
+                                        ? getQuantidadeInicialSelecao(item, resp)
                                         : 0
                                     });
                                   }}
@@ -2656,10 +2689,12 @@ export default function GerenciarCotacaoSolicitacao() {
         const totalItem = (item.respostas || []).reduce((acc, resp) => {
           const selecionado = vencedoresSelecionados[String(resp.resposta_item_id)];
           const quantidadeSelecionada = parseNumeroCompra(selecionado?.quantidade_alocada);
-          const saldoFornecedor = Math.max(
-            0,
-            parseNumeroCompra(resp.quantidade_disponivel) - parseNumeroCompra(resp.quantidade_alocada)
-          );
+          const saldoFornecedor = resp.saldo_disponivel_fornecedor !== undefined
+            ? parseNumeroCompra(resp.saldo_disponivel_fornecedor)
+            : Math.max(
+                0,
+                parseNumeroCompra(resp.quantidade_disponivel) - parseNumeroCompra(resp.quantidade_alocada)
+              );
           if (quantidadeSelecionada > saldoFornecedor + 0.0001) {
             errosDisponibilidadeFornecedor.push(
               `- ${item.nome} / ${resp.fornecedor_nome}: marcado ${formatNumeroCompra(quantidadeSelecionada)}, disponivel ${formatNumeroCompra(saldoFornecedor)}.`
@@ -2673,7 +2708,7 @@ export default function GerenciarCotacaoSolicitacao() {
         if (totalItem > saldoItem + 0.0001) {
           const excedente = totalItem - saldoItem;
           quantidadeExcedenteTotal += excedente;
-          itensExcedentes.push(`- ${item.nome}: solicitado ${formatNumeroCompra(saldoItem)}, compra ${formatNumeroCompra(totalItem)}, excedente ${formatNumeroCompra(excedente)} ${item.unidade || ''}.`);
+          itensExcedentes.push(`- ${item.nome}: saldo antes da rodada ${formatNumeroCompra(saldoItem)}, compra nesta rodada ${formatNumeroCompra(totalItem)}, excedente ${formatNumeroCompra(excedente)} ${item.unidade || ''}.`);
         }
       });
 
@@ -2683,11 +2718,6 @@ export default function GerenciarCotacaoSolicitacao() {
           '',
           ...errosDisponibilidadeFornecedor
         ].join('\n'));
-        return;
-      }
-
-      if (saldoTotalAntes <= 0.0001) {
-        alert('Nao existe saldo de itens disponivel para uma nova rodada de fechamento.');
         return;
       }
 
@@ -2826,6 +2856,8 @@ export default function GerenciarCotacaoSolicitacao() {
   const isAvulsa = solicitacao.origem === 'AVULSA';
   const statusSolicitacao = normalizeText(solicitacao.status);
   const fluxoTerminal = ['cancelada', 'cancelado', 'inativa', 'recusado', 'encerrado'].includes(statusSolicitacao);
+  const podeEditarRespostas = podeComprar
+    && (!fluxoTerminal || statusSolicitacao === 'encerrado');
   const cotacoesAtivas = (solicitacao.fornecedores || []).filter(
     (cotacao) => !['cancelada', 'cancelado'].includes(normalizeText(cotacao.status))
   );
@@ -3070,7 +3102,7 @@ export default function GerenciarCotacaoSolicitacao() {
                         const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
                         const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
-                        const podeEditarResposta = podeOperarFluxo && !cotacaoCancelada;
+                        const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
                         const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
                           && !fluxoTerminal;
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
@@ -3202,7 +3234,7 @@ export default function GerenciarCotacaoSolicitacao() {
             podeComprar={podeOperarFluxo}
             podeEncerrar={(podeFecharParcialCotacao || podeEncerrarCotacao) && !fluxoTerminal}
             podeEncerrarSemPedido={podeEncerrarSemPedidoCotacao && !fluxoTerminal && cotacoesAtivas.length > 0 && resumoEncerramentoSemPedido.saldoTotal > 0.0001}
-            podeEditarResposta={podeOperarFluxo}
+            podeEditarResposta={podeEditarRespostas}
             vencedoresSelecionados={vencedoresSelecionados}
             onVencedorChange={handleVencedorChange}
             onEditarRespostaFornecedor={abrirRespostaInternaPorId}
@@ -3232,6 +3264,7 @@ export default function GerenciarCotacaoSolicitacao() {
         cotacao={cotacaoRespostaInterna}
         form={formRespostaInterna}
         salvando={salvandoRespostaInterna}
+        solicitacaoEncerrada={statusSolicitacao === 'encerrado'}
         onChange={alterarRespostaInterna}
         onChangeItem={alterarItemRespostaInterna}
         onSalvar={handleSalvarRespostaInterna}

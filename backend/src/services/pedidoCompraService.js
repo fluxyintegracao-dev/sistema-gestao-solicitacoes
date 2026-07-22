@@ -35,6 +35,10 @@ const {
 } = require('./pedidoCompraStatusConfig');
 const { registrarFretePedido } = require('./pedidoCompraFreteService');
 const { validarResponsavelElegivelDelegacaoCompras } = require('./comprasDelegacaoService');
+const {
+  buildCompraFornecedorItemKey,
+  montarMapaAlocacoesAtivasPorFornecedorItem
+} = require('./comprasDisponibilidadeService');
 
 function normalizeText(value) {
   return String(value || '')
@@ -1146,24 +1150,22 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
   const mapaSaldos = saldosAtuais || montarMapaSaldosSolicitacao(solicitacao);
   const alocacoes = [];
   const totaisPorItem = new Map();
-  const alocadoAnteriorPorResposta = new Map();
-  const tributosAnterioresPorResposta = new Map();
+  const alocadoAnteriorPorFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(
+    solicitacao?.alocacoes || []
+  );
+  const tributosAnterioresPorFornecedorItem = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
-    const respostaId = Number(alocacao.resposta_item_id || 0);
-    alocadoAnteriorPorResposta.set(
-      respostaId,
-      roundQty((alocadoAnteriorPorResposta.get(respostaId) || 0) + asNumber(alocacao.quantidade_alocada))
-    );
-    const atual = tributosAnterioresPorResposta.get(respostaId) || { ipi: 0, icms: 0, st: 0 };
-    tributosAnterioresPorResposta.set(respostaId, {
+    const fornecedorItemKey = buildCompraFornecedorItemKey(alocacao.fornecedor_compra_id, alocacao);
+    const atual = tributosAnterioresPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
+    tributosAnterioresPorFornecedorItem.set(fornecedorItemKey, {
       ipi: roundMoney(atual.ipi + asNumber(alocacao.ipi_rateado)),
       icms: roundMoney(atual.icms + asNumber(alocacao.icms_rateado)),
       st: roundMoney(atual.st + asNumber(alocacao.st_rateado))
     });
   }
-  const alocadoRodadaPorResposta = new Map();
-  const tributosRodadaPorResposta = new Map();
+  const alocadoRodadaPorFornecedorItem = new Map();
+  const tributosRodadaPorFornecedorItem = new Map();
 
   for (const entrada of entradas) {
     const respostaItemId = Number(entrada?.resposta_item_id || entrada?.id || 0);
@@ -1187,6 +1189,10 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     }
 
     const itemKey = buildItemKeyFromResposta(resposta);
+    const fornecedorItemKey = buildCompraFornecedorItemKey(
+      vinculacaoFornecedor.fornecedor_compra_id,
+      resposta
+    );
     const quantidadeBase = roundQty(baseItem.quantidade_solicitada);
     const saldoItem = mapaSaldos.get(itemKey)?.saldo ?? quantidadeBase;
     const quantidadeEntrada =
@@ -1203,14 +1209,14 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const quantidadeDisponivel = roundQty(
       resposta.quantidade_disponivel ?? (resposta.disponivel ? quantidadeBase : 0)
     );
-    const quantidadeJaAlocadaResposta = roundQty(
-      (alocadoAnteriorPorResposta.get(respostaItemId) || 0)
-      + (alocadoRodadaPorResposta.get(respostaItemId) || 0)
+    const quantidadeJaAlocadaFornecedorItem = roundQty(
+      (alocadoAnteriorPorFornecedorItem.get(fornecedorItemKey) || 0)
+      + (alocadoRodadaPorFornecedorItem.get(fornecedorItemKey) || 0)
     );
-    const disponibilidadeRestante = roundQty(Math.max(0, quantidadeDisponivel - quantidadeJaAlocadaResposta));
+    const disponibilidadeRestante = roundQty(Math.max(0, quantidadeDisponivel - quantidadeJaAlocadaFornecedorItem));
     if (quantidadeAlocada > disponibilidadeRestante) {
       throw new Error(
-        `A quantidade definida para o fornecedor no item "${baseItem.descricao}" ultrapassa a quantidade disponivel. Disponivel na resposta: ${quantidadeDisponivel}. Ja alocada: ${quantidadeJaAlocadaResposta}. Saldo do fornecedor: ${disponibilidadeRestante}.`
+        `A quantidade definida para o fornecedor no item "${baseItem.descricao}" ultrapassa a quantidade disponivel. Disponivel na resposta: ${quantidadeDisponivel}. Ja comprada deste fornecedor para o item: ${quantidadeJaAlocadaFornecedorItem}. Saldo do fornecedor: ${disponibilidadeRestante}.`
       );
     }
 
@@ -1222,12 +1228,12 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     }
 
     totaisPorItem.set(itemKey, totalAtual);
-    alocadoRodadaPorResposta.set(
-      respostaItemId,
-      roundQty((alocadoRodadaPorResposta.get(respostaItemId) || 0) + quantidadeAlocada)
+    alocadoRodadaPorFornecedorItem.set(
+      fornecedorItemKey,
+      roundQty((alocadoRodadaPorFornecedorItem.get(fornecedorItemKey) || 0) + quantidadeAlocada)
     );
-    const tributosAnteriores = tributosAnterioresPorResposta.get(respostaItemId) || { ipi: 0, icms: 0, st: 0 };
-    const tributosRodada = tributosRodadaPorResposta.get(respostaItemId) || { ipi: 0, icms: 0, st: 0 };
+    const tributosAnteriores = tributosAnterioresPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
+    const tributosRodada = tributosRodadaPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
     const percentualQuantidade = quantidadeDisponivel > 0 ? quantidadeAlocada / quantidadeDisponivel : 0;
     const ratearTributo = (total, anterior, rodada) => roundMoney(Math.min(
       Math.max(0, asNumber(total) - anterior - rodada),
@@ -1236,7 +1242,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const ipiRateado = ratearTributo(resposta.ipi_valor, tributosAnteriores.ipi, tributosRodada.ipi);
     const icmsRateado = ratearTributo(resposta.icms_valor, tributosAnteriores.icms, tributosRodada.icms);
     const stRateado = ratearTributo(resposta.st_valor, tributosAnteriores.st, tributosRodada.st);
-    tributosRodadaPorResposta.set(respostaItemId, {
+    tributosRodadaPorFornecedorItem.set(fornecedorItemKey, {
       ipi: roundMoney(tributosRodada.ipi + ipiRateado),
       icms: roundMoney(tributosRodada.icms + icmsRateado),
       st: roundMoney(tributosRodada.st + stRateado)

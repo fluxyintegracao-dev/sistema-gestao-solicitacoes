@@ -54,6 +54,12 @@ const {
   gerarPedidosDosVencedores,
   isSolicitacaoCompraComPedidosFechadosComFornecedor
 } = require('../services/pedidoCompraService');
+const {
+  buildCompraItemKey,
+  calcularDisponibilidadeFornecedorItem,
+  montarMapaAlocacoesAtivasPorFornecedorItem,
+  montarMapaAlocacoesAtivasPorItem
+} = require('../services/comprasDisponibilidadeService');
 const { isPedidoCompraStatusLocked } = require('../services/pedidoCompraStatusConfig');
 const {
   construirResumoApropriacoes,
@@ -649,6 +655,21 @@ async function carregarSolicitacaoCompra(id) {
         ]
       },
       {
+        model: SolicitacaoCompraAlocacao,
+        as: 'alocacoes',
+        required: false,
+        separate: true,
+        attributes: [
+          'id',
+          'fornecedor_compra_id',
+          'item_tipo',
+          'solicitacao_compra_item_id',
+          'solicitacao_compra_item_manual_id',
+          'quantidade_alocada',
+          'status'
+        ]
+      },
+      {
         model: PedidoCompra,
         as: 'pedidos',
         include: [
@@ -1214,6 +1235,8 @@ async function carregarItensCotaveisDiretos(solicitacaoCompraId, transaction) {
 
 function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
+  const mapaAlocacoesPorItem = montarMapaAlocacoesAtivasPorItem(solicitacao.alocacoes || []);
+  const mapaAlocacoesPorFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(solicitacao.alocacoes || []);
   const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
     (cotacaoFornecedor) => !['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(cotacaoFornecedor.status))
   );
@@ -1259,6 +1282,16 @@ function montarComparativoSolicitacao(solicitacao) {
           buildRespostaItemKey(item.item_tipo, item.item_referencia_id);
       });
 
+      const quantidadeDisponivel = Number(
+        resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : 0)
+      );
+      const disponibilidadeFornecedor = calcularDisponibilidadeFornecedorItem({
+        fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
+        item,
+        quantidadeDisponivel,
+        mapaAlocacoesFornecedorItem: mapaAlocacoesPorFornecedorItem
+      });
+
       return {
         cotacao_fornecedor_id: cotacaoFornecedor.id,
         fornecedor_id: cotacaoFornecedor.fornecedor?.id || cotacaoFornecedor.fornecedor_compra_id,
@@ -1285,9 +1318,8 @@ function montarComparativoSolicitacao(solicitacao) {
         data_chegada: resposta?.data_chegada || null,
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
-        quantidade_disponivel: Number(
-          resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : 0)
-        ),
+        quantidade_disponivel: quantidadeDisponivel,
+        saldo_disponivel_fornecedor: disponibilidadeFornecedor.saldo_disponivel,
         ipi_valor: Number(resposta?.ipi_valor || 0),
         icms_valor: Number(resposta?.icms_valor || 0),
         st_valor: Number(resposta?.st_valor || 0),
@@ -1300,19 +1332,14 @@ function montarComparativoSolicitacao(solicitacao) {
               + Number(resposta.st_valor || 0)
             )
           : 0,
-        quantidade_alocada: (resposta?.alocacoes || [])
-          .filter((alocacao) => String(alocacao.status || '').toUpperCase() === 'ATIVA')
-          .reduce((acc, alocacao) => acc + Number(alocacao.quantidade_alocada || 0), 0),
+        quantidade_alocada: disponibilidadeFornecedor.quantidade_alocada,
         vencedor: Boolean(resposta?.vencedor)
       };
     }).filter((resposta) => resposta.quantidade_disponivel > 0 && Number(resposta.preco || 0) > 0);
 
     const disponiveis = respostas.filter((resposta) => resposta.disponivel && Number(resposta.preco) > 0);
     const quantidadeAtual = Number(item.quantidade || 0);
-    const quantidadeFechada = respostas.reduce(
-      (total, resposta) => total + Number(resposta.quantidade_alocada || 0),
-      0
-    );
+    const quantidadeFechada = Number(mapaAlocacoesPorItem.get(buildCompraItemKey(item)) || 0);
     const saldoDisponivel = Math.max(0, quantidadeAtual - quantidadeFechada);
     const melhor = disponiveis.reduce((acc, atual) => {
       if (!acc) return atual;

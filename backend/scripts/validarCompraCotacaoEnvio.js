@@ -7,6 +7,12 @@ const {
   validateCompraEnviarBody
 } = require('../src/validators/operationalValidators');
 const { ALL_PERMISSION_KEYS } = require('../src/constants/moduloPermissoes');
+const {
+  calcularDisponibilidadeFornecedorItem,
+  calcularNovaDisponibilidadeLiberada,
+  montarMapaAlocacoesAtivasPorFornecedorItem,
+  montarMapaAlocacoesAtivasPorItem
+} = require('../src/services/comprasDisponibilidadeService');
 
 function itemSelecionado() {
   return {
@@ -154,6 +160,68 @@ function validarCompatibilidadeDataChegadaLegada() {
   assert.strictEqual(resultado.itens[0].data_chegada, '2026-07-30');
 }
 
+function validarDisponibilidadeHistoricaPorFornecedorItem() {
+  const item = {
+    item_tipo: 'CADASTRADO',
+    item_referencia_id: 71
+  };
+  const alocacoes = [
+    {
+      fornecedor_compra_id: 10,
+      item_tipo: 'CADASTRADO',
+      solicitacao_compra_item_id: 71,
+      quantidade_alocada: 10,
+      status: 'ATIVA'
+    },
+    {
+      fornecedor_compra_id: 10,
+      item_tipo: 'CADASTRADO',
+      solicitacao_compra_item_id: 71,
+      quantidade_alocada: 3,
+      status: 'CANCELADA'
+    }
+  ];
+  const mapaFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(alocacoes);
+  const mapaItem = montarMapaAlocacoesAtivasPorItem(alocacoes);
+
+  const mesmoFornecedorAposEdicao = calcularDisponibilidadeFornecedorItem({
+    fornecedorCompraId: 10,
+    item,
+    quantidadeDisponivel: 20,
+    mapaAlocacoesFornecedorItem: mapaFornecedorItem
+  });
+  const outroFornecedor = calcularDisponibilidadeFornecedorItem({
+    fornecedorCompraId: 11,
+    item,
+    quantidadeDisponivel: 8,
+    mapaAlocacoesFornecedorItem: mapaFornecedorItem
+  });
+
+  assert.strictEqual(mesmoFornecedorAposEdicao.quantidade_alocada, 10);
+  assert.strictEqual(mesmoFornecedorAposEdicao.saldo_disponivel, 10);
+  assert.strictEqual(outroFornecedor.quantidade_alocada, 0);
+  assert.strictEqual(outroFornecedor.saldo_disponivel, 8);
+  assert.strictEqual(mapaItem.get('CADASTRADO:71'), 10);
+
+  const novaDisponibilidade = calcularNovaDisponibilidadeLiberada({
+    fornecedorCompraId: 10,
+    respostasAnteriores: [{ ...item, quantidade_disponivel: 10 }],
+    respostasNovas: [{ ...item, quantidade_disponivel: 20 }],
+    mapaAlocacoesFornecedorItem: mapaFornecedorItem
+  });
+  const semAumento = calcularNovaDisponibilidadeLiberada({
+    fornecedorCompraId: 10,
+    respostasAnteriores: [{ ...item, quantidade_disponivel: 20 }],
+    respostasNovas: [{ ...item, quantidade_disponivel: 20 }],
+    mapaAlocacoesFornecedorItem: mapaFornecedorItem
+  });
+
+  assert.strictEqual(novaDisponibilidade.quantidade_liberada_total, 10);
+  assert.strictEqual(novaDisponibilidade.itens[0].disponibilidade_anterior, 0);
+  assert.strictEqual(novaDisponibilidade.itens[0].disponibilidade_nova, 10);
+  assert.strictEqual(semAumento.quantidade_liberada_total, 0);
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
@@ -162,5 +230,6 @@ validarEncerramentoSemPedido();
 validarPermissaoEncerramentoSemPedido();
 validarPrazoGeralRespostaInterna();
 validarCompatibilidadeDataChegadaLegada();
+validarDisponibilidadeHistoricaPorFornecedorItem();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');
