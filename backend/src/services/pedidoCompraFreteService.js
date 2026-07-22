@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const {
   FornecedorCompra,
   Historico,
@@ -500,6 +501,67 @@ async function recalcularRateiosFrete({ pedido, frete, valorTotal, transaction }
   );
 }
 
+async function sincronizarRateiosFretesPendentesPedido({
+  pedidoId,
+  usuarioId = null,
+  motivo = 'Itens do pedido alterados',
+  transaction
+}) {
+  const pedido = await PedidoCompra.findByPk(Number(pedidoId), {
+    include: [
+      { model: PedidoCompraItem, as: 'itens' },
+      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome'] },
+      { model: SolicitacaoCompra, as: 'solicitacao', attributes: ['id', 'solicitacao_principal_id', 'status'] }
+    ],
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined
+  });
+  if (!pedido) {
+    throw new Error('Pedido de compra nao encontrado para sincronizar o frete.');
+  }
+
+  const fretes = await PedidoCompraFrete.findAll({
+    where: {
+      pedido_compra_id: pedido.id,
+      titulo_financeiro_id: null,
+      [Op.or]: [
+        { status_financeiro: { [Op.ne]: 'CANCELADO' } },
+        { status_financeiro: null }
+      ]
+    },
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : undefined
+  });
+  const itensAtivos = (pedido.itens || []).filter((item) => !item.removido);
+
+  for (const frete of fretes) {
+    if (!itensAtivos.length) {
+      await frete.update({ status_financeiro: 'CANCELADO' }, { transaction });
+      await PedidoCompraFreteRateio.destroy({ where: { frete_id: frete.id }, transaction });
+      await registrarHistoricoControleFrete({
+        pedido,
+        frete,
+        usuarioId,
+        tipoAcao: 'FRETE_PEDIDO_CANCELADO_AUTOMATICAMENTE',
+        descricao: `Frete do pedido PC-${String(pedido.id).padStart(5, '0')} cancelado apos remanejamento integral`,
+        observacao: `${motivo}. O pedido ficou sem itens ativos.`,
+        metadados: { motivo, automatico: true },
+        transaction
+      });
+      continue;
+    }
+
+    await recalcularRateiosFrete({
+      pedido: { ...pedido.toJSON(), itens: itensAtivos },
+      frete,
+      valorTotal: roundMoney(frete.valor_total),
+      transaction
+    });
+  }
+
+  return fretes.length;
+}
+
 async function atualizarFretePedido({
   pedidoId,
   freteId,
@@ -612,5 +674,6 @@ module.exports = {
   cancelarFretePedido,
   listarFretesPendentesFinanceiro,
   listarFretesPedido,
-  registrarFretePedido
+  registrarFretePedido,
+  sincronizarRateiosFretesPendentesPedido
 };

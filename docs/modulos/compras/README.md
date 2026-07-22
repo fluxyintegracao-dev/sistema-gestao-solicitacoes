@@ -60,6 +60,8 @@ No fechamento de cotacao, a mesma chave de idempotencia nao pode repetir pedidos
 
 A disponibilidade e acumulada por fornecedor e item, sem depender do ID versionado da resposta. Uma edicao interna que aumente a capacidade total do fornecedor pode reabrir uma solicitacao `ENCERRADO` para `FECHAMENTO_PARCIAL`; o sistema abate tudo que ja foi comprado daquele fornecedor para o item e libera somente a diferenca real. A resposta publica continua bloqueada depois do encerramento.
 
+Reabrir um pedido libera ajustes operacionais, mas preserva as alocacoes ja compradas. Edicao e remanejamento ficam bloqueados quando houver titulo financeiro ou frete titulado. No remanejamento, origem e destino sao atualizados na mesma transacao, com validacao do saldo do fornecedor, custos gerenciais, descontos e fretes pendentes. Depois do ajuste, o usuario fecha novamente os pedidos; a solicitacao e as cotacoes sao sincronizadas automaticamente conforme todos os pedidos ativos estejam fechados ou algum pedido seja cancelado.
+
 ## Mudanca segura
 
 Testar compra normal e direta, destinos iniciais, compatibilidade de registros antigos, credor, itens cadastrados/manuais, importacao, rateio, edicao de apropriacoes, permissoes, cancelamento, cotacao, pedido, relatorios de compras e registros de origem.

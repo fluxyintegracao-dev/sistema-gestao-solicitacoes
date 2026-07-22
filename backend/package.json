@@ -10,6 +10,7 @@
     "test:boleto-caixa-retorno": "node scripts/validarBoletoCaixaRetornoCnab240.js",
     "test:fiscal-dfe-processor": "node scripts/validarFiscalDfeProcessor.js",
     "test:compra-cotacao-envio": "node scripts/validarCompraCotacaoEnvio.js",
+    "test:compra-remanejamento": "node scripts/validarCompraRemanejamento.js",
     "test:payments": "node scripts/validarPagamentosEngine.js",
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
     "test:importacao-titulos": "node scripts/validarImportacaoTitulos.js",

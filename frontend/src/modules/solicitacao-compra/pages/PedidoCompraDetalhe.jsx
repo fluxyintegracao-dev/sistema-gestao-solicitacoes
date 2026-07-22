@@ -1231,6 +1231,11 @@ export default function PedidoCompraDetalhe() {
     }
 
     const quantidadeMaxima = Number(itemEditando.quantidade_pedido || 0);
+    const candidatoDestino = (pedido.candidatos_remanejamento || []).find(
+      (candidato) => Number(candidato.resposta_item_id) === Number(remanejoSelecionado)
+    );
+    const saldoFornecedorDestino = Number(candidatoDestino?.saldo_disponivel_fornecedor || 0);
+    const quantidadeMaximaEfetiva = Math.min(quantidadeMaxima, saldoFornecedorDestino);
     const quantidadeInformada = remanejoQuantidade
       ? parseBrazilianQuantity(remanejoQuantidade)
       : quantidadeMaxima;
@@ -1240,8 +1245,8 @@ export default function PedidoCompraDetalhe() {
       return;
     }
 
-    if (quantidadeInformada > quantidadeMaxima) {
-      alert(`A quantidade remanejada nao pode ser maior que ${formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}.`);
+    if (quantidadeInformada > quantidadeMaximaEfetiva) {
+      alert(`A quantidade remanejada nao pode ser maior que ${formatQuantityLabel(quantidadeMaximaEfetiva, itemEditando.unidade)}. Esse limite considera o item de origem e o saldo atual do fornecedor de destino.`);
       return;
     }
 
@@ -1303,6 +1308,15 @@ export default function PedidoCompraDetalhe() {
           Number(candidato.fornecedor_id) !== Number(pedido.fornecedor_compra_id);
       })
     : [];
+  const candidatoRemanejamentoSelecionado = candidatosRemanejamentoItem.find(
+    (candidato) => Number(candidato.resposta_item_id) === Number(remanejoSelecionado)
+  );
+  const quantidadeMaximaRemanejamento = itemEditando
+    ? Math.min(
+        Number(itemEditando.quantidade_pedido || 0),
+        Number(candidatoRemanejamentoSelecionado?.saldo_disponivel_fornecedor ?? itemEditando.quantidade_pedido ?? 0)
+      )
+    : 0;
 
   return (
     <div className="page solicitacoes-page">
@@ -2061,7 +2075,7 @@ export default function PedidoCompraDetalhe() {
                     </p>
                   </div>
                   <span className="app-status-pill bg-blue-50 text-blue-700">
-                    Max. {formatQuantityLabel(itemEditando.quantidade_pedido, itemEditando.unidade)}
+                    Max. {formatQuantityLabel(quantidadeMaximaRemanejamento, itemEditando.unidade)}
                   </span>
                 </div>
                 <div className="mt-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_150px_auto]">
@@ -2076,7 +2090,7 @@ export default function PedidoCompraDetalhe() {
                     </option>
                     {candidatosRemanejamentoItem.map((candidato) => (
                       <option key={`${candidato.resposta_item_id}-${candidato.fornecedor_id}`} value={candidato.resposta_item_id}>
-                        {candidato.fornecedor_nome} - {formatUnitPrice(candidato.preco_unitario, candidato.unidade)} - prazo {candidato.prazo || '-'}
+                        {candidato.fornecedor_nome} - saldo {formatQuantityLabel(candidato.saldo_disponivel_fornecedor, candidato.unidade)} - {formatUnitPrice(candidato.preco_unitario, candidato.unidade)} - prazo {candidato.prazo || '-'}
                       </option>
                     ))}
                   </select>
@@ -2087,7 +2101,7 @@ export default function PedidoCompraDetalhe() {
                     value={remanejoQuantidade}
                     onChange={(event) => setRemanejoQuantidade(maskBrazilianQuantityInput(event.target.value))}
                     onBlur={(event) => setRemanejoQuantidade(normalizeBrazilianQuantityOnBlur(event.target.value))}
-                    placeholder={formatBrazilianQuantity(itemEditando.quantidade_pedido)}
+                    placeholder={formatBrazilianQuantity(quantidadeMaximaRemanejamento)}
                     disabled={pedidoBloqueado || remanejandoItem}
                   />
                   <button

@@ -67,7 +67,17 @@
 ## Pedido
 
 - pedido pode ser ajustado manualmente conforme permissao e estado;
+- reabrir pedido exige permissao e motivo, retorna o pedido ao status aberto configurado e serve para permitir edicao de quantidade, preco, itens e remanejamento; a reabertura nao cancela nem reduz as alocacoes existentes;
+- pedido com titulo financeiro ou frete com titulo vinculado nao pode ser reaberto: o efeito financeiro precisa ser tratado antes;
+- quando a compra estava encerrada, a reabertura coloca a solicitacao em revisao (`FECHAMENTO_PARCIAL` quando existem alocacoes) e marca a cotacao do fornecedor como `REABERTA`;
 - itens podem ser removidos, alterados, adicionados ou remanejados dentro do universo elegivel;
+- remanejamento transfere a quantidade entre fornecedores sem aumentar a quantidade total comprada: reduz ou cancela a alocacao de origem e cria uma alocacao ativa no destino;
+- o fornecedor de destino deve ter resposta vigente, preco e saldo real suficiente, calculado pela capacidade total menos todas as alocacoes ativas anteriores daquele fornecedor e item;
+- remanejamento e bloqueado quando o pedido de origem ou o pedido de destino possui efeitos financeiros vinculados;
+- IPI, ICMS, ST, DIFAL, desconto e frete pendente sao recalculados ou rateados na mesma transacao do remanejamento;
+- depois dos ajustes, os pedidos envolvidos permanecem abertos e precisam voltar ao status fechado com o fornecedor quando a negociacao estiver concluida;
+- quando todos os pedidos ativos ficam fechados e nao existe saldo da solicitacao, a compra volta a `ENCERRADO` e as cotacoes nao canceladas ficam `FINALIZADA`;
+- se um pedido for cancelado, suas alocacoes deixam de consumir saldo, a compra volta ao estado operacional conforme o saldo e a resposta do fornecedor permanece `RESPONDIDO`; a cotacao somente fica `CANCELADA` quando o operador solicita explicitamente o cancelamento da cotacao;
 - toda edicao manual de preco e quantidade precisa gerar log;
 - status configuravel ou cotacao encerrada pode bloquear alteracao posterior;
 - cancelamento e frete possuem regras e permissoes separadas.
