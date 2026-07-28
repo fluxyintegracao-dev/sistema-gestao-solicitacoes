@@ -4,11 +4,10 @@ const { URL } = require('url');
 
 const { env } = require('../../config/env');
 const { createBancoDoBrasilError, sanitizeHeaders, sanitizePayload } = require('./bancoDoBrasilErrors');
+const { assertBbRealSendingAllowed } = require('./bbPaymentsRuntimeGuard');
 
 function assertRealProviderEnabled() {
-  if (!env.bbSandboxRealEnabled) {
-    throw createBancoDoBrasilError(501, 'Integracao real BB esta desabilitada. Ative BB_REAL_PROVIDER_ENABLED=true nas variaveis de ambiente.', 'BB_REAL_PROVIDER_DISABLED');
-  }
+  assertBbRealSendingAllowed();
 }
 
 function buildHttpsAgent() {
@@ -29,9 +28,7 @@ function buildHttpsAgent() {
     options.ca = fs.readFileSync(env.bbCaCertPath);
   }
 
-  if (env.bbPaymentsEnv === 'sandbox' && env.bbTlsRejectUnauthorized === false) {
-    options.rejectUnauthorized = false;
-  }
+  options.rejectUnauthorized = true;
 
   return new https.Agent(options);
 }
@@ -147,7 +144,6 @@ function getHealth() {
     appKeyConfigured: Boolean(env.bbAppKey),
     clientIdConfigured: Boolean(env.bbClientId),
     clientSecretConfigured: Boolean(env.bbClientSecret),
-    autoLiberarLote: env.bbAutoLiberarLote,
     webhookEnabled: env.bbWebhookEnabled,
     webhookPath: env.bbWebhookPath,
     webhookRequireMtls: env.bbWebhookRequireMtls

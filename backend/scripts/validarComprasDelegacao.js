@@ -48,6 +48,11 @@ function validarIntegracaoEntreCamadas() {
 
   assert(routes.includes("router.get('/compras/delegacao/usuarios', allowComprasDelegacaoManage"));
   assert(pedidoService.includes('validarResponsavelElegivelDelegacaoCompras(responsavelId, { transaction })'));
+  assert(pedidoService.includes('Solicitacao atribuida a ${responsavelNome}'));
+  assert(pedidoService.includes('Compras atribuiu a solicitacao a ${responsavelNome}'));
+  assert(pedidoService.includes('responsavel_nome: responsavelNome'));
+  assert(!pedidoService.includes('Solicitacao atribuida ao usuario #${responsavelNormalizado}'));
+  assert(!pedidoService.includes('Compras atribuiu a solicitacao ao usuario #${responsavelId}'));
   assert(controller.includes('listarUsuariosElegiveisDelegacaoCompras()'));
   assert(frontend.includes('listarUsuariosDelegacaoCompras'));
   assert(frontend.includes('podeGerenciarDelegacao ? listarUsuariosDelegacaoCompras() : Promise.resolve([])'));

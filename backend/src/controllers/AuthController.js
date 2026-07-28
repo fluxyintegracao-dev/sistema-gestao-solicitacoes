@@ -102,7 +102,8 @@ function buildAuthPayload(user) {
     id: user.id,
     perfil: user.perfil,
     area: user.setor?.codigo || null,
-    setor_id: user.setor_id
+    setor_id: user.setor_id,
+    token_version: Number(user.token_version || 0)
   };
 }
 
@@ -200,7 +201,7 @@ module.exports = {
 
         return res.json({
           mfa_required: true,
-          challenge_token: buildMfaChallengeToken(user.id),
+          challenge_token: buildMfaChallengeToken(user),
           user: {
             id: user.id,
             nome: user.nome,
@@ -255,6 +256,9 @@ module.exports = {
 
       if (!user || user.ativo === false || !user.mfa_totp_enabled || !user.mfa_totp_secret) {
         return res.status(401).json({ error: 'MFA nao esta disponivel para este usuario.' });
+      }
+      if (Number(decoded.token_version || 0) !== Number(user.token_version || 0)) {
+        return res.status(401).json({ error: 'Desafio MFA revogado. Inicie o login novamente.' });
       }
 
       if (!verifyTotpCode(user.mfa_totp_secret, codigo)) {
@@ -342,6 +346,9 @@ module.exports = {
 
   async logout(req, res) {
     try {
+      if (req.user?.id) {
+        await User.increment('token_version', { by: 1, where: { id: req.user.id } });
+      }
       clearAuthCookies(res);
       await registrarEventoSeguranca({
         req,
@@ -403,7 +410,8 @@ module.exports = {
         mfa_totp_enabled: true,
         mfa_totp_secret: user.mfa_totp_temp_secret,
         mfa_totp_temp_secret: null,
-        mfa_totp_last_verified_at: new Date()
+        mfa_totp_last_verified_at: new Date(),
+        token_version: Number(user.token_version || 0) + 1
       });
 
       await registrarEventoSeguranca({
@@ -456,8 +464,10 @@ module.exports = {
         mfa_totp_enabled: false,
         mfa_totp_secret: null,
         mfa_totp_temp_secret: null,
-        mfa_totp_last_verified_at: null
+        mfa_totp_last_verified_at: null,
+        token_version: Number(user.token_version || 0) + 1
       });
+      clearAuthCookies(res);
 
       await registrarEventoSeguranca({
         req,

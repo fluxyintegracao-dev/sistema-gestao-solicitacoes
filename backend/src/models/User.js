@@ -1,3 +1,8 @@
+const {
+  decryptSensitiveValue,
+  encryptSensitiveValue
+} = require('../services/sensitiveFieldCrypto');
+
 module.exports = (sequelize, DataTypes) => {
   return sequelize.define('User', {
     id: {
@@ -92,17 +97,35 @@ module.exports = (sequelize, DataTypes) => {
 
     mfa_totp_secret: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
+      get() {
+        return decryptSensitiveValue(this.getDataValue('mfa_totp_secret'));
+      },
+      set(value) {
+        this.setDataValue('mfa_totp_secret', encryptSensitiveValue(value));
+      }
     },
 
     mfa_totp_temp_secret: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
+      get() {
+        return decryptSensitiveValue(this.getDataValue('mfa_totp_temp_secret'));
+      },
+      set(value) {
+        this.setDataValue('mfa_totp_temp_secret', encryptSensitiveValue(value));
+      }
     },
 
     mfa_totp_last_verified_at: {
       type: DataTypes.DATE,
       allowNull: true
+    },
+
+    token_version: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0
     }
   }, {
     tableName: 'users',

@@ -1,10 +1,9 @@
-const { env } = require('../../config/env');
 const { getAccessToken } = require('./bancoDoBrasilAuthService');
 const { requestJson, getHealth } = require('./bancoDoBrasilHttpClient');
 const {
-  mapBatchToPixTransferRequest,
-  mapReleasePaymentsRequest
+  mapBatchToPixTransferRequest
 } = require('./bancoDoBrasilPayloadMapper');
+const { assertBbRealSendingAllowed } = require('./bbPaymentsRuntimeGuard');
 const {
   mapPaymentStatus,
   mapRequestStatus
@@ -17,19 +16,8 @@ const {
 const SCOPES = {
   PIX_BATCH: 'pagamentos-lote.transferencias-pix-requisicao',
   PIX_INFO: 'pagamentos-lote.transferencias-pix-info',
-  RELEASE: 'pagamentos-lote.lotes-requisicao',
   INFO: 'pagamentos-lote.lotes-info'
 };
-
-function assertRealProviderEnabled() {
-  if (!env.bbSandboxRealEnabled) {
-    throw createBancoDoBrasilError(
-      400,
-      'Integracao real BB desabilitada. Ative BB_REAL_PROVIDER_ENABLED=true nas variaveis de ambiente.',
-      'BB_REAL_PROVIDER_DISABLED'
-    );
-  }
-}
 
 function getProviderBatchIdFromResponse(data, fallback) {
   return String(
@@ -106,7 +94,10 @@ function extractBancoDoBrasilErrorMessage(details) {
 }
 
 async function submitPixBatch(batch, options = {}) {
-  assertRealProviderEnabled();
+  assertBbRealSendingAllowed({
+    account: batch?.paymentAccount,
+    provider: batch?.provider
+  });
   const body = mapBatchToPixTransferRequest(batch, {
     numeroRequisicao: options.numeroRequisicao
   });
@@ -130,32 +121,8 @@ async function submitPixBatch(batch, options = {}) {
   };
 }
 
-async function releasePayments(batch, options = {}) {
-  assertRealProviderEnabled();
-  const body = mapReleasePaymentsRequest(batch, {
-    numeroRequisicao: options.numeroRequisicao
-  });
-  const token = await getAccessToken(SCOPES.RELEASE);
-  const response = await requestJson({
-    method: 'POST',
-    path: '/liberar-pagamentos',
-    body,
-    accessToken: token.access_token
-  });
-
-  return {
-    operation: 'RELEASE_PAYMENTS',
-    provider_status: normalizeSubmitStatus(response.data),
-    provider_batch_id: getProviderBatchIdFromResponse(response.data, body.numeroRequisicao),
-    http_status: response.http_status,
-    request_snapshot: response.request_snapshot,
-    response_snapshot: response.response_snapshot,
-    data: sanitizePayload(response.data)
-  };
-}
-
 async function getBatchStatus(providerBatchId) {
-  assertRealProviderEnabled();
+  assertBbRealSendingAllowed();
   if (!providerBatchId) {
     throw createBancoDoBrasilError(400, 'Identificador do lote BB nao informado.', 'BB_BATCH_ID_REQUIRED');
   }
@@ -179,7 +146,7 @@ async function getBatchStatus(providerBatchId) {
 }
 
 async function getBatchRequestStatus(numeroSolicitacao) {
-  assertRealProviderEnabled();
+  assertBbRealSendingAllowed();
   if (!numeroSolicitacao) {
     throw createBancoDoBrasilError(400, 'Numero da solicitacao BB nao informado.', 'BB_REQUEST_ID_REQUIRED');
   }
@@ -203,7 +170,7 @@ async function getBatchRequestStatus(numeroSolicitacao) {
 }
 
 async function searchPaymentsStatus(filters = {}) {
-  assertRealProviderEnabled();
+  assertBbRealSendingAllowed();
   const token = await getAccessToken(SCOPES.INFO);
   const response = await requestJson({
     method: 'GET',
@@ -236,7 +203,6 @@ module.exports = {
   SCOPES,
   getHealth,
   submitPixBatch,
-  releasePayments,
   getBatchStatus,
   getBatchRequestStatus,
   searchPaymentsStatus,

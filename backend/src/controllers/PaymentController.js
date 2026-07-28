@@ -19,7 +19,6 @@ const {
   handleBbWebhook,
   listBbTransactions,
   listPaymentEvents,
-  markBatchAsBankConfirmedMock,
   reprocessBatch,
   sincronizarStatusBb: sincronizarStatusBbService
 } = require('../services/paymentExecutionService');
@@ -205,16 +204,6 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao reprocessar lote de pagamento');
-    }
-  },
-
-  async simularRetornoBanco(req, res) {
-    try {
-      const data = await markBatchAsBankConfirmedMock(req, req.params.id, req.body || {});
-      return res.json(data);
-    } catch (error) {
-      console.error(error);
-      return responderErro(res, error, 'Erro ao simular retorno bancario');
     }
   },
 

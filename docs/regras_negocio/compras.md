@@ -67,6 +67,9 @@
 ## Pedido
 
 - pedido pode ser ajustado manualmente conforme permissao e estado;
+- a condicao de pagamento vigente na resposta e gravada como snapshot no pedido e e a fonte oficial para o detalhe e o PDF;
+- uma edicao isolada da resposta nao reescreve pedidos ja gerados; a atualizacao ocorre apenas quando o proprio pedido e reutilizado ou reaberto pelo fluxo operacional, sempre com auditoria dos valores anterior e novo;
+- o backfill de pedidos historicos prioriza o log de resposta existente na data de criacao e usa a cotacao atual apenas como compatibilidade quando nao houver historico suficiente;
 - reabrir pedido exige permissao e motivo, retorna o pedido ao status aberto configurado e serve para permitir edicao de quantidade, preco, itens e remanejamento; a reabertura nao cancela nem reduz as alocacoes existentes;
 - pedido com titulo financeiro ou frete com titulo vinculado nao pode ser reaberto: o efeito financeiro precisa ser tratado antes;
 - quando a compra estava encerrada, a reabertura coloca a solicitacao em revisao (`FECHAMENTO_PARCIAL` quando existem alocacoes) e marca a cotacao do fornecedor como `REABERTA`;
@@ -91,6 +94,7 @@
 - `SUPERADMIN` continua fora da lista operacional de responsaveis, preservando o comportamento anterior da selecao;
 - consultar candidatos exige permissao de gerenciamento da Delegacao de Compras; usuarios com acesso apenas para registrar atraso nao carregam essa lista;
 - remover o responsavel continua permitido;
+- ao delegar, a descricao visivel do historico identifica o responsavel pelo nome, enquanto ID e nome permanecem nos metadados para rastreabilidade tecnica;
 - atribuicao historica que deixou de ser elegivel nao e apagada automaticamente: permanece identificada na tela e precisa ser substituida ou removida antes de um novo salvamento gerencial;
 - o backend valida novamente usuario, atividade e setor no momento da gravacao e replica o responsavel validado para a solicitacao e seus pedidos vinculados na mesma transacao.
 

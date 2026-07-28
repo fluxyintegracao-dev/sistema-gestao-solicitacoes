@@ -50,6 +50,7 @@ As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/so
 - o vinculo pode ser o setor principal do usuario ou um setor adicional registrado em `usuario_setores`;
 - o endpoint dedicado `GET /compras/delegacao/usuarios` exige permissao de gerenciamento da delegacao e nao altera o endpoint generico de usuarios usado por outros fluxos;
 - o backend revalida a elegibilidade dentro da transacao ao salvar, protegendo contra desativacao ou troca de setor ocorrida depois do carregamento da tela;
+- os historicos da solicitacao de compra e da solicitacao principal exibem o nome do responsavel delegado; o ID permanece somente nos metadados tecnicos de auditoria;
 - atribuições historicas a usuarios fora de Compras sao preservadas para consulta, mas um novo salvamento gerencial exige trocar ou remover esse responsavel.
 
 ## Idempotencia

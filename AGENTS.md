@@ -49,7 +49,7 @@ Guia rapido para colaboradores e agentes automatizados.
   - `https://jrfluxy.com.br`
   - `https://www.jrfluxy.com.br`
   - `https://csc.jrfluxy.com.br`
-  - e aceita previews `https://sistema-gestao-solicitacoes-*.vercel.app`
+  - previews Vercel nao usam wildcard; quando necessarios, devem ser cadastrados por origem exata
 
 ### Frontend (UX/UI)
 - Menu lateral inicia oculto e abre por hover na borda esquerda; fecha ao sair do mouse.

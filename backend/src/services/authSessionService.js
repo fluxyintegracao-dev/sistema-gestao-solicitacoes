@@ -87,11 +87,14 @@ function buildAuthToken(payload) {
   return jwt.sign(payload, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 }
 
-function buildMfaChallengeToken(userId) {
+function buildMfaChallengeToken(user) {
+  const userId = typeof user === 'object' ? user?.id : user;
+  const tokenVersion = typeof user === 'object' ? Number(user?.token_version || 0) : 0;
   return jwt.sign(
     {
       purpose: 'MFA_CHALLENGE',
-      id: Number(userId)
+      id: Number(userId),
+      token_version: tokenVersion
     },
     env.jwtSecret,
     { expiresIn: env.mfaChallengeExpiresIn }

@@ -13,7 +13,7 @@ import {
 } from '../services/financeiro';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { textMatchesSearchTerms } from '../utils/search';
+import { categoriaFinanceiraMatchesSearch } from '../utils/categoriaFinanceira';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -191,8 +191,13 @@ function getTituloBloqueado(titulo) {
 }
 
 function categoriaCompativel(categoria, tipoTitulo) {
+  if (!categoria || categoria.ativo === false) {
+    return false;
+  }
+
   const tipoCategoria = String(categoria?.tipo || '').trim().toUpperCase();
-  return tipoCategoria === tipoTitulo || tipoCategoria === 'AMBOS';
+  const tipo = String(tipoTitulo || '').trim().toUpperCase();
+  return !tipoCategoria || tipoCategoria === tipo || tipoCategoria === 'AMBOS';
 }
 
 function buildFormFromTitulo(titulo) {
@@ -391,7 +396,9 @@ export default function FinanceiroTituloEditar() {
   }, [form?.tipo, parceiroBusca, titulo]);
 
   const categoriasFiltradas = useMemo(
-    () => categorias.filter((categoria) => categoriaCompativel(categoria, form?.tipo)),
+    () => categorias
+      .filter((categoria) => categoriaCompativel(categoria, form?.tipo))
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })),
     [categorias, form?.tipo]
   );
   const bloqueio = useMemo(() => getTituloBloqueado(titulo), [titulo]);
@@ -399,28 +406,15 @@ export default function FinanceiroTituloEditar() {
     if (!categoriaBusca.trim() || form?.categoria_financeira_id) return [];
 
     return categoriasFiltradas
-      .filter((categoria) => textMatchesSearchTerms([
-          categoria.nome,
-          categoria.descricao,
-          categoria.tipo,
-          categoria.dre_grupo,
-          categoria.dre_subgrupo,
-          categoria.classificacao_gerencial
-        ], categoriaBusca))
-      .slice(0, 8);
+      .filter((categoria) => categoriaFinanceiraMatchesSearch(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form?.categoria_financeira_id]);
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form?.categoria_financeira_id && !bloqueio;
   const categoriasModalFiltradas = useMemo(() => {
     if (!categoriaModalBusca.trim()) return categoriasFiltradas;
 
-    return categoriasFiltradas.filter((categoria) => textMatchesSearchTerms([
-        categoria.nome,
-        categoria.descricao,
-        categoria.tipo,
-        categoria.dre_grupo,
-        categoria.dre_subgrupo,
-        categoria.classificacao_gerencial
-      ], categoriaModalBusca));
+    return categoriasFiltradas.filter((categoria) => (
+      categoriaFinanceiraMatchesSearch(categoria, categoriaModalBusca)
+    ));
   }, [categoriaModalBusca, categoriasFiltradas]);
   const parceirosAutocomplete = useMemo(
     () => parceiros.filter((parceiro) => parceiroMatchesSearch(parceiro, parceiroBusca)).slice(0, 8),
@@ -995,7 +989,7 @@ export default function FinanceiroTituloEditar() {
                 </div>
               )}
               {mostrarListaCategorias && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
                   {categoriasAutocomplete.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                       Nenhuma categoria encontrada.
@@ -1478,7 +1472,7 @@ export default function FinanceiroTituloEditar() {
 
       {categoriaModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 py-6 backdrop-blur-sm">
-          <div className="w-full max-w-2xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+          <div className="flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
               <div>
                 <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
@@ -1495,10 +1489,10 @@ export default function FinanceiroTituloEditar() {
               </button>
             </div>
 
-            <div className="space-y-4 p-5">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 p-5">
               <input
                 className="input w-full"
-                placeholder="Filtrar categoria por nome, grupo, subgrupo ou descricao"
+                placeholder="Filtrar por ID, nome, grupo, subgrupo ou descricao"
                 value={categoriaModalBusca}
                 onChange={(event) => setCategoriaModalBusca(event.target.value)}
                 autoFocus
@@ -1508,7 +1502,7 @@ export default function FinanceiroTituloEditar() {
                 {categoriasModalFiltradas.length} categoria(s) disponivel(is) para {form.tipo === 'RECEBER' ? 'conta a receber' : 'conta a pagar'}.
               </div>
 
-              <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-2">
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-2">
                 {categoriasModalFiltradas.length === 0 ? (
                   <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
                     Nenhuma categoria encontrada para esse filtro.

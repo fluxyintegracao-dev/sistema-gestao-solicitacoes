@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { resolverCondicaoPagamentoPedido } = require('./pedidoCompraDocumentoUtils');
 const { findPedidoCompraStatusConfig } = require('./pedidoCompraStatusConfig');
 const { getRuntimeInstallationConfig } = require('./runtimeConfig');
 
@@ -502,7 +503,7 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   const w4r  = tableW - w4 * 3;
   const scCode  = `SC-${String(pedido?.solicitacao_compra_id || '').padStart(5, '0')}` +
     (pedido?.solicitacao?.numero_sienge ? ` - ${pedido.solicitacao.numero_sienge}` : '');
-  const condPag = pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento || '-';
+  const condPag = resolverCondicaoPagamentoPedido(pedido) || '-';
 
   cell(tableX,        w4,  r2y, rowH, 'Solicitacao',    scCode);
   cell(tableX + w4,   w4,  r2y, rowH, 'Criado em',      formatDateTime(pedido?.createdAt));

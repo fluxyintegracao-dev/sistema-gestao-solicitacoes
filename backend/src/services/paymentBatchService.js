@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { Op } = require('sequelize');
+const { env } = require('../config/env');
 const {
   ContaBancaria,
   EmpresaGrupo,
@@ -17,6 +18,11 @@ const {
   sequelize
 } = require('../models');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const {
+  canApprovePagamentos,
+  canPreparePagamentos,
+  canSendPagamentosBanco
+} = require('./authorizationService');
 const { toSnapshot: beneficiarySnapshot } = require('./paymentBeneficiaryService');
 const { validatePaymentBatchIntegrity } = require('./paymentBatchIntegrityService');
 const { verifyMfaStepUp } = require('./paymentApprovalService');
@@ -102,15 +108,38 @@ function snapshotTitulo(titulo) {
   };
 }
 
-async function getDefaultProvider() {
-  const provider = await PaymentProvider.findOne({
-    where: { codigo: 'BB', ambiente: 'HOMOLOGACAO', ativo: true },
-    order: [['id', 'ASC']]
-  });
-  if (!provider) {
-    throw createHttpError(400, 'Provider BB/HOMOLOGACAO nao configurado.');
-  }
-  return provider;
+function snapshotPaymentAccount(account) {
+  const plain = account?.get ? account.get({ plain: true }) : account || {};
+  return {
+    id: Number(plain.id || 0),
+    conta_bancaria_id: Number(plain.conta_bancaria_id || 0),
+    empresa_id: Number(plain.empresa_id || 0),
+    cnpj_pagador: String(plain.cnpj_pagador || '').replace(/\D+/g, ''),
+    provider_id: Number(plain.provider_id || 0),
+    banco_codigo: String(plain.banco_codigo || '').trim(),
+    agencia: String(plain.agencia || '').trim(),
+    agencia_digito: String(plain.agencia_digito || '').trim(),
+    conta: String(plain.conta || '').trim(),
+    conta_digito: String(plain.conta_digito || '').trim(),
+    tipo_conta: String(plain.tipo_conta || '').trim().toUpperCase(),
+    convenio: String(plain.convenio || '').trim(),
+    ambiente: String(plain.ambiente || '').trim().toUpperCase(),
+    conta_bancaria_empresa_id: Number(plain.contaBancaria?.empresa_id || 0)
+  };
+}
+
+function snapshotProvider(provider) {
+  const plain = provider?.get ? provider.get({ plain: true }) : provider || {};
+  return {
+    id: Number(plain.id || 0),
+    codigo: String(plain.codigo || '').trim().toUpperCase(),
+    ambiente: String(plain.ambiente || '').trim().toUpperCase(),
+    config_ref: String(plain.config_ref || '').trim(),
+    runtime_env: String(env.bbPaymentsEnv || '').trim().toLowerCase(),
+    runtime_mode: String(env.bbProviderMode || '').trim().toLowerCase(),
+    base_url: String(env.bbPaymentsBaseUrl || '').trim(),
+    oauth_url: String(env.bbOauthTokenUrl || '').trim()
+  };
 }
 
 async function listarTitulosElegiveis(req, filters = {}) {
@@ -218,8 +247,14 @@ async function createBatchFromTitulos(req, payload = {}) {
   }
 
   return sequelize.transaction(async (transaction) => {
-    const provider = await getDefaultProvider();
     const paymentAccount = await validatePaymentAccount(paymentAccountId);
+    const provider = await PaymentProvider.findByPk(paymentAccount.provider_id, { transaction });
+    if (!provider || provider.ativo === false) {
+      throw createHttpError(400, 'Provider da conta pagadora nao existe ou esta inativo.');
+    }
+    if (String(provider.ambiente || '').toUpperCase() !== String(paymentAccount.ambiente || '').toUpperCase()) {
+      throw createHttpError(400, 'Ambiente do provider diverge do ambiente da conta pagadora.');
+    }
     const titulos = await TituloFinanceiro.findAll({
       where: { id: { [Op.in]: tituloIds } },
       include: [
@@ -245,6 +280,8 @@ async function createBatchFromTitulos(req, payload = {}) {
       data_programada: dataProgramada,
       idempotency_key: buildIdempotencyKey('batch'),
       correlation_id: buildIdempotencyKey('corr'),
+      payment_account_snapshot: snapshotPaymentAccount(paymentAccount),
+      provider_snapshot: snapshotProvider(provider),
       aprovacao_status: 'RASCUNHO',
       created_by: req.user?.id || null
     }, { transaction });
@@ -375,6 +412,37 @@ async function getBatchDetail(req, id, { transaction = null } = {}) {
   ]);
   batch.setDataValue('approvals', approvals);
   batch.setDataValue('transactions', transactions);
+  const actorId = Number(req.user?.id || 0);
+  const isCreator = actorId > 0 && Number(batch.created_by || 0) === actorId;
+  const actorApproved = approvals.some(
+    (approval) => (
+      approval.acao === 'APPROVE'
+      && approval.status === 'APROVADO'
+      && Number(approval.aprovado_por) === actorId
+    )
+  );
+  const [actorCanPrepare, actorCanApprove, actorCanSend] = await Promise.all([
+    canPreparePagamentos(req.user),
+    canApprovePagamentos(req.user),
+    canSendPagamentosBanco(req.user)
+  ]);
+  batch.setDataValue('action_capabilities', {
+    is_creator: isCreator,
+    can_submit: Boolean(actorCanPrepare && isCreator && ['RASCUNHO', 'EM_REVISAO'].includes(String(batch.status || '').toUpperCase())),
+    can_approve: Boolean(actorCanApprove && !isCreator && batch.status === 'PENDENTE_APROVACAO'),
+    can_send: Boolean(
+      actorCanSend
+      && isCreator
+      && !actorApproved
+      && batch.status === 'APROVADO'
+    ),
+    can_reprocess: Boolean(
+      actorCanSend
+      && isCreator
+      && !actorApproved
+      && ['FALHA_INTEGRACAO', 'REJEITADO'].includes(String(batch.status || '').toUpperCase())
+    )
+  });
   return batch;
 }
 
@@ -389,6 +457,9 @@ async function submitBatchForApproval(req, id) {
       phaseLabel: 'envio para aprovacao'
     });
     submittedBatchId = batch.id;
+    if (Number(batch.created_by || 0) !== Number(req.user?.id || 0)) {
+      throw createHttpError(403, 'Somente o criador do lote pode submete-lo para aprovacao.');
+    }
 
     await batch.update({
       status: 'PENDENTE_APROVACAO',

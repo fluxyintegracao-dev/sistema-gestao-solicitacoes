@@ -4,11 +4,13 @@ const {
   PaymentBatch,
   PaymentBatchItem,
   PaymentAccount,
+  PaymentApproval,
   PaymentEvent,
   PaymentIntent,
   PaymentJob,
   PaymentProvider,
   PaymentTransaction,
+  User,
   sequelize
 } = require('../models');
 const { env } = require('../config/env');
@@ -23,8 +25,9 @@ const bancoDoBrasilProvider = require('./paymentProviderBancoDoBrasil');
 const bancoDoBrasilSandboxProvider = require('./bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
 const { sanitizePayload } = require('./bancoDoBrasilPayments/bancoDoBrasilErrors');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { canSendPagamentosBanco } = require('./authorizationService');
 
-const SEND_JOB_TYPES = ['SEND_PAYMENT_BATCH', 'BB_SUBMIT_PIX_BATCH', 'BB_RELEASE_BATCH'];
+const SEND_JOB_TYPES = ['SEND_PAYMENT_BATCH', 'BB_SUBMIT_PIX_BATCH'];
 const STALE_PROCESSING_JOB_MS = 15 * 60 * 1000;
 
 function createHttpError(statusCode, message) {
@@ -65,33 +68,74 @@ function getBbWebhookProviderEventId(body = {}) {
   ).trim() || null;
 }
 
-async function buildBbNumeroRequisicao(batchId) {
-  const base = Number(batchId);
-  if (!Number.isInteger(base) || base <= 0) {
-    throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
+function assertBatchOwnedByUser(batch, userId) {
+  const creatorId = Number(batch?.created_by || 0);
+  const actorId = Number(userId || 0);
+  if (!creatorId || !actorId || creatorId !== actorId) {
+    throw createHttpError(403, 'Somente o usuario que criou o lote pode envia-lo ou reprocessa-lo.');
   }
-
-  const transactions = await PaymentTransaction.findAll({
-    where: { payment_batch_id: batchId },
-    attributes: ['request_snapshot'],
-    order: [['createdAt', 'DESC']],
-    limit: 100
-  });
-  const usedNumbers = new Set(
-    transactions
-      .map((transaction) => Number(transaction.request_snapshot?.body?.numeroRequisicao || 0))
-      .filter((number) => Number.isInteger(number) && number > 0)
-  );
-
-  for (let offset = 0; offset < 900000; offset += 1) {
-    const numero = 100000 + ((Date.now() + offset) % 900000);
-    if (!usedNumbers.has(numero)) return numero;
-  }
-
-  throw createHttpError(400, 'Nao foi possivel gerar numeroRequisicao unico para o Banco do Brasil.');
 }
 
-async function ensureNoPendingSendJob(batchId) {
+async function assertSenderDidNotApprove(batchId, userId, { transaction = null } = {}) {
+  const approval = await PaymentApproval.findOne({
+    where: {
+      entity_type: 'BATCH',
+      entity_id: batchId,
+      acao: 'APPROVE',
+      status: 'APROVADO',
+      aprovado_por: userId
+    },
+    transaction
+  });
+  if (approval) {
+    throw createHttpError(403, 'O aprovador do lote nao pode envia-lo ao banco.');
+  }
+}
+
+async function assertSenderRoleAllowed(userOrId, { transaction = null } = {}) {
+  const user = typeof userOrId === 'object'
+    ? userOrId
+    : await User.findByPk(userOrId, { transaction });
+  if (!user || user.ativo === false || !(await canSendPagamentosBanco(user))) {
+    throw createHttpError(403, 'Usuario criador nao possui papel operacional valido para enviar lotes.');
+  }
+  return user;
+}
+
+function buildSendJobDedupeKey(batchId, jobType) {
+  return `${String(jobType)}:PAYMENT_BATCH:${Number(batchId)}`;
+}
+
+async function ensureStableBbRequestId(batch, { transaction = null } = {}) {
+  if (batch.provider_request_id) {
+    return Number(batch.provider_request_id);
+  }
+
+  const preferred = Number(batch.id);
+  const candidates = [];
+  if (Number.isInteger(preferred) && preferred > 0 && preferred <= 999999) {
+    candidates.push(preferred);
+  }
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    candidates.push(crypto.randomInt(100000, 1000000));
+  }
+
+  for (const candidate of candidates) {
+    const existing = await PaymentBatch.findOne({
+      where: { provider_request_id: String(candidate) },
+      attributes: ['id'],
+      transaction,
+      lock: transaction ? transaction.LOCK.UPDATE : null
+    });
+    if (existing && Number(existing.id) !== Number(batch.id)) continue;
+    await batch.update({ provider_request_id: String(candidate) }, { transaction });
+    return candidate;
+  }
+
+  throw createHttpError(409, 'Nao foi possivel reservar identificador bancario unico para o lote.');
+}
+
+async function ensureNoPendingSendJob(batchId, { transaction = null } = {}) {
   await PaymentJob.update(
     {
       status: 'ERRO',
@@ -106,7 +150,8 @@ async function ensureNoPendingSendJob(batchId) {
         entity_id: batchId,
         status: 'PROCESSANDO',
         locked_at: { [Op.lt]: new Date(Date.now() - STALE_PROCESSING_JOB_MS) }
-      }
+      },
+      transaction
     }
   );
 
@@ -117,7 +162,9 @@ async function ensureNoPendingSendJob(batchId) {
       entity_id: batchId,
       status: { [Op.in]: ['PENDENTE', 'PROCESSANDO'] }
     },
-    order: [['createdAt', 'DESC']]
+    order: [['createdAt', 'DESC']],
+    transaction,
+    lock: transaction ? transaction.LOCK.UPDATE : null
   });
 
   if (pendingJob) {
@@ -125,28 +172,32 @@ async function ensureNoPendingSendJob(batchId) {
   }
 }
 
-async function createSendBatchJob(batchId) {
+async function createSendBatchJob(batchId, requestedBy, { transaction = null } = {}) {
   return PaymentJob.create({
     job_type: 'SEND_PAYMENT_BATCH',
     entity_type: 'PAYMENT_BATCH',
     entity_id: batchId,
+    dedupe_key: buildSendJobDedupeKey(batchId, 'SEND_PAYMENT_BATCH'),
+    requested_by: requestedBy || null,
     status: 'PENDENTE',
     attempts: 0,
     max_attempts: 3,
     next_run_at: new Date()
-  });
+  }, { transaction });
 }
 
-async function createPaymentJob(batchId, jobType, nextRunAt = new Date()) {
+async function createPaymentJob(batchId, jobType, nextRunAt = new Date(), options = {}) {
   return PaymentJob.create({
     job_type: jobType,
     entity_type: 'PAYMENT_BATCH',
     entity_id: batchId,
+    dedupe_key: options.dedupeKey || null,
+    requested_by: options.requestedBy || null,
     status: 'PENDENTE',
     attempts: 0,
     max_attempts: 3,
     next_run_at: nextRunAt
-  });
+  }, { transaction: options.transaction || null });
 }
 
 async function getBatchWithPaymentGraph(batchId, transaction = null, lock = null) {
@@ -165,31 +216,66 @@ async function getBatchWithPaymentGraph(batchId, transaction = null, lock = null
   });
 }
 
+async function enqueueNewSendJob(req, id, jobType) {
+  const actorId = Number(req.user?.id || 0);
+  let jobId = null;
+  let batchId = Number(id);
+
+  await sequelize.transaction(async (transaction) => {
+    const batch = await validatePaymentBatchIntegrity(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+      expectedBatchStatuses: ['APROVADO'],
+      expectedIntentStatuses: ['APROVADO'],
+      phaseLabel: 'enfileiramento do envio ao banco'
+    });
+    batchId = batch.id;
+    assertBatchOwnedByUser(batch, actorId);
+    await assertSenderRoleAllowed(req.user, { transaction });
+    await assertSenderDidNotApprove(batch.id, actorId, { transaction });
+
+    if ((await countValidApprovals(batch.id, { transaction })) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
+      throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
+    }
+    await assertApprovalHashesMatchCurrentBatch(batch, {
+      transaction,
+      requireMinimumApprovals: true
+    });
+    await ensureNoPendingSendJob(batch.id, { transaction });
+
+    if (jobType === 'BB_SUBMIT_PIX_BATCH') {
+      await ensureStableBbRequestId(batch, { transaction });
+    }
+
+    const intentIds = (batch.items || []).map((item) => item.payment_intent_id).filter(Boolean);
+    await batch.update({ status: 'ENFILEIRADO' }, { transaction });
+    await PaymentIntent.update(
+      { status: 'ENFILEIRADO', updated_by: actorId },
+      { where: { id: { [Op.in]: intentIds } }, transaction }
+    );
+    await PaymentBatchItem.update(
+      { status: 'ENFILEIRADO' },
+      { where: { payment_batch_id: batch.id }, transaction }
+    );
+
+    const job = jobType === 'SEND_PAYMENT_BATCH'
+      ? await createSendBatchJob(batch.id, actorId, { transaction })
+      : await createPaymentJob(batch.id, jobType, new Date(), {
+          transaction,
+          requestedBy: actorId,
+          dedupeKey: buildSendJobDedupeKey(batch.id, jobType)
+        });
+    jobId = job.id;
+  });
+
+  return { batchId, jobId };
+}
+
 async function enqueueSendBatch(req, id, payload = {}) {
   await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
-
-  const batch = await PaymentBatch.findByPk(id, {
-    include: [{ model: PaymentBatchItem, as: 'items' }]
-  });
-  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-  if (String(batch.status || '').toUpperCase() !== 'APROVADO') {
-    throw createHttpError(400, 'Lote precisa estar aprovado para envio.');
-  }
-  if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
-    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
-  }
-  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
-    expectedBatchStatuses: ['APROVADO'],
-    expectedIntentStatuses: ['APROVADO'],
-    phaseLabel: 'envio ao banco'
-  });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
-
-  await ensureNoPendingSendJob(batch.id);
-  const job = await createSendBatchJob(batch.id);
-
-  await processSendBatchJob(req, job.id);
-  return PaymentBatch.findByPk(batch.id);
+  const queued = await enqueueNewSendJob(req, id, 'SEND_PAYMENT_BATCH');
+  await processSendBatchJob(req, queued.jobId);
+  return PaymentBatch.findByPk(queued.batchId);
 }
 
 async function reprocessBatch(req, id, payload = {}) {
@@ -199,11 +285,14 @@ async function reprocessBatch(req, id, payload = {}) {
     include: [{ model: PaymentBatchItem, as: 'items' }]
   });
   if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+  const actorId = Number(req.user?.id || 0);
+  assertBatchOwnedByUser(batch, actorId);
+  await assertSenderDidNotApprove(batch.id, actorId);
 
   const batchStatus = String(batch.status || '').toUpperCase();
-  const reprocessableBatchStatuses = ['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'];
+  const reprocessableBatchStatuses = ['FALHA_INTEGRACAO', 'REJEITADO'];
   if (!reprocessableBatchStatuses.includes(batchStatus)) {
-    throw createHttpError(400, 'Apenas lotes com falha ou rejeicao podem ser reprocessados.');
+    throw createHttpError(400, 'Apenas lotes integralmente falhos ou rejeitados podem ser reprocessados. Lotes parciais exigem novo lote com os itens rejeitados.');
   }
 
   if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
@@ -215,8 +304,6 @@ async function reprocessBatch(req, id, payload = {}) {
   });
   await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
-  await ensureNoPendingSendJob(batch.id);
-
   const reprocessableItemStatuses = ['FALHA_INTEGRACAO', 'REJEITADO_BANCO', 'REJEITADO'];
   const intentIds = (batch.items || [])
     .filter((item) => reprocessableItemStatuses.includes(String(item.status || '').toUpperCase()))
@@ -227,9 +314,26 @@ async function reprocessBatch(req, id, payload = {}) {
     throw createHttpError(400, 'Nao ha itens elegiveis para reprocessamento neste lote.');
   }
 
+  const jobType = env.bbSandboxRealEnabled ? 'BB_SUBMIT_PIX_BATCH' : 'SEND_PAYMENT_BATCH';
+  let jobId = null;
   await sequelize.transaction(async (transaction) => {
-    await batch.update({
-      status: 'APROVADO',
+    const lockedBatch = await PaymentBatch.findByPk(batch.id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!lockedBatch || String(lockedBatch.status || '').toUpperCase() !== batchStatus) {
+      throw createHttpError(409, 'Lote foi alterado durante o reprocessamento. Atualize a tela e tente novamente.');
+    }
+    assertBatchOwnedByUser(lockedBatch, actorId);
+    await assertSenderRoleAllowed(req.user, { transaction });
+    await assertSenderDidNotApprove(lockedBatch.id, actorId, { transaction });
+    await ensureNoPendingSendJob(lockedBatch.id, { transaction });
+    if (jobType === 'BB_SUBMIT_PIX_BATCH') {
+      await ensureStableBbRequestId(lockedBatch, { transaction });
+    }
+
+    await lockedBatch.update({
+      status: 'ENFILEIRADO',
       aprovacao_status: 'APROVADO',
       sent_at: null,
       sent_by: null,
@@ -238,7 +342,7 @@ async function reprocessBatch(req, id, payload = {}) {
 
     await PaymentIntent.update(
       {
-        status: 'APROVADO',
+        status: 'ENFILEIRADO',
         enviado_em: null,
         confirmado_banco_em: null,
         updated_by: req.user?.id || null
@@ -248,7 +352,7 @@ async function reprocessBatch(req, id, payload = {}) {
 
     await PaymentBatchItem.update(
       {
-        status: 'APROVADO',
+        status: 'ENFILEIRADO',
         erro_codigo: null,
         erro_mensagem: null,
         protocolo_banco: null,
@@ -263,6 +367,31 @@ async function reprocessBatch(req, id, payload = {}) {
         transaction
       }
     );
+
+    const dedupeKey = buildSendJobDedupeKey(lockedBatch.id, jobType);
+    const existingJob = await PaymentJob.findOne({
+      where: { dedupe_key: dedupeKey },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (existingJob) {
+      await existingJob.update({
+        status: 'PENDENTE',
+        requested_by: actorId,
+        next_run_at: new Date(),
+        locked_at: null,
+        locked_by: null,
+        last_error: null
+      }, { transaction });
+      jobId = existingJob.id;
+    } else {
+      const newJob = await createPaymentJob(lockedBatch.id, jobType, new Date(), {
+        transaction,
+        requestedBy: actorId,
+        dedupeKey
+      });
+      jobId = newJob.id;
+    }
   });
 
   await registrarEventoSeguranca({
@@ -279,29 +408,28 @@ async function reprocessBatch(req, id, payload = {}) {
     }
   });
 
-  const job = env.bbSandboxRealEnabled
-    ? await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH')
-    : await createSendBatchJob(batch.id);
-
-  if (env.bbSandboxRealEnabled) {
-    await processBbSubmitPixBatchJob(req, job.id);
+  if (jobType === 'BB_SUBMIT_PIX_BATCH') {
+    await processBbSubmitPixBatchJob(req, jobId);
   } else {
-    await processSendBatchJob(req, job.id);
+    await processSendBatchJob(req, jobId);
   }
   return PaymentBatch.findByPk(batch.id);
 }
 
 async function processSendBatchJob(req, jobId) {
-  const job = await PaymentJob.findByPk(jobId);
-  if (!job) throw createHttpError(404, 'Job de pagamento nao encontrado.');
-  if (String(job.status || '').toUpperCase() !== 'PENDENTE') return job;
-
   return sequelize.transaction(async (transaction) => {
+    const job = await PaymentJob.findByPk(jobId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!job) throw createHttpError(404, 'Job de pagamento nao encontrado.');
+    if (String(job.status || '').toUpperCase() !== 'PENDENTE') return job;
+
     await job.update({
       status: 'PROCESSANDO',
       attempts: Number(job.attempts || 0) + 1,
       locked_at: new Date(),
-      locked_by: `api:${req.user?.id || 'system'}`
+      locked_by: `api:${job.requested_by || req.user?.id || 'system'}`
     }, { transaction });
 
     const batch = await PaymentBatch.findByPk(job.entity_id, {
@@ -318,16 +446,29 @@ async function processSendBatchJob(req, jobId) {
       lock: transaction.LOCK.UPDATE
     });
     if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
+    const actorId = Number(job.requested_by || req.user?.id || 0);
+    assertBatchOwnedByUser(batch, actorId);
+    await assertSenderRoleAllowed(actorId, { transaction });
+    await assertSenderDidNotApprove(batch.id, actorId, { transaction });
     const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
       transaction,
       lock: transaction.LOCK.UPDATE,
-      expectedBatchStatuses: ['APROVADO'],
-      expectedIntentStatuses: ['APROVADO'],
+      expectedBatchStatuses: ['ENFILEIRADO'],
+      expectedIntentStatuses: ['ENFILEIRADO'],
       phaseLabel: 'processamento do envio ao banco'
     });
     await assertApprovalHashesMatchCurrentBatch(integrityBatch, { transaction, requireMinimumApprovals: true });
 
     const intentIds = batch.items.map((item) => item.payment_intent_id);
+    await batch.update({ status: 'ENVIANDO' }, { transaction });
+    await PaymentIntent.update(
+      { status: 'ENVIANDO', updated_by: actorId },
+      { where: { id: { [Op.in]: intentIds } }, transaction }
+    );
+    await PaymentBatchItem.update(
+      { status: 'ENVIANDO' },
+      { where: { payment_batch_id: batch.id }, transaction }
+    );
     const attemptNumber = await PaymentTransaction.count({
       where: { payment_batch_id: batch.id },
       transaction
@@ -344,11 +485,11 @@ async function processSendBatchJob(req, jobId) {
 
     await batch.update({
       status: 'ENVIADO_AO_BANCO',
-      sent_by: req.user?.id || null,
+      sent_by: actorId,
       sent_at: new Date()
     }, { transaction });
     await PaymentIntent.update(
-      { status: 'ENVIADO_AO_BANCO', enviado_em: new Date(), updated_by: req.user?.id || null },
+      { status: 'ENVIADO_AO_BANCO', enviado_em: new Date(), updated_by: actorId },
       { where: { id: { [Op.in]: intentIds } }, transaction }
     );
     await PaymentBatchItem.update(
@@ -537,54 +678,77 @@ async function persistBankReturnOnItems(batch, providerResult, now, intentStatus
 
 async function enqueueBbSandboxSendBatch(req, id, payload = {}) {
   await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
-
-  if (!env.bbSandboxRealEnabled) {
-    return enqueueSendBatch(req, id, payload);
+  const jobType = env.bbSandboxRealEnabled ? 'BB_SUBMIT_PIX_BATCH' : 'SEND_PAYMENT_BATCH';
+  const queued = await enqueueNewSendJob(req, id, jobType);
+  if (jobType === 'BB_SUBMIT_PIX_BATCH') {
+    await processBbSubmitPixBatchJob(req, queued.jobId);
+  } else {
+    await processSendBatchJob(req, queued.jobId);
   }
-
-  const batch = await PaymentBatch.findByPk(id, {
-    include: [{ model: PaymentBatchItem, as: 'items' }]
-  });
-  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-  if (String(batch.status || '').toUpperCase() !== 'APROVADO') {
-    throw createHttpError(400, 'Lote precisa estar aprovado para envio ao Banco do Brasil.');
-  }
-  if ((await countValidApprovals(batch.id)) < REQUIRED_PAYMENT_BATCH_APPROVALS) {
-    throw createHttpError(400, `Lote exige ${REQUIRED_PAYMENT_BATCH_APPROVALS} aprovacao valida.`);
-  }
-  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
-    expectedBatchStatuses: ['APROVADO'],
-    expectedIntentStatuses: ['APROVADO'],
-    phaseLabel: 'envio ao Banco do Brasil'
-  });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
-
-  await ensureNoPendingSendJob(batch.id);
-  const job = await createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH');
-  await processBbSubmitPixBatchJob(req, job.id);
-  return PaymentBatch.findByPk(batch.id);
+  return PaymentBatch.findByPk(queued.batchId);
 }
 
 async function processBbSubmitPixBatchJob(req, jobId) {
-  const job = await PaymentJob.findByPk(jobId);
-  if (!job) throw createHttpError(404, 'Job de pagamento BB nao encontrado.');
-  if (String(job.status || '').toUpperCase() !== 'PENDENTE') return job;
+  const claim = await sequelize.transaction(async (transaction) => {
+    const job = await PaymentJob.findByPk(jobId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!job) throw createHttpError(404, 'Job de pagamento BB nao encontrado.');
+    if (String(job.status || '').toUpperCase() !== 'PENDENTE') {
+      return { skipped: true, jobId: job.id };
+    }
 
-  await job.update({
-    status: 'PROCESSANDO',
-    attempts: Number(job.attempts || 0) + 1,
-    locked_at: new Date(),
-    locked_by: `bb-api:${req.user?.id || 'system'}`
+    const batch = await validatePaymentBatchIntegrity(job.entity_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+      expectedBatchStatuses: ['ENFILEIRADO'],
+      expectedIntentStatuses: ['ENFILEIRADO'],
+      phaseLabel: 'processamento do envio ao Banco do Brasil'
+    });
+    const actorId = Number(job.requested_by || 0);
+    assertBatchOwnedByUser(batch, actorId);
+    await assertSenderRoleAllowed(actorId, { transaction });
+    await assertSenderDidNotApprove(batch.id, actorId, { transaction });
+    await assertApprovalHashesMatchCurrentBatch(batch, {
+      transaction,
+      requireMinimumApprovals: true
+    });
+    const numeroRequisicao = await ensureStableBbRequestId(batch, { transaction });
+    const intentIds = (batch.items || []).map((item) => item.payment_intent_id).filter(Boolean);
+
+    await job.update({
+      status: 'PROCESSANDO',
+      attempts: Number(job.attempts || 0) + 1,
+      locked_at: new Date(),
+      locked_by: `bb-api:${actorId}`
+    }, { transaction });
+    await batch.update({ status: 'ENVIANDO' }, { transaction });
+    await PaymentIntent.update(
+      { status: 'ENVIANDO', updated_by: actorId },
+      { where: { id: { [Op.in]: intentIds } }, transaction }
+    );
+    await PaymentBatchItem.update(
+      { status: 'ENVIANDO' },
+      { where: { payment_batch_id: batch.id }, transaction }
+    );
+
+    return {
+      skipped: false,
+      actorId,
+      batchId: batch.id,
+      jobId: job.id,
+      numeroRequisicao
+    };
   });
 
-  const batch = await getBatchWithPaymentGraph(job.entity_id);
+  if (claim.skipped) {
+    return PaymentJob.findByPk(claim.jobId);
+  }
+
+  const job = await PaymentJob.findByPk(claim.jobId);
+  const batch = await getBatchWithPaymentGraph(claim.batchId);
   if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-  const integrityBatch = await validatePaymentBatchIntegrity(batch.id, {
-    expectedBatchStatuses: ['APROVADO'],
-    expectedIntentStatuses: ['APROVADO'],
-    phaseLabel: 'processamento do envio ao Banco do Brasil'
-  });
-  await assertApprovalHashesMatchCurrentBatch(integrityBatch, { requireMinimumApprovals: true });
 
   const startedAt = new Date();
   const attemptNumber = await PaymentTransaction.count({
@@ -592,9 +756,8 @@ async function processBbSubmitPixBatchJob(req, jobId) {
   }) + 1;
 
   try {
-    const numeroRequisicaoBb = await buildBbNumeroRequisicao(batch.id);
     const providerResult = await bancoDoBrasilSandboxProvider.submitPixBatch(batch, {
-      numeroRequisicao: numeroRequisicaoBb
+      numeroRequisicao: claim.numeroRequisicao
     });
     const now = new Date();
     const batchStatus = mapProviderResultToBatchStatus(providerResult.provider_status);
@@ -604,7 +767,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
     await sequelize.transaction(async (transaction) => {
       await batch.update({
         status: batchStatus,
-        sent_by: req.user?.id || null,
+        sent_by: claim.actorId,
         sent_at: now
       }, { transaction });
       await PaymentIntent.update(
@@ -612,7 +775,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
           status: intentStatus,
           enviado_em: now,
           confirmado_banco_em: intentStatus === 'AGUARDANDO_CONFIRMACAO_BAIXA' ? now : null,
-          updated_by: req.user?.id || null
+          updated_by: claim.actorId
         },
         { where: { id: { [Op.in]: intentIds } }, transaction }
       );
@@ -641,6 +804,7 @@ async function processBbSubmitPixBatchJob(req, jobId) {
         provider_id: batch.provider_id,
         event_type: 'BB_SUBMIT_PIX_BATCH_RESPONSE',
         provider_event_id: providerResult.provider_batch_id,
+        dedupe_key: `BB_SUBMIT_PIX_BATCH_RESPONSE:${batch.provider_id}:${batch.id}`,
         payload: providerResult.data,
         received_at: now,
         processed_at: now,
@@ -662,21 +826,27 @@ async function processBbSubmitPixBatchJob(req, jobId) {
       descricao: 'Lote PIX enviado ao Banco do Brasil'
     });
 
-    if (env.bbAutoLiberarLote) {
-      const releaseJob = await createPaymentJob(batch.id, 'BB_RELEASE_BATCH');
-      await processBbReleaseBatchJob(req, releaseJob.id);
-    }
-
     return job;
   } catch (error) {
     const normalized = bancoDoBrasilSandboxProvider.normalizeError(error);
+    const normalizedStatus = Number(normalized.statusCode || 0);
+    const paymentRequestMayHaveStarted = Boolean(error.details?.request_snapshot)
+      || normalized.code === 'BB_HTTP_TIMEOUT'
+      || (!normalizedStatus && !String(normalized.code || '').startsWith('BB_OAUTH_'));
+    const uncertain = paymentRequestMayHaveStarted && (
+      normalized.code === 'BB_HTTP_TIMEOUT'
+      || normalizedStatus >= 500
+      || !normalizedStatus
+    );
+    const failureStatus = uncertain ? 'ENVIO_INDETERMINADO' : 'FALHA_INTEGRACAO';
     await sequelize.transaction(async (transaction) => {
       await PaymentTransaction.create({
         payment_batch_id: batch.id,
         provider_id: batch.provider_id,
         attempt: attemptNumber,
-        status: 'FALHA_INTEGRACAO',
+        status: failureStatus,
         http_status: normalized.statusCode || null,
+        provider_batch_id: String(batch.provider_request_id || claim.numeroRequisicao),
         correlation_id: batch.correlation_id,
         idempotency_key: batch.idempotency_key,
         request_snapshot: sanitizePayload(error.details?.request_snapshot || null),
@@ -686,10 +856,10 @@ async function processBbSubmitPixBatchJob(req, jobId) {
         started_at: startedAt,
         finished_at: new Date()
       }, { transaction });
-      await batch.update({ status: 'FALHA_INTEGRACAO' }, { transaction });
+      await batch.update({ status: failureStatus }, { transaction });
       await PaymentBatchItem.update(
         {
-          status: 'FALHA_INTEGRACAO',
+          status: failureStatus,
           erro_codigo: normalized.code,
           erro_mensagem: normalized.message,
           protocolo_banco: null,
@@ -700,8 +870,8 @@ async function processBbSubmitPixBatchJob(req, jobId) {
       );
       await PaymentIntent.update(
         {
-          status: 'FALHA_INTEGRACAO',
-          updated_by: req.user?.id || null
+          status: failureStatus,
+          updated_by: claim.actorId
         },
         {
           where: {
@@ -712,90 +882,10 @@ async function processBbSubmitPixBatchJob(req, jobId) {
       );
       await job.update({ status: 'ERRO', last_error: normalized.message }, { transaction });
     });
-    throw createHttpError(normalized.statusCode || 500, normalized.message);
-  }
-}
-
-async function processBbReleaseBatchJob(req, jobId) {
-  const job = await PaymentJob.findByPk(jobId);
-  if (!job) throw createHttpError(404, 'Job de liberacao BB nao encontrado.');
-  if (String(job.status || '').toUpperCase() !== 'PENDENTE') return job;
-
-  await job.update({
-    status: 'PROCESSANDO',
-    attempts: Number(job.attempts || 0) + 1,
-    locked_at: new Date(),
-    locked_by: `bb-api:${req.user?.id || 'system'}`
-  });
-
-  const batch = await getBatchWithPaymentGraph(job.entity_id);
-  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-
-  const startedAt = new Date();
-  const attemptNumber = await PaymentTransaction.count({
-    where: { payment_batch_id: batch.id }
-  }) + 1;
-
-  try {
-    const lastSubmitTransaction = await findLastRealProviderBatchTransaction(batch.id);
-    if (!lastSubmitTransaction) {
-      throw createHttpError(400, 'Lote ainda nao possui identificador BB real para liberacao. Envie o lote ao Banco do Brasil antes de liberar.');
-    }
-    const providerResult = await bancoDoBrasilSandboxProvider.releasePayments(batch, {
-      numeroRequisicao: lastSubmitTransaction?.provider_batch_id
-    });
-    const now = new Date();
-
-    await sequelize.transaction(async (transaction) => {
-      await PaymentTransaction.create({
-        payment_batch_id: batch.id,
-        provider_id: batch.provider_id,
-        attempt: attemptNumber,
-        status: providerResult.provider_status || 'PROCESSANDO_BANCO',
-        http_status: providerResult.http_status,
-        provider_batch_id: providerResult.provider_batch_id,
-        correlation_id: batch.correlation_id,
-        idempotency_key: batch.idempotency_key,
-        request_snapshot: providerResult.request_snapshot,
-        response_snapshot: providerResult.response_snapshot,
-        started_at: startedAt,
-        finished_at: now
-      }, { transaction });
-      await PaymentEvent.create({
-        payment_batch_id: batch.id,
-        provider_id: batch.provider_id,
-        event_type: 'BB_RELEASE_BATCH_RESPONSE',
-        provider_event_id: providerResult.provider_batch_id,
-        payload: providerResult.data,
-        received_at: now,
-        processed_at: now,
-        processing_status: 'PROCESSADO'
-      }, { transaction });
-      await job.update({ status: 'SUCESSO', last_error: null }, { transaction });
-    });
-
-    return job;
-  } catch (error) {
-    const normalized = bancoDoBrasilSandboxProvider.normalizeError(error);
-    await sequelize.transaction(async (transaction) => {
-      await PaymentTransaction.create({
-        payment_batch_id: batch.id,
-        provider_id: batch.provider_id,
-        attempt: attemptNumber,
-        status: 'FALHA_INTEGRACAO',
-        http_status: normalized.statusCode || null,
-        correlation_id: batch.correlation_id,
-        idempotency_key: batch.idempotency_key,
-        request_snapshot: sanitizePayload(error.details?.request_snapshot || null),
-        response_snapshot: sanitizePayload(error.details?.response_snapshot || error.details || null),
-        error_code: normalized.code,
-        error_message: normalized.message,
-        started_at: startedAt,
-        finished_at: new Date()
-      }, { transaction });
-      await job.update({ status: 'ERRO', last_error: normalized.message }, { transaction });
-    });
-    throw error;
+    const safeMessage = uncertain
+      ? 'O resultado do envio ao Banco do Brasil ficou indeterminado. Nao reenvie o lote; sincronize o status bancario.'
+      : normalized.message;
+    throw createHttpError(normalized.statusCode || 500, safeMessage);
   }
 }
 
@@ -980,6 +1070,21 @@ async function handleBbWebhook(req) {
   if (!env.bbWebhookSecret) {
     throw createHttpError(500, 'BB_WEBHOOK_SECRET nao configurado para validar webhook BB.');
   }
+  if (env.bbWebhookRequireMtls) {
+    const mtlsHeader = env.bbWebhookMtlsVerifiedHeader || 'x-fluxy-client-cert-verified';
+    const mtlsValue = req.get(mtlsHeader);
+    if (!timingSafeEqualText(mtlsValue, env.bbWebhookMtlsVerifiedValue || 'SUCCESS')) {
+      await registrarEventoSeguranca({
+        req,
+        tipoEvento: 'BB_WEBHOOK_MTLS_REQUIRED',
+        recursoTipo: 'PAYMENT_EVENT',
+        status: 'FAILURE',
+        descricao: 'Webhook BB rejeitado porque o proxy nao confirmou o certificado cliente',
+        metadata: { header_name: mtlsHeader }
+      });
+      throw createHttpError(403, 'Certificado cliente do webhook BB nao confirmado.');
+    }
+  }
 
   const headerName = env.bbWebhookSecretHeader || 'x-fluxy-bb-webhook-secret';
   const receivedSecret = req.get(headerName);
@@ -1036,14 +1141,24 @@ async function handleBbWebhook(req) {
     return existingEvent;
   }
 
-  const event = await PaymentEvent.create({
-    provider_id: provider.id,
-    event_type: 'BB_WEBHOOK_RECEIVED',
-    provider_event_id: providerEventId,
-    payload: sanitizePayload(req.body || {}),
-    received_at: new Date(),
-    processing_status: 'PENDENTE'
-  });
+  const eventDedupeKey = `BB:${provider.id}:${providerEventId}`;
+  let event;
+  try {
+    event = await PaymentEvent.create({
+      provider_id: provider.id,
+      event_type: 'BB_WEBHOOK_RECEIVED',
+      provider_event_id: providerEventId,
+      dedupe_key: eventDedupeKey,
+      payload: sanitizePayload(req.body || {}),
+      received_at: new Date(),
+      processing_status: 'PENDENTE'
+    });
+  } catch (error) {
+    if (error?.name !== 'SequelizeUniqueConstraintError') throw error;
+    event = await PaymentEvent.findOne({ where: { dedupe_key: eventDedupeKey } });
+    if (!event) throw error;
+    return event;
+  }
 
   await registrarEventoSeguranca({
     req,
@@ -1058,88 +1173,6 @@ async function handleBbWebhook(req) {
   return event;
 }
 
-async function markBatchAsBankConfirmedMock(req, id, payload = {}) {
-  await verifyMfaStepUp(req, payload.codigo_mfa || payload.mfa_code);
-  const justificativa = String(payload.justificativa || '').trim();
-  if (!justificativa) {
-    throw createHttpError(400, 'Justificativa obrigatoria para retorno bancario mockado.');
-  }
-
-  const resultado = String(payload.resultado || 'CONFIRMADO').trim().toUpperCase();
-  const batch = await PaymentBatch.findByPk(id, {
-    include: [{ model: PaymentBatchItem, as: 'items' }]
-  });
-  if (!batch) throw createHttpError(404, 'Lote de pagamento nao encontrado.');
-  if (!['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(String(batch.status || '').toUpperCase())) {
-    throw createHttpError(400, 'Lote precisa ter sido enviado ao banco.');
-  }
-
-  const rejected = resultado === 'REJEITADO';
-  const failed = ['FALHA', 'FALHA_INTEGRACAO', 'ERRO'].includes(resultado);
-  const intentStatus = failed
-    ? 'FALHA_INTEGRACAO'
-    : rejected
-      ? 'REJEITADO_BANCO'
-      : 'AGUARDANDO_CONFIRMACAO_BAIXA';
-  const batchStatus = failed
-    ? 'FALHA_INTEGRACAO'
-    : rejected
-      ? 'REJEITADO'
-      : 'AGUARDANDO_CONFIRMACAO_BAIXA';
-  const now = new Date();
-  const intentIds = batch.items.map((item) => item.payment_intent_id);
-
-  await sequelize.transaction(async (transaction) => {
-    await batch.update({ status: batchStatus }, { transaction });
-    await PaymentIntent.update(
-      {
-        status: intentStatus,
-        confirmado_banco_em: rejected || failed ? null : now,
-        updated_by: req.user?.id || null
-      },
-      { where: { id: { [Op.in]: intentIds } }, transaction }
-    );
-    const itemUpdate = {
-      status: intentStatus,
-      erro_codigo: failed ? 'MOCK_FALHA_INTEGRACAO' : rejected ? 'MOCK_REJEITADO' : null,
-      erro_mensagem: failed ? 'Falha mockada de integracao.' : rejected ? 'Retorno mockado rejeitado.' : null,
-      confirmado_banco_em: rejected || failed ? null : now
-    };
-    if (rejected || failed) {
-      itemUpdate.protocolo_banco = null;
-      itemUpdate.end_to_end_id = null;
-    }
-    await PaymentBatchItem.update(
-      itemUpdate,
-      { where: { payment_batch_id: batch.id }, transaction }
-    );
-  });
-
-  await registrarEventoSeguranca({
-    req,
-    usuarioId: req.user?.id || null,
-    tipoEvento: failed
-      ? 'PAYMENT_BATCH_INTEGRATION_FAILED_MOCK'
-      : rejected
-        ? 'PAYMENT_BATCH_REJECTED_BY_BANK_MOCK'
-        : 'PAYMENT_BATCH_CONFIRMED_BY_BANK_MOCK',
-    recursoTipo: 'PAYMENT_BATCH',
-    recursoId: batch.id,
-    status: 'SUCCESS',
-    descricao: failed
-      ? 'Retorno mockado marcou falha de integracao no lote'
-      : rejected
-        ? 'Retorno mockado rejeitou o lote'
-        : 'Retorno mockado confirmou o lote',
-    metadata: {
-      resultado,
-      justificativa
-    }
-  });
-
-  return PaymentBatch.findByPk(batch.id);
-}
-
 module.exports = {
   enqueueBbSandboxSendBatch,
   enqueueSendBatch,
@@ -1147,9 +1180,7 @@ module.exports = {
   handleBbWebhook,
   listBbTransactions,
   listPaymentEvents,
-  markBatchAsBankConfirmedMock,
   processBbSubmitPixBatchJob,
-  processBbReleaseBatchJob,
   processSendBatchJob,
   reprocessBatch,
   sincronizarStatusBb

@@ -28,7 +28,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { maskCpfCnpj } from '../utils/formatters';
-import { textMatchesSearchTerms } from '../utils/search';
+import { categoriaFinanceiraMatchesSearch } from '../utils/categoriaFinanceira';
 
 function defaultContaForm() {
   return {
@@ -400,14 +400,7 @@ export default function FinanceiroCadastros() {
           return true;
         }
 
-        return textMatchesSearchTerms([
-          categoria.nome,
-          categoria.descricao,
-          tipoCategoria,
-          categoria.classificacao_gerencial,
-          categoria.dre_grupo,
-          categoria.dre_subgrupo
-        ], search);
+        return categoriaFinanceiraMatchesSearch(categoria, search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [categoriaFiltroNormalizado, categoriaTipoFiltro, categorias]);
@@ -425,14 +418,7 @@ export default function FinanceiroCadastros() {
         if (!search) {
           return true;
         }
-        return textMatchesSearchTerms([
-          categoria.nome,
-          categoria.descricao,
-          categoria.classificacao_gerencial,
-          categoria.dre_grupo,
-          categoria.dre_subgrupo,
-          tipoCategoria
-        ], search);
+        return categoriaFinanceiraMatchesSearch(categoria, search);
       })
       .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' }));
   }, [categorias, categoriasModalAba, categoriasModalBusca]);
@@ -1609,7 +1595,7 @@ export default function FinanceiroCadastros() {
                 <div className="finance-category-search-line">
                   <input
                     className="input w-full"
-                    placeholder="Filtrar por nome, descricao, DRE ou classificacao"
+                    placeholder="Filtrar por ID, nome, descricao, DRE ou classificacao"
                     value={categoriasModalBusca}
                     onChange={(event) => setCategoriasModalBusca(event.target.value)}
                   />

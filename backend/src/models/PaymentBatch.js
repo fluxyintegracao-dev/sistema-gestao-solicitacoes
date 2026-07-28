@@ -52,6 +52,19 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       unique: true
     },
+    provider_request_id: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      unique: true
+    },
+    payment_account_snapshot: {
+      type: DataTypes.JSON,
+      allowNull: true
+    },
+    provider_snapshot: {
+      type: DataTypes.JSON,
+      allowNull: true
+    },
     aprovacao_status: {
       type: DataTypes.STRING(40),
       allowNull: false,

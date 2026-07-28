@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { resolverCondicaoPagamentoPedido } = require('./pedidoCompraDocumentoUtils');
 const { getRuntimeInstallationConfig } = require('./runtimeConfig');
 
 const DEFAULT_BRAND_NAME = 'FLUXY';
@@ -240,7 +241,7 @@ function buildViewModel(pedido, options = {}) {
       obraCno: withFallback(pedido?.obra?.cno),
       obraEndereco: buildObraEndereco(pedido?.obra),
       notaFiscalInfo: buildNotaFiscalInfo(pedido),
-      condicaoPagamento: withFallback(pedido?.cotacaoFornecedor?.condicao_pagamento || pedido?.condicao_pagamento),
+      condicaoPagamento: withFallback(resolverCondicaoPagamentoPedido(pedido)),
       prazoEntrega: withFallback(
         pedido?.prazo_entrega_dias
           ? `${pedido.prazo_entrega_dias} ${pedido.prazo_entrega_tipo === 'DIAS_UTEIS' ? 'dias uteis' : 'dias corridos'}`

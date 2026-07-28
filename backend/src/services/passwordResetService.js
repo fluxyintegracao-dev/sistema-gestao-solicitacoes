@@ -149,7 +149,8 @@ async function resetPasswordByToken(token, password, req) {
     force_password_reset: false,
     password_reset_token_hash: null,
     password_reset_expires_at: null,
-    password_changed_at: new Date()
+    password_changed_at: new Date(),
+    token_version: Number(user.token_version || 0) + 1
   });
 
   await registrarEventoSeguranca({

@@ -1,8 +1,9 @@
-import { useEffect, useId, useMemo, useState } from 'react';
-import { textMatchesSearchTerms } from '../../utils/search';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { categoriaFinanceiraMatchesSearch } from '../../utils/categoriaFinanceira';
 
 function getCategoriaResumo(categoria) {
   return [
+    categoria?.id ? `#${categoria.id}` : null,
     categoria?.tipo,
     categoria?.dre_grupo,
     categoria?.dre_subgrupo
@@ -19,6 +20,8 @@ export default function CategoriaFinanceiraAutocomplete({
   placeholder = 'Digite para buscar a categoria'
 }) {
   const inputId = useId();
+  const listboxId = `${inputId}-listbox`;
+  const optionRefs = useRef([]);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -36,23 +39,19 @@ export default function CategoriaFinanceiraAutocomplete({
     const source = Array.isArray(options) ? options : [];
     const termo = query.trim();
 
-    if (!termo) return source.slice(0, 8);
+    if (!termo) return source;
 
-    return source
-      .filter((categoria) => textMatchesSearchTerms([
-        categoria?.nome,
-        categoria?.descricao,
-        categoria?.tipo,
-        categoria?.dre_grupo,
-        categoria?.dre_subgrupo,
-        categoria?.classificacao_gerencial
-      ], termo))
-      .slice(0, 8);
+    return source.filter((categoria) => categoriaFinanceiraMatchesSearch(categoria, termo));
   }, [options, query]);
 
   useEffect(() => {
     setActiveIndex(0);
   }, [query, options.length]);
+
+  useEffect(() => {
+    if (!open || !filteredOptions.length) return;
+    optionRefs.current[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, filteredOptions.length, open]);
 
   function selecionar(categoria) {
     if (!categoria) return;
@@ -109,6 +108,10 @@ export default function CategoriaFinanceiraAutocomplete({
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
+          aria-controls={listboxId}
+          aria-activedescendant={open && filteredOptions[activeIndex]
+            ? `${listboxId}-option-${filteredOptions[activeIndex].id}`
+            : undefined}
           onChange={(event) => {
             setQuery(event.target.value);
             setOpen(true);
@@ -122,11 +125,21 @@ export default function CategoriaFinanceiraAutocomplete({
         />
 
         {open && !disabled && (
-          <div className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] max-h-64 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
+          <div
+            id={listboxId}
+            role="listbox"
+            className="absolute left-0 right-0 top-[calc(100%+6px)] z-[80] max-h-64 overflow-y-auto overscroll-contain rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+          >
             {filteredOptions.length ? filteredOptions.map((categoria, index) => (
               <button
                 key={categoria.id}
+                id={`${listboxId}-option-${categoria.id}`}
+                ref={(element) => {
+                  optionRefs.current[index] = element;
+                }}
                 type="button"
+                role="option"
+                aria-selected={String(categoria.id) === String(value || '')}
                 className={`w-full rounded-lg px-3 py-2 text-left transition-colors ${
                   index === activeIndex
                     ? 'bg-[var(--c-primary)] text-white'
