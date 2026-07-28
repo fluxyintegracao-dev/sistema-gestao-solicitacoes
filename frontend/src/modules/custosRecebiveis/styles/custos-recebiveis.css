@@ -1663,7 +1663,215 @@
   }
 }
 
+.cr-obligations-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.cr-obligations-side {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+}
+
+.cr-obligation-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-border);
+}
+
+.cr-obligation-summary > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--ui-canvas);
+}
+
+.cr-obligation-summary span {
+  color: var(--c-muted);
+  font-size: 0.64rem;
+  font-weight: 760;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.cr-obligation-summary strong {
+  overflow: hidden;
+  color: var(--c-text);
+  font-size: 0.88rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cr-obligation-list,
+.cr-bypass-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cr-obligation-card,
+.cr-bypass-record {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-canvas);
+}
+
+.cr-obligation-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.cr-obligation-card[data-state="VENCIDA"] {
+  border-color: color-mix(in srgb, var(--accent-red, #c73847) 40%, var(--ui-border));
+}
+
+.cr-obligation-card__icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--cr-accent) 10%, var(--ui-surface));
+  color: var(--cr-accent);
+}
+
+.cr-obligation-card[data-state="VENCIDA"] .cr-obligation-card__icon {
+  background: color-mix(in srgb, var(--accent-red, #c73847) 10%, var(--ui-surface));
+  color: var(--accent-red, #c73847);
+}
+
+.cr-obligation-card__icon svg {
+  width: 19px;
+  height: 19px;
+}
+
+.cr-obligation-card__body,
+.cr-bypass-record > div {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.cr-obligation-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.cr-obligation-card__title strong,
+.cr-bypass-record strong {
+  color: var(--c-text);
+  font-size: 0.82rem;
+}
+
+.cr-obligation-card__body > span,
+.cr-bypass-record span {
+  color: var(--c-text);
+  font-size: 0.76rem;
+}
+
+.cr-obligation-card__body small,
+.cr-bypass-record small,
+.cr-server-time,
+.cr-helper-copy {
+  color: var(--c-muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.cr-deadline-badge {
+  display: inline-flex;
+  min-height: 22px;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--cr-warning) 14%, transparent);
+  color: var(--cr-warning);
+  font-size: 0.63rem;
+  font-weight: 780;
+}
+
+.cr-deadline-badge[data-alert="VENCIDO"] {
+  background: color-mix(in srgb, var(--accent-red, #c73847) 13%, transparent);
+  color: var(--accent-red, #c73847);
+}
+
+.cr-positive-text {
+  color: var(--cr-success) !important;
+}
+
+.cr-warning-text {
+  color: var(--cr-warning) !important;
+}
+
+.cr-server-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 2px 0;
+}
+
+.cr-server-time svg {
+  flex: 0 0 auto;
+}
+
+.cr-helper-copy {
+  margin: 0;
+}
+
+.cr-bypass-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 11px;
+  border: 1px solid var(--ui-border);
+  border-radius: 10px;
+  background: var(--ui-canvas);
+}
+
+.cr-bypass-form > .btn {
+  justify-self: end;
+}
+
+.cr-bypass-record {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.cr-status-pill[data-status="PENDENTE"] {
+  background: color-mix(in srgb, var(--cr-warning) 14%, transparent);
+  color: var(--cr-warning);
+}
+
+.cr-status-pill[data-status="VENCIDA"] {
+  background: color-mix(in srgb, var(--accent-red, #c73847) 13%, transparent);
+  color: var(--accent-red, #c73847);
+}
+
+.cr-status-pill[data-status="CUMPRIDA"] {
+  background: color-mix(in srgb, var(--cr-success) 14%, transparent);
+  color: var(--cr-success);
+}
+
 @media (max-width: 1100px) {
+  .cr-obligations-layout {
+    grid-template-columns: 1fr;
+  }
+
   .cr-dashboard-layout {
     grid-template-columns: 1fr;
   }
@@ -1880,9 +2088,39 @@
   .cr-table--realized td[colspan]::before {
     content: none;
   }
+
+  .cr-obligation-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .cr-obligation-card > .btn {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
 }
 
 @media (max-width: 430px) {
+  .cr-obligation-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cr-obligation-card {
+    grid-template-columns: 1fr;
+  }
+
+  .cr-obligation-card__icon {
+    display: none;
+  }
+
+  .cr-bypass-record {
+    grid-template-columns: 1fr;
+  }
+
+  .cr-bypass-record > .btn,
+  .cr-bypass-form > .btn {
+    width: 100%;
+  }
+
   .cr-plan-metrics,
   .cr-preview-metrics,
   .cr-mobile-record-grid {

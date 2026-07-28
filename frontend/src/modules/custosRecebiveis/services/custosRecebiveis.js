@@ -216,6 +216,18 @@ export async function solicitarReaberturaCompetencia(competenciaId, motivo) {
   return parseResponse(response, 'Erro ao solicitar reabertura');
 }
 
+export async function solicitarReaberturaObraCompetencia(obraId, competencia, motivo) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/reabertura`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ motivo })
+    }
+  );
+  return parseResponse(response, 'Erro ao solicitar reabertura');
+}
+
 export async function decidirReaberturaCompetencia(reaberturaId, payload) {
   const response = await fetch(
     `${API_URL}/custos-recebiveis/reaberturas/${reaberturaId}/aprovar`,
@@ -289,4 +301,43 @@ export async function baixarExportacaoCustosRecebiveis({
   anchor.click();
   anchor.remove();
   URL.revokeObjectURL(url);
+}
+
+export async function listarMinhasObrigacoesCustosRecebiveis() {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obrigacoes/minhas`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar obrigações e prazos');
+}
+
+export async function listarBypassesCustosRecebiveis() {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obrigacoes/bypass`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar bypasses');
+}
+
+export async function concederBypassCustosRecebiveis(payload) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obrigacoes/bypass`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-bypass') }),
+      body: JSON.stringify(payload)
+    }
+  );
+  return parseResponse(response, 'Erro ao conceder bypass');
+}
+
+export async function revogarBypassCustosRecebiveis(bypassId) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obrigacoes/bypass/${bypassId}`,
+    {
+      method: 'DELETE',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-bypass-revoke') })
+    }
+  );
+  return parseResponse(response, 'Erro ao revogar bypass');
 }

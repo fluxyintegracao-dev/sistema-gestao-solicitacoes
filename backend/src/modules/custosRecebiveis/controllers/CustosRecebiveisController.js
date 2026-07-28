@@ -19,7 +19,8 @@ const {
   obterPlanejamento,
   salvarCustos,
   salvarRecebiveis,
-  solicitarReabertura
+  solicitarReabertura,
+  solicitarReaberturaPorObraCompetencia
 } = require('../services/planejamentoService');
 const {
   listarRealizados,
@@ -27,6 +28,12 @@ const {
   reprocessarRealizados
 } = require('../services/realizadoService');
 const { gerarExportacao } = require('../services/exportacaoService');
+const {
+  concederBypass,
+  listarBypasses,
+  listarMinhasObrigacoes,
+  revogarBypass
+} = require('../services/obrigacaoService');
 
 function respondError(res, error, fallbackMessage) {
   const status = Number(error?.statusCode || error?.status);
@@ -236,6 +243,20 @@ class CustosRecebiveisController {
     }
   }
 
+  static async solicitarReaberturaPorObraCompetencia(req, res) {
+    try {
+      const result = await solicitarReaberturaPorObraCompetencia(
+        req.user,
+        req.params.obraId,
+        req.params.competencia,
+        req.body
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao solicitar reabertura');
+    }
+  }
+
   static async decidirReabertura(req, res) {
     try {
       return res.json(await decidirReabertura(
@@ -294,6 +315,48 @@ class CustosRecebiveisController {
       return res.send(result.buffer);
     } catch (error) {
       return respondError(res, error, 'Erro ao gerar a exportacao');
+    }
+  }
+
+  static async minhasObrigacoes(req, res) {
+    try {
+      return res.json(await listarMinhasObrigacoes(req.user));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar obrigacoes de Custos e Recebiveis');
+    }
+  }
+
+  static async bypasses(req, res) {
+    try {
+      return res.json(await listarBypasses(req.user));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar bypasses de Custos e Recebiveis');
+    }
+  }
+
+  static async concederBypass(req, res) {
+    try {
+      const result = await concederBypass(
+        req.user,
+        req.body,
+        req.get('Idempotency-Key')
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao conceder bypass de Custos e Recebiveis');
+    }
+  }
+
+  static async revogarBypass(req, res) {
+    try {
+      const result = await revogarBypass(
+        req.user,
+        req.params.id,
+        req.get('Idempotency-Key')
+      );
+      return res.json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao revogar bypass de Custos e Recebiveis');
     }
   }
 }

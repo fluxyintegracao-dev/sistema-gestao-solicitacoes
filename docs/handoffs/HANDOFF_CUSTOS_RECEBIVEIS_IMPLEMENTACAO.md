@@ -4,8 +4,9 @@
 
 - Branch: `dev-v2`.
 - Fases concluidas no codigo: Fase 0 - fundacao, Fase 1 - leitura e planilha micro,
-  Fase 2 - planejamento, medicao, dashboard, comparativo e reabertura e Fase 3 -
-  realizado, reconciliacao e exportacoes.
+  Fase 2 - planejamento, medicao, dashboard, comparativo e reabertura, Fase 3 -
+  realizado, reconciliacao e exportacoes e Fase 4 - obrigacoes, alertas, guard e
+  bypass.
 - Feature `CUSTOS_RECEBIVEIS`: cadastrada com `enabled: false`.
 - Dependencias: `OBRAS` e `FINANCEIRO`.
 - Frontend implementado, mas oculto enquanto a feature estiver desabilitada.
@@ -105,12 +106,44 @@
 - nenhuma escrita adicionada em Financeiro, Compras, Solicitacoes, Obras ou
   `apropriacoes`.
 
+## Fase 4 implementada
+
+- motor de obrigacoes limitado a responsaveis/substitutos ativos de obras ativas com
+  versao micro publicada;
+- ponto de partida por `competencia_inicial`, impedindo cobranca retroativa;
+- custos e recebiveis como obrigacoes independentes, cumpridas pela finalizacao da
+  competencia;
+- prazo no ultimo dia util do mes, as 18h pelo servidor, com antecipacao de fim de
+  semana e suporte opcional a `CR_FERIADOS`;
+- alertas `D-7`, `D-3`, `D-1` e `VENCIDO`;
+- aba responsiva `Obrigacoes e prazos`, com acesso direto ao planejamento;
+- reabertura de competencia vencida/finalizada disponivel inclusive quando o mes ainda
+  nao possuia registro;
+- reabertura mantida como fluxo da competencia, liberando todos os usuarios autorizados
+  da obra;
+- bypass mantido como excecao pessoal, com justificativa, expiracao obrigatoria,
+  limite de 30 dias, escopo e auditoria;
+- autoconcessao rejeitada no backend;
+- concessao e revogacao idempotentes e protegidas por bloqueio transacional do usuario
+  ou do registro;
+- bypass vigente libera o guard sem remover, ocultar ou cumprir a pendencia;
+- alerta de bypasses em meses consecutivos no painel administrativo;
+- payload `custos_recebiveis_pendencia` adicionado a login e `/auth/me`;
+- guard de frontend e backend, com resposta funcional
+  `MONTHLY_REQUIREMENT_PENDING`;
+- `SUPERADMIN`, rotas de resolucao e bypass vigente preservados do bloqueio;
+- falha inesperada no calculo e tratada como fail-open;
+- `CR_GUARD_MODE` entregue com fallback obrigatorio para `observe`; nenhum bloqueio foi
+  habilitado.
+
 ## Arquivos alterados fora do modulo
 
 - `backend/src/services/moduleConfigService.js`: registra a feature desabilitada e suas dependencias.
 - `backend/src/constants/moduloPermissoes.js`: registra as permissoes data-driven.
 - `backend/src/models/index.js`: registra models e associacoes.
 - `backend/src/routes.js`: monta o esqueleto backend sob a feature flag.
+- `backend/src/controllers/AuthController.js`: inclui o estado calculado da pendencia
+  no payload de sessao, somente quando a feature estiver habilitada.
 - `backend/migrations/202607280002_custos_recebiveis_fundacao.js`: cria somente tabelas `cr_*`.
 - `backend/scripts/validarCompraCotacaoEnvio.js`: remove dependencia indevida da contagem
   global e preserva a verificacao da permissao funcional de Compras.
@@ -127,6 +160,10 @@ Na Fase 1, os unicos arquivos funcionais fora da pasta propria do modulo foram:
   responsivo do shell somente para a rota do modulo;
 - `frontend/src/index.css`: retira o menu lateral oculto do fluxo somente nessa rota
   em smartphones, evitando que ele reserve 304 px fora da tela.
+- `frontend/src/components/PrivateRoute.jsx`: aplica o redirecionamento somente quando
+  o backend devolver `bloqueado: true`.
+- `frontend/src/contexts/AuthContext.jsx`: permite atualizar a sessao depois de cumprir
+  ou reabrir uma competencia, evitando estado de bloqueio obsoleto.
 
 As atualizacoes documentais deste README e deste handoff registram o estado real da
 entrega.
@@ -139,6 +176,7 @@ Passaram:
 - `node src/modules/custosRecebiveis/tests/validarFase1.js`;
 - `npm.cmd run test:custos-recebiveis-fase2`;
 - `npm.cmd run test:custos-recebiveis-fase3`;
+- `npm.cmd run test:custos-recebiveis-fase4`;
 - `npm.cmd run test:security-hardening`;
 - `npm.cmd run test:importacao-titulos`;
 - `npm.cmd run test:payments`;
@@ -178,6 +216,18 @@ Na Fase 1 ja haviam sido validados:
 - botoes de importacao bloqueados enquanto nenhum arquivo esta selecionado;
 - nenhum erro ou aviso registrado no console do navegador.
 
+Na Fase 4, a validacao automatizada sem banco confirmou:
+
+- ausencia de bloqueio em `observe`;
+- bloqueio de pendencia vencida em `enforce`;
+- bypass libera o guard sem apagar a pendencia;
+- `SUPERADMIN` nunca fica bloqueado;
+- competencia inicial impede meses anteriores;
+- antecipacao de finais de semana e feriados configurados;
+- rejeicao de autoconcessao e expiracao ausente;
+- contratos de rotas, permissoes, payload de sessao e redirect;
+- nenhuma chamada a banco remoto, migration ou ambiente de EC2.
+
 ## Pontos de parada mantidos
 
 - migration ainda nao executada em ambiente compartilhado;
@@ -186,16 +236,17 @@ Na Fase 1 ja haviam sido validados:
 - nenhuma migracao realizada para `main`;
 - homologacao visual com dados reais pendente porque depende da migration e da
   habilitacao controlada da feature em dev;
-- Fase 4 (obrigacoes e bloqueio) ainda nao iniciada.
+- `CR_GUARD_MODE` nao foi definido nem alterado em nenhum ambiente; o fallback continua
+  `observe`.
 
 ## Proximo passo exato
 
-1. revisar o diff e criar o commit da Fase 3 na `dev-v2`;
+1. revisar o diff e criar o commit da Fase 4 na `dev-v2`;
 2. o usuario envia a `dev-v2` e atualiza a EC2 de desenvolvimento;
 3. antes de iniciar os testes integrados, o usuario confirma separadamente a execucao da migration
    e a habilitacao de `CUSTOS_RECEBIVEIS` em dev;
-4. homologar escopo, permissoes, realizado, rateios, nao mapeados, reconciliacao,
-   estornos, exportacoes e responsividade;
+4. homologar escopo, permissoes, realizado, obrigacoes, reabertura, bypass, alertas e
+   responsividade;
 5. manter a feature desabilitada em producao;
-6. apos aceite da Fase 3, iniciar a Fase 4 sem habilitar a feature em producao;
+6. manter `CR_GUARD_MODE=observe` durante toda a homologacao inicial;
 7. somente o usuario executa a migracao para `main` e as atualizacoes de EC2.

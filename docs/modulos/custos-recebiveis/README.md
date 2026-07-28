@@ -11,7 +11,7 @@ orcamentaria macro de Obras e nao modifica registros dos modulos que consulta.
 
 ## Estado do runtime
 
-A fundacao tecnica da Fase 0 e os fluxos funcionais das Fases 1, 2 e 3 estao
+A fundacao tecnica da Fase 0 e os fluxos funcionais das Fases 1, 2, 3 e 4 estao
 implementados no codigo:
 
 - entrada `CUSTOS_RECEBIVEIS` no catalogo de modulos;
@@ -38,15 +38,22 @@ implementados no codigo:
 - reconciliacao manual auditada por item micro;
 - estornos neutralizados na projecao sem apagar o historico registrado;
 - exportacoes CSV e XLSX limitadas ao mesmo escopo de obras;
+- obrigacoes de custos e recebiveis calculadas a partir da competencia inicial do
+  responsavel, sem cobranca retroativa anterior a esse marco;
+- alertas D-7, D-3, D-1 e vencido calculados pelo horario do servidor;
+- reabertura da competencia vencida ou finalizada e bypass temporario de usuario
+  implementados como mecanismos distintos;
+- bypass limitado a 30 dias, sem autoconcessao, sem ocultar ou cumprir a obrigacao;
+- guard frontend e backend com kill-switch `CR_GUARD_MODE`, entregue em `observe`;
 - pagina frontend responsiva em `/custos-recebiveis`, com as abas `Visao geral`,
-  `Obras`, `Planejamento mensal`, `Comparativo`, `Custo realizado`, `Importacoes` e
-  `Exportacoes`;
+  `Obras`, `Planejamento mensal`, `Comparativo`, `Custo realizado`,
+  `Obrigacoes e prazos`, `Importacoes` e `Exportacoes`;
 - item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
   possuir a permissao explicita de acesso.
 
 A migration ainda nao foi executada em ambiente compartilhado e a feature permanece
-desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. Obrigacoes,
-bloqueio e configuracoes serao entregues nas fases posteriores.
+desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. O guard esta
+implementado em modo de observacao e nao bloqueia ou redireciona nenhum usuario.
 
 ## Fronteiras de dados
 
@@ -319,6 +326,66 @@ Cada tipo aceita `csv` ou `xlsx`. O CSV usa UTF-8 com BOM, separador por ponto e
 virgula e protecao contra interpretacao de formulas. O XLSX reutiliza
 `utils/excelWorkbook.js`.
 
+## Fase 4 - obrigacoes, reabertura, bypass e guard
+
+### Regras de obrigacao
+
+- Somente responsaveis ou substitutos ativos, vinculados a obra ativa e com plano
+  micro publicado, entram no calculo.
+- O usuario tambem precisa possuir as permissoes necessarias para acessar e preencher
+  custos e recebiveis; configuracao incompleta de acesso nao pode prende-lo.
+- O ponto de partida e `cr_responsaveis_obra.competencia_inicial`. Nenhum mes anterior
+  gera pendencia.
+- Custos previstos e recebiveis previstos geram obrigacoes separadas.
+- Finalizar a competencia cumpre ambas. Reabrir torna a obrigacao visivel novamente
+  ate uma nova finalizacao.
+- O prazo padrao e o ultimo dia util do mes, as 18h no horario do servidor. Sabados e
+  domingos sao antecipados automaticamente. Feriados opcionais podem ser informados
+  em `CR_FERIADOS`, como lista CSV de datas `AAAA-MM-DD`.
+
+### Guard seguro
+
+`CR_GUARD_MODE` aceita:
+
+```text
+observe  calcula e alerta, sem bloquear ou redirecionar
+enforce  bloqueia chamadas e redireciona somente pendencias vencidas legitimas
+```
+
+Valor ausente ou invalido sempre resulta em `observe`. A avaliacao ocorre na ordem:
+modo de observacao, `SUPERADMIN`, bypass vigente, rota liberada e, por ultimo,
+pendencia vencida. Falha inesperada no calculo e fail-open para evitar indisponibilidade
+geral.
+
+O backend responde `403` com `MONTHLY_REQUIREMENT_PENDING` em chamadas diretas quando
+o modo `enforce` estiver explicitamente ativo. O frontend usa o mesmo estado da sessao
+para levar o usuario ao planejamento. Perfil, logout, ajuda/suporte e o proprio modulo
+permanecem acessiveis.
+
+### Reabertura e bypass
+
+- Reabertura tem como alvo uma competencia da obra e libera qualquer usuario
+  autorizado durante a janela aprovada.
+- Mes vencido ainda sem registro pode criar sua competencia de forma idempotente ao
+  solicitar reabertura.
+- Bypass tem como alvo uma pessoa e, opcionalmente, uma obra.
+- Bypass exige justificativa, expiracao futura, permissao administrativa e
+  `Idempotency-Key`; e proibida a autoconcessao.
+- Concessao e revogacao escrevem na auditoria append-only. A expiracao ja nasce
+  registrada no evento de concessao e passa a valer automaticamente pelo horario do
+  servidor.
+- A pendencia continua listada e contada durante o bypass.
+
+### Rotas
+
+```text
+GET    /custos-recebiveis/obrigacoes/minhas
+GET    /custos-recebiveis/obrigacoes/bypass
+POST   /custos-recebiveis/obrigacoes/bypass
+DELETE /custos-recebiveis/obrigacoes/bypass/:id
+POST   /custos-recebiveis/obras/:obraId/competencias/:competencia/reabertura
+```
+
 ## Regras de evolucao
 
 - Cada fase funcional deve ser entregue e aceita separadamente.
@@ -329,7 +396,7 @@ virgula e protecao contra interpretacao de formulas. O XLSX reutiliza
   Compras ou Financeiro.
 - Toda mutacao futura deve ser transacional, idempotente quando aplicavel e auditada.
 
-## Validacao das Fases 0, 1, 2 e 3
+## Validacao das Fases 0, 1, 2, 3 e 4
 
 Executar:
 
@@ -339,6 +406,7 @@ node src/modules/custosRecebiveis/tests/validarFase0.js
 node src/modules/custosRecebiveis/tests/validarFase1.js
 npm.cmd run test:custos-recebiveis-fase2
 npm.cmd run test:custos-recebiveis-fase3
+npm.cmd run test:custos-recebiveis-fase4
 npm.cmd run test:docs
 npm.cmd run test:compra-cotacao-envio
 npm.cmd run test:compra-remanejamento

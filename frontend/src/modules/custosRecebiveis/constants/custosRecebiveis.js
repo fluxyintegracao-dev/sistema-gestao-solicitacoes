@@ -15,6 +15,8 @@ export const CUSTOS_RECEBIVEIS_PERMISSIONS = Object.freeze({
   REALIZADOS_VIEW: 'custos_recebiveis.realizados.visualizar',
   REALIZADOS_UPDATE: 'custos_recebiveis.realizados.atualizar',
   REALIZADOS_RECONCILE: 'custos_recebiveis.realizados.reconciliar',
+  OBRIGACOES_VIEW: 'custos_recebiveis.obrigacoes.visualizar',
+  OBLIGATION_BYPASS: 'custos_recebiveis.obrigacoes.conceder_bypass',
   REPORT_EXPORT: 'custos_recebiveis.relatorio.exportar',
   REOPEN_REQUEST: 'custos_recebiveis.reabertura.solicitar',
   REOPEN_APPROVE: 'custos_recebiveis.reabertura.aprovar'
@@ -45,6 +47,11 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
     id: 'realizado',
     label: 'Custo realizado',
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW
+  },
+  {
+    id: 'obrigacoes',
+    label: 'Obrigações e prazos',
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.OBRIGACOES_VIEW
   },
   {
     id: 'importacoes',

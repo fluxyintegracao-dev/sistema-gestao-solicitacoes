@@ -15,7 +15,8 @@ import {
   obterPlanejamentoCompetencia,
   salvarCustosCompetencia,
   salvarRecebiveisCompetencia,
-  solicitarReaberturaCompetencia
+  solicitarReaberturaCompetencia,
+  solicitarReaberturaObraCompetencia
 } from '../services/custosRecebiveis';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -217,7 +218,11 @@ export default function CrPlanejamentoView({
   async function requestReopening() {
     await runMutation(
       'reopen',
-      () => solicitarReaberturaCompetencia(data.competencia.id, reopenReason),
+      () => (
+        data.competencia.id
+          ? solicitarReaberturaCompetencia(data.competencia.id, reopenReason)
+          : solicitarReaberturaObraCompetencia(obra.id, competencia, reopenReason)
+      ),
       'Solicitação de reabertura registrada para decisão.'
     );
     setReopenReason('');
@@ -558,7 +563,7 @@ export default function CrPlanejamentoView({
             </div>
           ) : null}
 
-          {data?.competencia?.estado === 'FINALIZADA' && permissions.reopenRequest ? (
+          {data?.regras?.exige_reabertura && permissions.reopenRequest ? (
             <div className="cr-reopen-box">
               <label className="cr-field">
                 <span>Motivo da reabertura</span>

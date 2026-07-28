@@ -204,6 +204,7 @@ async function validateFinalizedCompetencyIsImmutable() {
         CrPlanoObra: { findOne: async () => ({ id: 3, versao: 2, situacao: 'PUBLICADA' }) },
         CrPlanoItem: { findAll: async () => [] },
         CrCompetencia: { findOne: async () => finalized },
+        CrReabertura: { findOne: async () => null },
         CrPrevisaoCusto: {
           destroy: async () => { replacedRows += 1; },
           bulkCreate: async () => { replacedRows += 1; }

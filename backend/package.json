@@ -19,7 +19,8 @@
     "test:security-hardening": "node scripts/validarSecurityHardening.js",
     "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",
     "test:custos-recebiveis-fase2": "node src/modules/custosRecebiveis/tests/validarFase2.js",
-    "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js"
+    "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js",
+    "test:custos-recebiveis-fase4": "node src/modules/custosRecebiveis/tests/validarFase4.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

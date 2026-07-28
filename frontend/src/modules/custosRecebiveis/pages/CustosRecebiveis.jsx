@@ -8,6 +8,7 @@ import {
   HiOutlineClipboardDocumentList,
   HiOutlineArrowDownTray,
   HiOutlineBanknotes,
+  HiOutlineClock,
   HiOutlineScale
 } from 'react-icons/hi2';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -16,6 +17,7 @@ import CrDashboardView from '../components/CrDashboardView';
 import CrExportacoesView from '../components/CrExportacoesView';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
+import CrObrigacoesView from '../components/CrObrigacoesView';
 import CrPlanejamentoView from '../components/CrPlanejamentoView';
 import CrPlanoWorkspace from '../components/CrPlanoWorkspace';
 import CrRealizadoView from '../components/CrRealizadoView';
@@ -42,6 +44,7 @@ const TAB_ICONS = {
   planejamento: HiOutlineClipboardDocumentList,
   comparativo: HiOutlineScale,
   realizado: HiOutlineBanknotes,
+  obrigacoes: HiOutlineClock,
   importacoes: HiOutlineCircleStack,
   exportacoes: HiOutlineArrowDownTray
 };
@@ -52,7 +55,7 @@ function currentMonth() {
 }
 
 export default function CustosRecebiveis() {
-  const { user } = useAuth();
+  const { user, refreshSession } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const [obras, setObras] = useState([]);
   const [obrasLoading, setObrasLoading] = useState(false);
@@ -135,6 +138,10 @@ export default function CustosRecebiveis() {
       CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_RECONCILE
     )
   }), [user]);
+  const canGrantBypass = hasExplicitCustosRecebiveisPermission(
+    user,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS
+  );
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
     || planData?.obra
     || null;
@@ -334,6 +341,23 @@ export default function CustosRecebiveis() {
     updateQuery({ aba: 'planejamento', obra: obraId, plano: null });
   }
 
+  function handleOpenObligationPlanning(item) {
+    updateQuery({
+      aba: 'planejamento',
+      obra: item.obra_id,
+      competencia: item.competencia,
+      plano: null,
+      bloqueio: item.exige_reabertura ? '1' : null
+    });
+  }
+
+  async function handlePlanningChanged() {
+    await Promise.all([
+      loadObras(),
+      refreshSession().catch(() => null)
+    ]);
+  }
+
   if (!activeTab) {
     return (
       <div className="page cr-page">
@@ -469,7 +493,7 @@ export default function CustosRecebiveis() {
           obra={selectedObra}
           competencia={competencia}
           permissions={planningPermissions}
-          onChanged={loadObras}
+          onChanged={handlePlanningChanged}
         />
       ) : null}
 
@@ -487,6 +511,14 @@ export default function CustosRecebiveis() {
           obra={selectedObra}
           competencia={competencia}
           permissions={realizedPermissions}
+        />
+      ) : null}
+
+      {activeTab === 'obrigacoes' ? (
+        <CrObrigacoesView
+          key={refreshToken}
+          canGrantBypass={canGrantBypass}
+          onOpenPlanning={handleOpenObligationPlanning}
         />
       ) : null}
 

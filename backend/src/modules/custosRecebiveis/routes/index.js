@@ -111,12 +111,43 @@ router.post(
 );
 
 router.post(
+  '/obras/:obraId/competencias/:competencia/reabertura',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_REQUEST),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.solicitarReaberturaPorObraCompetencia
+);
+
+router.post(
   '/reaberturas/:reaberturaId/aprovar',
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE),
   requireCustosRecebiveisObraScope(
     async (req) => resolverObraIdPorReabertura(req.params.reaberturaId)
   ),
   CustosRecebiveisController.decidirReabertura
+);
+
+router.get(
+  '/obrigacoes/minhas',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBRIGACOES_VIEW),
+  CustosRecebiveisController.minhasObrigacoes
+);
+
+router.get(
+  '/obrigacoes/bypass',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS),
+  CustosRecebiveisController.bypasses
+);
+
+router.post(
+  '/obrigacoes/bypass',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS),
+  CustosRecebiveisController.concederBypass
+);
+
+router.delete(
+  '/obrigacoes/bypass/:id',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS),
+  CustosRecebiveisController.revogarBypass
 );
 
 router.get(
