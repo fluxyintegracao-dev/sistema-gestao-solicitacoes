@@ -112,6 +112,7 @@ import {
   SST_NAV,
   SST_SIMPLIFIED_MODE
 } from '../modules/sst/constants/sstResources';
+import { canAccessCustosRecebiveis } from '../modules/custosRecebiveis/utils/access';
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
 
@@ -172,6 +173,7 @@ export default function Layout() {
   const [suporteWhatsappUrl, setSuporteWhatsappUrl] = useState(null);
   const nativeApp = isNativeApp();
   const comprasResponsiveRoute = isComprasResponsiveRoute(location.pathname);
+  const custosRecebiveisResponsiveRoute = location.pathname.startsWith('/custos-recebiveis');
 
   const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
 
@@ -354,6 +356,7 @@ export default function Layout() {
   const pagamentosAccess = canAccessPagamentos(user);
   const boletosAccess = canAccessBoletos(user);
   const financeiroModuleEnabled = hasEnabledModule(user, 'FINANCEIRO');
+  const custosRecebiveisAccess = canAccessCustosRecebiveis(user);
   const comercialAccess = canAccessComercial(user);
   const comercialEmpreendimentosAccess = canViewComercialEmpreendimentos(user);
   const comercialContratosAccess = canViewComercialContratos(user);
@@ -389,6 +392,7 @@ export default function Layout() {
       Comunicação: HiOutlineChatBubbleLeftRight,
       Compras: HiOutlineWallet,
       Financeiro: HiOutlineWallet,
+      'Custos e Recebíveis': HiOutlineBanknotes,
       Fiscal: HiOutlineDocumentText,
       CRM: HiOutlineUsers,
       Comercial: HiOutlineBuildingOffice2,
@@ -489,6 +493,12 @@ export default function Layout() {
         financeiroAccess ? item('/financeiro/cadastros', 'Cadastros Financeiros', HiOutlineRectangleGroup) : null,
         financeiroAccess ? item('/comprovantes/upload', 'Upload Comprovantes', HiOutlineCloudArrowUp) : null,
         financeiroAccess ? item('/comprovantes/pendentes', 'Comprovantes Pendentes', HiOutlineReceiptRefund) : null
+      ]);
+    }
+
+    if (custosRecebiveisAccess) {
+      addGroup('Custos e Recebíveis', [
+        item('/custos-recebiveis', 'Custos e Recebíveis', HiOutlineBanknotes)
       ]);
     }
 
@@ -679,6 +689,7 @@ export default function Layout() {
     comprasSolicitacoesAccess,
     comprasSolicitacoesCreateAccess,
     contratosAccess,
+    custosRecebiveisAccess,
     crmAccess,
     crmAtendimentoAccess,
     crmAutomacoesAccess,
@@ -755,7 +766,7 @@ export default function Layout() {
 
   return (
     <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''}`}>
+      <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''} ${custosRecebiveisResponsiveRoute ? 'custos-recebiveis-layout-scope' : ''}`}>
         <div className="layout-shell-backdrop" aria-hidden="true" />
 
         <aside

@@ -11,7 +11,8 @@ orcamentaria macro de Obras e nao modifica registros dos modulos que consulta.
 
 ## Estado do runtime
 
-A Fase 0 fornece somente a fundacao tecnica:
+A fundacao tecnica da Fase 0 e o fluxo funcional da Fase 1 estao implementados no
+codigo:
 
 - entrada `CUSTOS_RECEBIVEIS` no catalogo de modulos;
 - feature desabilitada por padrao;
@@ -20,10 +21,20 @@ A Fase 0 fornece somente a fundacao tecnica:
 - models Sequelize e associacoes de leitura;
 - permissoes granulares;
 - policy propria de escopo por obra;
-- esqueleto de rotas backend.
+- listagem das obras do escopo do usuario;
+- workspace de consulta da estrutura micro e de suas versoes;
+- modelo XLSX por obra, com referencias macro somente para consulta;
+- validacao previa da planilha sem gravacao;
+- importacao transacional, versionada, idempotente e auditada;
+- publicacao de uma versao e substituicao atomica da versao anteriormente publicada;
+- pagina frontend responsiva em `/custos-recebiveis`, com as abas `Obras` e
+  `Importacoes`;
+- item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
+  possuir a permissao explicita de acesso.
 
-Ainda nao existem pagina, item de menu ou fluxo operacional disponivel ao usuario. A
-feature nao deve ser habilitada antes da conclusao e homologacao das fases funcionais.
+A migration ainda nao foi executada em ambiente compartilhado e a feature permanece
+desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. As demais
+abas do desenho canonico serao entregues nas fases posteriores.
 
 ## Fronteiras de dados
 
@@ -107,6 +118,72 @@ GET /custos-recebiveis/status
 
 Com a feature desligada, a resposta deve ser 403 inclusive para `SUPERADMIN`.
 
+## Fase 1 - leitura e planilha micro
+
+### Rotas
+
+Todas as rotas abaixo passam, nesta ordem, pela feature flag do prefixo, pela permissao
+geral `custos_recebiveis.modulo.acessar`, pela permissao da acao e, quando existe obra
+em contexto, pela policy de escopo:
+
+```text
+GET  /custos-recebiveis/obras
+GET  /custos-recebiveis/obras/:obraId/plano
+GET  /custos-recebiveis/obras/:obraId/plano/modelo
+POST /custos-recebiveis/obras/:obraId/plano/importar/validar
+POST /custos-recebiveis/obras/:obraId/plano/importar
+POST /custos-recebiveis/planos/:planoId/publicar
+```
+
+O upload somente e processado depois das validacoes de permissao e escopo.
+
+### Contrato da planilha
+
+A aba `ESTRUTURA_MICRO` possui exatamente estas colunas:
+
+```text
+codigo
+descricao
+unidade
+quantidade
+custo_unitario
+etapa_macro_codigo
+codigo_pai
+```
+
+O modelo tambem contem as abas `MACRO_REFERENCIA`, alimentada em modo somente leitura
+com as apropriacoes ativas da obra, e `INSTRUCOES`.
+
+A validacao rejeita cabecalho incompleto, codigos duplicados, valores negativos,
+referencias a pais inexistentes, ciclos hierarquicos e codigo macro inexistente ou
+inativo. O limite atual e de 10 MB e 10.000 linhas.
+
+### Versionamento, idempotencia e publicacao
+
+- Validar um arquivo nao grava dados.
+- A primeira importacao cria a versao 1 em `RASCUNHO`.
+- Uma reimportacao diferente exige motivo e cria nova versao; nunca sobrescreve a
+  anterior.
+- O mesmo hash SHA-256 para a mesma obra retorna a importacao existente e nao duplica
+  plano, itens ou auditoria.
+- A importacao grava somente `cr_planos_obra`, `cr_plano_itens`,
+  `cr_plano_macro_vinculos`, `cr_importacoes` e `cr_auditoria`.
+- A publicacao exige vinculo macro em todos os itens de custo.
+- Divergencia absoluta superior a 5% entre micro e macro exige justificativa.
+- Ao publicar, a versao publica anterior passa para `SUBSTITUIDA` e a nova passa para
+  `PUBLICADA` dentro da mesma transacao.
+- Nenhum fluxo cria, edita ou remove registros em `apropriacoes`.
+
+### Frontend
+
+- Rota unica `/custos-recebiveis`.
+- Contexto preservado na URL pelos parametros `aba`, `obra`, `plano`, `competencia` e
+  `sub`.
+- Tabelas compactas em desktop/notebook e registros empilhados em tablet/mobile.
+- Acoes de validacao, importacao e publicacao ficam bloqueadas enquanto a requisicao
+  esta em andamento.
+- A interface mostra apenas as abas e acoes autorizadas pelas permissoes granulares.
+
 ## Regras de evolucao
 
 - Cada fase funcional deve ser entregue e aceita separadamente.
@@ -117,21 +194,25 @@ Com a feature desligada, a resposta deve ser 403 inclusive para `SUPERADMIN`.
   Compras ou Financeiro.
 - Toda mutacao futura deve ser transacional, idempotente quando aplicavel e auditada.
 
-## Validacao da Fase 0
+## Validacao das Fases 0 e 1
 
 Executar:
 
 ```powershell
 cd C:\Fluxy\backend
 node src/modules/custosRecebiveis/tests/validarFase0.js
+node src/modules/custosRecebiveis/tests/validarFase1.js
 npm.cmd run test:docs
 npm.cmd run test:compra-cotacao-envio
+npm.cmd run test:compra-remanejamento
 npm.cmd run test:security-hardening
 npm.cmd run test:importacao-titulos
 npm.cmd run test:payments
 npm.cmd run test:smoke-sst
+
+cd C:\Fluxy\frontend
+npm.cmd run build
 ```
 
-O build do frontend tambem deve permanecer valido, embora a Fase 0 nao altere a
-interface.
-
+Antes da homologacao visual em dev, a migration deve ser executada pelo responsavel do
+ambiente e a feature deve ser habilitada somente mediante confirmacao explicita.

@@ -71,6 +71,7 @@ import {
   SST_NAV,
   SST_SIMPLIFIED_MODE
 } from './modules/sst/constants/sstResources';
+import { canAccessCustosRecebiveis } from './modules/custosRecebiveis/utils/access';
 
 const Login = lazy(() => import('./pages/Login'));
 const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
@@ -111,6 +112,7 @@ const FinanceiroBancos = lazy(() => import('./pages/FinanceiroBancos'));
 const FinanceiroCaixas = lazy(() => import('./pages/FinanceiroCaixas'));
 const FinanceiroResultadoObras = lazy(() => import('./pages/FinanceiroResultadoObras'));
 const FinanceiroResultadoCentrosCusto = lazy(() => import('./pages/FinanceiroResultadoCentrosCusto'));
+const CustosRecebiveis = lazy(() => import('./modules/custosRecebiveis/pages/CustosRecebiveis'));
   const ModuloRelatorios = lazy(() => import('./pages/ModuloRelatorios'));
   const ComprasRelatorioCategoriasInsumos = lazy(() => import('./pages/ComprasRelatorioCategoriasInsumos'));
   const ComprasRelatorioComprasDiretas = lazy(() => import('./pages/ComprasRelatorioComprasDiretas'));
@@ -299,6 +301,14 @@ function ConfiguracoesAreaRoute({ area, children }) {
 function EnabledModuleRoute({ moduleKey, children }) {
   const { user } = useAuth();
   if (!hasEnabledModule(user, moduleKey)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function CustosRecebiveisRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessCustosRecebiveis(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -989,6 +999,7 @@ export default function App() {
         <Route path="financeiro/conciliacao" element={<FinanceiroRoute><FinanceiroConciliacao /></FinanceiroRoute>} />
         <Route path="financeiro/caixas" element={<FinanceiroRoute><FinanceiroCaixas /></FinanceiroRoute>} />
         <Route path="financeiro/cadastros" element={<FinanceiroRoute><FinanceiroCadastros /></FinanceiroRoute>} />
+        <Route path="custos-recebiveis" element={<CustosRecebiveisRoute><CustosRecebiveis /></CustosRecebiveisRoute>} />
         <Route path="compras/relatorios" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ModuloRelatorios modulo="compras" /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/auditoria" element={<ModuloComprasRoute><ComprasRelatoriosRoute><RelatoriosAdministrativos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
         <Route path="compras/relatorios/categorias-insumos" element={<ModuloComprasRoute><ComprasRelatoriosRoute><ComprasRelatorioCategoriasInsumos /></ComprasRelatoriosRoute></ModuloComprasRoute>} />
