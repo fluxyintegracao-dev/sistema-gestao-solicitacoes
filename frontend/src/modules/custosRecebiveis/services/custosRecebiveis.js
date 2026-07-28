@@ -116,3 +116,114 @@ export async function baixarModeloPlanoMicro(obraId, obraCodigo = '') {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+function jsonHeaders(extra = {}) {
+  return authHeaders({ 'Content-Type': 'application/json', ...extra });
+}
+
+function newIdempotencyKey(prefix = 'cr') {
+  return globalThis.crypto?.randomUUID?.()
+    || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export async function obterCustosRecebiveisDashboard(competencia) {
+  const query = new URLSearchParams({ competencia });
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/dashboard?${query.toString()}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar dashboard');
+}
+
+export async function obterPlanejamentoCompetencia(obraId, competencia) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar planejamento da competência');
+}
+
+export async function salvarCustosCompetencia(obraId, competencia, itens) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/custos`,
+    {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ itens })
+    }
+  );
+  return parseResponse(response, 'Erro ao salvar custos previstos');
+}
+
+export async function salvarRecebiveisCompetencia(obraId, competencia, itens) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/receitas`,
+    {
+      method: 'PUT',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ itens })
+    }
+  );
+  return parseResponse(response, 'Erro ao salvar recebíveis previstos');
+}
+
+export async function finalizarPlanejamentoCompetencia(
+  obraId,
+  competencia,
+  justificativas = {}
+) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/finalizar`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-finalizar') }),
+      body: JSON.stringify(justificativas)
+    }
+  );
+  return parseResponse(response, 'Erro ao finalizar competência');
+}
+
+export async function consolidarMedicaoCompetencia(obraId, competencia, itens) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/medicao`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ itens })
+    }
+  );
+  return parseResponse(response, 'Erro ao consolidar medição');
+}
+
+export async function obterComparativoCompetencia(obraId, competencia) {
+  const query = new URLSearchParams({ competencia });
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/comparativo?${query.toString()}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar comparativo');
+}
+
+export async function solicitarReaberturaCompetencia(competenciaId, motivo) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/competencias/${competenciaId}/reabertura`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ motivo })
+    }
+  );
+  return parseResponse(response, 'Erro ao solicitar reabertura');
+}
+
+export async function decidirReaberturaCompetencia(reaberturaId, payload) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/reaberturas/${reaberturaId}/aprovar`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify(payload)
+    }
+  );
+  return parseResponse(response, 'Erro ao decidir reabertura');
+}

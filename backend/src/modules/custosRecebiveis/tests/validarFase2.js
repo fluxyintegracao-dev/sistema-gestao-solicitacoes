@@ -1,0 +1,252 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const {
+  consolidarMedicao,
+  finalizarCompetencia,
+  findPrivateSources,
+  monthRange,
+  normalizeCompetencia,
+  salvarCustos,
+  statusComparativo
+} = require('../services/planejamentoService');
+
+const moduleRoot = path.resolve(__dirname, '..');
+const backendRoot = path.resolve(moduleRoot, '../../..');
+
+function read(relativePath) {
+  return fs.readFileSync(path.resolve(backendRoot, relativePath), 'utf8');
+}
+
+function validateComparisonStates() {
+  assert.strictEqual(statusComparativo(0, 0), 'NEUTRO');
+  assert.strictEqual(statusComparativo(0, 10), 'SEM_PREVISAO');
+  assert.strictEqual(statusComparativo(10, 0), 'A_REALIZAR');
+  assert.strictEqual(statusComparativo(10, 10), 'DENTRO');
+  assert.strictEqual(statusComparativo(10, 9.99), 'DENTRO');
+  assert.strictEqual(statusComparativo(10, 10.01), 'ESTOURO');
+}
+
+function validateCompetenciaBoundaries() {
+  assert.strictEqual(normalizeCompetencia('2026-08'), '2026-08');
+  assert.deepStrictEqual(monthRange('2026-12'), {
+    first: '2026-12-01',
+    nextMonth: '2027-01-01'
+  });
+  assert.throws(() => normalizeCompetencia('08/2026'), /Competencia invalida/);
+}
+
+function validateBackendContracts() {
+  const service = read('src/modules/custosRecebiveis/services/planejamentoService.js');
+  const routes = read('src/modules/custosRecebiveis/routes/index.js');
+  const controller = read('src/modules/custosRecebiveis/controllers/CustosRecebiveisController.js');
+
+  [
+    "'/dashboard'",
+    "'/obras/:obraId/competencias/:competencia'",
+    "'/obras/:obraId/competencias/:competencia/custos'",
+    "'/obras/:obraId/competencias/:competencia/receitas'",
+    "'/obras/:obraId/competencias/:competencia/finalizar'",
+    "'/obras/:obraId/competencias/:competencia/medicao'",
+    "'/obras/:obraId/comparativo'",
+    "'/competencias/:competenciaId/reabertura'",
+    "'/reaberturas/:reaberturaId/aprovar'"
+  ].forEach((contract) => assert(routes.includes(contract), `Rota ausente: ${contract}`));
+
+  [
+    'DASHBOARD_VIEW',
+    'PLANEJAMENTO_VIEW',
+    'PLANEJAMENTO_COSTS',
+    'PLANEJAMENTO_RECEIVABLES',
+    'PLANEJAMENTO_FINISH',
+    'MEDICAO_CONSOLIDATE',
+    'COMPARATIVO_VIEW',
+    'REOPEN_REQUEST',
+    'REOPEN_APPROVE'
+  ].forEach((permission) => assert(routes.includes(permission), `Permissao ausente: ${permission}`));
+
+  assert(service.includes("estado === 'FINALIZADA'"));
+  assert(service.includes('CR_COMPETENCIA_IMUTAVEL'));
+  assert(service.includes("situacao: 'APROVADA'"));
+  assert(service.includes("expira_em: { [Op.gt]: new Date() }"));
+  assert(service.includes('Idempotency-Key e obrigatoria'));
+  assert(service.includes('transaction.LOCK.UPDATE'));
+  assert(service.includes("origem_exibicao: linkedTitleIsReceivable ? 'TITULO' : 'PARCELA_CONTRATUAL'"));
+  assert(service.includes("String(obra.classificacao).toUpperCase() !== 'PUBLICA'"));
+  assert(service.includes('CrAuditoria.create'));
+  assert(!service.includes('Apropriacao.update'));
+  assert(!service.includes('Apropriacao.destroy'));
+  assert(controller.includes("req.get('Idempotency-Key')"));
+}
+
+function validateFrontendContracts() {
+  const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
+  const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
+  const planning = read('../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx');
+  const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
+  const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
+
+  ['visao-geral', 'planejamento', 'comparativo'].forEach((tab) => (
+    assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
+  ));
+  assert(page.includes('<CrDashboardView'));
+  assert(page.includes('<CrPlanejamentoView'));
+  assert(page.includes('<CrComparativoView'));
+  assert(planning.includes('Etapa {step} de {STEPS.length}'));
+  assert(planning.includes('Parcela vinculada a título aparece uma única vez'));
+  assert(planning.includes('Competência finalizada e imutável'));
+  assert(planning.includes('disabled={Boolean(saving)}'));
+  assert(dashboard.includes('Previsto x realizado por macro'));
+  assert(dashboard.includes('Status das etapas'));
+  assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
+}
+
+function transactionHarness() {
+  return {
+    transaction: async (callback) => callback({ LOCK: { UPDATE: 'UPDATE' } })
+  };
+}
+
+function commonScope() {
+  return async () => ({ todas: true, obraIds: null });
+}
+
+async function validatePrivateAntiDoubleCount() {
+  const sources = await findPrivateSources(7, '2026-08', {
+    ContratoComercialParcela: {
+      findAll: async () => [{
+        id: 91,
+        descricao: 'Parcela 1',
+        data_vencimento: '2026-08-10',
+        valor_original: 1000,
+        contrato: { id: 12, numero: 'CT-12', obra_id: 7, status: 'ATIVO' },
+        tituloFinanceiro: {
+          id: 33,
+          codigo: 'REC-33',
+          descricao: 'Titulo da parcela',
+          tipo: 'RECEBER',
+          valor_original: 1250,
+          data_vencimento: '2026-08-12'
+        }
+      }]
+    },
+    ContratoComercial: {},
+    TituloFinanceiro: {}
+  });
+  assert.strictEqual(sources.length, 1);
+  assert.strictEqual(sources[0].key, 'titulo:33');
+  assert.strictEqual(sources[0].origem_exibicao, 'TITULO');
+  assert.strictEqual(sources[0].valor_previsto, 1250);
+}
+
+async function validateFinalizationIdempotency() {
+  let writes = 0;
+  const finalized = {
+    id: 41,
+    obra_id: 7,
+    competencia: '2026-08',
+    estado: 'FINALIZADA',
+    total_custo_previsto: 100,
+    total_receita_prevista: 200
+  };
+  const overrides = {
+    sequelize: transactionHarness(),
+    resolverEscopoObras: commonScope(),
+    Obra: { findByPk: async () => ({ id: 7, nome: 'Obra', classificacao: 'PUBLICA' }) },
+    CrPlanoObra: { findOne: async () => ({ id: 3, versao: 2, situacao: 'PUBLICADA' }) },
+    CrCompetencia: {
+      findOne: async () => finalized,
+      create: async () => { writes += 1; }
+    },
+    CrAuditoria: { create: async () => { writes += 1; } }
+  };
+  const first = await finalizarCompetencia(
+    { id: 1 },
+    7,
+    '2026-08',
+    {},
+    'same-key',
+    overrides
+  );
+  const second = await finalizarCompetencia(
+    { id: 1 },
+    7,
+    '2026-08',
+    {},
+    'same-key',
+    overrides
+  );
+  assert.strictEqual(first.idempotente, true);
+  assert.strictEqual(second.idempotente, true);
+  assert.strictEqual(writes, 0);
+}
+
+async function validateFinalizedCompetencyIsImmutable() {
+  let replacedRows = 0;
+  const finalized = {
+    id: 41,
+    obra_id: 7,
+    competencia: '2026-08',
+    estado: 'FINALIZADA'
+  };
+  await assert.rejects(
+    () => salvarCustos(
+      { id: 1 },
+      7,
+      '2026-08',
+      { itens: [] },
+      {
+        sequelize: transactionHarness(),
+        resolverEscopoObras: commonScope(),
+        Obra: { findByPk: async () => ({ id: 7, nome: 'Obra', classificacao: 'PUBLICA' }) },
+        CrPlanoObra: { findOne: async () => ({ id: 3, versao: 2, situacao: 'PUBLICADA' }) },
+        CrPlanoItem: { findAll: async () => [] },
+        CrCompetencia: { findOne: async () => finalized },
+        CrPrevisaoCusto: {
+          destroy: async () => { replacedRows += 1; },
+          bulkCreate: async () => { replacedRows += 1; }
+        }
+      }
+    ),
+    (error) => error?.code === 'CR_COMPETENCIA_IMUTAVEL'
+  );
+  assert.strictEqual(replacedRows, 0);
+}
+
+async function validatePrivateWorkRejectsMeasurement() {
+  await assert.rejects(
+    () => consolidarMedicao(
+      { id: 1 },
+      7,
+      '2026-08',
+      { itens: [] },
+      {
+        sequelize: transactionHarness(),
+        resolverEscopoObras: commonScope(),
+        Obra: {
+          findByPk: async () => ({ id: 7, nome: 'Obra privada', classificacao: 'PRIVADA' })
+        }
+      }
+    ),
+    (error) => error?.code === 'CR_MEDICAO_APENAS_OBRA_PUBLICA'
+  );
+}
+
+async function run() {
+  validateComparisonStates();
+  validateCompetenciaBoundaries();
+  validateBackendContracts();
+  validateFrontendContracts();
+  await validatePrivateAntiDoubleCount();
+  await validateFinalizationIdempotency();
+  await validateFinalizedCompetencyIsImmutable();
+  await validatePrivateWorkRejectsMeasurement();
+  console.log('Fase 2 de Custos e Recebiveis validada com sucesso.');
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

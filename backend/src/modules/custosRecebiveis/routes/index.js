@@ -7,6 +7,10 @@ const { CUSTOS_RECEBIVEIS_PERMISSIONS } = require('../constants/custosRecebiveis
 const { requireCustosRecebiveisPermission } = require('../policies/permissionPolicy');
 const { requireCustosRecebiveisObraScope } = require('../policies/obraScopePolicy');
 const { resolverObraIdPorPlano } = require('../services/planoMicroService');
+const {
+  resolverObraIdPorCompetencia,
+  resolverObraIdPorReabertura
+} = require('../services/planejamentoService');
 
 const router = express.Router();
 
@@ -23,6 +27,72 @@ router.get(
   '/obras',
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW),
   CustosRecebiveisController.obras
+);
+
+router.get(
+  '/dashboard',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.DASHBOARD_VIEW),
+  CustosRecebiveisController.dashboard
+);
+
+router.get(
+  '/obras/:obraId/competencias/:competencia',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.planejamento
+);
+
+router.put(
+  '/obras/:obraId/competencias/:competencia/custos',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.salvarCustos
+);
+
+router.put(
+  '/obras/:obraId/competencias/:competencia/receitas',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.salvarRecebiveis
+);
+
+router.post(
+  '/obras/:obraId/competencias/:competencia/finalizar',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_FINISH),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.finalizarCompetencia
+);
+
+router.post(
+  '/obras/:obraId/competencias/:competencia/medicao',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.MEDICAO_CONSOLIDATE),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.consolidarMedicao
+);
+
+router.get(
+  '/obras/:obraId/comparativo',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.comparativo
+);
+
+router.post(
+  '/competencias/:competenciaId/reabertura',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_REQUEST),
+  requireCustosRecebiveisObraScope(
+    async (req) => resolverObraIdPorCompetencia(req.params.competenciaId)
+  ),
+  CustosRecebiveisController.solicitarReabertura
+);
+
+router.post(
+  '/reaberturas/:reaberturaId/aprovar',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE),
+  requireCustosRecebiveisObraScope(
+    async (req) => resolverObraIdPorReabertura(req.params.reaberturaId)
+  ),
+  CustosRecebiveisController.decidirReabertura
 );
 
 router.get(

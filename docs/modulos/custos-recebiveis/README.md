@@ -11,8 +11,8 @@ orcamentaria macro de Obras e nao modifica registros dos modulos que consulta.
 
 ## Estado do runtime
 
-A fundacao tecnica da Fase 0 e o fluxo funcional da Fase 1 estao implementados no
-codigo:
+A fundacao tecnica da Fase 0 e os fluxos funcionais das Fases 1 e 2 estao
+implementados no codigo:
 
 - entrada `CUSTOS_RECEBIVEIS` no catalogo de modulos;
 - feature desabilitada por padrao;
@@ -27,14 +27,20 @@ codigo:
 - validacao previa da planilha sem gravacao;
 - importacao transacional, versionada, idempotente e auditada;
 - publicacao de uma versao e substituicao atomica da versao anteriormente publicada;
-- pagina frontend responsiva em `/custos-recebiveis`, com as abas `Obras` e
-  `Importacoes`;
+- planejamento mensal em tres etapas, separado para obras publicas e privadas;
+- medicao consolidada exclusiva de obras publicas;
+- recebiveis privados provenientes de contrato/titulo sem dupla contagem;
+- competencia finalizada imutavel, com reabertura temporaria aprovada;
+- dashboard e comparativo operacional com cinco estados;
+- pagina frontend responsiva em `/custos-recebiveis`, com as abas `Visao geral`,
+  `Obras`, `Planejamento mensal`, `Comparativo` e `Importacoes`;
 - item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
   possuir a permissao explicita de acesso.
 
 A migration ainda nao foi executada em ambiente compartilhado e a feature permanece
-desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. As demais
-abas do desenho canonico serao entregues nas fases posteriores.
+desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. Realizado,
+obrigacoes, bloqueio, exportacoes e configuracoes serao entregues nas fases
+posteriores.
 
 ## Fronteiras de dados
 
@@ -184,6 +190,72 @@ inativo. O limite atual e de 10 MB e 10.000 linhas.
   esta em andamento.
 - A interface mostra apenas as abas e acoes autorizadas pelas permissoes granulares.
 
+## Fase 2 - planejamento, medicao, dashboard e comparativo
+
+### Rotas
+
+```text
+GET  /custos-recebiveis/dashboard?competencia=AAAA-MM
+GET  /custos-recebiveis/obras/:obraId/competencias/:competencia
+PUT  /custos-recebiveis/obras/:obraId/competencias/:competencia/custos
+PUT  /custos-recebiveis/obras/:obraId/competencias/:competencia/receitas
+POST /custos-recebiveis/obras/:obraId/competencias/:competencia/finalizar
+POST /custos-recebiveis/obras/:obraId/competencias/:competencia/medicao
+GET  /custos-recebiveis/obras/:obraId/comparativo?competencia=AAAA-MM
+POST /custos-recebiveis/competencias/:competenciaId/reabertura
+POST /custos-recebiveis/reaberturas/:reaberturaId/aprovar
+```
+
+Todas seguem a ordem feature flag, acesso geral, permissao da acao e escopo da obra.
+As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
+`cr_auditoria`.
+
+### Planejamento publico e privado
+
+- O assistente possui tres etapas: recebiveis, custos e revisao/finalizacao.
+- Custos e recebiveis publicos aceitam somente itens folha da versao micro publicada.
+- O custo/valor por item e calculado no backend; o frontend apresenta o mesmo calculo
+  apenas como retorno imediato ao usuario.
+- Obra publica usa previsao e medicao por item micro.
+- Obra privada lista parcelas contratuais com vencimento na competencia.
+- Quando uma parcela privada possui `titulo_financeiro_id` de Contas a Receber, ela e
+  apresentada e gravada como uma unica origem vinculada ao titulo; a parcela nao e
+  somada novamente.
+- Obra privada nao recebe interface nem endpoint funcional de medicao.
+- O planejamento mensal nao cria itens dentro do plano publicado e nunca altera
+  `apropriacoes`.
+
+### Finalizacao e reabertura
+
+- `Idempotency-Key` e obrigatoria ao finalizar.
+- A primeira finalizacao grava o snapshot da versao publicada, totais, usuario e data.
+- Repetir a finalizacao retorna o estado existente e nao cria auditoria ou registro
+  adicional.
+- Uma competencia `FINALIZADA` rejeita alteracao de custos e recebiveis.
+- Reabertura exige motivo, decisao por permissao separada e `expira_em` futuro.
+- Ao aprovar, a competencia passa a `REABERTA`; qualquer usuario autorizado da obra
+  pode editar durante a janela.
+- Expirada a janela, novas mutacoes sao rejeitadas mesmo que o estado continue
+  `REABERTA`.
+- Uma nova finalizacao preserva o snapshot original da competencia.
+
+### Comparativo
+
+Os cinco estados sao determinados no backend:
+
+```text
+NEUTRO        previsto = 0 e realizado = 0
+SEM_PREVISAO  previsto = 0 e realizado > 0
+A_REALIZAR    previsto > 0 e realizado = 0
+DENTRO        realizado <= previsto
+ESTOURO       realizado > previsto
+```
+
+O dashboard consolida previsto e realizado por macro e apresenta o estado das obras
+do escopo. O comparativo detalha item, macro, previsto, realizado, desvio, percentual
+e estado. Nesta fase, `cr_realizados` pode estar vazio; sua projecao oficial e
+reconciliacao pertencem a Fase 3.
+
 ## Regras de evolucao
 
 - Cada fase funcional deve ser entregue e aceita separadamente.
@@ -194,7 +266,7 @@ inativo. O limite atual e de 10 MB e 10.000 linhas.
   Compras ou Financeiro.
 - Toda mutacao futura deve ser transacional, idempotente quando aplicavel e auditada.
 
-## Validacao das Fases 0 e 1
+## Validacao das Fases 0, 1 e 2
 
 Executar:
 
@@ -202,6 +274,7 @@ Executar:
 cd C:\Fluxy\backend
 node src/modules/custosRecebiveis/tests/validarFase0.js
 node src/modules/custosRecebiveis/tests/validarFase1.js
+npm.cmd run test:custos-recebiveis-fase2
 npm.cmd run test:docs
 npm.cmd run test:compra-cotacao-envio
 npm.cmd run test:compra-remanejamento

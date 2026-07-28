@@ -10,6 +10,17 @@ const {
   publicarPlanoMicro,
   validarArquivoPlanoMicro
 } = require('../services/planoMicroService');
+const {
+  consolidarMedicao,
+  decidirReabertura,
+  finalizarCompetencia,
+  obterComparativo,
+  obterDashboard,
+  obterPlanejamento,
+  salvarCustos,
+  salvarRecebiveis,
+  solicitarReabertura
+} = require('../services/planejamentoService');
 
 function respondError(res, error, fallbackMessage) {
   const status = Number(error?.statusCode || error?.status);
@@ -117,6 +128,117 @@ class CustosRecebiveisController {
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao publicar a versao da estrutura micro');
+    }
+  }
+
+  static async dashboard(req, res) {
+    try {
+      return res.json(await obterDashboard(req.user, req.query.competencia));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar dashboard de Custos e Recebiveis');
+    }
+  }
+
+  static async planejamento(req, res) {
+    try {
+      return res.json(await obterPlanejamento(
+        req.user,
+        req.params.obraId,
+        req.params.competencia
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar planejamento da competencia');
+    }
+  }
+
+  static async salvarCustos(req, res) {
+    try {
+      return res.json(await salvarCustos(
+        req.user,
+        req.params.obraId,
+        req.params.competencia,
+        req.body
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao salvar custos previstos');
+    }
+  }
+
+  static async salvarRecebiveis(req, res) {
+    try {
+      return res.json(await salvarRecebiveis(
+        req.user,
+        req.params.obraId,
+        req.params.competencia,
+        req.body
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao salvar recebiveis previstos');
+    }
+  }
+
+  static async finalizarCompetencia(req, res) {
+    try {
+      const result = await finalizarCompetencia(
+        req.user,
+        req.params.obraId,
+        req.params.competencia,
+        req.body,
+        req.get('Idempotency-Key')
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao finalizar a competencia');
+    }
+  }
+
+  static async consolidarMedicao(req, res) {
+    try {
+      return res.json(await consolidarMedicao(
+        req.user,
+        req.params.obraId,
+        req.params.competencia,
+        req.body
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consolidar a medicao');
+    }
+  }
+
+  static async comparativo(req, res) {
+    try {
+      return res.json(await obterComparativo(
+        req.user,
+        req.params.obraId,
+        req.query.competencia
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar o comparativo');
+    }
+  }
+
+  static async solicitarReabertura(req, res) {
+    try {
+      const result = await solicitarReabertura(
+        req.user,
+        req.params.competenciaId,
+        req.body
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao solicitar reabertura');
+    }
+  }
+
+  static async decidirReabertura(req, res) {
+    try {
+      return res.json(await decidirReabertura(
+        req.user,
+        req.params.reaberturaId,
+        req.body
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao decidir a reabertura');
     }
   }
 }

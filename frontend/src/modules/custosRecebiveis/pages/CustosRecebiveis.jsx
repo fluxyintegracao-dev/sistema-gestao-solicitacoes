@@ -4,11 +4,16 @@ import {
   HiOutlineArrowPath,
   HiOutlineBuildingOffice2,
   HiOutlineChartBarSquare,
-  HiOutlineCircleStack
+  HiOutlineCircleStack,
+  HiOutlineClipboardDocumentList,
+  HiOutlineScale
 } from 'react-icons/hi2';
 import { useAuth } from '../../../contexts/AuthContext';
+import CrComparativoView from '../components/CrComparativoView';
+import CrDashboardView from '../components/CrDashboardView';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
+import CrPlanejamentoView from '../components/CrPlanejamentoView';
 import CrPlanoWorkspace from '../components/CrPlanoWorkspace';
 import {
   CUSTOS_RECEBIVEIS_PERMISSIONS,
@@ -28,7 +33,10 @@ import {
 import '../styles/custos-recebiveis.css';
 
 const TAB_ICONS = {
+  'visao-geral': HiOutlineChartBarSquare,
   obras: HiOutlineBuildingOffice2,
+  planejamento: HiOutlineClipboardDocumentList,
+  comparativo: HiOutlineScale,
   importacoes: HiOutlineCircleStack
 };
 
@@ -50,6 +58,7 @@ export default function CustosRecebiveis() {
   const [importing, setImporting] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [refreshToken, setRefreshToken] = useState(0);
 
   const availableTabs = useMemo(
     () => CUSTOS_RECEBIVEIS_TABS.filter((tab) => (
@@ -80,6 +89,36 @@ export default function CustosRecebiveis() {
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_PUBLISH
   );
+  const planningPermissions = useMemo(() => ({
+    costs: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS
+    ),
+    receipts: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES
+    ),
+    finish: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_FINISH
+    ),
+    measurementView: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.MEDICAO_VIEW
+    ),
+    measurement: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.MEDICAO_CONSOLIDATE
+    ),
+    reopenRequest: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_REQUEST
+    ),
+    reopenApprove: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE
+    )
+  }), [user]);
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
     || planData?.obra
     || null;
@@ -271,7 +310,12 @@ export default function CustosRecebiveis() {
 
   async function handleRefresh() {
     setFeedback(null);
+    setRefreshToken((current) => current + 1);
     await Promise.all([loadObras(), loadPlan()]);
+  }
+
+  function handleOpenPlanning(obraId) {
+    updateQuery({ aba: 'planejamento', obra: obraId, plano: null });
   }
 
   if (!activeTab) {
@@ -393,6 +437,32 @@ export default function CustosRecebiveis() {
             </div>
           ) : null}
         </>
+      ) : null}
+
+      {activeTab === 'visao-geral' ? (
+        <CrDashboardView
+          key={`${competencia}-${refreshToken}`}
+          competencia={competencia}
+          onOpenPlanning={handleOpenPlanning}
+        />
+      ) : null}
+
+      {activeTab === 'planejamento' ? (
+        <CrPlanejamentoView
+          key={`${selectedObraId}-${competencia}-${refreshToken}`}
+          obra={selectedObra}
+          competencia={competencia}
+          permissions={planningPermissions}
+          onChanged={loadObras}
+        />
+      ) : null}
+
+      {activeTab === 'comparativo' ? (
+        <CrComparativoView
+          key={`${selectedObraId}-${competencia}-${refreshToken}`}
+          obra={selectedObra}
+          competencia={competencia}
+        />
       ) : null}
 
       {activeTab === 'importacoes' ? (

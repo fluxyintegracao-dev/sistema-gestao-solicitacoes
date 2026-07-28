@@ -3,7 +3,8 @@
 ## Estado atual
 
 - Branch: `dev-v2`.
-- Fases concluidas no codigo: Fase 0 - fundacao e Fase 1 - leitura e planilha micro.
+- Fases concluidas no codigo: Fase 0 - fundacao, Fase 1 - leitura e planilha micro e
+  Fase 2 - planejamento, medicao, dashboard, comparativo e reabertura.
 - Feature `CUSTOS_RECEBIVEIS`: cadastrada com `enabled: false`.
 - Dependencias: `OBRAS` e `FINANCEIRO`.
 - Frontend implementado, mas oculto enquanto a feature estiver desabilitada.
@@ -52,6 +53,30 @@
 - ordem backend: feature do prefixo -> acesso geral do modulo -> permissao da acao ->
   escopo da obra -> processamento do upload.
 
+## Fase 2 implementada
+
+- dashboard consolidado por competencia, com previsto x realizado por macro e estado
+  operacional das obras do escopo;
+- assistente mensal em tres etapas para recebiveis, custos e revisao/finalizacao;
+- obra publica com previsao e medicao consolidada por item micro;
+- obra privada com recebiveis originados em parcelas contratuais;
+- parcela vinculada a titulo de Contas a Receber aparece uma unica vez como titulo,
+  sem somar parcela e titulo;
+- obra privada nao exibe medicao e o backend rejeita consolidacao por chamada direta;
+- custos, recebiveis e medicoes limitados aos itens folha da versao micro publicada;
+- calculos financeiros repetidos no backend, sem confiar no total enviado pelo
+  frontend;
+- competencia finalizada imutavel;
+- finalizacao exige `Idempotency-Key`, usa bloqueio e retorna idempotencia quando ja
+  concluida;
+- snapshot da versao micro, totais, usuario e data gravados na competencia;
+- reabertura por solicitacao e decisao separadas, com motivo, prazo futuro e auditoria;
+- edicao de competencia reaberta permitida somente enquanto a aprovacao estiver
+  vigente;
+- comparativo com `NEUTRO`, `SEM_PREVISAO`, `A_REALIZAR`, `DENTRO` e `ESTOURO`;
+- todas as novas rotas mantem feature -> acesso geral -> permissao da acao -> escopo;
+- todas as mutacoes escrevem somente em `cr_*`.
+
 ## Arquivos alterados fora do modulo
 
 - `backend/src/services/moduleConfigService.js`: registra a feature desabilitada e suas dependencias.
@@ -84,6 +109,7 @@ Passaram:
 
 - `node src/modules/custosRecebiveis/tests/validarFase0.js`;
 - `node src/modules/custosRecebiveis/tests/validarFase1.js`;
+- `npm.cmd run test:custos-recebiveis-fase2`;
 - `npm.cmd run test:security-hardening`;
 - `npm.cmd run test:importacao-titulos`;
 - `npm.cmd run test:payments`;
@@ -96,7 +122,17 @@ Passaram:
 O registro central permanece com 19 grupos, 89 areas e 299 permissoes.
 
 Tambem passou a verificacao visual local com APIs simuladas, sem banco e sem ambiente
-remoto:
+remoto. Na Fase 2 foram validados:
+
+- dashboard com os dois blocos operacionais e progresso por macro;
+- navegacao das tres etapas do planejamento publico;
+- obra privada finalizada sem painel de medicao;
+- titulo e parcela contratual apresentados como origens exclusivas;
+- painel de solicitacao e decisao de reabertura;
+- comparativo com os estados de execucao e destaque dos desvios;
+- nenhuma chamada a banco, migration ou ambiente remoto durante o QA.
+
+Na Fase 1 ja haviam sido validados:
 
 - notebook em 1366 x 768, sem overflow horizontal;
 - tablet em 768 x 1024, com tabelas convertidas em registros empilhados;
@@ -113,16 +149,18 @@ remoto:
 - nenhuma migracao realizada para `main`;
 - homologacao visual com dados reais pendente porque depende da migration e da
   habilitacao controlada da feature em dev;
-- fases de planejamento mensal, comparativo, realizado, obrigacoes, exportacoes e
-  configuracoes ainda nao iniciadas.
+- Fase 3 (projetor idempotente do realizado, nao mapeados, reconciliacao e
+  exportacoes) ainda nao iniciada;
+- Fase 4 (obrigacoes e bloqueio) ainda nao iniciada.
 
 ## Proximo passo exato
 
-1. revisar o diff e criar o commit da Fase 1 na `dev-v2`;
+1. revisar o diff e criar o commit da Fase 2 na `dev-v2`;
 2. o usuario envia a `dev-v2` e atualiza a EC2 de desenvolvimento;
-3. antes de iniciar os testes, o usuario confirma separadamente a execucao da migration
+3. antes de iniciar os testes integrados, o usuario confirma separadamente a execucao da migration
    e a habilitacao de `CUSTOS_RECEBIVEIS` em dev;
-4. homologar escopo, permissao, modelo, validacao, idempotencia, reimportacao,
-   publicacao e responsividade;
+4. homologar escopo, permissoes, planejamento publico/privado, medicao, finalizacao,
+   idempotencia, reabertura, dashboard, comparativo e responsividade;
 5. manter a feature desabilitada em producao;
-6. somente o usuario executa a migracao para `main` e as atualizacoes de EC2.
+6. apos aceite da Fase 2, iniciar a Fase 3 sem habilitar a feature em producao;
+7. somente o usuario executa a migracao para `main` e as atualizacoes de EC2.
