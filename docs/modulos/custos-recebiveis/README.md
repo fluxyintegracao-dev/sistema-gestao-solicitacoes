@@ -11,7 +11,7 @@ orcamentaria macro de Obras e nao modifica registros dos modulos que consulta.
 
 ## Estado do runtime
 
-A fundacao tecnica da Fase 0 e os fluxos funcionais das Fases 1 e 2 estao
+A fundacao tecnica da Fase 0 e os fluxos funcionais das Fases 1, 2 e 3 estao
 implementados no codigo:
 
 - entrada `CUSTOS_RECEBIVEIS` no catalogo de modulos;
@@ -32,15 +32,21 @@ implementados no codigo:
 - recebiveis privados provenientes de contrato/titulo sem dupla contagem;
 - competencia finalizada imutavel, com reabertura temporaria aprovada;
 - dashboard e comparativo operacional com cinco estados;
+- projetor idempotente do custo realizado, alimentado somente por baixas ativas;
+- rateio resolvido por titulo, apropriacao e solicitacao, na ordem canonica;
+- fila de valores nao mapeados, sem descarte do total financeiro;
+- reconciliacao manual auditada por item micro;
+- estornos neutralizados na projecao sem apagar o historico registrado;
+- exportacoes CSV e XLSX limitadas ao mesmo escopo de obras;
 - pagina frontend responsiva em `/custos-recebiveis`, com as abas `Visao geral`,
-  `Obras`, `Planejamento mensal`, `Comparativo` e `Importacoes`;
+  `Obras`, `Planejamento mensal`, `Comparativo`, `Custo realizado`, `Importacoes` e
+  `Exportacoes`;
 - item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
   possuir a permissao explicita de acesso.
 
 A migration ainda nao foi executada em ambiente compartilhado e a feature permanece
-desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. Realizado,
-obrigacoes, bloqueio, exportacoes e configuracoes serao entregues nas fases
-posteriores.
+desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. Obrigacoes,
+bloqueio e configuracoes serao entregues nas fases posteriores.
 
 ## Fronteiras de dados
 
@@ -253,8 +259,65 @@ ESTOURO       realizado > previsto
 
 O dashboard consolida previsto e realizado por macro e apresenta o estado das obras
 do escopo. O comparativo detalha item, macro, previsto, realizado, desvio, percentual
-e estado. Nesta fase, `cr_realizados` pode estar vazio; sua projecao oficial e
-reconciliacao pertencem a Fase 3.
+e estado.
+
+## Fase 3 - custo realizado, reconciliacao e exportacoes
+
+### Rotas
+
+```text
+GET  /custos-recebiveis/obras/:obraId/realizados?competencia=AAAA-MM
+POST /custos-recebiveis/obras/:obraId/realizados/reprocessar
+POST /custos-recebiveis/realizados/:id/reconciliar
+GET  /custos-recebiveis/exportacoes/:tipo?competencia=AAAA-MM&obra_id=&formato=
+```
+
+As permissoes de visualizar, atualizar, reconciliar e exportar sao independentes.
+Todas as rotas respeitam a feature, o acesso geral, a permissao da acao e o escopo da
+obra. A exportacao sem `obra_id` percorre somente as obras devolvidas pela mesma policy
+de escopo.
+
+### Fonte oficial e idempotencia
+
+- Somente `MovimentoFinanceiro` do tipo `BAIXA`, com `status = ATIVO`, vinculado a
+  titulo `PAGAR`, entra no custo realizado.
+- Pedido, solicitacao e titulo aparecem na cadeia de rastreabilidade, mas nunca sao
+  somados ao realizado.
+- O valor usa `valor_quitacao`, com fallback para `valor`, e a competencia e o mes de
+  `data_movimento`.
+- O rateio do titulo e preferencial. Sem ele, o projetor tenta apropriacao do titulo,
+  rateio da solicitacao e apropriacao direta da solicitacao, nessa ordem.
+- A divisao proporcional preserva os centavos e a soma exata da baixa.
+- A chave logica continua sendo `movimento_financeiro_id + plano_item_id`.
+- Reprocessar sem mudanca nao grava novamente e retorna `idempotente: true`.
+
+### Nao mapeados, reconciliacao e estorno
+
+- Se nenhuma apropriacao resolver um unico item micro, o valor fica em
+  `NAO_MAPEADO`, permanece visivel e continua compondo o total realizado.
+- A reconciliacao exige item micro da obra e motivo. A decisao e registrada em
+  `cr_auditoria` e reaplicada nos proximos reprocessamentos.
+- Quando uma baixa deixa de estar ativa, a projecao e neutralizada com valor zero e um
+  evento de correcao e anexado a auditoria. O registro historico nao e apagado.
+- Consultas do dashboard e comparativo exigem movimento ainda ativo, evitando que um
+  estorno continue no total antes do proximo reprocessamento.
+- Nenhuma operacao da Fase 3 cria ou altera movimento, titulo, pedido, solicitacao ou
+  apropriacao.
+
+### Exportacoes
+
+Os tipos disponiveis sao:
+
+- `medicao-recebiveis`;
+- `custos-previstos`;
+- `comparativo`;
+- `custo-realizado`;
+- `solicitacoes-titulos`;
+- `resumo-executivo`.
+
+Cada tipo aceita `csv` ou `xlsx`. O CSV usa UTF-8 com BOM, separador por ponto e
+virgula e protecao contra interpretacao de formulas. O XLSX reutiliza
+`utils/excelWorkbook.js`.
 
 ## Regras de evolucao
 
@@ -266,7 +329,7 @@ reconciliacao pertencem a Fase 3.
   Compras ou Financeiro.
 - Toda mutacao futura deve ser transacional, idempotente quando aplicavel e auditada.
 
-## Validacao das Fases 0, 1 e 2
+## Validacao das Fases 0, 1, 2 e 3
 
 Executar:
 
@@ -275,6 +338,7 @@ cd C:\Fluxy\backend
 node src/modules/custosRecebiveis/tests/validarFase0.js
 node src/modules/custosRecebiveis/tests/validarFase1.js
 npm.cmd run test:custos-recebiveis-fase2
+npm.cmd run test:custos-recebiveis-fase3
 npm.cmd run test:docs
 npm.cmd run test:compra-cotacao-envio
 npm.cmd run test:compra-remanejamento

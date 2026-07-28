@@ -6,15 +6,19 @@ import {
   HiOutlineChartBarSquare,
   HiOutlineCircleStack,
   HiOutlineClipboardDocumentList,
+  HiOutlineArrowDownTray,
+  HiOutlineBanknotes,
   HiOutlineScale
 } from 'react-icons/hi2';
 import { useAuth } from '../../../contexts/AuthContext';
 import CrComparativoView from '../components/CrComparativoView';
 import CrDashboardView from '../components/CrDashboardView';
+import CrExportacoesView from '../components/CrExportacoesView';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
 import CrPlanejamentoView from '../components/CrPlanejamentoView';
 import CrPlanoWorkspace from '../components/CrPlanoWorkspace';
+import CrRealizadoView from '../components/CrRealizadoView';
 import {
   CUSTOS_RECEBIVEIS_PERMISSIONS,
   CUSTOS_RECEBIVEIS_TABS
@@ -37,7 +41,9 @@ const TAB_ICONS = {
   obras: HiOutlineBuildingOffice2,
   planejamento: HiOutlineClipboardDocumentList,
   comparativo: HiOutlineScale,
-  importacoes: HiOutlineCircleStack
+  realizado: HiOutlineBanknotes,
+  importacoes: HiOutlineCircleStack,
+  exportacoes: HiOutlineArrowDownTray
 };
 
 function currentMonth() {
@@ -117,6 +123,16 @@ export default function CustosRecebiveis() {
     reopenApprove: hasExplicitCustosRecebiveisPermission(
       user,
       CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE
+    )
+  }), [user]);
+  const realizedPermissions = useMemo(() => ({
+    update: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_UPDATE
+    ),
+    reconcile: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_RECONCILE
     )
   }), [user]);
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
@@ -465,6 +481,15 @@ export default function CustosRecebiveis() {
         />
       ) : null}
 
+      {activeTab === 'realizado' ? (
+        <CrRealizadoView
+          key={`${selectedObraId}-${competencia}-${refreshToken}`}
+          obra={selectedObra}
+          competencia={competencia}
+          permissions={realizedPermissions}
+        />
+      ) : null}
+
       {activeTab === 'importacoes' ? (
         <CrImportacoesView
           key={selectedObraId || 'none'}
@@ -478,6 +503,14 @@ export default function CustosRecebiveis() {
           onValidate={handleValidate}
           onImport={handleImport}
           onOpenPlan={handleOpenPlan}
+        />
+      ) : null}
+
+      {activeTab === 'exportacoes' ? (
+        <CrExportacoesView
+          key={`${selectedObraId}-${competencia}`}
+          obra={selectedObra}
+          competencia={competencia}
         />
       ) : null}
     </div>

@@ -11,6 +11,7 @@ const {
   resolverObraIdPorCompetencia,
   resolverObraIdPorReabertura
 } = require('../services/planejamentoService');
+const { resolverObraIdPorRealizado } = require('../services/realizadoService');
 
 const router = express.Router();
 
@@ -77,6 +78,29 @@ router.get(
   CustosRecebiveisController.comparativo
 );
 
+router.get(
+  '/obras/:obraId/realizados',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.realizados
+);
+
+router.post(
+  '/obras/:obraId/realizados/reprocessar',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_UPDATE),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.reprocessarRealizados
+);
+
+router.post(
+  '/realizados/:id/reconciliar',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_RECONCILE),
+  requireCustosRecebiveisObraScope(
+    async (req) => resolverObraIdPorRealizado(req.params.id)
+  ),
+  CustosRecebiveisController.reconciliarRealizado
+);
+
 router.post(
   '/competencias/:competenciaId/reabertura',
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_REQUEST),
@@ -130,6 +154,12 @@ router.post(
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_PUBLISH),
   requireCustosRecebiveisObraScope(async (req) => resolverObraIdPorPlano(req.params.planoId)),
   CustosRecebiveisController.publicar
+);
+
+router.get(
+  '/exportacoes/:tipo',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.REPORT_EXPORT),
+  CustosRecebiveisController.exportacao
 );
 
 module.exports = router;

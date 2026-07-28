@@ -21,6 +21,12 @@ const {
   salvarRecebiveis,
   solicitarReabertura
 } = require('../services/planejamentoService');
+const {
+  listarRealizados,
+  reconciliarRealizado,
+  reprocessarRealizados
+} = require('../services/realizadoService');
+const { gerarExportacao } = require('../services/exportacaoService');
 
 function respondError(res, error, fallbackMessage) {
   const status = Number(error?.statusCode || error?.status);
@@ -239,6 +245,55 @@ class CustosRecebiveisController {
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao decidir a reabertura');
+    }
+  }
+
+  static async realizados(req, res) {
+    try {
+      return res.json(await listarRealizados(
+        req.user,
+        req.params.obraId,
+        req.query.competencia
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar o custo realizado');
+    }
+  }
+
+  static async reprocessarRealizados(req, res) {
+    try {
+      return res.json(await reprocessarRealizados(
+        req.user,
+        req.params.obraId,
+        req.body?.competencia || req.query.competencia
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao reprocessar o custo realizado');
+    }
+  }
+
+  static async reconciliarRealizado(req, res) {
+    try {
+      const result = await reconciliarRealizado(
+        req.user,
+        req.params.id,
+        req.body
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao reconciliar o custo realizado');
+    }
+  }
+
+  static async exportacao(req, res) {
+    try {
+      const result = await gerarExportacao(req.user, req.params.tipo, req.query);
+      res.setHeader('Content-Type', result.contentType);
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.send(result.buffer);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao gerar a exportacao');
     }
   }
 }

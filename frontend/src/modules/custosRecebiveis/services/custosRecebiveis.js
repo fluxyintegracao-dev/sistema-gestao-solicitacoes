@@ -227,3 +227,66 @@ export async function decidirReaberturaCompetencia(reaberturaId, payload) {
   );
   return parseResponse(response, 'Erro ao decidir reabertura');
 }
+
+export async function obterCustosRealizados(obraId, competencia) {
+  const query = new URLSearchParams({ competencia });
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/realizados?${query.toString()}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar custo realizado');
+}
+
+export async function reprocessarCustosRealizados(obraId, competencia) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/realizados/reprocessar`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-realizado') }),
+      body: JSON.stringify({ competencia })
+    }
+  );
+  return parseResponse(response, 'Erro ao atualizar realizações');
+}
+
+export async function reconciliarCustoRealizado(realizadoId, payload) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/realizados/${realizadoId}/reconciliar`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-reconciliar') }),
+      body: JSON.stringify(payload)
+    }
+  );
+  return parseResponse(response, 'Erro ao reconciliar custo realizado');
+}
+
+export async function baixarExportacaoCustosRecebiveis({
+  tipo,
+  competencia,
+  obraId = null,
+  formato = 'xlsx'
+}) {
+  const query = new URLSearchParams({ competencia, formato });
+  if (obraId) query.set('obra_id', obraId);
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/exportacoes/${tipo}?${query.toString()}`,
+    { headers: authHeaders() }
+  );
+  if (!response.ok) {
+    await parseResponse(response, 'Erro ao gerar exportação');
+  }
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  const filename = filenameMatch?.[1]
+    || `custos-recebiveis-${tipo}-${competencia}.${formato}`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

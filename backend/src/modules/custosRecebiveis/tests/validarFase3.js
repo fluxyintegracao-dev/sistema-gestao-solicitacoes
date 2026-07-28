@@ -1,0 +1,239 @@
+'use strict';
+
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const {
+  allocateMoney,
+  buildProjectionRows,
+  reprocessarRealizados
+} = require('../services/realizadoService');
+const { createCsvBuffer } = require('../services/exportacaoService');
+
+const moduleRoot = path.resolve(__dirname, '..');
+const backendRoot = path.resolve(moduleRoot, '../../..');
+
+function read(relativePath) {
+  return fs.readFileSync(path.resolve(backendRoot, relativePath), 'utf8');
+}
+
+function validateRouteAndPermissionContracts() {
+  const routes = read('src/modules/custosRecebiveis/routes/index.js');
+  const service = read('src/modules/custosRecebiveis/services/realizadoService.js');
+  const exportService = read('src/modules/custosRecebiveis/services/exportacaoService.js');
+  const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
+  const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
+
+  [
+    "'/obras/:obraId/realizados'",
+    "'/obras/:obraId/realizados/reprocessar'",
+    "'/realizados/:id/reconciliar'",
+    "'/exportacoes/:tipo'"
+  ].forEach((contract) => assert(routes.includes(contract), `Rota ausente: ${contract}`));
+
+  [
+    'REALIZADOS_VIEW',
+    'REALIZADOS_UPDATE',
+    'REALIZADOS_RECONCILE',
+    'REPORT_EXPORT'
+  ].forEach((permission) => assert(routes.includes(permission), `Permissao ausente: ${permission}`));
+
+  assert(service.includes("status: ACTIVE_MOVEMENT_STATUS"));
+  assert(service.includes("tipo_movimento: SETTLEMENT_MOVEMENT_TYPE"));
+  assert(service.includes("where: { tipo: 'PAGAR' }"));
+  assert(service.includes("evento: 'CR_REALIZADO_RECONCILIADO'"));
+  assert(service.includes("motivo: 'BAIXA_INATIVA_OU_FORA_DA_FONTE'"));
+  assert(exportService.includes('createWorkbookBuffer'));
+  assert(exportService.includes('resolveWorks'));
+  assert(constants.includes("id: 'realizado'"));
+  assert(constants.includes("id: 'exportacoes'"));
+  assert(page.includes('<CrRealizadoView'));
+  assert(page.includes('<CrExportacoesView'));
+  assert(!service.includes('MovimentoFinanceiro.create'));
+  assert(!service.includes('TituloFinanceiro.update'));
+  assert(!service.includes('PedidoCompra.update'));
+  assert(!service.includes('Apropriacao.update'));
+}
+
+function validateAllocationRounding() {
+  const allocated = allocateMoney(100, [
+    { valor_rateio: 60 },
+    { valor_rateio: 40 }
+  ]);
+  assert.deepStrictEqual(allocated.map((item) => item.valor), [60, 40]);
+
+  const cents = allocateMoney(10, [
+    { percentual: 33.3333 },
+    { percentual: 33.3333 },
+    { percentual: 33.3334 }
+  ]);
+  assert.strictEqual(cents.reduce((sum, item) => sum + item.valor, 0), 10);
+}
+
+function activeMovement(overrides = {}) {
+  return {
+    id: 7,
+    status: 'ATIVO',
+    tipo_movimento: 'BAIXA',
+    valor: 100,
+    valor_quitacao: 100,
+    titulo: {
+      id: 9,
+      tipo: 'PAGAR',
+      obra_id: 3,
+      apropriacao_id: 11,
+      apropriacao: { id: 11, obra_id: 3, codigo: '00.001' },
+      rateios: [],
+      solicitacao: null
+    },
+    ...overrides
+  };
+}
+
+function validateOnlyActiveSettlementsBecomeRealized() {
+  const mapping = new Map([[11, [{
+    id: 21,
+    codigo: 'MICRO-1',
+    etapa_macro_codigo: '00.001'
+  }]]]);
+  const active = buildProjectionRows({
+    movement: activeMovement(),
+    obraId: 3,
+    planItemsByAppropriation: mapping
+  });
+  assert.strictEqual(active.length, 1);
+  assert.strictEqual(active[0].plano_item_id, 21);
+  assert.strictEqual(active[0].valor, 100);
+  assert.strictEqual(active[0].estado, 'BAIXA_ATIVA');
+
+  assert.deepStrictEqual(buildProjectionRows({
+    movement: activeMovement({ status: 'ESTORNADO' }),
+    obraId: 3,
+    planItemsByAppropriation: mapping
+  }), []);
+  assert.deepStrictEqual(buildProjectionRows({
+    movement: activeMovement({ tipo_movimento: 'TARIFA_BANCARIA' }),
+    obraId: 3,
+    planItemsByAppropriation: mapping
+  }), []);
+  assert.deepStrictEqual(buildProjectionRows({
+    movement: activeMovement({
+      titulo: { ...activeMovement().titulo, tipo: 'RECEBER' }
+    }),
+    obraId: 3,
+    planItemsByAppropriation: mapping
+  }), []);
+}
+
+function validateRateioAndNonMappedPreservation() {
+  const movement = activeMovement({
+    valor_quitacao: 150,
+    titulo: {
+      id: 9,
+      tipo: 'PAGAR',
+      obra_id: 3,
+      apropriacao_id: null,
+      rateios: [
+        {
+          obra_id: 3,
+          apropriacao_id: 11,
+          valor_rateio: 60,
+          apropriacao: { id: 11, obra_id: 3, codigo: '00.001' }
+        },
+        {
+          obra_id: 4,
+          apropriacao_id: 12,
+          valor_rateio: 40,
+          apropriacao: { id: 12, obra_id: 4, codigo: '00.002' }
+        }
+      ],
+      solicitacao: null
+    }
+  });
+  const rows = buildProjectionRows({
+    movement,
+    obraId: 3,
+    planItemsByAppropriation: new Map()
+  });
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(rows[0].valor, 90);
+  assert.strictEqual(rows[0].estado, 'NAO_MAPEADO');
+  assert.strictEqual(rows[0].plano_item_id, null);
+}
+
+function transactionHarness() {
+  return {
+    transaction: async (callback) => callback({ LOCK: { UPDATE: 'UPDATE' } })
+  };
+}
+
+async function validateReversalCorrectionIsIdempotent() {
+  let auditWrites = 0;
+  const projection = {
+    id: 31,
+    competencia_id: 5,
+    obra_id: 3,
+    movimento_financeiro_id: 7,
+    plano_item_id: 21,
+    etapa_macro_codigo: '00.001',
+    valor: 100,
+    estado: 'BAIXA_ATIVA',
+    async update(payload) {
+      Object.assign(this, payload);
+    }
+  };
+  const overrides = {
+    sequelize: transactionHarness(),
+    resolverEscopoObras: async () => ({ todas: true, obraIds: null }),
+    Obra: {
+      findByPk: async () => ({ id: 3, codigo: '03', nome: 'Obra teste' })
+    },
+    CrCompetencia: {
+      findOne: async () => ({ id: 5, obra_id: 3, competencia: '2026-08' })
+    },
+    CrPlanoObra: { findOne: async () => null },
+    CrPlanoItem: { findAll: async () => [] },
+    CrPlanoMacroVinculo: { findAll: async () => [] },
+    TituloFinanceiroRateio: { findAll: async () => [] },
+    TituloFinanceiro: { findAll: async () => [] },
+    MovimentoFinanceiro: { findAll: async () => [] },
+    CrRealizado: { findAll: async () => [projection] },
+    CrAuditoria: {
+      findAll: async () => [],
+      create: async () => { auditWrites += 1; }
+    }
+  };
+  const first = await reprocessarRealizados({ id: 2 }, 3, '2026-08', overrides);
+  assert.strictEqual(first.correcoes, 1);
+  assert.strictEqual(first.idempotente, false);
+  assert.strictEqual(projection.valor, 0);
+  assert.strictEqual(auditWrites, 1);
+
+  const second = await reprocessarRealizados({ id: 2 }, 3, '2026-08', overrides);
+  assert.strictEqual(second.correcoes, 0);
+  assert.strictEqual(second.idempotente, true);
+  assert.strictEqual(auditWrites, 1);
+}
+
+function validateCsvFormulaProtection() {
+  const csv = createCsvBuffer([
+    ['Nome', 'Valor'],
+    ['=HYPERLINK("https://example.com")', 10]
+  ]).toString('utf8');
+  assert(csv.includes(`"'=HYPERLINK`));
+}
+
+async function run() {
+  validateRouteAndPermissionContracts();
+  validateAllocationRounding();
+  validateOnlyActiveSettlementsBecomeRealized();
+  validateRateioAndNonMappedPreservation();
+  await validateReversalCorrectionIsIdempotent();
+  validateCsvFormulaProtection();
+  console.log('Fase 3 de Custos e Recebiveis validada com sucesso.');
+}
+
+run().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

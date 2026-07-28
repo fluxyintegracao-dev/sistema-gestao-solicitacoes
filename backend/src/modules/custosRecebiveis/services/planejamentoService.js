@@ -24,6 +24,7 @@ function dependencies(overrides = {}) {
     ContratoComercial: db.ContratoComercial,
     ContratoComercialParcela: db.ContratoComercialParcela,
     TituloFinanceiro: db.TituloFinanceiro,
+    MovimentoFinanceiro: db.MovimentoFinanceiro,
     User: db.User,
     resolverEscopoObras,
     ...overrides
@@ -871,8 +872,16 @@ async function buildComparison(obraId, competenciaCode, deps) {
       ? deps.CrRealizado.findAll({
         where: {
           competencia_id: competencia.id,
+          valor: { [Op.ne]: 0 },
           estado: { [Op.in]: ['COMPROMETIDO', 'INCORRIDO', 'BAIXA_ATIVA', 'NAO_MAPEADO'] }
-        }
+        },
+        include: [{
+          model: deps.MovimentoFinanceiro,
+          as: 'movimentoFinanceiro',
+          attributes: [],
+          required: true,
+          where: { status: 'ATIVO' }
+        }]
       })
       : []
   ]);

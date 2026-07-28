@@ -12,6 +12,10 @@ export const CUSTOS_RECEBIVEIS_PERMISSIONS = Object.freeze({
   PLANEJAMENTO_FINISH: 'custos_recebiveis.planejamento.finalizar',
   MEDICAO_VIEW: 'custos_recebiveis.medicao.visualizar',
   MEDICAO_CONSOLIDATE: 'custos_recebiveis.medicao.consolidar',
+  REALIZADOS_VIEW: 'custos_recebiveis.realizados.visualizar',
+  REALIZADOS_UPDATE: 'custos_recebiveis.realizados.atualizar',
+  REALIZADOS_RECONCILE: 'custos_recebiveis.realizados.reconciliar',
+  REPORT_EXPORT: 'custos_recebiveis.relatorio.exportar',
   REOPEN_REQUEST: 'custos_recebiveis.reabertura.solicitar',
   REOPEN_APPROVE: 'custos_recebiveis.reabertura.aprovar'
 });
@@ -38,9 +42,19 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW
   },
   {
+    id: 'realizado',
+    label: 'Custo realizado',
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW
+  },
+  {
     id: 'importacoes',
     label: 'Importações',
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_VIEW
+  },
+  {
+    id: 'exportacoes',
+    label: 'Exportações',
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REPORT_EXPORT
   }
 ]);
 
