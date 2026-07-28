@@ -17,7 +17,10 @@ import { listarApropriacoes } from '../services/apropriacoes';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { categoriaFinanceiraMatchesSearch } from '../utils/categoriaFinanceira';
+import {
+  categoriaFinanceiraMatchesAutocomplete,
+  categoriaFinanceiraMatchesSearch
+} from '../utils/categoriaFinanceira';
 import CategoriaFinanceiraAutocomplete from '../components/ui/CategoriaFinanceiraAutocomplete';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -687,7 +690,7 @@ export default function FinanceiroTituloNovo() {
     }
 
     return categoriasFiltradas
-      .filter((categoria) => categoriaFinanceiraMatchesSearch(categoria, categoriaBusca));
+      .filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form.categoria_financeira_id]);
 
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form.categoria_financeira_id;

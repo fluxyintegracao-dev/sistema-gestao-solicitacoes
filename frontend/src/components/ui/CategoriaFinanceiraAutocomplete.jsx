@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { categoriaFinanceiraMatchesSearch } from '../../utils/categoriaFinanceira';
+import { categoriaFinanceiraMatchesAutocomplete } from '../../utils/categoriaFinanceira';
 
 function getCategoriaResumo(categoria) {
   return [
@@ -41,7 +41,7 @@ export default function CategoriaFinanceiraAutocomplete({
 
     if (!termo) return source;
 
-    return source.filter((categoria) => categoriaFinanceiraMatchesSearch(categoria, termo));
+    return source.filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, termo));
   }, [options, query]);
 
   useEffect(() => {

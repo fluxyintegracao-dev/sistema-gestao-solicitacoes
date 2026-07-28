@@ -13,7 +13,10 @@ import {
 } from '../services/financeiro';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { categoriaFinanceiraMatchesSearch } from '../utils/categoriaFinanceira';
+import {
+  categoriaFinanceiraMatchesAutocomplete,
+  categoriaFinanceiraMatchesSearch
+} from '../utils/categoriaFinanceira';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -406,7 +409,7 @@ export default function FinanceiroTituloEditar() {
     if (!categoriaBusca.trim() || form?.categoria_financeira_id) return [];
 
     return categoriasFiltradas
-      .filter((categoria) => categoriaFinanceiraMatchesSearch(categoria, categoriaBusca));
+      .filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form?.categoria_financeira_id]);
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form?.categoria_financeira_id && !bloqueio;
   const categoriasModalFiltradas = useMemo(() => {

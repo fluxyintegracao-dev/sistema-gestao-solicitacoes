@@ -5,7 +5,10 @@ import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../servi
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
-import { categoriaFinanceiraMatchesSearch } from '../../utils/categoriaFinanceira';
+import {
+  categoriaFinanceiraMatchesAutocomplete,
+  categoriaFinanceiraMatchesSearch
+} from '../../utils/categoriaFinanceira';
 import CategoriaFinanceiraAutocomplete from '../../components/ui/CategoriaFinanceiraAutocomplete';
 import {
   gerarContaPorSolicitacao,
@@ -794,7 +797,7 @@ export default function FinanceiroCard({
         return true;
       }
 
-      return categoriaFinanceiraMatchesSearch(categoria, categoriaSearch);
+      return categoriaFinanceiraMatchesAutocomplete(categoria, categoriaSearch);
     });
   }, [categoriaSearch, categoriasCompativeis]);
 

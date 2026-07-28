@@ -1,5 +1,12 @@
 import { textMatchesSearchTerms } from './search';
 
+export function categoriaFinanceiraMatchesAutocomplete(categoria, searchValue) {
+  return textMatchesSearchTerms([
+    categoria?.codigo,
+    categoria?.nome
+  ], searchValue);
+}
+
 export function categoriaFinanceiraMatchesSearch(categoria, searchValue) {
   return textMatchesSearchTerms([
     categoria?.id,
