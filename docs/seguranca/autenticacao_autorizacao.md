@@ -31,7 +31,7 @@ O codigo ainda reconhece perfis especializados em fluxos especificos, como `FINA
 
 2. Perfil e permissao de area
    - registro central em `backend/src/constants/moduloPermissoes.js`;
-   - estado auditado em 2026-07-22: 18 grupos, 81 areas e 275 chaves;
+   - estado auditado em 2026-07-28: 19 grupos, 89 areas e 299 chaves;
    - formato `modulo.area.acao`, por exemplo `financeiro.titulos.criar`;
    - configuracao `PERMISSOES_AREAS_USUARIOS` contem permissoes por usuario, bloqueios por usuario e padroes por setor/perfil;
    - a permissao efetiva e a uniao de padrao do setor/perfil, sessao e concessao individual, menos os bloqueios;
@@ -61,3 +61,8 @@ Campos relevantes entregues ao frontend:
 - setor principal, setores/vinculos adicionais e escopos de obra quando aplicaveis.
 
 Lista vazia de `areas_permissoes` representa compatibilidade sem restricao granular, nao negacao total. Uma chave desconhecida de modulo tambem possui fallback permissivo; consulte `../arquitetura/visao_geral.md` antes de criar ou renomear modulos.
+
+Excecao segura para modulo novo: `CUSTOS_RECEBIVEIS` nao usa esse fallback legado.
+Seu backend resolve as concessoes explicitas diretamente da matriz central, aplica os
+bloqueios individuais e concede bypass somente a `SUPERADMIN`. Sem
+`custos_recebiveis.modulo.acessar`, o acesso permanece negado.

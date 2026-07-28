@@ -454,6 +454,85 @@ const MODULO_PERMISSION_GROUPS = [
     ]
   },
   {
+    modulo: 'CUSTOS_RECEBIVEIS',
+    label: 'Custos e Recebiveis',
+    descricao: 'Planejamento mensal, custos realizados, recebiveis e governanca por obra.',
+    areas: [
+      {
+        key: 'custos_recebiveis.acesso',
+        label: 'Acesso e escopo',
+        permissoes: [
+          { key: 'custos_recebiveis.modulo.acessar', label: 'Acessar modulo', descricao: 'Permite acessar o modulo Custos e Recebiveis quando habilitado na instalacao.' },
+          { key: 'custos_recebiveis.escopo.todas_obras', label: 'Visualizar todas as obras', descricao: 'Amplia o escopo do modulo para todas as obras, independentemente dos vinculos do usuario.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.visualizacao',
+        label: 'Visualizacao',
+        permissoes: [
+          { key: 'custos_recebiveis.dashboard.visualizar', label: 'Visualizar dashboard', descricao: 'Permite consultar os indicadores do modulo.' },
+          { key: 'custos_recebiveis.comparativo.visualizar', label: 'Visualizar comparativo', descricao: 'Permite comparar planejado, consolidado e realizado.' },
+          { key: 'custos_recebiveis.obras.visualizar', label: 'Visualizar obras', descricao: 'Permite consultar as obras dentro do escopo autorizado.' },
+          { key: 'custos_recebiveis.estrutura_micro.visualizar', label: 'Visualizar estrutura micro', descricao: 'Permite consultar versoes e itens do plano micro.' },
+          { key: 'custos_recebiveis.planejamento.visualizar', label: 'Visualizar planejamento', descricao: 'Permite consultar previsoes mensais de custos e recebiveis.' },
+          { key: 'custos_recebiveis.medicao.visualizar', label: 'Visualizar medicoes', descricao: 'Permite consultar medicoes consolidadas de obras publicas.' },
+          { key: 'custos_recebiveis.realizados.visualizar', label: 'Visualizar realizados', descricao: 'Permite consultar custos realizados e itens nao mapeados.' },
+          { key: 'custos_recebiveis.obrigacoes.visualizar', label: 'Visualizar obrigacoes', descricao: 'Permite consultar obrigacoes e prazos dos responsaveis.' },
+          { key: 'custos_recebiveis.auditoria.visualizar', label: 'Visualizar auditoria', descricao: 'Permite consultar a trilha de auditoria do modulo.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.estrutura',
+        label: 'Estrutura micro',
+        permissoes: [
+          { key: 'custos_recebiveis.estrutura_micro.importar', label: 'Importar estrutura micro', descricao: 'Permite validar e importar uma nova versao da planilha micro.' },
+          { key: 'custos_recebiveis.estrutura_micro.publicar_versao', label: 'Publicar versao micro', descricao: 'Permite publicar uma versao validada do plano micro.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.planejamento',
+        label: 'Planejamento mensal',
+        permissoes: [
+          { key: 'custos_recebiveis.planejamento.preencher_custos', label: 'Preencher custos previstos', descricao: 'Permite registrar custos previstos por competencia.' },
+          { key: 'custos_recebiveis.planejamento.preencher_recebiveis', label: 'Preencher recebiveis previstos', descricao: 'Permite registrar ou confirmar recebiveis previstos por competencia.' },
+          { key: 'custos_recebiveis.planejamento.finalizar', label: 'Finalizar planejamento', descricao: 'Permite finalizar e congelar a competencia planejada.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.medicao',
+        label: 'Medicao consolidada',
+        permissoes: [
+          { key: 'custos_recebiveis.medicao.consolidar', label: 'Consolidar medicao', descricao: 'Permite consolidar medicao de obra publica.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.realizados',
+        label: 'Custos realizados',
+        permissoes: [
+          { key: 'custos_recebiveis.realizados.atualizar', label: 'Atualizar realizados', descricao: 'Permite executar a atualizacao idempotente dos realizados.' },
+          { key: 'custos_recebiveis.realizados.reconciliar', label: 'Reconciliar realizados', descricao: 'Permite mapear e reconciliar movimentos pendentes.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.governanca',
+        label: 'Governanca',
+        permissoes: [
+          { key: 'custos_recebiveis.reabertura.solicitar', label: 'Solicitar reabertura', descricao: 'Permite solicitar a reabertura de uma competencia finalizada.' },
+          { key: 'custos_recebiveis.reabertura.aprovar', label: 'Aprovar reabertura', descricao: 'Permite aprovar ou negar solicitacoes de reabertura.' },
+          { key: 'custos_recebiveis.obrigacoes.conceder_bypass', label: 'Conceder bypass', descricao: 'Permite conceder excecao temporaria e auditada a obrigacoes vencidas.' },
+          { key: 'custos_recebiveis.configuracoes.gerenciar', label: 'Gerenciar configuracoes', descricao: 'Permite alterar parametros operacionais do modulo.' }
+        ]
+      },
+      {
+        key: 'custos_recebiveis.saida',
+        label: 'Relatorios e exportacoes',
+        permissoes: [
+          { key: 'custos_recebiveis.relatorio.exportar', label: 'Exportar relatorios', descricao: 'Permite exportar dados limitados ao mesmo escopo de obras do usuario.' }
+        ]
+      }
+    ]
+  },
+  {
     modulo: 'CONTRATOS',
     label: 'Contratos',
     descricao: 'Gestão de contratos com fornecedores e parceiros.',

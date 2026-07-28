@@ -408,6 +408,7 @@ const { requireCrmModule } = require('./middlewares/crmAccess');
 const fiscalRoutes = require('./modules/fiscal/routes');
 const sstRoutes = require('./modules/sst/routes');
 const governancaRoutes = require('./modules/governanca/routes');
+const custosRecebiveisRoutes = require('./modules/custosRecebiveis/routes');
 //console.log('AnexoController =>', AnexoController);
 
 function hashRateLimitValue(value, fallback = 'anon') {
@@ -555,6 +556,11 @@ router.use('/integracoes/sienge', requireEnabledModule('INTEGRACAO_SIENGE'));
 router.use('/boletos', requireEnabledModule('BOLETOS'));
 router.use('/fiscal', requireEnabledModule('FISCAL'));
 router.use('/fiscal', fiscalRoutes);
+router.use(
+  '/custos-recebiveis',
+  requireEnabledModule('CUSTOS_RECEBIVEIS', { allowSuperadminBypass: false })
+);
+router.use('/custos-recebiveis', custosRecebiveisRoutes);
 router.use('/sst', requireEnabledModule('SST'));
 router.use('/sst', sstRoutes);
 router.use('/governanca', governancaRoutes);

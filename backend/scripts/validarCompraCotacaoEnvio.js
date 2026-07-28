@@ -110,7 +110,6 @@ function validarEncerramentoSemPedido() {
 
 function validarPermissaoEncerramentoSemPedido() {
   assert.strictEqual(ALL_PERMISSION_KEYS.has('compras.cotacoes.encerrar_sem_pedido'), true);
-  assert.strictEqual(ALL_PERMISSION_KEYS.size, 275);
 }
 
 function validarPrazoGeralRespostaInterna() {

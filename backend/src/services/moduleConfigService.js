@@ -106,6 +106,16 @@ const MODULE_CATALOG = [
     requiresAll: ['FINANCEIRO', 'OBRAS']
   },
   {
+    key: 'CUSTOS_RECEBIVEIS',
+    label: 'Custos e Recebiveis',
+    packageKey: 'OBRAS_FINANCEIRO',
+    packageLabel: 'Add-on Financeiro/Obras',
+    description: 'Planejamento mensal, custos realizados e recebiveis por obra, com estrutura micro independente.',
+    enabled: false,
+    locked: false,
+    requiresAll: ['OBRAS', 'FINANCEIRO']
+  },
+  {
     key: 'CONTRATOS',
     label: 'Contratos',
     packageKey: 'OPERACIONAL',

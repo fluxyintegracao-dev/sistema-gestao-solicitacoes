@@ -101,7 +101,7 @@ Guia rapido para colaboradores e agentes automatizados.
   - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
 - sistema de permissoes de areas por usuario:
   - registro central em `backend/src/constants/moduloPermissoes.js`
-  - 18 grupos, 81 areas e 275 permissoes no formato `modulo.area.acao`
+  - 19 grupos, 89 areas e 299 permissoes no formato `modulo.area.acao`
   - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
   - sessao do usuario: campo `areas_permissoes`
   - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`
