@@ -17,6 +17,8 @@ export const CUSTOS_RECEBIVEIS_PERMISSIONS = Object.freeze({
   REALIZADOS_RECONCILE: 'custos_recebiveis.realizados.reconciliar',
   OBRIGACOES_VIEW: 'custos_recebiveis.obrigacoes.visualizar',
   OBLIGATION_BYPASS: 'custos_recebiveis.obrigacoes.conceder_bypass',
+  AUDITORIA_VIEW: 'custos_recebiveis.auditoria.visualizar',
+  CONFIG_MANAGE: 'custos_recebiveis.configuracoes.gerenciar',
   REPORT_EXPORT: 'custos_recebiveis.relatorio.exportar',
   REOPEN_REQUEST: 'custos_recebiveis.reabertura.solicitar',
   REOPEN_APPROVE: 'custos_recebiveis.reabertura.aprovar'
@@ -62,6 +64,16 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
     id: 'exportacoes',
     label: 'Exportações',
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REPORT_EXPORT
+  },
+  {
+    id: 'auditoria',
+    label: 'Auditoria',
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.AUDITORIA_VIEW
+  },
+  {
+    id: 'configuracoes',
+    label: 'Configurações',
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE
   }
 ]);
 

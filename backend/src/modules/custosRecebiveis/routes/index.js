@@ -12,6 +12,9 @@ const {
   resolverObraIdPorReabertura
 } = require('../services/planejamentoService');
 const { resolverObraIdPorRealizado } = require('../services/realizadoService');
+const {
+  resolverObraIdPorResponsabilidade
+} = require('../services/governancaService');
 
 const router = express.Router();
 
@@ -148,6 +151,36 @@ router.delete(
   '/obrigacoes/bypass/:id',
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS),
   CustosRecebiveisController.revogarBypass
+);
+
+router.get(
+  '/obras/:obraId/responsaveis',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.responsaveisObra
+);
+
+router.post(
+  '/obras/:obraId/responsaveis',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.cadastrarResponsavelObra
+);
+
+router.patch(
+  '/responsaveis/:id/encerrar',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE),
+  requireCustosRecebiveisObraScope(
+    async (req) => resolverObraIdPorResponsabilidade(req.params.id)
+  ),
+  CustosRecebiveisController.encerrarResponsabilidade
+);
+
+router.get(
+  '/obras/:obraId/auditoria',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.AUDITORIA_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.auditoriaObra
 );
 
 router.get(

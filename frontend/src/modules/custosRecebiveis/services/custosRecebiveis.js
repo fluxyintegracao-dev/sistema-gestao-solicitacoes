@@ -341,3 +341,50 @@ export async function revogarBypassCustosRecebiveis(bypassId) {
   );
   return parseResponse(response, 'Erro ao revogar bypass');
 }
+
+export async function listarResponsaveisCustosRecebiveis(obraId) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/responsaveis`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar responsáveis da obra');
+}
+
+export async function cadastrarResponsavelCustosRecebiveis(obraId, payload) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/responsaveis`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-responsavel') }),
+      body: JSON.stringify(payload)
+    }
+  );
+  return parseResponse(response, 'Erro ao cadastrar responsável da obra');
+}
+
+export async function encerrarResponsabilidadeCustosRecebiveis(id, payload) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/responsaveis/${id}/encerrar`,
+    {
+      method: 'PATCH',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-responsavel-encerrar') }),
+      body: JSON.stringify(payload)
+    }
+  );
+  return parseResponse(response, 'Erro ao encerrar responsabilidade da obra');
+}
+
+export async function listarAuditoriaCustosRecebiveis(obraId, params = {}) {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && String(value).trim() !== '') {
+      query.set(key, value);
+    }
+  });
+  const suffix = query.toString() ? `?${query.toString()}` : '';
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/auditoria${suffix}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao consultar auditoria');
+}

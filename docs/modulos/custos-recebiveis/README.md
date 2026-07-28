@@ -51,9 +51,10 @@ implementados no codigo:
 - item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
   possuir a permissao explicita de acesso.
 
-A migration ainda nao foi executada em ambiente compartilhado e a feature permanece
-desabilitada. Portanto, o modulo ainda nao esta disponivel aos usuarios. O guard esta
-implementado em modo de observacao e nao bloqueia ou redireciona nenhum usuario.
+A migration foi executada com sucesso apenas no ambiente de desenvolvimento em
+28/07/2026, pelo responsavel do ambiente. A feature permanece desabilitada e o modulo
+ainda nao esta disponivel aos usuarios. `CR_GUARD_MODE` nao foi configurado; portanto,
+o fallback continua em `observe` e nao bloqueia ou redireciona nenhum usuario.
 
 ## Fronteiras de dados
 
@@ -386,6 +387,34 @@ DELETE /custos-recebiveis/obrigacoes/bypass/:id
 POST   /custos-recebiveis/obras/:obraId/competencias/:competencia/reabertura
 ```
 
+## Fechamento de prontidao operacional
+
+Antes da ativacao controlada em dev foi concluido o fluxo que alimenta
+`cr_responsaveis_obra`, fonte obrigatoria do motor de obrigacoes:
+
+- configuracao por obra de um responsavel e de substitutos;
+- somente usuarios ativos previamente vinculados em `usuarios_obras` sao elegiveis;
+- competencia inicial igual ou posterior ao mes corrente, impedindo cobranca
+  retroativa;
+- somente um papel ativo por usuario e apenas um responsavel principal por obra;
+- troca do responsavel encerra o vinculo anterior sem apagar o historico;
+- encerramento manual exige justificativa;
+- criacao e encerramento exigem `Idempotency-Key`, transacao e auditoria;
+- consulta da auditoria append-only por obra, limitada ao mesmo escopo operacional.
+
+Rotas:
+
+```text
+GET   /custos-recebiveis/obras/:obraId/responsaveis
+POST  /custos-recebiveis/obras/:obraId/responsaveis
+PATCH /custos-recebiveis/responsaveis/:id/encerrar
+GET   /custos-recebiveis/obras/:obraId/auditoria
+```
+
+O frontend possui as abas `Configuracoes` e `Auditoria`, exibidas somente pelas
+permissoes `custos_recebiveis.configuracoes.gerenciar` e
+`custos_recebiveis.auditoria.visualizar`.
+
 ## Regras de evolucao
 
 - Cada fase funcional deve ser entregue e aceita separadamente.
@@ -407,6 +436,7 @@ node src/modules/custosRecebiveis/tests/validarFase1.js
 npm.cmd run test:custos-recebiveis-fase2
 npm.cmd run test:custos-recebiveis-fase3
 npm.cmd run test:custos-recebiveis-fase4
+npm.cmd run test:custos-recebiveis-prontidao
 npm.cmd run test:docs
 npm.cmd run test:compra-cotacao-envio
 npm.cmd run test:compra-remanejamento
@@ -419,5 +449,6 @@ cd C:\Fluxy\frontend
 npm.cmd run build
 ```
 
-Antes da homologacao visual em dev, a migration deve ser executada pelo responsavel do
-ambiente e a feature deve ser habilitada somente mediante confirmacao explicita.
+Antes da homologacao visual em dev, a feature deve ser habilitada somente mediante
+confirmacao explicita. A migration de desenvolvimento ja foi executada; nenhuma
+migration foi executada em producao.

@@ -34,6 +34,12 @@ const {
   listarMinhasObrigacoes,
   revogarBypass
 } = require('../services/obrigacaoService');
+const {
+  cadastrarResponsavelObra,
+  encerrarResponsabilidade,
+  listarAuditoriaObra,
+  listarResponsaveisObra
+} = require('../services/governancaService');
 
 function respondError(res, error, fallbackMessage) {
   const status = Number(error?.statusCode || error?.status);
@@ -357,6 +363,53 @@ class CustosRecebiveisController {
       return res.json(result);
     } catch (error) {
       return respondError(res, error, 'Erro ao revogar bypass de Custos e Recebiveis');
+    }
+  }
+
+  static async responsaveisObra(req, res) {
+    try {
+      return res.json(await listarResponsaveisObra(req.params.obraId));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar responsaveis da obra');
+    }
+  }
+
+  static async cadastrarResponsavelObra(req, res) {
+    try {
+      const result = await cadastrarResponsavelObra(
+        req.user,
+        req.params.obraId,
+        req.body,
+        req.get('Idempotency-Key')
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao cadastrar responsavel da obra');
+    }
+  }
+
+  static async encerrarResponsabilidade(req, res) {
+    try {
+      const result = await encerrarResponsabilidade(
+        req.user,
+        req.params.id,
+        req.body,
+        req.get('Idempotency-Key')
+      );
+      return res.json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao encerrar responsabilidade da obra');
+    }
+  }
+
+  static async auditoriaObra(req, res) {
+    try {
+      return res.json(await listarAuditoriaObra(
+        req.params.obraId,
+        req.query
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao consultar auditoria de Custos e Recebiveis');
     }
   }
 }

@@ -10,7 +10,8 @@
 - Feature `CUSTOS_RECEBIVEIS`: cadastrada com `enabled: false`.
 - Dependencias: `OBRAS` e `FINANCEIRO`.
 - Frontend implementado, mas oculto enquanto a feature estiver desabilitada.
-- Nenhuma migration foi executada em ambiente local compartilhado, dev ou producao.
+- A migration foi executada com sucesso somente em dev pelo usuario em 28/07/2026.
+- Nenhuma migration foi executada em producao.
 - Nenhum arquivo de `apropriacoes` ou modelo legado protegido foi alterado.
 - Nenhum acesso a EC2 foi realizado.
 - Migracao para `main` e atualizacoes de EC2 sao responsabilidade exclusiva do usuario.
@@ -136,6 +137,19 @@
 - `CR_GUARD_MODE` entregue com fallback obrigatorio para `observe`; nenhum bloqueio foi
   habilitado.
 
+## Fechamento de prontidao implementado
+
+- cadastro operacional de responsavel e substitutos por obra;
+- elegibilidade limitada a usuarios ativos ja vinculados a obra;
+- competencia inicial sem retroatividade e troca do responsavel com preservacao do
+  historico;
+- encerramento justificado, mutacoes idempotentes, transacionais e auditadas;
+- consulta append-only da auditoria por obra;
+- abas responsivas `Configuracoes` e `Auditoria`;
+- permissoes existentes `configuracoes.gerenciar` e `auditoria.visualizar` agora possuem
+  superficies e endpoints funcionais;
+- nenhuma migration adicional e nenhuma escrita fora das tabelas `cr_*`.
+
 ## Arquivos alterados fora do modulo
 
 - `backend/src/services/moduleConfigService.js`: registra a feature desabilitada e suas dependencias.
@@ -177,6 +191,7 @@ Passaram:
 - `npm.cmd run test:custos-recebiveis-fase2`;
 - `npm.cmd run test:custos-recebiveis-fase3`;
 - `npm.cmd run test:custos-recebiveis-fase4`;
+- `npm.cmd run test:custos-recebiveis-prontidao`;
 - `npm.cmd run test:security-hardening`;
 - `npm.cmd run test:importacao-titulos`;
 - `npm.cmd run test:payments`;
@@ -230,9 +245,10 @@ Na Fase 4, a validacao automatizada sem banco confirmou:
 
 ## Pontos de parada mantidos
 
-- migration ainda nao executada em ambiente compartilhado;
+- migration executada somente em dev pelo usuario; producao permanece sem a migration;
 - feature ainda desabilitada;
-- nenhuma atualizacao realizada na EC2;
+- a EC2 dev e o frontend foram atualizados pelo usuario ate a Fase 4; o fechamento de
+  prontidao deste diff ainda depende de novo commit, push e atualizacao pelo usuario;
 - nenhuma migracao realizada para `main`;
 - homologacao visual com dados reais pendente porque depende da migration e da
   habilitacao controlada da feature em dev;
@@ -241,12 +257,12 @@ Na Fase 4, a validacao automatizada sem banco confirmou:
 
 ## Proximo passo exato
 
-1. revisar o diff e criar o commit da Fase 4 na `dev-v2`;
-2. o usuario envia a `dev-v2` e atualiza a EC2 de desenvolvimento;
-3. antes de iniciar os testes integrados, o usuario confirma separadamente a execucao da migration
-   e a habilitacao de `CUSTOS_RECEBIVEIS` em dev;
-4. homologar escopo, permissoes, realizado, obrigacoes, reabertura, bypass, alertas e
-   responsividade;
-5. manter a feature desabilitada em producao;
-6. manter `CR_GUARD_MODE=observe` durante toda a homologacao inicial;
+1. validar e commitar o fechamento de prontidao na `dev-v2`;
+2. o usuario envia a `dev-v2` e atualiza backend dev e frontend;
+3. o usuario confirma e habilita `CUSTOS_RECEBIVEIS` somente em dev;
+4. conceder permissoes a usuarios de teste e cadastrar responsavel/substituto pela aba
+   `Configuracoes`, sempre com competencia inicial no mes corrente;
+5. homologar escopo, importacao/publicacao, planejamento, realizado, obrigacoes,
+   reabertura, bypass, auditoria, alertas e responsividade;
+6. manter a feature desabilitada em producao e `CR_GUARD_MODE=observe`;
 7. somente o usuario executa a migracao para `main` e as atualizacoes de EC2.

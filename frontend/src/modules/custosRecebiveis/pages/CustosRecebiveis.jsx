@@ -9,10 +9,13 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineBanknotes,
   HiOutlineClock,
+  HiOutlineCog6Tooth,
+  HiOutlineShieldCheck,
   HiOutlineScale
 } from 'react-icons/hi2';
 import { useAuth } from '../../../contexts/AuthContext';
 import CrComparativoView from '../components/CrComparativoView';
+import CrConfiguracoesView from '../components/CrConfiguracoesView';
 import CrDashboardView from '../components/CrDashboardView';
 import CrExportacoesView from '../components/CrExportacoesView';
 import CrImportacoesView from '../components/CrImportacoesView';
@@ -21,6 +24,7 @@ import CrObrigacoesView from '../components/CrObrigacoesView';
 import CrPlanejamentoView from '../components/CrPlanejamentoView';
 import CrPlanoWorkspace from '../components/CrPlanoWorkspace';
 import CrRealizadoView from '../components/CrRealizadoView';
+import CrAuditoriaView from '../components/CrAuditoriaView';
 import {
   CUSTOS_RECEBIVEIS_PERMISSIONS,
   CUSTOS_RECEBIVEIS_TABS
@@ -46,7 +50,9 @@ const TAB_ICONS = {
   realizado: HiOutlineBanknotes,
   obrigacoes: HiOutlineClock,
   importacoes: HiOutlineCircleStack,
-  exportacoes: HiOutlineArrowDownTray
+  exportacoes: HiOutlineArrowDownTray,
+  auditoria: HiOutlineShieldCheck,
+  configuracoes: HiOutlineCog6Tooth
 };
 
 function currentMonth() {
@@ -543,6 +549,21 @@ export default function CustosRecebiveis() {
           key={`${selectedObraId}-${competencia}`}
           obra={selectedObra}
           competencia={competencia}
+        />
+      ) : null}
+
+      {activeTab === 'auditoria' ? (
+        <CrAuditoriaView
+          key={`${selectedObraId}-${refreshToken}`}
+          obra={selectedObra}
+        />
+      ) : null}
+
+      {activeTab === 'configuracoes' ? (
+        <CrConfiguracoesView
+          key={`${selectedObraId}-${refreshToken}`}
+          obra={selectedObra}
+          onChanged={handleRefresh}
         />
       ) : null}
     </div>
