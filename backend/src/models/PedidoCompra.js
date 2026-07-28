@@ -46,6 +46,10 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true
       },
+      condicao_pagamento: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
       desconto_total: {
         type: DataTypes.DECIMAL(14, 2),
         allowNull: false,

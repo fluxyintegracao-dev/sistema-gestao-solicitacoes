@@ -1369,16 +1369,17 @@ async function canAccessPagamentos(user) {
 }
 
 async function canPreparePagamentos(user) {
-  if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
-    return userHasAreaPermission(user, ['financeiro.pagamentos.preparar']);
+    return (
+      userHasAreaPermission(user, ['financeiro.pagamentos.preparar'])
+      && !userHasAreaPermission(user, ['financeiro.pagamentos.aprovar'])
+    );
   }
 
-  return userHasFinanceiroSector(user);
+  return (await userHasFinanceiroSector(user)) && !userHasPaymentApprovalDirectorate(user);
 }
 
 async function canApprovePagamentos(user) {
-  if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
     return userHasAreaPermission(user, ['financeiro.pagamentos.aprovar']);
   }
@@ -1396,12 +1397,14 @@ async function canRejectPagamentos(user) {
 }
 
 async function canSendPagamentosBanco(user) {
-  if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
-    return userHasAreaPermission(user, ['financeiro.pagamentos.enviar_banco']);
+    return (
+      userHasAreaPermission(user, ['financeiro.pagamentos.enviar_banco'])
+      && !userHasAreaPermission(user, ['financeiro.pagamentos.aprovar'])
+    );
   }
 
-  return userHasFinanceiroSector(user);
+  return (await userHasFinanceiroSector(user)) && !userHasPaymentApprovalDirectorate(user);
 }
 
 async function canSyncPagamentosBanco(user) {

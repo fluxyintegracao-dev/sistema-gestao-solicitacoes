@@ -26,7 +26,12 @@ function validarAssinaturaGoogleSync(rawBody, signature, secret) {
 
 async function validarAssinaturaGoogle(rawBody, signature) {
   const secret = await getConfigValue('CRM_GOOGLE_WEBHOOK_SECRET');
-  if (!secret) return true; // sem segredo configurado, aceita
+  if (!secret) {
+    throw Object.assign(
+      new Error('CRM_GOOGLE_WEBHOOK_SECRET nao configurado para validar webhook Google.'),
+      { status: 503 }
+    );
+  }
   return validarAssinaturaGoogleSync(rawBody, signature, secret);
 }
 

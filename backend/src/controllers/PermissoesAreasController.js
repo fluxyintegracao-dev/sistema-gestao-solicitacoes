@@ -13,6 +13,17 @@ const {
 } = require('../modules/sst/constants/sstSimplificationPolicy');
 
 const CHAVE = 'PERMISSOES_AREAS_USUARIOS';
+const PAYMENT_APPROVE_KEY = 'financeiro.pagamentos.aprovar';
+const PAYMENT_OPERATOR_KEYS = new Set([
+  'financeiro.pagamentos.preparar',
+  'financeiro.pagamentos.enviar_banco'
+]);
+
+function enforcePaymentRoleSeparation(permissoes = []) {
+  const normalized = normalizeModuloPermissaoList(permissoes);
+  if (!normalized.includes(PAYMENT_APPROVE_KEY)) return normalized;
+  return normalized.filter((key) => !PAYMENT_OPERATOR_KEYS.has(key));
+}
 
 function normalizePerfilKey(value) {
   return String(value || '')
@@ -21,7 +32,7 @@ function normalizePerfilKey(value) {
     .replace(/\s+/g, '_');
 }
 
-function normalizeUsuarios(input) {
+function normalizeUsuarios(input, { enforcePaymentRoles = true } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     return {};
   }
@@ -32,7 +43,9 @@ function normalizeUsuarios(input) {
       return acc;
     }
 
-    acc[id] = normalizeModuloPermissaoList(permissoes);
+    acc[id] = enforcePaymentRoles
+      ? enforcePaymentRoleSeparation(permissoes)
+      : normalizeModuloPermissaoList(permissoes);
     return acc;
   }, {});
 }
@@ -54,7 +67,7 @@ function normalizePadroesSetorPerfil(input) {
         return perfilAcc;
       }
 
-      perfilAcc[perfilKey] = normalizeModuloPermissaoList(permissoes);
+      perfilAcc[perfilKey] = enforcePaymentRoleSeparation(permissoes);
       return perfilAcc;
     }, {});
 
@@ -124,7 +137,7 @@ module.exports = {
         : currentConfig.usuarios || {};
 
       let normalizedBloqueios = Object.prototype.hasOwnProperty.call(req.body || {}, 'usuarios_bloqueios')
-        ? normalizeUsuarios(req.body?.usuarios_bloqueios)
+        ? normalizeUsuarios(req.body?.usuarios_bloqueios, { enforcePaymentRoles: false })
         : currentConfig.usuarios_bloqueios || {};
 
       let normalizedPadroes = Object.prototype.hasOwnProperty.call(req.body || {}, 'padroes_setor_perfil')

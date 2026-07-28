@@ -1,5 +1,4 @@
 const crypto = require('crypto');
-const { env } = require('../config/env');
 const {
   CrmConfig,
   CrmConversation,
@@ -97,11 +96,7 @@ async function validarAssinaturaMeta(rawBody, signature) {
   console.log('[META SIGNATURE] HEADER', signature ? 'PRESENTE' : 'AUSENTE');
   console.log('[META SIGNATURE] SECRET CONFIGURADO', !!secret);
   if (!secret) {
-    if (env.nodeEnv === 'production') {
-      throw createHttpError('CRM_META_WEBHOOK_SECRET nao configurado para validar webhook Meta', 500);
-    }
-    console.warn('[crm-meta] CRM_META_WEBHOOK_SECRET ausente; assinatura Meta nao sera validada neste ambiente.');
-    return true;
+    throw createHttpError('CRM_META_WEBHOOK_SECRET nao configurado para validar webhook Meta', 503);
   }
   return validarAssinaturaMetaSync(rawBody, signature, secret);
 }

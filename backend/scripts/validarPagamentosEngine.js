@@ -7,8 +7,7 @@ const {
   validatePaymentBatchCreateBody,
   validatePaymentBeneficiaryCreateBody,
   validatePaymentCancelBody,
-  validatePaymentMfaBody,
-  validatePaymentMockReturnBody
+  validatePaymentMfaBody
 } = require('../src/validators/paymentValidators');
 const bancoDoBrasilProvider = require('../src/services/paymentProviderBancoDoBrasil');
 const bancoDoBrasilSandboxProvider = require('../src/services/bancoDoBrasilPayments/BancoDoBrasilPaymentProvider');
@@ -126,16 +125,6 @@ function validateSensitiveActionsPayloads() {
   const cancel = validatePaymentCancelBody({ justificativa: 'Cancelamento operacional' });
   assert.strictEqual(cancel.justificativa, 'Cancelamento operacional');
 
-  const retornoPadrao = validatePaymentMockReturnBody({});
-  assert.strictEqual(retornoPadrao.resultado, 'CONFIRMADO');
-
-  const retornoFalha = validatePaymentMockReturnBody({ resultado: 'falha' });
-  assert.strictEqual(retornoFalha.resultado, 'FALHA');
-
-  expectValidationError(
-    () => validatePaymentMockReturnBody({ resultado: 'PAGO' }),
-    'Resultado invalido'
-  );
 }
 
 function validatePaymentAccountPayload() {
@@ -177,7 +166,6 @@ function validateRoutesAndCriticalGuards() {
     '/financeiro/pagamentos/bb/health',
     '/payments/bb/webhook',
     '/financeiro/pagamentos/lotes/:id/reprocessar',
-    '/financeiro/pagamentos/lotes/:id/simular-retorno-banco',
     '/financeiro/pagamentos/aguardando-baixa',
     '/financeiro/pagamentos/intents/:id/confirmar-baixa'
   ].forEach((route) => {
@@ -198,6 +186,11 @@ function validateRoutesAndCriticalGuards() {
     'MFA step-up nao encontrado na execucao/reprocessamento.'
   );
   assert(
+    executionService.includes('Somente o usuario que criou o lote pode envia-lo ou reprocessa-lo')
+      && executionService.includes('O aprovador do lote nao pode envia-lo ao banco'),
+    'Segregacao entre criacao, aprovacao e envio nao encontrada.'
+  );
+  assert(
     executionService.includes('BB_WEBHOOK_SECRET nao configurado') && executionService.includes('Segredo do webhook BB invalido'),
     'Validacao de segredo do webhook BB nao encontrada.'
   );
@@ -214,8 +207,9 @@ function validateRoutesAndCriticalGuards() {
     'Consulta de auditoria tecnica de eventos de pagamento nao encontrada.'
   );
   assert(
-    executionService.includes('Ja existe um job de envio pendente ou em processamento'),
-    'Bloqueio de job duplicado nao encontrado.'
+    executionService.includes('dedupe_key')
+      && executionService.includes('Ja existe um job de envio pendente ou em processamento'),
+    'Idempotencia de job de envio nao encontrada.'
   );
   assert(
     executionService.includes('paymentProviderBancoDoBrasil'),
@@ -226,7 +220,18 @@ function validateRoutesAndCriticalGuards() {
     'Job BB_SUBMIT_PIX_BATCH nao encontrado.'
   );
   assert(
-    executionService.includes("env.bbSandboxRealEnabled") && executionService.includes("createPaymentJob(batch.id, 'BB_SUBMIT_PIX_BATCH')"),
+    executionService.includes('ENVIO_INDETERMINADO')
+      && executionService.includes('ensureStableBbRequestId'),
+    'Tratamento de envio indeterminado ou identificador estavel BB nao encontrado.'
+  );
+  assert(
+    !executionService.includes('BB_RELEASE_BATCH')
+      && !executionService.includes('bbAutoLiberarLote')
+      && !executionService.includes('simularRetornoBanco'),
+    'Fluxo removido de liberacao automatica ou simulacao bancaria ainda esta ativo.'
+  );
+  assert(
+    executionService.includes("env.bbSandboxRealEnabled") && executionService.includes("'BB_SUBMIT_PIX_BATCH'"),
     'Reprocessamento BB sandbox nao esta direcionando para o job real.'
   );
   assert(

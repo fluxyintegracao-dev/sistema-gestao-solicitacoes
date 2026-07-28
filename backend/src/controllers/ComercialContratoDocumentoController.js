@@ -21,7 +21,7 @@ function responderErroDocumento(res, error, fallbackMessage) {
 
 function assertWebhookSecret(req) {
   const secret = String(process.env.D4SIGN_WEBHOOK_SECRET || '').trim();
-  if (!secret) return true;
+  if (!secret) return false;
 
   const headerSecret = String(req.get('x-fluxy-webhook-secret') || '').trim();
   const querySecret = String(req.query?.secret || '').trim();

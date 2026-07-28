@@ -91,6 +91,18 @@ module.exports = async (req, res, next) => {
       });
       return res.status(401).json({ error: 'Sessao invalida' });
     }
+    if (Number(decoded.token_version || 0) !== Number(user.token_version || 0)) {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: user.id,
+        tipoEvento: 'AUTH_TOKEN_REVOKED',
+        recursoTipo: 'AUTH',
+        recursoId: req.originalUrl,
+        status: 'DENIED',
+        descricao: 'Token revogado por alteracao de credencial ou encerramento de sessao'
+      });
+      return res.status(401).json({ error: 'Sessao revogada. Entre novamente.' });
+    }
 
     const [financeiroLiberado, capacidadesRhDp, areasPermissoes] = await Promise.all([
       canAccessFinanceiro(user),

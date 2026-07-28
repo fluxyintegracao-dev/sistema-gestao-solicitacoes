@@ -346,9 +346,9 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'financeiro.pagamentos.visualizar', label: 'Visualizar pagamentos', descricao: 'Ver lotes, intents e status bancario.' },
           { key: 'financeiro.pagamentos.preparar', label: 'Preparar lotes', descricao: 'Selecionar titulos elegiveis e criar lotes de pagamento.' },
-          { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Aprovar lotes conforme alcada.' },
+          { key: 'financeiro.pagamentos.aprovar', label: 'Aprovar lotes', descricao: 'Papel aprovador: confere e aprova lotes de outros usuarios; incompativel com criar ou enviar lotes.' },
           { key: 'financeiro.pagamentos.rejeitar', label: 'Rejeitar lotes', descricao: 'Rejeitar lotes antes do envio bancario.' },
-          { key: 'financeiro.pagamentos.enviar_banco', label: 'Enviar ao banco', descricao: 'Enviar lote aprovado para o provider bancario.' },
+          { key: 'financeiro.pagamentos.enviar_banco', label: 'Enviar lotes proprios ao banco', descricao: 'Papel operador: envia somente lotes criados pelo proprio usuario e aprovados por outra pessoa.' },
           { key: 'financeiro.pagamentos.sincronizar_banco', label: 'Sincronizar retorno bancario', descricao: 'Atualizar manualmente o status do lote junto ao Banco do Brasil.' },
           { key: 'financeiro.pagamentos.cancelar', label: 'Cancelar pagamentos', descricao: 'Cancelar lotes ou itens antes do envio definitivo.' },
           { key: 'financeiro.pagamentos.reprocessar', label: 'Reprocessar falhas', descricao: 'Reprocessar jobs ou retornos elegiveis.' },

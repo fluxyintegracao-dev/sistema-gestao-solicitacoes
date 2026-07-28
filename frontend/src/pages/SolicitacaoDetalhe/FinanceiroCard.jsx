@@ -5,7 +5,10 @@ import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../servi
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
-import { textMatchesSearchTerms } from '../../utils/search';
+import {
+  categoriaFinanceiraMatchesAutocomplete,
+  categoriaFinanceiraMatchesSearch
+} from '../../utils/categoriaFinanceira';
 import CategoriaFinanceiraAutocomplete from '../../components/ui/CategoriaFinanceiraAutocomplete';
 import {
   gerarContaPorSolicitacao,
@@ -794,14 +797,7 @@ export default function FinanceiroCard({
         return true;
       }
 
-      return textMatchesSearchTerms([
-        categoria.nome,
-        categoria.descricao,
-        categoria.tipo,
-        categoria.dre_grupo,
-        categoria.dre_subgrupo,
-        categoria.classificacao_gerencial
-      ], categoriaSearch);
+      return categoriaFinanceiraMatchesAutocomplete(categoria, categoriaSearch);
     });
   }, [categoriaSearch, categoriasCompativeis]);
 
@@ -856,7 +852,7 @@ export default function FinanceiroCard({
       return [];
     }
 
-    return categoriasFiltradas.slice(0, 5);
+    return categoriasFiltradas;
   }, [categoriaSearch, categoriasFiltradas, selectedCategory]);
 
   function selecionarCategoria(categoria) {
@@ -2397,7 +2393,7 @@ export default function FinanceiroCard({
               <input
                 className="input w-full"
                 type="text"
-                placeholder="Buscar categoria por nome ou descricao"
+                placeholder="Buscar categoria por ID, nome ou descricao"
                 value={categoriaSearch}
                 onChange={(event) => setCategoriaSearch(event.target.value)}
               />
@@ -2408,7 +2404,7 @@ export default function FinanceiroCard({
                   : `${categoriasFiltradas.length} categoria(s) disponivel(is) para ${String(form.tipo || '').toLowerCase()}.`}
               </div>
 
-              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-2xl border border-slate-200 p-2">
+              <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain rounded-2xl border border-slate-200 p-2">
                 {loadingCategorias ? (
                   <div className="px-3 py-4 text-sm text-slate-500">
                     Buscando categorias...

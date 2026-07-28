@@ -26,6 +26,11 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: true
     },
+    dedupe_key: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      unique: true
+    },
     payload: {
       type: DataTypes.JSON,
       allowNull: true

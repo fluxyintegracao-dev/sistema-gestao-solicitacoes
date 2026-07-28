@@ -126,6 +126,7 @@ const env = {
   securityLogRetentionDays: Number(process.env.SECURITY_LOG_RETENTION_DAYS || 90),
   mfaIssuer: String(process.env.MFA_ISSUER || process.env.PRODUCT_NAME || 'Fluxy').trim(),
   mfaChallengeExpiresIn: String(process.env.MFA_CHALLENGE_EXPIRES_IN || '5m').trim(),
+  mfaEncryptionKey: String(process.env.MFA_ENCRYPTION_KEY || '').trim(),
   productName: String(process.env.PRODUCT_NAME || 'Fluxy').trim(),
   companyName: String(process.env.COMPANY_NAME || '').trim(),
   companyLegalName: String(process.env.COMPANY_LEGAL_NAME || '').trim(),
@@ -189,7 +190,6 @@ const env = {
   bbContaCorrenteDebito: String(process.env.BB_CONTA_CORRENTE_DEBITO || '').trim(),
   bbDigitoContaCorrenteDebito: String(process.env.BB_DIGITO_CONTA_CORRENTE_DEBITO || '').trim(),
   bbCnpjPagador: String(process.env.BB_CNPJ_PAGADOR || '').trim(),
-  bbAutoLiberarLote: parseBoolean(process.env.BB_AUTO_LIBERAR_LOTE, false),
   bbRequestTimeoutMs: Number(process.env.BB_REQUEST_TIMEOUT_MS || 30000),
   bbTokenCacheTtlSeconds: Number(process.env.BB_TOKEN_CACHE_TTL_SECONDS || 3000),
   bbOauthMaxAttempts: Number(process.env.BB_OAUTH_MAX_ATTEMPTS || 3),
@@ -200,7 +200,9 @@ const env = {
   bbWebhookPath: String(process.env.BB_WEBHOOK_PATH || '/api/payments/bb/webhook').trim(),
   bbWebhookRequireMtls: parseBoolean(process.env.BB_WEBHOOK_REQUIRE_MTLS, true),
   bbWebhookSecret: String(process.env.BB_WEBHOOK_SECRET || '').trim(),
-  bbWebhookSecretHeader: String(process.env.BB_WEBHOOK_SECRET_HEADER || 'x-fluxy-bb-webhook-secret').trim().toLowerCase()
+  bbWebhookSecretHeader: String(process.env.BB_WEBHOOK_SECRET_HEADER || 'x-fluxy-bb-webhook-secret').trim().toLowerCase(),
+  bbWebhookMtlsVerifiedHeader: String(process.env.BB_WEBHOOK_MTLS_VERIFIED_HEADER || 'x-fluxy-client-cert-verified').trim().toLowerCase(),
+  bbWebhookMtlsVerifiedValue: String(process.env.BB_WEBHOOK_MTLS_VERIFIED_VALUE || 'SUCCESS').trim()
 };
 
 env.siengeResolvedBaseUrl = buildSiengeApiBaseUrl({
@@ -226,6 +228,9 @@ function validateRequiredEnv() {
   }
   if (env.clamavRequired && !env.clamavEnabled) {
     missing.push('CLAMAV_ENABLED');
+  }
+  if (env.nodeEnv === 'production' && !env.mfaEncryptionKey) {
+    missing.push('MFA_ENCRYPTION_KEY');
   }
 
   if (missing.length > 0) {

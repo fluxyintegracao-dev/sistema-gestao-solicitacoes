@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { env } = require('../config/env');
 const {
   ContaBancaria,
   Parceiro,
@@ -40,6 +41,56 @@ function getTitleLabel(titulo) {
 
 function getSnapshotValue(snapshot, field) {
   return snapshot && Object.prototype.hasOwnProperty.call(snapshot, field) ? snapshot[field] : null;
+}
+
+function buildCurrentPaymentAccountSnapshot(batch) {
+  return {
+    id: Number(batch.paymentAccount?.id || 0),
+    conta_bancaria_id: Number(batch.paymentAccount?.conta_bancaria_id || 0),
+    empresa_id: Number(batch.paymentAccount?.empresa_id || 0),
+    cnpj_pagador: onlyDigits(batch.paymentAccount?.cnpj_pagador),
+    provider_id: Number(batch.paymentAccount?.provider_id || 0),
+    banco_codigo: String(batch.paymentAccount?.banco_codigo || '').trim(),
+    agencia: String(batch.paymentAccount?.agencia || '').trim(),
+    agencia_digito: String(batch.paymentAccount?.agencia_digito || '').trim(),
+    conta: String(batch.paymentAccount?.conta || '').trim(),
+    conta_digito: String(batch.paymentAccount?.conta_digito || '').trim(),
+    tipo_conta: normalizeStatus(batch.paymentAccount?.tipo_conta),
+    convenio: String(batch.paymentAccount?.convenio || '').trim(),
+    ambiente: normalizeStatus(batch.paymentAccount?.ambiente),
+    conta_bancaria_empresa_id: Number(batch.paymentAccount?.contaBancaria?.empresa_id || 0)
+  };
+}
+
+function buildCurrentProviderSnapshot(batch) {
+  return {
+    id: Number(batch.provider?.id || 0),
+    codigo: normalizeStatus(batch.provider?.codigo),
+    ambiente: normalizeStatus(batch.provider?.ambiente),
+    config_ref: String(batch.provider?.config_ref || '').trim(),
+    runtime_env: String(env.bbPaymentsEnv || '').trim().toLowerCase(),
+    runtime_mode: String(env.bbProviderMode || '').trim().toLowerCase(),
+    base_url: String(env.bbPaymentsBaseUrl || '').trim(),
+    oauth_url: String(env.bbOauthTokenUrl || '').trim()
+  };
+}
+
+function assertFrozenSnapshotMatches(label, frozenSnapshot, currentSnapshot) {
+  if (!frozenSnapshot || typeof frozenSnapshot !== 'object') {
+    throw createHttpError(409, `${label} nao possui snapshot de seguranca. Cancele e gere um novo lote.`);
+  }
+
+  for (const [field, currentValue] of Object.entries(currentSnapshot)) {
+    if (!Object.prototype.hasOwnProperty.call(frozenSnapshot, field)) {
+      continue;
+    }
+    if (String(frozenSnapshot[field] ?? '') !== String(currentValue ?? '')) {
+      throw createHttpError(
+        409,
+        `${label} foi alterada no campo ${field} depois da criacao do lote. Cancele e gere um novo lote.`
+      );
+    }
+  }
 }
 
 function buildIntegrityHash(snapshot) {
@@ -128,6 +179,16 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
   if (Number(batch.empresa_id || 0) !== Number(batch.paymentAccount.empresa_id)) {
     throw createHttpError(400, 'Empresa gravada no lote diverge da empresa da conta pagadora.');
   }
+  assertFrozenSnapshotMatches(
+    'Conta pagadora',
+    batch.payment_account_snapshot,
+    buildCurrentPaymentAccountSnapshot(batch)
+  );
+  assertFrozenSnapshotMatches(
+    'Configuracao do provider',
+    batch.provider_snapshot,
+    buildCurrentProviderSnapshot(batch)
+  );
 
   const items = Array.isArray(batch.items) ? batch.items : [];
   if (!items.length) throw createHttpError(400, 'Lote sem itens para validar.');
@@ -217,6 +278,8 @@ async function validatePaymentBatchIntegrity(batchId, options = {}) {
     empresa_id: Number(batch.empresa_id || 0),
     conta_bancaria_id: Number(batch.paymentAccount?.conta_bancaria_id || 0),
     conta_bancaria_empresa_id: Number(batch.paymentAccount?.contaBancaria?.empresa_id || 0),
+    payment_account_snapshot: batch.payment_account_snapshot,
+    provider_snapshot: batch.provider_snapshot,
     quantidade_itens: items.length,
     valor_total: toCurrencyNumber(batch.valor_total),
     data_programada: batch.data_programada || null,

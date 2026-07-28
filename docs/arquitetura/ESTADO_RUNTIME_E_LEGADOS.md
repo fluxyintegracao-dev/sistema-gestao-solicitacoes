@@ -1,6 +1,6 @@
 # Estado do Runtime e Codigos Legados
 
-Data da verificacao: 2026-07-13.
+Data da verificacao: 2026-07-20.
 
 Este documento separa comportamento vigente de codigo mantido apenas por compatibilidade. Presenca em model, migration, rota, menu ou catalogo nao transforma um recurso descontinuado em regra de negocio valida.
 
@@ -27,7 +27,7 @@ No fluxo de Compras:
 
 - `PATCH /compras/solicitacoes/:id/integrar` retorna `410` antes de qualquer logica antiga;
 - `PATCH /compras/solicitacoes/:id/liberar` retorna `410` antes de qualquer logica antiga;
-- solicitacao aprovada pela diretoria segue diretamente para cotacao;
+- novas solicitacoes de compra nascem diretamente em `LIBERADO_PARA_COMPRA`; campos e regras de diretoria atendem somente registros antigos ja marcados com esse fluxo;
 - campos como `numero_sienge`, `integrado_sienge` e `data_integracao_sienge` ainda existem e nao podem ser removidos sem migration e busca de consumidores;
 - `numero_sienge` ainda aparece em compatibilidades de numero da compra; renomear ou excluir exige migracao de dados e contrato.
 

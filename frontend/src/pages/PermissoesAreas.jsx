@@ -625,8 +625,8 @@ export default function PermissoesAreas() {
           <div>
             <h1 className="page-title">Permissoes adicionais por Usuario</h1>
             <p className="page-subtitle">
-              Adicione excecoes individuais acima do padrao por setor e perfil. SUPERADMIN e ADMINISTRADOR seguem
-              com bypass total e nao sao afetados por esta configuracao.
+              Adicione excecoes individuais acima do padrao por setor e perfil. Nas operacoes criticas de pagamento,
+              aprovacao e preparacao/envio sao papeis incompativeis, inclusive para perfis administrativos.
             </p>
           </div>
           <div className="app-page-actions">

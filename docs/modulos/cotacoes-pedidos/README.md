@@ -48,6 +48,9 @@ O modulo administra fornecedores convidados, escopo de itens por fornecedor, tok
 ## Pedido
 
 - pedido nasce de uma rodada de fechamento e referencia `fechamento_id` quando criado pelo fluxo atual;
+- a condicao de pagamento da resposta e copiada para `PedidoCompra.condicao_pagamento` como snapshot no momento da geracao e aparece no detalhe e no PDF;
+- editar somente a resposta da cotacao depois da geracao nao altera silenciosamente pedidos ja emitidos; quando um pedido existente e explicitamente reutilizado ou reaberto pelo fluxo operacional, o snapshot pode ser atualizado com registro de antes e depois no log;
+- pedidos historicos recebem a condicao mais proxima disponivel no log da resposta anterior a criacao, com fallback para a cotacao atual; a leitura dos documentos preserva compatibilidade com associacoes legadas;
 - o pedido preserva os valores rateados de IPI, ICMS, ST e DIFAL para formar o custo gerencial dos itens;
 - frete embutido permanece como informacao da cotacao; frete pago a terceiro cria uma pendencia financeira idempotente, sem exigir credor na cotacao;
 - quando o transportador nao for informado, o Financeiro escolhe o credor ao gerar o titulo de contas a pagar;

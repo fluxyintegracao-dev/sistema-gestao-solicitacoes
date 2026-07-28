@@ -6,15 +6,12 @@ const INSTALLATION_CONFIG_KEY = 'INSTALACAO_CONFIG';
 // da instancia ser persistida e validada fora do contexto da construtora original.
 const LEGACY_COMPAT_ALLOWED_ORIGINS = [
   'https://sistema-gestao-solicitacoes.vercel.app',
-  'https://sistema-gestao-solicitacoes-*.vercel.app',
   'https://api.jrfluxy.com.br',
   'https://jrfluxy.com.br',
   'https://www.jrfluxy.com.br',
   'https://csc.jrfluxy.com.br',
   'https://dev.jrfluxy.com.br',
-  'https://api-dev.jrfluxy.com.br',
-  'http://localhost:5173',
-  'http://127.0.0.1:5173'
+  'https://api-dev.jrfluxy.com.br'
 ];
 
 function getDefaultInstallationConfig() {
@@ -41,12 +38,9 @@ function getDefaultInstallationConfig() {
 function normalizeAllowedOrigins(value) {
   return Array.from(
     new Set(
-      [
-        ...LEGACY_COMPAT_ALLOWED_ORIGINS,
-        ...(Array.isArray(value) ? value : [])
-      ]
+      (Array.isArray(value) ? value : LEGACY_COMPAT_ALLOWED_ORIGINS)
         .map((item) => String(item || '').trim())
-        .filter(Boolean)
+        .filter((item) => Boolean(item) && !item.includes('*'))
     )
   );
 }

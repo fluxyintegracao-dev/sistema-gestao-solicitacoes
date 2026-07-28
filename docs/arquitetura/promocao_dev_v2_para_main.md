@@ -35,9 +35,9 @@ Regras:
 - `BB_CERT_PATH` aponta para o certificado A1 da empresa, fora do repositorio.
 - `BB_CERT_PASSPHRASE` fica somente no `.env` do servidor.
 - `BB_CA_CERT_PATH` deve apontar para a cadeia CA oficial quando o banco exigir cadeia adicional.
-- `BB_TLS_REJECT_UNAUTHORIZED=false` e permitido somente em sandbox/homologacao para destravar testes quando o endpoint do BB retorna `SELF_SIGNED_CERT_IN_CHAIN`.
-- Em producao, `BB_TLS_REJECT_UNAUTHORIZED` deve ser `true`.
-- Em producao, se houver erro de cadeia TLS, resolver com `BB_CA_CERT_PATH` e cadeia CA correta, nunca relaxando a validacao TLS.
+- `BB_TLS_REJECT_UNAUTHORIZED` deve ser `true` em homologacao e producao; o provider real bloqueia envio quando a validacao TLS esta desativada.
+- Se houver erro de cadeia TLS, resolver com `BB_CA_CERT_PATH` e cadeia CA correta, nunca relaxando a validacao TLS.
+- `MFA_ENCRYPTION_KEY` deve ser configurada antes das migrations de identidade e deve ser a mesma em todas as instancias do ambiente.
 
 ## Checklist antes do merge
 
@@ -165,6 +165,6 @@ curl http://127.0.0.1:8000/health
 
 - copiar `.env` de staging para producao sem trocar banco e valores proprios da main.
 - versionar certificados, tokens, senhas, app keys ou arquivos `.pfx`.
-- usar `BB_TLS_REJECT_UNAUTHORIZED=false` em producao.
+- usar `BB_TLS_REJECT_UNAUTHORIZED=false` em qualquer envio real.
 - baixar titulo automaticamente no envio do lote BB.
 - rodar migrations em producao sem validacao previa em staging.

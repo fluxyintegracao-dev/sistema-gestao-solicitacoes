@@ -36,19 +36,13 @@ A visibilidade efetiva depende de combinacao entre:
   - `usuario_setores` armazena todos os setores vinculados
   - a listagem, detalhe e acoes de solicitacao consideram o setor principal e os setores adicionais
   - ao importar usuarios por CSV, o primeiro setor informado vira o principal e os demais ficam vinculados
-- quando a obra estiver classificada e houver configuracao de aprovacao por diretoria:
-  - obra `PUBLICA` deve nascer em `DIR_OBRAS_PUBLICAS`
-  - obra `PRIVADA` deve nascer em `DIR_OBRAS_PRIVADAS`
-  - para usuarios do setor `OBRA`, essa escolha passa a seguir a classificacao da obra e a configuracao de `Areas Visiveis para OBRA`, sem depender de `Areas por Setor de Origem`
-  - na criacao, o usuario seleciona a area destino operacional e o sistema grava a diretoria correspondente em campo separado
-  - a solicitacao nasce na diretoria da classificacao da obra e, apos aprovacao, segue para a area operacional selecionada na criacao
-  - a configuracao de destino por tipo permanece como fallback para registros antigos ou sem destino persistido
-  - o setor destino vira o dono da solicitacao para seguir o fluxo normal
-  - `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` continuam vendo solicitacoes novas do fluxo que pertencem a sua diretoria, mesmo apos aprovacao e envio
-  - essa visibilidade adicional depende do marcador formal `fluxo_aprovacao_diretoria`
-  - solicitacoes antigas continuam no comportamento anterior
-  - `DIR_ADMIN` nao ganha visibilidade global automatica; continua vendo apenas o que estiver no setor dela ou o que chegar por mencao/atribuicao
-  - o criador da obra continua vendo a solicitacao
+- encaminhamento de novas solicitacoes:
+  - a classificacao `PUBLICA` ou `PRIVADA` da obra nao redireciona mais a criacao para uma diretoria;
+  - a solicitacao nasce diretamente na area responsavel escolhida e esse setor passa a ser seu dono operacional;
+  - `Areas Visiveis para OBRA`, `Areas por Setor de Origem`, tipos por setor, autoria, atribuicao e historico continuam compondo a visibilidade;
+  - registros antigos marcados com `fluxo_aprovacao_diretoria` preservam a visibilidade e as regras necessarias para concluir o fluxo legado;
+  - `DIR_ADMIN`, `DIR_OBRAS_PUBLICAS` e `DIR_OBRAS_PRIVADAS` nao ganham visibilidade global sobre solicitacoes novas apenas pelo perfil de diretoria;
+  - o criador da obra continua vendo a solicitacao quando as demais regras de escopo permitirem.
 - pagamentos parciais:
   - somente `FINANCEIRO` pode informar pagamentos pela interface
   - `SUPERADMIN` continua como excecao administrativa no backend
@@ -72,7 +66,7 @@ A visibilidade efetiva depende de combinacao entre:
   - `SUPERADMIN` pode finalizar lotes e excluir lotes sem itens autorizados
   - `SUPERADMIN` pode reabrir lotes finalizados para que a diretoria ajuste a selecao antes de finalizar novamente
   - diretorias podem salvar a selecao de um lote aberto sem finalizar; a selecao fica persistida para retomada posterior
-  - lotes abertos listam solicitacoes nao `PAGA` da classificacao da diretoria; no fluxo novo, a solicitacao precisa estar aprovada pela diretoria, e solicitacoes legadas sem fluxo de diretoria continuam elegiveis
+  - lotes abertos seguem os criterios de classificacao, status e escopo implementados no dominio de prioridades; a inclusao no lote nao constitui aprovacao nem altera a area responsavel
   - a autorizacao de prioridade nao muda o setor responsavel da solicitacao
   - a autorizacao marca a solicitacao como `prioridade_diretoria_ativa`
 

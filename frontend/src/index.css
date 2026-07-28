@@ -5492,6 +5492,9 @@ input[type="file"]:disabled {
 
 .finance-category-modal-body {
   display: grid;
+  min-height: 0;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  overflow: hidden;
   gap: 0.85rem;
 }
 
@@ -5514,7 +5517,12 @@ input[type="file"]:disabled {
 
 .finance-category-modal-table {
   display: grid;
-  overflow: hidden;
+  min-height: 0;
+  max-height: min(58vh, 560px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   border: 1px solid var(--sol-border-color);
   border-radius: 14px;
 }
@@ -5535,6 +5543,9 @@ input[type="file"]:disabled {
 }
 
 .finance-category-modal-row--head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   background: color-mix(in srgb, var(--c-bg) 72%, var(--premium-glass-bg));
   color: var(--c-muted);
   font-size: 0.7rem;

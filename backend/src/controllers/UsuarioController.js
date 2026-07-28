@@ -16,6 +16,36 @@ const {
   sendPasswordResetEmail
 } = require('../services/passwordResetService');
 
+const SAFE_USER_MANAGEMENT_ATTRIBUTES = [
+  'id',
+  'nome',
+  'email',
+  'perfil',
+  'cargo_id',
+  'setor_id',
+  'ativo',
+  'ultimo_acesso_em',
+  'pode_criar_solicitacao_compra',
+  'pode_enviar_qualquer_setor',
+  'force_password_reset',
+  'password_changed_at',
+  'password_setup_sent_at',
+  'mfa_totp_enabled',
+  'mfa_totp_last_verified_at',
+  'createdAt',
+  'updatedAt'
+];
+
+const SAFE_ASSIGNMENT_USER_ATTRIBUTES = [
+  'id',
+  'nome',
+  'email',
+  'perfil',
+  'cargo_id',
+  'setor_id',
+  'ativo'
+];
+
 function podeDefinirPerfilSuperadmin(req, perfilDestino) {
   const perfilSolicitante = String(req.user?.perfil || '').trim().toUpperCase();
   const perfilNormalizado = String(perfilDestino || '').trim().toUpperCase();
@@ -168,7 +198,7 @@ module.exports = {
 
       const usuarios = await User.findAll({
         where: whereUsuarios,
-        attributes: { exclude: ['senha'] }, // nunca retornar senha
+        attributes: SAFE_USER_MANAGEMENT_ATTRIBUTES,
         include: [
           {
             model: Cargo,
@@ -218,7 +248,7 @@ module.exports = {
       }
 
       const usuarios = await User.findAll({
-        attributes: { exclude: ['senha'] },
+        attributes: SAFE_ASSIGNMENT_USER_ATTRIBUTES,
         where: {
           setor_id: setorId,
           ativo: true,
@@ -289,7 +319,7 @@ module.exports = {
       const { id } = req.params;
 
       const usuario = await User.findByPk(id, {
-        attributes: { exclude: ['senha'] },
+        attributes: SAFE_USER_MANAGEMENT_ATTRIBUTES,
         include: [
           {
             model: Cargo,
@@ -545,6 +575,9 @@ module.exports = {
         dadosUpdate.password_reset_token_hash = null;
         dadosUpdate.password_reset_expires_at = null;
         dadosUpdate.password_changed_at = new Date();
+        dadosUpdate.token_version = Number(usuario.token_version || 0) + 1;
+      } else if (ativo !== undefined && Boolean(ativo) !== Boolean(usuario.ativo)) {
+        dadosUpdate.token_version = Number(usuario.token_version || 0) + 1;
       }
 
       await usuario.update(dadosUpdate);
@@ -955,7 +988,8 @@ module.exports = {
         force_password_reset: false,
         password_reset_token_hash: null,
         password_reset_expires_at: null,
-        password_changed_at: new Date()
+        password_changed_at: new Date(),
+        token_version: Number(usuario.token_version || 0) + 1
       });
 
       await registrarEventoSeguranca({

@@ -29,7 +29,6 @@ import {
   rejeitarPaymentBatch,
   reprocessarPaymentBatch,
   sincronizarPaymentBatchStatusBb,
-  simularRetornoPaymentBatch,
   submeterPaymentBatch
 } from '../services/financeiro';
 import { getObras } from '../services/obras';
@@ -56,8 +55,7 @@ const TABS = [
 const PAYMENT_EVENT_TYPES = [
   'BB_WEBHOOK_RECEIVED',
   'BB_BATCH_STATUS_SYNCED',
-  'BB_SUBMIT_PIX_BATCH_RESPONSE',
-  'BB_RELEASE_BATCH_RESPONSE'
+  'BB_SUBMIT_PIX_BATCH_RESPONSE'
 ];
 
 const PAYMENT_EVENT_STATUSES = ['PENDENTE', 'PROCESSADO', 'ERRO'];
@@ -65,8 +63,8 @@ const PAYMENT_EVENT_STATUSES = ['PENDENTE', 'PROCESSADO', 'ERRO'];
 const BATCH_STEPS = [
   { statuses: ['RASCUNHO'], label: 'Rascunho' },
   { statuses: ['PENDENTE_APROVACAO'], label: 'Aprovacao' },
-  { statuses: ['APROVADO'], label: 'Aprovado' },
-  { statuses: ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'], label: 'Banco' },
+  { statuses: ['APROVADO', 'ENFILEIRADO', 'ENVIANDO'], label: 'Aprovado' },
+  { statuses: ['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'ENVIO_INDETERMINADO'], label: 'Banco' },
   { statuses: ['AGUARDANDO_CONFIRMACAO_BAIXA', 'BAIXADO'], label: 'Baixa' }
 ];
 
@@ -484,6 +482,7 @@ export default function FinanceiroPagamentos() {
       ? selectedBatch.approvals.filter((approval) => approval.acao === 'APPROVE' && approval.status === 'APROVADO')
       : []
   ), [selectedBatch]);
+  const batchCapabilities = selectedBatch?.action_capabilities || {};
 
   const paymentOverview = useMemo(() => {
     const activeAccounts = accounts.filter((account) => getPaymentAccountPendencies(account).length === 0);
@@ -750,30 +749,6 @@ export default function FinanceiroPagamentos() {
     runBatchAction('reprocessar', (id) => reprocessarPaymentBatch(id, {
       codigo_mfa: mfaCode,
       justificativa: justificativa.trim() || 'Reprocessamento solicitado pela operacao financeira.'
-    }));
-  }
-
-  function handleMockBankReturn(resultado) {
-    if (!selectedBatch?.id) return;
-    if (!String(mfaCode || '').trim()) {
-      setError('Informe o codigo MFA para registrar retorno bancario mockado.');
-      return;
-    }
-    const justificativa = window.prompt(
-      resultado === 'CONFIRMADO'
-        ? 'Informe a justificativa/evidencia para confirmar o retorno bancario mockado:'
-        : 'Informe a justificativa/evidencia para registrar falha no retorno bancario mockado:'
-    );
-    if (justificativa === null) return;
-    const motivo = justificativa.trim();
-    if (!motivo) {
-      setError('Informe uma justificativa para registrar o retorno bancario mockado.');
-      return;
-    }
-    runBatchAction(resultado === 'CONFIRMADO' ? 'retorno' : 'falha-mock', (id) => simularRetornoPaymentBatch(id, {
-      resultado,
-      codigo_mfa: mfaCode,
-      justificativa: motivo
     }));
   }
 
@@ -1177,14 +1152,14 @@ export default function FinanceiroPagamentos() {
                         onChange={(e) => setMfaCode(e.target.value)}
                       />
                       <div className="flex flex-wrap gap-2">
-                        {canPrepare && (
-                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('submeter', (id) => submeterPaymentBatch(id))} disabled={selectedBatch.status !== 'RASCUNHO' || actionLoading === 'submeter'}>
+                        {canPrepare && batchCapabilities.is_creator && (
+                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('submeter', (id) => submeterPaymentBatch(id))} disabled={!batchCapabilities.can_submit || actionLoading === 'submeter'}>
                             <HiOutlineShieldCheck className="h-4 w-4" />
                             Submeter
                           </button>
                         )}
-                        {canApprove && (
-                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('aprovar', (id) => aprovarPaymentBatch(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'PENDENTE_APROVACAO' || !mfaCode || actionLoading === 'aprovar'}>
+                        {canApprove && !batchCapabilities.is_creator && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('aprovar', (id) => aprovarPaymentBatch(id, { codigo_mfa: mfaCode }))} disabled={!batchCapabilities.can_approve || !mfaCode || actionLoading === 'aprovar'}>
                             <HiOutlineCheckCircle className="h-4 w-4" />
                             Aprovar
                           </button>
@@ -1201,39 +1176,29 @@ export default function FinanceiroPagamentos() {
                             {cancelRequiresMfa ? 'Cancelar com MFA' : 'Cancelar'}
                           </button>
                         )}
-                        {!isBbSandbox && canSend && (
-                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar'}>
+                        {!isBbSandbox && canSend && batchCapabilities.is_creator && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar', (id) => enviarPaymentBatchBanco(id, { codigo_mfa: mfaCode }))} disabled={!batchCapabilities.can_send || !mfaCode || actionLoading === 'enviar'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
                             Enviar mock
                           </button>
                         )}
-                        {isBbSandbox && canSend && (
-                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={selectedBatch.status !== 'APROVADO' || !mfaCode || actionLoading === 'enviar-bb'}>
+                        {isBbSandbox && canSend && batchCapabilities.is_creator && (
+                          <button type="button" className="btn btn-primary" onClick={() => runBatchAction('enviar-bb', (id) => enviarPaymentBatchBbSandbox(id, { codigo_mfa: mfaCode }))} disabled={!batchCapabilities.can_send || !mfaCode || actionLoading === 'enviar-bb'}>
                             <HiOutlinePaperAirplane className="h-4 w-4" />
                             Enviar ao BB
                           </button>
                         )}
                         {canSync && (
-                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
+                          <button type="button" className="btn btn-outline" onClick={() => runBatchAction('sync-bb', (id) => sincronizarPaymentBatchStatusBb(id))} disabled={!isBbSandbox || !['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO', 'ENVIO_INDETERMINADO', 'FALHA_INTEGRACAO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(selectedBatch.status) || actionLoading === 'sync-bb'}>
                             <HiOutlineArrowPath className="h-4 w-4" />
                             Sincronizar BB
                           </button>
                         )}
-                        {canReprocess && (
-                          <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!['FALHA_INTEGRACAO', 'REJEITADO', 'PARCIALMENTE_REJEITADO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'reprocessar'}>
+                        {canReprocess && batchCapabilities.is_creator && (
+                          <button type="button" className="btn btn-outline" onClick={handleReprocessBatch} disabled={!batchCapabilities.can_reprocess || !mfaCode || actionLoading === 'reprocessar'}>
                             <HiOutlineArrowPath className="h-4 w-4" />
                             Reprocessar
                           </button>
-                        )}
-                        {!isBbSandbox && canSend && (
-                          <>
-                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('CONFIRMADO')} disabled={!['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'retorno'}>
-                              Confirmar banco com MFA
-                            </button>
-                            <button type="button" className="btn btn-outline" onClick={() => handleMockBankReturn('FALHA')} disabled={!['ENVIADO_AO_BANCO', 'PROCESSANDO_BANCO'].includes(selectedBatch.status) || !mfaCode || actionLoading === 'falha-mock'}>
-                              Falha mock com MFA
-                            </button>
-                          </>
                         )}
                       </div>
                     </div>
@@ -1244,6 +1209,16 @@ export default function FinanceiroPagamentos() {
                         <> - {bbHealth?.baseURL || 'URL BB nao informada'} - certificado {bbHealth?.certificateConfigured ? 'configurado' : 'pendente'}</>
                       )}
                     </div>
+                    {selectedBatch.status === 'ENVIO_INDETERMINADO' && (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">
+                        O resultado do envio e indeterminado. Nao gere outro lote para os mesmos titulos; sincronize o status com o Banco do Brasil.
+                      </div>
+                    )}
+                    {selectedBatch.status === 'APROVADO' && !batchCapabilities.is_creator && (
+                      <div className="app-note">
+                        Somente o usuario que criou este lote pode envia-lo ao banco depois da aprovacao.
+                      </div>
+                    )}
 
                     <div className="grid gap-4 lg:grid-cols-2">
                       <div>

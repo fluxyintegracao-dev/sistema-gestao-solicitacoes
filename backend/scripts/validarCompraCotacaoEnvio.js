@@ -1,4 +1,6 @@
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 
 const {
   validateCompraCotacaoRespostaInternaBody,
@@ -13,6 +15,9 @@ const {
   montarMapaAlocacoesAtivasPorFornecedorItem,
   montarMapaAlocacoesAtivasPorItem
 } = require('../src/services/comprasDisponibilidadeService');
+const {
+  resolverCondicaoPagamentoPedido
+} = require('../src/services/pedidoCompraDocumentoUtils');
 
 function itemSelecionado() {
   return {
@@ -222,6 +227,62 @@ function validarDisponibilidadeHistoricaPorFornecedorItem() {
   assert.strictEqual(semAumento.quantidade_liberada_total, 0);
 }
 
+function validarSnapshotCondicaoPagamentoPedido() {
+  assert.strictEqual(
+    resolverCondicaoPagamentoPedido({
+      condicao_pagamento: '30/60 dias',
+      cotacaoFornecedor: { condicao_pagamento: 'A vista' }
+    }),
+    '30/60 dias'
+  );
+  assert.strictEqual(
+    resolverCondicaoPagamentoPedido({
+      itens: [{
+        respostaItem: {
+          cotacaoFornecedor: { condicao_pagamento: 'Outros: PERMUTA' }
+        }
+      }]
+    }),
+    'Outros: PERMUTA'
+  );
+  assert.strictEqual(resolverCondicaoPagamentoPedido({ itens: [] }), null);
+
+  const serviceSource = fs.readFileSync(
+    path.join(__dirname, '../src/services/pedidoCompraService.js'),
+    'utf8'
+  );
+  const snapshotsNaCriacao = serviceSource.match(
+    /condicao_pagamento:\s*normalizeOptionalText\(vinculacaoFornecedor\.condicao_pagamento\)/g
+  ) || [];
+  assert(
+    snapshotsNaCriacao.length >= 2,
+    'As duas rotas de criacao de pedido devem gravar o snapshot da condicao de pagamento.'
+  );
+  assert(
+    serviceSource.includes('PEDIDO_CONDICAO_PAGAMENTO_ATUALIZADA'),
+    'Atualizacao do snapshot em pedido reutilizado deve permanecer auditavel.'
+  );
+
+  const modelSource = fs.readFileSync(
+    path.join(__dirname, '../src/models/PedidoCompra.js'),
+    'utf8'
+  );
+  assert(
+    modelSource.includes('condicao_pagamento'),
+    'PedidoCompra deve expor o snapshot da condicao de pagamento.'
+  );
+
+  const detailSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/PedidoCompraDetalhe.jsx'),
+    'utf8'
+  );
+  assert(
+    detailSource.includes('Condicao de pagamento') &&
+      detailSource.includes('pedido.condicao_pagamento'),
+    'Detalhe do pedido deve exibir a condicao de pagamento persistida.'
+  );
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
@@ -231,5 +292,6 @@ validarPermissaoEncerramentoSemPedido();
 validarPrazoGeralRespostaInterna();
 validarCompatibilidadeDataChegadaLegada();
 validarDisponibilidadeHistoricaPorFornecedorItem();
+validarSnapshotCondicaoPagamentoPedido();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');

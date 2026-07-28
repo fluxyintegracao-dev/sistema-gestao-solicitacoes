@@ -217,7 +217,6 @@ const {
   validatePaymentBeneficiaryCreateBody,
   validatePaymentBeneficiaryUpdateBody,
   validatePaymentCancelBody,
-  validatePaymentMockReturnBody,
   validatePaymentRejectBody,
   validatePaymentMfaBody
 } = require('./validators/paymentValidators');
@@ -481,6 +480,14 @@ const d4signWebhookRateLimit = createRateLimit({
   resource: 'D4SIGN_WEBHOOK'
 });
 
+const bbWebhookRateLimit = createRateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  message: 'Muitos eventos BB recebidos em pouco tempo.',
+  eventType: 'BB_WEBHOOK_RATE_LIMIT',
+  resource: 'BB_WEBHOOK'
+});
+
 const passwordChangeRateLimit = createRateLimit({
   windowMs: Math.max(1, env.passwordRateLimitWindowMinutes) * 60 * 1000,
   max: Math.max(1, env.passwordRateLimitMaxAttempts),
@@ -521,7 +528,7 @@ router.get('/crm/webhooks/meta', requireEnabledModule('CRM', { allowSuperadminBy
 router.post('/crm/webhooks/meta', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookMetaController.receive);
 router.post('/crm/webhooks/google', crmWebhookRateLimit, requireEnabledModule('CRM', { allowSuperadminBypass: false }), CrmWebhookGoogleController.receive);
 router.post('/webhooks/d4sign', d4signWebhookRateLimit, uploadComprovantes.none(), ComercialContratoDocumentoController.webhookD4Sign);
-router.post('/payments/bb/webhook', PaymentController.bbWebhook);
+router.post('/payments/bb/webhook', bbWebhookRateLimit, PaymentController.bbWebhook);
 const auth = require('./middlewares/auth');
 router.use(auth);
 router.use(csrfProtection);
@@ -1619,7 +1626,6 @@ router.get('/financeiro/pagamentos/lotes/:id/transacoes-bb', allowPagamentosAudi
 router.post('/financeiro/pagamentos/lotes/:id/itens/:itemId/comprovante', allowPagamentosAudit, criticalRateLimit, validateRequest({ params: validatePaymentBatchItemParams }), PaymentController.comprovanteItemBb);
 router.get('/financeiro/pagamentos/eventos', allowPagamentosAudit, PaymentController.eventos);
 router.post('/financeiro/pagamentos/lotes/:id/reprocessar', allowPagamentosReprocess, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMfaBody }), PaymentController.reprocessarLote);
-router.post('/financeiro/pagamentos/lotes/:id/simular-retorno-banco', allowPagamentosSend, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Lote de pagamento'), body: validatePaymentMockReturnBody }), PaymentController.simularRetornoBanco);
 router.get('/financeiro/pagamentos/aguardando-baixa', allowPagamentosConfirmBaixa, PaymentController.aguardandoBaixa);
 router.post('/financeiro/pagamentos/intents/:id/confirmar-baixa', allowPagamentosConfirmBaixa, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Intencao de pagamento') }), PaymentController.confirmarBaixa);
 router.get('/financeiro/pagamentos/providers', allowPagamentosRead, PaymentController.providers);

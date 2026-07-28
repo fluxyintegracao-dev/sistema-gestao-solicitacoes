@@ -2,7 +2,7 @@
 
 Data inicial: 2026-05-07
 
-Este documento descreve o modulo interno de pagamentos bancarios do FLUXY V2, preparado para futura integracao com Banco do Brasil. A primeira etapa tem foco em PIX por chave e provider mockado. Nao ha chamada real para API BB nesta fase.
+Este documento descreve o modulo interno de pagamentos bancarios do FLUXY V2. O fluxo suporta provider mock e integracao real controlada com o Banco do Brasil para PIX por chave. A chamada real permanece bloqueada por multiplos gates de ambiente e seguranca.
 
 ## Objetivo
 
@@ -29,7 +29,7 @@ Nunca baixar um titulo no momento do envio do lote.
 
 A baixa e semiautomatica:
 
-1. lote e enviado ao provider mockado;
+1. lote e enviado ao provider configurado;
 2. provider confirma/rejeita os itens;
 3. intents confirmadas ficam em `AGUARDANDO_CONFIRMACAO_BAIXA`;
 4. usuario financeiro com permissao especifica confirma a baixa;
@@ -55,16 +55,15 @@ A baixa e semiautomatica:
 - rotas REST protegidas por permissao especifica;
 - detalhe de lote com itens, aprovacoes e tentativas tecnicas.
 
-### Fase 3 - Execucao mockada e baixa semiautomatica
+### Fase 3 - Execucao controlada e baixa semiautomatica
 
 - uma aprovacao por usuario diferente do criador do lote;
 - bloqueio para o criador aprovar o proprio lote;
 - MFA step-up para aprovar e enviar;
 - job persistente em `payment_jobs`;
-- provider Banco do Brasil em modo `MOCK_HOMOLOGACAO`;
-- adapter Banco do Brasil centralizado em `paymentProviderBancoDoBrasil`, com modo real explicitamente bloqueado ate confirmacao OAuth2/mTLS;
+- provider Banco do Brasil em modo mock ou real, conforme gates explicitos;
+- adapter Banco do Brasil centralizado e provider real protegido por OAuth2/mTLS, allowlist de endpoints e alinhamento de ambientes;
 - snapshots tecnicos do provider com referencias de segredo mascaradas;
-- simulacao de confirmacao/rejeicao bancaria;
 - cancelamento auditavel de lote antes do envio ao banco, liberando as intents para nova tentativa;
 - reprocessamento auditavel de lotes com falha/rejeicao elegivel, com MFA e bloqueio de job duplicado;
 - baixa manual confirmada pelo financeiro apos confirmacao bancaria;
@@ -77,7 +76,7 @@ A baixa e semiautomatica:
 - listagem de titulos elegiveis;
 - criacao de lote;
 - revisao de lote com status por item;
-- aprovacao, rejeicao, envio mockado e simulacao de retorno;
+- aprovacao, rejeicao, envio e sincronizacao de retorno;
 - cancelamento de lote nos status anteriores ao envio bancario;
 - botao de reprocessar para lotes com falha/rejeicao elegivel;
 - tela de pagamentos aguardando baixa;
@@ -132,12 +131,20 @@ Favorecidos:
 - `financeiro.favorecidos.gerenciar`
 - `financeiro.favorecidos.auditar`
 
-Fallback operacional inicial quando o usuario nao tem permissoes granulares configuradas:
+Fallback operacional quando o usuario nao tem permissoes granulares configuradas:
 
-- setor/perfil FINANCEIRO pode preparar, enviar e confirmar baixa;
+- setor/perfil FINANCEIRO pode preparar, enviar lotes proprios e confirmar baixa;
 - Diretoria Administrativa e Diretoria Executiva podem aprovar;
 - FINANCEIRO e essas diretorias podem gerenciar favorecidos;
-- SUPERADMIN e ADMINISTRADOR mantem bypass administrativo.
+- perfis administrativos nao possuem bypass para preparar, aprovar ou enviar lotes. A segregacao dos papeis criticos e obrigatoria.
+
+Regras de segregacao:
+
+- o criador nao pode aprovar o proprio lote;
+- somente o criador pode enviar ou reprocessar o lote;
+- quem possui permissao de aprovacao nao pode manter `preparar` nem `enviar_banco`;
+- quem aprovou um lote nao pode envia-lo;
+- aprovacao e envio exigem MFA step-up.
 
 ## Status de PaymentIntent
 
@@ -151,6 +158,7 @@ Fallback operacional inicial quando o usuario nao tem permissoes granulares conf
 - `ENVIANDO`
 - `ENVIADO_AO_BANCO`
 - `PROCESSANDO_BANCO`
+- `ENVIO_INDETERMINADO`
 - `CONFIRMADO_BANCO`
 - `AGUARDANDO_CONFIRMACAO_BAIXA`
 - `BAIXADO`
@@ -168,6 +176,7 @@ Fallback operacional inicial quando o usuario nao tem permissoes granulares conf
 - `ENVIANDO`
 - `ENVIADO_AO_BANCO`
 - `PROCESSANDO_BANCO`
+- `ENVIO_INDETERMINADO`
 - `CONFIRMADO_BANCO`
 - `PARCIALMENTE_CONFIRMADO`
 - `AGUARDANDO_CONFIRMACAO_BAIXA`
@@ -185,11 +194,14 @@ Fallback operacional inicial quando o usuario nao tem permissoes granulares conf
 - `payment_batches.codigo` unico;
 - `payment_batches.idempotency_key` unico;
 - `payment_batches.correlation_id` unico;
+- `payment_batches.provider_request_id` unico;
 - `payment_batch_items.payment_batch_id + payment_intent_id` unico;
 - `payment_approvals.entity_type + entity_id + aprovado_por` unico;
+- `payment_jobs.dedupe_key` unico;
+- `payment_events.dedupe_key` unico;
 - `payment_intents.active_titulo_key` unico por titulo para status ativos.
 
-A coluna `active_titulo_key` e gerada pelo MySQL e impede mais de uma intent ativa para o mesmo titulo. Status finais como `BAIXADO`, `REJEITADO_BANCO`, `FALHA_INTEGRACAO` e `CANCELADO` liberam nova tentativa futura, quando a regra de negocio permitir.
+A coluna `active_titulo_key` e gerada pelo MySQL e impede mais de uma intent ativa para o mesmo titulo. `ENVIO_INDETERMINADO` permanece ativo e bloqueia uma nova intent ate a conciliacao do envio. Status finais como `BAIXADO`, `REJEITADO_BANCO`, `FALHA_INTEGRACAO` e `CANCELADO` liberam nova tentativa futura, quando a regra de negocio permitir.
 
 ## Proximas fases
 
@@ -212,13 +224,12 @@ Variaveis de ambiente adicionadas:
 - `BB_CERT_PATH`
 - `BB_CERT_PASSPHRASE`
 - `BB_CA_CERT_PATH`
-- `BB_TLS_REJECT_UNAUTHORIZED`: manter `true` por padrao. Em homologacao/sandbox, pode ser definido como `false` temporariamente se o endpoint do BB retornar `SELF_SIGNED_CERT_IN_CHAIN` e a cadeia CA oficial ainda nao estiver configurada em `BB_CA_CERT_PATH`. Nao usar `false` em producao.
+- `BB_TLS_REJECT_UNAUTHORIZED`: deve permanecer `true`; o provider real recusa envio quando a validacao TLS esta desativada.
 - `BB_NUMERO_CONTRATO_PAGAMENTO`
 - `BB_AGENCIA_DEBITO`
 - `BB_CONTA_CORRENTE_DEBITO`
 - `BB_DIGITO_CONTA_CORRENTE_DEBITO`
 - `BB_CNPJ_PAGADOR`
-- `BB_AUTO_LIBERAR_LOTE`
 - `BB_REQUEST_TIMEOUT_MS`
 - `BB_TOKEN_CACHE_TTL_SECONDS`
 - `BB_OAUTH_MAX_ATTEMPTS`: quantidade maxima de tentativas para obter token OAuth2 em caso de falha temporaria de conexao com o BB. Padrao recomendado: `3`.
@@ -227,27 +238,31 @@ Variaveis de ambiente adicionadas:
 - `BB_WEBHOOK_ENABLED`
 - `BB_WEBHOOK_PATH`
 - `BB_WEBHOOK_REQUIRE_MTLS`
+- `BB_WEBHOOK_SECRET`
+- `BB_WEBHOOK_SECRET_HEADER`
+- `BB_WEBHOOK_MTLS_VERIFIED_HEADER`
+- `BB_WEBHOOK_MTLS_VERIFIED_VALUE`
 
 Regras de seguranca:
 
 - `BB_REAL_PROVIDER_ENABLED=false` mantem o fluxo mockado.
 - `BB_REAL_PROVIDER_ENABLED=true` exige `BB_CLIENT_ID`, `BB_CLIENT_SECRET`, `BB_APP_KEY` e certificado A1 configurado fora do repositorio.
+- `BB_PAYMENTS_ENABLED=true`, `BB_PROVIDER_MODE=real`, TLS valido, endpoint oficial e ambientes alinhados tambem sao obrigatorios.
 - certificado, senha, app key, token e client secret nunca devem ser versionados nem expostos no frontend.
 - snapshots tecnicos sao mascarados antes de gravar em `payment_transactions`.
+- nao existe opcao de liberacao automatica de lote no runtime.
 
 Certificado A1, CA e TLS:
 
 - o certificado A1 configurado em `BB_CERT_PATH` e a identidade da empresa usada no mTLS com o Banco do Brasil;
 - a cadeia CA/TLS e a cadeia de confianca que o Node usa para validar o certificado apresentado pelo servidor do Banco do Brasil;
 - erro `SELF_SIGNED_CERT_IN_CHAIN` normalmente indica problema de confianca na cadeia TLS do servidor ou ausencia de CA intermediaria/local, nao necessariamente erro no A1;
-- em homologacao, `BB_TLS_REJECT_UNAUTHORIZED=false` pode ser usado temporariamente para teste controlado quando a cadeia do endpoint de homologacao nao for aceita pelo Node;
-- em producao, `BB_TLS_REJECT_UNAUTHORIZED` deve permanecer `true`;
-- se producao apresentar erro de cadeia TLS, a correcao deve ser configurar a cadeia CA correta em `BB_CA_CERT_PATH`, nao relaxar a validacao TLS.
+- em homologacao e producao, `BB_TLS_REJECT_UNAUTHORIZED` deve permanecer `true`;
+- se qualquer ambiente apresentar erro de cadeia TLS, a correcao deve ser configurar a cadeia CA correta em `BB_CA_CERT_PATH`, nao relaxar a validacao TLS.
 
 Endpoints BB usados:
 
 - `POST /lotes-transferencias-pix`
-- `POST /liberar-pagamentos`
 - `GET /{id}`
 - `GET /{id}/solicitacao`
 - `GET /pagamentos`
@@ -255,7 +270,6 @@ Endpoints BB usados:
 Escopos OAuth2:
 
 - `pagamentos-lote.transferencias-pix-requisicao`
-- `pagamentos-lote.lotes-requisicao`
 - `pagamentos-lote.lotes-info`
 
 Rotas internas FLUXY adicionadas:
@@ -271,7 +285,7 @@ Rotas internas FLUXY adicionadas:
 Fluxo real BB:
 
 1. lote e criado e recebe uma aprovacao de usuario diferente do criador;
-2. usuario financeiro informa MFA e envia pelo botao `Enviar ao BB`;
+2. o mesmo usuario que criou o lote informa MFA e envia pelo botao `Enviar ao BB`;
 3. backend cria job `BB_SUBMIT_PIX_BATCH`;
 4. provider monta payload `RequisicaoPOSTLotePagamentosTransferenciaPix`;
 5. OAuth2 gera token client credentials;
@@ -285,9 +299,11 @@ Numero da requisicao BB:
 
 - `numeroRequisicao` e controlado pelo FLUXY, mas o Banco do Brasil nao permite reutilizar um numero ja recebido;
 - o lote interno do FLUXY mantem seu `id` e `codigo`;
-- no envio real, o `numeroRequisicao` enviado ao BB e gerado na faixa de 6 digitos, evitando numeros ja usados no historico local do lote;
-- reprocessar um lote em `FALHA_INTEGRACAO` deve gerar novo `numeroRequisicao`, porque o numero anterior pode ter sido registrado pelo BB mesmo quando a resposta foi `400`;
-- se uma tentativa tiver status externo desconhecido, consultar/sincronizar antes de reenviar para reduzir risco de duplicidade.
+- antes da chamada real, o `numeroRequisicao` e persistido em `payment_batches.provider_request_id`;
+- todas as tentativas do mesmo lote reutilizam esse identificador estavel;
+- timeout, erro 5xx ou falha de rede durante o POST deixam o lote em `ENVIO_INDETERMINADO`;
+- lote indeterminado deve ser consultado/sincronizado e nao pode ser reenviado cegamente;
+- reprocessamento e permitido apenas quando a falha ou rejeicao e comprovada e nao ha itens parcialmente confirmados.
 
 Formato de data PIX:
 
@@ -310,11 +326,12 @@ Webhook:
 - por padrao `BB_WEBHOOK_ENABLED=false`;
 - quando desabilitado, responde como indisponivel;
 - quando habilitado, exige `BB_WEBHOOK_SECRET`;
+- quando `BB_WEBHOOK_REQUIRE_MTLS=true`, exige tambem o header de confirmacao inserido pelo proxy apos validar o certificado cliente;
 - o segredo deve vir no header configurado em `BB_WEBHOOK_SECRET_HEADER` ou no padrao `x-fluxy-bb-webhook-secret`;
 - payload sem identificador do evento do provedor e recusado para preservar idempotencia e rastreabilidade;
 - notificacao repetida com o mesmo identificador reaproveita o evento ja registrado;
 - eventos aceitos, duplicados e recusados sao registrados na auditoria de seguranca;
-- validacao mTLS via Nginx/EC2 deve ser fechada em fase posterior.
+- o Nginx deve remover headers de confirmacao vindos do cliente e inserir o valor confiavel somente apos mTLS valido.
 
 Auditoria tecnica:
 
@@ -327,14 +344,14 @@ Homologacao BB - pendencias:
 
 - validar payload final no Swagger/OpenAPI BB com massa real do convenio;
 - validar certificado A1, cadeia CA e senha no servidor privado;
-- validar se a liberacao sera manual ou automatica;
 - confirmar se `numeroRequisicao` deve seguir sequencia propria do convenio;
 - confirmar limites por lote e regras de janela bancaria;
 - testar retorno 201 de `POST /lotes-transferencias-pix`;
 - testar consulta de lote e pagamentos;
 - testar rejeicao/inconsistencia sem baixar titulo;
 - testar que `Pago` nao cria baixa automatica;
-- validar webhook mTLS em Nginx antes de habilitar.
+- validar webhook mTLS em Nginx antes de habilitar;
+- confirmar operacionalmente que o lote chega ao BB aguardando a aprovacao bancaria prevista no convenio.
 
 Fase 5:
 
@@ -346,7 +363,6 @@ Fase 6:
 
 - executar testes reais em sandbox com credenciais e certificado configurados na AWS;
 - ajustar payload conforme retorno oficial do convenio;
-- implementar liberacao manual/automatica conforme decisao operacional;
 - adicionar polling recorrente e webhook mTLS conforme produto contratado;
 - preparar evidencias formais de homologacao antes de qualquer producao.
 

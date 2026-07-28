@@ -29,7 +29,7 @@ Essa area continua sendo usada para:
 
 - filtrar os tipos de solicitacao disponiveis;
 - definir a regra operacional do setor destino;
-- receber a solicitacao depois da aprovacao por diretoria, quando esse fluxo estiver ativo.
+- receber a solicitacao imediatamente depois da criacao.
 
 ## Tipo de solicitacao por setor
 
@@ -44,27 +44,19 @@ Regra:
 
 Essa regra recupera o comportamento da V1, onde cada setor tinha seus proprios tipos de solicitacao.
 
-## Aprovacao por diretoria
+## Encaminhamento direto e legado de diretoria
 
-A aprovacao por diretoria e uma etapa intermediaria antes da area responsavel final.
+O fluxo vigente para novos registros nao possui aprovacao intermediaria por diretoria.
 
 Fluxo oficial:
 
-1. Usuario cria a solicitacao normalmente.
-2. Usuario seleciona a area responsavel final.
-3. O campo `Diretoria de aprovacao` aparece como campo proprio na tela.
-4. A diretoria e definida conforme a classificacao da obra, por exemplo `PUBLICA` ou `PRIVADA`.
-5. Ao salvar, a solicitacao cai primeiro na diretoria correspondente.
-6. Depois da aprovacao da diretoria, a solicitacao segue para a area responsavel final selecionada na criacao.
+1. Usuario cria a solicitacao.
+2. Usuario seleciona a area responsavel.
+3. O backend valida area, tipo, obra e permissao.
+4. A solicitacao nasce diretamente na area selecionada.
+5. `fluxo_aprovacao_diretoria` e gravado como `false`, e `diretoria_fluxo_codigo` e `setor_destino_pos_aprovacao` ficam nulos.
 
-Regras tecnicas:
-
-- `area_responsavel` pode armazenar temporariamente a diretoria enquanto a aprovacao estiver pendente.
-- `setor_destino_pos_aprovacao` guarda a area responsavel final.
-- `fluxo_aprovacao_diretoria` indica que a solicitacao esta nesse fluxo.
-- `diretoria_fluxo_codigo` registra a diretoria esperada.
-- a diretoria informada deve corresponder a classificacao da obra.
-- somente usuario vinculado a diretoria correta pode aprovar.
+Os campos, regras de leitura e o endpoint de aprovacao por diretoria permanecem apenas para processar solicitacoes antigas que ja estejam formalmente marcadas com `fluxo_aprovacao_diretoria = true`. Compatibilidade de legado nao autoriza o frontend ou outro modulo a criar novos registros nesse fluxo.
 
 ## Prioridades da diretoria
 
@@ -169,9 +161,8 @@ Obras/apropriacoes:
 
 ## Configuracoes administrativas adicionadas/recuperadas
 
-As seguintes telas/configuracoes fazem parte da compatibilidade V1 -> V2:
+As seguintes telas/configuracoes fazem parte da operacao atual ou da compatibilidade V1 -> V2:
 
-- `Aprovacao Diretoria`;
 - `Prioridades Diretoria`;
 - `Tipos Compartilhados`;
 - `Automacao por Status`;
@@ -182,14 +173,11 @@ As seguintes telas/configuracoes fazem parte da compatibilidade V1 -> V2:
 Antes de subir em producao:
 
 - aplicar migrations em copia/staging do banco de producao;
-- conferir classificacao de todas as obras usadas no fluxo de diretoria;
-- configurar qual diretoria atende cada classificacao de obra;
 - revisar tipos de solicitacao por setor;
 - revisar usuarios com multiplos setores;
 - revisar usuarios com envio livre entre setores;
-- testar criacao de solicitacao com e sem fluxo de diretoria;
-- testar aprovacao por diretoria e envio para a area final;
+- testar criacao de solicitacao diretamente na area selecionada;
+- testar leitura e conclusao segura de registros antigos ainda marcados com fluxo de diretoria;
 - testar automacao por status;
 - testar pagamentos parciais;
 - forcar novo login dos usuarios apos deploy para renovar permissoes de sessao.
-

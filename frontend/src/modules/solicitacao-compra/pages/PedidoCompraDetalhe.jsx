@@ -1503,6 +1503,10 @@ export default function PedidoCompraDetalhe() {
                 ) : null}
               </div>
               <div>
+                <div className="text-[var(--c-muted)]">Condicao de pagamento</div>
+                <div className="break-words font-semibold">{pedido.condicao_pagamento || '-'}</div>
+              </div>
+              <div>
                 <div className="text-[var(--c-muted)]">Criado por</div>
                 <div className="font-semibold">{pedido.criador?.nome || '-'}</div>
               </div>

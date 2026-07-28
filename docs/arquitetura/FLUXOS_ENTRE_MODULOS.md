@@ -11,14 +11,15 @@ Validar: idempotencia, status de origem, permissao, historico e notificacao.
 
 ## Compras para cotacao e pedido
 
-1. Compra conclui a aprovacao interna ou da diretoria e fica apta a cotar sem etapa externa adicional.
+1. Compra normal nasce liberada diretamente para Compras e fica apta a cotar sem aprovacao de diretoria ou etapa externa adicional.
 2. Cada fornecedor recebe token individual e somente os itens marcados para ele.
 3. O backend valida que os itens pertencem a mesma compra; rascunhos e respostas permanecem associados ao fornecedor e suas substituicoes preservam historico.
-4. Comparativo considera respostas validas e o encerramento seleciona vencedor/quantidade por item.
-5. Pedidos sao gerados e fechados uma unica vez; cotacoes nao canceladas sao finalizadas na mesma transacao.
-6. Alteracoes posteriores em pedidos sao auditadas e respeitam bloqueios de status.
+4. Comparativo considera respostas validas e cada rodada seleciona vencedor/quantidade por item.
+5. Fechamento parcial acrescenta pedidos e alocacoes e preserva saldo; fechamento final consome o restante e finaliza as cotacoes nao canceladas.
+6. A chave de idempotencia da rodada impede duplicidade sem bloquear rodadas posteriores legitimas.
+7. Alteracoes posteriores em pedidos sao auditadas e respeitam bloqueios de status e efeitos financeiros/fiscais.
 
-Validar: aprovacao, escopo de itens por fornecedor, pertencimento do item, prazo, token, rascunho, minimo, vencedor, total, apropriacao, bloqueio de edicao e duplicidade.
+Validar: destino inicial, compatibilidade legada, escopo de itens por fornecedor, pertencimento do item, prazo, token, rascunho, minimo, vencedor, saldo, fechamento parcial/final, apropriacao, bloqueio de edicao, cancelamento e duplicidade.
 
 ## Origem operacional para financeiro
 

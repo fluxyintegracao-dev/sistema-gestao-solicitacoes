@@ -52,6 +52,11 @@ function normalizeText(value) {
     .toUpperCase();
 }
 
+function normalizeOptionalText(value) {
+  const normalized = String(value ?? '').trim();
+  return normalized || null;
+}
+
 function asNumber(value) {
   const parsed = Number(value || 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -709,10 +714,14 @@ async function obterOuCriarPedidoPorFornecedor({
   });
 
   if (pedido) {
+    const condicaoPagamentoAnterior = normalizeOptionalText(pedido.condicao_pagamento);
     const atualizacaoPedido = {
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
-      desconto_total: roundMoney(vinculacaoFornecedor.desconto_total)
+      desconto_total: roundMoney(vinculacaoFornecedor.desconto_total),
+      condicao_pagamento: normalizeOptionalText(vinculacaoFornecedor.condicao_pagamento)
     };
+    const condicaoPagamentoAlterada =
+      condicaoPagamentoAnterior !== atualizacaoPedido.condicao_pagamento;
     const statusAnterior = String(pedido.status || '');
     if (normalizeText(pedido.status) === 'CANCELADO') {
       await pedido.update(
@@ -768,9 +777,27 @@ async function obterOuCriarPedidoPorFornecedor({
       });
     } else if (
       roundMoney(pedido.desconto_total) !== atualizacaoPedido.desconto_total ||
-      String(pedido.valor_minimo_pedido || '') !== String(atualizacaoPedido.valor_minimo_pedido || '')
+      String(pedido.valor_minimo_pedido || '') !== String(atualizacaoPedido.valor_minimo_pedido || '') ||
+      condicaoPagamentoAlterada
     ) {
       await pedido.update(atualizacaoPedido, { transaction });
+    }
+
+    if (condicaoPagamentoAlterada) {
+      await registrarLogSolicitacaoCompra({
+        solicitacaoCompraId: solicitacao.id,
+        usuarioId,
+        fornecedorCompraId: pedido.fornecedor_compra_id,
+        tipoAcao: 'PEDIDO_CONDICAO_PAGAMENTO_ATUALIZADA',
+        descricao: `Condicao de pagamento de ${buildPedidoCodigo(pedido.id)} atualizada ao reutilizar o pedido`,
+        metadados: {
+          pedido_compra_id: pedido.id,
+          condicao_pagamento_anterior: condicaoPagamentoAnterior,
+          condicao_pagamento_nova: atualizacaoPedido.condicao_pagamento,
+          origem: 'COTACAO_FORNECEDOR'
+        },
+        transaction
+      });
     }
     return pedido;
   }
@@ -784,6 +811,7 @@ async function obterOuCriarPedidoPorFornecedor({
       status: 'ABERTO',
       origem: 'COTACAO',
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
+      condicao_pagamento: normalizeOptionalText(vinculacaoFornecedor.condicao_pagamento),
       desconto_total: roundMoney(vinculacaoFornecedor.desconto_total),
       atingiu_pedido_minimo: true,
       observacoes: null
@@ -798,7 +826,8 @@ async function obterOuCriarPedidoPorFornecedor({
     tipoAcao: 'PEDIDO_GERADO',
     descricao: `Pedido preliminar gerado para ${vinculacaoFornecedor.fornecedor?.nome || vinculacaoFornecedor.fornecedor_compra_id}`,
     metadados: {
-      pedido_compra_id: pedido.id
+      pedido_compra_id: pedido.id,
+      condicao_pagamento: pedido.condicao_pagamento
     },
     transaction
   });
@@ -1464,6 +1493,7 @@ async function criarPedidoPorFornecedorRodada({
       status: 'ABERTO',
       origem: 'COTACAO',
       valor_minimo_pedido: vinculacaoFornecedor.valor_minimo_pedido || null,
+      condicao_pagamento: normalizeOptionalText(vinculacaoFornecedor.condicao_pagamento),
       desconto_total: roundMoney(descontoTotal),
       prazo_entrega_dias: vinculacaoFornecedor.prazo_entrega_dias || null,
       prazo_entrega_tipo: vinculacaoFornecedor.prazo_entrega_tipo || null,
@@ -1488,7 +1518,8 @@ async function criarPedidoPorFornecedorRodada({
       pedido_compra_id: pedido.id,
       fechamento_id: fechamento.id,
       numero_rodada: fechamento.numero_rodada,
-      tipo_fechamento: fechamento.tipo
+      tipo_fechamento: fechamento.tipo,
+      condicao_pagamento: pedido.condicao_pagamento
     },
     transaction
   });
@@ -1503,7 +1534,8 @@ async function criarPedidoPorFornecedorRodada({
     metadados: {
       fechamento_id: fechamento.id,
       numero_rodada: fechamento.numero_rodada,
-      tipo_fechamento: fechamento.tipo
+      tipo_fechamento: fechamento.tipo,
+      condicao_pagamento: pedido.condicao_pagamento
     },
     transaction
   });
@@ -3535,6 +3567,9 @@ async function delegarSolicitacaoCompra({
 
   const responsavelElegivel = await validarResponsavelElegivelDelegacaoCompras(responsavelId, { transaction });
   const responsavelNormalizado = responsavelElegivel?.id || null;
+  const responsavelNome = responsavelNormalizado
+    ? (String(responsavelElegivel?.nome || responsavelElegivel?.email || '').trim() || 'Usuario de Compras')
+    : null;
 
   await solicitacao.update(
     {
@@ -3574,10 +3609,11 @@ async function delegarSolicitacaoCompra({
     usuarioId,
     tipoAcao: 'DELEGACAO_COMPRA',
     descricao: responsavelNormalizado
-      ? `Solicitacao atribuida ao usuario #${responsavelNormalizado}`
+      ? `Solicitacao atribuida a ${responsavelNome}`
       : 'Responsavel de compras removido da solicitacao',
     metadados: {
       responsavel_id: responsavelNormalizado,
+      responsavel_nome: responsavelNome,
       prazo_compra: prazoCompra || null,
       motivo_atraso: motivoNormalizado || null,
       motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || null
@@ -3589,11 +3625,12 @@ async function delegarSolicitacaoCompra({
     solicitacao,
     usuarioId,
     acao: 'SOLICITACAO_COMPRA_DELEGADA',
-    descricao: responsavelId
-      ? `Compras atribuiu a solicitacao ao usuario #${responsavelId}${prazoCompra ? ` com prazo ${prazoCompra}` : ''}`
+    descricao: responsavelNormalizado
+      ? `Compras atribuiu a solicitacao a ${responsavelNome}${prazoCompra ? ` com prazo ${prazoCompra}` : ''}`
       : 'Compras removeu o responsavel da solicitacao',
     metadados: {
-      responsavel_id: responsavelId || null,
+      responsavel_id: responsavelNormalizado,
+      responsavel_nome: responsavelNome,
       prazo_compra: prazoCompra || null,
       motivo_atraso: motivoNormalizado || null,
       motivo_delegacao_vencida: motivoDelegacaoVencidaNormalizado || null

@@ -2,9 +2,11 @@ const {
   ContaBancaria,
   EmpresaGrupo,
   PaymentAccount,
+  PaymentBatch,
   PaymentProvider,
   sequelize
 } = require('../models');
+const { Op } = require('sequelize');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 function createHttpError(statusCode, message) {
@@ -166,6 +168,10 @@ async function createPaymentAccount(req, payload = {}) {
 
   return sequelize.transaction(async (transaction) => {
     const provider = await resolveProvider(data.provider_id, { transaction });
+    data.ambiente = data.ambiente || provider.ambiente || 'HOMOLOGACAO';
+    if (String(provider.ambiente || '').toUpperCase() !== String(data.ambiente || '').toUpperCase()) {
+      throw createHttpError(400, 'Ambiente do provider deve ser o mesmo da conta pagadora.');
+    }
     const account = await PaymentAccount.create({
       ...data,
       provider_id: provider.id,
@@ -197,7 +203,61 @@ async function updatePaymentAccount(req, id, payload = {}) {
 
   const previous = snapshot(account);
   const data = await validatePayload(payload, { partial: true });
-  if (data.provider_id) await resolveProvider(data.provider_id);
+  const criticalFields = [
+    'conta_bancaria_id',
+    'empresa_id',
+    'cnpj_pagador',
+    'provider_id',
+    'banco_codigo',
+    'agencia',
+    'agencia_digito',
+    'conta',
+    'conta_digito',
+    'tipo_conta',
+    'convenio',
+    'ambiente',
+    'ativo'
+  ];
+  const changesCriticalConfiguration = criticalFields.some(
+    (field) => (
+      Object.prototype.hasOwnProperty.call(data, field)
+      && String(data[field] ?? '') !== String(account[field] ?? '')
+    )
+  );
+  if (changesCriticalConfiguration) {
+    const activeBatch = await PaymentBatch.findOne({
+      where: {
+        payment_account_id: account.id,
+        status: {
+          [Op.in]: [
+            'RASCUNHO',
+            'EM_REVISAO',
+            'PENDENTE_APROVACAO',
+            'APROVADO',
+            'ENFILEIRADO',
+            'ENVIANDO',
+            'ENVIADO_AO_BANCO',
+            'PROCESSANDO_BANCO',
+            'ENVIO_INDETERMINADO',
+            'AGUARDANDO_CONFIRMACAO_BAIXA'
+          ]
+        }
+      },
+      attributes: ['id', 'codigo', 'status']
+    });
+    if (activeBatch) {
+      throw createHttpError(
+        409,
+        `Conta pagadora possui lote ativo ${activeBatch.codigo || `#${activeBatch.id}`} em status ${activeBatch.status}. Cancele ou conclua o lote antes de alterar dados bancarios.`
+      );
+    }
+  }
+  const providerIdFinal = data.provider_id || account.provider_id;
+  const providerFinal = await resolveProvider(providerIdFinal);
+  const ambienteFinal = data.ambiente || account.ambiente;
+  if (String(providerFinal.ambiente || '').toUpperCase() !== String(ambienteFinal || '').toUpperCase()) {
+    throw createHttpError(400, 'Ambiente do provider deve ser o mesmo da conta pagadora.');
+  }
   const contaBancariaIdFinal = data.conta_bancaria_id || account.conta_bancaria_id;
   const empresaIdFinal = data.empresa_id !== undefined ? data.empresa_id : account.empresa_id;
   if (contaBancariaIdFinal && empresaIdFinal) {

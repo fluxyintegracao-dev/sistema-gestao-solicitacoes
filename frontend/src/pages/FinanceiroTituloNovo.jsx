@@ -17,7 +17,10 @@ import { listarApropriacoes } from '../services/apropriacoes';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { textMatchesSearchTerms } from '../utils/search';
+import {
+  categoriaFinanceiraMatchesAutocomplete,
+  categoriaFinanceiraMatchesSearch
+} from '../utils/categoriaFinanceira';
 import CategoriaFinanceiraAutocomplete from '../components/ui/CategoriaFinanceiraAutocomplete';
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -236,8 +239,13 @@ function normalizeSearchText(value) {
 }
 
 function categoriaCompativel(categoria, tipoTitulo) {
+  if (!categoria || categoria.ativo === false) {
+    return false;
+  }
+
   const tipoCategoria = String(categoria?.tipo || '').trim().toUpperCase();
-  return tipoCategoria === tipoTitulo;
+  const tipo = String(tipoTitulo || '').trim().toUpperCase();
+  return !tipoCategoria || tipoCategoria === 'AMBOS' || tipoCategoria === tipo;
 }
 
 function prioridadeCategoria(categoria, tipoTitulo) {
@@ -682,15 +690,7 @@ export default function FinanceiroTituloNovo() {
     }
 
     return categoriasFiltradas
-      .filter((categoria) => textMatchesSearchTerms([
-          categoria.nome,
-          categoria.descricao,
-          categoria.tipo,
-          categoria.dre_grupo,
-          categoria.dre_subgrupo,
-          categoria.classificacao_gerencial
-        ], categoriaBusca))
-      .slice(0, 8);
+      .filter((categoria) => categoriaFinanceiraMatchesAutocomplete(categoria, categoriaBusca));
   }, [categoriaBusca, categoriasFiltradas, form.categoria_financeira_id]);
 
   const mostrarListaCategorias = categoriaBusca.trim().length > 0 && !form.categoria_financeira_id;
@@ -700,14 +700,9 @@ export default function FinanceiroTituloNovo() {
       return categoriasFiltradas;
     }
 
-    return categoriasFiltradas.filter((categoria) => textMatchesSearchTerms([
-        categoria.nome,
-        categoria.descricao,
-        categoria.tipo,
-        categoria.dre_grupo,
-        categoria.dre_subgrupo,
-        categoria.classificacao_gerencial
-      ], categoriaModalBusca));
+    return categoriasFiltradas.filter((categoria) => (
+      categoriaFinanceiraMatchesSearch(categoria, categoriaModalBusca)
+    ));
   }, [categoriaModalBusca, categoriasFiltradas]);
 
   const parceiroSelecionado = useMemo(() => {
@@ -1551,7 +1546,7 @@ export default function FinanceiroTituloNovo() {
                     </div>
                   )}
                   {mostrarListaCategorias && (
-                    <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
+                    <div className="absolute left-0 right-0 top-full z-20 mt-2 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-lg">
                       {categoriasAutocomplete.length === 0 ? (
                         <div className="px-3 py-2 text-sm text-[var(--c-muted)]">
                           Nenhuma categoria encontrada.
@@ -2556,7 +2551,7 @@ export default function FinanceiroTituloNovo() {
 
       {categoriaModalOpen && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 px-4 py-6">
-          <div className="card flex max-h-[72vh] w-full max-w-2xl flex-col gap-3 overflow-hidden">
+          <div className="card flex max-h-[calc(100vh-3rem)] w-full max-w-2xl flex-col gap-3 overflow-hidden">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-[var(--c-text)]">Selecionar categoria financeira</h3>
@@ -2573,48 +2568,50 @@ export default function FinanceiroTituloNovo() {
               </button>
             </div>
 
-            <input
-              className="input w-full"
-              placeholder="Filtrar categoria por nome, grupo, subgrupo ou descricao"
-              value={categoriaModalBusca}
-              onChange={(event) => setCategoriaModalBusca(event.target.value)}
-              autoFocus
-            />
+            <div className="flex min-h-0 flex-1 flex-col gap-3">
+              <input
+                className="input w-full"
+                placeholder="Filtrar por ID, nome, grupo, subgrupo ou descricao"
+                value={categoriaModalBusca}
+                onChange={(event) => setCategoriaModalBusca(event.target.value)}
+                autoFocus
+              />
 
-            <div className="text-xs text-[var(--c-muted)]">
-              {categoriasModalFiltradas.length} categoria(s) disponivel(is) para {form.tipo === 'RECEBER' ? 'conta a receber' : 'conta a pagar'}.
-            </div>
+              <div className="text-xs text-[var(--c-muted)]">
+                {categoriasModalFiltradas.length} categoria(s) disponivel(is) para {form.tipo === 'RECEBER' ? 'conta a receber' : 'conta a pagar'}.
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-2">
-              {categoriasModalFiltradas.length === 0 ? (
-                <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
-                  Nenhuma categoria encontrada para esse filtro.
-                </div>
-              ) : categoriasModalFiltradas.map((categoria) => (
-                <button
-                  key={categoria.id}
-                  type="button"
-                  className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
-                    String(form.categoria_financeira_id) === String(categoria.id)
-                      ? 'border-blue-300 bg-blue-50'
-                      : 'border-transparent hover:border-[var(--c-border)] hover:bg-[var(--c-surface)]'
-                  }`}
-                  onClick={() => selecionarCategoriaFinanceira(categoria)}
-                >
-                  <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <div className="font-semibold text-[var(--c-text)]">{categoria.nome}</div>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
-                      </div>
-                      <div className="text-xs text-[var(--c-muted)]">{getCategoriaDreResumo(categoria)}</div>
-                    </div>
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
-                      #{categoria.id}
-                    </span>
+              <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-2">
+                {categoriasModalFiltradas.length === 0 ? (
+                  <div className="px-3 py-4 text-sm text-[var(--c-muted)]">
+                    Nenhuma categoria encontrada para esse filtro.
                   </div>
-                </button>
-              ))}
+                ) : categoriasModalFiltradas.map((categoria) => (
+                  <button
+                    key={categoria.id}
+                    type="button"
+                    className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+                      String(form.categoria_financeira_id) === String(categoria.id)
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-transparent hover:border-[var(--c-border)] hover:bg-[var(--c-surface)]'
+                    }`}
+                    onClick={() => selecionarCategoriaFinanceira(categoria)}
+                  >
+                    <div className="flex flex-col gap-1 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="font-semibold text-[var(--c-text)]">{categoria.nome}</div>
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
+                        </div>
+                        <div className="text-xs text-[var(--c-muted)]">{getCategoriaDreResumo(categoria)}</div>
+                      </div>
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                        #{categoria.id}
+                      </span>
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>

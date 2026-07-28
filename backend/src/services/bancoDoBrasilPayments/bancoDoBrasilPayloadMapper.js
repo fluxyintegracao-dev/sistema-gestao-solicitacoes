@@ -156,15 +156,8 @@ function mapBatchToPixTransferRequest(batch, options = {}) {
   };
 }
 
-function mapReleasePaymentsRequest(batch, options = {}) {
-  return {
-    numeroRequisicao: resolveNumeroRequisicao(batch, options.numeroRequisicao)
-  };
-}
-
 module.exports = {
   mapBatchToPixTransferRequest,
-  mapReleasePaymentsRequest,
   toDdMmYyyyString,
   toDdMmYyyyNumber: toDdMmYyyyString
 };

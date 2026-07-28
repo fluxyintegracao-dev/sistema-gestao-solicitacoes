@@ -1515,16 +1515,6 @@ export async function reprocessarPaymentBatch(id, data = {}) {
   return parseJson(response, 'Erro ao reprocessar lote de pagamento');
 }
 
-export async function simularRetornoPaymentBatch(id, data = {}) {
-  const response = await fetch(`${API_URL}/financeiro/pagamentos/lotes/${id}/simular-retorno-banco`, {
-    method: 'POST',
-    headers: authHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(data)
-  });
-
-  return parseJson(response, 'Erro ao simular retorno bancario');
-}
-
 export async function getPaymentsAwaitingBaixa() {
   const response = await fetch(`${API_URL}/financeiro/pagamentos/aguardando-baixa`, {
     headers: authHeaders()

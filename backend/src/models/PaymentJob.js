@@ -18,6 +18,15 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: false
     },
+    dedupe_key: {
+      type: DataTypes.STRING(180),
+      allowNull: true,
+      unique: true
+    },
+    requested_by: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     status: {
       type: DataTypes.STRING(20),
       allowNull: false,

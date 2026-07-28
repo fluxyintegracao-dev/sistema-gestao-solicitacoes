@@ -15,7 +15,9 @@
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
     "test:importacao-titulos": "node scripts/validarImportacaoTitulos.js",
     "test:docs": "node scripts/validarDocumentacao.js",
-    "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js"
+    "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js",
+    "test:security-hardening": "node scripts/validarSecurityHardening.js",
+    "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",
