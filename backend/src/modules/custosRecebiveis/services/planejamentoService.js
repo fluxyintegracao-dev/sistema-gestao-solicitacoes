@@ -25,6 +25,7 @@ function dependencies(overrides = {}) {
     ContratoComercial: db.ContratoComercial,
     ContratoComercialParcela: db.ContratoComercialParcela,
     TituloFinanceiro: db.TituloFinanceiro,
+    TituloFinanceiroRateio: db.TituloFinanceiroRateio,
     MovimentoFinanceiro: db.MovimentoFinanceiro,
     User: db.User,
     resolverEscopoObras,
@@ -68,6 +69,37 @@ function monthRange(competencia) {
     ? `${year + 1}-01-01`
     : `${year}-${String(month + 1).padStart(2, '0')}-01`;
   return { first, nextMonth };
+}
+
+function competenciaAtual(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  return `${year}-${month}`;
+}
+
+function competenciaSeguinte(competencia) {
+  const [year, month] = normalizeCompetencia(competencia).split('-').map(Number);
+  return month === 12
+    ? `${year + 1}-01`
+    : `${year}-${String(month + 1).padStart(2, '0')}`;
+}
+
+function assertCompetenciaNovoMes(competencia, now = new Date()) {
+  const atual = competenciaAtual(now);
+  const permitidas = [atual, competenciaSeguinte(atual)];
+  if (!permitidas.includes(competencia)) {
+    throw createBusinessError(
+      422,
+      'CR_COMPETENCIA_FORA_JANELA',
+      `Novo mes permite somente as competencias ${permitidas.join(' ou ')}.`
+    );
+  }
+  return permitidas;
 }
 
 function normalizeText(value, maxLength = 2000) {
@@ -117,6 +149,23 @@ function serializeCompetencia(value) {
     finalizado_em: item.finalizado_em || null,
     updatedAt: item.updatedAt || null
   };
+}
+
+function isMeaningfulCost(value) {
+  const item = plain(value);
+  return number(item.quantidade) > 0 || money(item.valor_previsto) !== 0;
+}
+
+function isMeaningfulReceipt(value) {
+  const item = plain(value);
+  return number(item.quantidade_prevista) > 0 || money(item.valor_previsto) !== 0;
+}
+
+function isMeaningfulMeasurement(value) {
+  const item = plain(value);
+  return number(item.quantidade_medida) > 0
+    || money(item.valor_medido) !== 0
+    || money(item.valor_glosa) !== 0;
 }
 
 function serializeReabertura(value) {
@@ -264,6 +313,32 @@ async function findCompetencia(obraId, competencia, deps, options = {}) {
   });
 }
 
+async function findPlanForCompetencia(obraId, competencia, deps, options = {}) {
+  const saved = await findCompetencia(obraId, competencia, deps, options);
+  if (!saved?.plano_versao_snapshot) {
+    return {
+      saved,
+      plan: await findPublishedPlan(obraId, deps, options)
+    };
+  }
+  const plan = await deps.CrPlanoObra.findOne({
+    where: {
+      obra_id: obraId,
+      versao: saved.plano_versao_snapshot
+    },
+    transaction: options.transaction,
+    lock: options.lock
+  });
+  if (!plan) {
+    throw createBusinessError(
+      409,
+      'CR_PLANO_SNAPSHOT_NOT_FOUND',
+      'A versao do plano vinculada a competencia nao foi encontrada.'
+    );
+  }
+  return { saved, plan };
+}
+
 async function getOrCreateCompetencia(obraId, competencia, deps, transaction) {
   let record = await findCompetencia(obraId, competencia, deps, {
     transaction,
@@ -343,18 +418,348 @@ async function assertScope(user, obraId, deps) {
   }
 }
 
+function rateioWeight(value) {
+  const item = plain(value);
+  const fixed = Math.abs(number(item.valor_rateio));
+  if (fixed > 0) return fixed;
+  return Math.abs(number(item.percentual));
+}
+
+async function totalBaixasFinanceirasPorCompetencia(obraId, competencias, tipo, deps) {
+  const months = [...new Set((competencias || []).map(normalizeCompetencia))].sort();
+  if (!months.length) return new Map();
+  const { first } = monthRange(months[0]);
+  const { nextMonth } = monthRange(months[months.length - 1]);
+  const workRateios = await deps.TituloFinanceiroRateio.findAll({
+    where: { obra_id: obraId },
+    attributes: ['titulo_financeiro_id'],
+    raw: true
+  });
+  const rateioTitleIds = [...new Set(workRateios
+    .map((item) => Number(item.titulo_financeiro_id))
+    .filter((id) => id > 0))];
+  const titles = await deps.TituloFinanceiro.findAll({
+    where: {
+      tipo,
+      [Op.or]: [
+        { obra_id: obraId },
+        ...(rateioTitleIds.length ? [{ id: { [Op.in]: rateioTitleIds } }] : [])
+      ]
+    },
+    attributes: ['id', 'obra_id'],
+    include: [
+      {
+        model: deps.TituloFinanceiroRateio,
+        as: 'rateios',
+        required: false,
+        attributes: ['obra_id', 'valor_rateio', 'percentual']
+      },
+      {
+        model: deps.MovimentoFinanceiro,
+        as: 'movimentos',
+        required: true,
+        attributes: ['id', 'valor', 'valor_quitacao', 'data_movimento'],
+        where: {
+          status: 'ATIVO',
+          tipo_movimento: 'BAIXA',
+          data_movimento: { [Op.gte]: first, [Op.lt]: nextMonth }
+        }
+      }
+    ]
+  });
+
+  const totals = new Map(months.map((month) => [month, 0]));
+  titles.forEach((titleValue) => {
+    const title = plain(titleValue);
+    const rateios = Array.isArray(title.rateios) ? title.rateios : [];
+    const totalWeight = rateios.reduce((sum, item) => sum + rateioWeight(item), 0);
+    const workWeight = rateios
+      .filter((item) => Number(item.obra_id) === Number(obraId))
+      .reduce((sum, item) => sum + rateioWeight(item), 0);
+    const factor = rateios.length
+      ? (totalWeight > 0 ? workWeight / totalWeight : 0)
+      : (Number(title.obra_id) === Number(obraId) ? 1 : 0);
+    (title.movimentos || []).forEach((movement) => {
+      const month = String(movement.data_movimento || '').slice(0, 7);
+      if (!totals.has(month)) return;
+      const received = Math.abs(number(movement.valor_quitacao || movement.valor));
+      totals.set(month, money(number(totals.get(month)) + (received * factor)));
+    });
+  });
+  return totals;
+}
+
+async function listarCompetencias(user, obraIdValue, overrides = {}) {
+  const deps = dependencies(overrides);
+  const obraId = positiveId(obraIdValue, 'Obra');
+  await assertScope(user, obraId, deps);
+  const obra = await findObra(obraId, deps);
+  const rows = await deps.CrCompetencia.findAll({
+    where: { obra_id: obraId },
+    order: [['competencia', 'DESC'], ['id', 'DESC']]
+  });
+  const ids = rows.map((item) => Number(item.id));
+  const [measurements, actuals, receivedByMonth] = ids.length
+    ? await Promise.all([
+      deps.CrMedicaoConsolidada.findAll({
+        where: { competencia_id: { [Op.in]: ids } }
+      }),
+      deps.CrRealizado.findAll({
+        where: {
+          competencia_id: { [Op.in]: ids },
+          valor: { [Op.ne]: 0 }
+        },
+        include: [{
+          model: deps.MovimentoFinanceiro,
+          as: 'movimentoFinanceiro',
+          attributes: [],
+          required: true,
+          where: { status: 'ATIVO', tipo_movimento: 'BAIXA' }
+        }]
+      }),
+      totalBaixasFinanceirasPorCompetencia(
+        obraId,
+        rows.map((item) => item.competencia),
+        'RECEBER',
+        deps
+      )
+    ])
+    : [[], [], new Map()];
+  const measurementByCompetency = new Map();
+  const competenciesWithMeasurement = new Set();
+  measurements.forEach((item) => measurementByCompetency.set(
+    Number(item.competencia_id),
+    money(number(measurementByCompetency.get(Number(item.competencia_id)))
+      + number(item.valor_medido))
+  ));
+  measurements.forEach((item) => competenciesWithMeasurement.add(Number(item.competencia_id)));
+  const actualByCompetency = new Map();
+  actuals.forEach((item) => actualByCompetency.set(
+    Number(item.competencia_id),
+    money(number(actualByCompetency.get(Number(item.competencia_id)))
+      + number(item.valor))
+  ));
+  const items = rows.map((rowValue) => {
+    const row = plain(rowValue);
+    const presented = money(row.total_receita_prevista);
+    const approved = money(measurementByCompetency.get(Number(row.id)));
+    const hasApprovedMeasurement = competenciesWithMeasurement.has(Number(row.id));
+    return {
+      ...serializeCompetencia(row),
+      medicao_apresentada: presented,
+      medicao_aprovada: hasApprovedMeasurement ? approved : null,
+      glosa: hasApprovedMeasurement ? money(Math.max(0, presented - approved)) : null,
+      custo_realizado: money(actualByCompetency.get(Number(row.id))),
+      receita_recebida: money(receivedByMonth.get(row.competencia))
+    };
+  });
+  const atual = competenciaAtual();
+  return {
+    obra: serializeObra(obra),
+    items,
+    competencias_permitidas: [atual, competenciaSeguinte(atual)]
+  };
+}
+
+async function criarCompetencia(
+  user,
+  obraIdValue,
+  payload = {},
+  idempotencyKey = null,
+  overrides = {}
+) {
+  const deps = dependencies(overrides);
+  const obraId = positiveId(obraIdValue, 'Obra');
+  const competenciaCode = normalizeCompetencia(payload.competencia);
+  const key = normalizeText(idempotencyKey, 180);
+  if (!key) {
+    throw createBusinessError(
+      400,
+      'CR_IDEMPOTENCY_REQUIRED',
+      'Idempotency-Key e obrigatoria para criar a competencia.'
+    );
+  }
+  assertCompetenciaNovoMes(competenciaCode);
+  await assertScope(user, obraId, deps);
+
+  return deps.sequelize.transaction(async (transaction) => {
+    await findObra(obraId, deps, { transaction, lock: transaction.LOCK.UPDATE });
+    const existingCompetencia = await findCompetencia(obraId, competenciaCode, deps, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const plan = existingCompetencia?.plano_versao_snapshot
+      ? await deps.CrPlanoObra.findOne({
+        where: {
+          obra_id: obraId,
+          versao: existingCompetencia.plano_versao_snapshot
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+      : await findPublishedPlan(obraId, deps, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+    if (!plan) {
+      throw createBusinessError(
+        409,
+        'CR_PLANO_SNAPSHOT_NOT_FOUND',
+        'A versao do plano vinculada a competencia nao foi encontrada.'
+      );
+    }
+    if (existingCompetencia) {
+      return {
+        idempotente: true,
+        competencia: serializeCompetencia(existingCompetencia)
+      };
+    }
+    let record;
+    try {
+      record = await deps.CrCompetencia.create({
+        obra_id: obraId,
+        competencia: competenciaCode,
+        estado: 'ABERTA',
+        plano_versao_snapshot: Number(plan.versao)
+      }, { transaction });
+    } catch (error) {
+      if (error?.name !== 'SequelizeUniqueConstraintError') throw error;
+      record = await findCompetencia(obraId, competenciaCode, deps, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (record) {
+        return { idempotente: true, competencia: serializeCompetencia(record) };
+      }
+      throw error;
+    }
+    await audit(deps, transaction, {
+      obraId,
+      competenciaId: record.id,
+      userId: user?.id,
+      event: 'CR_COMPETENCIA_CRIADA',
+      description: 'Competencia mensal criada pelo fluxo Novo mes.',
+      payload: {
+        competencia: competenciaCode,
+        plano_versao_snapshot: Number(plan.versao),
+        idempotency_key: key
+      }
+    });
+    return { idempotente: false, competencia: serializeCompetencia(record) };
+  });
+}
+
+async function pesquisarItensPlano(
+  user,
+  obraIdValue,
+  query = {},
+  overrides = {}
+) {
+  const deps = dependencies(overrides);
+  const obraId = positiveId(obraIdValue, 'Obra');
+  const competenciaCode = normalizeCompetencia(query.competencia);
+  await assertScope(user, obraId, deps);
+  const saved = await findCompetencia(obraId, competenciaCode, deps);
+  const plan = saved?.plano_versao_snapshot
+    ? await deps.CrPlanoObra.findOne({
+      where: { obra_id: obraId, versao: saved.plano_versao_snapshot }
+    })
+    : await findPublishedPlan(obraId, deps);
+  if (!plan) {
+    throw createBusinessError(409, 'CR_PLANO_SNAPSHOT_NOT_FOUND', 'Plano da competencia nao encontrado.');
+  }
+  const term = normalizeText(query.q, 120);
+  const limit = Math.min(50, Math.max(1, number(query.limit, 20)));
+  const page = Math.max(1, Math.floor(number(query.page, 1)));
+  const where = { plano_id: plan.id, somadora: false };
+  if (term) {
+    const like = `%${term}%`;
+    where[Op.or] = [
+      { codigo: { [Op.like]: like } },
+      { descricao: { [Op.like]: like } },
+      { etapa_macro_codigo: { [Op.like]: like } }
+    ];
+  }
+  const result = await deps.CrPlanoItem.findAndCountAll({
+    where,
+    order: [['ordem', 'ASC'], ['codigo', 'ASC']],
+    limit,
+    offset: (page - 1) * limit
+  });
+  const serialized = result.rows.map(serializeItem);
+  const itemIds = serialized.map((item) => item.id);
+  const previousCompetencies = await deps.CrCompetencia.findAll({
+    where: {
+      obra_id: obraId,
+      competencia: { [Op.lt]: competenciaCode }
+    },
+    attributes: ['id']
+  });
+  const previousIds = previousCompetencies.map((item) => Number(item.id));
+  const [receipts, measurements] = itemIds.length && previousIds.length
+    ? await Promise.all([
+      deps.CrPrevisaoReceita.findAll({
+        where: {
+          competencia_id: { [Op.in]: previousIds },
+          plano_item_id: { [Op.in]: itemIds }
+        }
+      }),
+      deps.CrMedicaoConsolidada.findAll({
+        where: {
+          competencia_id: { [Op.in]: previousIds },
+          plano_item_id: { [Op.in]: itemIds }
+        }
+      })
+    ])
+    : [[], []];
+  const receiptTotals = new Map();
+  receipts.forEach((item) => receiptTotals.set(
+    Number(item.plano_item_id),
+    number(receiptTotals.get(Number(item.plano_item_id))) + number(item.quantidade_prevista)
+  ));
+  const measurementTotals = new Map();
+  measurements.forEach((item) => measurementTotals.set(
+    Number(item.plano_item_id),
+    number(measurementTotals.get(Number(item.plano_item_id))) + number(item.quantidade_medida)
+  ));
+  return {
+    items: serialized.map((item) => ({
+      ...item,
+      quantidade_apresentada_anterior: number(receiptTotals.get(item.id)),
+      quantidade_aprovada_anterior: number(measurementTotals.get(item.id))
+    })),
+    pagination: {
+      page,
+      limit,
+      total: Number(result.count),
+      pages: Math.max(1, Math.ceil(Number(result.count) / limit))
+    },
+    plano: { id: Number(plan.id), versao: Number(plan.versao) }
+  };
+}
+
 async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides = {}) {
   const deps = dependencies(overrides);
   const obraId = positiveId(obraIdValue, 'Obra');
   const competenciaCode = normalizeCompetencia(competenciaValue);
   await assertScope(user, obraId, deps);
-  const [obra, plan, saved] = await Promise.all([
+  const [obra, saved] = await Promise.all([
     findObra(obraId, deps),
-    findPublishedPlan(obraId, deps),
     findCompetencia(obraId, competenciaCode, deps)
   ]);
-  const items = await findPlanItems(plan.id, deps);
-  const [costs, receipts, measurements, reopenings, privateSources] = await Promise.all([
+  const plan = saved?.plano_versao_snapshot
+    ? await deps.CrPlanoObra.findOne({
+      where: { obra_id: obraId, versao: saved.plano_versao_snapshot }
+    })
+    : await findPublishedPlan(obraId, deps);
+  if (!plan) {
+    throw createBusinessError(
+      409,
+      'CR_PLANO_SNAPSHOT_NOT_FOUND',
+      'A versao do plano vinculada a competencia nao foi encontrada.'
+    );
+  }
+  const [rawCosts, rawReceipts, rawMeasurements, reopenings, privateSources] = await Promise.all([
     saved
       ? deps.CrPrevisaoCusto.findAll({ where: { competencia_id: saved.id } })
       : [],
@@ -378,6 +783,72 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       ? findPrivateSources(obraId, competenciaCode, deps)
       : []
   ]);
+  const costs = rawCosts.filter(isMeaningfulCost);
+  const receipts = rawReceipts.filter((item) => (
+    String(obra.classificacao).toUpperCase() === 'PRIVADA' || isMeaningfulReceipt(item)
+  ));
+  const measurements = rawMeasurements.filter(isMeaningfulMeasurement);
+  const selectedItemIds = [...new Set([
+    ...costs.map((item) => Number(item.plano_item_id)),
+    ...receipts.map((item) => Number(item.plano_item_id)).filter(Boolean),
+    ...measurements.map((item) => Number(item.plano_item_id))
+  ])];
+  const items = selectedItemIds.length
+    ? await deps.CrPlanoItem.findAll({
+      where: {
+        plano_id: plan.id,
+        id: { [Op.in]: selectedItemIds },
+        somadora: false
+      },
+      order: [['ordem', 'ASC'], ['codigo', 'ASC']]
+    })
+    : [];
+  const previousCompetencies = selectedItemIds.length
+    ? await deps.CrCompetencia.findAll({
+      where: {
+        obra_id: obraId,
+        competencia: { [Op.lt]: competenciaCode }
+      },
+      attributes: ['id']
+    })
+    : [];
+  const previousIds = previousCompetencies.map((item) => Number(item.id));
+  const [previousReceipts, previousMeasurements] = previousIds.length
+    ? await Promise.all([
+      deps.CrPrevisaoReceita.findAll({
+        where: {
+          competencia_id: { [Op.in]: previousIds },
+          plano_item_id: { [Op.in]: selectedItemIds }
+        }
+      }),
+      deps.CrMedicaoConsolidada.findAll({
+        where: {
+          competencia_id: { [Op.in]: previousIds },
+          plano_item_id: { [Op.in]: selectedItemIds }
+        }
+      })
+    ])
+    : [[], []];
+  const previousReceiptByItem = new Map();
+  previousReceipts.forEach((item) => previousReceiptByItem.set(
+    Number(item.plano_item_id),
+    number(previousReceiptByItem.get(Number(item.plano_item_id)))
+      + number(item.quantidade_prevista)
+  ));
+  const previousMeasurementByItem = new Map();
+  previousMeasurements.forEach((item) => previousMeasurementByItem.set(
+    Number(item.plano_item_id),
+    number(previousMeasurementByItem.get(Number(item.plano_item_id)))
+      + number(item.quantidade_medida)
+  ));
+  const serializePlanningItem = (value) => {
+    const item = serializeItem(value);
+    return {
+      ...item,
+      quantidade_apresentada_anterior: number(previousReceiptByItem.get(item.id)),
+      quantidade_aprovada_anterior: number(previousMeasurementByItem.get(item.id))
+    };
+  };
 
   const costByItem = new Map(costs.map((value) => [Number(value.plano_item_id), plain(value)]));
   const receiptByItem = new Map(receipts
@@ -398,8 +869,10 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
   ));
   const expired = prazoCompetencia(competenciaCode) <= new Date();
 
-  const publicReceipts = items.map((value) => {
-    const item = serializeItem(value);
+  const publicReceipts = items
+    .filter((value) => receiptByItem.has(Number(value.id)))
+    .map((value) => {
+    const item = serializePlanningItem(value);
     const savedReceipt = receiptByItem.get(item.id);
     return {
       plano_item_id: item.id,
@@ -408,7 +881,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       valor_previsto: money(savedReceipt?.valor_previsto),
       data_prevista: savedReceipt?.data_prevista || null
     };
-  });
+    });
 
   return {
     obra: serializeObra(obra),
@@ -430,8 +903,10 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         finalizado_por: null,
         finalizado_em: null
       },
-    custos: items.map((value) => {
-      const item = serializeItem(value);
+    custos: items
+      .filter((value) => costByItem.has(Number(value.id)))
+      .map((value) => {
+      const item = serializePlanningItem(value);
       const savedCost = costByItem.get(item.id);
       return {
         plano_item_id: item.id,
@@ -443,7 +918,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         valor_previsto: money(savedCost?.valor_previsto),
         parceiro_id: savedCost?.parceiro_id ? Number(savedCost.parceiro_id) : null
       };
-    }),
+      }),
     recebiveis: String(obra.classificacao).toUpperCase() === 'PUBLICA'
       ? publicReceipts
       : privateSources.map((source) => ({
@@ -454,18 +929,24 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         )
       })),
     medicoes: String(obra.classificacao).toUpperCase() === 'PUBLICA'
-      ? items.map((value) => {
-        const item = serializeItem(value);
+      ? items
+        .filter((value) => (
+          receiptByItem.has(Number(value.id)) || measurementByItem.has(Number(value.id))
+        ))
+        .map((value) => {
+        const item = serializePlanningItem(value);
         const savedMeasurement = measurementByItem.get(item.id);
         return {
           plano_item_id: item.id,
           item,
           quantidade_medida: number(savedMeasurement?.quantidade_medida),
           valor_medido: money(savedMeasurement?.valor_medido),
+          valor_glosa: money(savedMeasurement?.valor_glosa),
+          justificativa_glosa: savedMeasurement?.justificativa_glosa || null,
           data_medicao: savedMeasurement?.data_medicao || null,
           numero_medicao: savedMeasurement?.numero_medicao || null
-        };
-      })
+          };
+        })
       : [],
     reaberturas: reopenings.map(serializeReabertura),
     regras: {
@@ -523,7 +1004,7 @@ function validateCostRows(rows, allowedItems) {
       valor_previsto: money(quantidade * unitCost),
       parceiro_id: row.parceiro_id ? positiveId(row.parceiro_id, 'Parceiro') : null
     };
-  });
+  }).filter(isMeaningfulCost);
 }
 
 async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, overrides = {}) {
@@ -534,14 +1015,15 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
 
   return deps.sequelize.transaction(async (transaction) => {
     await findObra(obraId, deps, { transaction, lock: transaction.LOCK.UPDATE });
-    const plan = await findPublishedPlan(obraId, deps, {
+    const { saved, plan } = await findPlanForCompetencia(obraId, competenciaCode, deps, {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
     const items = await findPlanItems(plan.id, deps, { transaction });
     const allowed = new Map(items.map((item) => [Number(item.id), plain(item)]));
     const rows = validateCostRows(payload.itens, allowed);
-    const competencia = await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
+    const competencia = saved
+      || await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
     await assertEditable(competencia, deps, transaction);
 
     await deps.CrPrevisaoCusto.destroy({
@@ -571,7 +1053,7 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
   });
 }
 
-function validatePublicReceiptRows(rows, allowedItems) {
+function validatePublicReceiptRows(rows, allowedItems, previousQuantities = new Map()) {
   if (!Array.isArray(rows)) {
     throw createBusinessError(400, 'CR_RECEBIVEIS_INVALIDOS', 'Informe a lista de recebiveis.');
   }
@@ -595,6 +1077,14 @@ function validatePublicReceiptRows(rows, allowedItems) {
         `Quantidade prevista invalida na linha ${index + 1}.`
       );
     }
+    const accumulated = number(previousQuantities.get(itemId)) + quantity;
+    if (accumulated > number(planItem.quantidade) + 0.0001) {
+      throw createBusinessError(
+        422,
+        'CR_MEDICAO_SUPERA_ORCAMENTO',
+        `A quantidade acumulada supera o orcamento na linha ${index + 1}.`
+      );
+    }
     return {
       origem: 'MEDICAO',
       plano_item_id: itemId,
@@ -604,7 +1094,7 @@ function validatePublicReceiptRows(rows, allowedItems) {
       valor_previsto: money(quantity * number(planItem.custo_unitario)),
       data_prevista: row.data_prevista || null
     };
-  });
+  }).filter(isMeaningfulReceipt);
 }
 
 async function buildPrivateReceiptRows(obraId, competencia, rows, deps, transaction) {
@@ -648,15 +1138,41 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
-    const plan = await findPublishedPlan(obraId, deps, {
+    const { saved, plan } = await findPlanForCompetencia(obraId, competenciaCode, deps, {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
     const items = await findPlanItems(plan.id, deps, { transaction });
     const allowed = new Map(items.map((item) => [Number(item.id), plain(item)]));
     const isPublic = String(obra.classificacao).toUpperCase() === 'PUBLICA';
+    const previousQuantities = new Map();
+    if (isPublic) {
+      const previousCompetencies = await deps.CrCompetencia.findAll({
+        where: {
+          obra_id: obraId,
+          competencia: { [Op.lt]: competenciaCode }
+        },
+        attributes: ['id'],
+        transaction
+      });
+      const previousIds = previousCompetencies.map((item) => Number(item.id));
+      const previousReceipts = previousIds.length
+        ? await deps.CrPrevisaoReceita.findAll({
+          where: {
+            competencia_id: { [Op.in]: previousIds },
+            origem: 'MEDICAO'
+          },
+          transaction
+        })
+        : [];
+      previousReceipts.forEach((item) => previousQuantities.set(
+        Number(item.plano_item_id),
+        number(previousQuantities.get(Number(item.plano_item_id)))
+          + number(item.quantidade_prevista)
+      ));
+    }
     const rows = isPublic
-      ? validatePublicReceiptRows(payload.itens, allowed)
+      ? validatePublicReceiptRows(payload.itens, allowed, previousQuantities)
       : await buildPrivateReceiptRows(
         obraId,
         competenciaCode,
@@ -664,7 +1180,8 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
         deps,
         transaction
       );
-    const competencia = await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
+    const competencia = saved
+      || await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
     await assertEditable(competencia, deps, transaction);
 
     await deps.CrPrevisaoReceita.destroy({
@@ -807,20 +1324,90 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
         'Obras privadas usam recebiveis contratuais e nao possuem medicao.'
       );
     }
-    const plan = await findPublishedPlan(obraId, deps, {
+    const idempotencyKey = normalizeText(payload.idempotency_key, 180);
+    if (!idempotencyKey) {
+      throw createBusinessError(
+        400,
+        'CR_IDEMPOTENCY_REQUIRED',
+        'Idempotency-Key e obrigatoria para registrar a medicao aprovada.'
+      );
+    }
+    const existingCompetencia = await findCompetencia(obraId, competenciaCode, deps, {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
+    const plan = existingCompetencia?.plano_versao_snapshot
+      ? await deps.CrPlanoObra.findOne({
+        where: {
+          obra_id: obraId,
+          versao: existingCompetencia.plano_versao_snapshot
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+      : await findPublishedPlan(obraId, deps, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+    if (!plan) {
+      throw createBusinessError(
+        409,
+        'CR_PLANO_SNAPSHOT_NOT_FOUND',
+        'A versao do plano vinculada a competencia nao foi encontrada.'
+      );
+    }
     const items = await findPlanItems(plan.id, deps, { transaction });
     const allowed = new Map(items.map((item) => [Number(item.id), plain(item)]));
     if (!Array.isArray(payload.itens)) {
       throw createBusinessError(400, 'CR_MEDICAO_INVALIDA', 'Informe os itens da medicao.');
     }
+    const competencia = existingCompetencia
+      || await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
+    const previousAudit = await deps.CrAuditoria.findOne({
+      where: {
+        obra_id: obraId,
+        competencia_id: competencia.id,
+        evento: 'CR_MEDICAO_CONSOLIDADA'
+      },
+      order: [['criado_em', 'DESC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const previousPayloadRaw = plain(previousAudit).payload_json;
+    let previousPayload = previousPayloadRaw || {};
+    if (typeof previousPayloadRaw === 'string') {
+      try {
+        previousPayload = JSON.parse(previousPayloadRaw);
+      } catch {
+        previousPayload = {};
+      }
+    }
+    if (previousPayload.idempotency_key === idempotencyKey) {
+      return {
+        idempotente: true,
+        competencia: serializeCompetencia(competencia),
+        quantidade_itens: number(previousPayload.quantidade_itens),
+        valor_total: money(previousPayload.valor_total),
+        valor_glosa: money(previousPayload.valor_glosa)
+      };
+    }
+    const presentedRows = await deps.CrPrevisaoReceita.findAll({
+      where: {
+        competencia_id: competencia.id,
+        origem: 'MEDICAO'
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const presentedByItem = new Map(
+      presentedRows.map((item) => [Number(item.plano_item_id), plain(item)])
+    );
     const seen = new Set();
     const rows = payload.itens.map((row, index) => {
       const itemId = positiveId(row?.plano_item_id, `Item da linha ${index + 1}`);
       const item = allowed.get(itemId);
       const quantity = number(row.quantidade_medida, NaN);
+      const presented = presentedByItem.get(itemId);
       if (!item || seen.has(itemId) || !Number.isFinite(quantity) || quantity < 0) {
         throw createBusinessError(
           400,
@@ -828,17 +1415,59 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
           `Item ou quantidade invalida na linha ${index + 1}.`
         );
       }
+      if (!presented) {
+        throw createBusinessError(
+          422,
+          'CR_MEDICAO_SEM_APRESENTACAO',
+          `O item da linha ${index + 1} nao pertence a medicao apresentada da competencia.`
+        );
+      }
       seen.add(itemId);
+      const presentedQuantity = number(presented.quantidade_prevista);
+      const presentedValue = money(presented.valor_previsto);
+      const approvedValue = row.valor_medido === null || row.valor_medido === undefined
+        ? money(quantity * number(item.custo_unitario))
+        : money(number(row.valor_medido, NaN));
+      if (
+        quantity > presentedQuantity
+        || !Number.isFinite(approvedValue)
+        || approvedValue < 0
+        || approvedValue > presentedValue
+      ) {
+        throw createBusinessError(
+          422,
+          'CR_MEDICAO_ACIMA_APRESENTADA',
+          `Quantidade ou valor aprovado supera a medicao apresentada na linha ${index + 1}.`
+        );
+      }
+      const glosa = money(Math.max(0, presentedValue - approvedValue));
+      const glosaReason = normalizeText(row.justificativa_glosa);
+      if (glosa > 0 && glosaReason.length < 5) {
+        throw createBusinessError(
+          422,
+          'CR_GLOSA_JUSTIFICATIVA_REQUIRED',
+          `Informe a justificativa da glosa na linha ${index + 1}.`
+        );
+      }
       return {
         plano_item_id: itemId,
         quantidade_medida: quantity,
-        valor_medido: money(quantity * number(item.custo_unitario)),
+        valor_medido: approvedValue,
+        valor_glosa: glosa,
+        justificativa_glosa: glosaReason || null,
         data_medicao: row.data_medicao || null,
         numero_medicao: normalizeText(row.numero_medicao, 80) || null,
         registrado_por: user?.id
       };
+    }).filter(isMeaningfulMeasurement);
+    const itemIds = rows.map((row) => row.plano_item_id);
+    await deps.CrMedicaoConsolidada.destroy({
+      where: {
+        competencia_id: competencia.id,
+        ...(itemIds.length ? { plano_item_id: { [Op.notIn]: itemIds } } : {})
+      },
+      transaction
     });
-    const competencia = await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
     for (const row of rows) {
       const existing = await deps.CrMedicaoConsolidada.findOne({
         where: {
@@ -866,22 +1495,29 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
       payload: {
         competencia: competenciaCode,
         quantidade_itens: rows.length,
-        valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0))
+        valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0)),
+        valor_glosa: money(rows.reduce((sum, row) => sum + row.valor_glosa, 0)),
+        idempotency_key: idempotencyKey
       }
     });
     return {
+      idempotente: false,
       competencia: serializeCompetencia(competencia),
       quantidade_itens: rows.length,
-      valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0))
+      valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0)),
+      valor_glosa: money(rows.reduce((sum, row) => sum + row.valor_glosa, 0))
     };
   });
 }
 
 async function buildComparison(obraId, competenciaCode, deps) {
-  const plan = await findPublishedPlan(obraId, deps);
+  const { saved: competencia, plan } = await findPlanForCompetencia(
+    obraId,
+    competenciaCode,
+    deps
+  );
   const items = await findPlanItems(plan.id, deps);
-  const competencia = await findCompetencia(obraId, competenciaCode, deps);
-  const [costs, actuals] = await Promise.all([
+  const [costs, actuals, presentedRows, approvedRows, receivedByMonth] = await Promise.all([
     competencia
       ? deps.CrPrevisaoCusto.findAll({ where: { competencia_id: competencia.id } })
       : [],
@@ -890,7 +1526,7 @@ async function buildComparison(obraId, competenciaCode, deps) {
         where: {
           competencia_id: competencia.id,
           valor: { [Op.ne]: 0 },
-          estado: { [Op.in]: ['COMPROMETIDO', 'INCORRIDO', 'BAIXA_ATIVA', 'NAO_MAPEADO'] }
+          estado: { [Op.in]: ['BAIXA_ATIVA', 'NAO_MAPEADO'] }
         },
         include: [{
           model: deps.MovimentoFinanceiro,
@@ -900,7 +1536,19 @@ async function buildComparison(obraId, competenciaCode, deps) {
           where: { status: 'ATIVO' }
         }]
       })
-      : []
+      : [],
+    competencia
+      ? deps.CrPrevisaoReceita.findAll({ where: { competencia_id: competencia.id } })
+      : [],
+    competencia
+      ? deps.CrMedicaoConsolidada.findAll({ where: { competencia_id: competencia.id } })
+      : [],
+    totalBaixasFinanceirasPorCompetencia(
+      obraId,
+      [competenciaCode],
+      'RECEBER',
+      deps
+    )
   ]);
   const itemById = new Map(items.map((item) => [Number(item.id), serializeItem(item)]));
   const rows = new Map();
@@ -947,6 +1595,13 @@ async function buildComparison(obraId, competenciaCode, deps) {
     String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
     || String(a.codigo).localeCompare(String(b.codigo))
   ));
+  const measurementPresented = money(
+    presentedRows.reduce((sum, row) => sum + number(row.valor_previsto), 0)
+  );
+  const hasApprovedMeasurement = approvedRows.length > 0;
+  const measurementApproved = money(
+    approvedRows.reduce((sum, row) => sum + number(row.valor_medido), 0)
+  );
   return {
     competencia: serializeCompetencia(competencia),
     plano: { id: Number(plan.id), versao: Number(plan.versao) },
@@ -956,6 +1611,14 @@ async function buildComparison(obraId, competenciaCode, deps) {
       realizado: money(result.reduce((sum, row) => sum + row.realizado, 0)),
       estouros: result.filter((row) => row.estado === 'ESTOURO').length,
       sem_previsao: result.filter((row) => row.estado === 'SEM_PREVISAO').length
+    },
+    recebiveis: {
+      medicao_apresentada: measurementPresented,
+      medicao_aprovada: hasApprovedMeasurement ? measurementApproved : null,
+      glosa: hasApprovedMeasurement
+        ? money(Math.max(0, measurementPresented - measurementApproved))
+        : null,
+      receita_recebida: money(receivedByMonth.get(competenciaCode))
     }
   };
 }
@@ -979,7 +1642,14 @@ async function obterDashboard(user, competenciaValue, overrides = {}) {
   if (!scope.todas && scope.obraIds.length === 0) {
     return {
       competencia: competenciaCode,
-      cards: { custo_previsto: 0, custo_realizado: 0 },
+      cards: {
+        custo_previsto: 0,
+        custo_realizado: 0,
+        medicao_apresentada: 0,
+        medicao_aprovada: 0,
+        glosa: 0,
+        receita_recebida: 0
+      },
       macros: [],
       etapas: [],
       obras: []
@@ -1004,7 +1674,13 @@ async function obterDashboard(user, competenciaValue, overrides = {}) {
         comparison: {
           competencia: null,
           linhas: [],
-          resumo: { previsto: 0, realizado: 0, estouros: 0, sem_previsao: 0 }
+          resumo: { previsto: 0, realizado: 0, estouros: 0, sem_previsao: 0 },
+          recebiveis: {
+            medicao_apresentada: 0,
+            medicao_aprovada: null,
+            glosa: null,
+            receita_recebida: 0
+          }
         }
       });
     }
@@ -1031,7 +1707,23 @@ async function obterDashboard(user, competenciaValue, overrides = {}) {
     competencia: competenciaCode,
     cards: {
       custo_previsto: money(macros.reduce((sum, row) => sum + row.previsto, 0)),
-      custo_realizado: money(macros.reduce((sum, row) => sum + row.realizado, 0))
+      custo_realizado: money(macros.reduce((sum, row) => sum + row.realizado, 0)),
+      medicao_apresentada: money(summaries.reduce(
+        (sum, item) => sum + number(item.comparison.recebiveis?.medicao_apresentada),
+        0
+      )),
+      medicao_aprovada: money(summaries.reduce(
+        (sum, item) => sum + number(item.comparison.recebiveis?.medicao_aprovada),
+        0
+      )),
+      glosa: money(summaries.reduce(
+        (sum, item) => sum + number(item.comparison.recebiveis?.glosa),
+        0
+      )),
+      receita_recebida: money(summaries.reduce(
+        (sum, item) => sum + number(item.comparison.recebiveis?.receita_recebida),
+        0
+      ))
     },
     macros,
     etapas: summaries.map(({ obra, comparison }) => ({
@@ -1199,7 +1891,11 @@ async function decidirReabertura(user, reaberturaIdValue, payload = {}, override
 
 module.exports = {
   CONTRACT_ACTIVE_STATUSES,
+  assertCompetenciaNovoMes,
+  competenciaAtual,
+  competenciaSeguinte,
   consolidarMedicao,
+  criarCompetencia,
   decidirReabertura,
   findPrivateSources,
   finalizarCompetencia,
@@ -1208,6 +1904,8 @@ module.exports = {
   obterComparativo,
   obterDashboard,
   obterPlanejamento,
+  listarCompetencias,
+  pesquisarItensPlano,
   resolverObraIdPorCompetencia,
   resolverObraIdPorReabertura,
   salvarCustos,

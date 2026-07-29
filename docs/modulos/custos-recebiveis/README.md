@@ -210,6 +210,9 @@ inativo. O limite atual e de 10 MB e 10.000 linhas.
 
 ```text
 GET  /custos-recebiveis/dashboard?competencia=AAAA-MM
+GET  /custos-recebiveis/obras/:obraId/competencias
+POST /custos-recebiveis/obras/:obraId/competencias
+GET  /custos-recebiveis/obras/:obraId/plano/itens?competencia=AAAA-MM&q=&page=&limit=
 GET  /custos-recebiveis/obras/:obraId/competencias/:competencia
 PUT  /custos-recebiveis/obras/:obraId/competencias/:competencia/custos
 PUT  /custos-recebiveis/obras/:obraId/competencias/:competencia/receitas
@@ -226,11 +229,29 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
 
 ### Planejamento publico e privado
 
-- O assistente possui tres etapas: recebiveis, custos e revisao/finalizacao.
+- A entrada do planejamento e uma lista mensal por obra. Ela apresenta custo
+  planejado, medicao apresentada, medicao aprovada, glosa, custo realizado e receita
+  efetivamente recebida.
+- `Novo mes` cria somente a competencia atual ou a seguinte, com
+  `Idempotency-Key`, unicidade por obra/competencia e snapshot da versao publicada.
+- O assistente possui tres etapas: medicao apresentada, custos planejados e
+  revisao/finalizacao.
+- O plano completo nao e materializado na tela. Itens folha sao pesquisados no
+  backend por codigo, descricao ou etapa macro, com paginacao, e somente linhas
+  selecionadas com valores relevantes ficam persistidas.
 - Custos e recebiveis publicos aceitam somente itens folha da versao micro publicada.
 - O custo/valor por item e calculado no backend; o frontend apresenta o mesmo calculo
   apenas como retorno imediato ao usuario.
 - Obra publica usa previsao e medicao por item micro.
+- Em obra publica, `cr_previsoes_receita` representa a medicao apresentada pelo
+  responsavel e `cr_medicoes_consolidadas` representa a medicao aprovada pelo orgao.
+- A glosa e a diferenca positiva entre o valor apresentado e o aprovado. Glosa exige
+  justificativa auditavel e o aprovado nao pode superar o apresentado.
+- A medicao aprovada pode ser registrada depois da finalizacao do planejamento, sem
+  alterar o snapshot planejado.
+- Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
+  titulos `RECEBER`, rateadas para a obra. Custo realizado continua vindo de baixas
+  ativas de titulos `PAGAR`.
 - Obra privada lista parcelas contratuais com vencimento na competencia.
 - Quando uma parcela privada possui `titulo_financeiro_id` de Contas a Receber, ela e
   apresentada e gravada como uma unica origem vinculada ao titulo; a parcela nao e
@@ -265,9 +286,13 @@ DENTRO        realizado <= previsto
 ESTOURO       realizado > previsto
 ```
 
-O dashboard consolida previsto e realizado por macro e apresenta o estado das obras
-do escopo. O comparativo detalha item, macro, previsto, realizado, desvio, percentual
-e estado.
+O dashboard consolida custos planejados e realizados por macro e apresenta o estado
+das obras do escopo. No mesmo painel, os recebiveis permanecem separados em medicao
+apresentada, medicao aprovada, glosa e receita efetivamente recebida.
+
+O comparativo detalha item, macro, custo planejado, custo realizado, desvio,
+percentual e estado. Acima do detalhamento, apresenta os quatro indicadores de
+recebiveis sem somar medicao aprovada com entrada financeira.
 
 ## Fase 3 - custo realizado, reconciliacao e exportacoes
 

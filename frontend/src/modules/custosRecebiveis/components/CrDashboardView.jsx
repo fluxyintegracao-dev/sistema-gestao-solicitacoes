@@ -66,14 +66,30 @@ export default function CrDashboardView({ competencia, onOpenPlanning }) {
             Atualizar
           </button>
         </div>
-        <div className="cr-kpi-strip">
+        <div className="cr-kpi-strip cr-kpi-strip--dashboard">
           <div>
-            <span>Custo previsto</span>
+            <span>Custo planejado</span>
             <strong>{currency.format(data?.cards?.custo_previsto || 0)}</strong>
           </div>
           <div data-tone="actual">
             <span>Custo realizado</span>
             <strong>{currency.format(data?.cards?.custo_realizado || 0)}</strong>
+          </div>
+          <div>
+            <span>Medição apresentada</span>
+            <strong>{currency.format(data?.cards?.medicao_apresentada || 0)}</strong>
+          </div>
+          <div>
+            <span>Medição aprovada</span>
+            <strong>{currency.format(data?.cards?.medicao_aprovada || 0)}</strong>
+          </div>
+          <div data-tone="negative">
+            <span>Glosa</span>
+            <strong>{currency.format(data?.cards?.glosa || 0)}</strong>
+          </div>
+          <div data-tone="actual">
+            <span>Receita recebida</span>
+            <strong>{currency.format(data?.cards?.receita_recebida || 0)}</strong>
           </div>
         </div>
         <div className="cr-macro-progress-list">

@@ -5,7 +5,10 @@ import {
   HiOutlineChevronRight,
   HiOutlineClipboardDocumentCheck,
   HiOutlineExclamationTriangle,
-  HiOutlineLockClosed
+  HiOutlineLockClosed,
+  HiOutlineMagnifyingGlass,
+  HiOutlinePlus,
+  HiOutlineTrash
 } from 'react-icons/hi2';
 import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import {
@@ -13,6 +16,7 @@ import {
   decidirReaberturaCompetencia,
   finalizarPlanejamentoCompetencia,
   obterPlanejamentoCompetencia,
+  pesquisarItensPlanoCompetencia,
   salvarCustosCompetencia,
   salvarRecebiveisCompetencia,
   solicitarReaberturaCompetencia,
@@ -25,8 +29,8 @@ const currency = new Intl.NumberFormat('pt-BR', {
 });
 
 const STEPS = [
-  { id: 1, label: 'Medição e recebíveis' },
-  { id: 2, label: 'Custos previstos' },
+  { id: 1, label: 'Medição apresentada' },
+  { id: 2, label: 'Custos planejados' },
   { id: 3, label: 'Revisão e envio' }
 ];
 
@@ -58,6 +62,9 @@ export default function CrPlanejamentoView({
   const [feedback, setFeedback] = useState('');
   const [reopenReason, setReopenReason] = useState('');
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
+  const [itemSearch, setItemSearch] = useState({ receipts: '', costs: '' });
+  const [searchResults, setSearchResults] = useState({ receipts: [], costs: [] });
+  const [searching, setSearching] = useState('');
 
   const load = useCallback(async () => {
     if (!obra?.id) {
@@ -71,7 +78,25 @@ export default function CrPlanejamentoView({
       setData(response);
       setCosts(response.custos || []);
       setReceipts(response.recebiveis || []);
-      setMeasurements(response.medicoes || []);
+      if (response.obra?.classificacao === 'PUBLICA') {
+        const measurementsByItem = new Map(
+          (response.medicoes || []).map((item) => [Number(item.plano_item_id), item])
+        );
+        setMeasurements((response.recebiveis || []).map((receipt) => (
+          measurementsByItem.get(Number(receipt.plano_item_id)) || {
+            plano_item_id: receipt.plano_item_id,
+            item: receipt.item,
+            quantidade_medida: 0,
+            valor_medido: 0,
+            valor_glosa: receipt.valor_previsto || 0,
+            justificativa_glosa: '',
+            data_medicao: '',
+            numero_medicao: ''
+          }
+        )));
+      } else {
+        setMeasurements([]);
+      }
     } catch (requestError) {
       setData(null);
       setError(requestError.message || 'Erro ao carregar planejamento.');
@@ -98,6 +123,14 @@ export default function CrPlanejamentoView({
       : receipts.filter((item) => item.confirmado)
         .reduce((sum, item) => sum + asNumber(item.valor_previsto), 0)
   ), [isPublic, receipts]);
+  const totalApproved = useMemo(
+    () => measurements.reduce((sum, item) => sum + asNumber(item.valor_medido), 0),
+    [measurements]
+  );
+  const totalGlosa = useMemo(
+    () => Math.max(0, totalReceipts - totalApproved),
+    [totalApproved, totalReceipts]
+  );
 
   function updateCost(index, field, value) {
     setCosts((current) => current.map((item, itemIndex) => {
@@ -120,9 +153,87 @@ export default function CrPlanejamentoView({
   }
 
   function updateMeasurement(index, field, value) {
-    setMeasurements((current) => current.map((item, itemIndex) => (
-      itemIndex === index ? { ...item, [field]: value } : item
-    )));
+    setMeasurements((current) => current.map((item, itemIndex) => {
+      if (itemIndex !== index) return item;
+      const next = { ...item, [field]: value };
+      if (field === 'quantidade_medida') {
+        next.valor_medido = (
+          asNumber(value) * asNumber(item.item?.custo_unitario_orcado)
+        ).toFixed(2);
+      }
+      return next;
+    }));
+  }
+
+  async function searchPlanItems(kind) {
+    if (!obra?.id || searching) return;
+    try {
+      setSearching(kind);
+      setError('');
+      const response = await pesquisarItensPlanoCompetencia(
+        obra.id,
+        competencia,
+        { q: itemSearch[kind], limit: 20 }
+      );
+      setSearchResults((current) => ({ ...current, [kind]: response.items || [] }));
+    } catch (requestError) {
+      setError(requestError.message || 'Erro ao pesquisar serviços.');
+    } finally {
+      setSearching('');
+    }
+  }
+
+  function addReceipt(item) {
+    if (receipts.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
+    const receipt = {
+      plano_item_id: item.id,
+      item,
+      quantidade_prevista: 0,
+      valor_previsto: 0,
+      data_prevista: ''
+    };
+    setReceipts((current) => [...current, receipt]);
+    setMeasurements((current) => [...current, {
+      plano_item_id: item.id,
+      item,
+      quantidade_medida: 0,
+      valor_medido: 0,
+      valor_glosa: 0,
+      justificativa_glosa: '',
+      data_medicao: '',
+      numero_medicao: ''
+    }]);
+    setSearchResults((current) => ({ ...current, receipts: [] }));
+    setItemSearch((current) => ({ ...current, receipts: '' }));
+  }
+
+  function addCost(item) {
+    if (costs.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
+    setCosts((current) => [...current, {
+      plano_item_id: item.id,
+      item,
+      quantidade: 0,
+      custo_unitario: item.custo_unitario_orcado || 0,
+      valor_previsto: 0,
+      parceiro_id: null
+    }]);
+    setSearchResults((current) => ({ ...current, costs: [] }));
+    setItemSearch((current) => ({ ...current, costs: '' }));
+  }
+
+  function removeReceipt(itemId) {
+    setReceipts((current) => current.filter(
+      (item) => Number(item.plano_item_id) !== Number(itemId)
+    ));
+    setMeasurements((current) => current.filter(
+      (item) => Number(item.plano_item_id) !== Number(itemId)
+    ));
+  }
+
+  function removeCost(itemId) {
+    setCosts((current) => current.filter(
+      (item) => Number(item.plano_item_id) !== Number(itemId)
+    ));
   }
 
   async function runMutation(kind, action, successMessage) {
@@ -155,7 +266,7 @@ export default function CrPlanejamentoView({
     await runMutation(
       'receipts',
       () => salvarRecebiveisCompetencia(obra.id, competencia, rows),
-      'Recebíveis previstos salvos.'
+      'Medição apresentada salva.'
     );
   }
 
@@ -172,7 +283,7 @@ export default function CrPlanejamentoView({
           parceiro_id: item.parceiro_id || null
         }))
       ),
-      'Custos previstos salvos.'
+      'Custos planejados salvos.'
     );
   }
 
@@ -185,6 +296,8 @@ export default function CrPlanejamentoView({
         measurements.map((item) => ({
           plano_item_id: item.plano_item_id,
           quantidade_medida: asNumber(item.quantidade_medida),
+          valor_medido: asNumber(item.valor_medido),
+          justificativa_glosa: item.justificativa_glosa || null,
           data_medicao: item.data_medicao || null,
           numero_medicao: item.numero_medicao || null
         }))
@@ -311,7 +424,7 @@ export default function CrPlanejamentoView({
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>{isPublic ? 'Medição e recebíveis previstos' : 'Recebíveis contratuais da competência'}</h3>
+              <h3>{isPublic ? 'Medição apresentada no período' : 'Recebíveis contratuais da competência'}</h3>
               <p>
                 {isPublic
                   ? 'A quantidade prevista usa o custo unitário congelado no plano publicado.'
@@ -319,14 +432,78 @@ export default function CrPlanejamentoView({
               </p>
             </div>
           </div>
+          {isPublic && !readonly && permissions.receipts ? (
+            <div className="cr-item-picker">
+              <label className="cr-field">
+                <span>Adicionar serviço medido</span>
+                <div className="cr-search-input">
+                  <input
+                    value={itemSearch.receipts}
+                    placeholder="Pesquise por código, serviço ou etapa..."
+                    onChange={(event) => setItemSearch((current) => ({
+                      ...current,
+                      receipts: event.target.value
+                    }))}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        searchPlanItems('receipts');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={searching === 'receipts'}
+                    onClick={() => searchPlanItems('receipts')}
+                    aria-label="Pesquisar serviços"
+                  >
+                    <HiOutlineMagnifyingGlass className="h-4 w-4" />
+                  </button>
+                </div>
+              </label>
+              {searchResults.receipts.length ? (
+                <div className="cr-item-picker-results">
+                  {searchResults.receipts.map((item) => (
+                    <button key={item.id} type="button" onClick={() => addReceipt(item)}>
+                      <span><strong>{item.codigo}</strong> · {item.descricao}</span>
+                      <small>
+                        {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · saldo {
+                          Math.max(
+                            0,
+                            asNumber(item.quantidade_orcada)
+                              - asNumber(item.quantidade_apresentada_anterior)
+                          )
+                        }
+                      </small>
+                      <HiOutlinePlus className="h-4 w-4" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="cr-table-shell cr-planning-table">
             <table>
               <thead>
                 <tr>
                   <th>{isPublic ? 'Item micro' : 'Origem contratual'}</th>
-                  {isPublic ? <th>Qtd. prevista</th> : <th>Confirmar</th>}
-                  <th>Data prevista</th>
-                  <th>Valor previsto</th>
+                  {isPublic ? (
+                    <>
+                      <th>Qtd. orçada</th>
+                      <th>Já apresentada</th>
+                      <th>Nesta medição</th>
+                      <th>Valor apresentado</th>
+                      <th>Saldo após medição</th>
+                      <th aria-label="Ações" />
+                    </>
+                  ) : (
+                    <>
+                      <th>Confirmar</th>
+                      <th>Data prevista</th>
+                      <th>Valor previsto</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -344,8 +521,11 @@ export default function CrPlanejamentoView({
                           : `${item.origem_exibicao === 'TITULO' ? 'Título a receber' : 'Parcela contratual'} · contrato ${item.contrato.numero}`}
                       </span>
                     </td>
-                    <td>
-                      {isPublic ? (
+                    {isPublic ? (
+                      <>
+                        <td>{item.item.quantidade_orcada} {item.item.unidade || 'un'}</td>
+                        <td>{item.item.quantidade_apresentada_anterior || 0}</td>
+                        <td>
                         <input
                           type="number"
                           min="0"
@@ -354,33 +534,59 @@ export default function CrPlanejamentoView({
                           disabled={readonly || !permissions.receipts}
                           onChange={(event) => updateReceipt(index, 'quantidade_prevista', event.target.value)}
                         />
-                      ) : (
+                        </td>
+                        <td>{currency.format(item.valor_previsto || 0)}</td>
+                        <td>
+                          {Math.max(
+                            0,
+                            asNumber(item.item.quantidade_orcada)
+                              - asNumber(item.item.quantidade_apresentada_anterior)
+                              - asNumber(item.quantidade_prevista)
+                          )} {item.item.unidade || 'un'}
+                        </td>
+                        <td>
+                          {!readonly && permissions.receipts ? (
+                            <button
+                              type="button"
+                              className="cr-icon-action"
+                              onClick={() => removeReceipt(item.plano_item_id)}
+                              aria-label={`Remover ${item.item.descricao}`}
+                            >
+                              <HiOutlineTrash className="h-4 w-4" />
+                            </button>
+                          ) : null}
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td>
                         <input
                           type="checkbox"
                           checked={Boolean(item.confirmado)}
                           disabled={readonly || !permissions.receipts}
                           onChange={(event) => updateReceipt(index, 'confirmado', event.target.checked)}
                         />
-                      )}
-                    </td>
-                    <td>
-                      {isPublic ? (
-                        <input
-                          type="date"
-                          value={item.data_prevista || ''}
-                          disabled={readonly || !permissions.receipts}
-                          onChange={(event) => updateReceipt(index, 'data_prevista', event.target.value)}
-                        />
-                      ) : item.data_prevista}
-                    </td>
-                    <td>{currency.format(item.valor_previsto || 0)}</td>
+                        </td>
+                        <td>{item.data_prevista}</td>
+                        <td>{currency.format(item.valor_previsto || 0)}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
+                {!receipts.length ? (
+                  <tr>
+                    <td colSpan={isPublic ? 7 : 4} className="cr-table-empty">
+                      {isPublic
+                        ? 'Pesquise e adicione somente os serviços executados nesta medição.'
+                        : 'Nenhum recebível contratual encontrado para a competência.'}
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
           <div className="cr-panel-actions">
-            <strong>Total previsto: {currency.format(totalReceipts)}</strong>
+            <strong>{isPublic ? 'Total apresentado' : 'Total previsto'}: {currency.format(totalReceipts)}</strong>
             {permissions.receipts ? (
               <button
                 type="button"
@@ -395,64 +601,102 @@ export default function CrPlanejamentoView({
 
           {isPublic && permissions.measurementView ? (
             <details className="cr-measurement-panel">
-              <summary>Medição consolidada da competência</summary>
+              <summary>Medição aprovada pelo órgão e glosas</summary>
               <div className="cr-table-shell cr-planning-table">
                 <table>
                   <thead>
                     <tr>
                       <th>Item micro</th>
-                      <th>Qtd. medida</th>
-                      <th>Data</th>
-                      <th>Número</th>
+                      <th>Apresentado</th>
+                      <th>Qtd. aprovada</th>
+                      <th>Valor aprovado</th>
+                      <th>Glosa</th>
+                      <th>Justificativa</th>
+                      <th>Data / número</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {measurements.map((item, index) => (
-                      <tr key={item.plano_item_id}>
-                        <td>
-                          <strong>{item.item.codigo} · {item.item.descricao}</strong>
-                          <span>{item.item.unidade || 'un'}</span>
-                        </td>
-                        <td>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.0001"
-                            value={item.quantidade_medida}
-                            disabled={!permissions.measurement}
-                            onChange={(event) => updateMeasurement(index, 'quantidade_medida', event.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            type="date"
-                            value={item.data_medicao || ''}
-                            disabled={!permissions.measurement}
-                            onChange={(event) => updateMeasurement(index, 'data_medicao', event.target.value)}
-                          />
-                        </td>
-                        <td>
-                          <input
-                            value={item.numero_medicao || ''}
-                            disabled={!permissions.measurement}
-                            onChange={(event) => updateMeasurement(index, 'numero_medicao', event.target.value)}
-                          />
-                        </td>
-                      </tr>
-                    ))}
+                    {measurements.map((item, index) => {
+                      const receipt = receipts.find(
+                        (row) => Number(row.plano_item_id) === Number(item.plano_item_id)
+                      );
+                      const rowGlosa = Math.max(
+                        0,
+                        asNumber(receipt?.valor_previsto) - asNumber(item.valor_medido)
+                      );
+                      return (
+                        <tr key={item.plano_item_id}>
+                          <td>
+                            <strong>{item.item.codigo} · {item.item.descricao}</strong>
+                            <span>{item.item.unidade || 'un'}</span>
+                          </td>
+                          <td>
+                            {receipt?.quantidade_prevista || 0} {item.item.unidade || 'un'}
+                            <span>{currency.format(receipt?.valor_previsto || 0)}</span>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.0001"
+                              value={item.quantidade_medida}
+                              disabled={!permissions.measurement}
+                              onChange={(event) => updateMeasurement(index, 'quantidade_medida', event.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={item.valor_medido}
+                              disabled={!permissions.measurement}
+                              onChange={(event) => updateMeasurement(index, 'valor_medido', event.target.value)}
+                            />
+                          </td>
+                          <td data-tone={rowGlosa > 0 ? 'negative' : 'neutral'}>
+                            {currency.format(rowGlosa)}
+                          </td>
+                          <td>
+                            <input
+                              value={item.justificativa_glosa || ''}
+                              placeholder={rowGlosa > 0 ? 'Motivo da glosa' : 'Sem glosa'}
+                              disabled={!permissions.measurement}
+                              onChange={(event) => updateMeasurement(index, 'justificativa_glosa', event.target.value)}
+                            />
+                          </td>
+                          <td>
+                            <input
+                              type="date"
+                              value={item.data_medicao || ''}
+                              disabled={!permissions.measurement}
+                              onChange={(event) => updateMeasurement(index, 'data_medicao', event.target.value)}
+                            />
+                            <input
+                              value={item.numero_medicao || ''}
+                              placeholder="Boletim"
+                              disabled={!permissions.measurement}
+                              onChange={(event) => updateMeasurement(index, 'numero_medicao', event.target.value)}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
               {permissions.measurement ? (
                 <div className="cr-panel-actions">
-                  <span>A medição não altera a previsão finalizada.</span>
+                  <span>
+                    Aprovado: {currency.format(totalApproved)} · Glosa: {currency.format(totalGlosa)}
+                  </span>
                   <button
                     type="button"
                     className="btn btn-outline"
                     disabled={Boolean(saving)}
                     onClick={saveMeasurement}
                   >
-                    {saving === 'measurement' ? 'Consolidando...' : 'Consolidar medição'}
+                    {saving === 'measurement' ? 'Registrando...' : 'Registrar medição aprovada'}
                   </button>
                 </div>
               ) : null}
@@ -465,10 +709,57 @@ export default function CrPlanejamentoView({
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>Custos previstos por item micro</h3>
+              <h3>Custos planejados por item micro</h3>
               <p>Somente itens folha da versão publicada podem receber previsão mensal.</p>
             </div>
           </div>
+          {!readonly && permissions.costs ? (
+            <div className="cr-item-picker">
+              <label className="cr-field">
+                <span>Adicionar custo planejado</span>
+                <div className="cr-search-input">
+                  <input
+                    value={itemSearch.costs}
+                    placeholder="Pesquise por código, serviço ou etapa..."
+                    onChange={(event) => setItemSearch((current) => ({
+                      ...current,
+                      costs: event.target.value
+                    }))}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        searchPlanItems('costs');
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    disabled={searching === 'costs'}
+                    onClick={() => searchPlanItems('costs')}
+                    aria-label="Pesquisar serviços"
+                  >
+                    <HiOutlineMagnifyingGlass className="h-4 w-4" />
+                  </button>
+                </div>
+              </label>
+              {searchResults.costs.length ? (
+                <div className="cr-item-picker-results">
+                  {searchResults.costs.map((item) => (
+                    <button key={item.id} type="button" onClick={() => addCost(item)}>
+                      <span><strong>{item.codigo}</strong> · {item.descricao}</span>
+                      <small>
+                        {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · {
+                          currency.format(item.custo_unitario_orcado || 0)
+                        }
+                      </small>
+                      <HiOutlinePlus className="h-4 w-4" />
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <div className="cr-table-shell cr-planning-table">
             <table>
               <thead>
@@ -477,6 +768,7 @@ export default function CrPlanejamentoView({
                   <th>Qtd. prevista</th>
                   <th>Custo unitário</th>
                   <th>Valor previsto</th>
+                  <th aria-label="Ações" />
                 </tr>
               </thead>
               <tbody>
@@ -507,13 +799,32 @@ export default function CrPlanejamentoView({
                       />
                     </td>
                     <td>{currency.format(item.valor_previsto || 0)}</td>
+                    <td>
+                      {!readonly && permissions.costs ? (
+                        <button
+                          type="button"
+                          className="cr-icon-action"
+                          onClick={() => removeCost(item.plano_item_id)}
+                          aria-label={`Remover ${item.item.descricao}`}
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </td>
                   </tr>
                 ))}
+                {!costs.length ? (
+                  <tr>
+                    <td colSpan="5" className="cr-table-empty">
+                      Pesquise e adicione somente os custos planejados para esta competência.
+                    </td>
+                  </tr>
+                ) : null}
               </tbody>
             </table>
           </div>
           <div className="cr-panel-actions">
-            <strong>Total previsto: {currency.format(totalCosts)}</strong>
+            <strong>Total planejado: {currency.format(totalCosts)}</strong>
             {permissions.costs ? (
               <button
                 type="button"
@@ -531,8 +842,14 @@ export default function CrPlanejamentoView({
       {step === 3 ? (
         <div className="cr-review-layout">
           <div className="cr-review-summary">
-            <div><span>Recebíveis previstos</span><strong>{currency.format(totalReceipts)}</strong></div>
-            <div><span>Custos previstos</span><strong>{currency.format(totalCosts)}</strong></div>
+            <div><span>Medição apresentada</span><strong>{currency.format(totalReceipts)}</strong></div>
+            <div><span>Custos planejados</span><strong>{currency.format(totalCosts)}</strong></div>
+            {isPublic ? (
+              <div data-tone={totalGlosa > 0 ? 'negative' : 'positive'}>
+                <span>Glosa registrada</span>
+                <strong>{currency.format(totalGlosa)}</strong>
+              </div>
+            ) : null}
             <div data-tone={totalReceipts - totalCosts >= 0 ? 'positive' : 'negative'}>
               <span>Margem prevista</span>
               <strong>{currency.format(totalReceipts - totalCosts)}</strong>

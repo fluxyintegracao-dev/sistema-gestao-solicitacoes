@@ -21,7 +21,7 @@ import CrExportacoesView from '../components/CrExportacoesView';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
 import CrObrigacoesView from '../components/CrObrigacoesView';
-import CrPlanejamentoView from '../components/CrPlanejamentoView';
+import CrPlanejamentoMensalView from '../components/CrPlanejamentoMensalView';
 import CrPlanoWorkspace from '../components/CrPlanoWorkspace';
 import CrRealizadoView from '../components/CrRealizadoView';
 import CrAuditoriaView from '../components/CrAuditoriaView';
@@ -494,10 +494,11 @@ export default function CustosRecebiveis() {
       ) : null}
 
       {activeTab === 'planejamento' ? (
-        <CrPlanejamentoView
+        <CrPlanejamentoMensalView
           key={`${selectedObraId}-${competencia}-${refreshToken}`}
           obra={selectedObra}
-          competencia={competencia}
+          initialCompetencia={competencia}
+          autoOpen={searchParams.get('bloqueio') === '1'}
           permissions={planningPermissions}
           onChanged={handlePlanningChanged}
         />

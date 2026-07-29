@@ -143,6 +143,40 @@ export async function obterPlanejamentoCompetencia(obraId, competencia) {
   return parseResponse(response, 'Erro ao consultar planejamento da competência');
 }
 
+export async function listarCompetenciasObra(obraId) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao listar competências da obra');
+}
+
+export async function criarCompetenciaObra(obraId, competencia) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias`,
+    {
+      method: 'POST',
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-competencia') }),
+      body: JSON.stringify({ competencia })
+    }
+  );
+  return parseResponse(response, 'Erro ao criar competência mensal');
+}
+
+export async function pesquisarItensPlanoCompetencia(
+  obraId,
+  competencia,
+  { q = '', page = 1, limit = 20 } = {}
+) {
+  const query = new URLSearchParams({ competencia, page, limit });
+  if (String(q || '').trim()) query.set('q', String(q).trim());
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/plano/itens?${query.toString()}`,
+    { headers: authHeaders() }
+  );
+  return parseResponse(response, 'Erro ao pesquisar itens do plano micro');
+}
+
 export async function salvarCustosCompetencia(obraId, competencia, itens) {
   const response = await fetch(
     `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/custos`,
@@ -188,7 +222,7 @@ export async function consolidarMedicaoCompetencia(obraId, competencia, itens) {
     `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/medicao`,
     {
       method: 'POST',
-      headers: jsonHeaders(),
+      headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-medicao') }),
       body: JSON.stringify({ itens })
     }
   );

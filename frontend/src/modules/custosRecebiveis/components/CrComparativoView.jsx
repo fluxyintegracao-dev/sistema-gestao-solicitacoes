@@ -61,12 +61,38 @@ export default function CrComparativoView({ obra, competencia }) {
     <section className="cr-section">
       <div className="cr-section-heading">
         <div>
-          <h2>Planejado x realizado</h2>
+          <h2>Custos planejados x realizados</h2>
           <p>{obra.codigo || obra.id} · {obra.nome} · competência {competencia}</p>
         </div>
         <div className="cr-summary-inline">
-          <span>Previsto <strong>{currency.format(data?.resumo?.previsto || 0)}</strong></span>
-          <span>Realizado <strong>{currency.format(data?.resumo?.realizado || 0)}</strong></span>
+          <span>Custo planejado <strong>{currency.format(data?.resumo?.previsto || 0)}</strong></span>
+          <span>Custo realizado <strong>{currency.format(data?.resumo?.realizado || 0)}</strong></span>
+        </div>
+      </div>
+      <div className="cr-kpi-strip cr-kpi-strip--receivables">
+        <div>
+          <span>Medição apresentada</span>
+          <strong>{currency.format(data?.recebiveis?.medicao_apresentada || 0)}</strong>
+        </div>
+        <div>
+          <span>Medição aprovada</span>
+          <strong>
+            {data?.recebiveis?.medicao_aprovada == null
+              ? 'Aguardando'
+              : currency.format(data.recebiveis.medicao_aprovada)}
+          </strong>
+        </div>
+        <div data-tone="negative">
+          <span>Glosa</span>
+          <strong>
+            {data?.recebiveis?.glosa == null
+              ? '—'
+              : currency.format(data.recebiveis.glosa)}
+          </strong>
+        </div>
+        <div data-tone="actual">
+          <span>Receita recebida</span>
+          <strong>{currency.format(data?.recebiveis?.receita_recebida || 0)}</strong>
         </div>
       </div>
       <div className="cr-table-shell cr-desktop-table">

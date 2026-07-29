@@ -12,11 +12,14 @@ const {
 } = require('../services/planoMicroService');
 const {
   consolidarMedicao,
+  criarCompetencia,
   decidirReabertura,
   finalizarCompetencia,
   obterComparativo,
   obterDashboard,
   obterPlanejamento,
+  listarCompetencias,
+  pesquisarItensPlano,
   salvarCustos,
   salvarRecebiveis,
   solicitarReabertura,
@@ -170,6 +173,40 @@ class CustosRecebiveisController {
     }
   }
 
+  static async competencias(req, res) {
+    try {
+      return res.json(await listarCompetencias(req.user, req.params.obraId));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao listar competencias mensais');
+    }
+  }
+
+  static async criarCompetencia(req, res) {
+    try {
+      const result = await criarCompetencia(
+        req.user,
+        req.params.obraId,
+        req.body,
+        req.get('Idempotency-Key')
+      );
+      return res.status(result.idempotente ? 200 : 201).json(result);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao criar competencia mensal');
+    }
+  }
+
+  static async itensPlano(req, res) {
+    try {
+      return res.json(await pesquisarItensPlano(
+        req.user,
+        req.params.obraId,
+        req.query
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao pesquisar itens do plano micro');
+    }
+  }
+
   static async salvarCustos(req, res) {
     try {
       return res.json(await salvarCustos(
@@ -217,7 +254,10 @@ class CustosRecebiveisController {
         req.user,
         req.params.obraId,
         req.params.competencia,
-        req.body
+        {
+          ...req.body,
+          idempotency_key: req.get('Idempotency-Key')
+        }
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao consolidar a medicao');

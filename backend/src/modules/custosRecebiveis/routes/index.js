@@ -4,7 +4,10 @@ const express = require('express');
 const uploadComprovantes = require('../../../config/uploadComprovantes');
 const CustosRecebiveisController = require('../controllers/CustosRecebiveisController');
 const { CUSTOS_RECEBIVEIS_PERMISSIONS } = require('../constants/custosRecebiveisConstants');
-const { requireCustosRecebiveisPermission } = require('../policies/permissionPolicy');
+const {
+  requireAnyCustosRecebiveisPermission,
+  requireCustosRecebiveisPermission
+} = require('../policies/permissionPolicy');
 const { requireCustosRecebiveisObraScope } = require('../policies/obraScopePolicy');
 const { resolverObraIdPorPlano } = require('../services/planoMicroService');
 const {
@@ -37,6 +40,30 @@ router.get(
   '/dashboard',
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.DASHBOARD_VIEW),
   CustosRecebiveisController.dashboard
+);
+
+router.get(
+  '/obras/:obraId/competencias',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.competencias
+);
+
+router.post(
+  '/obras/:obraId/competencias',
+  requireAnyCustosRecebiveisPermission([
+    CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES
+  ]),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.criarCompetencia
+);
+
+router.get(
+  '/obras/:obraId/plano/itens',
+  requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_VIEW),
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.itensPlano
 );
 
 router.get(

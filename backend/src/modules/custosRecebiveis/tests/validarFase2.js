@@ -4,6 +4,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const {
+  assertCompetenciaNovoMes,
   consolidarMedicao,
   finalizarCompetencia,
   findPrivateSources,
@@ -36,6 +37,14 @@ function validateCompetenciaBoundaries() {
     nextMonth: '2027-01-01'
   });
   assert.throws(() => normalizeCompetencia('08/2026'), /Competencia invalida/);
+  assert.deepStrictEqual(
+    assertCompetenciaNovoMes('2026-08', new Date('2026-07-15T12:00:00-03:00')),
+    ['2026-07', '2026-08']
+  );
+  assert.throws(
+    () => assertCompetenciaNovoMes('2026-09', new Date('2026-07-15T12:00:00-03:00')),
+    /Novo mes permite somente/
+  );
 }
 
 function validateBackendContracts() {
@@ -45,6 +54,8 @@ function validateBackendContracts() {
 
   [
     "'/dashboard'",
+    "'/obras/:obraId/competencias'",
+    "'/obras/:obraId/plano/itens'",
     "'/obras/:obraId/competencias/:competencia'",
     "'/obras/:obraId/competencias/:competencia/custos'",
     "'/obras/:obraId/competencias/:competencia/receitas'",
@@ -85,6 +96,9 @@ function validateFrontendContracts() {
   const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
   const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
   const planning = read('../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx');
+  const monthlyPlanning = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoMensalView.jsx'
+  );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
 
@@ -92,12 +106,16 @@ function validateFrontendContracts() {
     assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
   ));
   assert(page.includes('<CrDashboardView'));
-  assert(page.includes('<CrPlanejamentoView'));
+  assert(page.includes('<CrPlanejamentoMensalView'));
   assert(page.includes('<CrComparativoView'));
   assert(planning.includes('Etapa {step} de {STEPS.length}'));
   assert(planning.includes('Parcela vinculada a título aparece uma única vez'));
   assert(planning.includes('Competência finalizada e imutável'));
   assert(planning.includes('disabled={Boolean(saving)}'));
+  assert(planning.includes('Registrar medição aprovada'));
+  assert(planning.includes('justificativa_glosa'));
+  assert(monthlyPlanning.includes('Novo mês'));
+  assert(monthlyPlanning.includes('Receita recebida'));
   assert(dashboard.includes('Previsto x realizado por macro'));
   assert(dashboard.includes('Status das etapas'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
@@ -235,6 +253,101 @@ async function validatePrivateWorkRejectsMeasurement() {
   );
 }
 
+async function validateApprovedMeasurementAndGlosa() {
+  let createdMeasurement = null;
+  let auditPayload = null;
+  const competencia = {
+    id: 41,
+    obra_id: 7,
+    competencia: '2026-08',
+    estado: 'FINALIZADA',
+    total_custo_previsto: 0,
+    total_receita_prevista: 100
+  };
+  const overrides = {
+    sequelize: transactionHarness(),
+    resolverEscopoObras: commonScope(),
+    Obra: {
+      findByPk: async () => ({ id: 7, nome: 'Obra publica', classificacao: 'PUBLICA' })
+    },
+    CrPlanoObra: {
+      findOne: async () => ({ id: 3, versao: 2, situacao: 'PUBLICADA' })
+    },
+    CrPlanoItem: {
+      findAll: async () => [{
+        id: 9,
+        plano_id: 3,
+        codigo: '01.01',
+        descricao: 'Servico',
+        somadora: false,
+        custo_unitario: 10
+      }]
+    },
+    CrCompetencia: { findOne: async () => competencia },
+    CrPrevisaoReceita: {
+      findAll: async () => [{
+        competencia_id: 41,
+        origem: 'MEDICAO',
+        plano_item_id: 9,
+        quantidade_prevista: 10,
+        valor_previsto: 100
+      }]
+    },
+    CrMedicaoConsolidada: {
+      destroy: async () => 0,
+      findOne: async () => null,
+      create: async (payload) => {
+        createdMeasurement = payload;
+        return payload;
+      }
+    },
+    CrAuditoria: {
+      findOne: async () => null,
+      create: async (payload) => {
+        auditPayload = payload.payload_json;
+      }
+    }
+  };
+  const result = await consolidarMedicao(
+    { id: 1 },
+    7,
+    '2026-08',
+    {
+      idempotency_key: 'medicao-1',
+      itens: [{
+        plano_item_id: 9,
+        quantidade_medida: 6,
+        valor_medido: 60,
+        justificativa_glosa: 'Glosa registrada pelo orgao.'
+      }]
+    },
+    overrides
+  );
+  assert.strictEqual(result.valor_total, 60);
+  assert.strictEqual(result.valor_glosa, 40);
+  assert.strictEqual(createdMeasurement.valor_glosa, 40);
+  assert.strictEqual(auditPayload.idempotency_key, 'medicao-1');
+
+  await assert.rejects(
+    () => consolidarMedicao(
+      { id: 1 },
+      7,
+      '2026-08',
+      {
+        idempotency_key: 'medicao-2',
+        itens: [{
+          plano_item_id: 9,
+          quantidade_medida: 11,
+          valor_medido: 110,
+          justificativa_glosa: null
+        }]
+      },
+      overrides
+    ),
+    (error) => error?.code === 'CR_MEDICAO_ACIMA_APRESENTADA'
+  );
+}
+
 async function run() {
   validateComparisonStates();
   validateCompetenciaBoundaries();
@@ -244,6 +357,7 @@ async function run() {
   await validateFinalizationIdempotency();
   await validateFinalizedCompetencyIsImmutable();
   await validatePrivateWorkRejectsMeasurement();
+  await validateApprovedMeasurementAndGlosa();
   console.log('Fase 2 de Custos e Recebiveis validada com sucesso.');
 }
 

@@ -2,6 +2,14 @@
   --cr-accent: var(--accent-blue, #315ce8);
   --cr-success: var(--accent-green, #07845a);
   --cr-warning: #b76b09;
+  --cr-danger: var(--accent-red, #d92d20);
+  --cr-primary: var(--cr-accent);
+  --cr-surface: var(--ui-surface);
+  --cr-border: var(--ui-border);
+  --cr-border-strong: color-mix(in srgb, var(--ui-border) 72%, var(--c-text));
+  --cr-text: var(--c-text);
+  --cr-ink: var(--c-text);
+  --cr-muted: var(--c-muted);
   width: min(100%, 1600px);
   margin-inline: auto;
   display: grid;
@@ -949,11 +957,21 @@
   font-size: 1.05rem;
 }
 
+.cr-kpi-strip--receivables {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 12px;
+}
+
+.cr-kpi-strip--dashboard {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .cr-kpi-strip [data-tone="actual"] strong,
 .cr-review-summary [data-tone="positive"] strong {
   color: var(--cr-success);
 }
 
+.cr-kpi-strip [data-tone="negative"] strong,
 .cr-review-summary [data-tone="negative"] strong {
   color: var(--accent-red, #c73847);
 }
@@ -2071,6 +2089,11 @@
     grid-template-columns: 1fr;
   }
 
+  .cr-kpi-strip--receivables,
+  .cr-kpi-strip--dashboard {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .cr-context-bar {
     grid-template-columns: minmax(240px, 1fr) minmax(180px, 0.6fr);
   }
@@ -2426,5 +2449,242 @@
 @media (prefers-reduced-motion: reduce) {
   .cr-page * {
     scroll-behavior: auto !important;
+  }
+}
+
+/* Planejamento mensal por competência, sem materializar o orçamento inteiro. */
+.cr-month-editor {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.cr-month-back {
+  justify-self: start;
+}
+
+.cr-months-workspace {
+  overflow: visible;
+}
+
+.cr-new-month-bar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-block: 1px solid var(--cr-border);
+  background: color-mix(in srgb, var(--cr-primary) 4%, var(--cr-surface));
+}
+
+.cr-new-month-bar .cr-field {
+  width: min(22rem, 100%);
+}
+
+.cr-new-month-bar > div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.cr-month-list {
+  display: grid;
+}
+
+.cr-month-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 0.8fr) minmax(42rem, 4fr) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--cr-border);
+}
+
+.cr-month-row:last-child {
+  border-bottom: 0;
+}
+
+.cr-month-identity {
+  display: grid;
+  justify-items: start;
+  gap: 0.2rem;
+}
+
+.cr-month-identity > span:first-child,
+.cr-month-row dt {
+  color: var(--cr-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.cr-month-identity > strong {
+  text-transform: capitalize;
+}
+
+.cr-month-row dl {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(7rem, 1fr));
+  gap: 0;
+  margin: 0;
+}
+
+.cr-month-row dl > div {
+  min-width: 0;
+  padding-inline: 0.75rem;
+  border-left: 1px solid var(--cr-border);
+}
+
+.cr-month-row dd {
+  margin: 0.2rem 0 0;
+  color: var(--cr-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cr-month-row [data-tone="negative"] dd,
+.cr-planning-table td[data-tone="negative"] {
+  color: var(--cr-danger);
+}
+
+.cr-month-row [data-tone="positive"] dd {
+  color: var(--cr-success);
+}
+
+.cr-item-picker {
+  position: relative;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--cr-border);
+}
+
+.cr-item-picker .cr-field {
+  max-width: 52rem;
+}
+
+.cr-search-input {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.45rem;
+}
+
+.cr-item-picker-results {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% - 0.35rem);
+  left: 1rem;
+  width: min(52rem, calc(100% - 2rem));
+  max-height: 19rem;
+  overflow-y: auto;
+  border: 1px solid var(--cr-border-strong);
+  border-radius: 0.65rem;
+  background: var(--cr-surface);
+  box-shadow: 0 0.85rem 2.4rem color-mix(in srgb, var(--cr-ink) 14%, transparent);
+}
+
+.cr-item-picker-results button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  width: 100%;
+  gap: 0.2rem 1rem;
+  padding: 0.7rem 0.8rem;
+  border: 0;
+  border-bottom: 1px solid var(--cr-border);
+  background: transparent;
+  color: var(--cr-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.cr-item-picker-results button:hover,
+.cr-item-picker-results button:focus-visible {
+  background: color-mix(in srgb, var(--cr-primary) 7%, var(--cr-surface));
+  outline: none;
+}
+
+.cr-item-picker-results button:last-child {
+  border-bottom: 0;
+}
+
+.cr-item-picker-results small {
+  color: var(--cr-muted);
+}
+
+.cr-item-picker-results svg {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+}
+
+.cr-icon-action {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid var(--cr-border);
+  border-radius: 0.45rem;
+  background: var(--cr-surface);
+  color: var(--cr-danger);
+  cursor: pointer;
+}
+
+.cr-table-empty {
+  padding: 1.35rem !important;
+  color: var(--cr-muted);
+  text-align: center;
+}
+
+.cr-measurement-panel td:last-child {
+  min-width: 10rem;
+}
+
+.cr-measurement-panel td:last-child input + input {
+  margin-top: 0.35rem;
+}
+
+@media (max-width: 1280px) {
+  .cr-month-row {
+    grid-template-columns: minmax(9rem, 0.7fr) minmax(34rem, 3fr) auto;
+    overflow-x: auto;
+  }
+
+  .cr-month-row dl {
+    grid-template-columns: repeat(3, minmax(8rem, 1fr));
+    row-gap: 0.75rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .cr-new-month-bar,
+  .cr-month-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .cr-new-month-bar {
+    flex-direction: column;
+  }
+
+  .cr-new-month-bar .cr-field,
+  .cr-new-month-bar > div,
+  .cr-new-month-bar .btn,
+  .cr-month-row > .btn {
+    width: 100%;
+  }
+
+  .cr-month-row dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cr-month-row dl > div {
+    padding: 0.55rem 0;
+    border-left: 0;
+    border-top: 1px solid var(--cr-border);
+  }
+
+  .cr-item-picker-results {
+    position: static;
+    width: 100%;
+    margin-top: 0.5rem;
+    box-shadow: none;
   }
 }

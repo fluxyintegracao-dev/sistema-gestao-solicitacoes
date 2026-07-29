@@ -83,8 +83,38 @@ function requireCustosRecebiveisPermission(permissionKey) {
   };
 }
 
+function requireAnyCustosRecebiveisPermission(permissionKeys = []) {
+  const expected = [...new Set((Array.isArray(permissionKeys) ? permissionKeys : [permissionKeys])
+    .map((value) => String(value || '').trim())
+    .filter(Boolean))];
+  return async (req, res, next) => {
+    try {
+      for (const permission of expected) {
+        if (await hasExplicitCustosRecebiveisPermission(req.user, permission)) {
+          return next();
+        }
+      }
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'AUTHZ_DENIED',
+        recursoTipo: 'CUSTOS_RECEBIVEIS',
+        recursoId: req.originalUrl,
+        status: 'DENIED',
+        descricao: 'Nenhuma das permissoes explicitas exigidas foi concedida',
+        metadata: { permissoes_aceitas: expected }
+      });
+      return res.status(403).json({ error: 'Acesso negado para Custos e Recebiveis' });
+    } catch (error) {
+      console.error('Erro ao validar permissoes de Custos e Recebiveis:', error.message);
+      return res.status(500).json({ error: 'Erro ao validar permissao do modulo' });
+    }
+  };
+}
+
 module.exports = {
   hasExplicitCustosRecebiveisPermission,
   resolveExplicitCustosRecebiveisPermissions,
+  requireAnyCustosRecebiveisPermission,
   requireCustosRecebiveisPermission
 };
