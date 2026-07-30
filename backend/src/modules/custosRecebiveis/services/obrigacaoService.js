@@ -15,7 +15,10 @@ const {
 } = require('../policies/permissionPolicy');
 
 const VALID_COMPETENCIA = /^\d{4}-(0[1-9]|1[0-2])$/;
-const OBRIGACAO_TYPES = Object.freeze(['CUSTO_PREVISTO', 'RECEITA_PREVISTA']);
+const OBRIGACAO_TYPES = Object.freeze({
+  CUSTO_PREVISTO: 'CUSTO_PREVISTO',
+  MEDICAO_APRESENTADA: 'RECEITA_PREVISTA'
+});
 const ACTIVE_OBLIGATION_STATES = Object.freeze(['PENDENTE', 'VENCIDA']);
 const MAX_BYPASS_DAYS = 30;
 
@@ -177,26 +180,44 @@ function serializeBypass(value, context = {}) {
   };
 }
 
-async function userCanResolveObligations(user, deps) {
-  if (deps.isSuperadmin(user)) return true;
-  const required = [
-    CUSTOS_RECEBIVEIS_PERMISSIONS.MODULE_ACCESS,
-    CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS,
-    CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES
-  ];
+async function resolveObligationCapabilities(user, deps) {
+  if (deps.isSuperadmin(user)) {
+    return {
+      moduleAccess: true,
+      costs: true,
+      receivables: true
+    };
+  }
   const permissions = new Set(
     (await deps.resolveExplicitPermissions(user))
       .map((permission) => String(permission || '').trim().toLowerCase())
   );
-  return required.every((permission) => permissions.has(permission));
+  return {
+    moduleAccess: permissions.has(CUSTOS_RECEBIVEIS_PERMISSIONS.MODULE_ACCESS),
+    costs: permissions.has(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS),
+    receivables: permissions.has(CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES)
+  };
+}
+
+function obligationTypesForWork(classificationValue, capabilities) {
+  if (!capabilities?.moduleAccess) return [];
+  const types = [];
+  if (capabilities.costs) types.push(OBRIGACAO_TYPES.CUSTO_PREVISTO);
+  if (
+    String(classificationValue || '').trim().toUpperCase() === 'PUBLICA'
+    && capabilities.receivables
+  ) {
+    types.push(OBRIGACAO_TYPES.MEDICAO_APRESENTADA);
+  }
+  return types;
 }
 
 async function findExpectedObligations(user, deps, options = {}) {
   const now = options.now || deps.now();
   const today = now.toISOString().slice(0, 10);
   const current = competenciaAtual(now);
-  const canResolve = await userCanResolveObligations(user, deps);
-  if (!canResolve) return [];
+  const capabilities = await resolveObligationCapabilities(user, deps);
+  if (!capabilities.moduleAccess) return [];
   const scope = await deps.resolverEscopoObras(user);
   if (!scope.todas && !scope.obraIds.length) return [];
 
@@ -215,7 +236,7 @@ async function findExpectedObligations(user, deps, options = {}) {
     include: [{
       model: deps.Obra,
       as: 'obra',
-      attributes: ['id', 'codigo', 'nome', 'ativo'],
+      attributes: ['id', 'codigo', 'nome', 'ativo', 'classificacao'],
       where: { ativo: true },
       required: true
     }],
@@ -283,6 +304,11 @@ async function findExpectedObligations(user, deps, options = {}) {
   const result = [];
   for (const [obraId, responsible] of uniqueByObra.entries()) {
     if (!plannedObras.has(obraId)) continue;
+    const obligationTypes = obligationTypesForWork(
+      responsible.obra?.classificacao,
+      capabilities
+    );
+    if (!obligationTypes.length) continue;
     const start = VALID_COMPETENCIA.test(String(responsible.competencia_inicial || ''))
       ? responsible.competencia_inicial
       : (firstCompetencyByObra.get(obraId) || current);
@@ -291,14 +317,15 @@ async function findExpectedObligations(user, deps, options = {}) {
       const complete = competency?.estado === 'FINALIZADA';
       const deadline = prazoCompetencia(competencia);
       const state = complete ? 'CUMPRIDA' : (deadline <= now ? 'VENCIDA' : 'PENDENTE');
-      for (const type of OBRIGACAO_TYPES) {
+      for (const type of obligationTypes) {
         result.push({
           user_id: Number(user.id),
           obra_id: obraId,
           obra: {
             id: obraId,
             codigo: responsible.obra?.codigo || null,
-            nome: responsible.obra?.nome || `Obra ${obraId}`
+            nome: responsible.obra?.nome || `Obra ${obraId}`,
+            classificacao: responsible.obra?.classificacao || null
           },
           competencia,
           tipo: type,
@@ -694,6 +721,7 @@ module.exports = {
   listarBypasses,
   listarMinhasObrigacoes,
   normalizeHolidaySet,
+  obligationTypesForWork,
   prazoCompetencia,
   revogarBypass
 };

@@ -10,6 +10,7 @@ const {
   guardMode,
   hasConsecutiveMonths,
   listCompetencias,
+  obligationTypesForWork,
   prazoCompetencia
 } = require('../services/obrigacaoService');
 
@@ -36,16 +37,46 @@ function validateDateRules() {
   assert.strictEqual(guardMode('invalid'), 'observe');
   assert.strictEqual(guardMode('enforce'), 'enforce');
   assert.strictEqual(hasConsecutiveMonths(['2026-07-02', '2026-06-18']), true);
+  assert.deepStrictEqual(
+    obligationTypesForWork('PUBLICA', {
+      moduleAccess: true,
+      costs: true,
+      receivables: true
+    }),
+    ['CUSTO_PREVISTO', 'RECEITA_PREVISTA']
+  );
+  assert.deepStrictEqual(
+    obligationTypesForWork('PRIVADA', {
+      moduleAccess: true,
+      costs: true,
+      receivables: true
+    }),
+    ['CUSTO_PREVISTO']
+  );
+  assert.deepStrictEqual(
+    obligationTypesForWork('PUBLICA', {
+      moduleAccess: true,
+      costs: true,
+      receivables: false
+    }),
+    ['CUSTO_PREVISTO']
+  );
 }
 
-function guardOverrides({ bypass = false, superadmin = false, noScope = false } = {}) {
+function guardOverrides({
+  bypass = false,
+  superadmin = false,
+  noScope = false,
+  classificacao = 'PUBLICA',
+  permissions = null
+} = {}) {
   return {
     now: () => new Date('2026-08-10T12:00:00'),
     isSuperadmin: () => superadmin,
     resolverEscopoObras: async () => (
       noScope ? { todas: false, obraIds: [] } : { todas: true, obraIds: null }
     ),
-    resolveExplicitPermissions: async () => [
+    resolveExplicitPermissions: async () => permissions || [
       'custos_recebiveis.modulo.acessar',
       'custos_recebiveis.planejamento.preencher_custos',
       'custos_recebiveis.planejamento.preencher_recebiveis'
@@ -55,7 +86,13 @@ function guardOverrides({ bypass = false, superadmin = false, noScope = false } 
         obra_id: 3,
         user_id: 7,
         competencia_inicial: '2026-07',
-        obra: { id: 3, codigo: '03', nome: 'Obra teste', ativo: true }
+        obra: {
+          id: 3,
+          codigo: '03',
+          nome: 'Obra teste',
+          ativo: true,
+          classificacao
+        }
       }]
     },
     CrPlanoObra: {
@@ -99,6 +136,27 @@ async function validateGuardModesAndBypass() {
   assert.strictEqual(observed.pendencia_detectada, true);
   assert.strictEqual(observed.bloqueado, false);
   assert.strictEqual(observed.competencia, '2026-07');
+  assert.strictEqual(observed.quantidade_vencidas, 2);
+
+  const privateWork = await calcularEstadoGuardUsuario(
+    user,
+    { mode: 'observe', moduleEnabled: true, persistir: false, now: new Date('2026-08-10T12:00:00') },
+    guardOverrides({ classificacao: 'PRIVADA' })
+  );
+  assert.strictEqual(privateWork.quantidade_vencidas, 1);
+
+  const publicWithoutReceivablesPermission = await calcularEstadoGuardUsuario(
+    user,
+    { mode: 'observe', moduleEnabled: true, persistir: false, now: new Date('2026-08-10T12:00:00') },
+    guardOverrides({
+      classificacao: 'PUBLICA',
+      permissions: [
+        'custos_recebiveis.modulo.acessar',
+        'custos_recebiveis.planejamento.preencher_custos'
+      ]
+    })
+  );
+  assert.strictEqual(publicWithoutReceivablesPermission.quantidade_vencidas, 1);
 
   const enforced = await calcularEstadoGuardUsuario(
     user,

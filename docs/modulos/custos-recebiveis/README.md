@@ -369,13 +369,20 @@ virgula e protecao contra interpretacao de formulas. O XLSX reutiliza
 
 - Somente responsaveis ou substitutos ativos, vinculados a obra ativa e com plano
   micro publicado, entram no calculo.
-- O usuario tambem precisa possuir as permissoes necessarias para acessar e preencher
-  custos e recebiveis; configuracao incompleta de acesso nao pode prende-lo.
+- O usuario precisa possuir acesso ao modulo. Cada obrigacao somente e gerada quando
+  ele tambem possui a permissao da acao correspondente; configuracao incompleta de
+  acesso nao pode prende-lo.
 - O ponto de partida e `cr_responsaveis_obra.competencia_inicial`. Nenhum mes anterior
   gera pendencia.
-- Custos previstos e recebiveis previstos geram obrigacoes separadas.
-- Finalizar a competencia cumpre ambas. Reabrir torna a obrigacao visivel novamente
-  ate uma nova finalizacao.
+- Em obras publicas, custos planejados e medicao apresentada geram obrigacoes
+  separadas.
+- Em obras privadas, somente custos planejados geram obrigacao manual. Os recebiveis
+  contratuais sao sincronizados automaticamente com o Financeiro e nao geram
+  pendencia de preenchimento.
+- A medicao aprovada de obra publica pode ser registrada depois da finalizacao,
+  quando o orgao responder, e nao integra a obrigacao mensal de preenchimento.
+- Finalizar a competencia cumpre as obrigacoes aplicaveis ao tipo da obra. Reabrir
+  torna essas obrigacoes visiveis novamente ate uma nova finalizacao.
 - O prazo padrao e o ultimo dia util do mes, as 18h no horario do servidor. Sabados e
   domingos sao antecipados automaticamente. Feriados opcionais podem ser informados
   em `CR_FERIADOS`, como lista CSV de datas `AAAA-MM-DD`.

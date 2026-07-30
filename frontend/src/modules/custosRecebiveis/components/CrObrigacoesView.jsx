@@ -17,9 +17,8 @@ import {
 } from '../services/custosRecebiveis';
 
 const TYPE_LABELS = {
-  CUSTO_PREVISTO: 'Custos previstos',
-  RECEITA_PREVISTA: 'Recebíveis previstos',
-  MEDICAO_CONSOLIDADA: 'Medição consolidada'
+  CUSTO_PREVISTO: 'Custos planejados',
+  RECEITA_PREVISTA: 'Medição apresentada'
 };
 
 const STATE_LABELS = {
