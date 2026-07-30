@@ -27,7 +27,7 @@ implementados no codigo:
 - validacao previa da planilha sem gravacao;
 - importacao transacional, versionada, idempotente e auditada;
 - publicacao de uma versao e substituicao atomica da versao anteriormente publicada;
-- planejamento mensal em tres etapas, separado para obras publicas e privadas;
+- planejamento mensal com etapas adaptadas a classificacao publica ou privada;
 - medicao consolidada exclusiva de obras publicas;
 - recebiveis privados provenientes de contrato/titulo sem dupla contagem;
 - competencia finalizada imutavel, com reabertura temporaria aprovada;
@@ -234,8 +234,11 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   efetivamente recebida.
 - `Novo mes` cria somente a competencia atual ou a seguinte, com
   `Idempotency-Key`, unicidade por obra/competencia e snapshot da versao publicada.
-- O assistente possui tres etapas: medicao apresentada, custos planejados e
-  revisao/finalizacao.
+- Em obra publica, o assistente possui quatro etapas: custos planejados, medicao
+  apresentada, medicao aprovada e revisao/finalizacao.
+- Em obra privada, o assistente possui duas etapas: custos planejados e recebiveis do
+  periodo. A finalizacao fica no rodape operacional da segunda etapa e nao existe
+  etapa de medicao ou confirmacao manual dos recebiveis.
 - O plano completo nao e materializado na tela. Itens folha sao pesquisados no
   backend por codigo, descricao ou etapa macro, com paginacao, e somente linhas
   selecionadas com valores relevantes ficam persistidas.
@@ -247,15 +250,19 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   responsavel e `cr_medicoes_consolidadas` representa a medicao aprovada pelo orgao.
 - A glosa e a diferenca positiva entre o valor apresentado e o aprovado. Glosa exige
   justificativa auditavel e o aprovado nao pode superar o apresentado.
-- A medicao aprovada pode ser registrada depois da finalizacao do planejamento, sem
-  alterar o snapshot planejado.
+- A medicao aprovada possui etapa propria, posterior a medicao apresentada, e pode ser
+  registrada depois da finalizacao do planejamento, sem alterar o snapshot planejado.
 - Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
   titulos `RECEBER`, rateadas para a obra. Custo realizado continua vindo de baixas
   ativas de titulos `PAGAR`.
-- Obra privada lista parcelas contratuais com vencimento na competencia.
+- Obra privada lista automaticamente parcelas contratuais e os respectivos titulos
+  a receber com vencimento na competencia. Nao existe marcacao ou confirmacao manual:
+  ao finalizar, as fontes oficiais do periodo sao sincronizadas no snapshot.
 - Quando uma parcela privada possui `titulo_financeiro_id` de Contas a Receber, ela e
   apresentada e gravada como uma unica origem vinculada ao titulo; a parcela nao e
   somada novamente.
+- Vencimento, inadimplencia, baixa e cobranca dos recebiveis privados continuam sendo
+  regras do Financeiro; o modulo apenas consulta e consolida esses registros.
 - Obra privada nao recebe interface nem endpoint funcional de medicao.
 - O planejamento mensal nao cria itens dentro do plano publicado e nunca altera
   `apropriacoes`.

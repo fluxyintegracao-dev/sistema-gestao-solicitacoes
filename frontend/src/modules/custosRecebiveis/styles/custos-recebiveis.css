@@ -1149,7 +1149,7 @@
 
 .cr-stepper {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1px;
   padding: 12px 14px 0;
   background: var(--ui-border);
@@ -1252,6 +1252,29 @@
 .cr-step-actions > span {
   color: var(--c-muted);
   font-size: 0.68rem;
+}
+
+.cr-automatic-source {
+  color: var(--c-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  text-align: right;
+}
+
+.cr-private-closeout {
+  display: grid;
+  gap: 12px;
+  padding-top: 2px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.cr-private-closeout .cr-review-summary {
+  padding: 0;
+}
+
+.cr-closure-actions {
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
 }
 
 .cr-measurement-panel {
@@ -2240,7 +2263,7 @@
 
   .cr-stepper {
     overflow-x: auto;
-    grid-template-columns: repeat(3, minmax(190px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   }
 
   .cr-reopen-box {

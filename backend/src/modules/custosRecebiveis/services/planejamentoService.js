@@ -297,6 +297,9 @@ async function findPrivateSources(obraId, competencia, deps, options = {}) {
         ? titulo.descricao
         : item.descricao,
       documento: linkedTitleIsReceivable ? titulo.codigo : null,
+      status_financeiro: linkedTitleIsReceivable
+        ? String(titulo.status || 'ABERTO').toUpperCase()
+        : 'PREVISTO_CONTRATO',
       data_prevista: linkedTitleIsReceivable
         ? titulo.data_vencimento
         : item.data_vencimento,
@@ -923,7 +926,8 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       ? publicReceipts
       : privateSources.map((source) => ({
         ...source,
-        confirmado: receiptByPrivateSource.has(source.key),
+        automatico: true,
+        registrado_competencia: receiptByPrivateSource.has(source.key),
         valor_previsto: money(
           receiptByPrivateSource.get(source.key)?.valor_previsto ?? source.valor_previsto
         )
@@ -1098,13 +1102,13 @@ function validatePublicReceiptRows(rows, allowedItems, previousQuantities = new 
 }
 
 async function buildPrivateReceiptRows(obraId, competencia, rows, deps, transaction) {
-  if (!Array.isArray(rows)) {
-    throw createBusinessError(400, 'CR_RECEBIVEIS_INVALIDOS', 'Informe as origens confirmadas.');
-  }
   const sources = await findPrivateSources(obraId, competencia, deps, { transaction });
   const allowed = new Map(sources.map((source) => [source.key, source]));
+  const requestedRows = Array.isArray(rows)
+    ? rows
+    : sources.map((source) => ({ key: source.key }));
   const seen = new Set();
-  return rows.map((row, index) => {
+  return requestedRows.map((row, index) => {
     const sourceKey = normalizeText(row?.key, 100);
     const source = allowed.get(sourceKey);
     if (!source || seen.has(sourceKey)) {
@@ -1176,7 +1180,7 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
       : await buildPrivateReceiptRows(
         obraId,
         competenciaCode,
-        payload.itens,
+        null,
         deps,
         transaction
       );
@@ -1204,7 +1208,9 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
       competenciaId: competencia.id,
       userId: user?.id,
       event: 'CR_PLANEJAMENTO_RECEBIVEIS_SALVO',
-      description: 'Recebiveis previstos da competencia atualizados.',
+      description: isPublic
+        ? 'Medicao apresentada da competencia atualizada.'
+        : 'Recebiveis privados sincronizados automaticamente com as fontes oficiais.',
       payload: {
         competencia: competenciaCode,
         classificacao_obra: obra.classificacao,
@@ -1238,7 +1244,10 @@ async function finalizarCompetencia(
   await assertScope(user, obraId, deps);
 
   return deps.sequelize.transaction(async (transaction) => {
-    await findObra(obraId, deps, { transaction, lock: transaction.LOCK.UPDATE });
+    const obra = await findObra(obraId, deps, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
     const plan = await findPublishedPlan(obraId, deps, {
       transaction,
       lock: transaction.LOCK.UPDATE
@@ -1248,6 +1257,28 @@ async function finalizarCompetencia(
       return { idempotente: true, competencia: serializeCompetencia(competencia) };
     }
     await assertEditable(competencia, deps, transaction);
+    if (String(obra.classificacao).toUpperCase() === 'PRIVADA') {
+      const automaticReceipts = await buildPrivateReceiptRows(
+        obraId,
+        competenciaCode,
+        null,
+        deps,
+        transaction
+      );
+      await deps.CrPrevisaoReceita.destroy({
+        where: { competencia_id: competencia.id },
+        transaction
+      });
+      if (automaticReceipts.length) {
+        await deps.CrPrevisaoReceita.bulkCreate(
+          automaticReceipts.map((row) => ({
+            ...row,
+            competencia_id: competencia.id
+          })),
+          { transaction, validate: true }
+        );
+      }
+    }
     const [costs, receipts] = await Promise.all([
       deps.CrPrevisaoCusto.findAll({
         where: { competencia_id: competencia.id },
@@ -1294,6 +1325,8 @@ async function finalizarCompetencia(
       description: 'Competencia finalizada e congelada para edicao.',
       payload: {
         competencia: competenciaCode,
+        classificacao_obra: obra.classificacao,
+        recebiveis_automaticos: String(obra.classificacao).toUpperCase() === 'PRIVADA',
         idempotency_key: key,
         plano_versao_snapshot: Number(competencia.plano_versao_snapshot),
         total_custo_previsto: totalCosts,

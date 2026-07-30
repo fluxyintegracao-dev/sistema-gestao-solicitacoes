@@ -80,6 +80,7 @@ export default function CrPlanejamentoMensalView({
   const availableNewMonths = (data?.competencias_permitidas || [])
     .filter((item) => !existingMonths.has(item));
   const canCreate = permissions.costs || permissions.receipts;
+  const isPublic = obra.classificacao === 'PUBLICA';
 
   async function createMonth() {
     if (!newMonth || creating) return;
@@ -139,9 +140,13 @@ export default function CrPlanejamentoMensalView({
     <section className="cr-workspace cr-months-workspace">
       <header className="cr-workspace-heading">
         <div>
-          <span>{obra.codigo || obra.id} · {obra.classificacao === 'PUBLICA' ? 'Obra pública' : 'Obra privada'}</span>
+          <span>{obra.codigo || obra.id} · {isPublic ? 'Obra pública' : 'Obra privada'}</span>
           <h2>Planejamento mensal · {obra.nome}</h2>
-          <p>Competências previstas, medições aprovadas e valores financeiros realizados.</p>
+          <p>
+            {isPublic
+              ? 'Custos planejados, medições apresentadas e aprovadas, glosas e valores realizados.'
+              : 'Custos planejados, recebíveis financeiros do período e valores realizados.'}
+          </p>
         </div>
         {canCreate ? (
           <button
@@ -205,7 +210,11 @@ export default function CrPlanejamentoMensalView({
         <div className="cr-empty-state cr-empty-state--large">
           <HiOutlineCalendarDays className="h-7 w-7" />
           <strong>Nenhuma competência iniciada</strong>
-          <span>Use Novo mês para registrar medição apresentada e custos planejados.</span>
+          <span>
+            {isPublic
+              ? 'Use Novo mês para registrar custos planejados e a medição apresentada.'
+              : 'Use Novo mês para registrar custos e consultar os recebíveis do período.'}
+          </span>
         </div>
       ) : null}
 
@@ -222,19 +231,25 @@ export default function CrPlanejamentoMensalView({
               </div>
               <dl>
                 <div><dt>Custo planejado</dt><dd>{currency.format(item.total_custo_previsto || 0)}</dd></div>
-                <div><dt>Medição apresentada</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
-                <div>
-                  <dt>Medição aprovada</dt>
-                  <dd>
-                    {item.medicao_aprovada == null
-                      ? 'Aguardando'
-                      : currency.format(item.medicao_aprovada)}
-                  </dd>
-                </div>
-                <div data-tone={item.glosa > 0 ? 'negative' : 'neutral'}>
-                  <dt>Glosa</dt>
-                  <dd>{item.glosa == null ? '—' : currency.format(item.glosa)}</dd>
-                </div>
+                {isPublic ? (
+                  <>
+                    <div><dt>Medição apresentada</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
+                    <div>
+                      <dt>Medição aprovada</dt>
+                      <dd>
+                        {item.medicao_aprovada == null
+                          ? 'Aguardando'
+                          : currency.format(item.medicao_aprovada)}
+                      </dd>
+                    </div>
+                    <div data-tone={item.glosa > 0 ? 'negative' : 'neutral'}>
+                      <dt>Glosa</dt>
+                      <dd>{item.glosa == null ? '—' : currency.format(item.glosa)}</dd>
+                    </div>
+                  </>
+                ) : (
+                  <div><dt>Recebíveis do período</dt><dd>{currency.format(item.total_receita_prevista || 0)}</dd></div>
+                )}
                 <div><dt>Custo realizado</dt><dd>{currency.format(item.custo_realizado || 0)}</dd></div>
                 <div data-tone="positive">
                   <dt>Receita recebida</dt><dd>{currency.format(item.receita_recebida || 0)}</dd>

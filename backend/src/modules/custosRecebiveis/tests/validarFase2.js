@@ -108,13 +108,20 @@ function validateFrontendContracts() {
   assert(page.includes('<CrDashboardView'));
   assert(page.includes('<CrPlanejamentoMensalView'));
   assert(page.includes('<CrComparativoView'));
-  assert(planning.includes('Etapa {step} de {STEPS.length}'));
-  assert(planning.includes('Parcela vinculada a título aparece uma única vez'));
-  assert(planning.includes('Competência finalizada e imutável'));
+  assert(planning.includes('PUBLIC_STEPS'));
+  assert(planning.includes('PRIVATE_STEPS'));
+  assert(planning.includes("label: 'Custos planejados'"));
+  assert(planning.includes("label: 'Medição apresentada'"));
+  assert(planning.includes("label: 'Medição aprovada'"));
+  assert(planning.includes("label: 'Recebíveis do período'"));
+  assert(planning.includes('Etapa {step} de {steps.length}'));
+  assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
+  assert(!planning.includes('checked={Boolean(item.confirmado)}'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
   assert(monthlyPlanning.includes('Novo mês'));
+  assert(monthlyPlanning.includes('Recebíveis do período'));
   assert(monthlyPlanning.includes('Receita recebida'));
   assert(dashboard.includes('Previsto x realizado por macro'));
   assert(dashboard.includes('Status das etapas'));
@@ -145,6 +152,7 @@ async function validatePrivateAntiDoubleCount() {
           codigo: 'REC-33',
           descricao: 'Titulo da parcela',
           tipo: 'RECEBER',
+          status: 'ABERTO',
           valor_original: 1250,
           data_vencimento: '2026-08-12'
         }
@@ -156,7 +164,98 @@ async function validatePrivateAntiDoubleCount() {
   assert.strictEqual(sources.length, 1);
   assert.strictEqual(sources[0].key, 'titulo:33');
   assert.strictEqual(sources[0].origem_exibicao, 'TITULO');
+  assert.strictEqual(sources[0].status_financeiro, 'ABERTO');
   assert.strictEqual(sources[0].valor_previsto, 1250);
+}
+
+async function validatePrivateReceiptsSyncOnFinalization() {
+  let persistedReceipts = [];
+  let auditPayload = null;
+  const competencia = {
+    id: 51,
+    obra_id: 11,
+    competencia: '2099-08',
+    estado: 'ABERTA',
+    plano_versao_snapshot: 1,
+    total_custo_previsto: 0,
+    total_receita_prevista: 0,
+    update: async function update(values) {
+      Object.assign(this, values);
+      return this;
+    }
+  };
+  const result = await finalizarCompetencia(
+    { id: 1 },
+    11,
+    '2099-08',
+    {},
+    'private-finish-1',
+    {
+      sequelize: transactionHarness(),
+      resolverEscopoObras: commonScope(),
+      Obra: {
+        findByPk: async () => ({
+          id: 11,
+          codigo: '11',
+          nome: 'Obra privada',
+          classificacao: 'PRIVADA'
+        })
+      },
+      CrPlanoObra: {
+        findOne: async () => ({ id: 4, versao: 1, situacao: 'PUBLICADA' })
+      },
+      CrCompetencia: {
+        findOne: async () => competencia
+      },
+      CrPrevisaoCusto: {
+        findAll: async () => [{ valor_previsto: 100 }]
+      },
+      CrPrevisaoReceita: {
+        destroy: async () => {
+          persistedReceipts = [];
+        },
+        bulkCreate: async (rows) => {
+          persistedReceipts = rows;
+          return rows;
+        },
+        findAll: async () => persistedReceipts
+      },
+      ContratoComercialParcela: {
+        findAll: async () => [{
+          id: 92,
+          descricao: 'Parcela agosto',
+          data_vencimento: '2099-08-10',
+          valor_original: 500,
+          contrato: {
+            id: 13,
+            numero: 'CT-13',
+            obra_id: 11,
+            status: 'ATIVO'
+          },
+          tituloFinanceiro: {
+            id: 34,
+            codigo: 'REC-34',
+            descricao: 'Recebivel de agosto',
+            tipo: 'RECEBER',
+            status: 'ABERTO',
+            valor_original: 500,
+            data_vencimento: '2099-08-10'
+          }
+        }]
+      },
+      CrReabertura: { findOne: async () => null },
+      CrAuditoria: {
+        create: async (payload) => {
+          auditPayload = payload.payload_json;
+        }
+      }
+    }
+  );
+  assert.strictEqual(result.idempotente, false);
+  assert.strictEqual(persistedReceipts.length, 1);
+  assert.strictEqual(persistedReceipts[0].titulo_financeiro_id, 34);
+  assert.strictEqual(competencia.total_receita_prevista, 500);
+  assert.strictEqual(auditPayload.recebiveis_automaticos, true);
 }
 
 async function validateFinalizationIdempotency() {
@@ -354,6 +453,7 @@ async function run() {
   validateBackendContracts();
   validateFrontendContracts();
   await validatePrivateAntiDoubleCount();
+  await validatePrivateReceiptsSyncOnFinalization();
   await validateFinalizationIdempotency();
   await validateFinalizedCompetencyIsImmutable();
   await validatePrivateWorkRejectsMeasurement();

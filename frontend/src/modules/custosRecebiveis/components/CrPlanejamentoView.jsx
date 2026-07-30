@@ -28,10 +28,16 @@ const currency = new Intl.NumberFormat('pt-BR', {
   currency: 'BRL'
 });
 
-const STEPS = [
-  { id: 1, label: 'Medição apresentada' },
-  { id: 2, label: 'Custos planejados' },
-  { id: 3, label: 'Revisão e envio' }
+const PUBLIC_STEPS = [
+  { id: 1, label: 'Custos planejados' },
+  { id: 2, label: 'Medição apresentada' },
+  { id: 3, label: 'Medição aprovada' },
+  { id: 4, label: 'Revisão e envio' }
+];
+
+const PRIVATE_STEPS = [
+  { id: 1, label: 'Custos planejados' },
+  { id: 2, label: 'Recebíveis do período' }
 ];
 
 function asNumber(value) {
@@ -43,6 +49,22 @@ function localExpiryDefault() {
   const date = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - (offset * 60 * 1000)).toISOString().slice(0, 16);
+}
+
+function privateReceiptStatusLabel(status) {
+  const normalized = String(status || '').toUpperCase();
+  const labels = {
+    PREVISTO_CONTRATO: 'Previsto em contrato',
+    ABERTO: 'Em aberto',
+    EM_ABERTO: 'Em aberto',
+    PENDENTE: 'Pendente',
+    VENCIDO: 'Vencido',
+    PAGO: 'Recebido',
+    RECEBIDO: 'Recebido',
+    QUITADO: 'Recebido',
+    CANCELADO: 'Cancelado'
+  };
+  return labels[normalized] || normalized.replaceAll('_', ' ') || 'Não informado';
 }
 
 export default function CrPlanejamentoView({
@@ -111,7 +133,8 @@ export default function CrPlanejamentoView({
     load();
   }, [load]);
 
-  const isPublic = data?.obra?.classificacao === 'PUBLICA';
+  const isPublic = (data?.obra?.classificacao || obra?.classificacao) === 'PUBLICA';
+  const steps = isPublic ? PUBLIC_STEPS : PRIVATE_STEPS;
   const readonly = data?.regras?.editavel === false;
   const totalCosts = useMemo(
     () => costs.reduce((sum, item) => sum + (asNumber(item.quantidade) * asNumber(item.custo_unitario)), 0),
@@ -120,8 +143,7 @@ export default function CrPlanejamentoView({
   const totalReceipts = useMemo(() => (
     isPublic
       ? receipts.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0)
-      : receipts.filter((item) => item.confirmado)
-        .reduce((sum, item) => sum + asNumber(item.valor_previsto), 0)
+      : receipts.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0)
   ), [isPublic, receipts]);
   const totalApproved = useMemo(
     () => measurements.reduce((sum, item) => sum + asNumber(item.valor_medido), 0),
@@ -256,13 +278,12 @@ export default function CrPlanejamentoView({
   }
 
   async function saveReceipts() {
-    const rows = isPublic
-      ? receipts.map((item) => ({
-        plano_item_id: item.plano_item_id,
-        quantidade_prevista: asNumber(item.quantidade_prevista),
-        data_prevista: item.data_prevista || null
-      }))
-      : receipts.filter((item) => item.confirmado).map((item) => ({ key: item.key }));
+    if (!isPublic) return;
+    const rows = receipts.map((item) => ({
+      plano_item_id: item.plano_item_id,
+      quantidade_prevista: asNumber(item.quantidade_prevista),
+      data_prevista: item.data_prevista || null
+    }));
     await runMutation(
       'receipts',
       () => salvarRecebiveisCompetencia(obra.id, competencia, rows),
@@ -356,6 +377,103 @@ export default function CrPlanejamentoView({
     );
   }
 
+  function renderClosureControls() {
+    return (
+      <>
+        {permissions.finish && data?.competencia?.estado !== 'FINALIZADA' ? (
+          <div className="cr-panel-actions cr-closure-actions">
+            <span>
+              {isPublic
+                ? 'Finalize depois de salvar custos e medição apresentada. A aprovação pode ser registrada quando o órgão responder.'
+                : 'Ao finalizar, os recebíveis exibidos são sincronizados automaticamente com as fontes oficiais.'}
+            </span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={Boolean(saving)}
+              onClick={finish}
+            >
+              <HiOutlineCheckCircle className="h-4 w-4" />
+              {saving === 'finish' ? 'Finalizando...' : 'Finalizar competência'}
+            </button>
+          </div>
+        ) : null}
+
+        {data?.regras?.exige_reabertura && permissions.reopenRequest ? (
+          <div className="cr-reopen-box">
+            <label className="cr-field">
+              <span>Motivo da reabertura</span>
+              <textarea
+                value={reopenReason}
+                onChange={(event) => setReopenReason(event.target.value)}
+                placeholder="Explique o ajuste necessário para auditoria."
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={reopenReason.trim().length < 10 || Boolean(saving)}
+              onClick={requestReopening}
+            >
+              Solicitar reabertura
+            </button>
+          </div>
+        ) : null}
+
+        {data?.reaberturas?.length ? (
+          <div className="cr-reopening-list">
+            <div className="cr-block-heading">
+              <div>
+                <h3>Histórico de reaberturas</h3>
+                <p>Decisão e prazo ficam vinculados à competência, com auditoria.</p>
+              </div>
+            </div>
+            {permissions.reopenApprove
+              && data.reaberturas.some((item) => item.situacao === 'SOLICITADA') ? (
+                <label className="cr-field cr-expiry-field">
+                  <span>Janela de edição até</span>
+                  <input
+                    type="datetime-local"
+                    value={decisionExpiry}
+                    onChange={(event) => setDecisionExpiry(event.target.value)}
+                  />
+                </label>
+              ) : null}
+            {data.reaberturas.map((item) => (
+              <article key={item.id} className="cr-reopening-row">
+                <div>
+                  <strong>{item.solicitante?.nome || `Usuário #${item.solicitado_por}`}</strong>
+                  <span>{item.motivo}</span>
+                </div>
+                <span className="cr-status-pill" data-status={item.situacao}>{item.situacao}</span>
+                {permissions.reopenApprove && item.situacao === 'SOLICITADA' ? (
+                  <div>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      disabled={Boolean(saving)}
+                      onClick={() => decideReopening(item.id, 'NEGADA')}
+                    >
+                      Negar
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      disabled={Boolean(saving)}
+                      onClick={() => decideReopening(item.id, 'APROVADA')}
+                    >
+                      Aprovar
+                    </button>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </>
+    );
+  }
+
   if (!obra?.id) {
     return (
       <section className="cr-section cr-empty-state cr-empty-state--large">
@@ -397,8 +515,12 @@ export default function CrPlanejamentoView({
         <div className="cr-lock-banner">
           <HiOutlineLockClosed className="h-5 w-5" />
           <div>
-            <strong>Competência finalizada e imutável</strong>
-            <span>Os dados permanecem disponíveis para consulta. A edição exige reabertura aprovada.</span>
+            <strong>Competência finalizada</strong>
+            <span>
+              {isPublic
+                ? 'Custos e medição apresentada estão congelados. A medição aprovada permanece disponível para registro quando o órgão responder.'
+                : 'Custos e recebíveis do período permanecem disponíveis para consulta. A edição dos custos exige reabertura aprovada.'}
+            </span>
           </div>
         </div>
       ) : null}
@@ -407,7 +529,7 @@ export default function CrPlanejamentoView({
       {feedback ? <div className="cr-feedback" data-tone="success">{feedback}</div> : null}
 
       <nav className="cr-stepper" aria-label="Etapas do planejamento">
-        {STEPS.map((item) => (
+        {steps.map((item) => (
           <button
             key={item.id}
             type="button"
@@ -420,15 +542,15 @@ export default function CrPlanejamentoView({
         ))}
       </nav>
 
-      {step === 1 ? (
+      {step === 2 ? (
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>{isPublic ? 'Medição apresentada no período' : 'Recebíveis contratuais da competência'}</h3>
+              <h3>{isPublic ? 'Medição apresentada no período' : 'Recebíveis cadastrados para o período'}</h3>
               <p>
                 {isPublic
                   ? 'A quantidade prevista usa o custo unitário congelado no plano publicado.'
-                  : 'Parcela vinculada a título aparece uma única vez como título a receber.'}
+                  : 'Consulta automática de parcelas e títulos a receber. O acompanhamento de vencimento e cobrança permanece no Financeiro.'}
               </p>
             </div>
           </div>
@@ -499,9 +621,10 @@ export default function CrPlanejamentoView({
                     </>
                   ) : (
                     <>
-                      <th>Confirmar</th>
-                      <th>Data prevista</th>
-                      <th>Valor previsto</th>
+                      <th>Documento</th>
+                      <th>Status financeiro</th>
+                      <th>Vencimento</th>
+                      <th>Valor</th>
                     </>
                   )}
                 </tr>
@@ -559,13 +682,11 @@ export default function CrPlanejamentoView({
                       </>
                     ) : (
                       <>
+                        <td>{item.documento || 'Parcela contratual'}</td>
                         <td>
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.confirmado)}
-                          disabled={readonly || !permissions.receipts}
-                          onChange={(event) => updateReceipt(index, 'confirmado', event.target.checked)}
-                        />
+                          <span className="cr-status-pill" data-status={item.status_financeiro}>
+                            {privateReceiptStatusLabel(item.status_financeiro)}
+                          </span>
                         </td>
                         <td>{item.data_prevista}</td>
                         <td>{currency.format(item.valor_previsto || 0)}</td>
@@ -575,10 +696,10 @@ export default function CrPlanejamentoView({
                 ))}
                 {!receipts.length ? (
                   <tr>
-                    <td colSpan={isPublic ? 7 : 4} className="cr-table-empty">
+                    <td colSpan={isPublic ? 7 : 5} className="cr-table-empty">
                       {isPublic
                         ? 'Pesquise e adicione somente os serviços executados nesta medição.'
-                        : 'Nenhum recebível contratual encontrado para a competência.'}
+                        : 'Nenhuma parcela ou título a receber encontrado para a competência.'}
                     </td>
                   </tr>
                 ) : null}
@@ -586,22 +707,53 @@ export default function CrPlanejamentoView({
             </table>
           </div>
           <div className="cr-panel-actions">
-            <strong>{isPublic ? 'Total apresentado' : 'Total previsto'}: {currency.format(totalReceipts)}</strong>
-            {permissions.receipts ? (
+            <strong>{isPublic ? 'Total apresentado' : 'Total cadastrado'}: {currency.format(totalReceipts)}</strong>
+            {isPublic && permissions.receipts ? (
               <button
                 type="button"
                 className="btn btn-primary"
                 disabled={readonly || Boolean(saving)}
                 onClick={saveReceipts}
               >
-                {saving === 'receipts' ? 'Salvando...' : 'Salvar recebíveis'}
+                {saving === 'receipts' ? 'Salvando...' : 'Salvar medição apresentada'}
               </button>
-            ) : null}
+            ) : (
+              !isPublic ? (
+                <span className="cr-automatic-source">
+                  Fonte automática: contratos e títulos do Financeiro
+                </span>
+              ) : null
+            )}
           </div>
+          {!isPublic ? (
+            <div className="cr-private-closeout">
+              <div className="cr-review-summary">
+                <div><span>Custos planejados</span><strong>{currency.format(totalCosts)}</strong></div>
+                <div><span>Recebíveis do período</span><strong>{currency.format(totalReceipts)}</strong></div>
+                <div data-tone={totalReceipts - totalCosts >= 0 ? 'positive' : 'negative'}>
+                  <span>Margem prevista</span>
+                  <strong>{currency.format(totalReceipts - totalCosts)}</strong>
+                </div>
+              </div>
+              {renderClosureControls()}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
-          {isPublic && permissions.measurementView ? (
-            <details className="cr-measurement-panel">
-              <summary>Medição aprovada pelo órgão e glosas</summary>
+      {step === 3 && isPublic ? (
+        <div className="cr-planning-panel cr-measurement-panel">
+          <div className="cr-block-heading">
+            <div>
+              <h3>Medição aprovada pelo órgão</h3>
+              <p>
+                Registre o valor reconhecido pelo órgão. A diferença para o apresentado
+                será tratada como glosa e exigirá justificativa.
+              </p>
+            </div>
+          </div>
+          {permissions.measurementView ? (
+            <>
               <div className="cr-table-shell cr-planning-table">
                 <table>
                   <thead>
@@ -682,30 +834,41 @@ export default function CrPlanejamentoView({
                         </tr>
                       );
                     })}
+                    {!measurements.length ? (
+                      <tr>
+                        <td colSpan="7" className="cr-table-empty">
+                          Salve primeiro a medição apresentada para registrar a aprovação do órgão.
+                        </td>
+                      </tr>
+                    ) : null}
                   </tbody>
                 </table>
               </div>
-              {permissions.measurement ? (
-                <div className="cr-panel-actions">
-                  <span>
-                    Aprovado: {currency.format(totalApproved)} · Glosa: {currency.format(totalGlosa)}
-                  </span>
+              <div className="cr-panel-actions">
+                <span>
+                  Aprovado: {currency.format(totalApproved)} · Glosa: {currency.format(totalGlosa)}
+                </span>
+                {permissions.measurement ? (
                   <button
                     type="button"
-                    className="btn btn-outline"
-                    disabled={Boolean(saving)}
+                    className="btn btn-primary"
+                    disabled={!measurements.length || Boolean(saving)}
                     onClick={saveMeasurement}
                   >
                     {saving === 'measurement' ? 'Registrando...' : 'Registrar medição aprovada'}
                   </button>
-                </div>
-              ) : null}
-            </details>
-          ) : null}
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="cr-empty-state">
+              Você não possui permissão para visualizar a medição aprovada.
+            </div>
+          )}
         </div>
       ) : null}
 
-      {step === 2 ? (
+      {step === 1 ? (
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
@@ -839,17 +1002,16 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      {step === 3 ? (
+      {step === 4 && isPublic ? (
         <div className="cr-review-layout">
           <div className="cr-review-summary">
-            <div><span>Medição apresentada</span><strong>{currency.format(totalReceipts)}</strong></div>
             <div><span>Custos planejados</span><strong>{currency.format(totalCosts)}</strong></div>
-            {isPublic ? (
-              <div data-tone={totalGlosa > 0 ? 'negative' : 'positive'}>
-                <span>Glosa registrada</span>
-                <strong>{currency.format(totalGlosa)}</strong>
-              </div>
-            ) : null}
+            <div><span>Medição apresentada</span><strong>{currency.format(totalReceipts)}</strong></div>
+            <div><span>Medição aprovada</span><strong>{currency.format(totalApproved)}</strong></div>
+            <div data-tone={totalGlosa > 0 ? 'negative' : 'positive'}>
+              <span>Glosa registrada</span>
+              <strong>{currency.format(totalGlosa)}</strong>
+            </div>
             <div data-tone={totalReceipts - totalCosts >= 0 ? 'positive' : 'negative'}>
               <span>Margem prevista</span>
               <strong>{currency.format(totalReceipts - totalCosts)}</strong>
@@ -865,92 +1027,7 @@ export default function CrPlanejamentoView({
               </span>
             </div>
           </div>
-          {permissions.finish && data?.competencia?.estado !== 'FINALIZADA' ? (
-            <div className="cr-panel-actions">
-              <span>Finalize somente depois de salvar as etapas 1 e 2.</span>
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={Boolean(saving)}
-                onClick={finish}
-              >
-                <HiOutlineCheckCircle className="h-4 w-4" />
-                {saving === 'finish' ? 'Finalizando...' : 'Finalizar competência'}
-              </button>
-            </div>
-          ) : null}
-
-          {data?.regras?.exige_reabertura && permissions.reopenRequest ? (
-            <div className="cr-reopen-box">
-              <label className="cr-field">
-                <span>Motivo da reabertura</span>
-                <textarea
-                  value={reopenReason}
-                  onChange={(event) => setReopenReason(event.target.value)}
-                  placeholder="Explique o ajuste necessário para auditoria."
-                />
-              </label>
-              <button
-                type="button"
-                className="btn btn-outline"
-                disabled={reopenReason.trim().length < 10 || Boolean(saving)}
-                onClick={requestReopening}
-              >
-                Solicitar reabertura
-              </button>
-            </div>
-          ) : null}
-
-          {data?.reaberturas?.length ? (
-            <div className="cr-reopening-list">
-              <div className="cr-block-heading">
-                <div>
-                  <h3>Histórico de reaberturas</h3>
-                  <p>Decisão e prazo ficam vinculados à competência, com auditoria.</p>
-                </div>
-              </div>
-              {permissions.reopenApprove
-                && data.reaberturas.some((item) => item.situacao === 'SOLICITADA') ? (
-                  <label className="cr-field cr-expiry-field">
-                    <span>Janela de edição até</span>
-                    <input
-                      type="datetime-local"
-                      value={decisionExpiry}
-                      onChange={(event) => setDecisionExpiry(event.target.value)}
-                    />
-                  </label>
-                ) : null}
-              {data.reaberturas.map((item) => (
-                <article key={item.id} className="cr-reopening-row">
-                  <div>
-                    <strong>{item.solicitante?.nome || `Usuário #${item.solicitado_por}`}</strong>
-                    <span>{item.motivo}</span>
-                  </div>
-                  <span className="cr-status-pill" data-status={item.situacao}>{item.situacao}</span>
-                  {permissions.reopenApprove && item.situacao === 'SOLICITADA' ? (
-                    <div>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        disabled={Boolean(saving)}
-                        onClick={() => decideReopening(item.id, 'NEGADA')}
-                      >
-                        Negar
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        disabled={Boolean(saving)}
-                        onClick={() => decideReopening(item.id, 'APROVADA')}
-                      >
-                        Aprovar
-                      </button>
-                    </div>
-                  ) : null}
-                </article>
-              ))}
-            </div>
-          ) : null}
+          {renderClosureControls()}
         </div>
       ) : null}
 
@@ -964,12 +1041,12 @@ export default function CrPlanejamentoView({
           <HiOutlineChevronLeft className="h-4 w-4" />
           Anterior
         </button>
-        <span>Etapa {step} de {STEPS.length}</span>
+        <span>Etapa {step} de {steps.length}</span>
         <button
           type="button"
           className="btn btn-outline"
-          disabled={step === STEPS.length}
-          onClick={() => setStep((current) => Math.min(STEPS.length, current + 1))}
+          disabled={step === steps.length}
+          onClick={() => setStep((current) => Math.min(steps.length, current + 1))}
         >
           Próxima
           <HiOutlineChevronRight className="h-4 w-4" />
