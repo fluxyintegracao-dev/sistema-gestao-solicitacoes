@@ -209,7 +209,7 @@ inativo. O limite atual e de 10 MB e 10.000 linhas.
 ### Rotas
 
 ```text
-GET  /custos-recebiveis/dashboard?competencia=AAAA-MM
+GET  /custos-recebiveis/dashboard?competencia=AAAA-MM&obra_id=
 GET  /custos-recebiveis/obras/:obraId/competencias
 POST /custos-recebiveis/obras/:obraId/competencias
 GET  /custos-recebiveis/obras/:obraId/plano/itens?competencia=AAAA-MM&q=&page=&limit=
@@ -297,9 +297,21 @@ DENTRO        realizado <= previsto
 ESTOURO       realizado > previsto
 ```
 
-O dashboard consolida custos planejados e realizados por macro e apresenta o estado
-das obras do escopo. No mesmo painel, os recebiveis permanecem separados em medicao
-apresentada, medicao aprovada, glosa e receita efetivamente recebida.
+O dashboard respeita a obra selecionada no contexto. Com `obra_id`, apresenta custos,
+recebiveis, serie historica de seis competencias e detalhamento apenas das macros com
+movimento daquela obra. Sem `obra_id`, consolida todas as obras autorizadas, mas nao
+mistura ou detalha macros de obras diferentes.
+
+O antigo painel de status de todas as obras foi substituido por pontos de atencao
+acionaveis: custo acima do planejado, glosa, movimento sem mapeamento, medicao
+aguardando aprovacao, recebivel privado vencido, planejamento ausente e obrigacao
+mensal vencida. Cada alerta direciona para a aba operacional correspondente.
+
+Os indicadores sao adaptados a classificacao da obra. Obras publicas exibem medicao
+apresentada, aprovada, glosa, receita recebida e saldo. Obras privadas exibem
+recebivel previsto, recebido, saldo e quantidade de titulos vencidos. No consolidado,
+o valor reconhecido combina medicao publica aprovada e recebiveis privados previstos,
+sem somar a receita recebida ao reconhecimento.
 
 O comparativo detalha item, macro, custo planejado, custo realizado, desvio,
 percentual e estado. Acima do detalhamento, apresenta os quatro indicadores de
@@ -323,10 +335,22 @@ de escopo.
 
 ### Fonte oficial e idempotencia
 
+- A aba `Custo realizado` usa exclusivamente titulos financeiros `PAGAR` como razao de
+  custos alocados a obra. Ela nao consulta nem lista pedidos de compra ou solicitacoes.
+- A visao principal lista todos os titulos da obra, independentemente do status, e
+  permite alternar para os titulos com vencimento dentro da competencia selecionada.
+- Cada titulo apresenta valor alocado a obra, valor pago, saldo, credor, categoria,
+  apropriacao e status financeiro. Titulos rateados usam somente a parcela destinada
+  a obra; os valores pago e saldo sao proporcionais ao rateio.
+- Titulos cancelados ou estornados permanecem visiveis para rastreabilidade, mas nao
+  compoem os totais ativos de custo.
+- O resumo separa total alocado, saldo em aberto, valor pago e total com vencimento na
+  competencia. Os filtros distinguem aberto, parcial, quitado, previsao e demais
+  estados sem alterar o cadastro financeiro.
+- A projecao `cr_realizados`, usada pelo dashboard, comparativo e exportacoes para
+  representar caixa realizado, continua seguindo as regras de baixas abaixo.
 - Somente `MovimentoFinanceiro` do tipo `BAIXA`, com `status = ATIVO`, vinculado a
   titulo `PAGAR`, entra no custo realizado.
-- Pedido, solicitacao e titulo aparecem na cadeia de rastreabilidade, mas nunca sao
-  somados ao realizado.
 - O valor usa `valor_quitacao`, com fallback para `valor`, e a competencia e o mes de
   `data_movimento`.
 - O rateio do titulo e preferencial. Sem ele, o projetor tenta apropriacao do titulo,

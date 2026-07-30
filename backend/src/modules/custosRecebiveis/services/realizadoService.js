@@ -17,11 +17,9 @@ function dependencies(overrides = {}) {
     Parceiro: db.Parceiro,
     Solicitacao: db.Solicitacao,
     SolicitacaoApropriacao: db.SolicitacaoApropriacao,
-    SolicitacaoCompra: db.SolicitacaoCompra,
-    PedidoCompra: db.PedidoCompra,
-    FornecedorCompra: db.FornecedorCompra,
     TituloFinanceiro: db.TituloFinanceiro,
     TituloFinanceiroRateio: db.TituloFinanceiroRateio,
+    CategoriaFinanceira: db.CategoriaFinanceira,
     MovimentoFinanceiro: db.MovimentoFinanceiro,
     CrPlanoObra: db.CrPlanoObra,
     CrPlanoItem: db.CrPlanoItem,
@@ -603,131 +601,199 @@ function serializeRealized(rowValue, chain = {}) {
   };
 }
 
-async function buildPurchaseChain(rows, deps) {
-  const requestIds = [...new Set(rows.map((row) => (
-    Number(plain(plain(row).tituloFinanceiro).solicitacao_id)
-  )).filter((id) => id > 0))];
-  if (!requestIds.length) return new Map();
-  const purchaseRequests = await deps.SolicitacaoCompra.findAll({
-    where: { solicitacao_principal_id: { [Op.in]: requestIds } },
-    attributes: ['id', 'solicitacao_principal_id'],
-    raw: true
-  });
-  const purchaseIds = purchaseRequests.map((item) => Number(item.id));
-  const orders = purchaseIds.length
-    ? await deps.PedidoCompra.findAll({
-      where: { solicitacao_compra_id: { [Op.in]: purchaseIds } },
-      attributes: ['id', 'solicitacao_compra_id', 'status'],
-      order: [['id', 'DESC']],
-      raw: true
-    })
-    : [];
-  const requestByPurchase = new Map(
-    purchaseRequests.map((item) => [Number(item.id), Number(item.solicitacao_principal_id)])
-  );
-  const chain = new Map();
-  orders.forEach((order) => {
-    const requestId = requestByPurchase.get(Number(order.solicitacao_compra_id));
-    if (!requestId || chain.has(requestId)) return;
-    chain.set(requestId, {
-      id: Number(order.id),
-      codigo: `PC-${String(order.id).padStart(5, '0')}`,
-      status: order.status
-    });
-  });
-  return chain;
+const TITLE_SETTLED_STATUSES = new Set([
+  'BAIXADO',
+  'CONCILIADO',
+  'PAGO',
+  'PAGA',
+  'QUITADO',
+  'QUITADA'
+]);
+const TITLE_INACTIVE_STATUSES = new Set(['CANCELADO', 'CANCELADA', 'ESTORNADO', 'ESTORNADA']);
+
+function titleStatusGroup(statusValue) {
+  const status = String(statusValue || '').trim().toUpperCase();
+  if (TITLE_SETTLED_STATUSES.has(status)) return 'QUITADO';
+  if (status === 'PARCIAL') return 'PARCIAL';
+  if (status === 'ABERTO' || status === 'ABERTA') return 'ABERTO';
+  if (status === 'PREVISAO' || status === 'PREVISÃO') return 'PREVISAO';
+  if (TITLE_INACTIVE_STATUSES.has(status)) return 'INATIVO';
+  return 'OUTRO';
 }
 
-async function listarCamadasOperacionais(obraId, competencia, deps) {
+function serializeAllocatedTitle(titleValue, obraId, competencia) {
+  const title = plain(titleValue);
+  const rateios = (title.rateios || []).map(plain);
+  const workAllocations = rateios.filter((item) => Number(item.obra_id) === Number(obraId));
+  const hasAuthoritativeAllocations = Boolean(title.possui_rateio) || rateios.length > 0;
+  const originalTitleValue = money(title.valor_original);
+  const allocatedValue = hasAuthoritativeAllocations
+    ? money(workAllocations.reduce((sum, item) => sum + number(item.valor_rateio), 0))
+    : (Number(title.obra_id) === Number(obraId) ? originalTitleValue : 0);
+  if (allocatedValue <= 0) return null;
+
+  const allocationRatio = originalTitleValue > 0
+    ? Math.min(1, allocatedValue / originalTitleValue)
+    : 0;
+  const paidValue = money(Math.min(
+    allocatedValue,
+    Math.max(0, number(title.valor_baixado)) * allocationRatio
+  ));
+  const balanceValue = money(Math.min(
+    allocatedValue,
+    Math.max(0, number(title.valor_saldo)) * allocationRatio
+  ));
+  const status = String(title.status || '').trim().toUpperCase() || 'SEM_STATUS';
+  const statusGroup = titleStatusGroup(status);
+  const dueDate = title.data_vencimento || null;
   const { first, nextMonth } = monthRange(competencia);
-  const [titles, orders] = await Promise.all([
-    deps.TituloFinanceiro.findAll({
-      where: {
-        obra_id: obraId,
-        tipo: 'PAGAR',
-        status: { [Op.notIn]: ['QUITADO', 'CANCELADO', 'PREVISAO'] },
-        data_vencimento: { [Op.gte]: first, [Op.lt]: nextMonth }
-      },
-      include: [
-        {
-          model: deps.Parceiro,
-          as: 'parceiro',
-          required: false,
-          attributes: ['id', 'nome', 'cpf_cnpj']
-        },
-        {
-          model: deps.Solicitacao,
-          as: 'solicitacao',
-          required: false,
-          attributes: ['id', 'codigo']
-        }
-      ],
-      order: [['data_vencimento', 'ASC'], ['id', 'ASC']]
-    }),
-    deps.PedidoCompra.findAll({
-      where: {
-        obra_id: obraId,
-        status: { [Op.notIn]: ['CANCELADO', 'REABERTO'] },
-        createdAt: { [Op.gte]: first, [Op.lt]: nextMonth }
-      },
-      include: [{
-        model: deps.FornecedorCompra,
-        as: 'fornecedor',
+  const directAppropriation = plain(title.apropriacao);
+  const allocationAppropriations = workAllocations
+    .map((item) => plain(item.apropriacao))
+    .filter((item) => item.id);
+  const appropriations = allocationAppropriations.length
+    ? allocationAppropriations
+    : (directAppropriation.id ? [directAppropriation] : []);
+  const partner = plain(title.parceiro);
+  const category = plain(title.categoriaFinanceira);
+
+  return {
+    id: Number(title.id),
+    codigo: title.codigo || null,
+    descricao: title.descricao,
+    numero_documento: title.numero_documento || null,
+    status,
+    grupo_status: statusGroup,
+    origem_titulo: title.origem_titulo || null,
+    data_emissao: title.data_emissao || null,
+    data_vencimento: dueDate,
+    data_quitacao: title.data_quitacao || null,
+    valor_alocado: allocatedValue,
+    valor_pago: paidValue,
+    valor_saldo: balanceValue,
+    em_competencia: Boolean(dueDate && dueDate >= first && dueDate < nextMonth),
+    ativo_no_custo: statusGroup !== 'INATIVO',
+    parceiro: partner.id ? {
+      id: Number(partner.id),
+      nome: partner.nome,
+      cpf_cnpj: partner.cpf_cnpj || null
+    } : null,
+    categoria: category.id ? {
+      id: Number(category.id),
+      nome: category.nome
+    } : null,
+    apropriacoes: appropriations.map((item) => ({
+      id: Number(item.id),
+      codigo: item.codigo || null,
+      nome: item.descricao || null
+    }))
+  };
+}
+
+function summarizeAllocatedTitles(items = []) {
+  const active = items.filter((item) => item.ativo_no_custo);
+  const byGroup = (group) => active.filter((item) => item.grupo_status === group);
+  const inCompetence = active.filter((item) => item.em_competencia);
+  return {
+    titulos: items.length,
+    titulos_ativos: active.length,
+    total_alocado: money(active.reduce((sum, item) => sum + number(item.valor_alocado), 0)),
+    total_pago: money(active.reduce((sum, item) => sum + number(item.valor_pago), 0)),
+    saldo_aberto: money(active.reduce((sum, item) => sum + number(item.valor_saldo), 0)),
+    vencimento_competencia: money(
+      inCompetence.reduce((sum, item) => sum + number(item.valor_alocado), 0)
+    ),
+    titulos_competencia: inCompetence.length,
+    status: {
+      aberto: byGroup('ABERTO').length,
+      parcial: byGroup('PARCIAL').length,
+      quitado: byGroup('QUITADO').length,
+      previsao: byGroup('PREVISAO').length,
+      outros: byGroup('OUTRO').length,
+      inativos: items.filter((item) => item.grupo_status === 'INATIVO').length
+    }
+  };
+}
+
+async function listarTitulosFinanceirosAlocados(obraId, competencia, deps) {
+  const allocationRows = await deps.TituloFinanceiroRateio.findAll({
+    where: { obra_id: obraId },
+    attributes: ['titulo_financeiro_id'],
+    raw: true
+  });
+  const allocatedTitleIds = [...new Set(
+    allocationRows.map((item) => Number(item.titulo_financeiro_id)).filter((id) => id > 0)
+  )];
+  const workConditions = [{ obra_id: obraId }];
+  if (allocatedTitleIds.length) {
+    workConditions.push({ id: { [Op.in]: allocatedTitleIds } });
+  }
+  const titles = await deps.TituloFinanceiro.findAll({
+    where: {
+      tipo: 'PAGAR',
+      [Op.or]: workConditions
+    },
+    attributes: [
+      'id',
+      'codigo',
+      'obra_id',
+      'apropriacao_id',
+      'possui_rateio',
+      'parceiro_id',
+      'categoria_financeira_id',
+      'origem_titulo',
+      'status',
+      'descricao',
+      'numero_documento',
+      'valor_original',
+      'valor_saldo',
+      'valor_baixado',
+      'data_emissao',
+      'data_vencimento',
+      'data_quitacao'
+    ],
+    include: [
+      {
+        model: deps.Parceiro,
+        as: 'parceiro',
         required: false,
-        attributes: ['id', 'nome', 'cnpj']
-      }],
-      order: [['createdAt', 'ASC'], ['id', 'ASC']]
-    })
-  ]);
-  const titleRows = titles.map((titleValue) => {
-    const title = plain(titleValue);
-    return {
-      key: `incorrido:${title.id}`,
-      tipo: 'TITULO',
-      estado: 'INCORRIDO',
-      valor: money(title.valor_saldo || title.valor_original),
-      data: title.data_vencimento || null,
-      solicitacao: title.solicitacao?.id ? {
-        id: Number(title.solicitacao.id),
-        codigo: title.solicitacao.codigo || null
-      } : null,
-      pedido: null,
-      titulo: {
-        id: Number(title.id),
-        codigo: title.codigo || null,
-        descricao: title.descricao,
-        status: title.status
+        attributes: ['id', 'nome', 'cpf_cnpj']
       },
-      parceiro: title.parceiro?.id ? {
-        id: Number(title.parceiro.id),
-        nome: title.parceiro.nome,
-        cpf_cnpj: title.parceiro.cpf_cnpj || null
-      } : null
-    };
-  });
-  const orderRows = orders.map((orderValue) => {
-    const order = plain(orderValue);
-    return {
-      key: `comprometido:${order.id}`,
-      tipo: 'PEDIDO',
-      estado: 'COMPROMETIDO',
-      valor: money(order.valor_total),
-      data: order.createdAt || null,
-      solicitacao: null,
-      pedido: {
-        id: Number(order.id),
-        codigo: `PC-${String(order.id).padStart(5, '0')}`,
-        status: order.status
+      {
+        model: deps.CategoriaFinanceira,
+        as: 'categoriaFinanceira',
+        required: false,
+        attributes: ['id', 'nome']
       },
-      titulo: null,
-      parceiro: order.fornecedor?.id ? {
-        id: Number(order.fornecedor.id),
-        nome: order.fornecedor.nome,
-        cpf_cnpj: order.fornecedor.cnpj || null
-      } : null
-    };
+      {
+        model: deps.Apropriacao,
+        as: 'apropriacao',
+        required: false,
+        attributes: ['id', 'codigo', 'descricao']
+      },
+      {
+        model: deps.TituloFinanceiroRateio,
+        as: 'rateios',
+        required: false,
+        attributes: ['id', 'obra_id', 'apropriacao_id', 'valor_rateio'],
+        include: [{
+          model: deps.Apropriacao,
+          as: 'apropriacao',
+          required: false,
+          attributes: ['id', 'codigo', 'descricao']
+        }]
+      }
+    ],
+    order: [['data_vencimento', 'DESC'], ['id', 'DESC']]
   });
-  return [...orderRows, ...titleRows];
+  return titles
+    .map((title) => serializeAllocatedTitle(title, obraId, competencia))
+    .filter(Boolean)
+    .sort((a, b) => (
+      Number(b.em_competencia) - Number(a.em_competencia)
+      || String(b.data_vencimento || '').localeCompare(String(a.data_vencimento || ''))
+      || b.id - a.id
+    ));
 }
 
 async function listarRealizados(user, obraIdValue, competenciaValue, overrides = {}) {
@@ -735,20 +801,28 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
   const obraId = positiveId(obraIdValue, 'Obra');
   const competencia = normalizeCompetencia(competenciaValue);
   await assertScope(user, obraId, deps);
-  const [obra, competency, planContext] = await Promise.all([
+  const [obra, competency, planContext, allocatedTitles] = await Promise.all([
     deps.Obra.findByPk(obraId, { attributes: ['id', 'codigo', 'nome', 'classificacao'] }),
     deps.CrCompetencia.findOne({ where: { obra_id: obraId, competencia } }),
-    findPlanContext(obraId, competencia, deps)
+    findPlanContext(obraId, competencia, deps),
+    listarTitulosFinanceirosAlocados(obraId, competencia, deps)
   ]);
   if (!obra) throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
+  const titleSummary = summarizeAllocatedTitles(allocatedTitles);
   if (!competency) {
-    const contextos = await listarCamadasOperacionais(obraId, competencia, deps);
     return {
       obra: plain(obra),
       competencia,
-      resumo: { realizado: 0, nao_mapeado: 0, baixas_ativas: 0, estornos: 0 },
+      resumo: {
+        realizado: 0,
+        nao_mapeado: 0,
+        baixas_ativas: 0,
+        estornos: 0,
+        ...titleSummary
+      },
       itens_plano: planContext.items,
-      contextos,
+      titulos: allocatedTitles,
+      contextos: [],
       items: []
     };
   }
@@ -766,20 +840,12 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
         as: 'tituloFinanceiro',
         required: false,
         attributes: ['id', 'codigo', 'descricao', 'status', 'solicitacao_id', 'parceiro_id'],
-        include: [
-          {
-            model: deps.Parceiro,
-            as: 'parceiro',
-            required: false,
-            attributes: ['id', 'nome', 'cpf_cnpj']
-          },
-          {
-            model: deps.Solicitacao,
-            as: 'solicitacao',
-            required: false,
-            attributes: ['id', 'codigo']
-          }
-        ]
+        include: [{
+          model: deps.Parceiro,
+          as: 'parceiro',
+          required: false,
+          attributes: ['id', 'nome', 'cpf_cnpj']
+        }]
       },
       {
         model: deps.CrPlanoItem,
@@ -793,15 +859,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
       ['id', 'DESC']
     ]
   });
-  const chainByRequest = await buildPurchaseChain(rows, deps);
-  const items = rows.map((row) => {
-    const title = plain(plain(row).tituloFinanceiro);
-    return serializeRealized(row, {
-      pedido: chainByRequest.get(Number(title.solicitacao_id)) || null
-    });
-  });
+  const items = rows.map((row) => serializeRealized(row));
   const activeItems = items.filter((item) => item.ativo && item.valor !== 0);
-  const contextos = await listarCamadasOperacionais(obraId, competencia, deps);
   return {
     obra: plain(obra),
     competencia,
@@ -812,7 +871,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
         .filter((item) => item.estado === 'NAO_MAPEADO')
         .reduce((sum, item) => sum + item.valor, 0)),
       baixas_ativas: activeItems.length,
-      estornos: items.filter((item) => item.estado === 'ESTORNADO').length
+      estornos: items.filter((item) => item.estado === 'ESTORNADO').length,
+      ...titleSummary
     },
     itens_plano: planContext.items.map((item) => ({
       id: Number(item.id),
@@ -820,7 +880,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
       descricao: item.descricao,
       etapa_macro_codigo: item.etapa_macro_codigo || null
     })),
-    contextos,
+    titulos: allocatedTitles,
+    contextos: [],
     items
   };
 }
@@ -921,11 +982,14 @@ module.exports = {
   buildProjectionRows,
   dependencies,
   listarRealizados,
-  listarCamadasOperacionais,
+  listarTitulosFinanceirosAlocados,
   monthRange,
   normalizeCompetencia,
   reconciliarRealizado,
   reprocessarRealizados,
   resolveNaturalAllocations,
-  resolverObraIdPorRealizado
+  resolverObraIdPorRealizado,
+  serializeAllocatedTitle,
+  summarizeAllocatedTitles,
+  titleStatusGroup
 };

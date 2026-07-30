@@ -6,12 +6,14 @@ const path = require('path');
 const {
   assertCompetenciaNovoMes,
   consolidarMedicao,
+  dashboardCompetencias,
   finalizarCompetencia,
   findPrivateSources,
   monthRange,
   normalizeCompetencia,
   salvarCustos,
-  statusComparativo
+  statusComparativo,
+  summarizeDashboardRows
 } = require('../services/planejamentoService');
 
 const moduleRoot = path.resolve(__dirname, '..');
@@ -44,6 +46,38 @@ function validateCompetenciaBoundaries() {
   assert.throws(
     () => assertCompetenciaNovoMes('2026-09', new Date('2026-07-15T12:00:00-03:00')),
     /Novo mes permite somente/
+  );
+  assert.deepStrictEqual(
+    dashboardCompetencias('2026-02'),
+    ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']
+  );
+  assert.deepStrictEqual(
+    summarizeDashboardRows([{
+      custo_planejado: 100,
+      custo_realizado: 120,
+      recebivel_previsto: 180,
+      recebivel_reconhecido: 150,
+      receita_recebida: 90,
+      glosa: 30,
+      medicao_aprovada: 150,
+      movimentos_sem_mapeamento: 2,
+      recebiveis_vencidos: 1
+    }]),
+    {
+      custo_planejado: 100,
+      custo_realizado: 120,
+      desvio_custo: 20,
+      percentual_custo: 120,
+      recebivel_previsto: 180,
+      recebivel_reconhecido: 150,
+      receita_recebida: 90,
+      saldo_receber: 60,
+      glosa: 30,
+      tem_medicao_aprovada: true,
+      obras_com_custo_acima: 1,
+      movimentos_sem_mapeamento: 2,
+      recebiveis_vencidos: 1
+    }
   );
 }
 
@@ -90,6 +124,9 @@ function validateBackendContracts() {
   assert(!service.includes('Apropriacao.update'));
   assert(!service.includes('Apropriacao.destroy'));
   assert(controller.includes("req.get('Idempotency-Key')"));
+  assert(controller.includes('req.query.obra_id'));
+  assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
+  assert(service.includes('macros: selectedObraId ? macros : []'));
 }
 
 function validateFrontendContracts() {
@@ -127,8 +164,13 @@ function validateFrontendContracts() {
   assert(monthlyPlanning.includes('Recebíveis do período'));
   assert(monthlyPlanning.includes('Receita recebida'));
   assert(monthlyPlanning.includes("obra?.classificacao === 'PUBLICA'"));
-  assert(dashboard.includes('Previsto x realizado por macro'));
-  assert(dashboard.includes('Status das etapas'));
+  assert(dashboard.includes('Pontos de atenção'));
+  assert(dashboard.includes('Evolução de custos'));
+  assert(dashboard.includes('Evolução de recebíveis'));
+  assert(dashboard.includes('Custos por macro'));
+  assert(!dashboard.includes('Status das etapas'));
+  assert(page.includes('obra={selectedObra}'));
+  assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
 }
 

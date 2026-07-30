@@ -4,7 +4,8 @@ import {
   HiOutlineArrowsRightLeft,
   HiOutlineBanknotes,
   HiOutlineExclamationTriangle,
-  HiOutlineLink
+  HiOutlineLink,
+  HiOutlineMagnifyingGlass
 } from 'react-icons/hi2';
 import {
   obterCustosRealizados,
@@ -14,11 +15,32 @@ import {
 import CrStatusPill from './CrStatusPill';
 
 const STATUS_LABELS = {
-  BAIXA_ATIVA: 'Baixa ativa',
-  NAO_MAPEADO: 'Não mapeado',
+  ABERTO: 'Aberto',
+  ABERTA: 'Aberto',
+  PARCIAL: 'Parcialmente pago',
+  QUITADO: 'Quitado',
+  QUITADA: 'Quitado',
+  BAIXADO: 'Quitado',
+  PAGO: 'Quitado',
+  PAGA: 'Quitado',
+  CONCILIADO: 'Quitado',
+  PREVISAO: 'Previsão',
+  CANCELADO: 'Cancelado',
+  CANCELADA: 'Cancelado',
   ESTORNADO: 'Estornado',
-  COMPROMETIDO: 'Comprometido',
-  INCORRIDO: 'Incorrido'
+  ESTORNADA: 'Estornado',
+  BAIXA_ATIVA: 'Baixa ativa',
+  NAO_MAPEADO: 'Não mapeado'
+};
+
+const GROUP_LABELS = {
+  TODOS: 'Todos',
+  ABERTO: 'Abertos',
+  PARCIAL: 'Parciais',
+  QUITADO: 'Quitados',
+  PREVISAO: 'Previsões',
+  OUTRO: 'Outros',
+  INATIVO: 'Inativos'
 };
 
 function currency(value) {
@@ -33,12 +55,36 @@ function formatDate(value) {
   return new Date(`${String(value).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR');
 }
 
-function chainLabel(item) {
-  return [
-    item.solicitacao?.codigo,
-    item.pedido?.codigo,
-    item.titulo?.codigo
-  ].filter(Boolean).join(' → ') || 'Título sem origem operacional';
+function formatMonth(value) {
+  if (!value) return '-';
+  const [year, month] = String(value).split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-BR', {
+    month: 'long',
+    year: 'numeric'
+  }).format(new Date(year, month - 1, 1));
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function titleReference(item) {
+  return item.codigo || item.numero_documento || `Título #${item.id}`;
+}
+
+function appropriationLabel(item) {
+  const values = (item.apropriacoes || []).map((appropriation) => (
+    [appropriation.codigo, appropriation.nome].filter(Boolean).join(' · ')
+  ));
+  return values.length ? values.join(', ') : 'Sem apropriação';
+}
+
+function reconciliationTitle(item) {
+  return item.titulo?.codigo || `Título #${item.titulo?.id || item.id}`;
 }
 
 export default function CrRealizadoView({
@@ -51,6 +97,9 @@ export default function CrRealizadoView({
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [scopeFilter, setScopeFilter] = useState('TODOS');
+  const [statusFilter, setStatusFilter] = useState('TODOS');
+  const [search, setSearch] = useState('');
   const [reconciliation, setReconciliation] = useState(null);
   const [selectedPlanItem, setSelectedPlanItem] = useState('');
   const [reason, setReason] = useState('');
@@ -65,7 +114,7 @@ export default function CrRealizadoView({
       setError('');
       setData(await obterCustosRealizados(obra.id, competencia));
     } catch (requestError) {
-      setError(requestError.message || 'Erro ao consultar realizações.');
+      setError(requestError.message || 'Erro ao consultar os custos financeiros.');
       setData(null);
     } finally {
       setLoading(false);
@@ -73,6 +122,9 @@ export default function CrRealizadoView({
   }
 
   useEffect(() => {
+    setScopeFilter('TODOS');
+    setStatusFilter('TODOS');
+    setSearch('');
     load();
   }, [obra?.id, competencia]);
 
@@ -82,23 +134,39 @@ export default function CrRealizadoView({
       || String(a.codigo || '').localeCompare(String(b.codigo || ''))
     ))
   ), [data?.itens_plano]);
-  const displayItems = useMemo(() => ([
-    ...(data?.contextos || []).map((item) => ({
-      ...item,
-      id: null,
-      displayKey: item.key,
-      data_movimento: item.data,
-      item_micro: null,
-      etapa_macro_codigo: null,
-      ativo: false,
-      contextual: true
-    })),
-    ...(data?.items || []).map((item) => ({
-      ...item,
-      displayKey: `realizado:${item.id}`,
-      contextual: false
-    }))
-  ]), [data?.contextos, data?.items]);
+
+  const titles = useMemo(() => data?.titulos || [], [data?.titulos]);
+  const mappingQueue = useMemo(() => (
+    (data?.items || []).filter((item) => (
+      item.ativo && item.estado === 'NAO_MAPEADO' && Number(item.valor || 0) !== 0
+    ))
+  ), [data?.items]);
+  const normalizedSearch = normalizeSearch(search);
+  const filteredTitles = useMemo(() => titles.filter((item) => {
+    if (scopeFilter === 'COMPETENCIA' && !item.em_competencia) return false;
+    if (statusFilter !== 'TODOS' && item.grupo_status !== statusFilter) return false;
+    if (!normalizedSearch) return true;
+    return normalizeSearch([
+      item.codigo,
+      item.numero_documento,
+      item.descricao,
+      item.parceiro?.nome,
+      item.parceiro?.cpf_cnpj,
+      item.categoria?.nome,
+      ...(item.apropriacoes || []).flatMap((entry) => [entry.codigo, entry.nome])
+    ].filter(Boolean).join(' ')).includes(normalizedSearch);
+  }), [normalizedSearch, scopeFilter, statusFilter, titles]);
+
+  const statusCounts = useMemo(() => titles.reduce((accumulator, item) => {
+    const group = item.grupo_status || 'OUTRO';
+    accumulator[group] = (accumulator[group] || 0) + 1;
+    return accumulator;
+  }, {}), [titles]);
+
+  const statusOptions = useMemo(() => (
+    ['TODOS', 'ABERTO', 'PARCIAL', 'QUITADO', 'PREVISAO', 'OUTRO', 'INATIVO']
+      .filter((group) => group === 'TODOS' || Number(statusCounts[group] || 0) > 0)
+  ), [statusCounts]);
 
   async function handleReprocess() {
     if (!obra?.id || processing) return;
@@ -108,11 +176,11 @@ export default function CrRealizadoView({
       setFeedback('');
       const result = await reprocessarCustosRealizados(obra.id, competencia);
       setFeedback(result.idempotente
-        ? 'As projeções já estavam atualizadas. Nenhum total foi alterado.'
+        ? 'O mapeamento das baixas já estava atualizado.'
         : `${result.criados} inclusão(ões), ${result.atualizados} atualização(ões) e ${result.correcoes} correção(ões) processadas.`);
       await load();
     } catch (requestError) {
-      setError(requestError.message || 'Erro ao atualizar realizações.');
+      setError(requestError.message || 'Erro ao atualizar o mapeamento das baixas.');
     } finally {
       setProcessing(false);
     }
@@ -149,121 +217,223 @@ export default function CrRealizadoView({
     return (
       <section className="cr-section cr-empty-state cr-empty-state--large">
         <HiOutlineBanknotes className="h-7 w-7" />
-        <strong>Selecione uma obra para consultar o realizado</strong>
-        <span>A competência do contexto define o mês das baixas financeiras.</span>
+        <strong>Selecione uma obra para consultar os custos</strong>
+        <span>A lista considera somente títulos financeiros a pagar alocados à obra.</span>
       </section>
     );
   }
 
+  const summary = data?.resumo || {};
+
   return (
     <>
-      <section className="cr-section">
-        <header className="cr-section-header cr-section-header--actions">
+      <section className="cr-section cr-cost-ledger">
+        <header className="cr-section-header">
           <div>
-            <span>Rastreabilidade financeira</span>
-            <h2>Custo realizado · {obra.nome}</h2>
+            <span>Razão de custos financeiros</span>
+            <h2>Custos alocados · {obra.nome}</h2>
             <p>
-              Somente baixas ativas entram no total. Solicitação, pedido e título são
-              exibidos como contexto e nunca comprovam caixa sozinhos.
+              Fonte exclusiva: títulos financeiros a pagar. Pedidos e solicitações não
+              compõem esta lista.
             </p>
           </div>
-          {permissions.update ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={processing}
-              onClick={handleReprocess}
-            >
-              <HiOutlineArrowPath className={processing ? 'h-4 w-4 cr-spin' : 'h-4 w-4'} />
-              {processing ? 'Atualizando...' : 'Atualizar realizações'}
-            </button>
-          ) : null}
         </header>
 
         {error ? <div className="cr-feedback" data-tone="error">{error}</div> : null}
         {feedback ? <div className="cr-feedback" data-tone="success">{feedback}</div> : null}
 
-        <div className="cr-summary-grid cr-summary-grid--realized">
+        <div className="cr-cost-ledger__summary" aria-label="Resumo dos custos da obra">
           <article>
-            <span>Realizado</span>
-            <strong>{currency(data?.resumo?.realizado)}</strong>
-            <small>Baixas ativas da competência</small>
+            <span>Total alocado</span>
+            <strong>{currency(summary.total_alocado)}</strong>
+            <small>{Number(summary.titulos_ativos || 0)} título(s) ativo(s)</small>
           </article>
-          <article data-tone={Number(data?.resumo?.nao_mapeado) > 0 ? 'warning' : 'neutral'}>
-            <span>Não mapeado</span>
-            <strong>{currency(data?.resumo?.nao_mapeado)}</strong>
-            <small>Permanece no total até reconciliar</small>
+          <article data-tone={Number(summary.saldo_aberto) > 0 ? 'warning' : 'neutral'}>
+            <span>Saldo em aberto</span>
+            <strong>{currency(summary.saldo_aberto)}</strong>
+            <small>Aberto, parcial, previsão e outros estados ativos</small>
           </article>
-          <article>
-            <span>Baixas ativas</span>
-            <strong>{Number(data?.resumo?.baixas_ativas || 0)}</strong>
-            <small>Movimentos que comprovam caixa</small>
+          <article data-tone="success">
+            <span>Valor pago</span>
+            <strong>{currency(summary.total_pago)}</strong>
+            <small>Baixas acumuladas dos títulos</small>
           </article>
-          <article>
-            <span>Estornos preservados</span>
-            <strong>{Number(data?.resumo?.estornos || 0)}</strong>
-            <small>Histórico visível, valor neutralizado</small>
+          <article data-tone="context">
+            <span>Vence em {formatMonth(competencia)}</span>
+            <strong>{currency(summary.vencimento_competencia)}</strong>
+            <small>{Number(summary.titulos_competencia || 0)} título(s) na competência</small>
           </article>
         </div>
 
+        <div className="cr-cost-ledger__toolbar">
+          <div className="cr-cost-ledger__scope" aria-label="Escopo dos títulos">
+            <button
+              type="button"
+              data-active={scopeFilter === 'TODOS'}
+              onClick={() => setScopeFilter('TODOS')}
+            >
+              Todos da obra
+              <strong>{titles.length}</strong>
+            </button>
+            <button
+              type="button"
+              data-active={scopeFilter === 'COMPETENCIA'}
+              onClick={() => setScopeFilter('COMPETENCIA')}
+            >
+              Vencem na competência
+              <strong>{Number(summary.titulos_competencia || 0)}</strong>
+            </button>
+          </div>
+          <label className="cr-cost-ledger__search">
+            <HiOutlineMagnifyingGlass className="h-4 w-4" />
+            <span className="sr-only">Pesquisar títulos</span>
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Título, credor, categoria ou apropriação"
+            />
+          </label>
+        </div>
+
+        <div className="cr-cost-ledger__statuses" aria-label="Filtrar por situação financeira">
+          {statusOptions.map((group) => (
+            <button
+              type="button"
+              key={group}
+              data-active={statusFilter === group}
+              onClick={() => setStatusFilter(group)}
+            >
+              {GROUP_LABELS[group]}
+              <strong>{group === 'TODOS' ? titles.length : Number(statusCounts[group] || 0)}</strong>
+            </button>
+          ))}
+        </div>
+
+        <div className="cr-cost-ledger__result">
+          <span>
+            {filteredTitles.length} de {titles.length} título(s)
+          </span>
+          {scopeFilter === 'COMPETENCIA' ? (
+            <small>Vencimento entre o primeiro e o último dia da competência.</small>
+          ) : (
+            <small>Histórico completo dos custos financeiros alocados à obra.</small>
+          )}
+        </div>
+
         <div className="cr-table-wrap">
-          <table className="cr-table cr-table--realized">
+          <table className="cr-table cr-table--cost-ledger">
             <thead>
               <tr>
-                <th>Data</th>
-                <th>Cadeia operacional</th>
-                <th>Parceiro</th>
-                <th>Item micro</th>
-                <th className="is-number">Valor</th>
-                <th>Estado</th>
-                <th aria-label="Ações" />
+                <th>Vencimento</th>
+                <th>Título / descrição</th>
+                <th>Credor</th>
+                <th>Categoria / apropriação</th>
+                <th className="is-number">Alocado</th>
+                <th className="is-number">Pago</th>
+                <th className="is-number">Saldo</th>
+                <th>Situação</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan="7">Carregando custo realizado...</td></tr>
+                <tr><td colSpan="8">Carregando títulos financeiros...</td></tr>
               ) : null}
-              {!loading && !displayItems.length ? (
+              {!loading && !filteredTitles.length ? (
                 <tr>
-                  <td colSpan="7">
-                    Nenhuma projeção processada nesta competência. Use “Atualizar realizações”
-                    quando houver baixas financeiras.
+                  <td colSpan="8">
+                    {titles.length
+                      ? 'Nenhum título corresponde aos filtros selecionados.'
+                      : 'Nenhum título a pagar está alocado a esta obra.'}
                   </td>
                 </tr>
               ) : null}
-              {!loading && displayItems.map((item) => (
+              {!loading && filteredTitles.map((item) => (
                 <tr
-                  key={item.displayKey}
-                  className={item.valor === 0 ? 'is-muted-row' : ''}
-                  data-contextual={item.contextual ? 'true' : 'false'}
+                  key={item.id}
+                  data-in-competence={item.em_competencia ? 'true' : 'false'}
+                  data-inactive={item.ativo_no_custo ? 'false' : 'true'}
                 >
-                  <td data-label="Data">{formatDate(item.data_movimento)}</td>
-                  <td data-label="Cadeia">
-                    <strong>{chainLabel(item)}</strong>
-                    <small>
-                      {item.contextual
-                        ? 'Camada informativa — não compõe o total realizado'
-                        : item.titulo?.descricao || 'Sem descrição do título'}
-                    </small>
+                  <td data-label="Vencimento">
+                    <strong>{formatDate(item.data_vencimento)}</strong>
+                    {item.em_competencia ? <small>Na competência</small> : null}
                   </td>
-                  <td data-label="Parceiro">{item.parceiro?.nome || '-'}</td>
-                  <td data-label="Item micro">
-                    {item.item_micro
-                      ? `${item.item_micro.codigo} · ${item.item_micro.descricao}`
-                      : item.etapa_macro_codigo || 'Aguardando reconciliação'}
+                  <td data-label="Título">
+                    <strong>{titleReference(item)}</strong>
+                    <small>{item.descricao || 'Sem descrição'}</small>
                   </td>
-                  <td data-label="Valor" className="is-number">{currency(item.valor)}</td>
-                  <td data-label="Estado">
+                  <td data-label="Credor">
+                    <strong>{item.parceiro?.nome || '-'}</strong>
+                    <small>{item.parceiro?.cpf_cnpj || ''}</small>
+                  </td>
+                  <td data-label="Classificação">
+                    <strong>{item.categoria?.nome || 'Sem categoria'}</strong>
+                    <small>{appropriationLabel(item)}</small>
+                  </td>
+                  <td data-label="Alocado" className="is-number">
+                    {currency(item.valor_alocado)}
+                  </td>
+                  <td data-label="Pago" className="is-number">
+                    {currency(item.valor_pago)}
+                  </td>
+                  <td data-label="Saldo" className="is-number">
+                    <strong>{currency(item.valor_saldo)}</strong>
+                  </td>
+                  <td data-label="Situação">
                     <CrStatusPill
-                      status={item.estado}
-                      label={STATUS_LABELS[item.estado] || item.estado}
+                      status={item.status}
+                      label={STATUS_LABELS[item.status] || item.status}
                     />
                   </td>
-                  <td data-label="Ação">
-                    {permissions.reconcile
-                      && item.ativo
-                      && item.estado === 'NAO_MAPEADO'
-                      && item.valor !== 0 ? (
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {(permissions.update || mappingQueue.length > 0) ? (
+          <details className="cr-cost-ledger__technical">
+            <summary>
+              <span>
+                Mapeamento contábil do realizado
+                <small>
+                  {mappingQueue.length
+                    ? `${mappingQueue.length} baixa(s) aguardando item micro`
+                    : 'Baixas financeiras conciliadas com o plano micro'}
+                </small>
+              </span>
+              {mappingQueue.length ? (
+                <strong>{mappingQueue.length} pendente(s)</strong>
+              ) : null}
+            </summary>
+            <div className="cr-cost-ledger__technical-body">
+              <div className="cr-cost-ledger__technical-actions">
+                <p>
+                  Esta rotina atualiza somente a projeção <code>cr_*</code>. Nenhum título,
+                  pedido ou movimento financeiro é alterado.
+                </p>
+                {permissions.update ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={processing}
+                    onClick={handleReprocess}
+                  >
+                    <HiOutlineArrowPath className={processing ? 'h-4 w-4 cr-spin' : 'h-4 w-4'} />
+                    {processing ? 'Atualizando...' : 'Atualizar mapeamento'}
+                  </button>
+                ) : null}
+              </div>
+              {mappingQueue.length ? (
+                <div className="cr-cost-ledger__mapping-list">
+                  {mappingQueue.map((item) => (
+                    <div key={item.id}>
+                      <span>
+                        <strong>{reconciliationTitle(item)}</strong>
+                        <small>{item.titulo?.descricao || 'Baixa sem item micro'}</small>
+                      </span>
+                      <strong>{currency(item.valor)}</strong>
+                      {permissions.reconcile ? (
                         <button
                           type="button"
                           className="btn btn-outline btn-sm"
@@ -273,20 +443,17 @@ export default function CrRealizadoView({
                           Reconciliar
                         </button>
                       ) : null}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <footer className="cr-operational-note">
-          <HiOutlineExclamationTriangle className="h-4 w-4" />
-          <span>
-            Reprocessar não cria baixa, não altera títulos e não muda pedidos. A operação
-            apenas atualiza a projeção <code>cr_*</code>.
-          </span>
-        </footer>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="cr-cost-ledger__technical-empty">
+                  Nenhuma baixa ativa está aguardando reconciliação.
+                </div>
+              )}
+            </div>
+          </details>
+        ) : null}
       </section>
 
       {reconciliation ? (
@@ -301,7 +468,7 @@ export default function CrRealizadoView({
               <div>
                 <span>Fila de não mapeados</span>
                 <h2 id="cr-reconcile-title">Reconciliar baixa</h2>
-                <p>{chainLabel(reconciliation)} · {currency(reconciliation.valor)}</p>
+                <p>{reconciliationTitle(reconciliation)} · {currency(reconciliation.valor)}</p>
               </div>
               <button
                 type="button"

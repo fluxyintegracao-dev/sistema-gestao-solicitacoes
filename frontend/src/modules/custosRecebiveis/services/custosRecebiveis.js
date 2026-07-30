@@ -126,8 +126,11 @@ function newIdempotencyKey(prefix = 'cr') {
     || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export async function obterCustosRecebiveisDashboard(competencia) {
+export async function obterCustosRecebiveisDashboard(competencia, obraId = null) {
   const query = new URLSearchParams({ competencia });
+  if (Number.isInteger(Number(obraId)) && Number(obraId) > 0) {
+    query.set('obra_id', String(Number(obraId)));
+  }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/dashboard?${query.toString()}`,
     { headers: authHeaders() }

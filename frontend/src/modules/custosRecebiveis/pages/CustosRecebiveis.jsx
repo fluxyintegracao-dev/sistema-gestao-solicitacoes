@@ -347,6 +347,16 @@ export default function CustosRecebiveis() {
     updateQuery({ aba: 'planejamento', obra: obraId, plano: null });
   }
 
+  function handleOpenDashboardArea(item) {
+    updateQuery({
+      aba: item?.destino || 'comparativo',
+      obra: item?.obra_id || null,
+      competencia: item?.competencia || competencia,
+      plano: null,
+      bloqueio: item?.tipo === 'OBRIGACAO_VENCIDA' ? '1' : null
+    });
+  }
+
   function handleOpenObligationPlanning(item) {
     updateQuery({
       aba: 'planejamento',
@@ -487,9 +497,10 @@ export default function CustosRecebiveis() {
 
       {activeTab === 'visao-geral' ? (
         <CrDashboardView
-          key={`${competencia}-${refreshToken}`}
+          key={`${selectedObraId || 'carteira'}-${competencia}-${refreshToken}`}
           competencia={competencia}
-          onOpenPlanning={handleOpenPlanning}
+          obra={selectedObra}
+          onOpenArea={handleOpenDashboardArea}
         />
       ) : null}
 

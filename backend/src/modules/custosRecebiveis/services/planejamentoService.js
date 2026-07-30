@@ -4,7 +4,10 @@ const { Op } = require('sequelize');
 const db = require('../../../models');
 const { createBusinessError } = require('./planoMicroService');
 const { resolverEscopoObras } = require('../policies/obraScopePolicy');
-const { prazoCompetencia } = require('./obrigacaoService');
+const {
+  listarMinhasObrigacoes,
+  prazoCompetencia
+} = require('./obrigacaoService');
 
 const VALID_COMPETENCIA = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CONTRACT_ACTIVE_STATUSES = ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO'];
@@ -28,6 +31,7 @@ function dependencies(overrides = {}) {
     TituloFinanceiroRateio: db.TituloFinanceiroRateio,
     MovimentoFinanceiro: db.MovimentoFinanceiro,
     User: db.User,
+    listarMinhasObrigacoes,
     resolverEscopoObras,
     ...overrides
   };
@@ -80,6 +84,19 @@ function competenciaAtual(now = new Date()) {
   const year = parts.find((part) => part.type === 'year')?.value;
   const month = parts.find((part) => part.type === 'month')?.value;
   return `${year}-${month}`;
+}
+
+function dataAtualSaoPaulo(now = new Date()) {
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return `${year}-${month}-${day}`;
 }
 
 function competenciaSeguinte(competencia) {
@@ -1668,106 +1685,446 @@ async function obterComparativo(user, obraIdValue, competenciaValue, overrides =
   };
 }
 
-async function obterDashboard(user, competenciaValue, overrides = {}) {
+function competenciaAnterior(competencia) {
+  const [year, month] = normalizeCompetencia(competencia).split('-').map(Number);
+  return month === 1
+    ? `${year - 1}-12`
+    : `${year}-${String(month - 1).padStart(2, '0')}`;
+}
+
+function dashboardCompetencias(endValue, total = 6) {
+  const end = normalizeCompetencia(endValue);
+  const result = [end];
+  while (result.length < total) result.unshift(competenciaAnterior(result[0]));
+  return result;
+}
+
+function summarizeDashboardRows(rows) {
+  const custoPlanejado = money(rows.reduce((sum, row) => sum + row.custo_planejado, 0));
+  const custoRealizado = money(rows.reduce((sum, row) => sum + row.custo_realizado, 0));
+  const recebivelPrevisto = money(rows.reduce((sum, row) => sum + row.recebivel_previsto, 0));
+  const recebivelReconhecido = money(
+    rows.reduce((sum, row) => sum + row.recebivel_reconhecido, 0)
+  );
+  const receitaRecebida = money(rows.reduce((sum, row) => sum + row.receita_recebida, 0));
+  const glosa = money(rows.reduce((sum, row) => sum + row.glosa, 0));
+  return {
+    custo_planejado: custoPlanejado,
+    custo_realizado: custoRealizado,
+    desvio_custo: money(custoRealizado - custoPlanejado),
+    percentual_custo: custoPlanejado > 0
+      ? Math.round((custoRealizado / custoPlanejado) * 10000) / 100
+      : null,
+    recebivel_previsto: recebivelPrevisto,
+    recebivel_reconhecido: recebivelReconhecido,
+    receita_recebida: receitaRecebida,
+    saldo_receber: money(Math.max(0, recebivelReconhecido - receitaRecebida)),
+    glosa,
+    tem_medicao_aprovada: rows.some((row) => row.medicao_aprovada != null),
+    obras_com_custo_acima: rows.filter(
+      (row) => row.custo_planejado > 0 && row.custo_realizado > row.custo_planejado
+    ).length,
+    movimentos_sem_mapeamento: rows.reduce(
+      (sum, row) => sum + row.movimentos_sem_mapeamento,
+      0
+    ),
+    recebiveis_vencidos: rows.reduce((sum, row) => sum + row.recebiveis_vencidos, 0)
+  };
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const result = [];
+  const safeLimit = Math.max(1, Number(limit) || 1);
+  for (let index = 0; index < items.length; index += safeLimit) {
+    const batch = items.slice(index, index + safeLimit);
+    result.push(...await Promise.all(batch.map(mapper)));
+  }
+  return result;
+}
+
+async function buildDashboardRows(obras, competencias, deps) {
+  const obraIds = obras.map((obra) => Number(obra.id));
+  if (!obraIds.length) return [];
+  const competenciaRows = await deps.CrCompetencia.findAll({
+    where: {
+      obra_id: { [Op.in]: obraIds },
+      competencia: { [Op.between]: [competencias[0], competencias[competencias.length - 1]] }
+    }
+  });
+  const competenciaIds = competenciaRows.map((item) => Number(item.id));
+  const [actuals, approvedMeasurements, receivedEntries] = await Promise.all([
+    competenciaIds.length
+      ? deps.CrRealizado.findAll({
+        where: {
+          competencia_id: { [Op.in]: competenciaIds },
+          valor: { [Op.ne]: 0 },
+          estado: { [Op.in]: ['BAIXA_ATIVA', 'NAO_MAPEADO'] }
+        },
+        include: [{
+          model: deps.MovimentoFinanceiro,
+          as: 'movimentoFinanceiro',
+          attributes: [],
+          required: true,
+          where: { status: 'ATIVO' }
+        }]
+      })
+      : [],
+    competenciaIds.length
+      ? deps.CrMedicaoConsolidada.findAll({
+        where: { competencia_id: { [Op.in]: competenciaIds } }
+      })
+      : [],
+    mapWithConcurrency(obras, 5, async (obra) => [
+      Number(obra.id),
+      await totalBaixasFinanceirasPorCompetencia(
+        Number(obra.id),
+        competencias,
+        'RECEBER',
+        deps
+      )
+    ])
+  ]);
+
+  const competenciaByKey = new Map(competenciaRows.map((record) => {
+    const item = plain(record);
+    return [`${Number(item.obra_id)}:${item.competencia}`, item];
+  }));
+  const actualByCompetencia = new Map();
+  actuals.forEach((record) => {
+    const item = plain(record);
+    const id = Number(item.competencia_id);
+    const current = actualByCompetencia.get(id) || { total: 0, unmapped: 0 };
+    current.total = money(current.total + number(item.valor));
+    if (item.estado === 'NAO_MAPEADO' || !item.plano_item_id) current.unmapped += 1;
+    actualByCompetencia.set(id, current);
+  });
+  const approvedByCompetencia = new Map();
+  approvedMeasurements.forEach((record) => {
+    const item = plain(record);
+    const id = Number(item.competencia_id);
+    const current = approvedByCompetencia.get(id) || { total: 0, exists: false };
+    current.total = money(current.total + number(item.valor_medido));
+    current.exists = true;
+    approvedByCompetencia.set(id, current);
+  });
+  const receivedByWork = new Map(receivedEntries);
+  const today = dataAtualSaoPaulo();
+  const settledStatuses = new Set([
+    'BAIXADO',
+    'CONCILIADO',
+    'PAGO',
+    'QUITADO',
+    'CANCELADO',
+    'ESTORNADO'
+  ]);
+  const overduePrivateReceivables = new Map();
+  await mapWithConcurrency(
+    obras.filter((obra) => String(obra.classificacao || '').toUpperCase() === 'PRIVADA'),
+    5,
+    async (obra) => {
+      const sources = await findPrivateSources(
+        Number(obra.id),
+        competencias[competencias.length - 1],
+        deps
+      );
+      overduePrivateReceivables.set(
+        Number(obra.id),
+        sources.filter((source) => (
+          source.data_prevista
+          && String(source.data_prevista).slice(0, 10) < today
+          && !settledStatuses.has(String(source.status_financeiro || '').toUpperCase())
+        )).length
+      );
+      return null;
+    }
+  );
+
+  const rows = [];
+  obras.forEach((obraValue) => {
+    const obra = serializeObra(obraValue);
+    const isPublic = String(obra.classificacao || '').toUpperCase() === 'PUBLICA';
+    competencias.forEach((competencia) => {
+      const saved = competenciaByKey.get(`${obra.id}:${competencia}`) || null;
+      const actual = saved
+        ? (actualByCompetencia.get(Number(saved.id)) || { total: 0, unmapped: 0 })
+        : { total: 0, unmapped: 0 };
+      const approved = saved
+        ? (approvedByCompetencia.get(Number(saved.id)) || null)
+        : null;
+      const expected = money(saved?.total_receita_prevista);
+      const recognized = isPublic
+        ? (approved?.exists ? money(approved.total) : 0)
+        : expected;
+      rows.push({
+        obra,
+        competencia,
+        competencia_id: saved?.id ? Number(saved.id) : null,
+        estado_competencia: saved?.estado || 'NAO_INICIADA',
+        custo_planejado: money(saved?.total_custo_previsto),
+        custo_realizado: money(actual.total),
+        recebivel_previsto: expected,
+        recebivel_reconhecido: recognized,
+        medicao_aprovada: isPublic && approved?.exists ? money(approved.total) : null,
+        glosa: isPublic && approved?.exists
+          ? money(Math.max(0, expected - number(approved.total)))
+          : 0,
+        receita_recebida: money(receivedByWork.get(obra.id)?.get(competencia)),
+        movimentos_sem_mapeamento: actual.unmapped,
+        recebiveis_vencidos: competencia === competencias[competencias.length - 1]
+          ? number(overduePrivateReceivables.get(obra.id))
+          : 0
+      });
+    });
+  });
+  return rows;
+}
+
+function buildDashboardAlerts(currentRows, overdueObligations = []) {
+  const alerts = [];
+  const push = (row, type, tone, title, description, destination, priority = 50) => {
+    alerts.push({
+      id: `${type}:${row.obra.id}:${row.competencia}`,
+      tipo: type,
+      tom: tone,
+      prioridade: priority,
+      titulo: title,
+      descricao: description,
+      obra: row.obra,
+      obra_id: row.obra.id,
+      competencia: row.competencia,
+      destino: destination
+    });
+  };
+  currentRows.forEach((row) => {
+    const obraLabel = `${row.obra.codigo || row.obra.id} · ${row.obra.nome}`;
+    if (!row.competencia_id) {
+      push(
+        row,
+        'PLANEJAMENTO_AUSENTE',
+        'warning',
+        'Planejamento não iniciado',
+        `${obraLabel} ainda não possui planejamento para a competência.`,
+        'planejamento',
+        70
+      );
+    }
+    if (row.custo_planejado > 0 && row.custo_realizado > row.custo_planejado) {
+      push(
+        row,
+        'CUSTO_ACIMA',
+        'negative',
+        'Custo acima do planejado',
+        `${obraLabel} está ${money(row.custo_realizado - row.custo_planejado).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })} acima do planejamento.`,
+        'comparativo',
+        100
+      );
+    }
+    if (row.glosa > 0) {
+      push(
+        row,
+        'GLOSA',
+        'negative',
+        'Glosa registrada',
+        `${obraLabel} possui glosa de ${row.glosa.toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })}.`,
+        'comparativo',
+        95
+      );
+    }
+    if (row.movimentos_sem_mapeamento > 0) {
+      push(
+        row,
+        'SEM_MAPEAMENTO',
+        'warning',
+        'Movimento sem mapeamento',
+        `${obraLabel} possui ${row.movimentos_sem_mapeamento} movimento(s) sem item micro.`,
+        'realizado',
+        90
+      );
+    }
+    if (
+      String(row.obra.classificacao || '').toUpperCase() === 'PUBLICA'
+      && row.recebivel_previsto > 0
+      && row.medicao_aprovada == null
+    ) {
+      push(
+        row,
+        'MEDICAO_AGUARDANDO_APROVACAO',
+        'info',
+        'Medição aguardando aprovação',
+        `${obraLabel} possui medição apresentada ainda sem aprovação do órgão.`,
+        'planejamento',
+        60
+      );
+    }
+    if (
+      String(row.obra.classificacao || '').toUpperCase() === 'PUBLICA'
+      && row.recebivel_reconhecido > row.receita_recebida
+    ) {
+      push(
+        row,
+        'RECEBIMENTO_PENDENTE',
+        'warning',
+        'Medição aprovada a receber',
+        `${obraLabel} possui ${money(row.recebivel_reconhecido - row.receita_recebida).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL'
+        })} reconhecido e ainda não recebido.`,
+        'realizado',
+        82
+      );
+    }
+    if (row.recebiveis_vencidos > 0) {
+      push(
+        row,
+        'RECEBIVEL_VENCIDO',
+        'negative',
+        'Recebível vencido',
+        `${obraLabel} possui ${row.recebiveis_vencidos} recebível(is) contratual(is) vencido(s).`,
+        'realizado',
+        98
+      );
+    }
+  });
+  const currentByWork = new Map(currentRows.map((row) => [Number(row.obra.id), row]));
+  const overdueByWork = new Map();
+  overdueObligations.forEach((item) => {
+    const obraId = Number(item.obra_id);
+    const current = overdueByWork.get(obraId) || {
+      quantidade: 0,
+      competencia: item.competencia
+    };
+    current.quantidade += 1;
+    if (item.competencia < current.competencia) current.competencia = item.competencia;
+    overdueByWork.set(obraId, current);
+  });
+  overdueByWork.forEach((value, obraId) => {
+    const row = currentByWork.get(obraId);
+    if (!row) return;
+    push(
+      { ...row, competencia: value.competencia },
+      'OBRIGACAO_VENCIDA',
+      'negative',
+      'Obrigação mensal vencida',
+      `${row.obra.codigo || row.obra.id} · ${row.obra.nome} possui ${value.quantidade} obrigação(ões) vencida(s).`,
+      'planejamento',
+      110
+    );
+  });
+  return alerts
+    .sort((a, b) => b.prioridade - a.prioridade || a.titulo.localeCompare(b.titulo))
+    .slice(0, 12);
+}
+
+async function obterDashboard(
+  user,
+  competenciaValue,
+  obraIdValue = null,
+  overrides = {}
+) {
   const deps = dependencies(overrides);
   const competenciaCode = normalizeCompetencia(competenciaValue);
+  const selectedObraId = obraIdValue == null || obraIdValue === ''
+    ? null
+    : positiveId(obraIdValue, 'Obra');
   const scope = await deps.resolverEscopoObras(user);
-  if (!scope.todas && scope.obraIds.length === 0) {
+  if (selectedObraId) await assertScope(user, selectedObraId, deps);
+  if (!selectedObraId && !scope.todas && scope.obraIds.length === 0) {
     return {
       competencia: competenciaCode,
-      cards: {
-        custo_previsto: 0,
-        custo_realizado: 0,
-        medicao_apresentada: 0,
-        medicao_aprovada: 0,
-        glosa: 0,
-        receita_recebida: 0
-      },
+      escopo: { tipo: 'CARTEIRA', obra: null, total_obras: 0 },
+      cards: summarizeDashboardRows([]),
+      historico: [],
       macros: [],
-      etapas: [],
+      alertas: [],
       obras: []
     };
   }
-  const obraWhere = { ativo: true, tipo_centro_custo: 'OBRA' };
-  if (!scope.todas) obraWhere.id = { [Op.in]: scope.obraIds };
+
+  const obraWhere = {
+    ativo: true,
+    tipo_centro_custo: 'OBRA',
+    ...(selectedObraId ? { id: selectedObraId } : {})
+  };
+  if (!selectedObraId && !scope.todas) obraWhere.id = { [Op.in]: scope.obraIds };
   const obras = await deps.Obra.findAll({
     where: obraWhere,
     attributes: ['id', 'codigo', 'nome', 'classificacao'],
     order: [['nome', 'ASC']]
   });
-  const summaries = [];
-  for (const obra of obras) {
+  if (selectedObraId && !obras.length) {
+    throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
+  }
+
+  const competencias = dashboardCompetencias(competenciaCode);
+  const rows = await buildDashboardRows(obras, competencias, deps);
+  const currentRows = rows.filter((row) => row.competencia === competenciaCode);
+  const historico = competencias.map((competencia) => ({
+    competencia,
+    ...summarizeDashboardRows(rows.filter((row) => row.competencia === competencia))
+  }));
+
+  let macros = [];
+  if (selectedObraId) {
     try {
-      const comparison = await buildComparison(Number(obra.id), competenciaCode, deps);
-      summaries.push({ obra: serializeObra(obra), comparison });
+      const comparison = await buildComparison(selectedObraId, competenciaCode, deps);
+      const macroMap = new Map();
+      comparison.linhas
+        .filter((line) => number(line.previsto) !== 0 || number(line.realizado) !== 0)
+        .forEach((line) => {
+          const key = line.etapa_macro_codigo || 'SEM_MACRO';
+          const current = macroMap.get(key) || {
+            codigo: key,
+            previsto: 0,
+            realizado: 0,
+            itens: 0
+          };
+          current.previsto = money(current.previsto + line.previsto);
+          current.realizado = money(current.realizado + line.realizado);
+          current.itens += 1;
+          macroMap.set(key, current);
+        });
+      macros = [...macroMap.values()].map((row) => ({
+        ...row,
+        delta: money(row.realizado - row.previsto),
+        percentual_execucao: row.previsto > 0
+          ? Math.round((row.realizado / row.previsto) * 10000) / 100
+          : null,
+        estado: statusComparativo(row.previsto, row.realizado)
+      }));
     } catch (error) {
       if (error?.code !== 'CR_PLANO_PUBLICADO_REQUIRED') throw error;
-      summaries.push({
-        obra: serializeObra(obra),
-        comparison: {
-          competencia: null,
-          linhas: [],
-          resumo: { previsto: 0, realizado: 0, estouros: 0, sem_previsao: 0 },
-          recebiveis: {
-            medicao_apresentada: 0,
-            medicao_aprovada: null,
-            glosa: null,
-            receita_recebida: 0
-          }
-        }
-      });
     }
   }
-  const macroMap = new Map();
-  summaries.forEach(({ comparison }) => {
-    comparison.linhas.forEach((line) => {
-      const key = line.etapa_macro_codigo || 'SEM_MACRO';
-      const current = macroMap.get(key) || { codigo: key, previsto: 0, realizado: 0 };
-      current.previsto = money(current.previsto + line.previsto);
-      current.realizado = money(current.realizado + line.realizado);
-      macroMap.set(key, current);
-    });
-  });
-  const macros = [...macroMap.values()].map((row) => ({
-    ...row,
-    delta: money(row.realizado - row.previsto),
-    percentual_execucao: row.previsto > 0
-      ? Math.round((row.realizado / row.previsto) * 10000) / 100
-      : null,
-    estado: statusComparativo(row.previsto, row.realizado)
-  }));
+
+  let overdueObligations = [];
+  try {
+    const obligationData = await deps.listarMinhasObrigacoes(user);
+    const workIds = new Set(obras.map((obra) => Number(obra.id)));
+    overdueObligations = (obligationData?.items || []).filter((item) => (
+      item.situacao === 'VENCIDA' && workIds.has(Number(item.obra_id))
+    ));
+  } catch (error) {
+    overdueObligations = [];
+  }
+
   return {
     competencia: competenciaCode,
-    cards: {
-      custo_previsto: money(macros.reduce((sum, row) => sum + row.previsto, 0)),
-      custo_realizado: money(macros.reduce((sum, row) => sum + row.realizado, 0)),
-      medicao_apresentada: money(summaries.reduce(
-        (sum, item) => sum + number(item.comparison.recebiveis?.medicao_apresentada),
-        0
-      )),
-      medicao_aprovada: money(summaries.reduce(
-        (sum, item) => sum + number(item.comparison.recebiveis?.medicao_aprovada),
-        0
-      )),
-      glosa: money(summaries.reduce(
-        (sum, item) => sum + number(item.comparison.recebiveis?.glosa),
-        0
-      )),
-      receita_recebida: money(summaries.reduce(
-        (sum, item) => sum + number(item.comparison.recebiveis?.receita_recebida),
-        0
-      ))
+    escopo: {
+      tipo: selectedObraId ? 'OBRA' : 'CARTEIRA',
+      obra: selectedObraId ? serializeObra(obras[0]) : null,
+      total_obras: obras.length
     },
-    macros,
-    etapas: summaries.map(({ obra, comparison }) => ({
-      obra,
-      estado_competencia: comparison.competencia?.estado || 'NAO_INICIADA',
-      previsto: comparison.resumo.previsto,
-      realizado: comparison.resumo.realizado,
-      estouros: comparison.resumo.estouros,
-      sem_previsao: comparison.resumo.sem_previsao
-    })),
-    obras: summaries.map(({ obra }) => obra)
+    cards: summarizeDashboardRows(currentRows),
+    historico,
+    macros: selectedObraId ? macros : [],
+    alertas: buildDashboardAlerts(currentRows, overdueObligations),
+    obras: obras.map(serializeObra)
   };
 }
 
@@ -1929,6 +2286,7 @@ module.exports = {
   competenciaSeguinte,
   consolidarMedicao,
   criarCompetencia,
+  dashboardCompetencias,
   decidirReabertura,
   findPrivateSources,
   finalizarCompetencia,
@@ -1945,5 +2303,6 @@ module.exports = {
   salvarRecebiveis,
   solicitarReabertura,
   solicitarReaberturaPorObraCompetencia,
-  statusComparativo
+  statusComparativo,
+  summarizeDashboardRows
 };

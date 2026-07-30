@@ -155,7 +155,11 @@ class CustosRecebiveisController {
 
   static async dashboard(req, res) {
     try {
-      return res.json(await obterDashboard(req.user, req.query.competencia));
+      return res.json(await obterDashboard(
+        req.user,
+        req.query.competencia,
+        req.query.obra_id
+      ));
     } catch (error) {
       return respondError(res, error, 'Erro ao consultar dashboard de Custos e Recebiveis');
     }

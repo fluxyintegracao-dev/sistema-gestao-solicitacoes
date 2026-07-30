@@ -6,7 +6,10 @@ const path = require('path');
 const {
   allocateMoney,
   buildProjectionRows,
-  reprocessarRealizados
+  reprocessarRealizados,
+  serializeAllocatedTitle,
+  summarizeAllocatedTitles,
+  titleStatusGroup
 } = require('../services/realizadoService');
 const { createCsvBuffer } = require('../services/exportacaoService');
 
@@ -22,6 +25,7 @@ function validateRouteAndPermissionContracts() {
   const service = read('src/modules/custosRecebiveis/services/realizadoService.js');
   const exportService = read('src/modules/custosRecebiveis/services/exportacaoService.js');
   const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
+  const realizedView = read('../frontend/src/modules/custosRecebiveis/components/CrRealizadoView.jsx');
   const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
 
   [
@@ -49,10 +53,88 @@ function validateRouteAndPermissionContracts() {
   assert(constants.includes("id: 'exportacoes'"));
   assert(page.includes('<CrRealizadoView'));
   assert(page.includes('<CrExportacoesView'));
+  assert(realizedView.includes('Fonte exclusiva: títulos financeiros a pagar'));
+  assert(realizedView.includes('Todos da obra'));
+  assert(realizedView.includes('Vencem na competência'));
+  assert(realizedView.includes('data?.titulos || []'));
+  assert(!realizedView.includes('Cadeia operacional'));
+  assert(!service.includes('deps.PedidoCompra.findAll'));
+  assert(!service.includes('deps.SolicitacaoCompra.findAll'));
   assert(!service.includes('MovimentoFinanceiro.create'));
   assert(!service.includes('TituloFinanceiro.update'));
   assert(!service.includes('PedidoCompra.update'));
   assert(!service.includes('Apropriacao.update'));
+}
+
+function validateFinancialTitleLedger() {
+  assert.strictEqual(titleStatusGroup('ABERTO'), 'ABERTO');
+  assert.strictEqual(titleStatusGroup('PARCIAL'), 'PARCIAL');
+  assert.strictEqual(titleStatusGroup('QUITADO'), 'QUITADO');
+  assert.strictEqual(titleStatusGroup('PREVISAO'), 'PREVISAO');
+  assert.strictEqual(titleStatusGroup('CANCELADO'), 'INATIVO');
+
+  const direct = serializeAllocatedTitle({
+    id: 10,
+    codigo: 'FIN-0010',
+    obra_id: 3,
+    possui_rateio: false,
+    status: 'ABERTO',
+    descricao: 'Custo direto',
+    valor_original: 1000,
+    valor_baixado: 0,
+    valor_saldo: 1000,
+    data_vencimento: '2026-08-20',
+    rateios: []
+  }, 3, '2026-08');
+  assert.strictEqual(direct.valor_alocado, 1000);
+  assert.strictEqual(direct.valor_pago, 0);
+  assert.strictEqual(direct.valor_saldo, 1000);
+  assert.strictEqual(direct.em_competencia, true);
+
+  const shared = serializeAllocatedTitle({
+    id: 11,
+    codigo: 'FIN-0011',
+    obra_id: 4,
+    possui_rateio: true,
+    status: 'PARCIAL',
+    descricao: 'Custo rateado',
+    valor_original: 1000,
+    valor_baixado: 400,
+    valor_saldo: 600,
+    data_vencimento: '2026-09-10',
+    rateios: [
+      { obra_id: 3, valor_rateio: 250, apropriacao: { id: 7, codigo: '00.001' } },
+      { obra_id: 4, valor_rateio: 750, apropriacao: { id: 8, codigo: '00.002' } }
+    ]
+  }, 3, '2026-08');
+  assert.strictEqual(shared.valor_alocado, 250);
+  assert.strictEqual(shared.valor_pago, 100);
+  assert.strictEqual(shared.valor_saldo, 150);
+  assert.strictEqual(shared.em_competencia, false);
+  assert.strictEqual(shared.apropriacoes[0].codigo, '00.001');
+
+  const canceled = serializeAllocatedTitle({
+    id: 12,
+    obra_id: 3,
+    possui_rateio: false,
+    status: 'CANCELADO',
+    descricao: 'Título cancelado',
+    valor_original: 300,
+    valor_baixado: 0,
+    valor_saldo: 300,
+    data_vencimento: '2026-08-25',
+    rateios: []
+  }, 3, '2026-08');
+  const summary = summarizeAllocatedTitles([direct, shared, canceled]);
+  assert.strictEqual(summary.titulos, 3);
+  assert.strictEqual(summary.titulos_ativos, 2);
+  assert.strictEqual(summary.total_alocado, 1250);
+  assert.strictEqual(summary.total_pago, 100);
+  assert.strictEqual(summary.saldo_aberto, 1150);
+  assert.strictEqual(summary.vencimento_competencia, 1000);
+  assert.strictEqual(summary.status.aberto, 1);
+  assert.strictEqual(summary.status.parcial, 1);
+  assert.strictEqual(summary.status.inativos, 1);
 }
 
 function validateAllocationRounding() {
@@ -226,6 +308,7 @@ function validateCsvFormulaProtection() {
 async function run() {
   validateRouteAndPermissionContracts();
   validateAllocationRounding();
+  validateFinancialTitleLedger();
   validateOnlyActiveSettlementsBecomeRealized();
   validateRateioAndNonMappedPreservation();
   await validateReversalCorrectionIsIdempotent();
