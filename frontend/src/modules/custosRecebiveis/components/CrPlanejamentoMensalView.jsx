@@ -80,7 +80,7 @@ export default function CrPlanejamentoMensalView({
   const availableNewMonths = (data?.competencias_permitidas || [])
     .filter((item) => !existingMonths.has(item));
   const canCreate = permissions.costs || permissions.receipts;
-  const isPublic = obra.classificacao === 'PUBLICA';
+  const isPublic = obra?.classificacao === 'PUBLICA';
 
   async function createMonth() {
     if (!newMonth || creating) return;

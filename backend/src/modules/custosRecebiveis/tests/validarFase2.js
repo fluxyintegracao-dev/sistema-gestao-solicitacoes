@@ -126,6 +126,7 @@ function validateFrontendContracts() {
   assert(monthlyPlanning.includes('Novo mês'));
   assert(monthlyPlanning.includes('Recebíveis do período'));
   assert(monthlyPlanning.includes('Receita recebida'));
+  assert(monthlyPlanning.includes("obra?.classificacao === 'PUBLICA'"));
   assert(dashboard.includes('Previsto x realizado por macro'));
   assert(dashboard.includes('Status das etapas'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
