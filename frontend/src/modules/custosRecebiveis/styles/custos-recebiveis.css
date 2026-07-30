@@ -2632,6 +2632,13 @@
   color: var(--cr-muted);
 }
 
+.cr-item-picker-feedback {
+  padding: 0.8rem;
+  color: var(--cr-muted);
+  font-size: 0.74rem;
+  text-align: left;
+}
+
 .cr-item-picker-results svg {
   grid-row: 1 / span 2;
   grid-column: 2;

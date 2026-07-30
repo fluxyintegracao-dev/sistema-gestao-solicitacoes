@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HiOutlineCheckCircle,
   HiOutlineChevronLeft,
@@ -86,7 +86,10 @@ export default function CrPlanejamentoView({
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
   const [itemSearch, setItemSearch] = useState({ receipts: '', costs: '' });
   const [searchResults, setSearchResults] = useState({ receipts: [], costs: [] });
+  const [lastCompletedSearch, setLastCompletedSearch] = useState({ receipts: '', costs: '' });
   const [searching, setSearching] = useState('');
+  const searchRequestRef = useRef({ receipts: 0, costs: 0 });
+  const searchDebounceRef = useRef({ receipts: null, costs: null });
 
   const load = useCallback(async () => {
     if (!obra?.id) {
@@ -128,8 +131,16 @@ export default function CrPlanejamentoView({
   }, [obra?.id, competencia]);
 
   useEffect(() => {
+    searchRequestRef.current.receipts += 1;
+    searchRequestRef.current.costs += 1;
+    window.clearTimeout(searchDebounceRef.current.receipts);
+    window.clearTimeout(searchDebounceRef.current.costs);
     setStep(1);
     setFeedback('');
+    setItemSearch({ receipts: '', costs: '' });
+    setSearchResults({ receipts: [], costs: [] });
+    setLastCompletedSearch({ receipts: '', costs: '' });
+    setSearching('');
     load();
   }, [load]);
 
@@ -187,23 +198,68 @@ export default function CrPlanejamentoView({
     }));
   }
 
-  async function searchPlanItems(kind) {
-    if (!obra?.id || searching) return;
+  function updateItemSearch(kind, value) {
+    searchRequestRef.current[kind] += 1;
+    setItemSearch((current) => ({ ...current, [kind]: value }));
+    setSearchResults((current) => ({ ...current, [kind]: [] }));
+  }
+
+  const searchPlanItems = useCallback(async (kind, rawQuery) => {
+    const query = String(rawQuery || '').trim();
+    if (!obra?.id || !query) {
+      searchRequestRef.current[kind] += 1;
+      setSearchResults((current) => ({ ...current, [kind]: [] }));
+      setLastCompletedSearch((current) => ({ ...current, [kind]: '' }));
+      setSearching((current) => (current === kind ? '' : current));
+      return;
+    }
+    const requestId = searchRequestRef.current[kind] + 1;
+    searchRequestRef.current[kind] = requestId;
     try {
       setSearching(kind);
       setError('');
       const response = await pesquisarItensPlanoCompetencia(
         obra.id,
         competencia,
-        { q: itemSearch[kind], limit: 20 }
+        { q: query, limit: 20 }
       );
+      if (searchRequestRef.current[kind] !== requestId) return;
       setSearchResults((current) => ({ ...current, [kind]: response.items || [] }));
+      setLastCompletedSearch((current) => ({ ...current, [kind]: query }));
     } catch (requestError) {
+      if (searchRequestRef.current[kind] !== requestId) return;
       setError(requestError.message || 'Erro ao pesquisar serviços.');
     } finally {
-      setSearching('');
+      if (searchRequestRef.current[kind] === requestId) {
+        setSearching((current) => (current === kind ? '' : current));
+      }
     }
+  }, [obra?.id, competencia]);
+
+  function runImmediateItemSearch(kind) {
+    window.clearTimeout(searchDebounceRef.current[kind]);
+    searchDebounceRef.current[kind] = null;
+    searchPlanItems(kind, itemSearch[kind]);
   }
+
+  useEffect(() => {
+    const kind = step === 1
+      ? 'costs'
+      : (step === 2 && isPublic ? 'receipts' : null);
+    if (!kind) return undefined;
+    const query = String(itemSearch[kind] || '').trim();
+    if (!query) {
+      searchPlanItems(kind, '');
+      return undefined;
+    }
+    searchDebounceRef.current[kind] = window.setTimeout(() => {
+      searchPlanItems(kind, query);
+    }, 300);
+    return () => {
+      window.clearTimeout(searchDebounceRef.current[kind]);
+      searchDebounceRef.current[kind] = null;
+    };
+  }, [isPublic, itemSearch.costs, itemSearch.receipts, searchPlanItems, step]);
 
   function addReceipt(item) {
     if (receipts.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
@@ -226,6 +282,7 @@ export default function CrPlanejamentoView({
       numero_medicao: ''
     }]);
     setSearchResults((current) => ({ ...current, receipts: [] }));
+    setLastCompletedSearch((current) => ({ ...current, receipts: '' }));
     setItemSearch((current) => ({ ...current, receipts: '' }));
   }
 
@@ -240,6 +297,7 @@ export default function CrPlanejamentoView({
       parceiro_id: null
     }]);
     setSearchResults((current) => ({ ...current, costs: [] }));
+    setLastCompletedSearch((current) => ({ ...current, costs: '' }));
     setItemSearch((current) => ({ ...current, costs: '' }));
   }
 
@@ -562,14 +620,20 @@ export default function CrPlanejamentoView({
                   <input
                     value={itemSearch.receipts}
                     placeholder="Pesquise por código, serviço ou etapa..."
-                    onChange={(event) => setItemSearch((current) => ({
-                      ...current,
-                      receipts: event.target.value
-                    }))}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="cr-receipts-search-results"
+                    aria-expanded={
+                      searching === 'receipts' || searchResults.receipts.length > 0
+                    }
+                    onChange={(event) => updateItemSearch('receipts', event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
-                        searchPlanItems('receipts');
+                        runImmediateItemSearch('receipts');
+                      }
+                      if (event.key === 'Escape') {
+                        setSearchResults((current) => ({ ...current, receipts: [] }));
                       }
                     }}
                   />
@@ -577,17 +641,36 @@ export default function CrPlanejamentoView({
                     type="button"
                     className="btn btn-outline"
                     disabled={searching === 'receipts'}
-                    onClick={() => searchPlanItems('receipts')}
+                    onClick={() => runImmediateItemSearch('receipts')}
                     aria-label="Pesquisar serviços"
                   >
                     <HiOutlineMagnifyingGlass className="h-4 w-4" />
                   </button>
                 </div>
               </label>
-              {searchResults.receipts.length ? (
-                <div className="cr-item-picker-results">
+              {searching === 'receipts'
+                || searchResults.receipts.length
+                || (
+                  lastCompletedSearch.receipts === itemSearch.receipts.trim()
+                  && Boolean(itemSearch.receipts.trim())
+                ) ? (
+                <div
+                  id="cr-receipts-search-results"
+                  className="cr-item-picker-results"
+                  role="listbox"
+                  aria-label="Serviços encontrados"
+                >
+                  {searching === 'receipts' ? (
+                    <div className="cr-item-picker-feedback">Buscando opções...</div>
+                  ) : null}
                   {searchResults.receipts.map((item) => (
-                    <button key={item.id} type="button" onClick={() => addReceipt(item)}>
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      onClick={() => addReceipt(item)}
+                    >
                       <span><strong>{item.codigo}</strong> · {item.descricao}</span>
                       <small>
                         {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · saldo {
@@ -601,6 +684,11 @@ export default function CrPlanejamentoView({
                       <HiOutlinePlus className="h-4 w-4" />
                     </button>
                   ))}
+                  {searching !== 'receipts' && !searchResults.receipts.length ? (
+                    <div className="cr-item-picker-feedback">
+                      Nenhum serviço encontrado com esses caracteres.
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -884,14 +972,18 @@ export default function CrPlanejamentoView({
                   <input
                     value={itemSearch.costs}
                     placeholder="Pesquise por código, serviço ou etapa..."
-                    onChange={(event) => setItemSearch((current) => ({
-                      ...current,
-                      costs: event.target.value
-                    }))}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-controls="cr-costs-search-results"
+                    aria-expanded={searching === 'costs' || searchResults.costs.length > 0}
+                    onChange={(event) => updateItemSearch('costs', event.target.value)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
-                        searchPlanItems('costs');
+                        runImmediateItemSearch('costs');
+                      }
+                      if (event.key === 'Escape') {
+                        setSearchResults((current) => ({ ...current, costs: [] }));
                       }
                     }}
                   />
@@ -899,17 +991,36 @@ export default function CrPlanejamentoView({
                     type="button"
                     className="btn btn-outline"
                     disabled={searching === 'costs'}
-                    onClick={() => searchPlanItems('costs')}
+                    onClick={() => runImmediateItemSearch('costs')}
                     aria-label="Pesquisar serviços"
                   >
                     <HiOutlineMagnifyingGlass className="h-4 w-4" />
                   </button>
                 </div>
               </label>
-              {searchResults.costs.length ? (
-                <div className="cr-item-picker-results">
+              {searching === 'costs'
+                || searchResults.costs.length
+                || (
+                  lastCompletedSearch.costs === itemSearch.costs.trim()
+                  && Boolean(itemSearch.costs.trim())
+                ) ? (
+                <div
+                  id="cr-costs-search-results"
+                  className="cr-item-picker-results"
+                  role="listbox"
+                  aria-label="Itens de custo encontrados"
+                >
+                  {searching === 'costs' ? (
+                    <div className="cr-item-picker-feedback">Buscando opções...</div>
+                  ) : null}
                   {searchResults.costs.map((item) => (
-                    <button key={item.id} type="button" onClick={() => addCost(item)}>
+                    <button
+                      key={item.id}
+                      type="button"
+                      role="option"
+                      aria-selected="false"
+                      onClick={() => addCost(item)}
+                    >
                       <span><strong>{item.codigo}</strong> · {item.descricao}</span>
                       <small>
                         {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · {
@@ -919,6 +1030,11 @@ export default function CrPlanejamentoView({
                       <HiOutlinePlus className="h-4 w-4" />
                     </button>
                   ))}
+                  {searching !== 'costs' && !searchResults.costs.length ? (
+                    <div className="cr-item-picker-feedback">
+                      Nenhum item encontrado com esses caracteres.
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -928,6 +1044,7 @@ export default function CrPlanejamentoView({
               <thead>
                 <tr>
                   <th>Macro / item micro</th>
+                  <th>Qtd. orçada</th>
                   <th>Qtd. prevista</th>
                   <th>Custo unitário</th>
                   <th>Valor previsto</th>
@@ -940,6 +1057,9 @@ export default function CrPlanejamentoView({
                     <td>
                       <strong>{item.item.codigo} · {item.item.descricao}</strong>
                       <span>{item.item.etapa_macro_codigo || 'Sem macro'} · {item.item.unidade || 'un'}</span>
+                    </td>
+                    <td>
+                      {item.item.quantidade_orcada} {item.item.unidade || 'un'}
                     </td>
                     <td>
                       <input
@@ -978,7 +1098,7 @@ export default function CrPlanejamentoView({
                 ))}
                 {!costs.length ? (
                   <tr>
-                    <td colSpan="5" className="cr-table-empty">
+                    <td colSpan="6" className="cr-table-empty">
                       Pesquise e adicione somente os custos planejados para esta competência.
                     </td>
                   </tr>

@@ -242,6 +242,10 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
 - O plano completo nao e materializado na tela. Itens folha sao pesquisados no
   backend por codigo, descricao ou etapa macro, com paginacao, e somente linhas
   selecionadas com valores relevantes ficam persistidas.
+- Os seletores de itens em custos planejados e medicao apresentada usam autocomplete
+  incremental com debounce; a lista e atualizada pelos caracteres digitados sem
+  exigir clique no botao de busca. Custos planejados tambem exibem a quantidade
+  orcada congelada do item para comparacao com a quantidade prevista.
 - Custos e recebiveis publicos aceitam somente itens folha da versao micro publicada.
 - O custo/valor por item e calculado no backend; o frontend apresenta o mesmo calculo
   apenas como retorno imediato ao usuario.

@@ -117,6 +117,9 @@ function validateFrontendContracts() {
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
   assert(!planning.includes('checked={Boolean(item.confirmado)}'));
+  assert(planning.includes('aria-autocomplete="list"'));
+  assert(planning.includes('window.setTimeout'));
+  assert(planning.includes('Qtd. orçada'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
