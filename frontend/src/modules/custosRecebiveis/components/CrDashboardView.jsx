@@ -326,8 +326,8 @@ export default function CrDashboardView({
                 return (
                   <div key={item.codigo} className="cr-macro-ops-row" data-state={item.estado}>
                     <div className="cr-macro-ops-row__name">
-                      <strong>{item.codigo}</strong>
-                      <span>{item.itens} item(ns) com movimento</span>
+                      <strong>{item.nome || 'Macro sem descrição'}</strong>
+                      <span>{item.codigo} · {item.itens} item(ns) com movimento</span>
                     </div>
                     <div className="cr-macro-ops-row__numbers">
                       <span>Planejado <strong>{currency.format(item.previsto || 0)}</strong></span>

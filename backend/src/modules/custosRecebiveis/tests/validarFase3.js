@@ -132,6 +132,8 @@ function validateFinancialTitleLedger() {
   assert.strictEqual(summary.total_pago, 100);
   assert.strictEqual(summary.saldo_aberto, 1150);
   assert.strictEqual(summary.vencimento_competencia, 1000);
+  assert.strictEqual(summary.saldo_vencimento_competencia, 1000);
+  assert.strictEqual(summary.titulos_abertos_competencia, 1);
   assert.strictEqual(summary.status.aberto, 1);
   assert.strictEqual(summary.status.parcial, 1);
   assert.strictEqual(summary.status.inativos, 1);

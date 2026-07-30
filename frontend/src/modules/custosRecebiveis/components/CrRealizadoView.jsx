@@ -258,10 +258,14 @@ export default function CrRealizadoView({
             <strong>{currency(summary.total_pago)}</strong>
             <small>Baixas acumuladas dos títulos</small>
           </article>
-          <article data-tone="context">
-            <span>Vence em {formatMonth(competencia)}</span>
-            <strong>{currency(summary.vencimento_competencia)}</strong>
-            <small>{Number(summary.titulos_competencia || 0)} título(s) na competência</small>
+          <article
+            data-tone={Number(summary.saldo_vencimento_competencia) > 0 ? 'warning' : 'context'}
+          >
+            <span>Em aberto em {formatMonth(competencia)}</span>
+            <strong>{currency(summary.saldo_vencimento_competencia)}</strong>
+            <small>
+              {Number(summary.titulos_abertos_competencia || 0)} título(s) com saldo no período
+            </small>
           </article>
         </div>
 

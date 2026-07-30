@@ -450,6 +450,9 @@ export default function CustosRecebiveis() {
             value={competencia}
             onChange={(event) => updateQuery({ competencia: event.target.value })}
           />
+          {activeTab === 'realizado' ? (
+            <small>Altere o mês e o ano para recalcular o período financeiro.</small>
+          ) : null}
         </label>
         <div className="cr-context-summary">
           <span>Escopo atual</span>

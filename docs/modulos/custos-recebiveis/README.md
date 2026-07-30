@@ -344,9 +344,11 @@ de escopo.
   a obra; os valores pago e saldo sao proporcionais ao rateio.
 - Titulos cancelados ou estornados permanecem visiveis para rastreabilidade, mas nao
   compoem os totais ativos de custo.
-- O resumo separa total alocado, saldo em aberto, valor pago e total com vencimento na
-  competencia. Os filtros distinguem aberto, parcial, quitado, previsao e demais
-  estados sem alterar o cadastro financeiro.
+- O resumo separa total alocado, saldo em aberto, valor pago e saldo ainda aberto dos
+  titulos com vencimento na competencia selecionada. A competencia de contexto pode
+  ser alterada por mes e ano e recalcula o card e o recorte da lista. Os filtros
+  distinguem aberto, parcial, quitado, previsao e demais estados sem alterar o cadastro
+  financeiro.
 - A projecao `cr_realizados`, usada pelo dashboard, comparativo e exportacoes para
   representar caixa realizado, continua seguindo as regras de baixas abaixo.
 - Somente `MovimentoFinanceiro` do tipo `BAIXA`, com `status = ATIVO`, vinculado a

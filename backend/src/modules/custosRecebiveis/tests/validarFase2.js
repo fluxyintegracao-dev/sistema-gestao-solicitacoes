@@ -127,6 +127,8 @@ function validateBackendContracts() {
   assert(controller.includes('req.query.obra_id'));
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
+  assert(service.includes("attributes: ['codigo', 'descricao']"));
+  assert(service.includes('macroNameByCode'));
 }
 
 function validateFrontendContracts() {
@@ -168,6 +170,7 @@ function validateFrontendContracts() {
   assert(dashboard.includes('Evolução de custos'));
   assert(dashboard.includes('Evolução de recebíveis'));
   assert(dashboard.includes('Custos por macro'));
+  assert(dashboard.includes("item.nome || 'Macro sem descrição'"));
   assert(!dashboard.includes('Status das etapas'));
   assert(page.includes('obra={selectedObra}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));

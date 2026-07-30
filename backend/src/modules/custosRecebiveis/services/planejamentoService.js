@@ -16,6 +16,7 @@ function dependencies(overrides = {}) {
   return {
     sequelize: db.sequelize,
     Obra: db.Obra,
+    Apropriacao: db.Apropriacao,
     CrPlanoObra: db.CrPlanoObra,
     CrPlanoItem: db.CrPlanoItem,
     CrCompetencia: db.CrCompetencia,
@@ -2089,8 +2090,25 @@ async function obterDashboard(
           current.itens += 1;
           macroMap.set(key, current);
         });
+      const macroCodes = [...macroMap.keys()].filter((code) => code !== 'SEM_MACRO');
+      const macroReferences = macroCodes.length
+        ? await deps.Apropriacao.findAll({
+          where: {
+            obra_id: selectedObraId,
+            codigo: { [Op.in]: macroCodes }
+          },
+          attributes: ['codigo', 'descricao'],
+          raw: true
+        })
+        : [];
+      const macroNameByCode = new Map(
+        macroReferences.map((item) => [String(item.codigo), item.descricao || null])
+      );
       macros = [...macroMap.values()].map((row) => ({
         ...row,
+        nome: row.codigo === 'SEM_MACRO'
+          ? 'Sem macro vinculada'
+          : (macroNameByCode.get(String(row.codigo)) || 'Macro sem descrição'),
         delta: money(row.realizado - row.previsto),
         percentual_execucao: row.previsto > 0
           ? Math.round((row.realizado / row.previsto) * 10000) / 100

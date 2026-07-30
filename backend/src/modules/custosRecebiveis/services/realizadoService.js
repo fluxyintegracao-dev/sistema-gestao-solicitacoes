@@ -694,6 +694,7 @@ function summarizeAllocatedTitles(items = []) {
   const active = items.filter((item) => item.ativo_no_custo);
   const byGroup = (group) => active.filter((item) => item.grupo_status === group);
   const inCompetence = active.filter((item) => item.em_competencia);
+  const openInCompetence = inCompetence.filter((item) => number(item.valor_saldo) > 0);
   return {
     titulos: items.length,
     titulos_ativos: active.length,
@@ -704,6 +705,10 @@ function summarizeAllocatedTitles(items = []) {
       inCompetence.reduce((sum, item) => sum + number(item.valor_alocado), 0)
     ),
     titulos_competencia: inCompetence.length,
+    saldo_vencimento_competencia: money(
+      openInCompetence.reduce((sum, item) => sum + number(item.valor_saldo), 0)
+    ),
+    titulos_abertos_competencia: openInCompetence.length,
     status: {
       aberto: byGroup('ABERTO').length,
       parcial: byGroup('PARCIAL').length,
