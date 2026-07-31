@@ -39,7 +39,6 @@ import FinanceiroTitulosImportacaoPanel from '../components/financeiro/Financeir
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
 const COLUMN_ORDER_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnOrder';
-const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 const PAGE_SIZE_OPTIONS = ['25', '50', '100', '150', '200', 'all'];
 const NATUREZAS_INTERCOMPANY_BAIXA = [
   {
@@ -467,7 +466,7 @@ function isCartaoDebito(cartao) {
 }
 
 function normalizeFormaPagamentoText(forma) {
-  return [forma?.codigo, forma?.nome]
+  return [forma?.tipo, forma?.codigo, forma?.nome]
     .filter(Boolean)
     .join(' ')
     .normalize('NFD')
@@ -495,6 +494,22 @@ function isFormaPagamentoCartaoCredito(forma) {
   if (!forma) return false;
   const text = normalizeFormaPagamentoText(forma);
   return Boolean(forma.gera_fatura) || text.includes('CREDITO');
+}
+
+function getFormaRecebimentoOperacional(forma) {
+  if (!forma) return '';
+  const text = [forma.tipo, forma.codigo, forma.nome]
+    .filter(Boolean)
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+
+  if (isFormaPagamentoCartao(forma)) return 'CARTAO';
+  if (Boolean(forma.exige_cheque) || text.includes('CHEQUE')) return 'CHEQUE';
+
+  return ['DINHEIRO', 'PIX', 'TRANSFERENCIA', 'BOLETO', 'PERMUTA', 'BENS', 'OUTROS']
+    .find((tipo) => text.split(/[^A-Z0-9_]+/).includes(tipo)) || '';
 }
 
 function getCartaoLabel(cartao) {
@@ -577,6 +592,7 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
     empresa_id: '',
     conta_bancaria_id: '',
     cartao_id: '',
+    forma_pagamento_id: '',
     forma_recebimento: '',
     intercompany: false,
     natureza_intercompany_baixa: 'OPERACIONAL_TERCEIRO',
@@ -933,6 +949,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const baixaMassaParcelada = baixaMassaFormaParcelavel && Boolean(baixaMassaForm.parcelado);
   const baixaMassaTipoSelecionado = String(selectedTitulosBaixaveis[0]?.tipo || fixedTipo || draftFilters.tipo || '').toUpperCase();
   const baixaMassaFormaLabel = baixaMassaTipoSelecionado === 'PAGAR' ? 'Forma de pagamento' : 'Forma de recebimento';
+  const formasPagamentoBaixaMassa = useMemo(
+    () => formasPagamentoFiltradas.filter((forma) => Boolean(getFormaRecebimentoOperacional(forma))),
+    [formasPagamentoFiltradas]
+  );
   const chequesTerceirosDisponiveis = useMemo(
     () => chequesTerceiros.filter((cheque) => String(cheque?.status || '').toUpperCase() === 'EM_CARTEIRA'),
     [chequesTerceiros]
@@ -1378,7 +1398,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       return;
     }
 
-    if (!baixaMassaForm.forma_recebimento) {
+    if (!baixaMassaForm.forma_pagamento_id || !baixaMassaForm.forma_recebimento) {
       setError(`Informe a ${baixaMassaFormaLabel.toLowerCase()} da baixa em massa.`);
       return;
     }
@@ -1470,6 +1490,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           empresa_id: baixaMassaForm.empresa_id,
           conta_bancaria_id: baixaMassaForm.conta_bancaria_id,
           cartao_id: baixaMassaForm.cartao_id || null,
+          forma_pagamento_id: baixaMassaForm.forma_pagamento_id,
           forma_recebimento: baixaMassaForm.forma_recebimento,
           data_movimento: baixaMassaForm.data_movimento,
           observacoes: baixaMassaForm.observacoes || 'Baixa em massa agrupada e parcelada.',
@@ -1488,6 +1509,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               empresa_id: baixaMassaForm.empresa_id,
               conta_bancaria_id: baixaMassaForm.conta_bancaria_id || null,
               cartao_id: baixaMassaForm.cartao_id || null,
+              forma_pagamento_id: baixaMassaForm.forma_pagamento_id,
               forma_recebimento: baixaMassaForm.forma_recebimento,
               valor: Number(titulo.valor_saldo || 0),
               desconto: baixaMassaForm.desconto || 0,
@@ -2523,30 +2545,45 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   <span className="app-filter-label">{baixaMassaFormaLabel}</span>
                   <select
                     className="input w-full input-sm"
-                    value={baixaMassaForm.forma_recebimento}
-                    onChange={(event) => setBaixaMassaForm((current) => ({
-                      ...current,
-                      forma_recebimento: event.target.value,
-                      cartao_id: '',
-                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id,
-                      parcelado: false,
-                      desconto: '',
-                      usar_cheque_terceiro: false,
-                      cheque_terceiro_id: '',
-                      cheque_numero: '',
-                      cheque_emitente: '',
-                      cheque_banco: '',
-                      cheque_agencia: '',
-                      cheque_conta: '',
-                      parcelas: buildBaixaMassaParcelas(selectedSaldo, current.quantidade_parcelas || 2, current.data_movimento)
-                    }))}
+                    value={baixaMassaForm.forma_pagamento_id}
+                    onChange={(event) => {
+                      const formaPagamentoId = event.target.value;
+                      const formaSelecionada = formasPagamentoBaixaMassa.find(
+                        (forma) => String(forma.id) === String(formaPagamentoId)
+                      );
+                      const formaOperacional = getFormaRecebimentoOperacional(formaSelecionada);
+                      setBaixaMassaForm((current) => ({
+                        ...current,
+                        forma_pagamento_id: formaPagamentoId,
+                        forma_recebimento: formaOperacional,
+                        cartao_id: '',
+                        conta_bancaria_id: isCartaoForma(formaOperacional) ? '' : current.conta_bancaria_id,
+                        parcelado: false,
+                        desconto: '',
+                        usar_cheque_terceiro: false,
+                        cheque_terceiro_id: '',
+                        cheque_numero: '',
+                        cheque_emitente: '',
+                        cheque_banco: '',
+                        cheque_agencia: '',
+                        cheque_conta: '',
+                        parcelas: buildBaixaMassaParcelas(selectedSaldo, current.quantidade_parcelas || 2, current.data_movimento)
+                      }));
+                    }}
                     required
                   >
                     <option value="">Selecione</option>
-                    {FORMAS_RECEBIMENTO.map((forma) => (
-                      <option key={forma} value={forma}>{forma}</option>
+                    {formasPagamentoBaixaMassa.map((forma) => (
+                      <option key={forma.id} value={forma.id}>
+                        {forma.nome} · {forma.codigo}
+                      </option>
                     ))}
                   </select>
+                  {formasPagamentoBaixaMassa.length === 0 ? (
+                    <span className="mt-1 text-xs text-amber-700">
+                      Nenhuma forma ativa e compatível foi encontrada nos cadastros financeiros.
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="app-filter-field md:col-span-2">
@@ -3015,6 +3052,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
                   (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
                   (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
+                  !baixaMassaForm.forma_pagamento_id ||
                   (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) ||
                   (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
                   (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||

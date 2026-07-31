@@ -72,6 +72,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(30),
       allowNull: true
     },
+    forma_pagamento_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     tipo_permuta: {
       type: DataTypes.STRING(80),
       allowNull: true

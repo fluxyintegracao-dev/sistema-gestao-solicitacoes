@@ -1030,7 +1030,8 @@ export default function FinanceiroTituloDetalhe() {
                         Empresa pagadora: {movimento.empresa?.nome || movimento.empresa?.razao_social || 'Nao informada'}
                       </div>
                       <div className="text-[var(--c-muted)]">
-                        {baixaFormaLabel}: {movimento.forma_recebimento || 'Nao informada'}
+                        {baixaFormaLabel}: {movimento.formaPagamento?.nome || movimento.forma_recebimento || 'Nao informada'}
+                        {movimento.formaPagamento?.codigo ? ` · ${movimento.formaPagamento.codigo}` : ''}
                       </div>
                       <div className="text-[var(--c-muted)]">
                         Valor base {formatCurrency(movimento.valor)} - Juros {formatCurrency(movimento.juros)} - Multa {formatCurrency(movimento.multa)} - Desconto {formatCurrency(movimento.desconto)}

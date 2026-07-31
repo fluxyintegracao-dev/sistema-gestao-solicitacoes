@@ -2667,6 +2667,16 @@ db.TituloFinanceiro.belongsTo(db.FormaPagamentoFinanceira, {
   as: 'formaPagamento'
 });
 
+db.FormaPagamentoFinanceira.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.FormaPagamentoFinanceira, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'formaPagamento'
+});
+
 db.CartaoFinanceiro.hasMany(db.TituloFinanceiro, {
   foreignKey: 'cartao_id',
   as: 'titulos'
