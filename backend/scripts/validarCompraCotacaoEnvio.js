@@ -282,6 +282,57 @@ function validarSnapshotCondicaoPagamentoPedido() {
   );
 }
 
+function validarPermissaoEBuscaFornecedores() {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../src/controllers/FornecedorCompraController.js'),
+    'utf8'
+  );
+  assert(
+    controllerSource.includes('canManageComprasFornecedores') &&
+      controllerSource.includes('canViewComprasFornecedores'),
+    'Controller de fornecedores deve usar as permissoes granulares proprias.'
+  );
+  assert(
+    !controllerSource.includes('canManageComprasCotacoes') &&
+      !controllerSource.includes('canViewComprasCotacoes'),
+    'Controller de fornecedores nao deve depender das permissoes de cotacoes.'
+  );
+  assert(
+    controllerSource.includes("const documentoBusca = busca.replace(/\\D/g, '');") &&
+      controllerSource.includes('documentoFornecedorSemPontuacao()'),
+    'Busca de fornecedores deve comparar CPF/CNPJ sem pontuacao.'
+  );
+
+  const accessSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/utils/acessoProduto.js'),
+    'utf8'
+  );
+  assert(
+    accessSource.includes('export function canManageComprasFornecedores(user)') &&
+      accessSource.includes("hasPermissao(user, 'compras.fornecedores.gerenciar')"),
+    'Frontend deve resolver a gestao de fornecedores pela permissao granular.'
+  );
+
+  const fornecedoresPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/GestaoFornecedores.jsx'),
+    'utf8'
+  );
+  assert(
+    fornecedoresPageSource.includes('const canManage = canManageComprasFornecedores(user);'),
+    'Pagina de fornecedores deve exibir suas acoes pela permissao granular.'
+  );
+
+  const parceirosPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/pages/Parceiros.jsx'),
+    'utf8'
+  );
+  assert(
+    parceirosPageSource.includes('const documentoSearch = normalizeDocumento(filtro);') &&
+      parceirosPageSource.includes('documentoSemPontuacao.includes(documentoSearch)'),
+    'Cadastro de Pessoas deve localizar CPF/CNPJ com ou sem pontuacao.'
+  );
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
@@ -292,5 +343,6 @@ validarPrazoGeralRespostaInterna();
 validarCompatibilidadeDataChegadaLegada();
 validarDisponibilidadeHistoricaPorFornecedorItem();
 validarSnapshotCondicaoPagamentoPedido();
+validarPermissaoEBuscaFornecedores();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');

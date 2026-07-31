@@ -565,6 +565,16 @@ export function canViewComprasFornecedores(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+export function canManageComprasFornecedores(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (!hasEnabledModule(user, 'COTACOES')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.fornecedores.gerenciar');
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 export function canViewComprasRelatorios(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (isBusinessAdmin(user)) return true;

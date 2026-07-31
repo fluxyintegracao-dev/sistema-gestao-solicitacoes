@@ -53,6 +53,13 @@ As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/so
 - os historicos da solicitacao de compra e da solicitacao principal exibem o nome do responsavel delegado; o ID permanece somente nos metadados tecnicos de auditoria;
 - atribuições historicas a usuarios fora de Compras sao preservadas para consulta, mas um novo salvamento gerencial exige trocar ou remover esse responsavel.
 
+## Gestao de fornecedores
+
+- visualizar a pagina usa `compras.fornecedores.visualizar` ou `compras.fornecedores.gerenciar`;
+- cadastrar, editar e desativar exige `compras.fornecedores.gerenciar` tanto no frontend quanto no backend;
+- na ausencia de configuracao granular, permanece o fallback para usuarios do setor de Compras;
+- a pesquisa por CPF/CNPJ ignora pontos, tracos, barras e espacos, sem alterar o documento armazenado nem a unicidade do cadastro central de Parceiros.
+
 ## Idempotencia
 
 Criacao, encaminhamento, aprovacao, cancelamento e envio para cotacao devem impedir repeticao concorrente. O backend deve revalidar status em transacao; o frontend bloqueia multiplos cliques.
