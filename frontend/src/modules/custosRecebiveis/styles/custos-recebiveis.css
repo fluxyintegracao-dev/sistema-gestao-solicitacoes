@@ -3733,6 +3733,10 @@
   border-radius: 0.5rem;
 }
 
+.cr-measurement-justification {
+  margin: 0.75rem 0 0;
+}
+
 @media (max-width: 760px) {
   .cr-macro-planning-heading { align-items: stretch; flex-direction: column; }
   .cr-macro-planning-heading .btn { width: 100%; }

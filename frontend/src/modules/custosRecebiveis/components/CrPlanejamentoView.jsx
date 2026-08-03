@@ -16,6 +16,7 @@ import {
   decidirReaberturaCompetencia,
   finalizarPlanejamentoCompetencia,
   obterPlanejamentoCompetencia,
+  pesquisarItensPlanoCompetencia,
   salvarCustosCompetencia,
   salvarRecebiveisCompetencia,
   solicitarReaberturaCompetencia,
@@ -44,14 +45,6 @@ function asNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function normalizeSearch(value) {
-  return String(value || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
-
 function newLocalKey(prefix = 'cr-subitem') {
   return globalThis.crypto?.randomUUID?.()
     || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -68,6 +61,44 @@ function localExpiryDefault() {
   const date = new Date(Date.now() + (7 * 24 * 60 * 60 * 1000));
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - (offset * 60 * 1000)).toISOString().slice(0, 16);
+}
+
+function usePlanItemSearch(obraId, competencia, macroCode, query) {
+  const [state, setState] = useState({ items: [], loading: false, error: '' });
+
+  useEffect(() => {
+    if (!obraId || !competencia || !macroCode) {
+      setState({ items: [], loading: false, error: '' });
+      return undefined;
+    }
+    let active = true;
+    setState((current) => ({ ...current, loading: true, error: '' }));
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await pesquisarItensPlanoCompetencia(obraId, competencia, {
+          q: query,
+          page: 1,
+          limit: 50,
+          etapaMacroCodigo: macroCode
+        });
+        if (active) setState({ items: response.items || [], loading: false, error: '' });
+      } catch (requestError) {
+        if (active) {
+          setState({
+            items: [],
+            loading: false,
+            error: requestError.message || 'Não foi possível pesquisar a planilha.'
+          });
+        }
+      }
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [obraId, competencia, macroCode, query]);
+
+  return state;
 }
 
 function privateReceiptStatusLabel(status) {
@@ -105,6 +136,9 @@ export default function CrPlanejamentoView({
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
   const [measurementPickerMacro, setMeasurementPickerMacro] = useState('');
   const [measurementSearch, setMeasurementSearch] = useState('');
+  const [approvedPickerMacro, setApprovedPickerMacro] = useState('');
+  const [approvedSearch, setApprovedSearch] = useState('');
+  const [measurementJustification, setMeasurementJustification] = useState('');
 
   const load = useCallback(async () => {
     if (!obra?.id) {
@@ -119,30 +153,13 @@ export default function CrPlanejamentoView({
       setCosts(response.custos || []);
       setReceipts(response.recebiveis || []);
       if (response.obra?.classificacao === 'PUBLICA') {
-        const measurementsByItem = new Map(
-          (response.medicoes || []).map((item) => [planningRowKey(item), item])
+        setMeasurements(response.medicoes || []);
+        setMeasurementJustification(
+          (response.medicoes || []).find((item) => item.justificativa_glosa)?.justificativa_glosa || ''
         );
-        setMeasurements((response.recebiveis || []).map((receipt) => (
-          measurementsByItem.get(planningRowKey(receipt)) || {
-            previsao_custo_id: receipt.previsao_custo_id,
-            plano_item_id: receipt.plano_item_id,
-            item: receipt.item,
-            etapa_macro_codigo: receipt.etapa_macro_codigo,
-            descricao: receipt.descricao,
-            unidade: receipt.unidade,
-            quantidade_base: receipt.quantidade_base,
-            custo_unitario: receipt.custo_unitario,
-            valor_base: receipt.valor_base,
-            quantidade_medida: 0,
-            valor_medido: 0,
-            valor_glosa: receipt.valor_previsto || 0,
-            justificativa_glosa: '',
-            data_medicao: '',
-            numero_medicao: ''
-          }
-        )));
       } else {
         setMeasurements([]);
+        setMeasurementJustification('');
       }
     } catch (requestError) {
       setData(null);
@@ -157,12 +174,27 @@ export default function CrPlanejamentoView({
     setFeedback('');
     setMeasurementPickerMacro('');
     setMeasurementSearch('');
+    setApprovedPickerMacro('');
+    setApprovedSearch('');
+    setMeasurementJustification('');
     load();
   }, [load]);
 
   const isPublic = (data?.obra?.classificacao || obra?.classificacao) === 'PUBLICA';
   const steps = isPublic ? PUBLIC_STEPS : PRIVATE_STEPS;
   const readonly = data?.regras?.editavel === false;
+  const forecastSearch = usePlanItemSearch(
+    obra?.id,
+    competencia,
+    measurementPickerMacro,
+    measurementSearch
+  );
+  const approvedItemSearch = usePlanItemSearch(
+    obra?.id,
+    competencia,
+    approvedPickerMacro,
+    approvedSearch
+  );
   const totalCosts = useMemo(
     () => costs.reduce((sum, item) => sum + (asNumber(item.quantidade) * asNumber(item.custo_unitario)), 0),
     [costs]
@@ -214,33 +246,39 @@ export default function CrPlanejamentoView({
     }));
   }
 
-  function addReceipt(cost) {
-    if (!cost?.id || receipts.some((row) => Number(row.previsao_custo_id) === Number(cost.id))) return;
+  function addReceipt(item) {
+    if (!item?.id || receipts.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
     const receipt = {
-      previsao_custo_id: cost.id,
-      plano_item_id: null,
-      etapa_macro_codigo: cost.etapa_macro_codigo,
-      descricao: cost.descricao,
-      unidade: cost.unidade,
-      quantidade_base: cost.quantidade,
-      custo_unitario: cost.custo_unitario,
-      valor_base: cost.valor_previsto,
-      item: null,
+      previsao_custo_id: null,
+      plano_item_id: item.id,
+      etapa_macro_codigo: item.etapa_macro_codigo,
+      descricao: item.descricao,
+      unidade: item.unidade,
+      quantidade_base: item.quantidade_orcada,
+      custo_unitario: item.custo_unitario_orcado,
+      valor_base: item.valor_orcado,
+      item,
       quantidade_prevista: 0,
       valor_previsto: 0,
       data_prevista: ''
     };
     setReceipts((current) => [...current, receipt]);
+    setMeasurementPickerMacro('');
+    setMeasurementSearch('');
+  }
+
+  function addApprovedMeasurement(item) {
+    if (!item?.id || measurements.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
     setMeasurements((current) => [...current, {
-      previsao_custo_id: cost.id,
-      plano_item_id: null,
-      etapa_macro_codigo: cost.etapa_macro_codigo,
-      descricao: cost.descricao,
-      unidade: cost.unidade,
-      quantidade_base: cost.quantidade,
-      custo_unitario: cost.custo_unitario,
-      valor_base: cost.valor_previsto,
-      item: null,
+      previsao_custo_id: null,
+      plano_item_id: item.id,
+      etapa_macro_codigo: item.etapa_macro_codigo,
+      descricao: item.descricao,
+      unidade: item.unidade,
+      quantidade_base: item.quantidade_orcada,
+      custo_unitario: item.custo_unitario_orcado,
+      valor_base: item.valor_orcado,
+      item,
       quantidade_medida: 0,
       valor_medido: 0,
       valor_glosa: 0,
@@ -248,8 +286,8 @@ export default function CrPlanejamentoView({
       data_medicao: '',
       numero_medicao: ''
     }]);
-    setMeasurementPickerMacro('');
-    setMeasurementSearch('');
+    setApprovedPickerMacro('');
+    setApprovedSearch('');
   }
 
   function addCost(macro) {
@@ -273,6 +311,9 @@ export default function CrPlanejamentoView({
     setReceipts((current) => current.filter(
       (item) => planningRowKey(item) !== reference
     ));
+  }
+
+  function removeMeasurement(reference) {
     setMeasurements((current) => current.filter(
       (item) => planningRowKey(item) !== reference
     ));
@@ -292,19 +333,8 @@ export default function CrPlanejamentoView({
     return receipts.filter((item) => item.etapa_macro_codigo === macroCode);
   }
 
-  function availableMeasurementCosts(macroCode, search = '') {
-    const selectedIds = new Set(receipts.map((item) => Number(item.previsao_custo_id)).filter(Boolean));
-    const available = costsForMacro(macroCode).filter(
-      (item) => item.id && !selectedIds.has(Number(item.id))
-    );
-    const term = normalizeSearch(search);
-    if (!term) return available;
-    return available.filter((item) => normalizeSearch([
-      item.descricao,
-      item.unidade,
-      item.quantidade,
-      item.custo_unitario
-    ].filter(Boolean).join(' ')).includes(term));
+  function measurementsForMacro(macroCode) {
+    return measurements.filter((item) => item.etapa_macro_codigo === macroCode);
   }
 
   function renderCostMacro(macro, macroIndex) {
@@ -414,8 +444,8 @@ export default function CrPlanejamentoView({
 
   function renderForecastMeasurementMacro(macro, macroIndex) {
     const rows = receiptsForMacro(macro.codigo);
-    const allAvailable = availableMeasurementCosts(macro.codigo);
-    const available = availableMeasurementCosts(macro.codigo, measurementSearch);
+    const selectedIds = new Set(receipts.map((item) => Number(item.plano_item_id)).filter(Boolean));
+    const available = forecastSearch.items.filter((item) => !selectedIds.has(Number(item.id)));
     const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
     const pickerOpen = measurementPickerMacro === macro.codigo;
     return (
@@ -445,7 +475,7 @@ export default function CrPlanejamentoView({
         </header>
         {pickerOpen ? (
           <div className="cr-macro-subitem-picker">
-            <strong>Selecione um custo planejado desta etapa</strong>
+            <strong>Selecione um subitem da planilha nesta etapa</strong>
             <label className="cr-macro-picker-search">
               <HiOutlineMagnifyingGlass className="h-4 w-4" />
               <input
@@ -458,27 +488,32 @@ export default function CrPlanejamentoView({
               />
             </label>
             <div className="cr-macro-picker-results" role="listbox">
-              {available.map((cost) => (
+              {available.map((item) => (
                 <button
-                  key={cost.id}
+                  key={item.id}
                   type="button"
                   role="option"
                   aria-selected="false"
-                  onClick={() => addReceipt(cost)}
+                  onClick={() => addReceipt(item)}
                 >
-                  <span>{cost.descricao}</span>
-                  <small>{cost.unidade} · {cost.quantidade} × {currency.format(cost.custo_unitario)}</small>
+                  <span>{item.codigo} · {item.descricao}</span>
+                  <small>
+                    {item.unidade || 'un'} · orçado {item.quantidade_orcada} × {currency.format(item.custo_unitario_orcado)}
+                  </small>
                   <HiOutlinePlus className="h-4 w-4" />
                 </button>
               ))}
-              {!allAvailable.length ? (
-                <span className="cr-macro-picker-empty">
-                  Salve os custos planejados ou todos os subitens desta etapa já foram adicionados.
-                </span>
+              {forecastSearch.loading ? (
+                <span className="cr-macro-picker-empty">Pesquisando itens da planilha...</span>
               ) : null}
-              {allAvailable.length > 0 && !available.length ? (
+              {forecastSearch.error ? (
+                <span className="cr-macro-picker-empty" data-tone="error">{forecastSearch.error}</span>
+              ) : null}
+              {!forecastSearch.loading && !forecastSearch.error && !available.length ? (
                 <span className="cr-macro-picker-empty">
-                  Nenhum subitem desta etapa corresponde à pesquisa.
+                  {measurementSearch.trim()
+                    ? 'Nenhum subitem da planilha corresponde à pesquisa nesta etapa.'
+                    : 'Nenhum subitem disponível na planilha para esta etapa.'}
                 </span>
               ) : null}
             </div>
@@ -558,6 +593,166 @@ export default function CrPlanejamentoView({
     );
   }
 
+  function renderApprovedMeasurementMacro(macro, macroIndex) {
+    const rows = measurementsForMacro(macro.codigo);
+    const selectedIds = new Set(measurements.map((item) => Number(item.plano_item_id)).filter(Boolean));
+    const available = approvedItemSearch.items.filter((item) => !selectedIds.has(Number(item.id)));
+    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_medido), 0);
+    const pickerOpen = approvedPickerMacro === macro.codigo;
+    return (
+      <article key={macro.codigo} className="cr-macro-planning-block">
+        <header className="cr-macro-planning-heading">
+          <div>
+            <b>{macroIndex + 1}</b>
+            <div>
+              <strong>{macro.codigo} · {macro.descricao}</strong>
+              <span>{rows.length} subitem(ns) na medição aprovada</span>
+            </div>
+          </div>
+          {permissions.measurement ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              aria-expanded={pickerOpen}
+              onClick={() => {
+                setApprovedPickerMacro(pickerOpen ? '' : macro.codigo);
+                setApprovedSearch('');
+              }}
+            >
+              <HiOutlinePlus className="h-4 w-4" />
+              Adicionar subitem
+            </button>
+          ) : null}
+        </header>
+        {pickerOpen ? (
+          <div className="cr-macro-subitem-picker">
+            <strong>Selecione um subitem aprovado nesta etapa</strong>
+            <label className="cr-macro-picker-search">
+              <HiOutlineMagnifyingGlass className="h-4 w-4" />
+              <input
+                autoFocus
+                type="search"
+                value={approvedSearch}
+                placeholder="Pesquisar subitem aprovado..."
+                aria-label={`Pesquisar subitens aprovados de ${macro.descricao}`}
+                onChange={(event) => setApprovedSearch(event.target.value)}
+              />
+            </label>
+            <div className="cr-macro-picker-results" role="listbox">
+              {available.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  onClick={() => addApprovedMeasurement(item)}
+                >
+                  <span>{item.codigo} · {item.descricao}</span>
+                  <small>
+                    {item.unidade || 'un'} · orçado {item.quantidade_orcada} × {currency.format(item.custo_unitario_orcado)}
+                  </small>
+                  <HiOutlinePlus className="h-4 w-4" />
+                </button>
+              ))}
+              {approvedItemSearch.loading ? (
+                <span className="cr-macro-picker-empty">Pesquisando itens da planilha...</span>
+              ) : null}
+              {approvedItemSearch.error ? (
+                <span className="cr-macro-picker-empty" data-tone="error">{approvedItemSearch.error}</span>
+              ) : null}
+              {!approvedItemSearch.loading && !approvedItemSearch.error && !available.length ? (
+                <span className="cr-macro-picker-empty">
+                  {approvedSearch.trim()
+                    ? 'Nenhum subitem da planilha corresponde à pesquisa nesta etapa.'
+                    : 'Nenhum subitem disponível na planilha para esta etapa.'}
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+        <div className="cr-table-shell cr-planning-table cr-forecast-measurement-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Serviço aprovado</th>
+                <th>Unid.</th>
+                <th>Qtd. orçada</th>
+                <th>Qtd. já aprovada</th>
+                <th>Qtd. aprovada</th>
+                <th>Valor unitário</th>
+                <th>Valor aprovado</th>
+                <th>Data / boletim</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item) => {
+                const index = measurements.findIndex(
+                  (row) => planningRowKey(row) === planningRowKey(item)
+                );
+                const previousQuantity = asNumber(item.item?.quantidade_aprovada_anterior);
+                return (
+                  <tr key={planningRowKey(item)}>
+                    <td><strong>{item.item?.codigo} · {item.descricao || item.item?.descricao}</strong></td>
+                    <td>{item.unidade || item.item?.unidade || 'un'}</td>
+                    <td>{item.quantidade_base}</td>
+                    <td>{previousQuantity}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max={Math.max(0, asNumber(item.quantidade_base) - previousQuantity)}
+                        step="0.0001"
+                        value={item.quantidade_medida}
+                        disabled={!permissions.measurement}
+                        onChange={(event) => updateMeasurement(index, 'quantidade_medida', event.target.value)}
+                      />
+                    </td>
+                    <td>{currency.format(item.custo_unitario || 0)}</td>
+                    <td><strong>{currency.format(item.valor_medido || 0)}</strong></td>
+                    <td>
+                      <input
+                        type="date"
+                        value={item.data_medicao || ''}
+                        disabled={!permissions.measurement}
+                        onChange={(event) => updateMeasurement(index, 'data_medicao', event.target.value)}
+                      />
+                      <input
+                        value={item.numero_medicao || ''}
+                        placeholder="Boletim"
+                        disabled={!permissions.measurement}
+                        onChange={(event) => updateMeasurement(index, 'numero_medicao', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      {permissions.measurement ? (
+                        <button
+                          type="button"
+                          className="cr-icon-action"
+                          onClick={() => removeMeasurement(planningRowKey(item))}
+                          aria-label={`Remover ${item.descricao || item.item?.descricao}`}
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!rows.length ? (
+                <tr><td colSpan="9" className="cr-table-empty">Adicione os subitens efetivamente aprovados pelo órgão.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <footer className="cr-macro-total">
+          <span>Total aprovado da etapa</span>
+          <strong>{currency.format(total)}</strong>
+        </footer>
+      </article>
+    );
+  }
+
   async function runMutation(kind, action, successMessage) {
     if (saving) return null;
     try {
@@ -629,7 +824,8 @@ export default function CrPlanejamentoView({
           justificativa_glosa: item.justificativa_glosa || null,
           data_medicao: item.data_medicao || null,
           numero_medicao: item.numero_medicao || null
-        }))
+        })),
+        measurementJustification
       ),
       'Medição consolidada com rastreabilidade.'
     );
@@ -856,7 +1052,7 @@ export default function CrPlanejamentoView({
             <div>
               <h3>Medição prevista no período</h3>
               <p>
-                Adicione os subitens salvos nos custos planejados. As informações do serviço são carregadas automaticamente; informe somente a quantidade medida.
+                Pesquise os subitens da planilha dentro de cada etapa macro. As informações orçamentárias são carregadas automaticamente; informe somente a quantidade prevista para medição.
               </p>
             </div>
           </div>
@@ -1036,103 +1232,31 @@ export default function CrPlanejamentoView({
             <div>
               <h3>Medição aprovada pelo órgão</h3>
               <p>
-                Registre o valor reconhecido pelo órgão. A diferença para o previsto
-                será tratada como glosa e exigirá justificativa.
+                Pesquise na planilha os itens efetivamente aprovados. Eles podem ser diferentes
+                da previsão; a diferença total será tratada como glosa e exigirá justificativa.
               </p>
             </div>
           </div>
           {permissions.measurementView ? (
             <>
-              <div className="cr-table-shell cr-planning-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Subitem planejado</th>
-                      <th>Previsto</th>
-                      <th>Qtd. aprovada</th>
-                      <th>Valor aprovado</th>
-                      <th>Glosa</th>
-                      <th>Justificativa</th>
-                      <th>Data / número</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {measurements.map((item, index) => {
-                      const receipt = receipts.find(
-                        (row) => planningRowKey(row) === planningRowKey(item)
-                      );
-                      const rowGlosa = Math.max(
-                        0,
-                        asNumber(receipt?.valor_previsto) - asNumber(item.valor_medido)
-                      );
-                      return (
-                        <tr key={planningRowKey(item)}>
-                          <td>
-                            <strong>{item.descricao || item.item?.descricao}</strong>
-                            <span>{item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || item.item?.unidade || 'un'}</span>
-                          </td>
-                          <td>
-                            {receipt?.quantidade_prevista || 0} {item.unidade || item.item?.unidade || 'un'}
-                            <span>{currency.format(receipt?.valor_previsto || 0)}</span>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.0001"
-                              value={item.quantidade_medida}
-                              disabled={!permissions.measurement}
-                              onChange={(event) => updateMeasurement(index, 'quantidade_medida', event.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              value={item.valor_medido}
-                              disabled={!permissions.measurement}
-                              onChange={(event) => updateMeasurement(index, 'valor_medido', event.target.value)}
-                            />
-                          </td>
-                          <td data-tone={rowGlosa > 0 ? 'negative' : 'neutral'}>
-                            {currency.format(rowGlosa)}
-                          </td>
-                          <td>
-                            <input
-                              value={item.justificativa_glosa || ''}
-                              placeholder={rowGlosa > 0 ? 'Motivo da glosa' : 'Sem glosa'}
-                              disabled={!permissions.measurement}
-                              onChange={(event) => updateMeasurement(index, 'justificativa_glosa', event.target.value)}
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="date"
-                              value={item.data_medicao || ''}
-                              disabled={!permissions.measurement}
-                              onChange={(event) => updateMeasurement(index, 'data_medicao', event.target.value)}
-                            />
-                            <input
-                              value={item.numero_medicao || ''}
-                              placeholder="Boletim"
-                              disabled={!permissions.measurement}
-                              onChange={(event) => updateMeasurement(index, 'numero_medicao', event.target.value)}
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {!measurements.length ? (
-                      <tr>
-                        <td colSpan="7" className="cr-table-empty">
-                          Salve primeiro a medição prevista para registrar a aprovação do órgão.
-                        </td>
-                      </tr>
-                    ) : null}
-                  </tbody>
-                </table>
+              <div className="cr-macro-planning-list">
+                {(data?.macros || []).map(renderApprovedMeasurementMacro)}
+                {!data?.macros?.length ? (
+                  <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
+                ) : null}
               </div>
+              {totalApproved < totalReceipts ? (
+                <label className="cr-field cr-measurement-justification">
+                  <span>Justificativa da diferença entre previsto e aprovado</span>
+                  <textarea
+                    rows="3"
+                    value={measurementJustification}
+                    placeholder="Explique a glosa ou a diferença de composição aprovada pelo órgão."
+                    disabled={!permissions.measurement}
+                    onChange={(event) => setMeasurementJustification(event.target.value)}
+                  />
+                </label>
+              ) : null}
               <div className="cr-panel-actions">
                 <span>
                   Aprovado: {currency.format(totalApproved)} · Glosa: {currency.format(totalGlosa)}
@@ -1141,7 +1265,11 @@ export default function CrPlanejamentoView({
                   <button
                     type="button"
                     className="btn btn-primary"
-                    disabled={!measurements.length || Boolean(saving)}
+                    disabled={
+                      !measurements.length
+                      || Boolean(saving)
+                      || (totalApproved < totalReceipts && measurementJustification.trim().length < 5)
+                    }
                     onClick={saveMeasurement}
                   >
                     {saving === 'measurement' ? 'Registrando...' : 'Registrar medição aprovada'}

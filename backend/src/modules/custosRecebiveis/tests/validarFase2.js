@@ -11,6 +11,7 @@ const {
   findPrivateSources,
   monthRange,
   normalizeCompetencia,
+  pesquisarItensPlano,
   salvarCustos,
   salvarRecebiveis,
   statusComparativo,
@@ -134,6 +135,7 @@ function validateBackendContracts() {
   assert(service.includes('buildPlanMacros'));
   assert(service.includes('previsao_custo_id'));
   assert(service.includes('CR_CUSTO_DESATUALIZADO'));
+  assert(service.includes('etapa_macro_codigo: macroCode'));
   assert(migration.includes("const COSTS = 'cr_previsoes_custo'"));
   assert(migration.includes("'chave_local'"));
   assert(migration.includes("'previsao_custo_id'"));
@@ -172,7 +174,10 @@ function validateFrontendContracts() {
   assert(planning.includes('Qtd. planejada'));
   assert(planning.includes('Qtd. medida'));
   assert(planning.includes('Pesquisar subitem desta etapa'));
-  assert(planning.includes('availableMeasurementCosts(macro.codigo, measurementSearch)'));
+  assert(planning.includes('usePlanItemSearch'));
+  assert(planning.includes('etapaMacroCodigo: macroCode'));
+  assert(planning.includes('Pesquisar subitem aprovado'));
+  assert(planning.includes('addApprovedMeasurement'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
@@ -199,6 +204,39 @@ function transactionHarness() {
 
 function commonScope() {
   return async () => ({ todas: true, obraIds: null });
+}
+
+async function validatePlanSearchByMacro() {
+  let capturedQuery = null;
+  const result = await pesquisarItensPlano(
+    { id: 1 },
+    7,
+    {
+      competencia: '2026-08',
+      etapa_macro_codigo: '00.003',
+      q: 'concreto',
+      limit: 50
+    },
+    {
+      resolverEscopoObras: commonScope(),
+      CrCompetencia: {
+        findOne: async () => ({ plano_versao_snapshot: 2 }),
+        findAll: async () => []
+      },
+      CrPlanoObra: {
+        findOne: async () => ({ id: 3, versao: 2 })
+      },
+      CrPlanoItem: {
+        findAndCountAll: async (query) => {
+          capturedQuery = query;
+          return { rows: [], count: 0 };
+        }
+      }
+    }
+  );
+  assert.strictEqual(capturedQuery.where.etapa_macro_codigo, '00.003');
+  assert.strictEqual(capturedQuery.limit, 50);
+  assert.strictEqual(result.pagination.total, 0);
 }
 
 async function validatePrivateAntiDoubleCount() {
@@ -566,10 +604,22 @@ async function validateApprovedMeasurementAndGlosa() {
         codigo: '01.01',
         descricao: 'Servico',
         somadora: false,
+        quantidade: 20,
         custo_unitario: 10
+      }, {
+        id: 10,
+        plano_id: 3,
+        codigo: '01.02',
+        descricao: 'Servico aprovado diferente',
+        somadora: false,
+        quantidade: 8,
+        custo_unitario: 25
       }]
     },
-    CrCompetencia: { findOne: async () => competencia },
+    CrCompetencia: {
+      findOne: async () => competencia,
+      findAll: async () => []
+    },
     CrPrevisaoReceita: {
       findAll: async () => [{
         competencia_id: 41,
@@ -581,6 +631,7 @@ async function validateApprovedMeasurementAndGlosa() {
     },
     CrPrevisaoCusto: { findAll: async () => [] },
     CrMedicaoConsolidada: {
+      findAll: async () => [],
       destroy: async () => 0,
       bulkCreate: async (rows) => {
         [createdMeasurement] = rows;
@@ -600,6 +651,7 @@ async function validateApprovedMeasurementAndGlosa() {
     '2026-08',
     {
       idempotency_key: 'medicao-1',
+      justificativa_glosa_geral: 'Glosa registrada pelo orgao.',
       itens: [{
         plano_item_id: 9,
         quantidade_medida: 6,
@@ -623,15 +675,34 @@ async function validateApprovedMeasurementAndGlosa() {
         idempotency_key: 'medicao-2',
         itens: [{
           plano_item_id: 9,
-          quantidade_medida: 11,
-          valor_medido: 110,
+          quantidade_medida: 21,
+          valor_medido: 210,
           justificativa_glosa: null
         }]
       },
       overrides
     ),
-    (error) => error?.code === 'CR_MEDICAO_ACIMA_APRESENTADA'
+    (error) => error?.code === 'CR_MEDICAO_SUPERA_ORCAMENTO'
   );
+
+  const independentResult = await consolidarMedicao(
+    { id: 1 },
+    7,
+    '2026-08',
+    {
+      idempotency_key: 'medicao-3',
+      justificativa_glosa_geral: 'Composicao aprovada diferente da previsao.',
+      itens: [{
+        plano_item_id: 10,
+        quantidade_medida: 2,
+        valor_medido: 1
+      }]
+    },
+    overrides
+  );
+  assert.strictEqual(independentResult.valor_total, 50);
+  assert.strictEqual(createdMeasurement.plano_item_id, 10);
+  assert.strictEqual(createdMeasurement.valor_medido, 50);
 }
 
 async function run() {
@@ -639,6 +710,7 @@ async function run() {
   validateCompetenciaBoundaries();
   validateBackendContracts();
   validateFrontendContracts();
+  await validatePlanSearchByMacro();
   await validatePrivateAntiDoubleCount();
   await validatePrivateReceiptsSyncOnFinalization();
   await validateMonthlyMacroSubitemsAndForecastMeasurement();

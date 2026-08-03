@@ -11,17 +11,19 @@ O planejamento mensal usa a estrutura macro da versão publicada do orçamento d
 - O valor planejado do subitem é `quantidade × valor unitário`.
 - Novos subitens são acrescentados abaixo dos existentes na mesma etapa.
 - O subitem pertence à competência e não altera a planilha orçamentária publicada nem o cadastro de apropriações.
-- Ao excluir um subitem do planejamento mensal, as previsões de medição e medições aprovadas vinculadas a ele são removidas pela mesma transação relacional.
+- Subitens livres de custo mensal e itens de medição são registros independentes. Vínculos legados ainda existentes com um subitem mensal continuam protegidos pela transação relacional.
 
 ## Obra pública — Medição Prevista
 
-Depois de salvar os custos planejados, o usuário seleciona em cada etapa macro quais subitens farão parte da Medição Prevista. O sistema carrega automaticamente descrição, unidade, quantidade planejada e valor unitário. O único valor operacional informado nessa etapa é a quantidade medida prevista.
+Em cada etapa macro, o usuário pesquisa diretamente os itens analíticos da versão publicada da planilha orçamentária e escolhe quais farão parte da Medição Prevista. A consulta é paginada, executada sob demanda e filtrada pela etapa macro aberta; não carrega a planilha inteira na tela. O sistema traz automaticamente código, descrição, unidade, quantidade orçada e valor unitário. O único valor operacional informado nessa etapa é a quantidade medida prevista.
 
-O valor da Medição Prevista é calculado por `quantidade medida × valor unitário do subitem`. A quantidade não pode superar a quantidade planejada no subitem.
+O valor da Medição Prevista é calculado por `quantidade medida × valor unitário congelado na versão do plano vinculada à competência`. A quantidade acumulada entre competências não pode superar a quantidade orçada do item.
 
 ## Obra pública — Medição Aprovada
 
-A Medição Aprovada continua sendo uma etapa posterior e independente. Ela referencia o mesmo subitem mensal, não pode superar a Medição Prevista e exige justificativa quando houver glosa.
+A Medição Aprovada é uma etapa posterior e independente. O usuário pesquisa novamente os itens analíticos da planilha dentro de cada etapa macro e informa quais itens e quantidades foram efetivamente aprovados pelo órgão. Os itens aprovados podem ser diferentes dos itens previstos, mas a quantidade aprovada acumulada não pode superar a quantidade orçada do item.
+
+O valor aprovado é sempre calculado pelo sistema com o valor unitário congelado no plano. A glosa gerencial da competência corresponde à diferença positiva entre o total da Medição Prevista e o total da Medição Aprovada. Quando houver essa diferença, uma justificativa geral com rastreabilidade de auditoria é obrigatória.
 
 ## Obra privada
 
@@ -33,4 +35,3 @@ Obras privadas mantêm o fluxo de custos planejados seguido da leitura automáti
 - Salvamentos atualizam registros existentes, criam os novos e removem somente os itens omitidos daquela competência.
 - As operações permanecem transacionais e respeitam as regras de competência finalizada, vencida ou reaberta.
 - Os campos legados baseados em item do plano continuam aceitos internamente para compatibilidade, embora o fluxo novo use `previsao_custo_id`.
-

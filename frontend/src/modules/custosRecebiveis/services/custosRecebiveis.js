@@ -169,10 +169,13 @@ export async function criarCompetenciaObra(obraId, competencia) {
 export async function pesquisarItensPlanoCompetencia(
   obraId,
   competencia,
-  { q = '', page = 1, limit = 20 } = {}
+  { q = '', page = 1, limit = 20, etapaMacroCodigo = '' } = {}
 ) {
   const query = new URLSearchParams({ competencia, page, limit });
   if (String(q || '').trim()) query.set('q', String(q).trim());
+  if (String(etapaMacroCodigo || '').trim()) {
+    query.set('etapa_macro_codigo', String(etapaMacroCodigo).trim());
+  }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/obras/${obraId}/plano/itens?${query.toString()}`,
     { headers: authHeaders() }
@@ -220,13 +223,21 @@ export async function finalizarPlanejamentoCompetencia(
   return parseResponse(response, 'Erro ao finalizar competência');
 }
 
-export async function consolidarMedicaoCompetencia(obraId, competencia, itens) {
+export async function consolidarMedicaoCompetencia(
+  obraId,
+  competencia,
+  itens,
+  justificativaGlosaGeral = ''
+) {
   const response = await fetch(
     `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/medicao`,
     {
       method: 'POST',
       headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-medicao') }),
-      body: JSON.stringify({ itens })
+      body: JSON.stringify({
+        itens,
+        justificativa_glosa_geral: justificativaGlosaGeral || null
+      })
     }
   );
   return parseResponse(response, 'Erro ao consolidar medição');

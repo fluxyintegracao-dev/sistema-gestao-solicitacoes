@@ -760,9 +760,14 @@ async function pesquisarItensPlano(
     throw createBusinessError(409, 'CR_PLANO_SNAPSHOT_NOT_FOUND', 'Plano da competencia nao encontrado.');
   }
   const term = normalizeText(query.q, 120);
+  const macroCode = normalizeText(query.etapa_macro_codigo, 80);
   const limit = Math.min(50, Math.max(1, number(query.limit, 20)));
   const page = Math.max(1, Math.floor(number(query.page, 1)));
-  const where = { plano_id: plan.id, somadora: false };
+  const where = {
+    plano_id: plan.id,
+    somadora: false,
+    ...(macroCode ? { etapa_macro_codigo: macroCode } : {})
+  };
   if (term) {
     const like = `%${term}%`;
     where[Op.or] = [
@@ -958,9 +963,6 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       : `parcela:${item.contrato_parcela_id}`;
     return [key, item];
   }));
-  const measurementByReference = new Map(
-    measurements.map((value) => [planningReferenceKey(value), plain(value)])
-  );
   const validReopening = reopenings.some((item) => (
     item.situacao === 'APROVADA' && item.expira_em && new Date(item.expira_em) > new Date()
   ));
@@ -1025,27 +1027,31 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         )
       })),
     medicoes: String(obra.classificacao).toUpperCase() === 'PUBLICA'
-      ? publicReceipts.map((receipt) => {
-        const key = receipt.previsao_custo_id
-          ? `custo:${receipt.previsao_custo_id}`
-          : `plano:${receipt.plano_item_id}`;
-        const savedMeasurement = measurementByReference.get(key);
+      ? measurements.map((savedValue) => {
+        const savedMeasurement = plain(savedValue);
+        const cost = savedMeasurement.previsao_custo_id
+          ? costById.get(Number(savedMeasurement.previsao_custo_id))
+          : null;
+        const planItemValue = savedMeasurement.plano_item_id
+          ? itemById.get(Number(savedMeasurement.plano_item_id))
+          : null;
+        const item = planItemValue ? serializePlanningItem(planItemValue) : null;
         return {
-          previsao_custo_id: receipt.previsao_custo_id,
-          plano_item_id: receipt.plano_item_id,
-          etapa_macro_codigo: receipt.etapa_macro_codigo,
-          descricao: receipt.descricao,
-          unidade: receipt.unidade,
-          quantidade_base: receipt.quantidade_base,
-          custo_unitario: receipt.custo_unitario,
-          valor_base: receipt.valor_base,
-          item: receipt.item,
-          quantidade_medida: number(savedMeasurement?.quantidade_medida),
-          valor_medido: money(savedMeasurement?.valor_medido),
-          valor_glosa: money(savedMeasurement?.valor_glosa),
-          justificativa_glosa: savedMeasurement?.justificativa_glosa || null,
-          data_medicao: savedMeasurement?.data_medicao || null,
-          numero_medicao: savedMeasurement?.numero_medicao || null
+          previsao_custo_id: cost?.id || null,
+          plano_item_id: item?.id || null,
+          etapa_macro_codigo: cost?.etapa_macro_codigo || item?.etapa_macro_codigo || null,
+          descricao: cost?.descricao || item?.descricao || 'Subitem sem descricao',
+          unidade: cost?.unidade || item?.unidade || null,
+          quantidade_base: cost?.quantidade ?? item?.quantidade_orcada ?? 0,
+          custo_unitario: cost?.custo_unitario ?? item?.custo_unitario_orcado ?? 0,
+          valor_base: cost?.valor_previsto ?? item?.valor_orcado ?? 0,
+          item,
+          quantidade_medida: number(savedMeasurement.quantidade_medida),
+          valor_medido: money(savedMeasurement.valor_medido),
+          valor_glosa: money(savedMeasurement.valor_glosa),
+          justificativa_glosa: savedMeasurement.justificativa_glosa || null,
+          data_medicao: savedMeasurement.data_medicao || null,
+          numero_medicao: savedMeasurement.numero_medicao || null
         };
       })
       : [],
@@ -1574,6 +1580,30 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
     }
     const items = await findPlanItems(plan.id, deps, { transaction });
     const allowed = new Map(items.map((item) => [Number(item.id), plain(item)]));
+    const previousCompetencies = await deps.CrCompetencia.findAll({
+      where: {
+        obra_id: obraId,
+        competencia: { [Op.lt]: competenciaCode }
+      },
+      attributes: ['id'],
+      transaction
+    });
+    const previousIds = previousCompetencies.map((item) => Number(item.id));
+    const previousMeasurements = previousIds.length
+      ? await deps.CrMedicaoConsolidada.findAll({
+        where: {
+          competencia_id: { [Op.in]: previousIds },
+          plano_item_id: { [Op.ne]: null }
+        },
+        transaction
+      })
+      : [];
+    const previousApprovedByItem = new Map();
+    previousMeasurements.forEach((item) => previousApprovedByItem.set(
+      Number(item.plano_item_id),
+      number(previousApprovedByItem.get(Number(item.plano_item_id)))
+        + number(item.quantidade_medida)
+    ));
     if (!Array.isArray(payload.itens)) {
       throw createBusinessError(400, 'CR_MEDICAO_INVALIDA', 'Informe os itens da medicao.');
     }
@@ -1644,52 +1674,54 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
           `Item ou quantidade invalida na linha ${index + 1}.`
         );
       }
-      if (!presented) {
-        throw createBusinessError(
-          422,
-          'CR_MEDICAO_SEM_APRESENTACAO',
-          `O item da linha ${index + 1} nao pertence a medicao prevista da competencia.`
-        );
-      }
       seen.add(reference);
-      const presentedQuantity = number(presented.quantidade_prevista);
-      const presentedValue = money(presented.valor_previsto);
-      const approvedValue = row.valor_medido === null || row.valor_medido === undefined
-        ? money(quantity * number(cost?.custo_unitario ?? item?.custo_unitario))
-        : money(number(row.valor_medido, NaN));
+      const baseQuantity = number(cost?.quantidade ?? item?.quantidade);
+      const previousApproved = itemId ? number(previousApprovedByItem.get(itemId)) : 0;
+      const approvedValue = money(
+        quantity * number(cost?.custo_unitario ?? item?.custo_unitario)
+      );
       if (
-        quantity > presentedQuantity
+        quantity + previousApproved > baseQuantity + 0.0001
         || !Number.isFinite(approvedValue)
         || approvedValue < 0
-        || approvedValue > presentedValue
       ) {
         throw createBusinessError(
           422,
-          'CR_MEDICAO_ACIMA_APRESENTADA',
-          `Quantidade ou valor aprovado supera a medicao prevista na linha ${index + 1}.`
+          'CR_MEDICAO_SUPERA_ORCAMENTO',
+          `A quantidade aprovada acumulada supera a quantidade orcada na linha ${index + 1}.`
         );
       }
-      const glosa = money(Math.max(0, presentedValue - approvedValue));
-      const glosaReason = normalizeText(row.justificativa_glosa);
-      if (glosa > 0 && glosaReason.length < 5) {
-        throw createBusinessError(
-          422,
-          'CR_GLOSA_JUSTIFICATIVA_REQUIRED',
-          `Informe a justificativa da glosa na linha ${index + 1}.`
-        );
-      }
+      const glosa = money(Math.max(0, money(presented?.valor_previsto) - approvedValue));
       return {
         plano_item_id: itemId,
         previsao_custo_id: costId,
         quantidade_medida: quantity,
         valor_medido: approvedValue,
         valor_glosa: glosa,
-        justificativa_glosa: glosaReason || null,
+        justificativa_glosa: normalizeText(row.justificativa_glosa) || null,
         data_medicao: row.data_medicao || null,
         numero_medicao: normalizeText(row.numero_medicao, 80) || null,
         registrado_por: user?.id
       };
     }).filter(isMeaningfulMeasurement);
+    const predictedTotal = money(
+      presentedRows.reduce((sum, row) => sum + number(row.valor_previsto), 0)
+    );
+    const approvedTotal = money(rows.reduce((sum, row) => sum + row.valor_medido, 0));
+    const overallGlosa = money(Math.max(0, predictedTotal - approvedTotal));
+    const generalGlosaReason = normalizeText(payload.justificativa_glosa_geral);
+    if (overallGlosa > 0 && generalGlosaReason.length < 5) {
+      throw createBusinessError(
+        422,
+        'CR_GLOSA_JUSTIFICATIVA_REQUIRED',
+        'Informe a justificativa da diferença entre a medicao prevista e a aprovada.'
+      );
+    }
+    if (generalGlosaReason) {
+      rows.forEach((row) => {
+        row.justificativa_glosa = generalGlosaReason;
+      });
+    }
     await deps.CrMedicaoConsolidada.destroy({
       where: { competencia_id: competencia.id },
       transaction
@@ -1709,8 +1741,9 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
       payload: {
         competencia: competenciaCode,
         quantidade_itens: rows.length,
-        valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0)),
-        valor_glosa: money(rows.reduce((sum, row) => sum + row.valor_glosa, 0)),
+        valor_total: approvedTotal,
+        valor_glosa: overallGlosa,
+        justificativa_glosa_geral: generalGlosaReason || null,
         idempotency_key: idempotencyKey
       }
     });
@@ -1718,8 +1751,8 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
       idempotente: false,
       competencia: serializeCompetencia(competencia),
       quantidade_itens: rows.length,
-      valor_total: money(rows.reduce((sum, row) => sum + row.valor_medido, 0)),
-      valor_glosa: money(rows.reduce((sum, row) => sum + row.valor_glosa, 0))
+      valor_total: approvedTotal,
+      valor_glosa: overallGlosa
     };
   });
 }
