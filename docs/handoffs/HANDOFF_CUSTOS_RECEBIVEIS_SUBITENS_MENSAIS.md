@@ -2,7 +2,7 @@
 
 ## Estado
 
-A base de subitens mensais e a pesquisa direta da planilha nas medições já foram implantadas na `dev-v2`. A alteração atual adiciona rascunho local automático para as edições de custos e medições e ainda está sem commit.
+A base de subitens mensais, pesquisa direta e rascunho local já foram implantados na `dev-v2`. A alteração atual adiciona modelos XLSX e prévia editável de importação nas três etapas e ainda está sem commit.
 
 ## Alterações
 
@@ -20,6 +20,12 @@ A base de subitens mensais e a pesquisa direta da planilha nas medições já fo
 - Custos, Medição Prevista e Medição Aprovada possuem rascunhos locais separados por usuário, obra, competência e versão do plano, com validade de sete dias.
 - A restauração ocorre após recarga ou retorno à tela; navegação e `pagehide` forçam a gravação dos últimos dados digitados.
 - Cada salvamento confirmado remove somente o rascunho daquela etapa, e a tela permite descartar todos os rascunhos do período manualmente.
+- Cada etapa possui modelo XLSX isolado por obra, competência e snapshot do plano.
+- Custos permanecem livres no arquivo; as duas medições liberam somente a coluna de quantidade e protegem as referências do orçamento.
+- A importação é bifásica: upload e prévia sem escrita, seguida de revalidação obrigatória após editar, excluir ou adicionar itens.
+- Linhas zeradas são ignoradas, fórmulas e cabeçalhos adulterados são rejeitados e o saldo acumulado é recalculado no backend.
+- Metadados ocultos impedem reutilizar o modelo em outra obra, competência, etapa ou versão do plano.
+- Confirmar aplica a prévia ao rascunho da etapa; o botão de salvamento existente continua sendo a única escrita oficial.
 
 ## Arquivos
 
@@ -29,9 +35,13 @@ A base de subitens mensais e a pesquisa direta da planilha nas medições já fo
 - `backend/src/modules/custosRecebiveis/models/CrPrevisaoReceita.js`
 - `backend/src/modules/custosRecebiveis/models/CrMedicaoConsolidada.js`
 - `backend/src/modules/custosRecebiveis/services/planejamentoService.js`
+- `backend/src/modules/custosRecebiveis/services/planejamentoPlanilhaService.js`
+- `backend/src/modules/custosRecebiveis/controllers/CustosRecebiveisController.js`
+- `backend/src/modules/custosRecebiveis/routes/index.js`
 - `backend/src/modules/custosRecebiveis/services/exportacaoService.js`
 - `backend/src/modules/custosRecebiveis/tests/validarFase2.js`
 - `frontend/src/modules/custosRecebiveis/services/custosRecebiveis.js`
+- `frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx`
 - `frontend/src/modules/custosRecebiveis/utils/planningDraftStorage.js`
 - componentes e estilos em `frontend/src/modules/custosRecebiveis/`
 - `docs/modulos/custos_recebiveis_planejamento_mensal.md`
@@ -45,7 +55,9 @@ A base de subitens mensais e a pesquisa direta da planilha nas medições já fo
 - `npm run test:custos-recebiveis-prontidao`.
 - `npm run build` no frontend.
 - `git diff --check`.
+- Geração real dos três workbooks em memória, releitura com ExcelJS e conferência das células bloqueadas/desbloqueadas.
+- Casos automatizados de linha zerada, dado protegido adulterado, custo livre e quantidade acima do saldo.
 
 ## Próximo passo
 
-Commitar a persistência de rascunho na `dev-v2`, atualizar o frontend de desenvolvimento e executar o smoke test de recarga, navegação, salvamento por etapa e descarte manual. Esta correção não cria migration nem altera o backend operacional. Não acessar a EC2 diretamente; o deploy é feito pelo usuário.
+Commitar os modelos e a importação na `dev-v2`, atualizar o ambiente de desenvolvimento e executar o smoke test das três planilhas: download, proteção no Excel, descarte de linhas zeradas, bloqueio por saldo, edição da prévia, revalidação, aplicação ao rascunho e salvamento oficial. Não há migration. Não acessar a EC2 diretamente; o deploy é feito pelo usuário.

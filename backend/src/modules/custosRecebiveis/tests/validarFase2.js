@@ -17,6 +17,10 @@ const {
   statusComparativo,
   summarizeDashboardRows
 } = require('../services/planejamentoService');
+const {
+  TYPES: PLANNING_SHEET_TYPES,
+  validarLinhasPlanejamento
+} = require('../services/planejamentoPlanilhaService');
 
 const moduleRoot = path.resolve(__dirname, '..');
 const backendRoot = path.resolve(moduleRoot, '../../..');
@@ -88,6 +92,7 @@ function validateBackendContracts() {
   const routes = read('src/modules/custosRecebiveis/routes/index.js');
   const controller = read('src/modules/custosRecebiveis/controllers/CustosRecebiveisController.js');
   const migration = read('migrations/202608030002_custos_recebiveis_subitens_mensais.js');
+  const spreadsheetService = read('src/modules/custosRecebiveis/services/planejamentoPlanilhaService.js');
 
   [
     "'/dashboard'",
@@ -98,6 +103,9 @@ function validateBackendContracts() {
     "'/obras/:obraId/competencias/:competencia/receitas'",
     "'/obras/:obraId/competencias/:competencia/finalizar'",
     "'/obras/:obraId/competencias/:competencia/medicao'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/modelo'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-arquivo'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-itens'",
     "'/obras/:obraId/comparativo'",
     "'/competencias/:competenciaId/reabertura'",
     "'/reaberturas/:reaberturaId/aprovar'"
@@ -141,6 +149,12 @@ function validateBackendContracts() {
   assert(migration.includes("'previsao_custo_id'"));
   assert(migration.includes('fk_cr_receitas_previsao_custo'));
   assert(migration.includes('fk_cr_medicoes_previsao_custo'));
+  assert(spreadsheetService.includes("worksheet.protect('FluxyPlanejamento'"));
+  assert(spreadsheetService.includes("workbook.addWorksheet('_METADADOS')"));
+  assert(spreadsheetService.includes("metadata.state = 'veryHidden'"));
+  assert(spreadsheetService.includes('Formulas nao sao permitidas'));
+  assert(spreadsheetService.includes('saldo_disponivel'));
+  assert(spreadsheetService.includes('quantity === 0'));
 }
 
 function validateFrontendContracts() {
@@ -155,6 +169,7 @@ function validateFrontendContracts() {
   );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
+  const planningImport = read('../frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx');
 
   ['visao-geral', 'planejamento', 'comparativo'].forEach((tab) => (
     assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
@@ -206,6 +221,59 @@ function validateFrontendContracts() {
   assert(page.includes('obra={selectedObra}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
+  assert(planning.includes("renderPlanningSheetActions('custos'"));
+  assert(planning.includes("renderPlanningSheetActions('medicao-prevista'"));
+  assert(planning.includes("renderPlanningSheetActions('medicao-aprovada'"));
+  assert(planningImport.includes('Confirmar importação'));
+  assert(planningImport.includes('Validar novamente'));
+}
+
+function validatePlanningSpreadsheetPreview() {
+  const baseContext = {
+    type: PLANNING_SHEET_TYPES.MEDICAO_PREVISTA,
+    obra: { id: 7, codigo: '28', nome: 'ESCOLA' },
+    competencia: '2026-08',
+    plan: { id: 3, versao: 1 },
+    macros: [{ codigo: '00.001', descricao: 'Administracao', ordem: 1 }],
+    items: [{
+      plano_item_id: 9,
+      etapa_macro_codigo: '00.001',
+      etapa_macro_descricao: 'Administracao',
+      item_codigo: '00.001.01',
+      descricao: 'Engenheiro residente',
+      unidade: 'mes',
+      quantidade_orcada: 12,
+      valor_unitario: 100,
+      saldo_disponivel: 4
+    }]
+  };
+  const valid = validarLinhasPlanejamento(baseContext, [
+    { item_codigo: '00.001.01', quantidade: 0 },
+    { item_codigo: '00.001.01', descricao: 'Dado adulterado', quantidade: 3 }
+  ]);
+  assert.strictEqual(valid.itens.length, 1);
+  assert.strictEqual(valid.itens[0].descricao, 'Engenheiro residente');
+  assert.strictEqual(valid.resumo.valido, true);
+  const overBudget = validarLinhasPlanejamento(baseContext, [
+    { item_codigo: '00.001.01', quantidade: 5 }
+  ]);
+  assert.strictEqual(overBudget.resumo.valido, false);
+  assert(overBudget.erros.some((message) => message.includes('saldo disponivel')));
+
+  const freeCosts = validarLinhasPlanejamento({
+    ...baseContext,
+    type: PLANNING_SHEET_TYPES.CUSTOS
+  }, [{
+    etapa_macro_codigo: '00.001',
+    etapa_macro_descricao: 'Texto adulterado',
+    descricao_servico: 'Equipe de campo',
+    unidade: 'mes',
+    valor_unitario: 2500,
+    quantidade: 2
+  }]);
+  assert.strictEqual(freeCosts.resumo.valido, true);
+  assert.strictEqual(freeCosts.itens[0].etapa_macro_descricao, 'Administracao');
+  assert.strictEqual(freeCosts.resumo.valor_total, 5000);
 }
 
 function transactionHarness() {
@@ -722,6 +790,7 @@ async function run() {
   validateCompetenciaBoundaries();
   validateBackendContracts();
   validateFrontendContracts();
+  validatePlanningSpreadsheetPreview();
   await validatePlanSearchByMacro();
   await validatePrivateAntiDoubleCount();
   await validatePrivateReceiptsSyncOnFinalization();

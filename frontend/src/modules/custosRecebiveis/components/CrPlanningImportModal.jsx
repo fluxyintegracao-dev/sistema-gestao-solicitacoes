@@ -1,0 +1,298 @@
+import { useEffect, useMemo, useState } from 'react';
+import {
+  HiOutlineCheckCircle,
+  HiOutlineExclamationTriangle,
+  HiOutlineMagnifyingGlass,
+  HiOutlinePlus,
+  HiOutlineTrash,
+  HiOutlineXMark
+} from 'react-icons/hi2';
+import { revalidarItensPlanilhaPlanejamento } from '../services/custosRecebiveis';
+
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
+const TITLES = {
+  custos: 'Custos planejados',
+  'medicao-prevista': 'Medição prevista',
+  'medicao-aprovada': 'Medição aprovada'
+};
+
+function asNumber(value) {
+  const parsed = Number(String(value ?? '').replace(',', '.'));
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function keyOf(row, index = 0) {
+  return row.chave_importacao || row.plano_item_id || `${row.etapa_macro_codigo}-${row.descricao}-${index}`;
+}
+
+export default function CrPlanningImportModal({
+  obraId,
+  competencia,
+  tipo,
+  preview,
+  onClose,
+  onConfirm
+}) {
+  const [rows, setRows] = useState([]);
+  const [result, setResult] = useState(null);
+  const [dirty, setDirty] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [requestError, setRequestError] = useState('');
+  const [catalogSearch, setCatalogSearch] = useState('');
+
+  useEffect(() => {
+    setRows(preview?.itens || []);
+    setResult(preview || null);
+    setDirty(false);
+    setRequestError('');
+    setCatalogSearch('');
+  }, [preview]);
+
+  const isCosts = tipo === 'custos';
+  const catalog = preview?.catalogo || [];
+  const selectedIds = useMemo(
+    () => new Set(rows.map((row) => Number(row.plano_item_id)).filter(Boolean)),
+    [rows]
+  );
+  const availableCatalog = useMemo(() => {
+    const term = catalogSearch.trim().toLocaleLowerCase('pt-BR');
+    return catalog.filter((item) => {
+      if (!isCosts && selectedIds.has(Number(item.plano_item_id))) return false;
+      if (!term) return true;
+      return [item.codigo, item.item_codigo, item.descricao, item.etapa_macro_descricao]
+        .some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(term));
+    }).slice(0, 40);
+  }, [catalog, catalogSearch, isCosts, selectedIds]);
+
+  function markDirty(nextRows) {
+    setRows(nextRows);
+    setDirty(true);
+    setRequestError('');
+  }
+
+  function updateRow(index, field, value) {
+    markDirty(rows.map((row, rowIndex) => {
+      if (rowIndex !== index) return row;
+      const next = { ...row, [field]: value, erros: [] };
+      const quantity = field === 'quantidade' ? asNumber(value) : asNumber(next.quantidade);
+      const unitValue = field === 'valor_unitario' ? asNumber(value) : asNumber(next.valor_unitario);
+      next.valor_total = quantity * unitValue;
+      return next;
+    }));
+  }
+
+  function removeRow(index) {
+    markDirty(rows.filter((_, rowIndex) => rowIndex !== index));
+  }
+
+  function addCatalogItem(item) {
+    if (isCosts) {
+      markDirty([...rows, {
+        chave_importacao: `local-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        etapa_macro_codigo: item.codigo,
+        etapa_macro_descricao: item.descricao,
+        descricao: '',
+        unidade: '',
+        valor_unitario: '',
+        quantidade: '',
+        valor_total: 0,
+        erros: []
+      }]);
+    } else {
+      markDirty([...rows, {
+        ...item,
+        chave_importacao: `item-${item.plano_item_id}`,
+        quantidade: '',
+        valor_total: 0,
+        erros: []
+      }]);
+    }
+    setCatalogSearch('');
+  }
+
+  async function revalidate() {
+    if (!rows.length) {
+      setRequestError('Adicione ao menos um item com quantidade maior que zero.');
+      return;
+    }
+    if (rows.some((row) => asNumber(row.quantidade) <= 0)) {
+      setRequestError('Preencha uma quantidade maior que zero em todos os itens da prévia ou exclua a linha.');
+      return;
+    }
+    try {
+      setValidating(true);
+      setRequestError('');
+      const response = await revalidarItensPlanilhaPlanejamento(
+        obraId,
+        competencia,
+        tipo,
+        rows
+      );
+      setRows(response.itens || []);
+      setResult(response);
+      setDirty(false);
+    } catch (error) {
+      setRequestError(error.message || 'Não foi possível revalidar a prévia.');
+    } finally {
+      setValidating(false);
+    }
+  }
+
+  const valid = Boolean(result?.resumo?.valido) && !dirty && rows.length > 0;
+
+  return (
+    <div className="cr-import-modal-backdrop" role="presentation">
+      <section
+        className="cr-import-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="cr-import-title"
+      >
+        <header className="cr-import-modal__header">
+          <div>
+            <span>Prévia da importação</span>
+            <h2 id="cr-import-title">{TITLES[tipo] || 'Planejamento mensal'}</h2>
+            <p>{preview?.obra?.codigo} · {preview?.obra?.nome} · competência {competencia}</p>
+          </div>
+          <button type="button" className="cr-icon-action" onClick={onClose} aria-label="Fechar prévia">
+            <HiOutlineXMark className="h-5 w-5" />
+          </button>
+        </header>
+
+        <div className="cr-import-modal__metrics">
+          <div><span>Itens</span><strong>{rows.length}</strong></div>
+          <div><span>Válidos</span><strong>{result?.resumo?.itens_validos || 0}</strong></div>
+          <div data-tone={result?.resumo?.itens_invalidos ? 'error' : 'success'}>
+            <span>Inconsistências</span><strong>{result?.resumo?.itens_invalidos || 0}</strong>
+          </div>
+          <div><span>Total</span><strong>{currency.format(result?.resumo?.valor_total || 0)}</strong></div>
+        </div>
+
+        <div className="cr-import-modal__add">
+          <label>
+            <span>{isCosts ? 'Adicionar serviço em uma etapa macro' : 'Adicionar item do orçamento'}</span>
+            <div>
+              <HiOutlineMagnifyingGlass className="h-4 w-4" />
+              <input
+                type="search"
+                value={catalogSearch}
+                placeholder={isCosts ? 'Pesquise a etapa macro...' : 'Pesquise por código ou descrição...'}
+                onChange={(event) => setCatalogSearch(event.target.value)}
+              />
+            </div>
+          </label>
+          {catalogSearch ? (
+            <div className="cr-import-modal__catalog">
+              {availableCatalog.map((item) => (
+                <button
+                  key={item.plano_item_id || item.codigo}
+                  type="button"
+                  onClick={() => addCatalogItem(item)}
+                >
+                  <span>{item.item_codigo || item.codigo} · {item.descricao}</span>
+                  <small>
+                    {isCosts
+                      ? 'Novo custo livre nesta etapa'
+                      : `${item.unidade || 'un'} · saldo ${item.saldo_disponivel}`}
+                  </small>
+                  <HiOutlinePlus className="h-4 w-4" />
+                </button>
+              ))}
+              {!availableCatalog.length ? <span>Nenhuma opção disponível.</span> : null}
+            </div>
+          ) : null}
+        </div>
+
+        {requestError ? <div className="cr-feedback" data-tone="error">{requestError}</div> : null}
+        {result?.erros?.length ? (
+          <details className="cr-import-modal__errors" open>
+            <summary>
+              <HiOutlineExclamationTriangle className="h-4 w-4" />
+              {result.erros.length} inconsistência(s) para revisar
+            </summary>
+            <div>{result.erros.map((error) => <span key={error}>{error}</span>)}</div>
+          </details>
+        ) : null}
+
+        <div className="cr-import-modal__table cr-table-shell">
+          <table>
+            <thead>
+              <tr>
+                <th>Etapa / item</th>
+                {isCosts ? <><th>Descrição</th><th>Unid.</th><th>Valor unit.</th></> : <><th>Unid.</th><th>Orçado</th><th>Saldo</th></>}
+                <th>Qtde.</th>
+                <th>Total</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, index) => (
+                <tr key={keyOf(row, index)} data-invalid={row.erros?.length ? 'true' : 'false'}>
+                  <td>
+                    <strong>{row.etapa_macro_codigo}</strong>
+                    <span>{isCosts ? row.etapa_macro_descricao : `${row.item_codigo} · ${row.descricao}`}</span>
+                  </td>
+                  {isCosts ? (
+                    <>
+                      <td><input value={row.descricao || ''} onChange={(event) => updateRow(index, 'descricao', event.target.value)} /></td>
+                      <td><input value={row.unidade || ''} onChange={(event) => updateRow(index, 'unidade', event.target.value)} /></td>
+                      <td><input type="number" min="0" step="0.0001" value={row.valor_unitario} onChange={(event) => updateRow(index, 'valor_unitario', event.target.value)} /></td>
+                    </>
+                  ) : (
+                    <>
+                      <td>{row.unidade || 'un'}</td>
+                      <td>{row.quantidade_orcada}</td>
+                      <td>{row.saldo_disponivel}</td>
+                    </>
+                  )}
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      max={isCosts ? undefined : row.saldo_disponivel}
+                      step="0.0001"
+                      value={row.quantidade}
+                      onChange={(event) => updateRow(index, 'quantidade', event.target.value)}
+                    />
+                    {row.erros?.length ? <small>{row.erros.join(' ')}</small> : null}
+                  </td>
+                  <td><strong>{currency.format(row.valor_total || 0)}</strong></td>
+                  <td>
+                    <button type="button" className="cr-icon-action" onClick={() => removeRow(index)} aria-label="Excluir item da prévia">
+                      <HiOutlineTrash className="h-4 w-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length ? (
+                <tr><td colSpan={isCosts ? 7 : 6} className="cr-table-empty">Nenhuma linha com quantidade maior que zero.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+
+        <footer className="cr-import-modal__footer">
+          <div data-state={valid ? 'valid' : 'pending'}>
+            {valid ? <HiOutlineCheckCircle className="h-5 w-5" /> : <HiOutlineExclamationTriangle className="h-5 w-5" />}
+            <span>{valid ? 'Todos os itens passaram na validação.' : 'Valide novamente após qualquer alteração.'}</span>
+          </div>
+          <div>
+            <button type="button" className="btn btn-outline" onClick={onClose}>Cancelar</button>
+            <button type="button" className="btn btn-outline" disabled={validating} onClick={revalidate}>
+              {validating ? 'Validando...' : 'Validar novamente'}
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!valid || validating}
+              onClick={() => onConfirm(result.itens)}
+            >
+              Confirmar importação
+            </button>
+          </div>
+        </footer>
+      </section>
+    </div>
+  );
+}

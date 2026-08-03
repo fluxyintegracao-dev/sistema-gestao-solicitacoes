@@ -4,15 +4,19 @@ import {
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
   HiOutlineClipboardDocumentCheck,
+  HiOutlineArrowDownTray,
+  HiOutlineArrowUpTray,
   HiOutlineExclamationTriangle,
   HiOutlineLockClosed,
   HiOutlineMagnifyingGlass,
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi2';
+import CrPlanningImportModal from './CrPlanningImportModal';
 import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import {
   consolidarMedicaoCompetencia,
+  baixarModeloPlanilhaPlanejamento,
   decidirReaberturaCompetencia,
   finalizarPlanejamentoCompetencia,
   obterPlanejamentoCompetencia,
@@ -20,6 +24,7 @@ import {
   salvarCustosCompetencia,
   salvarRecebiveisCompetencia,
   solicitarReaberturaCompetencia,
+  validarArquivoPlanilhaPlanejamento,
   solicitarReaberturaObraCompetencia
 } from '../services/custosRecebiveis';
 import {
@@ -153,6 +158,11 @@ export default function CrPlanejamentoView({
   const [measurementJustification, setMeasurementJustification] = useState('');
   const [draftNotice, setDraftNotice] = useState('');
   const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const [sheetType, setSheetType] = useState('');
+  const [sheetPreview, setSheetPreview] = useState(null);
+  const [sheetLoading, setSheetLoading] = useState('');
+  const sheetFileRef = useRef(null);
+  const sheetTypeRef = useRef('');
   const draftReadyRef = useRef(false);
   const latestDraftRef = useRef(null);
   const serverBaselineRef = useRef({
@@ -558,6 +568,192 @@ export default function CrPlanejamentoView({
     setCosts((current) => current.filter(
       (item) => planningRowKey(item) !== reference
     ));
+  }
+
+  async function downloadPlanningModel(type) {
+    if (sheetLoading) return;
+    try {
+      setSheetLoading(`download:${type}`);
+      setError('');
+      await baixarModeloPlanilhaPlanejamento(
+        obra.id,
+        competencia,
+        type,
+        obra.codigo || obra.id
+      );
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível baixar o modelo.');
+    } finally {
+      setSheetLoading('');
+    }
+  }
+
+  function choosePlanningFile(type) {
+    if (sheetLoading) return;
+    sheetTypeRef.current = type;
+    setSheetType(type);
+    sheetFileRef.current?.click();
+  }
+
+  async function handlePlanningFile(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    const importType = sheetTypeRef.current;
+    if (!file || !importType) return;
+    try {
+      setSheetLoading(`upload:${importType}`);
+      setError('');
+      const response = await validarArquivoPlanilhaPlanejamento(
+        obra.id,
+        competencia,
+        importType,
+        file
+      );
+      setSheetType(importType);
+      setSheetPreview(response);
+    } catch (requestError) {
+      setError(requestError.message || 'Não foi possível validar a planilha.');
+      setSheetPreview(null);
+    } finally {
+      setSheetLoading('');
+    }
+  }
+
+  function budgetItemFromImported(row, previousField) {
+    return {
+      id: Number(row.plano_item_id),
+      codigo: row.item_codigo,
+      descricao: row.descricao,
+      unidade: row.unidade,
+      quantidade_orcada: asNumber(row.quantidade_orcada),
+      custo_unitario_orcado: asNumber(row.valor_unitario),
+      valor_orcado: asNumber(row.quantidade_orcada) * asNumber(row.valor_unitario),
+      etapa_macro_codigo: row.etapa_macro_codigo,
+      [previousField]: Math.max(
+        0,
+        asNumber(row.quantidade_orcada) - asNumber(row.saldo_disponivel)
+      )
+    };
+  }
+
+  function applyPlanningImport(items) {
+    if (sheetType === 'custos') {
+      setCosts((current) => {
+        const next = [...current];
+        items.forEach((row) => {
+          const identity = `${row.etapa_macro_codigo}|${String(row.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(row.unidade || '').trim().toLocaleLowerCase('pt-BR')}`;
+          const index = next.findIndex((item) => (
+            `${item.etapa_macro_codigo}|${String(item.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(item.unidade || '').trim().toLocaleLowerCase('pt-BR')}` === identity
+          ));
+          const imported = {
+            ...(index >= 0 ? next[index] : {}),
+            id: index >= 0 ? next[index].id : null,
+            chave_local: index >= 0 ? next[index].chave_local : newLocalKey('cr-import-cost'),
+            plano_item_id: null,
+            etapa_macro_codigo: row.etapa_macro_codigo,
+            descricao: row.descricao,
+            unidade: row.unidade,
+            ordem: index >= 0
+              ? next[index].ordem
+              : next.filter((item) => item.etapa_macro_codigo === row.etapa_macro_codigo).length + 1,
+            item: null,
+            quantidade: asNumber(row.quantidade),
+            custo_unitario: asNumber(row.valor_unitario),
+            valor_previsto: asNumber(row.valor_total),
+            parceiro_id: null
+          };
+          if (index >= 0) next[index] = imported;
+          else next.push(imported);
+        });
+        return next;
+      });
+      setStep(1);
+    } else if (sheetType === 'medicao-prevista') {
+      setReceipts((current) => {
+        const next = [...current];
+        items.forEach((row) => {
+          const item = budgetItemFromImported(row, 'quantidade_apresentada_anterior');
+          const imported = {
+            previsao_custo_id: null,
+            plano_item_id: item.id,
+            etapa_macro_codigo: item.etapa_macro_codigo,
+            descricao: item.descricao,
+            unidade: item.unidade,
+            quantidade_base: item.quantidade_orcada,
+            custo_unitario: item.custo_unitario_orcado,
+            valor_base: item.valor_orcado,
+            item,
+            quantidade_prevista: asNumber(row.quantidade),
+            valor_previsto: asNumber(row.valor_total),
+            data_prevista: ''
+          };
+          const index = next.findIndex((value) => Number(value.plano_item_id) === item.id);
+          if (index >= 0) next[index] = { ...next[index], ...imported };
+          else next.push(imported);
+        });
+        return next;
+      });
+      setStep(2);
+    } else if (sheetType === 'medicao-aprovada') {
+      setMeasurements((current) => {
+        const next = [...current];
+        items.forEach((row) => {
+          const item = budgetItemFromImported(row, 'quantidade_aprovada_anterior');
+          const imported = {
+            previsao_custo_id: null,
+            plano_item_id: item.id,
+            etapa_macro_codigo: item.etapa_macro_codigo,
+            descricao: item.descricao,
+            unidade: item.unidade,
+            quantidade_base: item.quantidade_orcada,
+            custo_unitario: item.custo_unitario_orcado,
+            valor_base: item.valor_orcado,
+            item,
+            quantidade_medida: asNumber(row.quantidade),
+            valor_medido: asNumber(row.valor_total),
+            valor_glosa: 0,
+            justificativa_glosa: '',
+            data_medicao: '',
+            numero_medicao: ''
+          };
+          const index = next.findIndex((value) => Number(value.plano_item_id) === item.id);
+          if (index >= 0) next[index] = { ...next[index], ...imported };
+          else next.push(imported);
+        });
+        return next;
+      });
+      setStep(3);
+    }
+    setSheetPreview(null);
+    setFeedback('Importação aplicada ao rascunho. Revise e use o botão Salvar da etapa para gravar.');
+  }
+
+  function renderPlanningSheetActions(type, allowed = true) {
+    if (!allowed) return null;
+    const downloading = sheetLoading === `download:${type}`;
+    const uploading = sheetLoading === `upload:${type}`;
+    return (
+      <div className="cr-planning-sheet-actions">
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={Boolean(sheetLoading)}
+          onClick={() => downloadPlanningModel(type)}
+        >
+          <HiOutlineArrowDownTray className="h-4 w-4" />
+          {downloading ? 'Gerando...' : 'Baixar modelo'}
+        </button>
+        <button
+          type="button"
+          className="btn btn-outline"
+          disabled={(type !== 'medicao-aprovada' && readonly) || Boolean(sheetLoading)}
+          onClick={() => choosePlanningFile(type)}
+        >
+          <HiOutlineArrowUpTray className="h-4 w-4" />
+          {uploading ? 'Validando...' : 'Importar planilha'}
+        </button>
+      </div>
+    );
   }
 
   function costsForMacro(macroCode) {
@@ -1244,6 +1440,13 @@ export default function CrPlanejamentoView({
 
   return (
     <section className="cr-workspace cr-planning-workspace">
+      <input
+        ref={sheetFileRef}
+        type="file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        hidden
+        onChange={handlePlanningFile}
+      />
       <header className="cr-workspace-heading">
         <div>
           <span>Competência {competencia}</span>
@@ -1309,6 +1512,7 @@ export default function CrPlanejamentoView({
                 Pesquise os subitens da planilha dentro de cada etapa macro. As informações orçamentárias são carregadas automaticamente; informe somente a quantidade prevista para medição.
               </p>
             </div>
+            {renderPlanningSheetActions('medicao-prevista', permissions.receipts)}
           </div>
           <div className="cr-macro-planning-list">
             {(data?.macros || []).map(renderForecastMeasurementMacro)}
@@ -1490,6 +1694,7 @@ export default function CrPlanejamentoView({
                 da previsão; a diferença total será tratada como glosa e exigirá justificativa.
               </p>
             </div>
+            {renderPlanningSheetActions('medicao-aprovada', permissions.measurement)}
           </div>
           {permissions.measurementView ? (
             <>
@@ -1548,6 +1753,7 @@ export default function CrPlanejamentoView({
                 Cadastre livremente os serviços previstos para o mês. Cada subitem permanece vinculado à etapa macro para comparação, auditoria e medição.
               </p>
             </div>
+            {renderPlanningSheetActions('custos', permissions.costs)}
           </div>
           <div className="cr-planning-total-banner">
             <span>Custo previsto no mês</span>
@@ -1626,6 +1832,16 @@ export default function CrPlanejamentoView({
           <HiOutlineChevronRight className="h-4 w-4" />
         </button>
       </footer>
+      {sheetPreview ? (
+        <CrPlanningImportModal
+          obraId={obra.id}
+          competencia={competencia}
+          tipo={sheetType}
+          preview={sheetPreview}
+          onClose={() => setSheetPreview(null)}
+          onConfirm={applyPlanningImport}
+        />
+      ) : null}
     </section>
   );
 }

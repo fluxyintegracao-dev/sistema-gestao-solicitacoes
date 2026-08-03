@@ -38,9 +38,25 @@ Obras privadas mantêm o fluxo de custos planejados seguido da leitura automáti
 - Um rascunho de outra versão do plano não é restaurado. O usuário também pode descartá-lo manualmente pela tela.
 - O rascunho não altera o backend, não finaliza competência e não substitui as validações transacionais do salvamento oficial.
 
+## Modelos e importação por etapa
+
+As etapas Custos Planejados, Medição Prevista e Medição Aprovada possuem ações próprias para baixar modelo e importar planilha. O arquivo sempre é gerado para a obra, competência e versão do plano em contexto.
+
+- O modelo de Custos Planejados preserva o cadastro livre. Código e descrição da etapa macro ficam protegidos; descrição do serviço, unidade, valor unitário e quantidade ficam liberados para preenchimento.
+- Os modelos de Medição Prevista e Medição Aprovada trazem todos os itens analíticos do plano, com macro, código, descrição, unidade, quantidade orçada, valor unitário e saldo disponível protegidos. Somente a coluna `quantidade` é editável.
+- Linhas vazias ou com quantidade igual a zero não entram na prévia.
+- O backend rejeita fórmulas, arquivo diferente de `.xlsx`, aba ou cabeçalho alterado, item fora do snapshot da competência, duplicidade e quantidade acima do saldo disponível.
+- Metadados ocultos e protegidos vinculam o modelo à obra, competência, etapa, ID e versão do plano; arquivo de outro contexto é rejeitado.
+- O saldo da Medição Prevista considera o acumulado previsto em competências anteriores. O saldo da Medição Aprovada considera o acumulado aprovado em competências anteriores.
+- Custos livres não possuem saldo analítico próprio; a validação exige etapa macro válida, descrição, unidade, valor unitário e quantidade positiva.
+- A prévia permite excluir linhas, alterar quantidade e adicionar um item. Em custos, adiciona-se um serviço livre dentro de uma macro; nas medições, adiciona-se um item do plano.
+- Qualquer edição torna a prévia pendente. O usuário precisa executar `Validar novamente`; `Confirmar importação` permanece bloqueado enquanto houver erro ou alteração não revalidada.
+- Confirmar a importação aplica os itens ao rascunho da etapa, sem ignorar itens já digitados que não estavam no arquivo. O salvamento definitivo continua no botão da etapa para preservar justificativas, glosa, auditoria, transação e demais regras existentes.
+
 ## Integridade
 
 - Subitens mensais são identificados por chave local idempotente enquanto ainda não possuem ID no banco.
 - Salvamentos atualizam registros existentes, criam os novos e removem somente os itens omitidos daquela competência.
 - As operações permanecem transacionais e respeitam as regras de competência finalizada, vencida ou reaberta.
 - Custos mensais livres permanecem independentes da planilha; medições prevista e aprovada referenciam os itens analíticos da versão do plano vinculada à competência.
+- Códigos e descrições recebidos no arquivo de medição nunca são confiados: o backend resolve novamente os dados oficiais pelo código do item no snapshot da competência.
