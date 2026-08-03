@@ -3547,3 +3547,163 @@
     width: 100%;
   }
 }
+
+/* Novo mês: edição operacional por etapa macro. */
+.cr-macro-planning-panel { gap: 1rem; }
+
+.cr-planning-total-banner {
+  display: grid;
+  grid-template-columns: minmax(10rem, auto) 1fr;
+  gap: 0.18rem 1rem;
+  align-items: baseline;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--cr-accent) 26%, var(--cr-border));
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--cr-accent) 5%, var(--cr-surface));
+}
+
+.cr-planning-total-banner > span {
+  color: var(--cr-muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.cr-planning-total-banner > strong { color: var(--cr-text); font-size: 1.15rem; }
+.cr-planning-total-banner > small {
+  grid-column: 1 / -1;
+  color: var(--cr-muted);
+  font-size: 0.68rem;
+}
+
+.cr-macro-planning-list { display: grid; gap: 0.85rem; }
+
+.cr-macro-planning-block {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--cr-border);
+  border-radius: 0.72rem;
+  background: var(--cr-surface);
+}
+
+.cr-macro-planning-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.72rem 0.85rem;
+  background: color-mix(in srgb, var(--cr-accent) 4%, var(--cr-surface));
+}
+
+.cr-macro-planning-heading > div {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.cr-macro-planning-heading b {
+  display: grid;
+  width: 1.55rem;
+  height: 1.55rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--cr-accent) 24%, var(--cr-border));
+  border-radius: 999px;
+  color: var(--cr-accent);
+  font-size: 0.68rem;
+}
+
+.cr-macro-planning-heading > div > div { display: grid; min-width: 0; gap: 0.1rem; }
+.cr-macro-planning-heading strong {
+  overflow: hidden;
+  color: var(--cr-text);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cr-macro-planning-heading span { color: var(--cr-muted); font-size: 0.66rem; }
+.cr-macro-planning-heading .btn {
+  min-height: 2rem;
+  flex: 0 0 auto;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.7rem;
+}
+
+.cr-macro-subitems-table,
+.cr-forecast-measurement-table { border-width: 1px 0 0; border-radius: 0; }
+.cr-macro-subitems-table table { min-width: 760px; }
+.cr-macro-subitems-table th:first-child,
+.cr-macro-subitems-table td:first-child { width: 42%; }
+.cr-forecast-measurement-table table { min-width: 1180px; }
+.cr-forecast-measurement-table th:first-child,
+.cr-forecast-measurement-table td:first-child { min-width: 15rem; }
+
+.cr-macro-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.55rem 0.85rem;
+  background: color-mix(in srgb, var(--cr-text) 92%, var(--cr-accent));
+  color: var(--cr-surface);
+  font-size: 0.7rem;
+}
+.cr-macro-total strong { font-size: 0.76rem; }
+
+.cr-macro-subitem-picker {
+  display: grid;
+  gap: 0;
+  padding: 0.65rem 0.85rem;
+  border-top: 1px solid var(--cr-border);
+  background: var(--cr-surface);
+}
+.cr-macro-subitem-picker > strong {
+  padding: 0.15rem 0 0.55rem;
+  color: var(--cr-muted);
+  font-size: 0.68rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+.cr-macro-subitem-picker > button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.1rem 0.75rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--cr-border);
+  border-bottom: 0;
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  text-align: left;
+  cursor: pointer;
+}
+.cr-macro-subitem-picker > button:first-of-type { border-radius: 0.5rem 0.5rem 0 0; }
+.cr-macro-subitem-picker > button:last-of-type {
+  border-bottom: 1px solid var(--cr-border);
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+.cr-macro-subitem-picker > button:hover,
+.cr-macro-subitem-picker > button:focus-visible {
+  background: color-mix(in srgb, var(--cr-accent) 6%, var(--cr-surface));
+  outline: none;
+}
+.cr-macro-subitem-picker button span { font-size: 0.74rem; font-weight: 720; }
+.cr-macro-subitem-picker button small,
+.cr-macro-picker-empty { color: var(--cr-muted); font-size: 0.66rem; }
+.cr-macro-subitem-picker button svg {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  align-self: center;
+  color: var(--cr-accent);
+}
+.cr-macro-picker-empty {
+  padding: 0.65rem;
+  border: 1px dashed var(--cr-border);
+  border-radius: 0.5rem;
+}
+
+@media (max-width: 760px) {
+  .cr-macro-planning-heading { align-items: stretch; flex-direction: column; }
+  .cr-macro-planning-heading .btn { width: 100%; }
+  .cr-planning-total-banner { grid-template-columns: 1fr; }
+  .cr-planning-total-banner > small { grid-column: auto; }
+}

@@ -258,6 +258,76 @@ async function findPlanItems(planId, deps, options = {}) {
   return items.filter(isLeaf);
 }
 
+async function findPlanStructure(planId, deps, options = {}) {
+  return deps.CrPlanoItem.findAll({
+    where: { plano_id: planId },
+    order: [['ordem', 'ASC'], ['codigo', 'ASC']],
+    transaction: options.transaction
+  });
+}
+
+function buildPlanMacros(values = []) {
+  const items = values.map((value) => plain(value));
+  const byCode = new Map(items.map((item) => [String(item.codigo), item]));
+  const grouped = new Map();
+
+  items.filter((item) => !Boolean(item.somadora)).forEach((item) => {
+    const code = String(item.etapa_macro_codigo || '').trim();
+    if (!code) return;
+    const macroItem = byCode.get(code);
+    const current = grouped.get(code) || {
+      codigo: code,
+      descricao: macroItem?.descricao || code,
+      valor_orcado: 0,
+      ordem: number(macroItem?.ordem, number(item.ordem))
+    };
+    current.valor_orcado = money(current.valor_orcado + number(item.valor_total));
+    current.ordem = Math.min(current.ordem, number(macroItem?.ordem, number(item.ordem)));
+    grouped.set(code, current);
+  });
+
+  if (!grouped.size) {
+    items.filter((item) => Boolean(item.somadora) && !item.item_pai_id).forEach((item) => {
+      grouped.set(String(item.codigo), {
+        codigo: String(item.codigo),
+        descricao: item.descricao || item.codigo,
+        valor_orcado: money(item.valor_total),
+        ordem: number(item.ordem)
+      });
+    });
+  }
+
+  return [...grouped.values()].sort((a, b) => (
+    a.ordem - b.ordem || a.codigo.localeCompare(b.codigo)
+  ));
+}
+
+function serializeMonthlyCost(value, item = null) {
+  const cost = plain(value);
+  const planItem = item ? serializeItem(item) : null;
+  return {
+    id: Number(cost.id),
+    chave_local: cost.chave_local || null,
+    plano_item_id: cost.plano_item_id ? Number(cost.plano_item_id) : null,
+    etapa_macro_codigo: cost.etapa_macro_codigo || planItem?.etapa_macro_codigo || null,
+    descricao: cost.descricao || planItem?.descricao || 'Subitem sem descricao',
+    unidade: cost.unidade || planItem?.unidade || null,
+    ordem: number(cost.ordem),
+    quantidade: number(cost.quantidade),
+    custo_unitario: number(cost.custo_unitario),
+    valor_previsto: money(cost.valor_previsto),
+    parceiro_id: cost.parceiro_id ? Number(cost.parceiro_id) : null,
+    item: planItem
+  };
+}
+
+function planningReferenceKey(value) {
+  const item = plain(value);
+  if (item.previsao_custo_id) return `custo:${Number(item.previsao_custo_id)}`;
+  if (item.plano_item_id) return `plano:${Number(item.plano_item_id)}`;
+  return null;
+}
+
 async function findPrivateSources(obraId, competencia, deps, options = {}) {
   const { first, nextMonth } = monthRange(competencia);
   const rows = await deps.ContratoComercialParcela.findAll({
@@ -780,6 +850,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       'A versao do plano vinculada a competencia nao foi encontrada.'
     );
   }
+  const planStructure = await findPlanStructure(plan.id, deps);
   const [rawCosts, rawReceipts, rawMeasurements, reopenings, privateSources] = await Promise.all([
     saved
       ? deps.CrPrevisaoCusto.findAll({ where: { competencia_id: saved.id } })
@@ -813,7 +884,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
     ...costs.map((item) => Number(item.plano_item_id)),
     ...receipts.map((item) => Number(item.plano_item_id)).filter(Boolean),
     ...measurements.map((item) => Number(item.plano_item_id))
-  ])];
+  ].filter((itemId) => Number.isInteger(itemId) && itemId > 0))];
   const items = selectedItemIds.length
     ? await deps.CrPlanoItem.findAll({
       where: {
@@ -871,10 +942,15 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
     };
   };
 
-  const costByItem = new Map(costs.map((value) => [Number(value.plano_item_id), plain(value)]));
-  const receiptByItem = new Map(receipts
-    .filter((value) => value.plano_item_id)
-    .map((value) => [Number(value.plano_item_id), plain(value)]));
+  const itemById = new Map(items.map((value) => [Number(value.id), value]));
+  const serializedCosts = costs
+    .map((value) => serializeMonthlyCost(value, itemById.get(Number(value.plano_item_id))))
+    .sort((a, b) => (
+      String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
+      || a.ordem - b.ordem
+      || a.id - b.id
+    ));
+  const costById = new Map(serializedCosts.map((value) => [Number(value.id), value]));
   const receiptByPrivateSource = new Map(receipts.map((value) => {
     const item = plain(value);
     const key = item.titulo_financeiro_id
@@ -882,27 +958,39 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       : `parcela:${item.contrato_parcela_id}`;
     return [key, item];
   }));
-  const measurementByItem = new Map(
-    measurements.map((value) => [Number(value.plano_item_id), plain(value)])
+  const measurementByReference = new Map(
+    measurements.map((value) => [planningReferenceKey(value), plain(value)])
   );
   const validReopening = reopenings.some((item) => (
     item.situacao === 'APROVADA' && item.expira_em && new Date(item.expira_em) > new Date()
   ));
   const expired = prazoCompetencia(competenciaCode) <= new Date();
 
-  const publicReceipts = items
-    .filter((value) => receiptByItem.has(Number(value.id)))
-    .map((value) => {
-    const item = serializePlanningItem(value);
-    const savedReceipt = receiptByItem.get(item.id);
+  const publicReceipts = receipts.map((savedValue) => {
+    const savedReceipt = plain(savedValue);
+    const cost = savedReceipt.previsao_custo_id
+      ? costById.get(Number(savedReceipt.previsao_custo_id))
+      : null;
+    const planItemValue = savedReceipt.plano_item_id
+      ? itemById.get(Number(savedReceipt.plano_item_id))
+      : null;
+    const item = planItemValue ? serializePlanningItem(planItemValue) : null;
     return {
-      plano_item_id: item.id,
+      id: Number(savedReceipt.id),
+      previsao_custo_id: cost?.id || null,
+      plano_item_id: item?.id || null,
+      etapa_macro_codigo: cost?.etapa_macro_codigo || item?.etapa_macro_codigo || null,
+      descricao: cost?.descricao || item?.descricao || 'Subitem sem descricao',
+      unidade: cost?.unidade || item?.unidade || null,
+      quantidade_base: cost?.quantidade ?? item?.quantidade_orcada ?? 0,
+      custo_unitario: cost?.custo_unitario ?? item?.custo_unitario_orcado ?? 0,
+      valor_base: cost?.valor_previsto ?? item?.valor_orcado ?? 0,
       item,
-      quantidade_prevista: number(savedReceipt?.quantidade_prevista),
-      valor_previsto: money(savedReceipt?.valor_previsto),
-      data_prevista: savedReceipt?.data_prevista || null
+      quantidade_prevista: number(savedReceipt.quantidade_prevista),
+      valor_previsto: money(savedReceipt.valor_previsto),
+      data_prevista: savedReceipt.data_prevista || null
     };
-    });
+  });
 
   return {
     obra: serializeObra(obra),
@@ -911,6 +999,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
       versao: Number(plan.versao),
       total_micro: money(plan.total_micro)
     },
+    macros: buildPlanMacros(planStructure),
     competencia: saved
       ? serializeCompetencia(saved)
       : {
@@ -924,22 +1013,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         finalizado_por: null,
         finalizado_em: null
       },
-    custos: items
-      .filter((value) => costByItem.has(Number(value.id)))
-      .map((value) => {
-      const item = serializePlanningItem(value);
-      const savedCost = costByItem.get(item.id);
-      return {
-        plano_item_id: item.id,
-        item,
-        quantidade: number(savedCost?.quantidade),
-        custo_unitario: savedCost
-          ? number(savedCost.custo_unitario)
-          : item.custo_unitario_orcado,
-        valor_previsto: money(savedCost?.valor_previsto),
-        parceiro_id: savedCost?.parceiro_id ? Number(savedCost.parceiro_id) : null
-      };
-      }),
+    custos: serializedCosts,
     recebiveis: String(obra.classificacao).toUpperCase() === 'PUBLICA'
       ? publicReceipts
       : privateSources.map((source) => ({
@@ -951,24 +1025,29 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
         )
       })),
     medicoes: String(obra.classificacao).toUpperCase() === 'PUBLICA'
-      ? items
-        .filter((value) => (
-          receiptByItem.has(Number(value.id)) || measurementByItem.has(Number(value.id))
-        ))
-        .map((value) => {
-        const item = serializePlanningItem(value);
-        const savedMeasurement = measurementByItem.get(item.id);
+      ? publicReceipts.map((receipt) => {
+        const key = receipt.previsao_custo_id
+          ? `custo:${receipt.previsao_custo_id}`
+          : `plano:${receipt.plano_item_id}`;
+        const savedMeasurement = measurementByReference.get(key);
         return {
-          plano_item_id: item.id,
-          item,
+          previsao_custo_id: receipt.previsao_custo_id,
+          plano_item_id: receipt.plano_item_id,
+          etapa_macro_codigo: receipt.etapa_macro_codigo,
+          descricao: receipt.descricao,
+          unidade: receipt.unidade,
+          quantidade_base: receipt.quantidade_base,
+          custo_unitario: receipt.custo_unitario,
+          valor_base: receipt.valor_base,
+          item: receipt.item,
           quantidade_medida: number(savedMeasurement?.quantidade_medida),
           valor_medido: money(savedMeasurement?.valor_medido),
           valor_glosa: money(savedMeasurement?.valor_glosa),
           justificativa_glosa: savedMeasurement?.justificativa_glosa || null,
           data_medicao: savedMeasurement?.data_medicao || null,
           numero_medicao: savedMeasurement?.numero_medicao || null
-          };
-        })
+        };
+      })
       : [],
     reaberturas: reopenings.map(serializeReabertura),
     regras: {
@@ -993,40 +1072,69 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
   };
 }
 
-function validateCostRows(rows, allowedItems) {
+function validateCostRows(rows, allowedItems, allowedMacros) {
   if (!Array.isArray(rows)) {
     throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos previstos.');
   }
   const seen = new Set();
   return rows.map((row, index) => {
-    const itemId = positiveId(row?.plano_item_id, `Item da linha ${index + 1}`);
-    const planItem = allowedItems.get(itemId);
-    if (!planItem || seen.has(itemId)) {
+    const recordId = row?.id ? positiveId(row.id, `Custo da linha ${index + 1}`) : null;
+    const itemId = row?.plano_item_id
+      ? positiveId(row.plano_item_id, `Item da linha ${index + 1}`)
+      : null;
+    const planItem = itemId ? allowedItems.get(itemId) : null;
+    const macroCode = normalizeText(
+      row?.etapa_macro_codigo || planItem?.etapa_macro_codigo,
+      80
+    );
+    const localKey = normalizeText(row?.chave_local, 80);
+    const identity = recordId
+      ? `id:${recordId}`
+      : (itemId ? `plano:${itemId}` : `chave:${localKey}`);
+    if (
+      (itemId && !planItem)
+      || (!itemId && (!localKey || !allowedMacros.has(macroCode)))
+      || seen.has(identity)
+    ) {
       throw createBusinessError(
         400,
         'CR_CUSTO_ITEM_INVALIDO',
-        `Item invalido ou duplicado na linha ${index + 1}.`
+        `Subitem invalido ou duplicado na linha ${index + 1}.`
       );
     }
-    seen.add(itemId);
+    seen.add(identity);
+    const description = normalizeText(row?.descricao || planItem?.descricao, 500);
+    const unit = normalizeText(row?.unidade || planItem?.unidade, 30);
     const quantidade = number(row.quantidade, NaN);
     const unitCost = number(row.custo_unitario, NaN);
-    if (!Number.isFinite(quantidade) || quantidade < 0 || !Number.isFinite(unitCost) || unitCost < 0) {
+    if (
+      description.length < 2
+      || !unit
+      || !Number.isFinite(quantidade)
+      || quantidade <= 0
+      || !Number.isFinite(unitCost)
+      || unitCost < 0
+    ) {
       throw createBusinessError(
         400,
         'CR_CUSTO_VALOR_INVALIDO',
-        `Quantidade e custo unitario devem ser positivos na linha ${index + 1}.`
+        `Informe descricao, unidade, quantidade positiva e valor unitario valido na linha ${index + 1}.`
       );
     }
     return {
+      id: recordId,
       plano_item_id: itemId,
-      etapa_macro_codigo: planItem.etapa_macro_codigo || null,
+      etapa_macro_codigo: macroCode || null,
+      descricao: description,
+      unidade: unit,
+      ordem: Number.isInteger(Number(row.ordem)) ? Number(row.ordem) : index + 1,
+      chave_local: itemId ? null : localKey,
       quantidade,
       custo_unitario: unitCost,
       valor_previsto: money(quantidade * unitCost),
       parceiro_id: row.parceiro_id ? positiveId(row.parceiro_id, 'Parceiro') : null
     };
-  }).filter(isMeaningfulCost);
+  });
 }
 
 async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, overrides = {}) {
@@ -1041,23 +1149,55 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
       transaction,
       lock: transaction.LOCK.UPDATE
     });
-    const items = await findPlanItems(plan.id, deps, { transaction });
-    const allowed = new Map(items.map((item) => [Number(item.id), plain(item)]));
-    const rows = validateCostRows(payload.itens, allowed);
+    const structure = await findPlanStructure(plan.id, deps, { transaction });
+    const allowed = new Map(
+      structure.filter(isLeaf).map((item) => [Number(item.id), plain(item)])
+    );
+    const allowedMacros = new Set(buildPlanMacros(structure).map((item) => item.codigo));
+    const rows = validateCostRows(payload.itens, allowed, allowedMacros);
     const competencia = saved
       || await getOrCreateCompetencia(obraId, competenciaCode, deps, transaction);
     await assertEditable(competencia, deps, transaction);
-
-    await deps.CrPrevisaoCusto.destroy({
+    const existingRows = await deps.CrPrevisaoCusto.findAll({
       where: { competencia_id: competencia.id },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const existingById = new Map(existingRows.map((item) => [Number(item.id), item]));
+    const existingByKey = new Map(existingRows
+      .filter((item) => item.chave_local)
+      .map((item) => [String(item.chave_local), item]));
+    const keptIds = [];
+    for (const row of rows) {
+      const existing = (row.id ? existingById.get(row.id) : null)
+        || (row.chave_local ? existingByKey.get(row.chave_local) : null);
+      if (row.id && !existing) {
+        throw createBusinessError(
+          409,
+          'CR_CUSTO_DESATUALIZADO',
+          `O subitem ${row.id} nao pertence mais a esta competencia. Atualize a tela.`
+        );
+      }
+      const values = { ...row };
+      delete values.id;
+      if (existing) {
+        await existing.update(values, { transaction });
+        keptIds.push(Number(existing.id));
+      } else {
+        const created = await deps.CrPrevisaoCusto.create({
+          ...values,
+          competencia_id: competencia.id
+        }, { transaction });
+        keptIds.push(Number(created.id));
+      }
+    }
+    await deps.CrPrevisaoCusto.destroy({
+      where: {
+        competencia_id: competencia.id,
+        ...(keptIds.length ? { id: { [Op.notIn]: keptIds } } : {})
+      },
       transaction
     });
-    if (rows.length) {
-      await deps.CrPrevisaoCusto.bulkCreate(
-        rows.map((row) => ({ ...row, competencia_id: competencia.id })),
-        { transaction }
-      );
-    }
     const total = money(rows.reduce((sum, row) => sum + row.valor_previsto, 0));
     await competencia.update({
       estado: competencia.estado === 'REABERTA' ? 'REABERTA' : 'EM_PREENCHIMENTO',
@@ -1075,22 +1215,34 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
   });
 }
 
-function validatePublicReceiptRows(rows, allowedItems, previousQuantities = new Map()) {
+function validatePublicReceiptRows(
+  rows,
+  allowedItems,
+  allowedCosts = new Map(),
+  previousQuantities = new Map()
+) {
   if (!Array.isArray(rows)) {
     throw createBusinessError(400, 'CR_RECEBIVEIS_INVALIDOS', 'Informe a lista de recebiveis.');
   }
   const seen = new Set();
   return rows.map((row, index) => {
-    const itemId = positiveId(row?.plano_item_id, `Item da linha ${index + 1}`);
-    const planItem = allowedItems.get(itemId);
-    if (!planItem || seen.has(itemId)) {
+    const costId = row?.previsao_custo_id
+      ? positiveId(row.previsao_custo_id, `Subitem da linha ${index + 1}`)
+      : null;
+    const itemId = row?.plano_item_id
+      ? positiveId(row.plano_item_id, `Item da linha ${index + 1}`)
+      : null;
+    const cost = costId ? allowedCosts.get(costId) : null;
+    const planItem = itemId ? allowedItems.get(itemId) : null;
+    const identity = costId ? `custo:${costId}` : `plano:${itemId}`;
+    if ((!cost && !planItem) || seen.has(identity)) {
       throw createBusinessError(
         400,
         'CR_RECEBIVEL_ITEM_INVALIDO',
-        `Item invalido ou duplicado na linha ${index + 1}.`
+        `Subitem invalido ou duplicado na linha ${index + 1}.`
       );
     }
-    seen.add(itemId);
+    seen.add(identity);
     const quantity = number(row.quantidade_prevista, NaN);
     if (!Number.isFinite(quantity) || quantity < 0) {
       throw createBusinessError(
@@ -1099,8 +1251,11 @@ function validatePublicReceiptRows(rows, allowedItems, previousQuantities = new 
         `Quantidade prevista invalida na linha ${index + 1}.`
       );
     }
-    const accumulated = number(previousQuantities.get(itemId)) + quantity;
-    if (accumulated > number(planItem.quantidade) + 0.0001) {
+    const baseQuantity = cost ? number(cost.quantidade) : number(planItem.quantidade);
+    const accumulated = cost
+      ? quantity
+      : number(previousQuantities.get(itemId)) + quantity;
+    if (accumulated > baseQuantity + 0.0001) {
       throw createBusinessError(
         422,
         'CR_MEDICAO_SUPERA_ORCAMENTO',
@@ -1110,10 +1265,11 @@ function validatePublicReceiptRows(rows, allowedItems, previousQuantities = new 
     return {
       origem: 'MEDICAO',
       plano_item_id: itemId,
+      previsao_custo_id: costId,
       contrato_parcela_id: null,
       titulo_financeiro_id: null,
       quantidade_prevista: quantity,
-      valor_previsto: money(quantity * number(planItem.custo_unitario)),
+      valor_previsto: money(quantity * number(cost?.custo_unitario ?? planItem?.custo_unitario)),
       data_prevista: row.data_prevista || null
     };
   }).filter(isMeaningfulReceipt);
@@ -1140,6 +1296,7 @@ async function buildPrivateReceiptRows(obraId, competencia, rows, deps, transact
     return {
       origem: 'CONTRATO',
       plano_item_id: null,
+      previsao_custo_id: null,
       contrato_parcela_id: source.contrato_parcela_id,
       titulo_financeiro_id: source.titulo_financeiro_id,
       quantidade_prevista: null,
@@ -1193,8 +1350,16 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
           + number(item.quantidade_prevista)
       ));
     }
+    const currentCosts = isPublic && saved
+      ? await deps.CrPrevisaoCusto.findAll({
+        where: { competencia_id: saved.id },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      })
+      : [];
+    const allowedCosts = new Map(currentCosts.map((item) => [Number(item.id), plain(item)]));
     const rows = isPublic
-      ? validatePublicReceiptRows(payload.itens, allowed, previousQuantities)
+      ? validatePublicReceiptRows(payload.itens, allowed, allowedCosts, previousQuantities)
       : await buildPrivateReceiptRows(
         obraId,
         competenciaCode,
@@ -1227,7 +1392,7 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
       userId: user?.id,
       event: 'CR_PLANEJAMENTO_RECEBIVEIS_SALVO',
       description: isPublic
-        ? 'Medicao apresentada da competencia atualizada.'
+        ? 'Medicao prevista da competencia atualizada.'
         : 'Recebiveis privados sincronizados automaticamente com as fontes oficiais.',
       payload: {
         competencia: competenciaCode,
@@ -1450,16 +1615,29 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
       transaction,
       lock: transaction.LOCK.UPDATE
     });
-    const presentedByItem = new Map(
-      presentedRows.map((item) => [Number(item.plano_item_id), plain(item)])
+    const monthlyCosts = await deps.CrPrevisaoCusto.findAll({
+      where: { competencia_id: competencia.id },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const costById = new Map(monthlyCosts.map((item) => [Number(item.id), plain(item)]));
+    const presentedByReference = new Map(
+      presentedRows.map((item) => [planningReferenceKey(item), plain(item)])
     );
     const seen = new Set();
     const rows = payload.itens.map((row, index) => {
-      const itemId = positiveId(row?.plano_item_id, `Item da linha ${index + 1}`);
-      const item = allowed.get(itemId);
+      const costId = row?.previsao_custo_id
+        ? positiveId(row.previsao_custo_id, `Subitem da linha ${index + 1}`)
+        : null;
+      const itemId = row?.plano_item_id
+        ? positiveId(row.plano_item_id, `Item da linha ${index + 1}`)
+        : null;
+      const cost = costId ? costById.get(costId) : null;
+      const item = itemId ? allowed.get(itemId) : null;
+      const reference = costId ? `custo:${costId}` : `plano:${itemId}`;
       const quantity = number(row.quantidade_medida, NaN);
-      const presented = presentedByItem.get(itemId);
-      if (!item || seen.has(itemId) || !Number.isFinite(quantity) || quantity < 0) {
+      const presented = presentedByReference.get(reference);
+      if ((!cost && !item) || seen.has(reference) || !Number.isFinite(quantity) || quantity < 0) {
         throw createBusinessError(
           400,
           'CR_MEDICAO_ITEM_INVALIDO',
@@ -1470,14 +1648,14 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
         throw createBusinessError(
           422,
           'CR_MEDICAO_SEM_APRESENTACAO',
-          `O item da linha ${index + 1} nao pertence a medicao apresentada da competencia.`
+          `O item da linha ${index + 1} nao pertence a medicao prevista da competencia.`
         );
       }
-      seen.add(itemId);
+      seen.add(reference);
       const presentedQuantity = number(presented.quantidade_prevista);
       const presentedValue = money(presented.valor_previsto);
       const approvedValue = row.valor_medido === null || row.valor_medido === undefined
-        ? money(quantity * number(item.custo_unitario))
+        ? money(quantity * number(cost?.custo_unitario ?? item?.custo_unitario))
         : money(number(row.valor_medido, NaN));
       if (
         quantity > presentedQuantity
@@ -1488,7 +1666,7 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
         throw createBusinessError(
           422,
           'CR_MEDICAO_ACIMA_APRESENTADA',
-          `Quantidade ou valor aprovado supera a medicao apresentada na linha ${index + 1}.`
+          `Quantidade ou valor aprovado supera a medicao prevista na linha ${index + 1}.`
         );
       }
       const glosa = money(Math.max(0, presentedValue - approvedValue));
@@ -1502,6 +1680,7 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
       }
       return {
         plano_item_id: itemId,
+        previsao_custo_id: costId,
         quantidade_medida: quantity,
         valor_medido: approvedValue,
         valor_glosa: glosa,
@@ -1511,31 +1690,15 @@ async function consolidarMedicao(user, obraIdValue, competenciaValue, payload = 
         registrado_por: user?.id
       };
     }).filter(isMeaningfulMeasurement);
-    const itemIds = rows.map((row) => row.plano_item_id);
     await deps.CrMedicaoConsolidada.destroy({
-      where: {
-        competencia_id: competencia.id,
-        ...(itemIds.length ? { plano_item_id: { [Op.notIn]: itemIds } } : {})
-      },
+      where: { competencia_id: competencia.id },
       transaction
     });
-    for (const row of rows) {
-      const existing = await deps.CrMedicaoConsolidada.findOne({
-        where: {
-          competencia_id: competencia.id,
-          plano_item_id: row.plano_item_id
-        },
-        transaction,
-        lock: transaction.LOCK.UPDATE
-      });
-      if (existing) {
-        await existing.update(row, { transaction });
-      } else {
-        await deps.CrMedicaoConsolidada.create({
-          ...row,
-          competencia_id: competencia.id
-        }, { transaction });
-      }
+    if (rows.length) {
+      await deps.CrMedicaoConsolidada.bulkCreate(
+        rows.map((row) => ({ ...row, competencia_id: competencia.id })),
+        { transaction, validate: true }
+      );
     }
     await audit(deps, transaction, {
       obraId,
@@ -1605,13 +1768,15 @@ async function buildComparison(obraId, competenciaCode, deps) {
   const rows = new Map();
   costs.forEach((cost) => {
     const item = itemById.get(Number(cost.plano_item_id));
-    if (!item) return;
-    rows.set(item.id, {
-      key: `item:${item.id}`,
-      plano_item_id: item.id,
-      etapa_macro_codigo: item.etapa_macro_codigo,
-      codigo: item.codigo,
-      descricao: item.descricao,
+    const monthlyCost = serializeMonthlyCost(cost, item);
+    const key = item ? `item:${item.id}` : `custo:${monthlyCost.id}`;
+    rows.set(key, {
+      key,
+      plano_item_id: item?.id || null,
+      previsao_custo_id: item ? null : monthlyCost.id,
+      etapa_macro_codigo: monthlyCost.etapa_macro_codigo,
+      codigo: item?.codigo || monthlyCost.etapa_macro_codigo || '-',
+      descricao: monthlyCost.descricao,
       previsto: money(cost.valor_previsto),
       realizado: 0
     });
@@ -1958,7 +2123,7 @@ function buildDashboardAlerts(currentRows, overdueObligations = []) {
         'MEDICAO_AGUARDANDO_APROVACAO',
         'info',
         'Medição aguardando aprovação',
-        `${obraLabel} possui medição apresentada ainda sem aprovação do órgão.`,
+        `${obraLabel} possui medição prevista ainda sem aprovação do órgão.`,
         'planejamento',
         60
       );

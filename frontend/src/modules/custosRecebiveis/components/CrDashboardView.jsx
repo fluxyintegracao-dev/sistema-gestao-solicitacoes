@@ -207,7 +207,7 @@ export default function CrDashboardView({
             </div>
             <div className="cr-ops-metrics">
               <Metric
-                label={classification === 'PUBLICA' ? 'Medição apresentada' : 'Previsto'}
+                label={classification === 'PUBLICA' ? 'Medição prevista' : 'Previsto'}
                 value={currency.format(cards.recebivel_previsto || 0)}
               />
               {classification !== 'PRIVADA' ? (

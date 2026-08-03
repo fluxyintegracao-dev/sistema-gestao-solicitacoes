@@ -71,7 +71,7 @@ export default function CrComparativoView({ obra, competencia }) {
       </div>
       <div className="cr-kpi-strip cr-kpi-strip--receivables">
         <div>
-          <span>Medição apresentada</span>
+          <span>Medição prevista</span>
           <strong>{currency.format(data?.recebiveis?.medicao_apresentada || 0)}</strong>
         </div>
         <div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineCheckCircle,
   HiOutlineChevronLeft,
@@ -6,7 +6,6 @@ import {
   HiOutlineClipboardDocumentCheck,
   HiOutlineExclamationTriangle,
   HiOutlineLockClosed,
-  HiOutlineMagnifyingGlass,
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi2';
@@ -16,7 +15,6 @@ import {
   decidirReaberturaCompetencia,
   finalizarPlanejamentoCompetencia,
   obterPlanejamentoCompetencia,
-  pesquisarItensPlanoCompetencia,
   salvarCustosCompetencia,
   salvarRecebiveisCompetencia,
   solicitarReaberturaCompetencia,
@@ -30,7 +28,7 @@ const currency = new Intl.NumberFormat('pt-BR', {
 
 const PUBLIC_STEPS = [
   { id: 1, label: 'Custos planejados' },
-  { id: 2, label: 'Medição apresentada' },
+  { id: 2, label: 'Medição prevista' },
   { id: 3, label: 'Medição aprovada' },
   { id: 4, label: 'Revisão e envio' }
 ];
@@ -43,6 +41,18 @@ const PRIVATE_STEPS = [
 function asNumber(value) {
   const parsed = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newLocalKey(prefix = 'cr-subitem') {
+  return globalThis.crypto?.randomUUID?.()
+    || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function planningRowKey(value = {}) {
+  if (value.previsao_custo_id) return `custo:${Number(value.previsao_custo_id)}`;
+  if (value.plano_item_id) return `plano:${Number(value.plano_item_id)}`;
+  if (value.id) return `id:${Number(value.id)}`;
+  return `local:${value.chave_local || ''}`;
 }
 
 function localExpiryDefault() {
@@ -84,12 +94,7 @@ export default function CrPlanejamentoView({
   const [feedback, setFeedback] = useState('');
   const [reopenReason, setReopenReason] = useState('');
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
-  const [itemSearch, setItemSearch] = useState({ receipts: '', costs: '' });
-  const [searchResults, setSearchResults] = useState({ receipts: [], costs: [] });
-  const [lastCompletedSearch, setLastCompletedSearch] = useState({ receipts: '', costs: '' });
-  const [searching, setSearching] = useState('');
-  const searchRequestRef = useRef({ receipts: 0, costs: 0 });
-  const searchDebounceRef = useRef({ receipts: null, costs: null });
+  const [measurementPickerMacro, setMeasurementPickerMacro] = useState('');
 
   const load = useCallback(async () => {
     if (!obra?.id) {
@@ -105,12 +110,19 @@ export default function CrPlanejamentoView({
       setReceipts(response.recebiveis || []);
       if (response.obra?.classificacao === 'PUBLICA') {
         const measurementsByItem = new Map(
-          (response.medicoes || []).map((item) => [Number(item.plano_item_id), item])
+          (response.medicoes || []).map((item) => [planningRowKey(item), item])
         );
         setMeasurements((response.recebiveis || []).map((receipt) => (
-          measurementsByItem.get(Number(receipt.plano_item_id)) || {
+          measurementsByItem.get(planningRowKey(receipt)) || {
+            previsao_custo_id: receipt.previsao_custo_id,
             plano_item_id: receipt.plano_item_id,
             item: receipt.item,
+            etapa_macro_codigo: receipt.etapa_macro_codigo,
+            descricao: receipt.descricao,
+            unidade: receipt.unidade,
+            quantidade_base: receipt.quantidade_base,
+            custo_unitario: receipt.custo_unitario,
+            valor_base: receipt.valor_base,
             quantidade_medida: 0,
             valor_medido: 0,
             valor_glosa: receipt.valor_previsto || 0,
@@ -131,16 +143,9 @@ export default function CrPlanejamentoView({
   }, [obra?.id, competencia]);
 
   useEffect(() => {
-    searchRequestRef.current.receipts += 1;
-    searchRequestRef.current.costs += 1;
-    window.clearTimeout(searchDebounceRef.current.receipts);
-    window.clearTimeout(searchDebounceRef.current.costs);
     setStep(1);
     setFeedback('');
-    setItemSearch({ receipts: '', costs: '' });
-    setSearchResults({ receipts: [], costs: [] });
-    setLastCompletedSearch({ receipts: '', costs: '' });
-    setSearching('');
+    setMeasurementPickerMacro('');
     load();
   }, [load]);
 
@@ -179,7 +184,7 @@ export default function CrPlanejamentoView({
       if (itemIndex !== index) return item;
       const next = { ...item, [field]: value };
       if (isPublic && field === 'quantidade_prevista') {
-        next.valor_previsto = asNumber(value) * asNumber(item.item?.custo_unitario_orcado);
+        next.valor_previsto = asNumber(value) * asNumber(item.custo_unitario);
       }
       return next;
     }));
@@ -191,89 +196,40 @@ export default function CrPlanejamentoView({
       const next = { ...item, [field]: value };
       if (field === 'quantidade_medida') {
         next.valor_medido = (
-          asNumber(value) * asNumber(item.item?.custo_unitario_orcado)
+          asNumber(value) * asNumber(item.custo_unitario)
         ).toFixed(2);
       }
       return next;
     }));
   }
 
-  function updateItemSearch(kind, value) {
-    searchRequestRef.current[kind] += 1;
-    setItemSearch((current) => ({ ...current, [kind]: value }));
-    setSearchResults((current) => ({ ...current, [kind]: [] }));
-  }
-
-  const searchPlanItems = useCallback(async (kind, rawQuery) => {
-    const query = String(rawQuery || '').trim();
-    if (!obra?.id || !query) {
-      searchRequestRef.current[kind] += 1;
-      setSearchResults((current) => ({ ...current, [kind]: [] }));
-      setLastCompletedSearch((current) => ({ ...current, [kind]: '' }));
-      setSearching((current) => (current === kind ? '' : current));
-      return;
-    }
-    const requestId = searchRequestRef.current[kind] + 1;
-    searchRequestRef.current[kind] = requestId;
-    try {
-      setSearching(kind);
-      setError('');
-      const response = await pesquisarItensPlanoCompetencia(
-        obra.id,
-        competencia,
-        { q: query, limit: 20 }
-      );
-      if (searchRequestRef.current[kind] !== requestId) return;
-      setSearchResults((current) => ({ ...current, [kind]: response.items || [] }));
-      setLastCompletedSearch((current) => ({ ...current, [kind]: query }));
-    } catch (requestError) {
-      if (searchRequestRef.current[kind] !== requestId) return;
-      setError(requestError.message || 'Erro ao pesquisar serviços.');
-    } finally {
-      if (searchRequestRef.current[kind] === requestId) {
-        setSearching((current) => (current === kind ? '' : current));
-      }
-    }
-  }, [obra?.id, competencia]);
-
-  function runImmediateItemSearch(kind) {
-    window.clearTimeout(searchDebounceRef.current[kind]);
-    searchDebounceRef.current[kind] = null;
-    searchPlanItems(kind, itemSearch[kind]);
-  }
-
-  useEffect(() => {
-    const kind = step === 1
-      ? 'costs'
-      : (step === 2 && isPublic ? 'receipts' : null);
-    if (!kind) return undefined;
-    const query = String(itemSearch[kind] || '').trim();
-    if (!query) {
-      searchPlanItems(kind, '');
-      return undefined;
-    }
-    searchDebounceRef.current[kind] = window.setTimeout(() => {
-      searchPlanItems(kind, query);
-    }, 300);
-    return () => {
-      window.clearTimeout(searchDebounceRef.current[kind]);
-      searchDebounceRef.current[kind] = null;
-    };
-  }, [isPublic, itemSearch.costs, itemSearch.receipts, searchPlanItems, step]);
-
-  function addReceipt(item) {
-    if (receipts.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
+  function addReceipt(cost) {
+    if (!cost?.id || receipts.some((row) => Number(row.previsao_custo_id) === Number(cost.id))) return;
     const receipt = {
-      plano_item_id: item.id,
-      item,
+      previsao_custo_id: cost.id,
+      plano_item_id: null,
+      etapa_macro_codigo: cost.etapa_macro_codigo,
+      descricao: cost.descricao,
+      unidade: cost.unidade,
+      quantidade_base: cost.quantidade,
+      custo_unitario: cost.custo_unitario,
+      valor_base: cost.valor_previsto,
+      item: null,
       quantidade_prevista: 0,
       valor_previsto: 0,
       data_prevista: ''
     };
     setReceipts((current) => [...current, receipt]);
     setMeasurements((current) => [...current, {
-      plano_item_id: item.id,
-      item,
+      previsao_custo_id: cost.id,
+      plano_item_id: null,
+      etapa_macro_codigo: cost.etapa_macro_codigo,
+      descricao: cost.descricao,
+      unidade: cost.unidade,
+      quantidade_base: cost.quantidade,
+      custo_unitario: cost.custo_unitario,
+      valor_base: cost.valor_previsto,
+      item: null,
       quantidade_medida: 0,
       valor_medido: 0,
       valor_glosa: 0,
@@ -281,39 +237,274 @@ export default function CrPlanejamentoView({
       data_medicao: '',
       numero_medicao: ''
     }]);
-    setSearchResults((current) => ({ ...current, receipts: [] }));
-    setLastCompletedSearch((current) => ({ ...current, receipts: '' }));
-    setItemSearch((current) => ({ ...current, receipts: '' }));
+    setMeasurementPickerMacro('');
   }
 
-  function addCost(item) {
-    if (costs.some((row) => Number(row.plano_item_id) === Number(item.id))) return;
+  function addCost(macro) {
     setCosts((current) => [...current, {
-      plano_item_id: item.id,
-      item,
-      quantidade: 0,
-      custo_unitario: item.custo_unitario_orcado || 0,
+      id: null,
+      chave_local: newLocalKey(),
+      plano_item_id: null,
+      etapa_macro_codigo: macro.codigo,
+      descricao: '',
+      unidade: '',
+      ordem: current.filter((item) => item.etapa_macro_codigo === macro.codigo).length + 1,
+      item: null,
+      quantidade: '',
+      custo_unitario: '',
       valor_previsto: 0,
       parceiro_id: null
     }]);
-    setSearchResults((current) => ({ ...current, costs: [] }));
-    setLastCompletedSearch((current) => ({ ...current, costs: '' }));
-    setItemSearch((current) => ({ ...current, costs: '' }));
   }
 
-  function removeReceipt(itemId) {
+  function removeReceipt(reference) {
     setReceipts((current) => current.filter(
-      (item) => Number(item.plano_item_id) !== Number(itemId)
+      (item) => planningRowKey(item) !== reference
     ));
     setMeasurements((current) => current.filter(
-      (item) => Number(item.plano_item_id) !== Number(itemId)
+      (item) => planningRowKey(item) !== reference
     ));
   }
 
-  function removeCost(itemId) {
+  function removeCost(reference) {
     setCosts((current) => current.filter(
-      (item) => Number(item.plano_item_id) !== Number(itemId)
+      (item) => planningRowKey(item) !== reference
     ));
+  }
+
+  function costsForMacro(macroCode) {
+    return costs.filter((item) => item.etapa_macro_codigo === macroCode);
+  }
+
+  function receiptsForMacro(macroCode) {
+    return receipts.filter((item) => item.etapa_macro_codigo === macroCode);
+  }
+
+  function availableMeasurementCosts(macroCode) {
+    const selectedIds = new Set(receipts.map((item) => Number(item.previsao_custo_id)).filter(Boolean));
+    return costsForMacro(macroCode).filter((item) => item.id && !selectedIds.has(Number(item.id)));
+  }
+
+  function renderCostMacro(macro, macroIndex) {
+    const rows = costsForMacro(macro.codigo);
+    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
+    return (
+      <article key={macro.codigo} className="cr-macro-planning-block">
+        <header className="cr-macro-planning-heading">
+          <div>
+            <b>{macroIndex + 1}</b>
+            <div>
+              <strong>{macro.codigo} · {macro.descricao}</strong>
+              <span>Orçado na macro: {currency.format(macro.valor_orcado || 0)}</span>
+            </div>
+          </div>
+          {!readonly && permissions.costs ? (
+            <button type="button" className="btn btn-outline" onClick={() => addCost(macro)}>
+              <HiOutlinePlus className="h-4 w-4" />
+              Adicionar subitem
+            </button>
+          ) : null}
+        </header>
+        <div className="cr-table-shell cr-planning-table cr-macro-subitems-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Descrição do serviço</th>
+                <th>Unidade</th>
+                <th>Quantidade</th>
+                <th>Valor unitário</th>
+                <th>Valor total</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item) => {
+                const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
+                return (
+                  <tr key={planningRowKey(item)}>
+                    <td>
+                      <input
+                        value={item.descricao || ''}
+                        placeholder="Descreva o serviço planejado"
+                        maxLength="500"
+                        disabled={readonly || !permissions.costs}
+                        onChange={(event) => updateCost(index, 'descricao', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        value={item.unidade || ''}
+                        placeholder="un, m², mês..."
+                        maxLength="30"
+                        disabled={readonly || !permissions.costs}
+                        onChange={(event) => updateCost(index, 'unidade', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        value={item.quantidade}
+                        disabled={readonly || !permissions.costs}
+                        onChange={(event) => updateCost(index, 'quantidade', event.target.value)}
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.0001"
+                        value={item.custo_unitario}
+                        disabled={readonly || !permissions.costs}
+                        onChange={(event) => updateCost(index, 'custo_unitario', event.target.value)}
+                      />
+                    </td>
+                    <td><strong>{currency.format(item.valor_previsto || 0)}</strong></td>
+                    <td>
+                      {!readonly && permissions.costs ? (
+                        <button
+                          type="button"
+                          className="cr-icon-action"
+                          onClick={() => removeCost(planningRowKey(item))}
+                          aria-label={`Remover ${item.descricao || 'subitem'}`}
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!rows.length ? (
+                <tr><td colSpan="6" className="cr-table-empty">Nenhum subitem planejado nesta etapa.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <footer className="cr-macro-total">
+          <span>Total da etapa</span>
+          <strong>{currency.format(total)}</strong>
+        </footer>
+      </article>
+    );
+  }
+
+  function renderForecastMeasurementMacro(macro, macroIndex) {
+    const rows = receiptsForMacro(macro.codigo);
+    const available = availableMeasurementCosts(macro.codigo);
+    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
+    const pickerOpen = measurementPickerMacro === macro.codigo;
+    return (
+      <article key={macro.codigo} className="cr-macro-planning-block">
+        <header className="cr-macro-planning-heading">
+          <div>
+            <b>{macroIndex + 1}</b>
+            <div>
+              <strong>{macro.codigo} · {macro.descricao}</strong>
+              <span>{rows.length} subitem(ns) na medição prevista</span>
+            </div>
+          </div>
+          {!readonly && permissions.receipts ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setMeasurementPickerMacro(pickerOpen ? '' : macro.codigo)}
+            >
+              <HiOutlinePlus className="h-4 w-4" />
+              Adicionar subitem
+            </button>
+          ) : null}
+        </header>
+        {pickerOpen ? (
+          <div className="cr-macro-subitem-picker">
+            <strong>Selecione um custo planejado desta etapa</strong>
+            {available.map((cost) => (
+              <button key={cost.id} type="button" onClick={() => addReceipt(cost)}>
+                <span>{cost.descricao}</span>
+                <small>{cost.unidade} · {cost.quantidade} × {currency.format(cost.custo_unitario)}</small>
+                <HiOutlinePlus className="h-4 w-4" />
+              </button>
+            ))}
+            {!available.length ? (
+              <span className="cr-macro-picker-empty">
+                Salve os custos planejados ou todos os subitens desta etapa já foram adicionados.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="cr-table-shell cr-planning-table cr-forecast-measurement-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Serviço</th>
+                <th>Unid.</th>
+                <th>Qtd. planejada</th>
+                <th>Valor unitário</th>
+                <th>Total planejado</th>
+                <th>Qtd. já medida</th>
+                <th>Qtd. medida</th>
+                <th>Nesta medição</th>
+                <th>Saldo a medir</th>
+                <th aria-label="Ações" />
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((item) => {
+                const index = receipts.findIndex((row) => planningRowKey(row) === planningRowKey(item));
+                const previousQuantity = asNumber(item.item?.quantidade_apresentada_anterior);
+                const remainingQuantity = Math.max(
+                  0,
+                  asNumber(item.quantidade_base) - previousQuantity - asNumber(item.quantidade_prevista)
+                );
+                return (
+                  <tr key={planningRowKey(item)}>
+                    <td><strong>{item.descricao}</strong></td>
+                    <td>{item.unidade || 'un'}</td>
+                    <td>{item.quantidade_base}</td>
+                    <td>{currency.format(item.custo_unitario || 0)}</td>
+                    <td>{currency.format(item.valor_base || 0)}</td>
+                    <td>{previousQuantity}</td>
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max={Math.max(0, asNumber(item.quantidade_base) - previousQuantity)}
+                        step="0.0001"
+                        value={item.quantidade_prevista}
+                        disabled={readonly || !permissions.receipts}
+                        onChange={(event) => updateReceipt(index, 'quantidade_prevista', event.target.value)}
+                      />
+                    </td>
+                    <td><strong>{currency.format(item.valor_previsto || 0)}</strong></td>
+                    <td>{remainingQuantity} {item.unidade || 'un'}</td>
+                    <td>
+                      {!readonly && permissions.receipts ? (
+                        <button
+                          type="button"
+                          className="cr-icon-action"
+                          onClick={() => removeReceipt(planningRowKey(item))}
+                          aria-label={`Remover ${item.descricao}`}
+                        >
+                          <HiOutlineTrash className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                    </td>
+                  </tr>
+                );
+              })}
+              {!rows.length ? (
+                <tr><td colSpan="10" className="cr-table-empty">Adicione os subitens que terão medição prevista.</td></tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        <footer className="cr-macro-total">
+          <span>Total previsto da etapa</span>
+          <strong>{currency.format(total)}</strong>
+        </footer>
+      </article>
+    );
   }
 
   async function runMutation(kind, action, successMessage) {
@@ -338,6 +529,7 @@ export default function CrPlanejamentoView({
   async function saveReceipts() {
     if (!isPublic) return;
     const rows = receipts.map((item) => ({
+      previsao_custo_id: item.previsao_custo_id || null,
       plano_item_id: item.plano_item_id,
       quantidade_prevista: asNumber(item.quantidade_prevista),
       data_prevista: item.data_prevista || null
@@ -345,7 +537,7 @@ export default function CrPlanejamentoView({
     await runMutation(
       'receipts',
       () => salvarRecebiveisCompetencia(obra.id, competencia, rows),
-      'Medição apresentada salva.'
+      'Medição prevista salva.'
     );
   }
 
@@ -356,7 +548,13 @@ export default function CrPlanejamentoView({
         obra.id,
         competencia,
         costs.map((item) => ({
+          id: item.id || null,
+          chave_local: item.chave_local || null,
           plano_item_id: item.plano_item_id,
+          etapa_macro_codigo: item.etapa_macro_codigo,
+          descricao: item.descricao,
+          unidade: item.unidade,
+          ordem: item.ordem,
           quantidade: asNumber(item.quantidade),
           custo_unitario: asNumber(item.custo_unitario),
           parceiro_id: item.parceiro_id || null
@@ -373,6 +571,7 @@ export default function CrPlanejamentoView({
         obra.id,
         competencia,
         measurements.map((item) => ({
+          previsao_custo_id: item.previsao_custo_id || null,
           plano_item_id: item.plano_item_id,
           quantidade_medida: asNumber(item.quantidade_medida),
           valor_medido: asNumber(item.valor_medido),
@@ -442,7 +641,7 @@ export default function CrPlanejamentoView({
           <div className="cr-panel-actions cr-closure-actions">
             <span>
               {isPublic
-                ? 'Finalize depois de salvar custos e medição apresentada. A aprovação pode ser registrada quando o órgão responder.'
+                ? 'Finalize depois de salvar custos e medição prevista. A aprovação pode ser registrada quando o órgão responder.'
                 : 'Ao finalizar, os recebíveis exibidos são sincronizados automaticamente com as fontes oficiais.'}
             </span>
             <button
@@ -576,7 +775,7 @@ export default function CrPlanejamentoView({
             <strong>Competência finalizada</strong>
             <span>
               {isPublic
-                ? 'Custos e medição apresentada estão congelados. A medição aprovada permanece disponível para registro quando o órgão responder.'
+                ? 'Custos e medição prevista estão congelados. A medição aprovada permanece disponível para registro quando o órgão responder.'
                 : 'Custos e recebíveis do período permanecem disponíveis para consulta. A edição dos custos exige reabertura aprovada.'}
             </span>
           </div>
@@ -600,11 +799,43 @@ export default function CrPlanejamentoView({
         ))}
       </nav>
 
-      {step === 2 ? (
+      {step === 2 && isPublic ? (
+        <div className="cr-planning-panel cr-macro-planning-panel">
+          <div className="cr-block-heading">
+            <div>
+              <h3>Medição prevista no período</h3>
+              <p>
+                Adicione os subitens salvos nos custos planejados. As informações do serviço são carregadas automaticamente; informe somente a quantidade medida.
+              </p>
+            </div>
+          </div>
+          <div className="cr-macro-planning-list">
+            {(data?.macros || []).map(renderForecastMeasurementMacro)}
+            {!data?.macros?.length ? (
+              <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
+            ) : null}
+          </div>
+          <div className="cr-panel-actions">
+            <strong>Total da medição prevista: {currency.format(totalReceipts)}</strong>
+            {permissions.receipts ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={readonly || Boolean(saving)}
+                onClick={saveReceipts}
+              >
+                {saving === 'receipts' ? 'Salvando...' : 'Salvar medição prevista'}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
+      {step === 2 && !isPublic ? (
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>{isPublic ? 'Medição apresentada no período' : 'Recebíveis cadastrados para o período'}</h3>
+              <h3>{isPublic ? 'Medição prevista no período' : 'Recebíveis cadastrados para o período'}</h3>
               <p>
                 {isPublic
                   ? 'A quantidade prevista usa o custo unitário congelado no plano publicado.'
@@ -612,87 +843,6 @@ export default function CrPlanejamentoView({
               </p>
             </div>
           </div>
-          {isPublic && !readonly && permissions.receipts ? (
-            <div className="cr-item-picker">
-              <label className="cr-field">
-                <span>Adicionar serviço medido</span>
-                <div className="cr-search-input">
-                  <input
-                    value={itemSearch.receipts}
-                    placeholder="Pesquise por código, serviço ou etapa..."
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="cr-receipts-search-results"
-                    aria-expanded={
-                      searching === 'receipts' || searchResults.receipts.length > 0
-                    }
-                    onChange={(event) => updateItemSearch('receipts', event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        runImmediateItemSearch('receipts');
-                      }
-                      if (event.key === 'Escape') {
-                        setSearchResults((current) => ({ ...current, receipts: [] }));
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={searching === 'receipts'}
-                    onClick={() => runImmediateItemSearch('receipts')}
-                    aria-label="Pesquisar serviços"
-                  >
-                    <HiOutlineMagnifyingGlass className="h-4 w-4" />
-                  </button>
-                </div>
-              </label>
-              {searching === 'receipts'
-                || searchResults.receipts.length
-                || (
-                  lastCompletedSearch.receipts === itemSearch.receipts.trim()
-                  && Boolean(itemSearch.receipts.trim())
-                ) ? (
-                <div
-                  id="cr-receipts-search-results"
-                  className="cr-item-picker-results"
-                  role="listbox"
-                  aria-label="Serviços encontrados"
-                >
-                  {searching === 'receipts' ? (
-                    <div className="cr-item-picker-feedback">Buscando opções...</div>
-                  ) : null}
-                  {searchResults.receipts.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="option"
-                      aria-selected="false"
-                      onClick={() => addReceipt(item)}
-                    >
-                      <span><strong>{item.codigo}</strong> · {item.descricao}</span>
-                      <small>
-                        {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · saldo {
-                          Math.max(
-                            0,
-                            asNumber(item.quantidade_orcada)
-                              - asNumber(item.quantidade_apresentada_anterior)
-                          )
-                        }
-                      </small>
-                      <HiOutlinePlus className="h-4 w-4" />
-                    </button>
-                  ))}
-                  {searching !== 'receipts' && !searchResults.receipts.length ? (
-                    <div className="cr-item-picker-feedback">
-                      Nenhum serviço encontrado com esses caracteres.
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
           <div className="cr-table-shell cr-planning-table">
             <table>
               <thead>
@@ -701,9 +851,9 @@ export default function CrPlanejamentoView({
                   {isPublic ? (
                     <>
                       <th>Qtd. orçada</th>
-                      <th>Já apresentada</th>
+                      <th>Já medida</th>
                       <th>Nesta medição</th>
-                      <th>Valor apresentado</th>
+                      <th>Valor previsto</th>
                       <th>Saldo após medição</th>
                       <th aria-label="Ações" />
                     </>
@@ -795,7 +945,7 @@ export default function CrPlanejamentoView({
             </table>
           </div>
           <div className="cr-panel-actions">
-            <strong>{isPublic ? 'Total apresentado' : 'Total cadastrado'}: {currency.format(totalReceipts)}</strong>
+            <strong>{isPublic ? 'Total previsto' : 'Total cadastrado'}: {currency.format(totalReceipts)}</strong>
             {isPublic && permissions.receipts ? (
               <button
                 type="button"
@@ -803,7 +953,7 @@ export default function CrPlanejamentoView({
                 disabled={readonly || Boolean(saving)}
                 onClick={saveReceipts}
               >
-                {saving === 'receipts' ? 'Salvando...' : 'Salvar medição apresentada'}
+                {saving === 'receipts' ? 'Salvando...' : 'Salvar medição prevista'}
               </button>
             ) : (
               !isPublic ? (
@@ -835,7 +985,7 @@ export default function CrPlanejamentoView({
             <div>
               <h3>Medição aprovada pelo órgão</h3>
               <p>
-                Registre o valor reconhecido pelo órgão. A diferença para o apresentado
+                Registre o valor reconhecido pelo órgão. A diferença para o previsto
                 será tratada como glosa e exigirá justificativa.
               </p>
             </div>
@@ -846,8 +996,8 @@ export default function CrPlanejamentoView({
                 <table>
                   <thead>
                     <tr>
-                      <th>Item micro</th>
-                      <th>Apresentado</th>
+                      <th>Subitem planejado</th>
+                      <th>Previsto</th>
                       <th>Qtd. aprovada</th>
                       <th>Valor aprovado</th>
                       <th>Glosa</th>
@@ -858,20 +1008,20 @@ export default function CrPlanejamentoView({
                   <tbody>
                     {measurements.map((item, index) => {
                       const receipt = receipts.find(
-                        (row) => Number(row.plano_item_id) === Number(item.plano_item_id)
+                        (row) => planningRowKey(row) === planningRowKey(item)
                       );
                       const rowGlosa = Math.max(
                         0,
                         asNumber(receipt?.valor_previsto) - asNumber(item.valor_medido)
                       );
                       return (
-                        <tr key={item.plano_item_id}>
+                        <tr key={planningRowKey(item)}>
                           <td>
-                            <strong>{item.item.codigo} · {item.item.descricao}</strong>
-                            <span>{item.item.unidade || 'un'}</span>
+                            <strong>{item.descricao || item.item?.descricao}</strong>
+                            <span>{item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || item.item?.unidade || 'un'}</span>
                           </td>
                           <td>
-                            {receipt?.quantidade_prevista || 0} {item.item.unidade || 'un'}
+                            {receipt?.quantidade_prevista || 0} {item.unidade || item.item?.unidade || 'un'}
                             <span>{currency.format(receipt?.valor_previsto || 0)}</span>
                           </td>
                           <td>
@@ -925,7 +1075,7 @@ export default function CrPlanejamentoView({
                     {!measurements.length ? (
                       <tr>
                         <td colSpan="7" className="cr-table-empty">
-                          Salve primeiro a medição apresentada para registrar a aprovação do órgão.
+                          Salve primeiro a medição prevista para registrar a aprovação do órgão.
                         </td>
                       </tr>
                     ) : null}
@@ -957,154 +1107,25 @@ export default function CrPlanejamentoView({
       ) : null}
 
       {step === 1 ? (
-        <div className="cr-planning-panel">
+        <div className="cr-planning-panel cr-macro-planning-panel">
           <div className="cr-block-heading">
             <div>
-              <h3>Custos planejados por item micro</h3>
-              <p>Somente itens folha da versão publicada podem receber previsão mensal.</p>
+              <h3>Custos planejados por etapa macro</h3>
+              <p>
+                Cadastre livremente os serviços previstos para o mês. Cada subitem permanece vinculado à etapa macro para comparação, auditoria e medição.
+              </p>
             </div>
           </div>
-          {!readonly && permissions.costs ? (
-            <div className="cr-item-picker">
-              <label className="cr-field">
-                <span>Adicionar custo planejado</span>
-                <div className="cr-search-input">
-                  <input
-                    value={itemSearch.costs}
-                    placeholder="Pesquise por código, serviço ou etapa..."
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-controls="cr-costs-search-results"
-                    aria-expanded={searching === 'costs' || searchResults.costs.length > 0}
-                    onChange={(event) => updateItemSearch('costs', event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        runImmediateItemSearch('costs');
-                      }
-                      if (event.key === 'Escape') {
-                        setSearchResults((current) => ({ ...current, costs: [] }));
-                      }
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    disabled={searching === 'costs'}
-                    onClick={() => runImmediateItemSearch('costs')}
-                    aria-label="Pesquisar serviços"
-                  >
-                    <HiOutlineMagnifyingGlass className="h-4 w-4" />
-                  </button>
-                </div>
-              </label>
-              {searching === 'costs'
-                || searchResults.costs.length
-                || (
-                  lastCompletedSearch.costs === itemSearch.costs.trim()
-                  && Boolean(itemSearch.costs.trim())
-                ) ? (
-                <div
-                  id="cr-costs-search-results"
-                  className="cr-item-picker-results"
-                  role="listbox"
-                  aria-label="Itens de custo encontrados"
-                >
-                  {searching === 'costs' ? (
-                    <div className="cr-item-picker-feedback">Buscando opções...</div>
-                  ) : null}
-                  {searchResults.costs.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      role="option"
-                      aria-selected="false"
-                      onClick={() => addCost(item)}
-                    >
-                      <span><strong>{item.codigo}</strong> · {item.descricao}</span>
-                      <small>
-                        {item.etapa_macro_codigo || 'Sem macro'} · {item.unidade || 'un'} · {
-                          currency.format(item.custo_unitario_orcado || 0)
-                        }
-                      </small>
-                      <HiOutlinePlus className="h-4 w-4" />
-                    </button>
-                  ))}
-                  {searching !== 'costs' && !searchResults.costs.length ? (
-                    <div className="cr-item-picker-feedback">
-                      Nenhum item encontrado com esses caracteres.
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          <div className="cr-table-shell cr-planning-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Macro / item micro</th>
-                  <th>Qtd. orçada</th>
-                  <th>Qtd. prevista</th>
-                  <th>Custo unitário</th>
-                  <th>Valor previsto</th>
-                  <th aria-label="Ações" />
-                </tr>
-              </thead>
-              <tbody>
-                {costs.map((item, index) => (
-                  <tr key={item.plano_item_id}>
-                    <td>
-                      <strong>{item.item.codigo} · {item.item.descricao}</strong>
-                      <span>{item.item.etapa_macro_codigo || 'Sem macro'} · {item.item.unidade || 'un'}</span>
-                    </td>
-                    <td>
-                      {item.item.quantidade_orcada} {item.item.unidade || 'un'}
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        value={item.quantidade}
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'quantidade', event.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        value={item.custo_unitario}
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'custo_unitario', event.target.value)}
-                      />
-                    </td>
-                    <td>{currency.format(item.valor_previsto || 0)}</td>
-                    <td>
-                      {!readonly && permissions.costs ? (
-                        <button
-                          type="button"
-                          className="cr-icon-action"
-                          onClick={() => removeCost(item.plano_item_id)}
-                          aria-label={`Remover ${item.item.descricao}`}
-                        >
-                          <HiOutlineTrash className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-                {!costs.length ? (
-                  <tr>
-                    <td colSpan="6" className="cr-table-empty">
-                      Pesquise e adicione somente os custos planejados para esta competência.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <div className="cr-planning-total-banner">
+            <span>Custo previsto no mês</span>
+            <strong>{currency.format(totalCosts)}</strong>
+            <small>Quantidade × valor unitário compõe o total operacional.</small>
+          </div>
+          <div className="cr-macro-planning-list">
+            {(data?.macros || []).map(renderCostMacro)}
+            {!data?.macros?.length ? (
+              <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
+            ) : null}
           </div>
           <div className="cr-panel-actions">
             <strong>Total planejado: {currency.format(totalCosts)}</strong>
@@ -1115,7 +1136,7 @@ export default function CrPlanejamentoView({
                 disabled={readonly || Boolean(saving)}
                 onClick={saveCosts}
               >
-                {saving === 'costs' ? 'Salvando...' : 'Salvar custos'}
+                {saving === 'costs' ? 'Salvando...' : 'Salvar custos planejados'}
               </button>
             ) : null}
           </div>
@@ -1126,7 +1147,7 @@ export default function CrPlanejamentoView({
         <div className="cr-review-layout">
           <div className="cr-review-summary">
             <div><span>Custos planejados</span><strong>{currency.format(totalCosts)}</strong></div>
-            <div><span>Medição apresentada</span><strong>{currency.format(totalReceipts)}</strong></div>
+            <div><span>Medição prevista</span><strong>{currency.format(totalReceipts)}</strong></div>
             <div><span>Medição aprovada</span><strong>{currency.format(totalApproved)}</strong></div>
             <div data-tone={totalGlosa > 0 ? 'negative' : 'positive'}>
               <span>Glosa registrada</span>

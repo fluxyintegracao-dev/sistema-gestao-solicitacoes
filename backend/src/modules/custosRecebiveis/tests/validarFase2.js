@@ -12,6 +12,7 @@ const {
   monthRange,
   normalizeCompetencia,
   salvarCustos,
+  salvarRecebiveis,
   statusComparativo,
   summarizeDashboardRows
 } = require('../services/planejamentoService');
@@ -85,6 +86,7 @@ function validateBackendContracts() {
   const service = read('src/modules/custosRecebiveis/services/planejamentoService.js');
   const routes = read('src/modules/custosRecebiveis/routes/index.js');
   const controller = read('src/modules/custosRecebiveis/controllers/CustosRecebiveisController.js');
+  const migration = read('migrations/202608030002_custos_recebiveis_subitens_mensais.js');
 
   [
     "'/dashboard'",
@@ -129,6 +131,14 @@ function validateBackendContracts() {
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
+  assert(service.includes('buildPlanMacros'));
+  assert(service.includes('previsao_custo_id'));
+  assert(service.includes('CR_CUSTO_DESATUALIZADO'));
+  assert(migration.includes("const COSTS = 'cr_previsoes_custo'"));
+  assert(migration.includes("'chave_local'"));
+  assert(migration.includes("'previsao_custo_id'"));
+  assert(migration.includes('fk_cr_receitas_previsao_custo'));
+  assert(migration.includes('fk_cr_medicoes_previsao_custo'));
 }
 
 function validateFrontendContracts() {
@@ -150,15 +160,17 @@ function validateFrontendContracts() {
   assert(planning.includes('PUBLIC_STEPS'));
   assert(planning.includes('PRIVATE_STEPS'));
   assert(planning.includes("label: 'Custos planejados'"));
-  assert(planning.includes("label: 'Medição apresentada'"));
+  assert(planning.includes("label: 'Medição prevista'"));
   assert(planning.includes("label: 'Medição aprovada'"));
   assert(planning.includes("label: 'Recebíveis do período'"));
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
   assert(!planning.includes('checked={Boolean(item.confirmado)}'));
-  assert(planning.includes('aria-autocomplete="list"'));
-  assert(planning.includes('window.setTimeout'));
-  assert(planning.includes('Qtd. orçada'));
+  assert(planning.includes('Custos planejados por etapa macro'));
+  assert(planning.includes('Adicionar subitem'));
+  assert(planning.includes('previsao_custo_id'));
+  assert(planning.includes('Qtd. planejada'));
+  assert(planning.includes('Qtd. medida'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
@@ -401,6 +413,130 @@ async function validatePrivateWorkRejectsMeasurement() {
   );
 }
 
+async function validateMonthlyMacroSubitemsAndForecastMeasurement() {
+  let savedCosts = [];
+  let savedReceipts = [];
+  const competencia = {
+    id: 71,
+    obra_id: 7,
+    competencia: '2099-08',
+    estado: 'ABERTA',
+    plano_versao_snapshot: 1,
+    total_custo_previsto: 0,
+    total_receita_prevista: 0,
+    update: async function update(values) {
+      Object.assign(this, values);
+      return this;
+    }
+  };
+  const planItems = [
+    {
+      id: 100,
+      plano_id: 3,
+      codigo: '01',
+      descricao: 'Serviços preliminares',
+      somadora: true,
+      item_pai_id: null,
+      ordem: 1,
+      valor_total: 1000
+    },
+    {
+      id: 101,
+      plano_id: 3,
+      codigo: '01.01',
+      descricao: 'Referência orçamentária',
+      somadora: false,
+      etapa_macro_codigo: '01',
+      ordem: 2,
+      quantidade: 10,
+      custo_unitario: 100,
+      valor_total: 1000
+    }
+  ];
+  const baseOverrides = {
+    sequelize: transactionHarness(),
+    resolverEscopoObras: commonScope(),
+    Obra: {
+      findByPk: async () => ({ id: 7, nome: 'Obra pública', classificacao: 'PUBLICA' })
+    },
+    CrPlanoObra: {
+      findOne: async () => ({ id: 3, versao: 1, situacao: 'PUBLICADA' })
+    },
+    CrPlanoItem: { findAll: async () => planItems },
+    CrCompetencia: {
+      findOne: async () => competencia,
+      findAll: async () => []
+    },
+    CrReabertura: { findOne: async () => null },
+    CrAuditoria: { create: async (payload) => payload }
+  };
+
+  const costResult = await salvarCustos(
+    { id: 1 },
+    7,
+    '2099-08',
+    {
+      itens: [{
+        chave_local: 'local-subitem-1',
+        etapa_macro_codigo: '01',
+        descricao: 'Mobilização da equipe',
+        unidade: 'mês',
+        ordem: 1,
+        quantidade: 2,
+        custo_unitario: 150
+      }]
+    },
+    {
+      ...baseOverrides,
+      CrPrevisaoCusto: {
+        findAll: async () => savedCosts,
+        create: async (payload) => {
+          const created = {
+            id: 501,
+            ...payload,
+            update: async function update(values) {
+              Object.assign(this, values);
+              return this;
+            }
+          };
+          savedCosts.push(created);
+          return created;
+        },
+        destroy: async () => 0
+      }
+    }
+  );
+  assert.strictEqual(costResult.total, 300);
+  assert.strictEqual(savedCosts[0].plano_item_id, null);
+  assert.strictEqual(savedCosts[0].etapa_macro_codigo, '01');
+  assert.strictEqual(savedCosts[0].descricao, 'Mobilização da equipe');
+
+  const receiptResult = await salvarRecebiveis(
+    { id: 1 },
+    7,
+    '2099-08',
+    {
+      itens: [{ previsao_custo_id: 501, quantidade_prevista: 1.5 }]
+    },
+    {
+      ...baseOverrides,
+      CrPrevisaoCusto: { findAll: async () => savedCosts },
+      CrPrevisaoReceita: {
+        findAll: async () => [],
+        destroy: async () => { savedReceipts = []; },
+        bulkCreate: async (rows) => {
+          savedReceipts = rows;
+          return rows;
+        }
+      }
+    }
+  );
+  assert.strictEqual(receiptResult.total, 225);
+  assert.strictEqual(savedReceipts[0].previsao_custo_id, 501);
+  assert.strictEqual(savedReceipts[0].plano_item_id, null);
+  assert.strictEqual(savedReceipts[0].valor_previsto, 225);
+}
+
 async function validateApprovedMeasurementAndGlosa() {
   let createdMeasurement = null;
   let auditPayload = null;
@@ -441,12 +577,12 @@ async function validateApprovedMeasurementAndGlosa() {
         valor_previsto: 100
       }]
     },
+    CrPrevisaoCusto: { findAll: async () => [] },
     CrMedicaoConsolidada: {
       destroy: async () => 0,
-      findOne: async () => null,
-      create: async (payload) => {
-        createdMeasurement = payload;
-        return payload;
+      bulkCreate: async (rows) => {
+        [createdMeasurement] = rows;
+        return rows;
       }
     },
     CrAuditoria: {
@@ -503,6 +639,7 @@ async function run() {
   validateFrontendContracts();
   await validatePrivateAntiDoubleCount();
   await validatePrivateReceiptsSyncOnFinalization();
+  await validateMonthlyMacroSubitemsAndForecastMeasurement();
   await validateFinalizationIdempotency();
   await validateFinalizedCompetencyIsImmutable();
   await validatePrivateWorkRejectsMeasurement();
