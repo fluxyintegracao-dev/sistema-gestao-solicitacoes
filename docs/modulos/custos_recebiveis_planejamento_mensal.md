@@ -29,9 +29,18 @@ O valor aprovado é sempre calculado pelo sistema com o valor unitário congelad
 
 Obras privadas mantêm o fluxo de custos planejados seguido da leitura automática dos recebíveis financeiros da competência. Não existe etapa de Medição Prevista ou Medição Aprovada para obra privada.
 
+## Rascunho local de edição
+
+- Alterações ainda não salvas em Custos Planejados, Medição Prevista e Medição Aprovada são mantidas no navegador por até sete dias.
+- O rascunho é isolado por usuário, obra, competência e etapa; salvar uma etapa remove somente o rascunho correspondente.
+- Recarregar a página ou navegar para outra área restaura automaticamente os campos e a etapa mais recente.
+- O sistema força uma última gravação local ao sair da tela ou recarregar, protegendo inclusive alterações feitas imediatamente antes da navegação.
+- Um rascunho de outra versão do plano não é restaurado. O usuário também pode descartá-lo manualmente pela tela.
+- O rascunho não altera o backend, não finaliza competência e não substitui as validações transacionais do salvamento oficial.
+
 ## Integridade
 
 - Subitens mensais são identificados por chave local idempotente enquanto ainda não possuem ID no banco.
 - Salvamentos atualizam registros existentes, criam os novos e removem somente os itens omitidos daquela competência.
 - As operações permanecem transacionais e respeitam as regras de competência finalizada, vencida ou reaberta.
-- Os campos legados baseados em item do plano continuam aceitos internamente para compatibilidade, embora o fluxo novo use `previsao_custo_id`.
+- Custos mensais livres permanecem independentes da planilha; medições prevista e aprovada referenciam os itens analíticos da versão do plano vinculada à competência.

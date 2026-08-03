@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HiOutlineCheckCircle,
   HiOutlineChevronLeft,
@@ -22,6 +22,13 @@ import {
   solicitarReaberturaCompetencia,
   solicitarReaberturaObraCompetencia
 } from '../services/custosRecebiveis';
+import {
+  buildPlanningDraftKey,
+  hasPlanningDraft,
+  readPlanningDraft,
+  removePlanningDraft,
+  writePlanningDraft
+} from '../utils/planningDraftStorage';
 
 const currency = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -55,6 +62,10 @@ function planningRowKey(value = {}) {
   if (value.plano_item_id) return `plano:${Number(value.plano_item_id)}`;
   if (value.id) return `id:${Number(value.id)}`;
   return `local:${value.chave_local || ''}`;
+}
+
+function draftSignature(value) {
+  return JSON.stringify(value ?? null);
 }
 
 function localExpiryDefault() {
@@ -119,6 +130,7 @@ function privateReceiptStatusLabel(status) {
 
 export default function CrPlanejamentoView({
   obra,
+  userId,
   competencia,
   permissions,
   onChanged
@@ -139,8 +151,24 @@ export default function CrPlanejamentoView({
   const [approvedPickerMacro, setApprovedPickerMacro] = useState('');
   const [approvedSearch, setApprovedSearch] = useState('');
   const [measurementJustification, setMeasurementJustification] = useState('');
+  const [draftNotice, setDraftNotice] = useState('');
+  const [hasLocalDraft, setHasLocalDraft] = useState(false);
+  const draftReadyRef = useRef(false);
+  const latestDraftRef = useRef(null);
+  const serverBaselineRef = useRef({
+    costs: draftSignature([]),
+    receipts: draftSignature([]),
+    measurement: draftSignature({ items: [], justification: '' })
+  });
+  const draftKeys = useMemo(() => ({
+    costs: buildPlanningDraftKey(userId, obra?.id, competencia, 'custos'),
+    receipts: buildPlanningDraftKey(userId, obra?.id, competencia, 'medicao-prevista'),
+    measurement: buildPlanningDraftKey(userId, obra?.id, competencia, 'medicao-aprovada')
+  }), [competencia, obra?.id, userId]);
+  const allDraftKeys = useMemo(() => Object.values(draftKeys).filter(Boolean), [draftKeys]);
 
   const load = useCallback(async () => {
+    draftReadyRef.current = false;
     if (!obra?.id) {
       setData(null);
       return;
@@ -149,25 +177,57 @@ export default function CrPlanejamentoView({
       setLoading(true);
       setError('');
       const response = await obterPlanejamentoCompetencia(obra.id, competencia);
+      const serverCosts = response.custos || [];
+      const serverReceipts = response.recebiveis || [];
+      const serverMeasurements = response.obra?.classificacao === 'PUBLICA'
+        ? response.medicoes || []
+        : [];
+      const serverJustification = serverMeasurements
+        .find((item) => item.justificativa_glosa)?.justificativa_glosa || '';
+      const planVersion = response.plano?.versao;
+      const costsDraft = readPlanningDraft(draftKeys.costs, planVersion);
+      const receiptsDraft = readPlanningDraft(draftKeys.receipts, planVersion);
+      const measurementDraft = readPlanningDraft(draftKeys.measurement, planVersion);
+      const restoredDrafts = [costsDraft, receiptsDraft, measurementDraft].filter(Boolean);
+
+      serverBaselineRef.current = {
+        costs: draftSignature(serverCosts),
+        receipts: draftSignature(serverReceipts),
+        measurement: draftSignature({
+          items: serverMeasurements,
+          justification: serverJustification
+        })
+      };
       setData(response);
-      setCosts(response.custos || []);
-      setReceipts(response.recebiveis || []);
+      setCosts(Array.isArray(costsDraft?.items) ? costsDraft.items : serverCosts);
+      setReceipts(Array.isArray(receiptsDraft?.items) ? receiptsDraft.items : serverReceipts);
       if (response.obra?.classificacao === 'PUBLICA') {
-        setMeasurements(response.medicoes || []);
+        setMeasurements(
+          Array.isArray(measurementDraft?.items) ? measurementDraft.items : serverMeasurements
+        );
         setMeasurementJustification(
-          (response.medicoes || []).find((item) => item.justificativa_glosa)?.justificativa_glosa || ''
+          measurementDraft?.justification ?? serverJustification
         );
       } else {
         setMeasurements([]);
         setMeasurementJustification('');
       }
+      const latestRestoredDraft = [...restoredDrafts].sort(
+        (left, right) => Number(right?.meta?.salvo_em || 0) - Number(left?.meta?.salvo_em || 0)
+      )[0];
+      const restoredStep = Number(latestRestoredDraft?.meta?.etapa);
+      const maxStep = response.obra?.classificacao === 'PUBLICA' ? PUBLIC_STEPS.length : PRIVATE_STEPS.length;
+      if (restoredStep >= 1 && restoredStep <= maxStep) setStep(restoredStep);
+      setHasLocalDraft(restoredDrafts.length > 0);
+      setDraftNotice(restoredDrafts.length ? 'Rascunho local restaurado' : '');
+      draftReadyRef.current = true;
     } catch (requestError) {
       setData(null);
       setError(requestError.message || 'Erro ao carregar planejamento.');
     } finally {
       setLoading(false);
     }
-  }, [obra?.id, competencia]);
+  }, [competencia, draftKeys, obra?.id]);
 
   useEffect(() => {
     setStep(1);
@@ -177,12 +237,24 @@ export default function CrPlanejamentoView({
     setApprovedPickerMacro('');
     setApprovedSearch('');
     setMeasurementJustification('');
+    setDraftNotice('');
+    setHasLocalDraft(false);
     load();
   }, [load]);
 
   const isPublic = (data?.obra?.classificacao || obra?.classificacao) === 'PUBLICA';
   const steps = isPublic ? PUBLIC_STEPS : PRIVATE_STEPS;
   const readonly = data?.regras?.editavel === false;
+  latestDraftRef.current = {
+    costs,
+    receipts,
+    measurements,
+    measurementJustification,
+    isPublic,
+    permissions,
+    planVersion: data?.plano?.versao,
+    step
+  };
   const forecastSearch = usePlanItemSearch(
     obra?.id,
     competencia,
@@ -212,6 +284,160 @@ export default function CrPlanejamentoView({
     () => Math.max(0, totalReceipts - totalApproved),
     [totalApproved, totalReceipts]
   );
+  const refreshDraftPresence = useCallback(() => {
+    setHasLocalDraft(hasPlanningDraft(allDraftKeys));
+  }, [allDraftKeys]);
+  const flushPlanningDrafts = useCallback(() => {
+    if (!draftReadyRef.current || !latestDraftRef.current) return;
+    const latest = latestDraftRef.current;
+    const metadata = {
+      userId,
+      obraId: obra?.id,
+      competencia,
+      planVersion: latest.planVersion,
+      step: latest.step
+    };
+    if (
+      draftKeys.costs
+      && latest.permissions?.costs
+      && draftSignature(latest.costs) !== serverBaselineRef.current.costs
+    ) {
+      writePlanningDraft(draftKeys.costs, { items: latest.costs }, metadata);
+    }
+    if (
+      draftKeys.receipts
+      && latest.isPublic
+      && latest.permissions?.receipts
+      && draftSignature(latest.receipts) !== serverBaselineRef.current.receipts
+    ) {
+      writePlanningDraft(draftKeys.receipts, { items: latest.receipts }, metadata);
+    }
+    const measurementPayload = {
+      items: latest.measurements,
+      justification: latest.measurementJustification
+    };
+    if (
+      draftKeys.measurement
+      && latest.isPublic
+      && latest.permissions?.measurement
+      && draftSignature(measurementPayload) !== serverBaselineRef.current.measurement
+    ) {
+      writePlanningDraft(draftKeys.measurement, measurementPayload, metadata);
+    }
+  }, [competencia, draftKeys, obra?.id, userId]);
+
+  useEffect(() => {
+    window.addEventListener('pagehide', flushPlanningDrafts);
+    return () => {
+      window.removeEventListener('pagehide', flushPlanningDrafts);
+      flushPlanningDrafts();
+    };
+  }, [flushPlanningDrafts]);
+
+  useEffect(() => {
+    if (!draftReadyRef.current || !draftKeys.costs || !data || !permissions.costs) {
+      return undefined;
+    }
+    const signature = draftSignature(costs);
+    if (signature === serverBaselineRef.current.costs) {
+      removePlanningDraft(draftKeys.costs);
+      refreshDraftPresence();
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (!draftReadyRef.current) return;
+      const saved = writePlanningDraft(
+        draftKeys.costs,
+        { items: costs },
+        {
+          userId,
+          obraId: obra.id,
+          competencia,
+          planVersion: data.plano?.versao,
+          step
+        }
+      );
+      setDraftNotice(saved ? 'Rascunho salvo neste dispositivo' : 'Não foi possível salvar o rascunho');
+      refreshDraftPresence();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [competencia, costs, data, draftKeys.costs, obra?.id, permissions.costs, refreshDraftPresence, step, userId]);
+
+  useEffect(() => {
+    if (
+      !draftReadyRef.current
+      || !draftKeys.receipts
+      || !data
+      || !isPublic
+      || !permissions.receipts
+    ) return undefined;
+    const signature = draftSignature(receipts);
+    if (signature === serverBaselineRef.current.receipts) {
+      removePlanningDraft(draftKeys.receipts);
+      refreshDraftPresence();
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (!draftReadyRef.current) return;
+      const saved = writePlanningDraft(
+        draftKeys.receipts,
+        { items: receipts },
+        {
+          userId,
+          obraId: obra.id,
+          competencia,
+          planVersion: data.plano?.versao,
+          step
+        }
+      );
+      setDraftNotice(saved ? 'Rascunho salvo neste dispositivo' : 'Não foi possível salvar o rascunho');
+      refreshDraftPresence();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [competencia, data, draftKeys.receipts, isPublic, obra?.id, permissions.receipts, receipts, refreshDraftPresence, step, userId]);
+
+  useEffect(() => {
+    if (
+      !draftReadyRef.current
+      || !draftKeys.measurement
+      || !data
+      || !isPublic
+      || !permissions.measurement
+    ) return undefined;
+    const payload = { items: measurements, justification: measurementJustification };
+    const signature = draftSignature(payload);
+    if (signature === serverBaselineRef.current.measurement) {
+      removePlanningDraft(draftKeys.measurement);
+      refreshDraftPresence();
+      return undefined;
+    }
+    const timer = window.setTimeout(() => {
+      if (!draftReadyRef.current) return;
+      const saved = writePlanningDraft(
+        draftKeys.measurement,
+        payload,
+        {
+          userId,
+          obraId: obra.id,
+          competencia,
+          planVersion: data.plano?.versao,
+          step
+        }
+      );
+      setDraftNotice(saved ? 'Rascunho salvo neste dispositivo' : 'Não foi possível salvar o rascunho');
+      refreshDraftPresence();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [competencia, data, draftKeys.measurement, isPublic, measurementJustification, measurements, obra?.id, permissions.measurement, refreshDraftPresence, step, userId]);
+
+  async function discardLocalDraft() {
+    if (!window.confirm('Descartar as alterações não salvas desta obra e competência?')) return;
+    draftReadyRef.current = false;
+    allDraftKeys.forEach(removePlanningDraft);
+    setHasLocalDraft(false);
+    await load();
+    setDraftNotice('Rascunho descartado');
+  }
 
   function updateCost(index, field, value) {
     setCosts((current) => current.map((item, itemIndex) => {
@@ -762,13 +988,17 @@ export default function CrPlanejamentoView({
     );
   }
 
-  async function runMutation(kind, action, successMessage) {
+  async function runMutation(kind, action, successMessage, draftSection = '') {
     if (saving) return null;
     try {
       setSaving(kind);
       setError('');
       setFeedback('');
       const result = await action();
+      if (draftSection && draftKeys[draftSection]) {
+        removePlanningDraft(draftKeys[draftSection]);
+        refreshDraftPresence();
+      }
       setFeedback(successMessage);
       await load();
       onChanged?.();
@@ -792,7 +1022,8 @@ export default function CrPlanejamentoView({
     await runMutation(
       'receipts',
       () => salvarRecebiveisCompetencia(obra.id, competencia, rows),
-      'Medição prevista salva.'
+      'Medição prevista salva.',
+      'receipts'
     );
   }
 
@@ -815,7 +1046,8 @@ export default function CrPlanejamentoView({
           parceiro_id: item.parceiro_id || null
         }))
       ),
-      'Custos planejados salvos.'
+      'Custos planejados salvos.',
+      'costs'
     );
   }
 
@@ -836,7 +1068,8 @@ export default function CrPlanejamentoView({
         })),
         measurementJustification
       ),
-      'Medição consolidada com rastreabilidade.'
+      'Medição consolidada com rastreabilidade.',
+      'measurement'
     );
   }
 
@@ -1019,9 +1252,21 @@ export default function CrPlanejamentoView({
             Plano micro v{data?.plano?.versao} · {isPublic ? 'Obra pública com medição' : 'Obra privada com recebíveis contratuais'}
           </p>
         </div>
-        <span className="cr-status-pill" data-status={data?.competencia?.estado}>
-          {COMPETENCIA_ESTADO_LABELS[data?.competencia?.estado] || data?.competencia?.estado}
-        </span>
+        <div className="cr-planning-status-stack">
+          <span className="cr-status-pill" data-status={data?.competencia?.estado}>
+            {COMPETENCIA_ESTADO_LABELS[data?.competencia?.estado] || data?.competencia?.estado}
+          </span>
+          {draftNotice ? (
+            <span className="cr-draft-indicator" data-error={draftNotice.startsWith('Não') || undefined}>
+              {draftNotice}
+            </span>
+          ) : null}
+          {hasLocalDraft ? (
+            <button type="button" className="cr-draft-discard" onClick={discardLocalDraft}>
+              Descartar rascunho
+            </button>
+          ) : null}
+        </div>
       </header>
 
       {readonly ? (

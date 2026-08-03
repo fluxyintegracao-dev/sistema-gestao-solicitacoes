@@ -29,6 +29,7 @@ function monthLabel(value) {
 
 export default function CrPlanejamentoMensalView({
   obra,
+  userId,
   initialCompetencia,
   autoOpen = false,
   permissions,
@@ -125,6 +126,7 @@ export default function CrPlanejamentoMensalView({
         </button>
         <CrPlanejamentoView
           obra={obra}
+          userId={userId}
           competencia={selectedCompetencia}
           permissions={permissions}
           onChanged={async () => {

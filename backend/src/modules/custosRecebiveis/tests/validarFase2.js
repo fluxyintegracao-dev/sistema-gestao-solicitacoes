@@ -147,6 +147,9 @@ function validateFrontendContracts() {
   const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
   const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
   const planning = read('../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx');
+  const planningDraft = read(
+    '../frontend/src/modules/custosRecebiveis/utils/planningDraftStorage.js'
+  );
   const monthlyPlanning = read(
     '../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoMensalView.jsx'
   );
@@ -183,6 +186,13 @@ function validateFrontendContracts() {
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
+  assert(planning.includes('Rascunho salvo neste dispositivo'));
+  assert(planning.includes("window.addEventListener('pagehide', flushPlanningDrafts)"));
+  assert(planning.includes("'medicao-prevista'"));
+  assert(planningDraft.includes("fluxy_cr_planning_draft_v1"));
+  assert(planningDraft.includes('PLANNING_DRAFT_TTL_MS'));
+  assert(planningDraft.includes('plano_versao'));
+  assert(planningDraft.includes('window.localStorage.removeItem'));
   assert(monthlyPlanning.includes('Novo mês'));
   assert(monthlyPlanning.includes('Recebíveis do período'));
   assert(monthlyPlanning.includes('Receita recebida'));

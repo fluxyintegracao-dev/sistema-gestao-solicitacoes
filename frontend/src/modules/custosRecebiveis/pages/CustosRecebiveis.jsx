@@ -511,6 +511,7 @@ export default function CustosRecebiveis() {
         <CrPlanejamentoMensalView
           key={`${selectedObraId}-${competencia}-${refreshToken}`}
           obra={selectedObra}
+          userId={user?.id}
           initialCompetencia={competencia}
           autoOpen={searchParams.get('bloqueio') === '1'}
           permissions={planningPermissions}

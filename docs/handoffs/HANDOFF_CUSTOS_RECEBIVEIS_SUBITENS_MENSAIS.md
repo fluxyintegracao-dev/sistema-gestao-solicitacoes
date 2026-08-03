@@ -2,7 +2,7 @@
 
 ## Estado
 
-A base de subitens mensais já foi implantada na `dev-v2`. A correção atual — pesquisa direta da planilha nas medições prevista e aprovada — está concluída localmente e ainda sem commit. O módulo não possui registros operacionais, portanto não foi necessária conversão de dados existentes.
+A base de subitens mensais e a pesquisa direta da planilha nas medições já foram implantadas na `dev-v2`. A alteração atual adiciona rascunho local automático para as edições de custos e medições e ainda está sem commit.
 
 ## Alterações
 
@@ -17,6 +17,9 @@ A base de subitens mensais já foi implantada na `dev-v2`. A correção atual �
 - Obras privadas mantêm recebíveis automáticos do Financeiro.
 - Rótulo operacional alterado de Medição apresentada para Medição Prevista.
 - Contratos legados por `plano_item_id` foram preservados para compatibilidade.
+- Custos, Medição Prevista e Medição Aprovada possuem rascunhos locais separados por usuário, obra, competência e versão do plano, com validade de sete dias.
+- A restauração ocorre após recarga ou retorno à tela; navegação e `pagehide` forçam a gravação dos últimos dados digitados.
+- Cada salvamento confirmado remove somente o rascunho daquela etapa, e a tela permite descartar todos os rascunhos do período manualmente.
 
 ## Arquivos
 
@@ -29,6 +32,7 @@ A base de subitens mensais já foi implantada na `dev-v2`. A correção atual �
 - `backend/src/modules/custosRecebiveis/services/exportacaoService.js`
 - `backend/src/modules/custosRecebiveis/tests/validarFase2.js`
 - `frontend/src/modules/custosRecebiveis/services/custosRecebiveis.js`
+- `frontend/src/modules/custosRecebiveis/utils/planningDraftStorage.js`
 - componentes e estilos em `frontend/src/modules/custosRecebiveis/`
 - `docs/modulos/custos_recebiveis_planejamento_mensal.md`
 
@@ -44,4 +48,4 @@ A base de subitens mensais já foi implantada na `dev-v2`. A correção atual �
 
 ## Próximo passo
 
-Commitar a correção na `dev-v2`, atualizar backend e frontend de desenvolvimento e executar o smoke test das duas pesquisas independentes em uma obra pública. Esta correção não cria migration adicional. Não acessar a EC2 diretamente; o deploy é feito pelo usuário.
+Commitar a persistência de rascunho na `dev-v2`, atualizar o frontend de desenvolvimento e executar o smoke test de recarga, navegação, salvamento por etapa e descarte manual. Esta correção não cria migration nem altera o backend operacional. Não acessar a EC2 diretamente; o deploy é feito pelo usuário.
