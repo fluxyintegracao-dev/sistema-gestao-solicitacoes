@@ -12,6 +12,7 @@ A base de subitens mensais já foi implantada na `dev-v2`. A correção atual �
 - A consulta é paginada e filtrada no backend pela etapa macro, evitando carregar a planilha inteira no frontend.
 - Medição Aprovada repete a pesquisa independente dos itens da planilha. O item aprovado não precisa ter sido incluído na Medição Prevista.
 - Quantidades previstas e aprovadas respeitam separadamente o saldo orçado acumulado do item.
+- Na Medição Prevista, o campo limita imediatamente a quantidade ao saldo orçado disponível e a coluna usa o rótulo `Qtd. orçada`; o backend mantém a validação definitiva.
 - A diferença positiva entre o total previsto e o total aprovado é registrada como glosa e exige justificativa geral auditável.
 - Obras privadas mantêm recebíveis automáticos do Financeiro.
 - Rótulo operacional alterado de Medição apresentada para Medição Prevista.

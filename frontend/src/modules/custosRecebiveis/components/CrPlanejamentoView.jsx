@@ -227,7 +227,16 @@ export default function CrPlanejamentoView({
       if (itemIndex !== index) return item;
       const next = { ...item, [field]: value };
       if (isPublic && field === 'quantidade_prevista') {
-        next.valor_previsto = asNumber(value) * asNumber(item.custo_unitario);
+        const previousQuantity = asNumber(item.item?.quantidade_apresentada_anterior);
+        const availableQuantity = Math.max(
+          0,
+          asNumber(item.quantidade_base) - previousQuantity
+        );
+        next.quantidade_prevista = Math.min(
+          availableQuantity,
+          Math.max(0, asNumber(value))
+        );
+        next.valor_previsto = next.quantidade_prevista * asNumber(item.custo_unitario);
       }
       return next;
     }));
@@ -525,7 +534,7 @@ export default function CrPlanejamentoView({
               <tr>
                 <th>Serviço</th>
                 <th>Unid.</th>
-                <th>Qtd. planejada</th>
+                <th>Qtd. orçada</th>
                 <th>Valor unitário</th>
                 <th>Total planejado</th>
                 <th>Qtd. já medida</th>

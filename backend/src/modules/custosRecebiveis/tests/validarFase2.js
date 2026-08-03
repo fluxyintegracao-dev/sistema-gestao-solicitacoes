@@ -171,7 +171,9 @@ function validateFrontendContracts() {
   assert(planning.includes('Custos planejados por etapa macro'));
   assert(planning.includes('Adicionar subitem'));
   assert(planning.includes('previsao_custo_id'));
-  assert(planning.includes('Qtd. planejada'));
+  assert(planning.includes('Qtd. orçada'));
+  assert(planning.includes('Math.min('));
+  assert(planning.includes('item.item?.quantidade_apresentada_anterior'));
   assert(planning.includes('Qtd. medida'));
   assert(planning.includes('Pesquisar subitem desta etapa'));
   assert(planning.includes('usePlanItemSearch'));
