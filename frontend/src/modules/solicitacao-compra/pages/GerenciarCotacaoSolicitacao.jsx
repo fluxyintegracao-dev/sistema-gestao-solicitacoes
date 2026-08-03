@@ -18,8 +18,7 @@ import {
   encerrarSolicitacaoCompraSemPedido,
   enviarSolicitacaoCompraParaFornecedores,
   listarFornecedoresCompra,
-  obterComparativoSolicitacaoCompra,
-  obterSolicitacaoCompra,
+  obterWorkspaceCotacaoSolicitacaoCompra,
   obterUrlAssinadaCompra,
   obterUrlPdfCotacaoPublica,
   recusarSolicitacaoCompra,
@@ -2039,6 +2038,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [vencedoresSelecionados, setVencedoresSelecionados] = useState({});
   const encerramentoIdempotencyRef = useRef(null);
   const encerramentoSemPedidoIdempotencyRef = useRef(null);
+  const fornecedorRequestRef = useRef({ sequencia: 0, controller: null });
 
   const podeComprar = canOperateComprasCotacoes(user);
   const podeFecharParcialCotacao = canFecharParcialComprasCotacoes(user);
@@ -2073,10 +2073,14 @@ export default function GerenciarCotacaoSolicitacao() {
   }, [comparativo, solicitacao, vencedoresSelecionados]);
 
   async function carregarFornecedores() {
+    fornecedorRequestRef.current.controller?.abort();
+    const controller = new AbortController();
+    const sequencia = fornecedorRequestRef.current.sequencia + 1;
+    fornecedorRequestRef.current = { sequencia, controller };
     try {
       setBuscandoFornecedores(true);
-      const params = { limit: 200 };
-      const parceiroParams = { fornecedor: 1, ativo: 1, incluir_categorias: 1, limit: 200 };
+      const params = { limit: 80 };
+      const parceiroParams = { fornecedor: 1, ativo: 1, incluir_categorias: 1, limit: 80 };
       if (categoriaFornecedorId) {
         const categoria = categoriasFornecedor.find((item) => String(item.id) === String(categoriaFornecedorId));
         if (categoria?.nome) params.categoria = categoria.nome;
@@ -2087,9 +2091,11 @@ export default function GerenciarCotacaoSolicitacao() {
         parceiroParams.q = fornecedorBusca.trim();
       }
       const [fornecedoresData, parceirosData] = await Promise.all([
-        listarFornecedoresCompra(params),
-        buscarParceiros(parceiroParams)
+        listarFornecedoresCompra(params, { signal: controller.signal }),
+        buscarParceiros(parceiroParams, { signal: controller.signal })
       ]);
+
+      if (fornecedorRequestRef.current.sequencia !== sequencia) return;
 
       const fornecedoresCompra = (Array.isArray(fornecedoresData) ? fornecedoresData : []).map((fornecedor) => ({
         ...fornecedor,
@@ -2126,10 +2132,13 @@ export default function GerenciarCotacaoSolicitacao() {
           .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'))
       );
     } catch (error) {
+      if (error?.name === 'AbortError') return;
       console.error(error);
       alert(error.message || 'Erro ao buscar fornecedores');
     } finally {
-      setBuscandoFornecedores(false);
+      if (fornecedorRequestRef.current.sequencia === sequencia) {
+        setBuscandoFornecedores(false);
+      }
     }
   }
 
@@ -2137,24 +2146,17 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       setLoading(true);
       setErroCarregamento('');
-      const [dataSolicitacao, dataCategorias] = await Promise.all([
-        obterSolicitacaoCompra(id),
+      const [workspace, dataCategorias] = await Promise.all([
+        obterWorkspaceCotacaoSolicitacaoCompra(id),
         listarCategoriasParceiro()
       ]);
+      const dataSolicitacao = workspace?.solicitacao || null;
 
-      setSolicitacao(dataSolicitacao || null);
+      setSolicitacao(dataSolicitacao);
       setCategoriasFornecedor(Array.isArray(dataCategorias) ? dataCategorias : []);
       await carregarFornecedores();
-
-      if ((dataSolicitacao?.fornecedores || []).length > 0) {
-        const dataComparativo = await obterComparativoSolicitacaoCompra(id);
-        setComparativo(dataComparativo || null);
-
-        setVencedoresSelecionados({});
-      } else {
-        setComparativo(null);
-        setVencedoresSelecionados({});
-      }
+      setComparativo(workspace?.comparativo || null);
+      setVencedoresSelecionados({});
     } catch (error) {
       console.error(error);
       const mensagem = error.message || 'Erro ao carregar solicitacao de compra';
@@ -2178,6 +2180,7 @@ export default function GerenciarCotacaoSolicitacao() {
     }, 250);
     return () => window.clearTimeout(timer);
   }, [fornecedorBusca, categoriaFornecedorId]);
+  useEffect(() => () => fornecedorRequestRef.current.controller?.abort(), []);
 
   const itensCombinados = useMemo(() => {
     const itens = (solicitacao?.itens || []).map((item) => ({

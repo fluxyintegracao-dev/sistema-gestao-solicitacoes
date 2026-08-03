@@ -11,6 +11,7 @@ const routes = require('./routes');
 const path = require('path');
 const fs = require('fs');
 const { getRuntimeInstallationConfig } = require('./services/runtimeConfig');
+const { createComprasPerformanceMiddleware } = require('./observability/comprasPerformance');
 
 const uploadMaxMb = env.uploadMaxFileSizeMb;
 const requestBodyLimit = `${Math.max(1, env.requestBodyLimitMb)}mb`;
@@ -116,6 +117,11 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
   next();
 });
+app.use(createComprasPerformanceMiddleware({
+  enabled: env.comprasPerformanceEnabled,
+  sampleRate: env.comprasPerformanceSampleRate,
+  slowQueryThresholdMs: env.comprasPerformanceSlowQueryMs
+}));
 app.use(express.json({
   limit: requestBodyLimit,
   verify: (req, res, buf) => {

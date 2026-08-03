@@ -50,6 +50,7 @@ const {
 } = require('../services/pedidoCompraPdfPuppeteer');
 const { canAccessSolicitacaoFile } = require('../services/fileAccessService');
 const { listarUsuariosElegiveisDelegacaoCompras } = require('../services/comprasDelegacaoService');
+const { publishComprasRealtimeEventSafe } = require('../services/comprasRealtimeService');
 
 async function carregarUsuarioCompras(userId) {
   if (!userId) {
@@ -134,9 +135,24 @@ async function validarEscopoPedidoCompra(usuario, pedido, res) {
 }
 
 async function carregarPedidoCompraNoEscopo(req, res, usuario, pedidoId) {
-  const pedido = await obterPedidoDetalhe(pedidoId, {
-    obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
-  });
+  const recurso = req.pedidoCompraResource;
+  let pedido;
+  if (recurso && Number(recurso.id) === Number(pedidoId)) {
+    const solicitacao = await SolicitacaoCompra.findByPk(recurso.solicitacao_compra_id, {
+      attributes: ['id', 'comprador_responsavel_id', 'solicitante_id']
+    });
+    const recursoData = typeof recurso.toJSON === 'function' ? recurso.toJSON() : recurso;
+    pedido = solicitacao ? { ...recursoData, solicitacao } : null;
+  } else {
+    pedido = await PedidoCompra.findByPk(pedidoId, {
+      attributes: ['id', 'solicitacao_compra_id', 'obra_id'],
+      include: [{
+        model: SolicitacaoCompra,
+        as: 'solicitacao',
+        attributes: ['id', 'comprador_responsavel_id', 'solicitante_id']
+      }]
+    });
+  }
 
   if (!pedido) {
     res.status(404).json({ error: 'Pedido de compra nao encontrado' });
@@ -199,6 +215,7 @@ module.exports = {
         obraId: req.query?.obra_id,
         status: req.query?.status,
         q: req.query?.q,
+        visao: req.query?.visao,
         obraIds: req.compraScopeObraIds,
         compradorResponsavelId: podeVerEscopoCompleto ? null : usuario.id,
         solicitanteId: podeVerEscopoCompleto ? null : usuario.id
@@ -329,6 +346,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_ITEM_ADICIONADO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -368,6 +390,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_STATUS_ATUALIZADO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -407,6 +434,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_REABERTO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -492,6 +524,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_ITEM_ATUALIZADO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -531,6 +568,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_ITEM_REMOVIDO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -579,6 +621,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_CANCELADO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -661,6 +708,11 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'PEDIDO_ITEM_REMANEJADO',
+        pedidoId: req.params.id,
+        actor: usuario
+      });
       const pedido = await obterPedidoDetalhe(req.params.id, {
         obraIdsHistoricoPreco: await buildHistoricoPrecoScope(req)
       });
@@ -930,6 +982,12 @@ module.exports = {
       });
 
       await transaction.commit();
+      void publishComprasRealtimeEventSafe({
+        action: 'DELEGACAO_ATUALIZADA',
+        solicitacaoCompraId: req.params.id,
+        actor: usuario,
+        extraUserIds: [req.body?.responsavel_id]
+      });
       return res.json({ ok: true });
     } catch (error) {
       await transaction.rollback();

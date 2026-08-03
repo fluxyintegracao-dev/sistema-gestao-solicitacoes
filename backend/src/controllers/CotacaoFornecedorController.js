@@ -43,6 +43,7 @@ const {
   canViewAllComprasScope
 } = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
+const { publishComprasRealtimeEventSafe } = require('../services/comprasRealtimeService');
 
 const CONDICOES_PAGAMENTO_EXIGEM_PRAZO_PADRAO = ['BOLETO', 'CARTAO', 'CHEQUE', 'FATURADO', 'OUTROS'];
 
@@ -1070,6 +1071,14 @@ module.exports = {
         where.status = String(status).toUpperCase();
       }
 
+      if (q) {
+        const termo = `%${String(q).trim()}%`;
+        where[Op.or] = [
+          { '$fornecedor.nome$': { [Op.like]: termo } },
+          { '$solicitacao.titulo$': { [Op.like]: termo } }
+        ];
+      }
+
       if (obra_id) {
         solicitacaoWhere.obra_id = obra_id;
       } else if (Array.isArray(req.compraScopeObraIds)) {
@@ -1092,8 +1101,7 @@ module.exports = {
           {
             model: FornecedorCompra,
             as: 'fornecedor',
-            attributes: ['id', 'nome', 'email', 'whatsapp', 'contato'],
-            ...(q ? { where: { nome: { [Op.like]: `%${q}%` } }, required: false } : {})
+            attributes: ['id', 'nome', 'email', 'whatsapp', 'contato']
           },
           {
             model: SolicitacaoCompra,
@@ -1105,17 +1113,11 @@ module.exports = {
             where: solicitacaoWhere,
             required: true
           }
-        ]
+        ],
+        subQuery: false
       });
 
-      const filtrados = q
-        ? cotacoes.filter((c) =>
-            (c.fornecedor?.nome || '').toLowerCase().includes(q.toLowerCase()) ||
-            (c.solicitacao?.titulo || '').toLowerCase().includes(q.toLowerCase())
-          )
-        : cotacoes;
-
-      return res.json(filtrados);
+      return res.json(cotacoes);
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar cotacoes' });
@@ -1192,6 +1194,11 @@ module.exports = {
         frete_transportador_cpf_cnpj: req.body?.frete_transportador_cpf_cnpj,
         observacao_resposta: req.body?.observacao_resposta,
         usuario_interno: usuarioInterno
+      });
+      void publishComprasRealtimeEventSafe({
+        action: 'COTACAO_RESPONDIDA',
+        solicitacaoCompraId: cotacaoFornecedor.solicitacao_compra_id,
+        actor: usuarioInterno
       });
       const atualizada = await carregarCotacaoPorToken(req.params.token);
       return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
@@ -1394,6 +1401,12 @@ module.exports = {
         usuario_interno: req.user,
         rascunho: req.body.finalizar === false,
         permitir_reabertura_disponibilidade: solicitacaoEncerrada
+      });
+
+      void publishComprasRealtimeEventSafe({
+        action: req.body.finalizar === false ? 'COTACAO_RASCUNHO_ATUALIZADO' : 'COTACAO_RESPONDIDA_INTERNAMENTE',
+        solicitacaoCompraId: cotacaoFornecedor.solicitacao_compra_id,
+        actor: req.user
       });
 
       const atualizada = await carregarCotacaoPorToken(cotacaoBase.token);

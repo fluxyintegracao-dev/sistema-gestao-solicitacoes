@@ -60,6 +60,10 @@ module.exports = {
       const cidade = String(req.query.cidade || '').trim();
       const estado = String(req.query.estado || '').trim().toUpperCase();
       const categoriaFiltro = String(req.query.categoria || '').trim().toLowerCase();
+      const limiteInformado = Number.parseInt(req.query.limit, 10);
+      const limite = Number.isInteger(limiteInformado) && limiteInformado > 0
+        ? Math.min(limiteInformado, 200)
+        : null;
 
       const where = incluirInativos ? {} : { ativo: true };
 
@@ -89,7 +93,8 @@ module.exports = {
 
       let fornecedores = await FornecedorCompra.findAll({
         where,
-        order: [['nome', 'ASC']]
+        order: [['nome', 'ASC']],
+        ...(!categoriaFiltro && limite ? { limit } : {})
       });
 
       // Filtro por categoria (JSON field — feito em JS por compatibilidade)
@@ -98,6 +103,10 @@ module.exports = {
           const cats = Array.isArray(f.categoria_insumos) ? f.categoria_insumos : [];
           return cats.some((c) => String(c).toLowerCase().includes(categoriaFiltro));
         });
+      }
+
+      if (limite) {
+        fornecedores = fornecedores.slice(0, limite);
       }
 
       return res.json(fornecedores);

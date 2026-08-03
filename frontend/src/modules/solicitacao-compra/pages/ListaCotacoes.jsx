@@ -3,6 +3,7 @@ import { HiOutlineArrowTopRightOnSquare, HiOutlinePencilSquare } from 'react-ico
 import { useNavigate } from 'react-router-dom';
 import { listarCotacoes } from '../../../services/compras';
 import { getObras } from '../../../services/obras';
+import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 const STATUS_COTACAO = {
   ENVIADO:    { label: 'Enviado',    cls: 'app-status-pill bg-blue-100 text-blue-700' },
@@ -62,6 +63,8 @@ export default function ListaCotacoes() {
   useEffect(() => {
     carregar();
   }, []);
+
+  useComprasRealtimeRefresh(carregar);
 
   const respondidas = cotacoes.filter(
     (c) => ['RESPONDIDO', 'FINALIZADA'].includes(String(c.status || '').toUpperCase())

@@ -20,6 +20,10 @@ module.exports = {
   async index(req, res) {
     try {
       const { q, categoria_id } = req.query;
+      const limiteInformado = Number.parseInt(req.query.limit, 10);
+      const limite = Number.isInteger(limiteInformado) && limiteInformado > 0
+        ? Math.min(limiteInformado, 300)
+        : undefined;
       const where = { ativo: true };
 
       if (q) {
@@ -41,7 +45,8 @@ module.exports = {
           { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
           { model: Categoria, as: 'categoria', attributes: ['id', 'nome'] }
         ],
-        order: [['nome', 'ASC']]
+        order: [['nome', 'ASC']],
+        ...(limite ? { limit: limite } : {})
       });
 
       return res.json(insumos);

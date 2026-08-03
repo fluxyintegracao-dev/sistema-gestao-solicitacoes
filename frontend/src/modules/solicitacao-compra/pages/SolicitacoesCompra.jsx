@@ -13,6 +13,7 @@ import {
 import { getMinhasObras } from '../../../services/obras';
 import { canDeleteCompraSolicitacoes, canEncaminharCompraSolicitacoes } from '../../../utils/acessoProduto';
 import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 function formatarData(data) {
   if (!data) {
@@ -112,7 +113,7 @@ export default function SolicitacoesCompra() {
   async function carregarSolicitacoes() {
     try {
       setLoading(true);
-      const params = obraId ? { obra_id: obraId } : {};
+      const params = { visao: 'resumo', ...(obraId ? { obra_id: obraId } : {}) };
       const data = await listarSolicitacoesCompra(params);
       setSolicitacoes(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -130,6 +131,8 @@ export default function SolicitacoesCompra() {
   useEffect(() => {
     carregarSolicitacoes();
   }, [obraId]);
+
+  useComprasRealtimeRefresh(carregarSolicitacoes);
 
   const solicitacoesFiltradas = useMemo(() => {
     const termo = String(busca || '').trim().toLowerCase();
@@ -439,8 +442,8 @@ export default function SolicitacoesCompra() {
                       </div>
                     </td>
                     <td>{solicitacao.solicitante?.nome || '-'}</td>
-                    <td>{(solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0)}</td>
-                    <td>{solicitacao.fornecedores?.length || 0}</td>
+                    <td>{solicitacao.itens_count ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0))}</td>
+                    <td>{solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)}</td>
                     <td>{formatarData(solicitacao.necessario_para)}</td>
                     <td>{formatarData(solicitacao.createdAt)}</td>
                     <td>
@@ -504,7 +507,8 @@ export default function SolicitacoesCompra() {
           <div className="compras-mobile-list" aria-label="Solicitacoes de compra">
             {solicitacoesFiltradas.map((solicitacao) => {
               const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
-              const totalItens = (solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0);
+              const totalItens = solicitacao.itens_count
+                ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0));
 
               return (
                 <article key={`mobile-${solicitacao.id}`} className="compras-mobile-record">
@@ -519,7 +523,7 @@ export default function SolicitacoesCompra() {
                     <div className="compras-mobile-field"><span>Codigo da obra</span><strong>{solicitacao.obra?.codigo || '-'}</strong></div>
                     <div className="compras-mobile-field"><span>Solicitante</span><strong>{solicitacao.solicitante?.nome || '-'}</strong></div>
                     <div className="compras-mobile-field"><span>Itens</span><strong>{totalItens}</strong></div>
-                    <div className="compras-mobile-field"><span>Fornecedores</span><strong>{solicitacao.fornecedores?.length || 0}</strong></div>
+                    <div className="compras-mobile-field"><span>Fornecedores</span><strong>{solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)}</strong></div>
                     <div className="compras-mobile-field"><span>Necessario para</span><strong>{formatarData(solicitacao.necessario_para)}</strong></div>
                     <div className="compras-mobile-field"><span>Criada em</span><strong>{formatarData(solicitacao.createdAt)}</strong></div>
                   </div>

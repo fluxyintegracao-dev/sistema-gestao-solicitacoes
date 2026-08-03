@@ -27,9 +27,12 @@ import {
   sincronizarItemComRateios,
   validarRateiosItem
 } from '../utils/apropriacoes';
-
-const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
-const DRAFT_COMPRA_DIRETA_KEY = 'fluxy_compra_direta_draft';
+import {
+  buildComprasDraftKey,
+  readComprasDraft,
+  removeComprasDraft,
+  writeComprasDraft
+} from '../utils/comprasDraftStorage';
 const ITEM_ATTACHMENT_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.png,.jpg,.jpeg,.html,.rar';
 const HEADER_ATTACHMENT_ACCEPT = '.pdf,.png,.jpg,.jpeg,.xml';
 
@@ -168,9 +171,10 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const obraIdInicial = String(searchParams.get('obra_id') || '').trim();
   const tipoSolicitacaoIdInicial = String(searchParams.get('tipo_solicitacao_id') || '').trim();
   const areaResponsavelInicial = String(searchParams.get('area_responsavel') || '').trim();
-  const draftKey = modoCompraDireta ? DRAFT_COMPRA_DIRETA_KEY : DRAFT_KEY;
+  const draftKey = buildComprasDraftKey(user?.id, modoCompraDireta ? 'compra-direta' : 'solicitacao');
   const hidratandoDraftRef = useRef(false);
   const draftCarregadoRef = useRef(false);
+  const suspenderAutosaveAteRef = useRef(0);
   const importacaoCompraDiretaInputRef = useRef(null);
   const buscaCredorRequestRef = useRef(0);
   const [obras, setObras] = useState([]);
@@ -271,6 +275,22 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
+  function limparRascunho() {
+    if (!window.confirm('Limpar todos os dados ainda nao enviados desta compra?')) return;
+    suspenderAutosaveAteRef.current = Date.now() + 1500;
+    removeComprasDraft(draftKey);
+    setObraId(obraIdInicial || '');
+    setNecessarioPara('');
+    setObservacoes('');
+    setDadosPagamento('');
+    setDescontoTotal('');
+    setAnexosCabecalho([]);
+    setFormaPagamentoIds([]);
+    setParceiroId('');
+    setParceiroBusca('');
+    setItens([]);
+  }
+
   useEffect(() => {
     carregarObras();
     carregarInsumos();
@@ -316,21 +336,20 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
 
     try {
-      if (obraIdInicial) {
-        setObraId(obraIdInicial);
+      const dados = readComprasDraft(draftKey);
+      if (!dados) {
+        if (obraIdInicial) setObraId(obraIdInicial);
         draftCarregadoRef.current = true;
         return;
       }
-
-      const salvo = window.localStorage.getItem(draftKey);
-      if (!salvo) {
-        draftCarregadoRef.current = true;
-        return;
-      }
-
-      const dados = JSON.parse(salvo);
       const payload = dados?.payload;
       if (!payload || !payload.obra_id) {
+        if (obraIdInicial) setObraId(obraIdInicial);
+        draftCarregadoRef.current = true;
+        return;
+      }
+      if (obraIdInicial && Number(payload.obra_id) !== Number(obraIdInicial)) {
+        setObraId(obraIdInicial);
         draftCarregadoRef.current = true;
         return;
       }
@@ -366,7 +385,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 insumo_id: item.manual ? null : item.insumo_id,
                 insumo_nome: item.manual
                   ? item.nome_manual || item.insumo_nome || ''
-                  : resumoItem?.insumo_nome || '',
+                  : resumoItem?.insumo_nome || item.insumo_nome || '',
                 unidade_id: item.manual ? null : item.unidade_id,
                 unidade_sigla: item.manual
                   ? item.unidade_sigla_manual || item.unidade_sigla || ''
@@ -396,6 +415,62 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       draftCarregadoRef.current = true;
     }
   }, [draftKey]);
+
+  useEffect(() => {
+    if (
+      !draftCarregadoRef.current
+      || hidratandoDraftRef.current
+      || suspenderAutosaveAteRef.current > Date.now()
+    ) return undefined;
+    const possuiConteudo = Boolean(
+      obraId || necessarioPara || observacoes || dadosPagamento || parceiroId || itens.length
+    );
+    if (!possuiConteudo) return undefined;
+
+    const timer = window.setTimeout(() => {
+      writeComprasDraft(draftKey, {
+        payload: {
+          obra_id: obraId || null,
+          tipo_solicitacao_id: tipoSolicitacaoIdContexto || null,
+          necessario_para: necessarioPara || null,
+          observacoes: observacoes || '',
+          dados_pagamento: dadosPagamento || '',
+          desconto_total: descontoTotal || '',
+          anexos_cabecalho: anexosCabecalho,
+          forma_pagamento_ids: formaPagamentoIds,
+          parceiro_id: parceiroId || null,
+          itens
+        },
+        resumo: {
+          solicitante_nome: user?.nome || '',
+          credor_nome: parceiroBusca || '',
+          itens
+        },
+        contexto: {
+          tipo_solicitacao_id: tipoSolicitacaoIdContexto || null,
+          area_responsavel: areaResponsavelContexto || ''
+        }
+      }, user?.id);
+    }, 800);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    anexosCabecalho,
+    areaResponsavelContexto,
+    dadosPagamento,
+    descontoTotal,
+    draftKey,
+    formaPagamentoIds,
+    itens,
+    necessarioPara,
+    obraId,
+    observacoes,
+    parceiroBusca,
+    parceiroId,
+    tipoSolicitacaoIdContexto,
+    user?.id,
+    user?.nome
+  ]);
 
   useEffect(() => {
     carregarApropriacoes(obraId);
@@ -1042,7 +1117,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           }
         : undefined;
 
-      window.localStorage.setItem(draftKey, JSON.stringify({ payload, resumo, contexto }));
+      writeComprasDraft(draftKey, { payload, resumo, contexto }, user?.id);
       navigate(modoCompraDireta ? '/solicitacoes-compra-direta/revisar' : '/solicitacoes-compra/revisar');
     } catch (error) {
       console.error(error);
@@ -1573,6 +1648,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           </div>
 
           <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <button type="button" className="btn btn-outline" onClick={limparRascunho}>Limpar rascunho</button>
             <button type="button" className="btn btn-outline" onClick={() => navigate('/solicitacoes-compra')}>Cancelar</button>
             <button type="button" className="btn btn-primary" onClick={handleSalvar} disabled={loading}>{loading ? 'Preparando...' : 'Revisar solicitação'}</button>
           </div>
