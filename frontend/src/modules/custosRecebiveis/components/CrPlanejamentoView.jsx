@@ -6,6 +6,7 @@ import {
   HiOutlineClipboardDocumentCheck,
   HiOutlineExclamationTriangle,
   HiOutlineLockClosed,
+  HiOutlineMagnifyingGlass,
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi2';
@@ -41,6 +42,14 @@ const PRIVATE_STEPS = [
 function asNumber(value) {
   const parsed = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function normalizeSearch(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
 function newLocalKey(prefix = 'cr-subitem') {
@@ -95,6 +104,7 @@ export default function CrPlanejamentoView({
   const [reopenReason, setReopenReason] = useState('');
   const [decisionExpiry, setDecisionExpiry] = useState(localExpiryDefault);
   const [measurementPickerMacro, setMeasurementPickerMacro] = useState('');
+  const [measurementSearch, setMeasurementSearch] = useState('');
 
   const load = useCallback(async () => {
     if (!obra?.id) {
@@ -146,6 +156,7 @@ export default function CrPlanejamentoView({
     setStep(1);
     setFeedback('');
     setMeasurementPickerMacro('');
+    setMeasurementSearch('');
     load();
   }, [load]);
 
@@ -238,6 +249,7 @@ export default function CrPlanejamentoView({
       numero_medicao: ''
     }]);
     setMeasurementPickerMacro('');
+    setMeasurementSearch('');
   }
 
   function addCost(macro) {
@@ -280,9 +292,19 @@ export default function CrPlanejamentoView({
     return receipts.filter((item) => item.etapa_macro_codigo === macroCode);
   }
 
-  function availableMeasurementCosts(macroCode) {
+  function availableMeasurementCosts(macroCode, search = '') {
     const selectedIds = new Set(receipts.map((item) => Number(item.previsao_custo_id)).filter(Boolean));
-    return costsForMacro(macroCode).filter((item) => item.id && !selectedIds.has(Number(item.id)));
+    const available = costsForMacro(macroCode).filter(
+      (item) => item.id && !selectedIds.has(Number(item.id))
+    );
+    const term = normalizeSearch(search);
+    if (!term) return available;
+    return available.filter((item) => normalizeSearch([
+      item.descricao,
+      item.unidade,
+      item.quantidade,
+      item.custo_unitario
+    ].filter(Boolean).join(' ')).includes(term));
   }
 
   function renderCostMacro(macro, macroIndex) {
@@ -392,7 +414,8 @@ export default function CrPlanejamentoView({
 
   function renderForecastMeasurementMacro(macro, macroIndex) {
     const rows = receiptsForMacro(macro.codigo);
-    const available = availableMeasurementCosts(macro.codigo);
+    const allAvailable = availableMeasurementCosts(macro.codigo);
+    const available = availableMeasurementCosts(macro.codigo, measurementSearch);
     const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
     const pickerOpen = measurementPickerMacro === macro.codigo;
     return (
@@ -409,7 +432,11 @@ export default function CrPlanejamentoView({
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => setMeasurementPickerMacro(pickerOpen ? '' : macro.codigo)}
+              aria-expanded={pickerOpen}
+              onClick={() => {
+                setMeasurementPickerMacro(pickerOpen ? '' : macro.codigo);
+                setMeasurementSearch('');
+              }}
             >
               <HiOutlinePlus className="h-4 w-4" />
               Adicionar subitem
@@ -419,18 +446,42 @@ export default function CrPlanejamentoView({
         {pickerOpen ? (
           <div className="cr-macro-subitem-picker">
             <strong>Selecione um custo planejado desta etapa</strong>
-            {available.map((cost) => (
-              <button key={cost.id} type="button" onClick={() => addReceipt(cost)}>
-                <span>{cost.descricao}</span>
-                <small>{cost.unidade} · {cost.quantidade} × {currency.format(cost.custo_unitario)}</small>
-                <HiOutlinePlus className="h-4 w-4" />
-              </button>
-            ))}
-            {!available.length ? (
-              <span className="cr-macro-picker-empty">
-                Salve os custos planejados ou todos os subitens desta etapa já foram adicionados.
-              </span>
-            ) : null}
+            <label className="cr-macro-picker-search">
+              <HiOutlineMagnifyingGlass className="h-4 w-4" />
+              <input
+                autoFocus
+                type="search"
+                value={measurementSearch}
+                placeholder="Pesquisar subitem desta etapa..."
+                aria-label={`Pesquisar subitens de ${macro.descricao}`}
+                onChange={(event) => setMeasurementSearch(event.target.value)}
+              />
+            </label>
+            <div className="cr-macro-picker-results" role="listbox">
+              {available.map((cost) => (
+                <button
+                  key={cost.id}
+                  type="button"
+                  role="option"
+                  aria-selected="false"
+                  onClick={() => addReceipt(cost)}
+                >
+                  <span>{cost.descricao}</span>
+                  <small>{cost.unidade} · {cost.quantidade} × {currency.format(cost.custo_unitario)}</small>
+                  <HiOutlinePlus className="h-4 w-4" />
+                </button>
+              ))}
+              {!allAvailable.length ? (
+                <span className="cr-macro-picker-empty">
+                  Salve os custos planejados ou todos os subitens desta etapa já foram adicionados.
+                </span>
+              ) : null}
+              {allAvailable.length > 0 && !available.length ? (
+                <span className="cr-macro-picker-empty">
+                  Nenhum subitem desta etapa corresponde à pesquisa.
+                </span>
+              ) : null}
+            </div>
           </div>
         ) : null}
         <div className="cr-table-shell cr-planning-table cr-forecast-measurement-table">

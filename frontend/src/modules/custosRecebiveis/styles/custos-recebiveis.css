@@ -3664,7 +3664,38 @@
   letter-spacing: 0.045em;
   text-transform: uppercase;
 }
-.cr-macro-subitem-picker > button {
+.cr-macro-picker-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+.cr-macro-picker-search svg {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--cr-muted);
+  pointer-events: none;
+}
+.cr-macro-picker-search input {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.55rem 0.75rem 0.55rem 2.25rem;
+  border: 1px solid var(--cr-border);
+  border-radius: 0.5rem;
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  font-size: 0.75rem;
+}
+.cr-macro-picker-search input:focus {
+  border-color: var(--cr-accent);
+  outline: 2px solid color-mix(in srgb, var(--cr-accent) 16%, transparent);
+}
+.cr-macro-picker-results {
+  max-height: 15rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.cr-macro-picker-results > button {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 0.1rem 0.75rem;
@@ -3676,26 +3707,27 @@
   text-align: left;
   cursor: pointer;
 }
-.cr-macro-subitem-picker > button:first-of-type { border-radius: 0.5rem 0.5rem 0 0; }
-.cr-macro-subitem-picker > button:last-of-type {
+.cr-macro-picker-results > button:first-of-type { border-radius: 0.5rem 0.5rem 0 0; }
+.cr-macro-picker-results > button:last-of-type {
   border-bottom: 1px solid var(--cr-border);
   border-radius: 0 0 0.5rem 0.5rem;
 }
-.cr-macro-subitem-picker > button:hover,
-.cr-macro-subitem-picker > button:focus-visible {
+.cr-macro-picker-results > button:hover,
+.cr-macro-picker-results > button:focus-visible {
   background: color-mix(in srgb, var(--cr-accent) 6%, var(--cr-surface));
   outline: none;
 }
-.cr-macro-subitem-picker button span { font-size: 0.74rem; font-weight: 720; }
-.cr-macro-subitem-picker button small,
+.cr-macro-picker-results button span { font-size: 0.74rem; font-weight: 720; }
+.cr-macro-picker-results button small,
 .cr-macro-picker-empty { color: var(--cr-muted); font-size: 0.66rem; }
-.cr-macro-subitem-picker button svg {
+.cr-macro-picker-results button svg {
   grid-row: 1 / span 2;
   grid-column: 2;
   align-self: center;
   color: var(--cr-accent);
 }
 .cr-macro-picker-empty {
+  display: block;
   padding: 0.65rem;
   border: 1px dashed var(--cr-border);
   border-radius: 0.5rem;

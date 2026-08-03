@@ -171,6 +171,8 @@ function validateFrontendContracts() {
   assert(planning.includes('previsao_custo_id'));
   assert(planning.includes('Qtd. planejada'));
   assert(planning.includes('Qtd. medida'));
+  assert(planning.includes('Pesquisar subitem desta etapa'));
+  assert(planning.includes('availableMeasurementCosts(macro.codigo, measurementSearch)'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
