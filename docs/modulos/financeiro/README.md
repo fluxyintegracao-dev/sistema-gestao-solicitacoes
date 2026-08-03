@@ -35,6 +35,14 @@ Detalhes tecnicos e cenarios de aceite estao em [`PLANO_IMPORTACAO_TITULOS_PAGAR
 ## Baixa e estorno
 
 - baixa pode ser parcial ou total;
+- a baixa em massa lista somente formas ativas de `financeiro_formas_pagamento` e grava
+  `forma_pagamento_id` no movimento, preservando `forma_recebimento` como classificacao
+  tecnica retrocompativel;
+- o tipo cadastrado dirige as regras existentes: `CARTAO_CREDITO` e `CARTAO_DEBITO`
+  executam a regra `CARTAO`; formas como `FOPAG` podem permanecer distintas no cadastro
+  e executar a regra `TRANSFERENCIA`;
+- movimentos legados sem `forma_pagamento_id` continuam validos e as APIs antigas ainda
+  podem enviar apenas a classificacao tecnica aceita;
 - exige conta, data, valor base e ajustes de juros, multa ou desconto;
 - transacao bloqueia pagamento acima do saldo;
 - estorno marca o movimento como `ESTORNADO` e recalcula o titulo;

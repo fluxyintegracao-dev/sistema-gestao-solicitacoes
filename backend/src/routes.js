@@ -7,6 +7,7 @@ const router = express.Router();
 const permit = require('./middlewares/permissions');
 const csrfProtection = require('./middlewares/csrf');
 const requireMfaCompletion = require('./middlewares/requireMfaCompletion');
+const requireCustosRecebiveisCompletion = require('./modules/custosRecebiveis/middlewares/requireCustosRecebiveisCompletion');
 const { auditSuccess } = require('./middlewares/audit');
 const { createRateLimit } = require('./middlewares/rateLimit');
 const { getRequestIp } = require('./services/securityLogService');
@@ -408,6 +409,7 @@ const { requireCrmModule } = require('./middlewares/crmAccess');
 const fiscalRoutes = require('./modules/fiscal/routes');
 const sstRoutes = require('./modules/sst/routes');
 const governancaRoutes = require('./modules/governanca/routes');
+const custosRecebiveisRoutes = require('./modules/custosRecebiveis/routes');
 //console.log('AnexoController =>', AnexoController);
 
 function hashRateLimitValue(value, fallback = 'anon') {
@@ -539,6 +541,7 @@ router.post('/auth/mfa/setup', AuthController.mfaSetup);
 router.post('/auth/mfa/enable', validateRequest({ body: validateMfaCodeBody }), AuthController.mfaEnable);
 router.post('/auth/mfa/disable', validateRequest({ body: validateMfaCodeBody }), AuthController.mfaDisable);
 router.use(requireMfaCompletion);
+router.use(requireCustosRecebiveisCompletion);
 router.get('/live-updates', LiveUpdatesController.stream);
 router.get('/instalacao', permit(['SUPERADMIN']), InstalacaoController.show);
 router.patch('/instalacao', permit(['SUPERADMIN']), InstalacaoController.update);
@@ -555,6 +558,11 @@ router.use('/integracoes/sienge', requireEnabledModule('INTEGRACAO_SIENGE'));
 router.use('/boletos', requireEnabledModule('BOLETOS'));
 router.use('/fiscal', requireEnabledModule('FISCAL'));
 router.use('/fiscal', fiscalRoutes);
+router.use(
+  '/custos-recebiveis',
+  requireEnabledModule('CUSTOS_RECEBIVEIS', { allowSuperadminBypass: false })
+);
+router.use('/custos-recebiveis', custosRecebiveisRoutes);
 router.use('/sst', requireEnabledModule('SST'));
 router.use('/sst', sstRoutes);
 router.use('/governanca', governancaRoutes);
@@ -1783,6 +1791,7 @@ router.post('/compras/solicitacoes/inativar-massa', allowCompraSolicitacoesDelet
 router.post('/compras/solicitacoes/encaminhar-compras-massa', allowCompraSolicitacoesEncaminhar, criticalRateLimit, validateRequest({ body: validateCompraSolicitacaoEncaminharComprasMassaBody }), scopeCompraListAccess, SolicitacaoCompraController.encaminharParaCompras);
 router.get('/compras/solicitacoes/:id', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.show);
 router.get('/compras/solicitacoes/:id/comparativo', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.comparativo);
+router.get('/compras/solicitacoes/:id/workspace-cotacao', allowCompraSolicitacoesRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.workspaceCotacao);
 router.get('/compras/solicitacoes/:id/pdf', allowCompraSolicitacoesCreateFlowRead, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao de compra') }), requireCompraAccess, SolicitacaoCompraController.pdf);
 router.post('/compras/solicitacoes', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);
 router.post('/compras/solicitacoes-diretas', allowCompraSolicitacoesCreate, validateRequest({ body: validateCompraDiretaCreateBody }), requireCompraBodyObraAccess, SolicitacaoCompraController.create);

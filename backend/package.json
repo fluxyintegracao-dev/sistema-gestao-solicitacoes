@@ -11,13 +11,21 @@
     "test:fiscal-dfe-processor": "node scripts/validarFiscalDfeProcessor.js",
     "test:compra-cotacao-envio": "node scripts/validarCompraCotacaoEnvio.js",
     "test:compra-remanejamento": "node scripts/validarCompraRemanejamento.js",
+    "test:compras-performance": "node scripts/validarComprasPerformance.js",
+    "test:compras-performance-fases": "node scripts/validarComprasPerformanceFases.js",
+    "perf:compras:resumo": "node scripts/resumirComprasPerformance.js",
     "test:payments": "node scripts/validarPagamentosEngine.js",
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
     "test:importacao-titulos": "node scripts/validarImportacaoTitulos.js",
+    "test:baixa-massa-formas": "node scripts/validarBaixaMassaFormasPagamento.js",
     "test:docs": "node scripts/validarDocumentacao.js",
     "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js",
     "test:security-hardening": "node scripts/validarSecurityHardening.js",
-    "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js"
+    "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",
+    "test:custos-recebiveis-fase2": "node src/modules/custosRecebiveis/tests/validarFase2.js",
+    "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js",
+    "test:custos-recebiveis-fase4": "node src/modules/custosRecebiveis/tests/validarFase4.js",
+    "test:custos-recebiveis-prontidao": "node src/modules/custosRecebiveis/tests/validarProntidao.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.888.0",

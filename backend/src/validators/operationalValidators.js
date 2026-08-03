@@ -309,16 +309,22 @@ function validateContratoUpdateBody(body = {}) {
 }
 
 function validateCompraQuery(query = {}) {
-  ensureAllowedKeys(query, ['obra_id', 'contexto'], 'Consulta de compras');
+  ensureAllowedKeys(query, ['obra_id', 'contexto', 'visao'], 'Consulta de compras');
   const contexto = parseOptionalText(query.contexto, 'Contexto', 40);
   const contextoNormalizado = contexto ? String(contexto).trim().toLowerCase() : undefined;
   if (contextoNormalizado && !['delegacao'].includes(contextoNormalizado)) {
     throw new ValidationError('Contexto de consulta invalido.');
   }
+  const visao = parseOptionalText(query.visao, 'Visao', 40);
+  const visaoNormalizada = visao ? String(visao).trim().toLowerCase() : undefined;
+  if (visaoNormalizada && !['resumo', 'delegacao'].includes(visaoNormalizada)) {
+    throw new ValidationError('Visao de consulta invalida.');
+  }
 
   return {
     obra_id: parseInteger(query.obra_id, 'Obra'),
-    contexto: contextoNormalizado
+    contexto: contextoNormalizado,
+    visao: visaoNormalizada
   };
 }
 
@@ -794,13 +800,20 @@ function validateCompraEncerrarSemPedidoBody(body = {}) {
 }
 
 function validateCompraPedidoQuery(query = {}) {
-  ensureAllowedKeys(query, ['obra_id', 'solicitacao_id', 'status', 'q'], 'Consulta de pedidos de compra');
+  ensureAllowedKeys(query, ['obra_id', 'solicitacao_id', 'status', 'q', 'visao'], 'Consulta de pedidos de compra');
+
+  const visao = parseOptionalText(query.visao, 'Visao', 40);
+  const visaoNormalizada = visao ? String(visao).trim().toLowerCase() : undefined;
+  if (visaoNormalizada && visaoNormalizada !== 'resumo') {
+    throw new ValidationError('Visao de consulta invalida.');
+  }
 
   return {
     obra_id: parseInteger(query.obra_id, 'Obra'),
     solicitacao_id: parseInteger(query.solicitacao_id, 'Solicitacao de compra'),
     status: parseOptionalText(query.status, 'Status', 40),
-    q: parseOptionalText(query.q, 'Busca', 120)
+    q: parseOptionalText(query.q, 'Busca', 120),
+    visao: visaoNormalizada
   };
 }
 

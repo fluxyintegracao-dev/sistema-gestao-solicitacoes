@@ -8,6 +8,7 @@ import {
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasDelegacao } from '../../../utils/acessoProduto';
 import { formatarDataLocalPtBr, parseDateSmart } from '../../../utils/dateLocal';
+import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 function formatDate(value) {
   return formatarDataLocalPtBr(value);
@@ -96,7 +97,7 @@ export default function ComprasDelegacao() {
     try {
       setLoading(true);
       const [dataSolicitacoes, dataUsuarios] = await Promise.all([
-        listarSolicitacoesCompra({ contexto: 'delegacao' }),
+        listarSolicitacoesCompra({ contexto: 'delegacao', visao: 'delegacao' }),
         podeGerenciarDelegacao ? listarUsuariosDelegacaoCompras() : Promise.resolve([])
       ]);
       const listaSolicitacoes = Array.isArray(dataSolicitacoes) ? dataSolicitacoes : [];
@@ -119,6 +120,8 @@ export default function ComprasDelegacao() {
   useEffect(() => {
     carregar();
   }, [podeGerenciarDelegacao, user?.id]);
+
+  useComprasRealtimeRefresh(carregar);
 
   const solicitacoesFiltradas = useMemo(() => {
     const termo = filtro.trim().toLowerCase();

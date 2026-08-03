@@ -32,11 +32,12 @@ async function downloadResponse(response, fallbackName, fallbackMessage) {
   URL.revokeObjectURL(url);
 }
 
-export async function buscarParceiros(params = {}) {
+export async function buscarParceiros(params = {}, { signal } = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query ? `${API_URL}/parceiros?${query}` : `${API_URL}/parceiros`;
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    signal
   });
 
   return parseJson(response, 'Erro ao buscar parceiros');

@@ -6,7 +6,7 @@ import {
   desativarFornecedorCompra
 } from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
-import { isBusinessAdmin } from '../../../utils/acessoProduto';
+import { canManageComprasFornecedores } from '../../../utils/acessoProduto';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 
 const ESTADOS_BR = [
@@ -233,9 +233,7 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
 
 export default function GestaoFornecedores() {
   const { user } = useAuth();
-  const canManage = isBusinessAdmin(user) || ['COMPRAS'].some((t) =>
-    [String(user?.area || '').toUpperCase(), String(user?.setor?.codigo || '').toUpperCase()].includes(t)
-  );
+  const canManage = canManageComprasFornecedores(user);
 
   const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(false);

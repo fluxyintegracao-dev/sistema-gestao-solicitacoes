@@ -1,5 +1,15 @@
 const { Sequelize } = require('sequelize');
 const { env } = require('../config/env');
+const { recordDatabaseQuery } = require('../observability/comprasPerformance');
+
+const comprasPerformanceDatabaseOptions = env.comprasPerformanceEnabled
+  ? {
+      benchmark: true,
+      logging: recordDatabaseQuery
+    }
+  : {
+      logging: false
+    };
 
 const sequelize = new Sequelize(
   env.dbName,
@@ -9,7 +19,7 @@ const sequelize = new Sequelize(
     host: env.dbHost,
     port: env.dbPort,
     dialect: 'mysql',
-    logging: false,
+    ...comprasPerformanceDatabaseOptions,
   }
 );
 

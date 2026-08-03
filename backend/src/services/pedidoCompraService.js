@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const {
   FornecedorCompra,
   Historico,
@@ -2280,7 +2280,8 @@ async function listarPedidos({
   q,
   obraIds = null,
   compradorResponsavelId = null,
-  solicitanteId = null
+  solicitanteId = null,
+  visao = null
 } = {}) {
   const where = {};
 
@@ -2317,25 +2318,34 @@ async function listarPedidos({
     solicitacaoWhere[Op.or] = solicitacaoScope;
   }
 
+  const visaoResumo = String(visao || '').trim().toLowerCase() === 'resumo';
+  const includes = [
+    { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp'] },
+    {
+      model: SolicitacaoCompra,
+      as: 'solicitacao',
+      attributes: ['id', 'status', 'numero_sienge', 'comprador_responsavel_id', 'solicitante_id'],
+      where: solicitacaoWhere,
+      required: solicitacaoScope.length > 0
+    },
+    { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] }
+  ];
+  if (!visaoResumo) {
+    includes.push({
+      model: PedidoCompraItem,
+      as: 'itens',
+      attributes: ['id', 'descricao', 'valor_total', 'removido']
+    });
+  }
+
   const pedidos = await PedidoCompra.findAll({
     where,
-    include: [
-      { model: FornecedorCompra, as: 'fornecedor', attributes: ['id', 'nome', 'email', 'whatsapp'] },
-      {
-        model: SolicitacaoCompra,
-        as: 'solicitacao',
-        attributes: ['id', 'status', 'numero_sienge', 'comprador_responsavel_id', 'solicitante_id'],
-        where: solicitacaoWhere,
-        required: solicitacaoScope.length > 0
-      },
-      { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
-      { model: PedidoCompraItem, as: 'itens', attributes: ['id', 'descricao', 'valor_total', 'removido'] }
-    ],
+    include: includes,
     order: [['updatedAt', 'DESC']]
   });
 
   const filtro = String(q || '').trim().toLowerCase();
-  return pedidos.filter((pedido) => {
+  const pedidosFiltrados = pedidos.filter((pedido) => {
     if (!filtro) return true;
     const haystack = [
       buildPedidoCodigo(pedido.id),
@@ -2348,6 +2358,32 @@ async function listarPedidos({
       .join(' ');
     return haystack.includes(filtro);
   });
+
+  if (!visaoResumo || pedidosFiltrados.length === 0) {
+    return pedidosFiltrados;
+  }
+
+  const ids = pedidosFiltrados.map((pedido) => Number(pedido.id));
+  const contagens = await PedidoCompraItem.findAll({
+    where: {
+      pedido_compra_id: { [Op.in]: ids },
+      removido: false
+    },
+    attributes: [
+      'pedido_compra_id',
+      [fn('COUNT', col('id')), 'total']
+    ],
+    group: ['pedido_compra_id'],
+    raw: true
+  });
+  const mapaContagens = new Map(
+    contagens.map((row) => [Number(row.pedido_compra_id), Number(row.total || 0)])
+  );
+
+  return pedidosFiltrados.map((pedido) => ({
+    ...pedido.toJSON(),
+    itens_ativos_count: Number(mapaContagens.get(Number(pedido.id)) || 0)
+  }));
 }
 
 async function listarAuditoriaItensPedido({ obraId, pedidoId, itemId, acao, q, obraIds = null } = {}) {

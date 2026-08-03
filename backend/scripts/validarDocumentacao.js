@@ -16,6 +16,7 @@ const moduleDocByRuntimeKey = {
   FISCAL: 'fiscal',
   OBRAS: 'obras',
   PROVISOES: 'provisionamento',
+  CUSTOS_RECEBIVEIS: 'custos-recebiveis',
   CONTRATOS: 'contratos',
   COMERCIAL: 'comercial',
   CRM: 'crm',

@@ -1391,6 +1391,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
       'empresa_id',
       'conta_bancaria_id',
       'cartao_id',
+      'forma_pagamento_id',
       'forma_recebimento',
       'tipo_permuta',
       'categoria_bem',
@@ -1423,6 +1424,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
     'Baixa de titulo financeiro'
   );
 
+  const formaPagamentoId = parseInteger(body.forma_pagamento_id, 'Forma de pagamento');
   const formaRecebimento = parseEnum(
     body.forma_recebimento,
     'Forma de recebimento',
@@ -1453,6 +1455,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
     empresa_id: empresaId,
     conta_bancaria_id: contaBancariaId,
     cartao_id: cartaoId,
+    forma_pagamento_id: formaPagamentoId,
     forma_recebimento: formaRecebimento,
     tipo_permuta: parseOptionalText(body.tipo_permuta, 'Tipo de permuta', 80),
     categoria_bem: parseEnum(body.categoria_bem, 'Categoria do bem', CATEGORIAS_BEM),
@@ -1492,6 +1495,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
       'empresa_id',
       'conta_bancaria_id',
       'cartao_id',
+      'forma_pagamento_id',
       'forma_recebimento',
       'data_movimento',
       'observacoes',
@@ -1518,6 +1522,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
     parseInteger(id, 'Titulo financeiro', { required: true })
   ))));
 
+  const formaPagamentoId = parseInteger(body.forma_pagamento_id, 'Forma de pagamento');
   const formaRecebimento = parseEnum(
     body.forma_recebimento,
     'Forma de recebimento',
@@ -1596,6 +1601,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
     empresa_id: parseInteger(body.empresa_id, 'Empresa pagadora', { required: true }),
     conta_bancaria_id: contaBancariaId,
     cartao_id: cartaoId,
+    forma_pagamento_id: formaPagamentoId,
     forma_recebimento: formaRecebimento,
     data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento', { required: true }),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),

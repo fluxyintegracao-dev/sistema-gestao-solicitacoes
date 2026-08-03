@@ -189,6 +189,24 @@ db.FiscalAccountingBatch = require('../modules/fiscal/models/FiscalAccountingBat
 db.FiscalAccountingBatchItem = require('../modules/fiscal/models/FiscalAccountingBatchItem')(sequelize, Sequelize);
 
 /* =====================
+   CUSTOS E RECEBIVEIS
+===================== */
+db.CrPlanoObra = require('../modules/custosRecebiveis/models/CrPlanoObra')(sequelize, Sequelize);
+db.CrPlanoItem = require('../modules/custosRecebiveis/models/CrPlanoItem')(sequelize, Sequelize);
+db.CrPlanoMacroVinculo = require('../modules/custosRecebiveis/models/CrPlanoMacroVinculo')(sequelize, Sequelize);
+db.CrImportacao = require('../modules/custosRecebiveis/models/CrImportacao')(sequelize, Sequelize);
+db.CrCompetencia = require('../modules/custosRecebiveis/models/CrCompetencia')(sequelize, Sequelize);
+db.CrPrevisaoCusto = require('../modules/custosRecebiveis/models/CrPrevisaoCusto')(sequelize, Sequelize);
+db.CrPrevisaoReceita = require('../modules/custosRecebiveis/models/CrPrevisaoReceita')(sequelize, Sequelize);
+db.CrMedicaoConsolidada = require('../modules/custosRecebiveis/models/CrMedicaoConsolidada')(sequelize, Sequelize);
+db.CrRealizado = require('../modules/custosRecebiveis/models/CrRealizado')(sequelize, Sequelize);
+db.CrResponsavelObra = require('../modules/custosRecebiveis/models/CrResponsavelObra')(sequelize, Sequelize);
+db.CrObrigacaoUsuario = require('../modules/custosRecebiveis/models/CrObrigacaoUsuario')(sequelize, Sequelize);
+db.CrReabertura = require('../modules/custosRecebiveis/models/CrReabertura')(sequelize, Sequelize);
+db.CrGuardBypass = require('../modules/custosRecebiveis/models/CrGuardBypass')(sequelize, Sequelize);
+db.CrAuditoria = require('../modules/custosRecebiveis/models/CrAuditoria')(sequelize, Sequelize);
+
+/* =====================
    SST
 ===================== */
 db.SstRisco = require('../modules/sst/models/SstRisco')(sequelize, Sequelize);
@@ -2649,6 +2667,16 @@ db.TituloFinanceiro.belongsTo(db.FormaPagamentoFinanceira, {
   as: 'formaPagamento'
 });
 
+db.FormaPagamentoFinanceira.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'movimentos'
+});
+
+db.MovimentoFinanceiro.belongsTo(db.FormaPagamentoFinanceira, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'formaPagamento'
+});
+
 db.CartaoFinanceiro.hasMany(db.TituloFinanceiro, {
   foreignKey: 'cartao_id',
   as: 'titulos'
@@ -3967,6 +3995,69 @@ db.FiscalAccountingBatch.hasMany(db.FiscalAccountingBatchItem, { foreignKey: 'ba
 db.FiscalAccountingBatchItem.belongsTo(db.FiscalAccountingBatch, { foreignKey: 'batch_id', as: 'batch' });
 db.FiscalDfeDocument.hasMany(db.FiscalAccountingBatchItem, { foreignKey: 'fiscal_dfe_document_id', as: 'accountingBatchItems' });
 db.FiscalAccountingBatchItem.belongsTo(db.FiscalDfeDocument, { foreignKey: 'fiscal_dfe_document_id', as: 'document' });
+
+/* ===== CUSTOS E RECEBIVEIS ===== */
+db.CrPlanoObra.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrPlanoObra.belongsTo(db.User, { foreignKey: 'publicado_por', as: 'publicadoPor' });
+db.CrPlanoObra.hasMany(db.CrPlanoItem, { foreignKey: 'plano_id', as: 'itens' });
+
+db.CrPlanoItem.belongsTo(db.CrPlanoObra, { foreignKey: 'plano_id', as: 'plano' });
+db.CrPlanoItem.belongsTo(db.CrPlanoItem, { foreignKey: 'item_pai_id', as: 'itemPai' });
+db.CrPlanoItem.hasMany(db.CrPlanoItem, { foreignKey: 'item_pai_id', as: 'subitens' });
+db.CrPlanoItem.hasMany(db.CrPlanoMacroVinculo, { foreignKey: 'plano_item_id', as: 'vinculosMacro' });
+
+db.CrPlanoMacroVinculo.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrPlanoMacroVinculo.belongsTo(db.Apropriacao, { foreignKey: 'apropriacao_id', as: 'apropriacao' });
+
+db.CrImportacao.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrImportacao.belongsTo(db.CrPlanoObra, { foreignKey: 'plano_id', as: 'plano' });
+db.CrImportacao.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
+
+db.CrCompetencia.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrCompetencia.belongsTo(db.User, { foreignKey: 'finalizado_por', as: 'finalizadoPor' });
+db.CrCompetencia.hasMany(db.CrPrevisaoCusto, { foreignKey: 'competencia_id', as: 'previsoesCusto' });
+db.CrCompetencia.hasMany(db.CrPrevisaoReceita, { foreignKey: 'competencia_id', as: 'previsoesReceita' });
+db.CrCompetencia.hasMany(db.CrMedicaoConsolidada, { foreignKey: 'competencia_id', as: 'medicoes' });
+db.CrCompetencia.hasMany(db.CrRealizado, { foreignKey: 'competencia_id', as: 'realizados' });
+db.CrCompetencia.hasMany(db.CrReabertura, { foreignKey: 'competencia_id', as: 'reaberturas' });
+
+db.CrPrevisaoCusto.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrPrevisaoCusto.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrPrevisaoCusto.belongsTo(db.Parceiro, { foreignKey: 'parceiro_id', as: 'parceiro' });
+
+db.CrPrevisaoReceita.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrPrevisaoReceita.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrPrevisaoReceita.belongsTo(db.ContratoComercialParcela, { foreignKey: 'contrato_parcela_id', as: 'contratoParcela' });
+db.CrPrevisaoReceita.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'tituloFinanceiro' });
+
+db.CrMedicaoConsolidada.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrMedicaoConsolidada.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrMedicaoConsolidada.belongsTo(db.User, { foreignKey: 'registrado_por', as: 'registradoPor' });
+
+db.CrRealizado.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrRealizado.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrRealizado.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrRealizado.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'tituloFinanceiro' });
+db.CrRealizado.belongsTo(db.MovimentoFinanceiro, { foreignKey: 'movimento_financeiro_id', as: 'movimentoFinanceiro' });
+
+db.CrResponsavelObra.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrResponsavelObra.belongsTo(db.User, { foreignKey: 'user_id', as: 'usuario' });
+
+db.CrObrigacaoUsuario.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrObrigacaoUsuario.belongsTo(db.User, { foreignKey: 'user_id', as: 'usuario' });
+
+db.CrReabertura.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrReabertura.belongsTo(db.User, { foreignKey: 'solicitado_por', as: 'solicitadoPor' });
+db.CrReabertura.belongsTo(db.User, { foreignKey: 'aprovado_por', as: 'aprovadoPor' });
+
+db.CrGuardBypass.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrGuardBypass.belongsTo(db.User, { foreignKey: 'user_id', as: 'usuario' });
+db.CrGuardBypass.belongsTo(db.User, { foreignKey: 'concedido_por', as: 'concedidoPor' });
+db.CrGuardBypass.belongsTo(db.User, { foreignKey: 'revogado_por', as: 'revogadoPor' });
+
+db.CrAuditoria.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CrAuditoria.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
+db.CrAuditoria.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
 
 /* ===== SST ===== */
 [

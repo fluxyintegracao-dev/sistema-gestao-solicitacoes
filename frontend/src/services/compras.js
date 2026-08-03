@@ -130,14 +130,15 @@ export async function deletarCategoria(id) {
   return handleJsonResponse(response, 'Erro ao deletar categoria');
 }
 
-export async function listarInsumos(params = {}) {
+export async function listarInsumos(params = {}, { signal } = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query
     ? `${API_URL}/compras/insumos?${query}`
     : `${API_URL}/compras/insumos`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    signal
   });
   return handleJsonResponse(response, 'Erro ao buscar insumos');
 }
@@ -200,14 +201,15 @@ export async function deletarApropriacao(id) {
   return deletarApropriacaoCompartilhada(id);
 }
 
-export async function listarFornecedoresCompra(params = {}) {
+export async function listarFornecedoresCompra(params = {}, { signal } = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query
     ? `${API_URL}/compras/fornecedores?${query}`
     : `${API_URL}/compras/fornecedores`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    signal
   });
   return handleJsonResponse(response, 'Erro ao buscar fornecedores');
 }
@@ -221,14 +223,15 @@ export async function criarFornecedorCompra(data) {
   return handleJsonResponse(response, 'Erro ao criar fornecedor');
 }
 
-export async function listarSolicitacoesCompra(params = {}) {
+export async function listarSolicitacoesCompra(params = {}, { signal } = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query
     ? `${API_URL}/compras/solicitacoes?${query}`
     : `${API_URL}/compras/solicitacoes`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    signal
   });
   return handleJsonResponse(response, 'Erro ao buscar solicitacoes de compra');
 }
@@ -408,6 +411,14 @@ export async function obterComparativoSolicitacaoCompra(id) {
   return handleJsonResponse(response, 'Erro ao buscar comparativo da solicitacao');
 }
 
+export async function obterWorkspaceCotacaoSolicitacaoCompra(id, { signal } = {}) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/workspace-cotacao`, {
+    headers: authHeaders(),
+    signal
+  });
+  return handleJsonResponse(response, 'Erro ao carregar workspace da cotacao');
+}
+
 export async function encerrarSolicitacaoCompra(id, data, { idempotencyKey = null } = {}) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/encerrar`, {
     method: 'PATCH',
@@ -432,14 +443,15 @@ export async function encerrarSolicitacaoCompraSemPedido(id, data, { idempotency
   return handleJsonResponse(response, 'Erro ao encerrar cotacao sem gerar pedido');
 }
 
-export async function listarPedidosCompra(params = {}) {
+export async function listarPedidosCompra(params = {}, { signal } = {}) {
   const query = buildQueryString(params);
   const url = query
     ? `${API_URL}/compras/pedidos?${query}`
     : `${API_URL}/compras/pedidos`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    signal
   });
   return handleJsonResponse(response, 'Erro ao buscar pedidos de compra');
 }
@@ -797,10 +809,10 @@ export async function baixarPdfSolicitacaoCompra(id) {
   return response.blob();
 }
 
-export async function listarCotacoes(params = {}) {
+export async function listarCotacoes(params = {}, { signal } = {}) {
   const query = buildQueryString(params);
   const url = query ? `${API_URL}/compras/cotacoes?${query}` : `${API_URL}/compras/cotacoes`;
-  const response = await fetch(url, { headers: authHeaders() });
+  const response = await fetch(url, { headers: authHeaders(), signal });
   return handleJsonResponse(response, 'Erro ao buscar cotacoes');
 }
 

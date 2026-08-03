@@ -1,21 +1,35 @@
-const { Op } = require('sequelize');
+const { Op, col, fn, where: sequelizeWhere } = require('sequelize');
 const { FornecedorCompra } = require('../models');
 const {
   criarOuAtualizarFornecedorCentralizado,
   criarOuAtualizarFornecedorCentralizadoEmTransacao,
 } = require('../services/comprasFornecedorService');
 const {
-  canManageComprasCotacoes,
-  canViewComprasCotacoes
+  canManageComprasFornecedores,
+  canViewComprasFornecedores
 } = require('../services/authorizationService');
 const { sequelize } = require('../models');
 
 async function canReadFornecedores(req) {
-  return canViewComprasCotacoes(req.user);
+  return canViewComprasFornecedores(req.user);
 }
 
 async function canManageFornecedores(req) {
-  return canManageComprasCotacoes(req.user);
+  return canManageComprasFornecedores(req.user);
+}
+
+function documentoFornecedorSemPontuacao() {
+  return fn(
+    'REPLACE',
+    fn(
+      'REPLACE',
+      fn('REPLACE', fn('REPLACE', col('cnpj'), '.', ''), '/', ''),
+      '-',
+      ''
+    ),
+    ' ',
+    ''
+  );
 }
 
 function parseCategorias(raw) {
@@ -42,9 +56,14 @@ module.exports = {
       const incluirInativos = String(req.query.incluir_inativos || '').trim() === '1';
       const somenteAvulsos = String(req.query.somente_avulsos || '').trim() === '1';
       const busca = String(req.query.q || '').trim();
+      const documentoBusca = busca.replace(/\D/g, '');
       const cidade = String(req.query.cidade || '').trim();
       const estado = String(req.query.estado || '').trim().toUpperCase();
       const categoriaFiltro = String(req.query.categoria || '').trim().toLowerCase();
+      const limiteInformado = Number.parseInt(req.query.limit, 10);
+      const limite = Number.isInteger(limiteInformado) && limiteInformado > 0
+        ? Math.min(limiteInformado, 200)
+        : null;
 
       const where = incluirInativos ? {} : { ativo: true };
 
@@ -57,7 +76,10 @@ module.exports = {
           { nome: { [Op.like]: `%${busca}%` } },
           { cnpj: { [Op.like]: `%${busca}%` } },
           { email: { [Op.like]: `%${busca}%` } },
-          { contato: { [Op.like]: `%${busca}%` } }
+          { contato: { [Op.like]: `%${busca}%` } },
+          ...(documentoBusca
+            ? [sequelizeWhere(documentoFornecedorSemPontuacao(), { [Op.like]: `%${documentoBusca}%` })]
+            : [])
         ];
       }
 
@@ -71,7 +93,8 @@ module.exports = {
 
       let fornecedores = await FornecedorCompra.findAll({
         where,
-        order: [['nome', 'ASC']]
+        order: [['nome', 'ASC']],
+        ...(!categoriaFiltro && limite ? { limit } : {})
       });
 
       // Filtro por categoria (JSON field — feito em JS por compatibilidade)
@@ -80,6 +103,10 @@ module.exports = {
           const cats = Array.isArray(f.categoria_insumos) ? f.categoria_insumos : [];
           return cats.some((c) => String(c).toLowerCase().includes(categoriaFiltro));
         });
+      }
+
+      if (limite) {
+        fornecedores = fornecedores.slice(0, limite);
       }
 
       return res.json(fornecedores);

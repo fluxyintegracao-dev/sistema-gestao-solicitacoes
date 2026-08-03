@@ -8,7 +8,7 @@ const LiveUpdatesContext = createContext({
 });
 
 function buildStreamUrl() {
-  return `${API_URL}/live-updates?topics=solicitacoes`;
+  return `${API_URL}/live-updates?topics=solicitacoes,compras`;
 }
 
 export function LiveUpdatesProvider({ children }) {

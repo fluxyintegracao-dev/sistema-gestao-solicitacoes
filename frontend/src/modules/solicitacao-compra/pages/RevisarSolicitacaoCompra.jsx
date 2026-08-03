@@ -4,9 +4,13 @@ import { criarSolicitacaoCompra, criarSolicitacaoCompraDireta, obterUrlAssinadaC
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao, montarTextoResumoApropriacao } from '../utils/apropriacoes';
-
-const DRAFT_KEY = 'fluxy_solicitacao_compra_draft';
-const DRAFT_COMPRA_DIRETA_KEY = 'fluxy_compra_direta_draft';
+import { useAuth } from '../../../contexts/AuthContext';
+import {
+  buildComprasDraftKey,
+  readComprasDraft,
+  removeComprasDraft,
+  writeComprasDraft
+} from '../utils/comprasDraftStorage';
 
 function formatarData(data) {
   if (!data) {
@@ -89,7 +93,8 @@ function LinhaResumo({ titulo, valor, className = '' }) {
 
 export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
   const navigate = useNavigate();
-  const draftKey = modoCompraDireta ? DRAFT_COMPRA_DIRETA_KEY : DRAFT_KEY;
+  const { user } = useAuth();
+  const draftKey = buildComprasDraftKey(user?.id, modoCompraDireta ? 'compra-direta' : 'solicitacao');
   const [draft, setDraft] = useState(null);
   const [confirmado, setConfirmado] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -99,15 +104,13 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
 
   useEffect(() => {
     try {
-      const salvo = window.localStorage.getItem(draftKey);
-      if (!salvo) {
+      const dados = readComprasDraft(draftKey);
+      if (!dados) {
         navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
         return;
       }
-
-      const dados = JSON.parse(salvo);
       if (!dados?.payload?.obra_id || !Array.isArray(dados?.payload?.itens) || !dados.payload.itens.length) {
-        window.localStorage.removeItem(draftKey);
+        removeComprasDraft(draftKey);
         navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
         return;
       }
@@ -115,7 +118,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       setDraft(dados);
     } catch (error) {
       console.error(error);
-      window.localStorage.removeItem(draftKey);
+      removeComprasDraft(draftKey);
       navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', { replace: true });
     }
   }, [draftKey, modoCompraDireta, navigate]);
@@ -282,7 +285,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
       const resposta = modoCompraDireta
         ? await criarSolicitacaoCompraDireta(draft.payload)
         : await criarSolicitacaoCompra(draft.payload);
-      window.localStorage.removeItem(draftKey);
+      removeComprasDraft(draftKey);
       navigate(`/solicitacoes-compra/finalizada/${resposta.id}`, {
         replace: true,
         state: {
@@ -300,7 +303,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
 
   function handleVoltarEditar() {
     if (draft) {
-      window.localStorage.setItem(draftKey, JSON.stringify(draft));
+      writeComprasDraft(draftKey, draft, user?.id);
     }
     navigate(modoCompraDireta ? '/solicitacoes-compra-direta/nova' : '/solicitacoes-compra/nova', {
       state: { preservarRascunhoCompra: true }

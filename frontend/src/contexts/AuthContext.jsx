@@ -47,6 +47,15 @@ export function AuthProvider({ children }) {
     applySession(data);
   }
 
+  async function refreshSession() {
+    const data = await getCurrentSession();
+    applySession({
+      ...data,
+      token: data?.token || token
+    });
+    return data;
+  }
+
   function updateUser(patch) {
     setUser((current) => {
       if (!current) return current;
@@ -255,6 +264,7 @@ export function AuthProvider({ children }) {
         isAuthenticated,
         authReady,
         login,
+        refreshSession,
         logout,
         updateUser
       }}

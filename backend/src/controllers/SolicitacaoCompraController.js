@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Op } = require('sequelize');
+const { Op, fn, col } = require('sequelize');
 const {
   Anexo,
   Apropriacao,
@@ -86,6 +86,7 @@ const {
   isBusinessAdmin
 } = require('../services/authorizationService');
 const { validateCompraEnviarBody } = require('../validators/operationalValidators');
+const { publishComprasRealtimeEventSafe } = require('../services/comprasRealtimeService');
 const PDF_PAGE = {
   left: 20,
   top: 12,
@@ -563,15 +564,24 @@ function podeAcompanharCompraAguardandoDiretoria(usuario, solicitacao) {
     && Number(solicitacao.solicitante_id) === Number(usuario?.id);
 }
 
-async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction = null) {
+async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transaction = null, contexto = {}) {
   if (isSolicitacaoCompraCancelada(solicitacao)) return true;
   if (await isSolicitacaoPrincipalLiberadaParaCompras(solicitacao, transaction)) return true;
-  if (isSuperadmin(usuario)) return true;
+  const superadmin = typeof contexto.superadmin === 'boolean'
+    ? contexto.superadmin
+    : isSuperadmin(usuario);
+  if (superadmin) return true;
   if (Number(solicitacao?.solicitante_id || 0) > 0 && Number(solicitacao.solicitante_id) === Number(usuario?.id)) {
     return true;
   }
-  if (await userHasSetorCapability(usuario, 'eh_setor_geo')) return true;
-  return !(await userHasSetorCapability(usuario, 'eh_setor_compras'));
+  const ehSetorGeo = typeof contexto.ehSetorGeo === 'boolean'
+    ? contexto.ehSetorGeo
+    : await userHasSetorCapability(usuario, 'eh_setor_geo');
+  if (ehSetorGeo) return true;
+  const ehSetorCompras = typeof contexto.ehSetorCompras === 'boolean'
+    ? contexto.ehSetorCompras
+    : await userHasSetorCapability(usuario, 'eh_setor_compras');
+  return !ehSetorCompras;
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -2286,7 +2296,7 @@ module.exports = {
       const usuario = await validarAcesso(req, res);
       if (!usuario) return;
 
-      const { obra_id, contexto } = req.query;
+      const { obra_id, contexto, visao } = req.query;
       const statusOcultos = ['INATIVA'];
       const where = {
         origem: { [Op.ne]: 'COMPRA_DIRETA' },
@@ -2327,14 +2337,25 @@ module.exports = {
         };
       }
 
-      const solicitacoes = await SolicitacaoCompra.findAll({
-        where,
-        order: [['createdAt', 'DESC']],
-        include: [
-          { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
-          { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
-          { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
-          { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] },
+      const visaoResumida = ['resumo', 'delegacao'].includes(String(visao || '').toLowerCase());
+      const visaoDelegacao = String(visao || '').toLowerCase() === 'delegacao' || contextoDelegacao;
+      const includesLista = [
+        { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
+        { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
+        { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
+        { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] }
+      ];
+
+      if (visaoDelegacao) {
+        includesLista.push({
+          model: PedidoCompra,
+          as: 'pedidos',
+          attributes: ['id', 'status', 'encerrado_em']
+        });
+      }
+
+      if (!visaoResumida) {
+        includesLista.push(
           {
             model: SolicitacaoCompraItem,
             as: 'itens',
@@ -2357,16 +2378,33 @@ module.exports = {
             model: SolicitacaoCompraFornecedor,
             as: 'fornecedores',
             attributes: ['id', 'status', 'respondido_em', 'fornecedor_compra_id']
-          },
-          {
+          }
+        );
+        if (!visaoDelegacao) {
+          includesLista.push({
             model: PedidoCompra,
             as: 'pedidos',
             attributes: ['id', 'status', 'encerrado_em']
-          }
-        ]
+          });
+        }
+      }
+
+      const solicitacoes = await SolicitacaoCompra.findAll({
+        where,
+        order: [['createdAt', 'DESC']],
+        include: includesLista
       });
 
       const solicitacoesVisiveis = [];
+      const [ehSetorGeo, ehSetorCompras] = await Promise.all([
+        userHasSetorCapability(usuario, 'eh_setor_geo'),
+        userHasSetorCapability(usuario, 'eh_setor_compras')
+      ]);
+      const contextoAcompanhamento = {
+        superadmin: isSuperadmin(usuario),
+        ehSetorGeo,
+        ehSetorCompras
+      };
       for (const solicitacao of solicitacoes) {
         if (
           contextoDelegacao &&
@@ -2375,12 +2413,44 @@ module.exports = {
           continue;
         }
 
-        if (await podeAcompanharCompraAntesLiberacao(usuario, solicitacao)) {
+        if (await podeAcompanharCompraAntesLiberacao(usuario, solicitacao, null, contextoAcompanhamento)) {
           solicitacoesVisiveis.push(solicitacao);
         }
       }
 
-      return res.json(solicitacoesVisiveis);
+      if (!visaoResumida || solicitacoesVisiveis.length === 0) {
+        return res.json(solicitacoesVisiveis);
+      }
+
+      const idsVisiveis = solicitacoesVisiveis.map((item) => Number(item.id));
+      const contarPorSolicitacao = async (Model) => Model.findAll({
+        where: { solicitacao_compra_id: { [Op.in]: idsVisiveis } },
+        attributes: [
+          'solicitacao_compra_id',
+          [fn('COUNT', col('id')), 'total']
+        ],
+        group: ['solicitacao_compra_id'],
+        raw: true
+      });
+      const [itensCadastrados, itensManuais, fornecedores] = await Promise.all([
+        contarPorSolicitacao(SolicitacaoCompraItem),
+        contarPorSolicitacao(SolicitacaoCompraItemManual),
+        contarPorSolicitacao(SolicitacaoCompraFornecedor)
+      ]);
+      const montarMapaContagem = (rows) => new Map(
+        rows.map((row) => [Number(row.solicitacao_compra_id), Number(row.total || 0)])
+      );
+      const mapaItens = montarMapaContagem(itensCadastrados);
+      const mapaItensManuais = montarMapaContagem(itensManuais);
+      const mapaFornecedores = montarMapaContagem(fornecedores);
+
+      return res.json(solicitacoesVisiveis.map((solicitacao) => {
+        const data = solicitacao.toJSON();
+        const id = Number(solicitacao.id);
+        data.itens_count = Number(mapaItens.get(id) || 0) + Number(mapaItensManuais.get(id) || 0);
+        data.fornecedores_count = Number(mapaFornecedores.get(id) || 0);
+        return data;
+      }));
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar solicitacoes de compra' });
@@ -3592,6 +3662,12 @@ module.exports = {
 
       await transaction.commit();
 
+      void publishComprasRealtimeEventSafe({
+        action: compraDireta ? 'COMPRA_DIRETA_CRIADA' : 'SOLICITACAO_CRIADA',
+        solicitacaoCompraId: solicitacaoCompra.id,
+        actor: usuario
+      });
+
       const pdfAnexado = await anexarPdfNaSolicitacaoPrincipal({
         solicitacaoCompraId: solicitacaoCompra.id,
         solicitacaoPrincipalId: solicitacaoPrincipal.id,
@@ -4148,6 +4224,44 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao gerar comparativo da solicitacao' });
+    }
+  },
+
+  async workspaceCotacao(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const solicitacao = await carregarSolicitacaoCompra(req.params.id);
+      if (!solicitacao) {
+        return res.status(404).json({ error: 'Solicitacao nao encontrada' });
+      }
+
+      if (isSolicitacaoCompraDireta(solicitacao)) {
+        return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
+      if (isCompraAguardandoDiretoria(solicitacao)) {
+        return responderCompraAguardandoDiretoria(res);
+      }
+
+      if (!(await podeAcompanharCompraAntesLiberacao(usuario, solicitacao))) {
+        return responderCompraAguardandoLiberacao(res);
+      }
+
+      if (!(await validarEscopoSolicitacaoCompra(usuario, solicitacao, res))) {
+        return;
+      }
+
+      return res.json({
+        solicitacao,
+        comparativo: (solicitacao.fornecedores || []).length > 0
+          ? montarComparativoSolicitacao(solicitacao)
+          : null
+      });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar workspace da cotacao' });
     }
   },
 

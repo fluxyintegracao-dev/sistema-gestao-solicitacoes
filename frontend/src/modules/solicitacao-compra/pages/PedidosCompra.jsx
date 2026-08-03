@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { listarPedidosCompra } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
+import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -70,7 +71,8 @@ export default function PedidosCompra() {
         listarPedidosCompra({
           q: filtros.q || undefined,
           status: filtros.status || undefined,
-          obra_id: filtros.obra_id || undefined
+          obra_id: filtros.obra_id || undefined,
+          visao: 'resumo'
         }),
         getObras(),
         carregarStatusPedidosComFallback()
@@ -90,6 +92,8 @@ export default function PedidosCompra() {
   useEffect(() => {
     carregar();
   }, []);
+
+  useComprasRealtimeRefresh(carregar);
 
   const statusMap = useMemo(
     () => Object.fromEntries((statusOptions || []).map((item) => [String(item.codigo || '').toUpperCase(), item])),
@@ -241,7 +245,8 @@ export default function PedidosCompra() {
               </thead>
               <tbody>
                 {pedidos.map((pedido) => {
-                  const itensAtivos = (pedido.itens || []).filter((item) => !item.removido).length;
+                  const itensAtivos = pedido.itens_ativos_count
+                    ?? (pedido.itens || []).filter((item) => !item.removido).length;
 
                   return (
                     <tr key={pedido.id}>
@@ -285,7 +290,8 @@ export default function PedidosCompra() {
         {!loading && pedidos.length > 0 ? (
           <div className="compras-mobile-list" aria-label="Pedidos de compra">
             {pedidos.map((pedido) => {
-              const itensAtivos = (pedido.itens || []).filter((item) => !item.removido).length;
+              const itensAtivos = pedido.itens_ativos_count
+                ?? (pedido.itens || []).filter((item) => !item.removido).length;
               const codigoPedido = `PC-${String(pedido.id).padStart(5, '0')}`;
 
               return (

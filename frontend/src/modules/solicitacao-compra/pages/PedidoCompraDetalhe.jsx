@@ -755,7 +755,7 @@ export default function PedidoCompraDetalhe() {
       setBuscandoFornecedoresFrete(true);
       const [parceirosData, fornecedoresData] = await Promise.all([
         buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 }),
-        listarFornecedoresCompra({ q: termo, incluir_inativos: '0' })
+        listarFornecedoresCompra({ q: termo, incluir_inativos: '0', limit: 20 })
       ]);
       const parceiros = (Array.isArray(parceirosData) ? parceirosData : []).map((parceiro) => ({
         ...parceiro,
@@ -896,7 +896,6 @@ export default function PedidoCompraDetalhe() {
         ? await atualizarFretePedidoCompra(id, freteEditandoId, payload)
         : await registrarFretePedidoCompra(id, payload);
       setPedido(data || null);
-      await carregar();
       fecharModalFrete(true);
       alert(freteEditandoId
         ? 'Frete atualizado com auditoria registrada.'
@@ -926,7 +925,6 @@ export default function PedidoCompraDetalhe() {
       setSalvandoFrete(true);
       const data = await cancelarFretePedidoCompra(id, frete.id, { motivo: motivo.trim() });
       setPedido(data || null);
-      await carregar();
       alert('Frete cancelado com auditoria registrada.');
     } catch (error) {
       console.error(error);
@@ -945,8 +943,8 @@ export default function PedidoCompraDetalhe() {
       };
 
       setSavingItemId(itemId);
-      await atualizarItemPedidoCompra(id, itemId, payload);
-      await carregar();
+      const data = await atualizarItemPedidoCompra(id, itemId, payload);
+      setPedido(data || null);
       fecharModalEdicao();
       alert('Item atualizado com auditoria registrada.');
     } catch (error) {
@@ -960,8 +958,8 @@ export default function PedidoCompraDetalhe() {
   async function handleAdicionarResposta(respostaItemId) {
     try {
       setAddingRespostaId(respostaItemId);
-      await adicionarItemPedidoCompra(id, { resposta_item_id: respostaItemId });
-      await carregar();
+      const data = await adicionarItemPedidoCompra(id, { resposta_item_id: respostaItemId });
+      setPedido(data || null);
       alert('Item adicionado ao pedido.');
     } catch (error) {
       console.error(error);
@@ -974,8 +972,8 @@ export default function PedidoCompraDetalhe() {
   async function handleRemoverItem(itemId) {
     try {
       setRemovingItemId(itemId);
-      await removerItemPedidoCompra(id, itemId);
-      await carregar();
+      const data = await removerItemPedidoCompra(id, itemId);
+      setPedido(data || null);
       fecharModalEdicao();
       alert('Item removido do pedido.');
     } catch (error) {

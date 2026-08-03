@@ -141,6 +141,7 @@ export default function Parceiros() {
 
   const parceirosFiltrados = useMemo(() => {
     const search = normalizeSearchText(filtro);
+    const documentoSearch = normalizeDocumento(filtro);
     if (!search) {
       return parceiros;
     }
@@ -148,6 +149,7 @@ export default function Parceiros() {
     return parceiros.filter((parceiro) => {
       const nome = normalizeSearchText(parceiro.nome);
       const documento = normalizeSearchText(parceiro.cpf_cnpj);
+      const documentoSemPontuacao = normalizeDocumento(parceiro.cpf_cnpj);
       const telefone = normalizeSearchText(parceiro.telefone);
       const pix = normalizeSearchText([
         parceiro.pix_chave_fixa_1,
@@ -163,6 +165,7 @@ export default function Parceiros() {
       return (
         nome.includes(search) ||
         documento.includes(search) ||
+        Boolean(documentoSearch && documentoSemPontuacao.includes(documentoSearch)) ||
         telefone.includes(search) ||
         pix.includes(search) ||
         categoriasParceiro.includes(search)

@@ -34,6 +34,9 @@ const {
   requestPasswordResetByEmail,
   resetPasswordByToken
 } = require('../services/passwordResetService');
+const {
+  calcularEstadoGuardUsuario
+} = require('../modules/custosRecebiveis/services/obrigacaoService');
 
 const SETOR_ATTRIBUTES = [
   'id',
@@ -73,6 +76,29 @@ async function buildSessionUser(user) {
   const mfaEnabled = Boolean(user.mfa_totp_enabled);
   const setores = await listarSetoresDoUsuario(user);
   const setoresVisiveis = await obterSetoresVisiveisUsuario(user.id);
+  const custosRecebiveisEnabled = modules.some((item) => (
+    item?.key === 'CUSTOS_RECEBIVEIS' && item?.enabled
+  ));
+  const userForGuard = {
+    ...(user?.get ? user.get({ plain: true }) : user),
+    areas_permissoes: areasPermissoes
+  };
+  let custosRecebiveisPendencia = null;
+  try {
+    custosRecebiveisPendencia = await calcularEstadoGuardUsuario(userForGuard, {
+      moduleEnabled: custosRecebiveisEnabled,
+      persistir: custosRecebiveisEnabled
+    });
+  } catch (error) {
+    console.error('Falha segura ao calcular pendencia de Custos e Recebiveis:', error.message);
+    custosRecebiveisPendencia = {
+      habilitado: custosRecebiveisEnabled,
+      modo: 'observe',
+      bloqueado: false,
+      pendencia_detectada: false,
+      indisponivel: true
+    };
+  }
 
   return {
     id: user.id,
@@ -93,7 +119,8 @@ async function buildSessionUser(user) {
     modulos_habilitados: modules,
     mfa_totp_enabled: Boolean(user.mfa_totp_enabled),
     mfa_required_by_policy: mfaRequiredByPolicy,
-    mfa_setup_pending: mfaRequiredByPolicy && !mfaEnabled
+    mfa_setup_pending: mfaRequiredByPolicy && !mfaEnabled,
+    custos_recebiveis_pendencia: custosRecebiveisPendencia
   };
 }
 

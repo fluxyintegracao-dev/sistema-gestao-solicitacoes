@@ -396,6 +396,55 @@ function exigirFormaRecebimentoBaixa(value) {
   return formaRecebimento;
 }
 
+function resolverTipoOperacionalFormaPagamento(formaPagamento) {
+  const text = [formaPagamento?.tipo, formaPagamento?.codigo, formaPagamento?.nome]
+    .filter(Boolean)
+    .join(' ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  const tokens = text.split(/[^A-Z0-9_]+/).filter(Boolean);
+
+  if (
+    Boolean(formaPagamento?.exige_cartao)
+    || Boolean(formaPagamento?.gera_fatura)
+    || tokens.some((token) => ['CARTAO', 'CARTAO_CREDITO', 'CARTAO_DEBITO', 'CREDITO', 'DEBITO'].includes(token))
+  ) return 'CARTAO';
+  if (Boolean(formaPagamento?.exige_cheque) || tokens.includes('CHEQUE')) return 'CHEQUE';
+
+  return ['DINHEIRO', 'PIX', 'TRANSFERENCIA', 'BOLETO', 'PERMUTA', 'BENS', 'OUTROS']
+    .find((tipo) => tokens.includes(tipo)) || null;
+}
+
+async function resolverFormaPagamentoBaixa(payload = {}, options = {}) {
+  const formaPagamentoId = Number(payload.forma_pagamento_id || 0);
+  const formaRecebimentoInformada = normalizarFormaRecebimento(payload.forma_recebimento);
+  if (!Number.isInteger(formaPagamentoId) || formaPagamentoId <= 0) {
+    return {
+      formaPagamento: null,
+      formaPagamentoId: null,
+      formaRecebimento: exigirFormaRecebimentoBaixa(formaRecebimentoInformada)
+    };
+  }
+
+  const formaPagamento = await FormaPagamentoFinanceira.findByPk(formaPagamentoId, {
+    transaction: options.transaction
+  });
+  if (!formaPagamento || formaPagamento.ativo === false) {
+    throw createHttpError(400, 'A forma de pagamento selecionada nao existe ou esta inativa.');
+  }
+
+  const formaRecebimento = resolverTipoOperacionalFormaPagamento(formaPagamento);
+  if (!formaRecebimento) {
+    throw createHttpError(400, 'A forma de pagamento selecionada nao possui tipo compativel com a baixa financeira.');
+  }
+  if (formaRecebimentoInformada && formaRecebimentoInformada !== formaRecebimento) {
+    throw createHttpError(400, 'A forma de pagamento nao corresponde ao tipo operacional informado.');
+  }
+
+  return { formaPagamento, formaPagamentoId, formaRecebimento };
+}
+
 async function resolverCartaoBaixa({ formaRecebimento, cartaoId, conta, empresaBaixaId, dataMovimento, usuarioId, transaction }) {
   if (String(formaRecebimento || '').toUpperCase() !== 'CARTAO') {
     if (cartaoId) {
@@ -995,6 +1044,11 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
       model: MovimentoFinanceiro,
       as: 'movimentos',
       include: [
+        {
+          model: FormaPagamentoFinanceira,
+          as: 'formaPagamento',
+          attributes: ['id', 'nome', 'codigo', 'tipo']
+        },
         {
           model: ContaBancaria,
           as: 'contaBancaria',
@@ -3258,7 +3312,8 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     throw createHttpError(400, 'Valor final da quitacao deve ser maior que zero.');
   }
 
-  const formaRecebimento = exigirFormaRecebimentoBaixa(payload.forma_recebimento);
+  const formaBaixa = await resolverFormaPagamentoBaixa(payload);
+  const formaRecebimento = formaBaixa.formaRecebimento;
   const conta = await validarContaBancaria(payload.conta_bancaria_id);
   const empresaBaixaId = await validarEmpresaBaixa({
     empresaId: payload.empresa_id,
@@ -3315,6 +3370,7 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       empresa_id: empresaBaixaId,
       ...movimentoIntercompanyFields,
       caixa_sessao_id: caixaSessao?.id || null,
+      forma_pagamento_id: formaBaixa.formaPagamentoId,
       forma_recebimento: formaMovimento,
       tipo_permuta: payload.tipo_permuta || null,
       categoria_bem: payload.categoria_bem || null,
@@ -3503,7 +3559,8 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
     throw createHttpError(400, 'Selecione ao menos um titulo para a baixa parcelada.');
   }
 
-  const formaRecebimento = normalizarFormaRecebimento(payload.forma_recebimento);
+  const formaBaixa = await resolverFormaPagamentoBaixa(payload);
+  const formaRecebimento = formaBaixa.formaRecebimento;
   if (!['CHEQUE', 'CARTAO'].includes(formaRecebimento)) {
     throw createHttpError(400, 'Baixa parcelada em massa esta disponivel apenas para CHEQUE ou CARTAO.');
   }
@@ -3622,6 +3679,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         empresa_id: empresaBaixaId,
         ...movimentoIntercompanyFields,
         caixa_sessao_id: caixaSessao?.id || null,
+        forma_pagamento_id: formaBaixa.formaPagamentoId,
         forma_recebimento: formaRecebimento,
         documento_referencia: grupoParcelamentoId,
         tipo_movimento: 'BAIXA',
@@ -3679,7 +3737,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         empresa_id: empresaBaixaId,
         parceiro_id: referenciaTitulo.parceiro_id,
         categoria_financeira_id: referenciaTitulo.categoria_financeira_id || null,
-        forma_pagamento_id: null,
+        forma_pagamento_id: formaBaixa.formaPagamentoId,
         cartao_id: cartao?.id || null,
         grupo_parcelamento_id: grupoParcelamentoId,
         numero_parcela: numeroParcela,
@@ -3721,6 +3779,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         cartao_id: cartao?.id || null,
         empresa_id: empresaBaixaId,
         caixa_sessao_id: caixaSessao?.id || null,
+        forma_pagamento_id: formaBaixa.formaPagamentoId,
         forma_recebimento: formaRecebimento === 'CARTAO' ? 'CARTAO_PARCELADO' : 'CHEQUE_PARCELADO',
         documento_referencia: documentoReferencia,
         tipo_movimento: 'BAIXA',
@@ -3801,6 +3860,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         titulo_ids: tituloIds,
         movimento_ids_agrupados: movimentosOriginais.map((movimento) => movimento.id),
         parcelas: parcelasCriadas,
+        forma_pagamento_id: formaBaixa.formaPagamentoId,
         forma_recebimento: formaRecebimento,
         conta_bancaria_id: conta.id,
         cartao_id: cartao?.id || null,
@@ -4392,5 +4452,6 @@ module.exports = {
   listarAuditoriaTitulo,
   listarBaixasRealizadas,
   listarTitulos,
-  listarTitulosPorSolicitacao
+  listarTitulosPorSolicitacao,
+  resolverTipoOperacionalFormaPagamento
 };

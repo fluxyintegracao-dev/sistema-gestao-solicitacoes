@@ -9400,6 +9400,13 @@ body {
 }
 
 @media (max-width: 767px) {
+  .layout-shell.custos-recebiveis-layout-scope > .sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: calc(100dvh - 1.4rem);
+  }
+
   .sidebar {
     width: min(19rem, calc(100vw - 1.4rem)) !important;
     margin: 0.7rem;
