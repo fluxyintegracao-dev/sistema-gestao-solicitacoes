@@ -11,6 +11,18 @@
 - campos e endpoints de diretoria permanecem somente para compatibilidade de registros antigos ja marcados com esse fluxo;
 - os endpoints antigos de integracao e liberacao manual respondem `410` e nao fazem parte do fluxo vigente.
 
+### Importacao de itens
+
+- a solicitacao normal pode receber itens por modelo XLSX vinculado a obra selecionada;
+- o arquivo apenas preenche o rascunho da tela: nenhuma solicitacao e gravada antes da revisao e confirmacao existentes;
+- insumo cadastrado e identificado pelo codigo visivel no sistema; sem codigo, descricao e unidade formam um item manual;
+- quantidade deve ser positiva, unidade deve existir e apropriacao informada deve ser analitica e pertencer a obra;
+- `Necessario para` usa a data da linha ou a data geral da tela, mantendo a validacao obrigatoria antes da revisao;
+- especificacao e link podem ser importados, enquanto anexos continuam sendo enviados pela tela;
+- o arquivo da solicitacao normal nao possui precos, fornecedor ou pagamento, que continuam pertencendo a cotacao e aos fluxos posteriores;
+- erro em qualquer linha impede a incorporacao de todo o arquivo, sem gravacao parcial;
+- itens importados entram no mesmo autosave, rateio, revisao e endpoint de criacao dos itens digitados manualmente.
+
 ## Compra Direta
 
 - usa `origem = COMPRA_DIRETA` e possui fluxo proprio de criacao e revisao;

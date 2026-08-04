@@ -125,18 +125,32 @@ async function buildMeasurementsRows(user, works, competencia, deps) {
     const planning = await safePlanning(user, Number(work.id), competencia, deps);
     if (!planning) continue;
     if (String(work.classificacao || '').toUpperCase() === 'PUBLICA') {
+      const measurementRows = new Map();
       planning.recebiveis.forEach((receipt) => {
-        const measurement = planning.medicoes.find((item) => (
-          Number(item.plano_item_id) === Number(receipt.plano_item_id)
-        ));
+        const key = receipt.previsao_custo_id
+          ? `custo:${receipt.previsao_custo_id}`
+          : `plano:${receipt.plano_item_id}`;
+        measurementRows.set(key, { receipt, measurement: null });
+      });
+      planning.medicoes.forEach((measurement) => {
+        const key = measurement.previsao_custo_id
+          ? `custo:${measurement.previsao_custo_id}`
+          : `plano:${measurement.plano_item_id}`;
+        const current = measurementRows.get(key) || { receipt: null, measurement: null };
+        current.measurement = measurement;
+        measurementRows.set(key, current);
+      });
+      measurementRows.forEach(({ receipt, measurement }) => {
+        const source = receipt || measurement;
+        const item = receipt?.item || measurement?.item;
         rows.push([
           `${work.codigo || work.id} - ${work.nome}`,
           'PUBLICA',
           competencia,
           'MEDICAO',
-          `${receipt.item?.codigo || ''} - ${receipt.item?.descricao || ''}`.trim(),
-          formatDate(measurement?.data_medicao || receipt.data_prevista),
-          money(receipt.valor_previsto),
+          `${item?.codigo || ''} - ${item?.descricao || source?.descricao || ''}`.trim(),
+          formatDate(measurement?.data_medicao || receipt?.data_prevista),
+          money(receipt?.valor_previsto),
           money(measurement?.valor_medido)
         ]);
       });

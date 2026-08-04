@@ -29,6 +29,7 @@ function monthLabel(value) {
 
 export default function CrPlanejamentoMensalView({
   obra,
+  userId,
   initialCompetencia,
   autoOpen = false,
   permissions,
@@ -125,6 +126,7 @@ export default function CrPlanejamentoMensalView({
         </button>
         <CrPlanejamentoView
           obra={obra}
+          userId={userId}
           competencia={selectedCompetencia}
           permissions={permissions}
           onChanged={async () => {
@@ -144,7 +146,7 @@ export default function CrPlanejamentoMensalView({
           <h2>Planejamento mensal · {obra.nome}</h2>
           <p>
             {isPublic
-              ? 'Custos planejados, medições apresentadas e aprovadas, glosas e valores realizados.'
+              ? 'Custos planejados, medições previstas e aprovadas, glosas e valores realizados.'
               : 'Custos planejados, recebíveis financeiros do período e valores realizados.'}
           </p>
         </div>
@@ -212,7 +214,7 @@ export default function CrPlanejamentoMensalView({
           <strong>Nenhuma competência iniciada</strong>
           <span>
             {isPublic
-              ? 'Use Novo mês para registrar custos planejados e a medição apresentada.'
+              ? 'Use Novo mês para registrar custos planejados e a medição prevista.'
               : 'Use Novo mês para registrar custos e consultar os recebíveis do período.'}
           </span>
         </div>
@@ -233,7 +235,7 @@ export default function CrPlanejamentoMensalView({
                 <div><dt>Custo planejado</dt><dd>{currency.format(item.total_custo_previsto || 0)}</dd></div>
                 {isPublic ? (
                   <>
-                    <div><dt>Medição apresentada</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
+                    <div><dt>Medição prevista</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
                     <div>
                       <dt>Medição aprovada</dt>
                       <dd>

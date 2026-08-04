@@ -4024,14 +4024,18 @@ db.CrCompetencia.hasMany(db.CrReabertura, { foreignKey: 'competencia_id', as: 'r
 db.CrPrevisaoCusto.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
 db.CrPrevisaoCusto.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
 db.CrPrevisaoCusto.belongsTo(db.Parceiro, { foreignKey: 'parceiro_id', as: 'parceiro' });
+db.CrPrevisaoCusto.hasMany(db.CrPrevisaoReceita, { foreignKey: 'previsao_custo_id', as: 'medicoesPrevistas' });
+db.CrPrevisaoCusto.hasMany(db.CrMedicaoConsolidada, { foreignKey: 'previsao_custo_id', as: 'medicoesAprovadas' });
 
 db.CrPrevisaoReceita.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
 db.CrPrevisaoReceita.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrPrevisaoReceita.belongsTo(db.CrPrevisaoCusto, { foreignKey: 'previsao_custo_id', as: 'previsaoCusto' });
 db.CrPrevisaoReceita.belongsTo(db.ContratoComercialParcela, { foreignKey: 'contrato_parcela_id', as: 'contratoParcela' });
 db.CrPrevisaoReceita.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'tituloFinanceiro' });
 
 db.CrMedicaoConsolidada.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });
 db.CrMedicaoConsolidada.belongsTo(db.CrPlanoItem, { foreignKey: 'plano_item_id', as: 'planoItem' });
+db.CrMedicaoConsolidada.belongsTo(db.CrPrevisaoCusto, { foreignKey: 'previsao_custo_id', as: 'previsaoCusto' });
 db.CrMedicaoConsolidada.belongsTo(db.User, { foreignKey: 'registrado_por', as: 'registradoPor' });
 
 db.CrRealizado.belongsTo(db.CrCompetencia, { foreignKey: 'competencia_id', as: 'competencia' });

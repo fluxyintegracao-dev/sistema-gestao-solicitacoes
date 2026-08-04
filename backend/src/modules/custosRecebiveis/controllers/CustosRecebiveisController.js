@@ -26,6 +26,11 @@ const {
   solicitarReaberturaPorObraCompetencia
 } = require('../services/planejamentoService');
 const {
+  gerarModeloPlanejamento,
+  validarArquivoPlanejamento,
+  validarItensPlanejamento
+} = require('../services/planejamentoPlanilhaService');
+const {
   listarRealizados,
   reconciliarRealizado,
   reprocessarRealizados
@@ -265,6 +270,47 @@ class CustosRecebiveisController {
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao consolidar a medicao');
+    }
+  }
+
+  static async modeloPlanejamento(req, res) {
+    try {
+      const result = await gerarModeloPlanejamento(
+        req.params.obraId,
+        req.params.competencia,
+        req.params.tipo
+      );
+      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);
+      return res.send(result.buffer);
+    } catch (error) {
+      return respondError(res, error, 'Erro ao gerar modelo do planejamento');
+    }
+  }
+
+  static async validarPlanilhaPlanejamento(req, res) {
+    try {
+      return res.json(await validarArquivoPlanejamento(
+        req.params.obraId,
+        req.params.competencia,
+        req.params.tipo,
+        req.file
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao validar planilha do planejamento');
+    }
+  }
+
+  static async revalidarItensPlanejamento(req, res) {
+    try {
+      return res.json(await validarItensPlanejamento(
+        req.params.obraId,
+        req.params.competencia,
+        req.params.tipo,
+        req.body?.itens
+      ));
+    } catch (error) {
+      return respondError(res, error, 'Erro ao revalidar itens do planejamento');
     }
   }
 

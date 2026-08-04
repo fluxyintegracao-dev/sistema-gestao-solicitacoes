@@ -21,6 +21,18 @@ const {
 
 const router = express.Router();
 
+const planningSpreadsheetPermission = Object.freeze({
+  custos: CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_COSTS,
+  'medicao-prevista': CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_RECEIVABLES,
+  'medicao-aprovada': CUSTOS_RECEBIVEIS_PERMISSIONS.MEDICAO_CONSOLIDATE
+});
+
+function requirePlanningSpreadsheetPermission(req, res, next) {
+  const permission = planningSpreadsheetPermission[String(req.params.tipo || '').toLowerCase()];
+  if (!permission) return res.status(404).json({ error: 'Tipo de planilha de planejamento invalido.' });
+  return requireCustosRecebiveisPermission(permission)(req, res, next);
+}
+
 router.use(
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.MODULE_ACCESS)
 );
@@ -99,6 +111,28 @@ router.post(
   requireCustosRecebiveisPermission(CUSTOS_RECEBIVEIS_PERMISSIONS.MEDICAO_CONSOLIDATE),
   requireCustosRecebiveisObraScope(),
   CustosRecebiveisController.consolidarMedicao
+);
+
+router.get(
+  '/obras/:obraId/competencias/:competencia/planilhas/:tipo/modelo',
+  requirePlanningSpreadsheetPermission,
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.modeloPlanejamento
+);
+
+router.post(
+  '/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-arquivo',
+  requirePlanningSpreadsheetPermission,
+  requireCustosRecebiveisObraScope(),
+  uploadComprovantes.single('file'),
+  CustosRecebiveisController.validarPlanilhaPlanejamento
+);
+
+router.post(
+  '/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-itens',
+  requirePlanningSpreadsheetPermission,
+  requireCustosRecebiveisObraScope(),
+  CustosRecebiveisController.revalidarItensPlanejamento
 );
 
 router.get(

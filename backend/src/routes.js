@@ -1771,6 +1771,15 @@ router.put('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowC
 router.delete('/compras/fornecedores/:id', requireEnabledModule('COTACOES'), allowComprasFornecedoresManage, FornecedorCompraController.destroy);
 router.post('/compras/anexos-temporarios', allowCompraSolicitacoesUpload, uploadRateLimit, uploadComprovantes.single('file'), SolicitacaoCompraController.uploadTemporario);
 router.get('/compras/formas-pagamento-ativas', allowCompraSolicitacoesCreate, SolicitacaoCompraController.formasPagamentoAtivas);
+router.get('/compras/solicitacoes/modelo-itens-xlsx', allowCompraSolicitacoesCreate, scopeCompraListAccess, SolicitacaoCompraController.modeloSolicitacaoCompraXlsx);
+router.post(
+  '/compras/solicitacoes/importar-itens-xlsx',
+  allowCompraSolicitacoesCreate,
+  uploadRateLimit,
+  uploadComprovantes.single('file'),
+  requireCompraBodyObraAccess,
+  SolicitacaoCompraController.importarSolicitacaoCompraXlsx
+);
 router.post(
   '/compras/solicitacoes-diretas/credores',
   allowCompraSolicitacoesCreate,

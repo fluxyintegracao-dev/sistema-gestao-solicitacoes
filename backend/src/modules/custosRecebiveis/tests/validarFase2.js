@@ -11,10 +11,16 @@ const {
   findPrivateSources,
   monthRange,
   normalizeCompetencia,
+  pesquisarItensPlano,
   salvarCustos,
+  salvarRecebiveis,
   statusComparativo,
   summarizeDashboardRows
 } = require('../services/planejamentoService');
+const {
+  TYPES: PLANNING_SHEET_TYPES,
+  validarLinhasPlanejamento
+} = require('../services/planejamentoPlanilhaService');
 
 const moduleRoot = path.resolve(__dirname, '..');
 const backendRoot = path.resolve(moduleRoot, '../../..');
@@ -85,6 +91,8 @@ function validateBackendContracts() {
   const service = read('src/modules/custosRecebiveis/services/planejamentoService.js');
   const routes = read('src/modules/custosRecebiveis/routes/index.js');
   const controller = read('src/modules/custosRecebiveis/controllers/CustosRecebiveisController.js');
+  const migration = read('migrations/202608030002_custos_recebiveis_subitens_mensais.js');
+  const spreadsheetService = read('src/modules/custosRecebiveis/services/planejamentoPlanilhaService.js');
 
   [
     "'/dashboard'",
@@ -95,6 +103,9 @@ function validateBackendContracts() {
     "'/obras/:obraId/competencias/:competencia/receitas'",
     "'/obras/:obraId/competencias/:competencia/finalizar'",
     "'/obras/:obraId/competencias/:competencia/medicao'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/modelo'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-arquivo'",
+    "'/obras/:obraId/competencias/:competencia/planilhas/:tipo/validar-itens'",
     "'/obras/:obraId/comparativo'",
     "'/competencias/:competenciaId/reabertura'",
     "'/reaberturas/:reaberturaId/aprovar'"
@@ -129,17 +140,36 @@ function validateBackendContracts() {
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
+  assert(service.includes('buildPlanMacros'));
+  assert(service.includes('previsao_custo_id'));
+  assert(service.includes('CR_CUSTO_DESATUALIZADO'));
+  assert(service.includes('etapa_macro_codigo: macroCode'));
+  assert(migration.includes("const COSTS = 'cr_previsoes_custo'"));
+  assert(migration.includes("'chave_local'"));
+  assert(migration.includes("'previsao_custo_id'"));
+  assert(migration.includes('fk_cr_receitas_previsao_custo'));
+  assert(migration.includes('fk_cr_medicoes_previsao_custo'));
+  assert(spreadsheetService.includes("worksheet.protect('FluxyPlanejamento'"));
+  assert(spreadsheetService.includes("workbook.addWorksheet('_METADADOS')"));
+  assert(spreadsheetService.includes("metadata.state = 'veryHidden'"));
+  assert(spreadsheetService.includes('Formulas nao sao permitidas'));
+  assert(spreadsheetService.includes('saldo_disponivel'));
+  assert(spreadsheetService.includes('quantity === 0'));
 }
 
 function validateFrontendContracts() {
   const constants = read('../frontend/src/modules/custosRecebiveis/constants/custosRecebiveis.js');
   const page = read('../frontend/src/modules/custosRecebiveis/pages/CustosRecebiveis.jsx');
   const planning = read('../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx');
+  const planningDraft = read(
+    '../frontend/src/modules/custosRecebiveis/utils/planningDraftStorage.js'
+  );
   const monthlyPlanning = read(
     '../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoMensalView.jsx'
   );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
+  const planningImport = read('../frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx');
 
   ['visao-geral', 'planejamento', 'comparativo'].forEach((tab) => (
     assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
@@ -150,18 +180,34 @@ function validateFrontendContracts() {
   assert(planning.includes('PUBLIC_STEPS'));
   assert(planning.includes('PRIVATE_STEPS'));
   assert(planning.includes("label: 'Custos planejados'"));
-  assert(planning.includes("label: 'Medição apresentada'"));
+  assert(planning.includes("label: 'Medição prevista'"));
   assert(planning.includes("label: 'Medição aprovada'"));
   assert(planning.includes("label: 'Recebíveis do período'"));
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
   assert(!planning.includes('checked={Boolean(item.confirmado)}'));
-  assert(planning.includes('aria-autocomplete="list"'));
-  assert(planning.includes('window.setTimeout'));
+  assert(planning.includes('Custos planejados por etapa macro'));
+  assert(planning.includes('Adicionar subitem'));
+  assert(planning.includes('previsao_custo_id'));
   assert(planning.includes('Qtd. orçada'));
+  assert(planning.includes('Math.min('));
+  assert(planning.includes('item.item?.quantidade_apresentada_anterior'));
+  assert(planning.includes('Qtd. medida'));
+  assert(planning.includes('Pesquisar subitem desta etapa'));
+  assert(planning.includes('usePlanItemSearch'));
+  assert(planning.includes('etapaMacroCodigo: macroCode'));
+  assert(planning.includes('Pesquisar subitem aprovado'));
+  assert(planning.includes('addApprovedMeasurement'));
   assert(planning.includes('disabled={Boolean(saving)}'));
   assert(planning.includes('Registrar medição aprovada'));
   assert(planning.includes('justificativa_glosa'));
+  assert(planning.includes('Rascunho salvo neste dispositivo'));
+  assert(planning.includes("window.addEventListener('pagehide', flushPlanningDrafts)"));
+  assert(planning.includes("'medicao-prevista'"));
+  assert(planningDraft.includes("fluxy_cr_planning_draft_v1"));
+  assert(planningDraft.includes('PLANNING_DRAFT_TTL_MS'));
+  assert(planningDraft.includes('plano_versao'));
+  assert(planningDraft.includes('window.localStorage.removeItem'));
   assert(monthlyPlanning.includes('Novo mês'));
   assert(monthlyPlanning.includes('Recebíveis do período'));
   assert(monthlyPlanning.includes('Receita recebida'));
@@ -175,6 +221,59 @@ function validateFrontendContracts() {
   assert(page.includes('obra={selectedObra}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
+  assert(planning.includes("renderPlanningSheetActions('custos'"));
+  assert(planning.includes("renderPlanningSheetActions('medicao-prevista'"));
+  assert(planning.includes("renderPlanningSheetActions('medicao-aprovada'"));
+  assert(planningImport.includes('Confirmar importação'));
+  assert(planningImport.includes('Validar novamente'));
+}
+
+function validatePlanningSpreadsheetPreview() {
+  const baseContext = {
+    type: PLANNING_SHEET_TYPES.MEDICAO_PREVISTA,
+    obra: { id: 7, codigo: '28', nome: 'ESCOLA' },
+    competencia: '2026-08',
+    plan: { id: 3, versao: 1 },
+    macros: [{ codigo: '00.001', descricao: 'Administracao', ordem: 1 }],
+    items: [{
+      plano_item_id: 9,
+      etapa_macro_codigo: '00.001',
+      etapa_macro_descricao: 'Administracao',
+      item_codigo: '00.001.01',
+      descricao: 'Engenheiro residente',
+      unidade: 'mes',
+      quantidade_orcada: 12,
+      valor_unitario: 100,
+      saldo_disponivel: 4
+    }]
+  };
+  const valid = validarLinhasPlanejamento(baseContext, [
+    { item_codigo: '00.001.01', quantidade: 0 },
+    { item_codigo: '00.001.01', descricao: 'Dado adulterado', quantidade: 3 }
+  ]);
+  assert.strictEqual(valid.itens.length, 1);
+  assert.strictEqual(valid.itens[0].descricao, 'Engenheiro residente');
+  assert.strictEqual(valid.resumo.valido, true);
+  const overBudget = validarLinhasPlanejamento(baseContext, [
+    { item_codigo: '00.001.01', quantidade: 5 }
+  ]);
+  assert.strictEqual(overBudget.resumo.valido, false);
+  assert(overBudget.erros.some((message) => message.includes('saldo disponivel')));
+
+  const freeCosts = validarLinhasPlanejamento({
+    ...baseContext,
+    type: PLANNING_SHEET_TYPES.CUSTOS
+  }, [{
+    etapa_macro_codigo: '00.001',
+    etapa_macro_descricao: 'Texto adulterado',
+    descricao_servico: 'Equipe de campo',
+    unidade: 'mes',
+    valor_unitario: 2500,
+    quantidade: 2
+  }]);
+  assert.strictEqual(freeCosts.resumo.valido, true);
+  assert.strictEqual(freeCosts.itens[0].etapa_macro_descricao, 'Administracao');
+  assert.strictEqual(freeCosts.resumo.valor_total, 5000);
 }
 
 function transactionHarness() {
@@ -185,6 +284,39 @@ function transactionHarness() {
 
 function commonScope() {
   return async () => ({ todas: true, obraIds: null });
+}
+
+async function validatePlanSearchByMacro() {
+  let capturedQuery = null;
+  const result = await pesquisarItensPlano(
+    { id: 1 },
+    7,
+    {
+      competencia: '2026-08',
+      etapa_macro_codigo: '00.003',
+      q: 'concreto',
+      limit: 50
+    },
+    {
+      resolverEscopoObras: commonScope(),
+      CrCompetencia: {
+        findOne: async () => ({ plano_versao_snapshot: 2 }),
+        findAll: async () => []
+      },
+      CrPlanoObra: {
+        findOne: async () => ({ id: 3, versao: 2 })
+      },
+      CrPlanoItem: {
+        findAndCountAll: async (query) => {
+          capturedQuery = query;
+          return { rows: [], count: 0 };
+        }
+      }
+    }
+  );
+  assert.strictEqual(capturedQuery.where.etapa_macro_codigo, '00.003');
+  assert.strictEqual(capturedQuery.limit, 50);
+  assert.strictEqual(result.pagination.total, 0);
 }
 
 async function validatePrivateAntiDoubleCount() {
@@ -401,6 +533,130 @@ async function validatePrivateWorkRejectsMeasurement() {
   );
 }
 
+async function validateMonthlyMacroSubitemsAndForecastMeasurement() {
+  let savedCosts = [];
+  let savedReceipts = [];
+  const competencia = {
+    id: 71,
+    obra_id: 7,
+    competencia: '2099-08',
+    estado: 'ABERTA',
+    plano_versao_snapshot: 1,
+    total_custo_previsto: 0,
+    total_receita_prevista: 0,
+    update: async function update(values) {
+      Object.assign(this, values);
+      return this;
+    }
+  };
+  const planItems = [
+    {
+      id: 100,
+      plano_id: 3,
+      codigo: '01',
+      descricao: 'Serviços preliminares',
+      somadora: true,
+      item_pai_id: null,
+      ordem: 1,
+      valor_total: 1000
+    },
+    {
+      id: 101,
+      plano_id: 3,
+      codigo: '01.01',
+      descricao: 'Referência orçamentária',
+      somadora: false,
+      etapa_macro_codigo: '01',
+      ordem: 2,
+      quantidade: 10,
+      custo_unitario: 100,
+      valor_total: 1000
+    }
+  ];
+  const baseOverrides = {
+    sequelize: transactionHarness(),
+    resolverEscopoObras: commonScope(),
+    Obra: {
+      findByPk: async () => ({ id: 7, nome: 'Obra pública', classificacao: 'PUBLICA' })
+    },
+    CrPlanoObra: {
+      findOne: async () => ({ id: 3, versao: 1, situacao: 'PUBLICADA' })
+    },
+    CrPlanoItem: { findAll: async () => planItems },
+    CrCompetencia: {
+      findOne: async () => competencia,
+      findAll: async () => []
+    },
+    CrReabertura: { findOne: async () => null },
+    CrAuditoria: { create: async (payload) => payload }
+  };
+
+  const costResult = await salvarCustos(
+    { id: 1 },
+    7,
+    '2099-08',
+    {
+      itens: [{
+        chave_local: 'local-subitem-1',
+        etapa_macro_codigo: '01',
+        descricao: 'Mobilização da equipe',
+        unidade: 'mês',
+        ordem: 1,
+        quantidade: 2,
+        custo_unitario: 150
+      }]
+    },
+    {
+      ...baseOverrides,
+      CrPrevisaoCusto: {
+        findAll: async () => savedCosts,
+        create: async (payload) => {
+          const created = {
+            id: 501,
+            ...payload,
+            update: async function update(values) {
+              Object.assign(this, values);
+              return this;
+            }
+          };
+          savedCosts.push(created);
+          return created;
+        },
+        destroy: async () => 0
+      }
+    }
+  );
+  assert.strictEqual(costResult.total, 300);
+  assert.strictEqual(savedCosts[0].plano_item_id, null);
+  assert.strictEqual(savedCosts[0].etapa_macro_codigo, '01');
+  assert.strictEqual(savedCosts[0].descricao, 'Mobilização da equipe');
+
+  const receiptResult = await salvarRecebiveis(
+    { id: 1 },
+    7,
+    '2099-08',
+    {
+      itens: [{ previsao_custo_id: 501, quantidade_prevista: 1.5 }]
+    },
+    {
+      ...baseOverrides,
+      CrPrevisaoCusto: { findAll: async () => savedCosts },
+      CrPrevisaoReceita: {
+        findAll: async () => [],
+        destroy: async () => { savedReceipts = []; },
+        bulkCreate: async (rows) => {
+          savedReceipts = rows;
+          return rows;
+        }
+      }
+    }
+  );
+  assert.strictEqual(receiptResult.total, 225);
+  assert.strictEqual(savedReceipts[0].previsao_custo_id, 501);
+  assert.strictEqual(savedReceipts[0].plano_item_id, null);
+  assert.strictEqual(savedReceipts[0].valor_previsto, 225);
+}
+
 async function validateApprovedMeasurementAndGlosa() {
   let createdMeasurement = null;
   let auditPayload = null;
@@ -428,10 +684,22 @@ async function validateApprovedMeasurementAndGlosa() {
         codigo: '01.01',
         descricao: 'Servico',
         somadora: false,
+        quantidade: 20,
         custo_unitario: 10
+      }, {
+        id: 10,
+        plano_id: 3,
+        codigo: '01.02',
+        descricao: 'Servico aprovado diferente',
+        somadora: false,
+        quantidade: 8,
+        custo_unitario: 25
       }]
     },
-    CrCompetencia: { findOne: async () => competencia },
+    CrCompetencia: {
+      findOne: async () => competencia,
+      findAll: async () => []
+    },
     CrPrevisaoReceita: {
       findAll: async () => [{
         competencia_id: 41,
@@ -441,12 +709,13 @@ async function validateApprovedMeasurementAndGlosa() {
         valor_previsto: 100
       }]
     },
+    CrPrevisaoCusto: { findAll: async () => [] },
     CrMedicaoConsolidada: {
+      findAll: async () => [],
       destroy: async () => 0,
-      findOne: async () => null,
-      create: async (payload) => {
-        createdMeasurement = payload;
-        return payload;
+      bulkCreate: async (rows) => {
+        [createdMeasurement] = rows;
+        return rows;
       }
     },
     CrAuditoria: {
@@ -462,6 +731,7 @@ async function validateApprovedMeasurementAndGlosa() {
     '2026-08',
     {
       idempotency_key: 'medicao-1',
+      justificativa_glosa_geral: 'Glosa registrada pelo orgao.',
       itens: [{
         plano_item_id: 9,
         quantidade_medida: 6,
@@ -485,15 +755,34 @@ async function validateApprovedMeasurementAndGlosa() {
         idempotency_key: 'medicao-2',
         itens: [{
           plano_item_id: 9,
-          quantidade_medida: 11,
-          valor_medido: 110,
+          quantidade_medida: 21,
+          valor_medido: 210,
           justificativa_glosa: null
         }]
       },
       overrides
     ),
-    (error) => error?.code === 'CR_MEDICAO_ACIMA_APRESENTADA'
+    (error) => error?.code === 'CR_MEDICAO_SUPERA_ORCAMENTO'
   );
+
+  const independentResult = await consolidarMedicao(
+    { id: 1 },
+    7,
+    '2026-08',
+    {
+      idempotency_key: 'medicao-3',
+      justificativa_glosa_geral: 'Composicao aprovada diferente da previsao.',
+      itens: [{
+        plano_item_id: 10,
+        quantidade_medida: 2,
+        valor_medido: 1
+      }]
+    },
+    overrides
+  );
+  assert.strictEqual(independentResult.valor_total, 50);
+  assert.strictEqual(createdMeasurement.plano_item_id, 10);
+  assert.strictEqual(createdMeasurement.valor_medido, 50);
 }
 
 async function run() {
@@ -501,8 +790,11 @@ async function run() {
   validateCompetenciaBoundaries();
   validateBackendContracts();
   validateFrontendContracts();
+  validatePlanningSpreadsheetPreview();
+  await validatePlanSearchByMacro();
   await validatePrivateAntiDoubleCount();
   await validatePrivateReceiptsSyncOnFinalization();
+  await validateMonthlyMacroSubitemsAndForecastMeasurement();
   await validateFinalizationIdempotency();
   await validateFinalizedCompetencyIsImmutable();
   await validatePrivateWorkRejectsMeasurement();

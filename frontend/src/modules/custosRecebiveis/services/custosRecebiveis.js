@@ -169,10 +169,13 @@ export async function criarCompetenciaObra(obraId, competencia) {
 export async function pesquisarItensPlanoCompetencia(
   obraId,
   competencia,
-  { q = '', page = 1, limit = 20 } = {}
+  { q = '', page = 1, limit = 20, etapaMacroCodigo = '' } = {}
 ) {
   const query = new URLSearchParams({ competencia, page, limit });
   if (String(q || '').trim()) query.set('q', String(q).trim());
+  if (String(etapaMacroCodigo || '').trim()) {
+    query.set('etapa_macro_codigo', String(etapaMacroCodigo).trim());
+  }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/obras/${obraId}/plano/itens?${query.toString()}`,
     { headers: authHeaders() }
@@ -220,16 +223,75 @@ export async function finalizarPlanejamentoCompetencia(
   return parseResponse(response, 'Erro ao finalizar competência');
 }
 
-export async function consolidarMedicaoCompetencia(obraId, competencia, itens) {
+export async function consolidarMedicaoCompetencia(
+  obraId,
+  competencia,
+  itens,
+  justificativaGlosaGeral = ''
+) {
   const response = await fetch(
     `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/medicao`,
     {
       method: 'POST',
       headers: jsonHeaders({ 'Idempotency-Key': newIdempotencyKey('cr-medicao') }),
-      body: JSON.stringify({ itens })
+      body: JSON.stringify({
+        itens,
+        justificativa_glosa_geral: justificativaGlosaGeral || null
+      })
     }
   );
   return parseResponse(response, 'Erro ao consolidar medição');
+}
+
+export async function baixarModeloPlanilhaPlanejamento(
+  obraId,
+  competencia,
+  tipo,
+  obraCodigo = ''
+) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/planilhas/${tipo}/modelo`,
+    { headers: authHeaders() }
+  );
+  if (!response.ok) await parseResponse(response, 'Erro ao baixar modelo do planejamento');
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') || '';
+  const filename = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+    || `modelo-${tipo}-${obraCodigo || obraId}-${competencia}.xlsx`;
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function validarArquivoPlanilhaPlanejamento(obraId, competencia, tipo, file) {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/planilhas/${tipo}/validar-arquivo`,
+    {
+      method: 'POST',
+      headers: authHeaders(),
+      body: form
+    }
+  );
+  return parseResponse(response, 'Erro ao validar planilha do planejamento');
+}
+
+export async function revalidarItensPlanilhaPlanejamento(obraId, competencia, tipo, itens) {
+  const response = await fetch(
+    `${API_URL}/custos-recebiveis/obras/${obraId}/competencias/${competencia}/planilhas/${tipo}/validar-itens`,
+    {
+      method: 'POST',
+      headers: jsonHeaders(),
+      body: JSON.stringify({ itens })
+    }
+  );
+  return parseResponse(response, 'Erro ao revalidar itens do planejamento');
 }
 
 export async function obterComparativoCompetencia(obraId, competencia) {

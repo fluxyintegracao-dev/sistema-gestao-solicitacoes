@@ -18,7 +18,7 @@ import {
 
 const TYPE_LABELS = {
   CUSTO_PREVISTO: 'Custos planejados',
-  RECEITA_PREVISTA: 'Medição apresentada'
+  RECEITA_PREVISTA: 'Medição prevista'
 };
 
 const STATE_LABELS = {
