@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  baixarModeloItensSolicitacaoCompra,
   baixarModeloItensCompraDireta,
+  importarItensSolicitacaoCompra,
   importarItensCompraDireta,
   listarFormasPagamentoCompraDireta,
   listarInsumos,
@@ -175,7 +177,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const hidratandoDraftRef = useRef(false);
   const draftCarregadoRef = useRef(false);
   const suspenderAutosaveAteRef = useRef(0);
-  const importacaoCompraDiretaInputRef = useRef(null);
+  const importacaoItensInputRef = useRef(null);
+  const importacaoEmAndamentoRef = useRef(false);
   const buscaCredorRequestRef = useRef(0);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
@@ -205,7 +208,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [itens, setItens] = useState([]);
   const [uploadingArquivos, setUploadingArquivos] = useState({});
   const [uploadingAnexoCabecalho, setUploadingAnexoCabecalho] = useState(false);
-  const [importandoItensCompraDireta, setImportandoItensCompraDireta] = useState(false);
+  const [importandoItens, setImportandoItens] = useState(false);
   const [loading, setLoading] = useState(false);
   const [modalManualAberto, setModalManualAberto] = useState(false);
   const [modalApropriacaoIndex, setModalApropriacaoIndex] = useState(null);
@@ -635,16 +638,25 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
-  async function baixarModeloCompraDireta() {
+  async function baixarModeloItens() {
+    if (!modoCompraDireta && !obraId) {
+      alert('Selecione a obra antes de baixar o modelo.');
+      return;
+    }
+
     try {
-      await baixarModeloItensCompraDireta();
+      if (modoCompraDireta) {
+        await baixarModeloItensCompraDireta();
+      } else {
+        await baixarModeloItensSolicitacaoCompra(obraId);
+      }
     } catch (error) {
       console.error(error);
       alert(error.message || 'Erro ao baixar modelo de itens');
     }
   }
 
-  async function handleImportarItensCompraDireta(file) {
+  async function handleImportarItens(file) {
     if (!file) {
       return;
     }
@@ -654,9 +666,16 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       return;
     }
 
-    setImportandoItensCompraDireta(true);
+    if (importacaoEmAndamentoRef.current) {
+      return;
+    }
+
+    importacaoEmAndamentoRef.current = true;
+    setImportandoItens(true);
     try {
-      const data = await importarItensCompraDireta(file, obraId);
+      const data = modoCompraDireta
+        ? await importarItensCompraDireta(file, obraId)
+        : await importarItensSolicitacaoCompra(file, obraId, necessarioPara);
       const itensImportados = Array.isArray(data?.itens)
         ? data.itens.map((item) => sincronizarItemComRateios(item))
         : [];
@@ -666,14 +685,38 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         return;
       }
 
+      if (itens.length + itensImportados.length > 300) {
+        alert(`A solicitacao ficaria com ${itens.length + itensImportados.length} itens. O limite e 300 itens.`);
+        return;
+      }
+
+      if (!modoCompraDireta) {
+        const idsAtuais = new Set(
+          itens
+            .filter((item) => !item.manual && Number(item.insumo_id) > 0)
+            .map((item) => Number(item.insumo_id))
+        );
+        const duplicados = itensImportados.filter(
+          (item) => !item.manual && idsAtuais.has(Number(item.insumo_id))
+        );
+        if (duplicados.length) {
+          const nomes = duplicados.slice(0, 5).map((item) => item.insumo_nome).join(', ');
+          alert(`A importacao contem insumo(s) que ja estao na solicitacao: ${nomes}. Remova as duplicidades e tente novamente.`);
+          return;
+        }
+      }
+
       setItens((atual) => [...atual, ...itensImportados]);
-      alert(`${itensImportados.length} item(ns) importado(s) para a compra direta.`);
+      alert(
+        `${itensImportados.length} item(ns) importado(s) para ${modoCompraDireta ? 'a compra direta' : 'a solicitacao de compra'}. Revise os dados antes de continuar.`
+      );
     } catch (error) {
       console.error(error);
       const detalhes = Array.isArray(error?.erros) ? `\n${error.erros.join('\n')}` : '';
-      alert(`${error.message || 'Erro ao importar itens da compra direta'}${detalhes}`);
+      alert(`${error.message || 'Erro ao importar itens'}${detalhes}`);
     } finally {
-      setImportandoItensCompraDireta(false);
+      importacaoEmAndamentoRef.current = false;
+      setImportandoItens(false);
     }
   }
 
@@ -1444,35 +1487,42 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           <div className="card-header flex flex-wrap items-center justify-between gap-3">
             <h2 className="font-semibold">Itens da solicitação</h2>
             <div className="flex flex-wrap items-center justify-end gap-2 text-sm text-[var(--c-muted)]">
-              {modoCompraDireta && (
-                <>
-                  <button type="button" className="btn btn-outline" onClick={baixarModeloCompraDireta}>
-                    Baixar modelo Excel
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline"
-                    onClick={() => importacaoCompraDiretaInputRef.current?.click()}
-                    disabled={importandoItensCompraDireta}
-                  >
-                    {importandoItensCompraDireta ? 'Importando...' : 'Importar Excel'}
-                  </button>
-                  <input
-                    ref={importacaoCompraDiretaInputRef}
-                    type="file"
-                    className="hidden"
-                    accept=".xlsx,.xls"
-                    onChange={(event) => {
-                      const [file] = Array.from(event.target.files || []);
-                      void handleImportarItensCompraDireta(file);
-                      event.target.value = '';
-                    }}
-                  />
-                  <span className="rounded-full border border-[var(--c-border)] px-3 py-1 text-xs">
-                    Limite 300 itens
-                  </span>
-                </>
-              )}
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={baixarModeloItens}
+                  disabled={!modoCompraDireta && !obraId}
+                  title={!modoCompraDireta && !obraId ? 'Selecione a obra para baixar o modelo' : undefined}
+                >
+                  {modoCompraDireta ? 'Baixar modelo Excel' : 'Baixar modelo de itens'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => importacaoItensInputRef.current?.click()}
+                  disabled={importandoItens || !obraId}
+                  title={!obraId ? 'Selecione a obra antes de importar' : undefined}
+                >
+                  {importandoItens
+                    ? 'Importando...'
+                    : (modoCompraDireta ? 'Importar Excel' : 'Importar itens em massa')}
+                </button>
+                <input
+                  ref={importacaoItensInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".xlsx"
+                  onChange={(event) => {
+                    const [file] = Array.from(event.target.files || []);
+                    void handleImportarItens(file);
+                    event.target.value = '';
+                  }}
+                />
+                <span className="rounded-full border border-[var(--c-border)] px-3 py-1 text-xs">
+                  Limite 300 itens
+                </span>
+              </>
               <span>{itens.length} item(ns)</span>
               {itens.length > 0 && <span>{itensPendentesApropriacao} pendente(s) de rateio fechado</span>}
             </div>

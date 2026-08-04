@@ -23,6 +23,18 @@ Compras e dono da solicitacao de compra, origem normal/direta, itens, quantidade
 - cadastro rapido exige nome, CPF/CNPJ e telefone e aceita email;
 - valores, desconto, anexos, itens e apropriacoes sao validados no backend.
 
+## Importacao de itens na solicitacao normal
+
+- a Nova Solicitacao de Compra permite baixar um modelo XLSX depois de selecionar a obra;
+- o modelo traz abas de referencia de insumos ativos, unidades e apropriacoes analiticas da obra, sem expor IDs de banco ao usuario;
+- a planilha normal nao recebe fornecedor, forma de pagamento, valor unitario ou valor total, porque esses dados pertencem as etapas posteriores de cotacao;
+- a importacao aceita item cadastrado por codigo ou item manual por descricao e unidade, quantidade, especificacao, apropriacao, data necessaria e link do produto;
+- apropriacao e data podem ser completadas na tela antes da revisao; quando informadas na planilha, devem respeitar a obra e o formato vigente;
+- a importacao apenas alimenta o rascunho local e nao cria solicitacao, cotacao, pedido ou efeito financeiro;
+- qualquer erro bloqueia o arquivo inteiro, e o usuario revisa os itens importados na grade antes de seguir pelo fluxo existente;
+- o limite permanece em 300 itens considerando o que ja existe no rascunho, e multiplos envios simultaneos ficam bloqueados no frontend;
+- baixar e importar exigem `compras.solicitacoes.criar`, alem do escopo da obra validado no backend.
+
 ## Fluxo
 
 1. usuario cria a compra;

@@ -87,6 +87,12 @@ const {
 } = require('../services/authorizationService');
 const { validateCompraEnviarBody } = require('../validators/operationalValidators');
 const { publishComprasRealtimeEventSafe } = require('../services/comprasRealtimeService');
+const {
+  SOLICITACAO_COMPRA_IMPORT_MAX_ITEMS,
+  montarItensSolicitacaoImportados,
+  montarPlanilhasModeloSolicitacaoCompra,
+  normalizeImportedRows: normalizeSolicitacaoCompraImportedRows
+} = require('../services/compraItensPlanilhaService');
 const PDF_PAGE = {
   left: 20,
   top: 12,
@@ -2113,6 +2119,120 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar formas de pagamento ativas' });
+    }
+  },
+
+  async modeloSolicitacaoCompraXlsx(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      const obraId = Number(req.query?.obra_id || 0);
+      if (!obraId) {
+        return res.status(400).json({ error: 'Selecione a obra antes de baixar o modelo.' });
+      }
+
+      const [obra, insumos, unidades, apropriacoes] = await Promise.all([
+        Obra.findByPk(obraId, { attributes: ['id', 'codigo', 'nome'] }),
+        Insumo.findAll({
+          where: { ativo: true },
+          include: [{ model: Unidade, as: 'unidade' }],
+          order: [['nome', 'ASC']]
+        }),
+        Unidade.findAll({ order: [['nome', 'ASC']] }),
+        Apropriacao.findAll({
+          where: { obra_id: obraId },
+          attributes: APROPRIACAO_ATTRIBUTES,
+          order: [['codigo', 'ASC']]
+        })
+      ]);
+
+      if (!obra) {
+        return res.status(404).json({ error: 'Obra nao encontrada.' });
+      }
+
+      const buffer = await createWorkbookBuffer(
+        montarPlanilhasModeloSolicitacaoCompra({ obra, insumos, unidades, apropriacoes })
+      );
+
+      return responderXlsx(res, buffer, `modelo-itens-solicitacao-compra-${obra.codigo || obra.id}.xlsx`);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao gerar modelo de itens da solicitacao de compra' });
+    }
+  },
+
+  async importarSolicitacaoCompraXlsx(req, res) {
+    try {
+      const usuario = await validarAcesso(req, res);
+      if (!usuario) return;
+
+      if (!req.file) {
+        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      }
+
+      const obraId = Number(req.body?.obra_id || 0);
+      if (!obraId) {
+        return res.status(400).json({ error: 'Selecione a obra antes de importar os itens.' });
+      }
+
+      const rawRows = await sheetToJsonRows(req.file.buffer, {
+        filename: req.file.originalname,
+        defval: '',
+        raw: false
+      });
+      const rows = normalizeSolicitacaoCompraImportedRows(rawRows)
+        .filter((row) => Object.values(row).some((value) => String(value || '').trim()));
+
+      if (!rows.length) {
+        return res.status(400).json({ error: 'A planilha nao possui itens para importar.' });
+      }
+
+      if (rows.length > SOLICITACAO_COMPRA_IMPORT_MAX_ITEMS) {
+        return res.status(400).json({
+          error: `A planilha possui ${rows.length} itens. O limite e ${SOLICITACAO_COMPRA_IMPORT_MAX_ITEMS} itens por arquivo.`
+        });
+      }
+
+      const [insumos, unidades, apropriacoes] = await Promise.all([
+        Insumo.findAll({
+          where: { ativo: true },
+          include: [{ model: Unidade, as: 'unidade' }]
+        }),
+        Unidade.findAll(),
+        Apropriacao.findAll({
+          where: { obra_id: obraId },
+          attributes: APROPRIACAO_ATTRIBUTES
+        })
+      ]);
+
+      const { itens, erros } = montarItensSolicitacaoImportados({
+        rows,
+        insumos,
+        unidades,
+        apropriacoes,
+        necessarioParaPadrao: req.body?.necessario_para || ''
+      });
+
+      if (erros.length) {
+        return res.status(400).json({
+          error: `A importacao possui ${erros.length} erro(s). Corrija a planilha e tente novamente.`,
+          erros: erros.slice(0, 30)
+        });
+      }
+
+      return res.json({
+        itens,
+        total: itens.length,
+        limite: SOLICITACAO_COMPRA_IMPORT_MAX_ITEMS
+      });
+    } catch (error) {
+      console.error(error);
+      const statusCode = Number(error?.statusCode || 0);
+      if (statusCode >= 400 && statusCode < 500) {
+        return res.status(statusCode).json({ error: error.message });
+      }
+      return res.status(500).json({ error: 'Erro ao importar itens da solicitacao de compra' });
     }
   },
 

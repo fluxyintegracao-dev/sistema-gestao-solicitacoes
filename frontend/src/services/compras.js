@@ -311,6 +311,35 @@ export async function criarSolicitacaoCompraDireta(data) {
   return handleJsonResponse(response, 'Erro ao criar compra direta');
 }
 
+export async function baixarModeloItensSolicitacaoCompra(obraId) {
+  const params = new URLSearchParams();
+  if (obraId) {
+    params.set('obra_id', obraId);
+  }
+  const response = await fetch(`${API_URL}/compras/solicitacoes/modelo-itens-xlsx?${params.toString()}`, {
+    headers: authHeaders()
+  });
+  return downloadResponse(response, 'modelo-itens-solicitacao-compra.xlsx', 'Erro ao baixar modelo de itens');
+}
+
+export async function importarItensSolicitacaoCompra(file, obraId, necessarioPara = '') {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (obraId) {
+    formData.append('obra_id', obraId);
+  }
+  if (necessarioPara) {
+    formData.append('necessario_para', necessarioPara);
+  }
+
+  const response = await fetch(`${API_URL}/compras/solicitacoes/importar-itens-xlsx`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData
+  });
+  return handleJsonResponse(response, 'Erro ao importar itens da solicitacao de compra');
+}
+
 export async function listarFormasPagamentoCompraDireta() {
   const response = await fetch(`${API_URL}/compras/formas-pagamento-ativas`, {
     headers: authHeaders()
