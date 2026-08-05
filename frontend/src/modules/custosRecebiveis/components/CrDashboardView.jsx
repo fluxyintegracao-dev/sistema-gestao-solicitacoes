@@ -137,6 +137,7 @@ export default function CrDashboardView({
   const alerts = Array.isArray(data?.alertas) ? data.alertas : [];
   const macros = Array.isArray(data?.macros) ? data.macros : [];
   const workSummaries = Array.isArray(data?.obras_resumo) ? data.obras_resumo : [];
+  const isWorkContext = data?.escopo?.tipo === 'OBRA';
   const visibleWorkSummaries = useMemo(() => {
     const competenceSet = new Set(
       (competencias.length ? competencias : [competencia]).map(String)

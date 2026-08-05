@@ -268,6 +268,7 @@ function validateFrontendContracts() {
   assert(dashboard.includes('Planejamento mensal por obra'));
   assert(dashboard.includes('visibleWorkSummaries'));
   assert(dashboard.includes('filteredPortfolio'));
+  assert(dashboard.includes("const isWorkContext = data?.escopo?.tipo === 'OBRA'"));
   assert(dashboard.includes('obra(s) no recorte executivo'));
   assert(dashboard.includes('label="Medição aprovada"'));
   assert(dashboard.includes("tipo_centro_custo || '').toUpperCase() === 'OBRA'"));
