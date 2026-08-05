@@ -18,6 +18,7 @@ import CrComparativoView from '../components/CrComparativoView';
 import CrConfiguracoesView from '../components/CrConfiguracoesView';
 import CrDashboardView from '../components/CrDashboardView';
 import CrExportacoesView from '../components/CrExportacoesView';
+import CrExecutiveFilters from '../components/CrExecutiveFilters';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
 import CrObrigacoesView from '../components/CrObrigacoesView';
@@ -88,6 +89,16 @@ export default function CustosRecebiveis() {
   const selectedObraId = Number(searchParams.get('obra'));
   const selectedPlanId = Number(searchParams.get('plano'));
   const competencia = searchParams.get('competencia') || currentMonth();
+  const dashboardObraId = Number(searchParams.get('obra_decisao'));
+  const dashboardClassificacao = ['PUBLICA', 'PRIVADA'].includes(
+    String(searchParams.get('classificacao_decisao') || '').toUpperCase()
+  ) ? String(searchParams.get('classificacao_decisao')).toUpperCase() : '';
+  const dashboardCompetencias = [...new Set(
+    String(searchParams.get('competencias') || competencia)
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => /^\d{4}-\d{2}$/.test(item))
+  )];
   const canViewObras = hasExplicitCustosRecebiveisPermission(
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW
@@ -152,6 +163,10 @@ export default function CustosRecebiveis() {
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
     || planData?.obra
     || null;
+  const executiveWorks = useMemo(
+    () => obras.filter((obra) => String(obra.tipo_centro_custo || '').toUpperCase() === 'OBRA'),
+    [obras]
+  );
 
   const updateQuery = useCallback((updates, options = {}) => {
     setSearchParams((current) => {
@@ -429,19 +444,38 @@ export default function CustosRecebiveis() {
         })}
       </nav>
 
+      {activeTab === 'visao-geral' ? (
+        <CrExecutiveFilters
+          obras={executiveWorks}
+          obraId={Number.isInteger(dashboardObraId) && dashboardObraId > 0
+            ? dashboardObraId
+            : ''}
+          classificacao={dashboardClassificacao}
+          competenciaReferencia={competencia}
+          competencias={dashboardCompetencias.length ? dashboardCompetencias : [competencia]}
+          onObraChange={(value) => updateQuery({ obra_decisao: value || null })}
+          onClassificacaoChange={(value) => updateQuery({
+            classificacao_decisao: value || null
+          })}
+          onCompetenciaReferenciaChange={(value) => updateQuery({
+            competencia: value,
+            competencias: null
+          })}
+          onCompetenciasChange={(values) => updateQuery({
+            competencias: values.length === 1 && values[0] === competencia
+              ? null
+              : values.join(',')
+          })}
+        />
+      ) : (
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
-          <span>{activeTab === 'visao-geral' ? 'Escopo executivo' : 'Obra em contexto'}</span>
+          <span>Obra em contexto</span>
           <select
-            value={activeTab === 'visao-geral'
-              ? ''
-              : (Number.isInteger(selectedObraId) && selectedObraId > 0 ? selectedObraId : '')}
-            disabled={activeTab === 'visao-geral'}
+            value={Number.isInteger(selectedObraId) && selectedObraId > 0 ? selectedObraId : ''}
             onChange={(event) => handleSelectContextObra(event.target.value)}
           >
-            <option value="">
-              {activeTab === 'visao-geral' ? 'Todas as obras do seu escopo' : 'Selecione uma obra'}
-            </option>
+            <option value="">Selecione uma obra</option>
             {obras.map((obra) => (
               <option key={obra.id} value={obra.id}>
                 {obra.codigo || obra.id} · {obra.nome}
@@ -462,18 +496,13 @@ export default function CustosRecebiveis() {
         </label>
         <div className="cr-context-summary">
           <span>Escopo atual</span>
-          <strong>
-            {activeTab === 'visao-geral'
-              ? `${obras.length} obra(s) consolidadas`
-              : (selectedObra ? selectedObra.nome : `${obras.length} obra(s) disponível(is)`)}
-          </strong>
+          <strong>{selectedObra ? selectedObra.nome : `${obras.length} obra(s) disponível(is)`}</strong>
           <small>
-            {activeTab === 'visao-geral'
-              ? 'Os cards abaixo permitem abrir o planejamento de cada obra.'
-              : (selectedObra?.empresa?.nome || 'A competência será usada nas próximas fases do módulo.')}
+            {selectedObra?.empresa?.nome || 'A competência será usada nas próximas fases do módulo.'}
           </small>
         </div>
       </section>
+      )}
 
       {feedback && activeTab !== 'importacoes' ? (
         <div className="cr-feedback" data-tone={feedback.tone || 'info'}>
@@ -514,6 +543,11 @@ export default function CustosRecebiveis() {
         <CrDashboardView
           key={`carteira-${competencia}-${refreshToken}`}
           competencia={competencia}
+          competencias={dashboardCompetencias.length ? dashboardCompetencias : [competencia]}
+          obraFilterId={Number.isInteger(dashboardObraId) && dashboardObraId > 0
+            ? dashboardObraId
+            : null}
+          classificacaoFilter={dashboardClassificacao}
           canOpenPlanning={canOpenPlanning}
           onOpenArea={handleOpenDashboardArea}
         />

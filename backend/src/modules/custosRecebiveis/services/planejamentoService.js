@@ -130,7 +130,8 @@ function serializeObra(value) {
     id: Number(item.id),
     codigo: item.codigo || null,
     nome: item.nome,
-    classificacao: item.classificacao || null
+    classificacao: item.classificacao || null,
+    tipo_centro_custo: item.tipo_centro_custo || null
   };
 }
 
@@ -224,7 +225,7 @@ function statusComparativo(previstoValue, realizadoValue) {
 
 async function findObra(obraId, deps, options = {}) {
   const obra = await deps.Obra.findByPk(obraId, {
-    attributes: ['id', 'codigo', 'nome', 'classificacao'],
+    attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo'],
     transaction: options.transaction,
     lock: options.lock
   });
@@ -2286,7 +2287,7 @@ async function obterDashboard(
   if (!selectedObraId && !scope.todas) obraWhere.id = { [Op.in]: scope.obraIds };
   const obras = await deps.Obra.findAll({
     where: obraWhere,
-    attributes: ['id', 'codigo', 'nome', 'classificacao'],
+    attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo'],
     order: [['nome', 'ASC']]
   });
   if (selectedObraId && !obras.length) {
@@ -2363,7 +2364,7 @@ async function obterDashboard(
   }
 
   const alerts = buildDashboardAlerts(currentRows, overdueObligations);
-  const workSummaries = summarizeDashboardWorkRows(currentRows, alerts);
+  const workSummaries = summarizeDashboardWorkRows(rows, alerts);
 
   return {
     competencia: competenciaCode,

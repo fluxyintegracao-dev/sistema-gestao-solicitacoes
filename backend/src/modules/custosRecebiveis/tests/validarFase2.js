@@ -173,6 +173,9 @@ function validateBackendContracts() {
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes('obras_resumo: workSummaries'));
+  assert(service.includes('summarizeDashboardWorkRows(rows, alerts)'));
+  assert(service.includes("tipo_centro_custo: 'OBRA'"));
+  assert(service.includes("'classificacao', 'tipo_centro_custo'"));
   assert(service.includes('alertas: alerts'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
@@ -207,6 +210,9 @@ function validateFrontendContracts() {
     '../frontend/src/modules/custosRecebiveis/components/CrMonthlySummaryCard.jsx'
   );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
+  const executiveFilters = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrExecutiveFilters.jsx'
+  );
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
   const planningImport = read('../frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx');
 
@@ -214,6 +220,7 @@ function validateFrontendContracts() {
     assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
   ));
   assert(page.includes('<CrDashboardView'));
+  assert(page.includes('<CrExecutiveFilters'));
   assert(page.includes('<CrPlanejamentoMensalView'));
   assert(page.includes('<CrComparativoView'));
   assert(planning.includes('PUBLIC_STEPS'));
@@ -258,11 +265,17 @@ function validateFrontendContracts() {
   assert(dashboard.includes('Evolução de custos'));
   assert(dashboard.includes('Evolução de recebíveis'));
   assert(dashboard.includes('Planejamento mensal por obra'));
+  assert(dashboard.includes('visibleWorkSummaries'));
+  assert(dashboard.includes("tipo_centro_custo || '').toUpperCase() === 'OBRA'"));
   assert(dashboard.includes('item.obra.nome'));
   assert(dashboard.includes('Custos por macro'));
   assert(dashboard.includes("item.nome || 'Macro sem descrição'"));
   assert(!dashboard.includes('Status das etapas'));
-  assert(page.includes('Todas as obras do seu escopo'));
+  assert(executiveFilters.includes('Todas as obras do seu escopo'));
+  assert(executiveFilters.includes('Marcar seis meses'));
+  assert(executiveFilters.includes('type="checkbox"'));
+  assert(executiveFilters.includes('value="PUBLICA"'));
+  assert(executiveFilters.includes('value="PRIVADA"'));
   assert(page.includes('canOpenPlanning={canOpenPlanning}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));

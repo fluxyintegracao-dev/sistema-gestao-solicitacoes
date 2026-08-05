@@ -149,6 +149,7 @@ function serializeObra(obra) {
     nome: plain.nome,
     cidade: plain.cidade || null,
     classificacao: plain.classificacao || null,
+    tipo_centro_custo: plain.tipo_centro_custo || null,
     planilha_geral: plain.planilha_geral == null ? null : Number(plain.planilha_geral),
     margem_custo_esperada: plain.margem_custo_esperada == null
       ? null
@@ -234,6 +235,7 @@ async function listarObrasNoEscopo(user, query = {}, overrides = {}) {
       'nome',
       'cidade',
       'classificacao',
+      'tipo_centro_custo',
       'planilha_geral',
       'margem_custo_esperada',
       'empresa_grupo_id'

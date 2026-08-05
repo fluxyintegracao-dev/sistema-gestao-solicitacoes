@@ -304,6 +304,18 @@ recebivel ou medicao prevista, valor reconhecido, recebido, saldo e glosa quando
 aplicavel. Obras com alertas ficam primeiro para antecipar a tomada de decisao; o card
 abre o planejamento da respectiva obra sem alterar qualquer regra de preenchimento.
 
+Os filtros executivos atuam exclusivamente na secao `Decisao por obra`. O usuario pode
+combinar uma obra, a classificacao publica ou privada e mais de uma das seis competencias
+disponiveis; nesse recorte, a mesma obra aparece em um card para cada competencia
+selecionada. A carteira consolidada, as tendencias e os pontos de atencao permanecem
+calculados para todas as obras autorizadas na competencia de referencia, preservando a
+leitura executiva global.
+
+Tanto a lista do filtro quanto os cards aceitam apenas cadastros cujo
+`tipo_centro_custo = OBRA`. Centros de custos nao participam desta tela. Se um cadastro
+administrativo ainda aparecer como obra, o tipo do proprio cadastro deve ser corrigido;
+o frontend nao infere o tipo pelo nome para evitar ocultar uma obra valida.
+
 O endpoint continua aceitando `obra_id` para consumidores que precisem do recorte de
 uma obra, incluindo a serie historica de seis competencias e o detalhamento somente
 das macros com movimento. Sem `obra_id`, consolida todas as obras autorizadas e retorna

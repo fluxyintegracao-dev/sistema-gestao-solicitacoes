@@ -106,6 +106,9 @@ function TrendPanel({
 
 export default function CrDashboardView({
   competencia,
+  competencias = [],
+  obraFilterId = null,
+  classificacaoFilter = '',
   canOpenPlanning = false,
   onOpenArea
 }) {
@@ -137,6 +140,24 @@ export default function CrDashboardView({
   const alerts = Array.isArray(data?.alertas) ? data.alertas : [];
   const macros = Array.isArray(data?.macros) ? data.macros : [];
   const workSummaries = Array.isArray(data?.obras_resumo) ? data.obras_resumo : [];
+  const visibleWorkSummaries = useMemo(() => {
+    const competenceSet = new Set(
+      (competencias.length ? competencias : [competencia]).map(String)
+    );
+    return workSummaries
+      .filter((item) => (
+        String(item.obra?.tipo_centro_custo || '').toUpperCase() === 'OBRA'
+        && competenceSet.has(String(item.competencia))
+        && (!obraFilterId || Number(item.obra?.id) === Number(obraFilterId))
+        && (!classificacaoFilter
+          || String(item.obra?.classificacao || '').toUpperCase() === classificacaoFilter)
+      ))
+      .sort((a, b) => (
+        Number(b.alertas || 0) - Number(a.alertas || 0)
+        || String(a.obra?.nome || '').localeCompare(String(b.obra?.nome || ''), 'pt-BR')
+        || String(b.competencia).localeCompare(String(a.competencia))
+      ));
+  }, [classificacaoFilter, competencia, competencias, obraFilterId, workSummaries]);
   const costDeviation = Number(cards.desvio_custo) || 0;
 
   if (loading && !data) {
@@ -257,16 +278,21 @@ export default function CrDashboardView({
             <span className="cr-scope-kicker">Decisão por obra</span>
             <h2>Planejamento mensal por obra</h2>
             <p>
-              Competência {formatMonth(competencia)} · compare previsão, realização e recebimento
-              sem perder o consolidado da carteira.
+              {competencias.length > 1
+                ? `${competencias.length} competências selecionadas`
+                : `Competência ${formatMonth(competencias[0] || competencia)}`}
+              {' '}· os filtros afetam somente estes cards; o consolidado permanece integral.
             </p>
           </div>
-          <HiOutlineBuildingOffice2 className="h-5 w-5 cr-heading-icon" />
+          <span className="cr-portfolio-planning__count">
+            <HiOutlineBuildingOffice2 className="h-4 w-4" />
+            {visibleWorkSummaries.length} card(s)
+          </span>
         </div>
 
-        {workSummaries.length ? (
+        {visibleWorkSummaries.length ? (
           <div className="cr-portfolio-planning__grid">
-            {workSummaries.map((item) => (
+            {visibleWorkSummaries.map((item) => (
               <CrMonthlySummaryCard
                 key={`${item.obra.id}-${item.competencia}`}
                 title={item.obra.nome}
@@ -293,7 +319,7 @@ export default function CrDashboardView({
           </div>
         ) : (
           <div className="cr-empty-state">
-            Nenhuma obra disponível no seu escopo para esta competência.
+            Nenhuma obra corresponde aos filtros executivos selecionados.
           </div>
         )}
       </section>
