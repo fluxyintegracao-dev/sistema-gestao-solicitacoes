@@ -1959,6 +1959,27 @@ function dashboardCompetencias(endValue, total = 6) {
   return result;
 }
 
+function normalizeDashboardCompetencias(value, referenceValue) {
+  const reference = normalizeCompetencia(referenceValue);
+  if (value == null || value === '') return dashboardCompetencias(reference);
+  const rawValues = Array.isArray(value) ? value : String(value).split(',');
+  const competencias = [...new Set(
+    rawValues
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .map(normalizeCompetencia)
+  )].sort();
+  if (!competencias.length) return dashboardCompetencias(reference);
+  if (competencias.length > 12) {
+    throw createBusinessError(
+      422,
+      'CR_DASHBOARD_COMPETENCIAS_LIMIT',
+      'Selecione no maximo 12 competencias para o dashboard.'
+    );
+  }
+  return competencias;
+}
+
 function summarizeDashboardRows(rows) {
   const custoPlanejado = money(rows.reduce((sum, row) => sum + row.custo_planejado, 0));
   const custoRealizado = money(rows.reduce((sum, row) => sum + row.custo_realizado, 0));
@@ -2318,10 +2339,23 @@ async function obterDashboard(
   user,
   competenciaValue,
   obraIdValue = null,
+  competenciasValue = null,
   overrides = {}
 ) {
+  if (
+    competenciasValue
+    && typeof competenciasValue === 'object'
+    && !Array.isArray(competenciasValue)
+  ) {
+    overrides = competenciasValue;
+    competenciasValue = null;
+  }
   const deps = dependencies(overrides);
   const competenciaCode = normalizeCompetencia(competenciaValue);
+  const competencias = normalizeDashboardCompetencias(
+    competenciasValue,
+    competenciaCode
+  );
   const selectedObraId = obraIdValue == null || obraIdValue === ''
     ? null
     : positiveId(obraIdValue, 'Obra');
@@ -2355,7 +2389,6 @@ async function obterDashboard(
     throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
   }
 
-  const competencias = dashboardCompetencias(competenciaCode);
   const rows = await buildDashboardRows(obras, competencias, deps);
   const currentRows = rows.filter((row) => row.competencia === competenciaCode);
   const historico = competencias.map((competencia) => ({
@@ -2602,6 +2635,7 @@ module.exports = {
   consolidarMedicao,
   criarCompetencia,
   dashboardCompetencias,
+  normalizeDashboardCompetencias,
   decidirReabertura,
   findPrivateSources,
   finalizarCompetencia,

@@ -115,19 +115,24 @@ export default function CrDashboardView({
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const competenciasParam = (competencias.length ? competencias : [competencia]).join(',');
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      setData(await obterCustosRecebiveisDashboard(competencia));
+      setData(await obterCustosRecebiveisDashboard(
+        competencia,
+        null,
+        competenciasParam
+      ));
     } catch (requestError) {
       setData(null);
       setError(requestError.message || 'Erro ao carregar visão geral.');
     } finally {
       setLoading(false);
     }
-  }, [competencia]);
+  }, [competencia, competenciasParam]);
 
   useEffect(() => {
     void load();

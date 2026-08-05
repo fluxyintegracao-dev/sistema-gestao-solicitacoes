@@ -10,6 +10,7 @@ const {
   finalizarCompetencia,
   findPrivateSources,
   monthRange,
+  normalizeDashboardCompetencias,
   normalizeCompetencia,
   pesquisarItensPlano,
   salvarCustos,
@@ -57,6 +58,14 @@ function validateCompetenciaBoundaries() {
   assert.deepStrictEqual(
     dashboardCompetencias('2026-02'),
     ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']
+  );
+  assert.deepStrictEqual(
+    normalizeDashboardCompetencias('2026-07,2026-08', '2026-07'),
+    ['2026-07', '2026-08']
+  );
+  assert.deepStrictEqual(
+    normalizeDashboardCompetencias(['2026-08', '2026-07', '2026-08'], '2026-07'),
+    ['2026-07', '2026-08']
   );
   assert.deepStrictEqual(
     summarizeDashboardRows([{
@@ -170,6 +179,7 @@ function validateBackendContracts() {
   assert(!service.includes('Apropriacao.destroy'));
   assert(controller.includes("req.get('Idempotency-Key')"));
   assert(controller.includes('req.query.obra_id'));
+  assert(controller.includes('req.query.competencias'));
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes('obras_resumo: workSummaries'));
@@ -215,6 +225,9 @@ function validateFrontendContracts() {
     '../frontend/src/modules/custosRecebiveis/components/CrMonthlySummaryCard.jsx'
   );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
+  const frontendService = read(
+    '../frontend/src/modules/custosRecebiveis/services/custosRecebiveis.js'
+  );
   const executiveFilters = read(
     '../frontend/src/modules/custosRecebiveis/components/CrExecutiveFilters.jsx'
   );
@@ -273,6 +286,8 @@ function validateFrontendContracts() {
   assert(dashboard.includes('Planejamento mensal por obra'));
   assert(dashboard.includes('visibleWorkSummaries'));
   assert(dashboard.includes('filteredPortfolio'));
+  assert(dashboard.includes('competenciasParam'));
+  assert(frontendService.includes("query.set('competencias'"));
   assert(dashboard.includes("const isWorkContext = data?.escopo?.tipo === 'OBRA'"));
   assert(dashboard.includes('obra(s) no recorte executivo'));
   assert(dashboard.includes('label="Medição aprovada"'));

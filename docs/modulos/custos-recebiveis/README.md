@@ -269,6 +269,9 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   titulos `RECEBER`, rateadas para a obra. O comparativo por item separa `Medicao
   prevista` e `Medicao aprovada`; o custo realizado continua vindo de baixas ativas
   de titulos `PAGAR` e permanece nas visoes financeiras do modulo.
+- A carteira consolidada e os cards por obra usam exatamente as competencias
+  selecionadas no filtro executivo. A competencia de referencia permanece como
+  contexto para alertas e detalhes, mas nao limita o somatorio multicompetencia.
 - Obra privada lista automaticamente parcelas contratuais e os respectivos titulos
   a receber com vencimento na competencia. Nao existe marcacao ou confirmacao manual:
   ao finalizar, as fontes oficiais do periodo sao sincronizadas no snapshot.

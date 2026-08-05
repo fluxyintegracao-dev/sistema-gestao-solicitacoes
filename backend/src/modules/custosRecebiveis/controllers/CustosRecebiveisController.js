@@ -163,7 +163,8 @@ class CustosRecebiveisController {
       return res.json(await obterDashboard(
         req.user,
         req.query.competencia,
-        req.query.obra_id
+        req.query.obra_id,
+        req.query.competencias
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao consultar dashboard de Custos e Recebiveis');

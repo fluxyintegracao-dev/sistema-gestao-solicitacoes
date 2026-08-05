@@ -126,10 +126,23 @@ function newIdempotencyKey(prefix = 'cr') {
     || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export async function obterCustosRecebiveisDashboard(competencia, obraId = null) {
+export async function obterCustosRecebiveisDashboard(
+  competencia,
+  obraId = null,
+  competencias = []
+) {
   const query = new URLSearchParams({ competencia });
   if (Number.isInteger(Number(obraId)) && Number(obraId) > 0) {
     query.set('obra_id', String(Number(obraId)));
+  }
+  const selectedCompetencias = Array.isArray(competencias)
+    ? competencias
+    : String(competencias || '').split(',');
+  const normalizedCompetencias = [...new Set(
+    selectedCompetencias.map((item) => String(item || '').trim()).filter(Boolean)
+  )];
+  if (normalizedCompetencias.length) {
+    query.set('competencias', normalizedCompetencias.join(','));
   }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/dashboard?${query.toString()}`,
