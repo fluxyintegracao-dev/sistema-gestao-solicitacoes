@@ -15,7 +15,8 @@ const {
   salvarCustos,
   salvarRecebiveis,
   statusComparativo,
-  summarizeDashboardRows
+  summarizeDashboardRows,
+  summarizeDashboardWorkRows
 } = require('../services/planejamentoService');
 const {
   TYPES: PLANNING_SHEET_TYPES,
@@ -85,6 +86,39 @@ function validateCompetenciaBoundaries() {
       recebiveis_vencidos: 1
     }
   );
+
+  const workSummaries = summarizeDashboardWorkRows([
+    {
+      obra: { id: 1, nome: 'Obra sem alerta' },
+      competencia: '2026-08',
+      competencia_id: 10,
+      estado_competencia: 'FINALIZADA',
+      custo_planejado: 100,
+      custo_realizado: 80,
+      recebivel_previsto: 150,
+      recebivel_reconhecido: 140,
+      medicao_aprovada: 140,
+      receita_recebida: 100,
+      glosa: 10
+    },
+    {
+      obra: { id: 2, nome: 'Obra com alerta' },
+      competencia: '2026-08',
+      competencia_id: 11,
+      estado_competencia: 'ABERTA',
+      custo_planejado: 100,
+      custo_realizado: 125,
+      recebivel_previsto: 160,
+      recebivel_reconhecido: 120,
+      medicao_aprovada: 120,
+      receita_recebida: 20,
+      glosa: 40
+    }
+  ], [{ obra_id: 2 }, { obra_id: 2 }]);
+  assert.strictEqual(workSummaries[0].obra.id, 2);
+  assert.strictEqual(workSummaries[0].alertas, 2);
+  assert.strictEqual(workSummaries[0].desvio_custo, 25);
+  assert.strictEqual(workSummaries[0].saldo_receber, 100);
 }
 
 function validateBackendContracts() {
@@ -138,6 +172,7 @@ function validateBackendContracts() {
   assert(controller.includes('req.query.obra_id'));
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
+  assert(service.includes('obras_resumo: workSummaries'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
   assert(service.includes('buildPlanMacros'));
@@ -166,6 +201,9 @@ function validateFrontendContracts() {
   );
   const monthlyPlanning = read(
     '../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoMensalView.jsx'
+  );
+  const monthlySummary = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrMonthlySummaryCard.jsx'
   );
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
@@ -209,16 +247,22 @@ function validateFrontendContracts() {
   assert(planningDraft.includes('plano_versao'));
   assert(planningDraft.includes('window.localStorage.removeItem'));
   assert(monthlyPlanning.includes('Novo mês'));
-  assert(monthlyPlanning.includes('Recebíveis do período'));
-  assert(monthlyPlanning.includes('Receita recebida'));
   assert(monthlyPlanning.includes("obra?.classificacao === 'PUBLICA'"));
+  assert(monthlyPlanning.includes('<CrMonthlySummaryCard'));
+  assert(monthlySummary.includes('Custo planejado'));
+  assert(monthlySummary.includes('Recebível previsto'));
+  assert(monthlySummary.includes('Desvio de custo'));
+  assert(monthlySummary.includes('Saldo a receber'));
   assert(dashboard.includes('Pontos de atenção'));
   assert(dashboard.includes('Evolução de custos'));
   assert(dashboard.includes('Evolução de recebíveis'));
+  assert(dashboard.includes('Planejamento mensal por obra'));
+  assert(dashboard.includes('item.obra.nome'));
   assert(dashboard.includes('Custos por macro'));
   assert(dashboard.includes("item.nome || 'Macro sem descrição'"));
   assert(!dashboard.includes('Status das etapas'));
-  assert(page.includes('obra={selectedObra}'));
+  assert(page.includes('Todas as obras do seu escopo'));
+  assert(page.includes('canOpenPlanning={canOpenPlanning}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
   assert(planning.includes("renderPlanningSheetActions('custos'"));

@@ -148,6 +148,7 @@ export default function CustosRecebiveis() {
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS
   );
+  const canOpenPlanning = availableTabs.some((tab) => tab.id === 'planejamento');
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
     || planData?.obra
     || null;
@@ -430,12 +431,17 @@ export default function CustosRecebiveis() {
 
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
-          <span>Obra em contexto</span>
+          <span>{activeTab === 'visao-geral' ? 'Escopo executivo' : 'Obra em contexto'}</span>
           <select
-            value={Number.isInteger(selectedObraId) && selectedObraId > 0 ? selectedObraId : ''}
+            value={activeTab === 'visao-geral'
+              ? ''
+              : (Number.isInteger(selectedObraId) && selectedObraId > 0 ? selectedObraId : '')}
+            disabled={activeTab === 'visao-geral'}
             onChange={(event) => handleSelectContextObra(event.target.value)}
           >
-            <option value="">Selecione uma obra</option>
+            <option value="">
+              {activeTab === 'visao-geral' ? 'Todas as obras do seu escopo' : 'Selecione uma obra'}
+            </option>
             {obras.map((obra) => (
               <option key={obra.id} value={obra.id}>
                 {obra.codigo || obra.id} · {obra.nome}
@@ -456,9 +462,15 @@ export default function CustosRecebiveis() {
         </label>
         <div className="cr-context-summary">
           <span>Escopo atual</span>
-          <strong>{selectedObra ? selectedObra.nome : `${obras.length} obra(s) disponível(is)`}</strong>
+          <strong>
+            {activeTab === 'visao-geral'
+              ? `${obras.length} obra(s) consolidadas`
+              : (selectedObra ? selectedObra.nome : `${obras.length} obra(s) disponível(is)`)}
+          </strong>
           <small>
-            {selectedObra?.empresa?.nome || 'A competência será usada nas próximas fases do módulo.'}
+            {activeTab === 'visao-geral'
+              ? 'Os cards abaixo permitem abrir o planejamento de cada obra.'
+              : (selectedObra?.empresa?.nome || 'A competência será usada nas próximas fases do módulo.')}
           </small>
         </div>
       </section>
@@ -500,9 +512,9 @@ export default function CustosRecebiveis() {
 
       {activeTab === 'visao-geral' ? (
         <CrDashboardView
-          key={`${selectedObraId || 'carteira'}-${competencia}-${refreshToken}`}
+          key={`carteira-${competencia}-${refreshToken}`}
           competencia={competencia}
-          obra={selectedObra}
+          canOpenPlanning={canOpenPlanning}
           onOpenArea={handleOpenDashboardArea}
         />
       ) : null}

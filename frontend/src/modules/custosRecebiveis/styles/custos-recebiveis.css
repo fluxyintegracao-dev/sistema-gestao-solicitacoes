@@ -2915,70 +2915,164 @@
   gap: 0.5rem;
 }
 
-.cr-month-list {
+.cr-month-grid,
+.cr-portfolio-planning__grid {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 12px;
 }
 
-.cr-month-row {
+.cr-month-grid {
+  padding: 12px;
+}
+
+.cr-portfolio-planning {
   display: grid;
-  grid-template-columns: minmax(10rem, 0.8fr) minmax(42rem, 4fr) auto;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.85rem 1rem;
+  gap: 12px;
+}
+
+.cr-period-card {
+  container-type: inline-size;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--cr-border);
+  border-radius: 11px;
+  background: var(--cr-surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--cr-ink) 7%, transparent);
+}
+
+.cr-period-card[data-alert="true"] {
+  border-color: color-mix(in srgb, var(--cr-warning) 34%, var(--cr-border));
+}
+
+.cr-period-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px 11px;
   border-bottom: 1px solid var(--cr-border);
 }
 
-.cr-month-row:last-child {
-  border-bottom: 0;
-}
-
-.cr-month-identity {
+.cr-period-card__header > div {
   display: grid;
-  justify-items: start;
-  gap: 0.2rem;
+  min-width: 0;
+  gap: 3px;
 }
 
-.cr-month-identity > span:first-child,
-.cr-month-row dt {
+.cr-period-card__header span:not(.cr-status-pill) {
   color: var(--cr-muted);
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.055em;
+  font-size: 0.65rem;
+  font-weight: 780;
+  letter-spacing: 0.045em;
   text-transform: uppercase;
 }
 
-.cr-month-identity > strong {
-  text-transform: capitalize;
+.cr-period-card__header h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--cr-text);
+  font-size: 0.94rem;
+  font-weight: 850;
+  line-height: 1.25;
+  text-overflow: ellipsis;
 }
 
-.cr-month-row dl {
+.cr-period-card__metrics {
   display: grid;
-  grid-template-columns: repeat(6, minmax(7rem, 1fr));
-  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
 }
 
-.cr-month-row dl > div {
+.cr-period-card__metric {
   min-width: 0;
-  padding-inline: 0.75rem;
-  border-left: 1px solid var(--cr-border);
+  padding: 10px 14px;
+  border-right: 1px solid var(--cr-border);
+  border-bottom: 1px solid var(--cr-border);
 }
 
-.cr-month-row dd {
-  margin: 0.2rem 0 0;
+.cr-period-card__metric:nth-child(2n) {
+  border-right: 0;
+}
+
+.cr-period-card__metric:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.cr-period-card__metric dt {
+  color: var(--cr-muted);
+  font-size: 0.64rem;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.cr-period-card__metric dd {
+  margin: 4px 0 0;
+  overflow: hidden;
   color: var(--cr-text);
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: clamp(0.8rem, 1.8cqi, 0.94rem);
+  font-weight: 850;
+  line-height: 1.2;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.cr-month-row [data-tone="negative"] dd,
+.cr-period-card__metric[data-tone="positive"] dd {
+  color: var(--cr-success);
+}
+
+.cr-period-card__metric[data-tone="negative"] dd,
 .cr-planning-table td[data-tone="negative"] {
   color: var(--cr-danger);
 }
 
-.cr-month-row [data-tone="positive"] dd {
-  color: var(--cr-success);
+.cr-period-card__metric[data-tone="warning"] dd {
+  color: var(--cr-warning);
+}
+
+.cr-period-card__metric[data-tone="context"] dd {
+  color: var(--cr-primary);
+}
+
+.cr-period-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--cr-border);
+  background: color-mix(in srgb, var(--cr-primary) 2.5%, var(--cr-surface));
+}
+
+.cr-period-card__signals {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.cr-period-card__signals span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  color: var(--cr-muted);
+  background: color-mix(in srgb, var(--cr-muted) 10%, transparent);
+  font-size: 0.61rem;
+  font-weight: 740;
+}
+
+.cr-period-card__signals span[data-tone="negative"] {
+  color: var(--cr-danger);
+  background: color-mix(in srgb, var(--cr-danger) 10%, transparent);
+}
+
+.cr-period-card__signals span[data-tone="warning"] {
+  color: var(--cr-warning);
+  background: color-mix(in srgb, var(--cr-warning) 11%, transparent);
+}
+
+.cr-period-card__footer .btn {
+  flex: 0 0 auto;
 }
 
 .cr-item-picker {
@@ -3078,44 +3172,25 @@
   margin-top: 0.35rem;
 }
 
-@media (max-width: 1280px) {
-  .cr-month-row {
-    grid-template-columns: minmax(9rem, 0.7fr) minmax(34rem, 3fr) auto;
-    overflow-x: auto;
-  }
-
-  .cr-month-row dl {
-    grid-template-columns: repeat(3, minmax(8rem, 1fr));
-    row-gap: 0.75rem;
-  }
-}
-
 @media (max-width: 760px) {
   .cr-new-month-bar,
-  .cr-month-row {
+  .cr-period-card__footer {
     align-items: stretch;
-    grid-template-columns: 1fr;
   }
 
   .cr-new-month-bar {
     flex-direction: column;
   }
 
+  .cr-period-card__footer {
+    flex-direction: column;
+  }
+
   .cr-new-month-bar .cr-field,
   .cr-new-month-bar > div,
   .cr-new-month-bar .btn,
-  .cr-month-row > .btn {
+  .cr-period-card__footer .btn {
     width: 100%;
-  }
-
-  .cr-month-row dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cr-month-row dl > div {
-    padding: 0.55rem 0;
-    border-left: 0;
-    border-top: 1px solid var(--cr-border);
   }
 
   .cr-item-picker-results {

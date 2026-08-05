@@ -5,17 +5,12 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlinePlus
 } from 'react-icons/hi2';
-import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import {
   criarCompetenciaObra,
   listarCompetenciasObra
 } from '../services/custosRecebiveis';
+import CrMonthlySummaryCard from './CrMonthlySummaryCard';
 import CrPlanejamentoView from './CrPlanejamentoView';
-
-const currency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL'
-});
 
 function monthLabel(value) {
   if (!/^\d{4}-\d{2}$/.test(String(value || ''))) return value || '-';
@@ -221,50 +216,26 @@ export default function CrPlanejamentoMensalView({
       ) : null}
 
       {data?.items?.length ? (
-        <div className="cr-month-list">
+        <div className="cr-month-grid">
           {data.items.map((item) => (
-            <article key={item.id} className="cr-month-row">
-              <div className="cr-month-identity">
-                <span>Competência</span>
-                <strong>{monthLabel(item.competencia)}</strong>
-                <span className="cr-status-pill" data-status={item.estado}>
-                  {COMPETENCIA_ESTADO_LABELS[item.estado] || item.estado}
-                </span>
-              </div>
-              <dl>
-                <div><dt>Custo planejado</dt><dd>{currency.format(item.total_custo_previsto || 0)}</dd></div>
-                {isPublic ? (
-                  <>
-                    <div><dt>Medição prevista</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
-                    <div>
-                      <dt>Medição aprovada</dt>
-                      <dd>
-                        {item.medicao_aprovada == null
-                          ? 'Aguardando'
-                          : currency.format(item.medicao_aprovada)}
-                      </dd>
-                    </div>
-                    <div data-tone={item.glosa > 0 ? 'negative' : 'neutral'}>
-                      <dt>Glosa</dt>
-                      <dd>{item.glosa == null ? '—' : currency.format(item.glosa)}</dd>
-                    </div>
-                  </>
-                ) : (
-                  <div><dt>Recebíveis do período</dt><dd>{currency.format(item.total_receita_prevista || 0)}</dd></div>
-                )}
-                <div><dt>Custo realizado</dt><dd>{currency.format(item.custo_realizado || 0)}</dd></div>
-                <div data-tone="positive">
-                  <dt>Receita recebida</dt><dd>{currency.format(item.receita_recebida || 0)}</dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setSelectedCompetencia(item.competencia)}
-              >
-                {item.estado === 'FINALIZADA' ? 'Ver detalhes' : 'Editar'}
-              </button>
-            </article>
+            <CrMonthlySummaryCard
+              key={item.id}
+              title={monthLabel(item.competencia)}
+              eyebrow="Competência"
+              classification={obra.classificacao}
+              status={item.estado}
+              custoPlanejado={item.total_custo_previsto}
+              custoRealizado={item.custo_realizado}
+              recebivelPrevisto={item.medicao_apresentada ?? item.total_receita_prevista}
+              recebivelReconhecido={isPublic
+                ? item.medicao_aprovada
+                : item.total_receita_prevista}
+              receitaRecebida={item.receita_recebida}
+              medicaoAprovadaInformada={!isPublic || item.medicao_aprovada != null}
+              glosa={item.glosa}
+              actionLabel={item.estado === 'FINALIZADA' ? 'Ver detalhes' : 'Editar'}
+              onOpen={() => setSelectedCompetencia(item.competencia)}
+            />
           ))}
         </div>
       ) : null}

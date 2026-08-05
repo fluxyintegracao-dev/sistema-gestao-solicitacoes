@@ -10,6 +10,7 @@ import {
   HiOutlineWallet
 } from 'react-icons/hi2';
 import { obterCustosRecebiveisDashboard } from '../services/custosRecebiveis';
+import CrMonthlySummaryCard from './CrMonthlySummaryCard';
 
 const currency = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -105,7 +106,7 @@ function TrendPanel({
 
 export default function CrDashboardView({
   competencia,
-  obra,
+  canOpenPlanning = false,
   onOpenArea
 }) {
   const [data, setData] = useState(null);
@@ -116,14 +117,14 @@ export default function CrDashboardView({
     try {
       setLoading(true);
       setError('');
-      setData(await obterCustosRecebiveisDashboard(competencia, obra?.id));
+      setData(await obterCustosRecebiveisDashboard(competencia));
     } catch (requestError) {
       setData(null);
       setError(requestError.message || 'Erro ao carregar visão geral.');
     } finally {
       setLoading(false);
     }
-  }, [competencia, obra?.id]);
+  }, [competencia]);
 
   useEffect(() => {
     void load();
@@ -135,6 +136,7 @@ export default function CrDashboardView({
   const history = Array.isArray(data?.historico) ? data.historico : [];
   const alerts = Array.isArray(data?.alertas) ? data.alertas : [];
   const macros = Array.isArray(data?.macros) ? data.macros : [];
+  const workSummaries = Array.isArray(data?.obras_resumo) ? data.obras_resumo : [];
   const costDeviation = Number(cards.desvio_custo) || 0;
 
   if (loading && !data) {
@@ -247,6 +249,53 @@ export default function CrDashboardView({
             </div>
           </div>
         </div>
+      </section>
+
+      <section className="cr-section cr-portfolio-planning">
+        <div className="cr-section-heading">
+          <div>
+            <span className="cr-scope-kicker">Decisão por obra</span>
+            <h2>Planejamento mensal por obra</h2>
+            <p>
+              Competência {formatMonth(competencia)} · compare previsão, realização e recebimento
+              sem perder o consolidado da carteira.
+            </p>
+          </div>
+          <HiOutlineBuildingOffice2 className="h-5 w-5 cr-heading-icon" />
+        </div>
+
+        {workSummaries.length ? (
+          <div className="cr-portfolio-planning__grid">
+            {workSummaries.map((item) => (
+              <CrMonthlySummaryCard
+                key={`${item.obra.id}-${item.competencia}`}
+                title={item.obra.nome}
+                eyebrow={`${item.obra.codigo || item.obra.id} · ${formatMonth(item.competencia)}`}
+                classification={item.obra.classificacao}
+                status={item.estado_competencia}
+                custoPlanejado={item.custo_planejado}
+                custoRealizado={item.custo_realizado}
+                recebivelPrevisto={item.recebivel_previsto}
+                recebivelReconhecido={item.recebivel_reconhecido}
+                receitaRecebida={item.receita_recebida}
+                medicaoAprovadaInformada={item.medicao_aprovada != null}
+                glosa={item.glosa}
+                actionLabel="Abrir planejamento"
+                onOpen={canOpenPlanning
+                  ? () => onOpenArea?.({
+                    destino: 'planejamento',
+                    obra_id: item.obra.id,
+                    competencia: item.competencia
+                  })
+                  : null}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="cr-empty-state">
+            Nenhuma obra disponível no seu escopo para esta competência.
+          </div>
+        )}
       </section>
 
       <div className="cr-dashboard-trends">

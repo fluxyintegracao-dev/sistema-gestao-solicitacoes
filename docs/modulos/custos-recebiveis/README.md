@@ -297,10 +297,21 @@ DENTRO        realizado <= previsto
 ESTOURO       realizado > previsto
 ```
 
-O dashboard respeita a obra selecionada no contexto. Com `obra_id`, apresenta custos,
-recebiveis, serie historica de seis competencias e detalhamento apenas das macros com
-movimento daquela obra. Sem `obra_id`, consolida todas as obras autorizadas, mas nao
-mistura ou detalha macros de obras diferentes.
+Na interface, a Visao Geral e executiva e sempre consolida todas as obras autorizadas
+ao usuario na competencia escolhida. Abaixo do consolidado, cada obra aparece em um
+card mensal proprio, com nome em destaque, custo planejado e realizado, desvio,
+recebivel ou medicao prevista, valor reconhecido, recebido, saldo e glosa quando
+aplicavel. Obras com alertas ficam primeiro para antecipar a tomada de decisao; o card
+abre o planejamento da respectiva obra sem alterar qualquer regra de preenchimento.
+
+O endpoint continua aceitando `obra_id` para consumidores que precisem do recorte de
+uma obra, incluindo a serie historica de seis competencias e o detalhamento somente
+das macros com movimento. Sem `obra_id`, consolida todas as obras autorizadas e retorna
+tambem `obras_resumo`, sem misturar as estruturas micro entre obras.
+
+Na aba Planejamento mensal, as competencias sao apresentadas em cards responsivos com
+os mesmos indicadores do resumo executivo. As acoes existentes de editar ou consultar
+uma competencia permanecem inalteradas.
 
 O antigo painel de status de todas as obras foi substituido por pontos de atencao
 acionaveis: custo acima do planejado, glosa, movimento sem mapeamento, medicao

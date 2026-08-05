@@ -1931,6 +1931,38 @@ function summarizeDashboardRows(rows) {
   };
 }
 
+function summarizeDashboardWorkRows(rows, alerts = []) {
+  const alertCountByWork = new Map();
+  alerts.forEach((item) => {
+    const obraId = Number(item.obra_id);
+    alertCountByWork.set(obraId, Number(alertCountByWork.get(obraId) || 0) + 1);
+  });
+
+  return rows.map((row) => ({
+    obra: row.obra,
+    competencia: row.competencia,
+    competencia_id: row.competencia_id,
+    estado_competencia: row.estado_competencia,
+    custo_planejado: row.custo_planejado,
+    custo_realizado: row.custo_realizado,
+    desvio_custo: money(row.custo_realizado - row.custo_planejado),
+    percentual_custo: row.custo_planejado > 0
+      ? Math.round((row.custo_realizado / row.custo_planejado) * 10000) / 100
+      : null,
+    recebivel_previsto: row.recebivel_previsto,
+    recebivel_reconhecido: row.recebivel_reconhecido,
+    medicao_aprovada: row.medicao_aprovada,
+    receita_recebida: row.receita_recebida,
+    saldo_receber: money(Math.max(0, row.recebivel_reconhecido - row.receita_recebida)),
+    glosa: row.glosa,
+    alertas: Number(alertCountByWork.get(Number(row.obra.id)) || 0)
+  })).sort((a, b) => (
+    b.alertas - a.alertas
+    || Number(b.desvio_custo > 0) - Number(a.desvio_custo > 0)
+    || String(a.obra.nome || '').localeCompare(String(b.obra.nome || ''), 'pt-BR')
+  ));
+}
+
 async function mapWithConcurrency(items, limit, mapper) {
   const result = [];
   const safeLimit = Math.max(1, Number(limit) || 1);
@@ -2241,7 +2273,8 @@ async function obterDashboard(
       historico: [],
       macros: [],
       alertas: [],
-      obras: []
+      obras: [],
+      obras_resumo: []
     };
   }
 
@@ -2329,6 +2362,9 @@ async function obterDashboard(
     overdueObligations = [];
   }
 
+  const alerts = buildDashboardAlerts(currentRows, overdueObligations);
+  const workSummaries = summarizeDashboardWorkRows(currentRows, alerts);
+
   return {
     competencia: competenciaCode,
     escopo: {
@@ -2339,8 +2375,9 @@ async function obterDashboard(
     cards: summarizeDashboardRows(currentRows),
     historico,
     macros: selectedObraId ? macros : [],
-    alertas: buildDashboardAlerts(currentRows, overdueObligations),
-    obras: obras.map(serializeObra)
+    alertas,
+    obras: obras.map(serializeObra),
+    obras_resumo: workSummaries
   };
 }
 
@@ -2520,5 +2557,6 @@ module.exports = {
   solicitarReabertura,
   solicitarReaberturaPorObraCompetencia,
   statusComparativo,
-  summarizeDashboardRows
+  summarizeDashboardRows,
+  summarizeDashboardWorkRows
 };
