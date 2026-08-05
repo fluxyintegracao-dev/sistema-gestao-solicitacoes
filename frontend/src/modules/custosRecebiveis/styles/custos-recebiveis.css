@@ -258,15 +258,22 @@
 }
 
 .cr-competence-filter__options label {
-  display: flex;
-  min-height: 38px;
+  display: grid;
+  min-height: 34px;
+  grid-template-columns: 1.25rem minmax(0, 1fr) 1.25rem;
   align-items: center;
-  gap: 8px;
-  padding: 7px 9px;
+  gap: 4px;
+  padding: 5px 8px;
   border-bottom: 1px solid var(--ui-border);
   color: var(--c-text);
   font-size: 0.74rem;
   cursor: pointer;
+}
+
+.cr-competence-filter__options label > span {
+  grid-column: 2;
+  justify-self: center;
+  text-align: center;
 }
 
 .cr-competence-filter__options label:last-child {
@@ -279,9 +286,16 @@
   font-weight: 760;
 }
 
-.cr-competence-filter__options input {
-  width: 16px;
-  height: 16px;
+.cr-field .cr-competence-filter__options input[type="checkbox"] {
+  width: 14px;
+  min-width: 14px;
+  height: 14px;
+  min-height: 14px;
+  grid-column: 1;
+  justify-self: start;
+  margin: 0;
+  padding: 0;
+  border-radius: 3px;
   accent-color: var(--cr-accent);
 }
 
