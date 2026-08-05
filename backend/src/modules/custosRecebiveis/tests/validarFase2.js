@@ -173,6 +173,7 @@ function validateBackendContracts() {
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes('obras_resumo: workSummaries'));
+  assert(service.includes('alertas: alerts'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
   assert(service.includes('buildPlanMacros'));

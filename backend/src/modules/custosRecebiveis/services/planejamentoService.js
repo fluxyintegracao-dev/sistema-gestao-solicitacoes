@@ -2375,7 +2375,7 @@ async function obterDashboard(
     cards: summarizeDashboardRows(currentRows),
     historico,
     macros: selectedObraId ? macros : [],
-    alertas,
+    alertas: alerts,
     obras: obras.map(serializeObra),
     obras_resumo: workSummaries
   };
