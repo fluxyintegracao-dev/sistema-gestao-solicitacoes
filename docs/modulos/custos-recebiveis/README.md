@@ -304,12 +304,16 @@ recebivel ou medicao prevista, valor reconhecido, recebido, saldo e glosa quando
 aplicavel. Obras com alertas ficam primeiro para antecipar a tomada de decisao; o card
 abre o planejamento da respectiva obra sem alterar qualquer regra de preenchimento.
 
-Os filtros executivos atuam exclusivamente na secao `Decisao por obra`. O usuario pode
-combinar uma obra, a classificacao publica ou privada e mais de uma das seis competencias
-disponiveis; nesse recorte, a mesma obra aparece em um card para cada competencia
-selecionada. A carteira consolidada, as tendencias e os pontos de atencao permanecem
-calculados para todas as obras autorizadas na competencia de referencia, preservando a
-leitura executiva global.
+Os filtros executivos atuam na secao `Decisao por obra` e na `Carteira consolidada`. O
+usuario pode combinar uma obra, a classificacao publica ou privada e mais de uma das
+seis competencias disponiveis; nesse recorte, a mesma obra aparece em um card para cada
+competencia selecionada e seus valores compoem o consolidado superior. Tendencias e
+pontos de atencao continuam calculados na competencia de referencia.
+
+No grupo de recebiveis do consolidado, o indicador generico `Reconhecido` nao e
+exibido. Obras privadas usam diretamente a previsao financeira da competencia. Quando
+o recorte contem somente obras publicas, o indicador especifico `Medicao aprovada`
+permanece visivel porque sustenta o calculo de glosa e saldo a receber.
 
 Tanto a lista do filtro quanto os cards aceitam apenas cadastros cujo
 `tipo_centro_custo = OBRA`. Centros de custos nao participam desta tela. Se um cadastro

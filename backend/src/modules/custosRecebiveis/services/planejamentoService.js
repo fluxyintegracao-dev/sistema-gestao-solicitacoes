@@ -1956,6 +1956,7 @@ function summarizeDashboardWorkRows(rows, alerts = []) {
     receita_recebida: row.receita_recebida,
     saldo_receber: money(Math.max(0, row.recebivel_reconhecido - row.receita_recebida)),
     glosa: row.glosa,
+    recebiveis_vencidos: row.recebiveis_vencidos,
     alertas: Number(alertCountByWork.get(Number(row.obra.id)) || 0)
   })).sort((a, b) => (
     b.alertas - a.alertas

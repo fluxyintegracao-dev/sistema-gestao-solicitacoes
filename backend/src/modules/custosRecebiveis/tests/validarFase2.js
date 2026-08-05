@@ -174,6 +174,7 @@ function validateBackendContracts() {
   assert(service.includes('macros: selectedObraId ? macros : []'));
   assert(service.includes('obras_resumo: workSummaries'));
   assert(service.includes('summarizeDashboardWorkRows(rows, alerts)'));
+  assert(service.includes('recebiveis_vencidos: row.recebiveis_vencidos'));
   assert(service.includes("tipo_centro_custo: 'OBRA'"));
   assert(service.includes("'classificacao', 'tipo_centro_custo'"));
   assert(service.includes('alertas: alerts'));
@@ -266,6 +267,9 @@ function validateFrontendContracts() {
   assert(dashboard.includes('Evolução de recebíveis'));
   assert(dashboard.includes('Planejamento mensal por obra'));
   assert(dashboard.includes('visibleWorkSummaries'));
+  assert(dashboard.includes('filteredPortfolio'));
+  assert(dashboard.includes('obra(s) no recorte executivo'));
+  assert(dashboard.includes('label="Medição aprovada"'));
   assert(dashboard.includes("tipo_centro_custo || '').toUpperCase() === 'OBRA'"));
   assert(dashboard.includes('item.obra.nome'));
   assert(dashboard.includes('Custos por macro'));

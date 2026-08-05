@@ -133,9 +133,6 @@ export default function CrDashboardView({
     void load();
   }, [load]);
 
-  const isWorkContext = data?.escopo?.tipo === 'OBRA';
-  const classification = String(data?.escopo?.obra?.classificacao || '').toUpperCase();
-  const cards = data?.cards || {};
   const history = Array.isArray(data?.historico) ? data.historico : [];
   const alerts = Array.isArray(data?.alertas) ? data.alertas : [];
   const macros = Array.isArray(data?.macros) ? data.macros : [];
@@ -158,7 +155,52 @@ export default function CrDashboardView({
         || String(b.competencia).localeCompare(String(a.competencia))
       ));
   }, [classificacaoFilter, competencia, competencias, obraFilterId, workSummaries]);
-  const costDeviation = Number(cards.desvio_custo) || 0;
+  const filteredPortfolio = useMemo(() => {
+    const totals = visibleWorkSummaries.reduce((result, item) => ({
+      custo_planejado: result.custo_planejado + (Number(item.custo_planejado) || 0),
+      custo_realizado: result.custo_realizado + (Number(item.custo_realizado) || 0),
+      recebivel_previsto: result.recebivel_previsto + (Number(item.recebivel_previsto) || 0),
+      medicao_aprovada: result.medicao_aprovada + (Number(item.medicao_aprovada) || 0),
+      glosa: result.glosa + (Number(item.glosa) || 0),
+      receita_recebida: result.receita_recebida + (Number(item.receita_recebida) || 0),
+      saldo_receber: result.saldo_receber + (Number(item.saldo_receber) || 0),
+      recebiveis_vencidos: result.recebiveis_vencidos
+        + (Number(item.recebiveis_vencidos) || 0)
+    }), {
+      custo_planejado: 0,
+      custo_realizado: 0,
+      recebivel_previsto: 0,
+      medicao_aprovada: 0,
+      glosa: 0,
+      receita_recebida: 0,
+      saldo_receber: 0,
+      recebiveis_vencidos: 0
+    });
+    const classifications = new Set(
+      visibleWorkSummaries
+        .map((item) => String(item.obra?.classificacao || '').toUpperCase())
+        .filter(Boolean)
+    );
+    const publicPending = visibleWorkSummaries.filter((item) => (
+      String(item.obra?.classificacao || '').toUpperCase() === 'PUBLICA'
+      && item.medicao_aprovada == null
+    )).length;
+    const custoDesvio = totals.custo_realizado - totals.custo_planejado;
+    return {
+      ...totals,
+      desvio_custo: custoDesvio,
+      percentual_custo: totals.custo_planejado > 0
+        ? (totals.custo_realizado / totals.custo_planejado) * 100
+        : null,
+      classificacao: classifications.size === 1 ? [...classifications][0] : '',
+      total_obras: new Set(
+        visibleWorkSummaries.map((item) => Number(item.obra?.id)).filter(Boolean)
+      ).size,
+      medicoes_pendentes: publicPending
+    };
+  }, [visibleWorkSummaries]);
+  const costDeviation = Number(filteredPortfolio.desvio_custo) || 0;
+  const portfolioClassification = filteredPortfolio.classificacao;
 
   if (loading && !data) {
     return <section className="cr-section cr-empty-state">Carregando visão geral...</section>;
@@ -180,15 +222,14 @@ export default function CrDashboardView({
         <div className="cr-section-heading">
           <div>
             <span className="cr-scope-kicker">
-              {isWorkContext ? 'Obra em contexto' : 'Carteira consolidada'}
+              Carteira consolidada
             </span>
-            <h2>
-              {isWorkContext
-                ? `${data?.escopo?.obra?.codigo || data?.escopo?.obra?.id} · ${data?.escopo?.obra?.nome}`
-                : `${data?.escopo?.total_obras || 0} obra(s) no seu escopo`}
-            </h2>
+            <h2>{filteredPortfolio.total_obras} obra(s) no recorte executivo</h2>
             <p>
-              Competência {formatMonth(competencia)} · valores realizados consideram baixas financeiras ativas.
+              {competencias.length > 1
+                ? `${competencias.length} competências selecionadas`
+                : `Competência ${formatMonth(competencias[0] || competencia)}`}
+              {' '}· valores realizados consideram baixas financeiras ativas.
             </p>
           </div>
           <button type="button" className="btn btn-outline" onClick={load} disabled={loading}>
@@ -204,10 +245,13 @@ export default function CrDashboardView({
               <span>Custos</span>
             </div>
             <div className="cr-ops-metrics">
-              <Metric label="Planejado" value={currency.format(cards.custo_planejado || 0)} />
+              <Metric
+                label="Planejado"
+                value={currency.format(filteredPortfolio.custo_planejado || 0)}
+              />
               <Metric
                 label="Realizado"
-                value={currency.format(cards.custo_realizado || 0)}
+                value={currency.format(filteredPortfolio.custo_realizado || 0)}
                 tone="actual"
               />
               <Metric
@@ -217,8 +261,8 @@ export default function CrDashboardView({
               />
               <Metric
                 label="Execução"
-                value={formatPercent(cards.percentual_custo)}
-                tone={Number(cards.percentual_custo) > 100 ? 'negative' : 'neutral'}
+                value={formatPercent(filteredPortfolio.percentual_custo)}
+                tone={Number(filteredPortfolio.percentual_custo) > 100 ? 'negative' : 'neutral'}
               />
             </div>
           </div>
@@ -230,41 +274,44 @@ export default function CrDashboardView({
             </div>
             <div className="cr-ops-metrics">
               <Metric
-                label={classification === 'PUBLICA' ? 'Medição prevista' : 'Previsto'}
-                value={currency.format(cards.recebivel_previsto || 0)}
+                label={portfolioClassification === 'PUBLICA' ? 'Medição prevista' : 'Previsto'}
+                value={currency.format(filteredPortfolio.recebivel_previsto || 0)}
               />
-              {classification !== 'PRIVADA' ? (
+              {portfolioClassification === 'PUBLICA' ? (
                 <Metric
-                  label={classification === 'PUBLICA' ? 'Medição aprovada' : 'Reconhecido'}
-                  value={
-                    classification === 'PUBLICA' && !cards.tem_medicao_aprovada
-                      ? 'Aguardando'
-                      : currency.format(cards.recebivel_reconhecido || 0)
-                  }
+                  label="Medição aprovada"
+                  value={filteredPortfolio.medicoes_pendentes === visibleWorkSummaries.length
+                    ? 'Aguardando'
+                    : currency.format(filteredPortfolio.medicao_aprovada || 0)}
+                  helper={filteredPortfolio.medicoes_pendentes > 0
+                    ? `${filteredPortfolio.medicoes_pendentes} competência(s) aguardando`
+                    : null}
                 />
               ) : null}
-              {classification !== 'PRIVADA' ? (
+              {portfolioClassification !== 'PRIVADA' ? (
                 <Metric
                   label="Glosa"
-                  value={currency.format(cards.glosa || 0)}
-                  tone={Number(cards.glosa) > 0 ? 'negative' : 'neutral'}
+                  value={currency.format(filteredPortfolio.glosa || 0)}
+                  tone={Number(filteredPortfolio.glosa) > 0 ? 'negative' : 'neutral'}
                 />
               ) : null}
               <Metric
                 label="Recebido"
-                value={currency.format(cards.receita_recebida || 0)}
+                value={currency.format(filteredPortfolio.receita_recebida || 0)}
                 tone="actual"
               />
               <Metric
                 label="Saldo a receber"
-                value={currency.format(cards.saldo_receber || 0)}
-                tone={Number(cards.saldo_receber) > 0 ? 'warning' : 'positive'}
+                value={currency.format(filteredPortfolio.saldo_receber || 0)}
+                tone={Number(filteredPortfolio.saldo_receber) > 0 ? 'warning' : 'positive'}
               />
-              {classification === 'PRIVADA' ? (
+              {portfolioClassification === 'PRIVADA' ? (
                 <Metric
                   label="Títulos vencidos"
-                  value={String(cards.recebiveis_vencidos || 0)}
-                  tone={Number(cards.recebiveis_vencidos) > 0 ? 'negative' : 'neutral'}
+                  value={String(filteredPortfolio.recebiveis_vencidos || 0)}
+                  tone={Number(filteredPortfolio.recebiveis_vencidos) > 0
+                    ? 'negative'
+                    : 'neutral'}
                 />
               ) : null}
             </div>
@@ -281,7 +328,7 @@ export default function CrDashboardView({
               {competencias.length > 1
                 ? `${competencias.length} competências selecionadas`
                 : `Competência ${formatMonth(competencias[0] || competencia)}`}
-              {' '}· os filtros afetam somente estes cards; o consolidado permanece integral.
+              {' '}· os mesmos filtros também compõem a carteira consolidada acima.
             </p>
           </div>
           <span className="cr-portfolio-planning__count">
