@@ -45,9 +45,10 @@ implementados no codigo:
   implementados como mecanismos distintos;
 - bypass limitado a 30 dias, sem autoconcessao, sem ocultar ou cumprir a obrigacao;
 - guard frontend e backend com kill-switch `CR_GUARD_MODE`, entregue em `observe`;
-- pagina frontend responsiva em `/custos-recebiveis`, com as abas `Visao geral`,
-  `Obras`, `Planejamento mensal`, `Comparativo`, `Custo realizado`,
-  `Obrigacoes e prazos`, `Importacoes` e `Exportacoes`;
+- pagina frontend responsiva em `/custos-recebiveis`, com navegacao operacional por
+  `Visao geral`, `Planejamento mensal` e `Obrigacoes e prazos`; comparativo e custo
+  realizado ficam dentro do mes da obra, enquanto importacoes estruturais,
+  exportacoes, auditoria e configuracoes dependem de permissoes administrativas;
 - item unico de menu, exibido somente quando a feature estiver habilitada e o usuario
   possuir a permissao explicita de acesso.
 
@@ -230,19 +231,20 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
 ### Planejamento publico e privado
 
 - A entrada do planejamento e uma lista mensal por obra. Ela apresenta custo
-  planejado, medicao apresentada, medicao aprovada, glosa, custo realizado e receita
+  planejado, medicao prevista, medicao aprovada, glosa, custo realizado e receita
   efetivamente recebida.
 - `Novo mes` cria somente a competencia atual ou a seguinte, com
   `Idempotency-Key`, unicidade por obra/competencia e snapshot da versao publicada.
-- Em obra publica, o assistente possui quatro etapas: custos planejados, medicao
-  apresentada, medicao aprovada e revisao/finalizacao.
+- Em obra publica, o assistente de criacao possui tres etapas: custos planejados,
+  medicao prevista e revisao/finalizacao. A medicao aprovada e registrada depois,
+  como acao propria do card da competencia, quando o orgao devolver a medicao.
 - Em obra privada, o assistente possui duas etapas: custos planejados e recebiveis do
   periodo. A finalizacao fica no rodape operacional da segunda etapa e nao existe
   etapa de medicao ou confirmacao manual dos recebiveis.
 - O plano completo nao e materializado na tela. Itens folha sao pesquisados no
   backend por codigo, descricao ou etapa macro, com paginacao, e somente linhas
   selecionadas com valores relevantes ficam persistidas.
-- Os seletores de itens em custos planejados e medicao apresentada usam autocomplete
+- Os seletores de itens em custos planejados e medicao prevista usam autocomplete
   incremental com debounce; a lista e atualizada pelos caracteres digitados sem
   exigir clique no botao de busca. Custos planejados tambem exibem a quantidade
   orcada congelada do item para comparacao com a quantidade prevista.
@@ -250,12 +252,19 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
 - O custo/valor por item e calculado no backend; o frontend apresenta o mesmo calculo
   apenas como retorno imediato ao usuario.
 - Obra publica usa previsao e medicao por item micro.
-- Em obra publica, `cr_previsoes_receita` representa a medicao apresentada pelo
+- Em obra publica, `cr_previsoes_receita` representa a medicao prevista pelo
   responsavel e `cr_medicoes_consolidadas` representa a medicao aprovada pelo orgao.
-- A glosa e a diferenca positiva entre o valor apresentado e o aprovado. Glosa exige
-  justificativa auditavel e o aprovado nao pode superar o apresentado.
-- A medicao aprovada possui etapa propria, posterior a medicao apresentada, e pode ser
+- A glosa e a diferenca positiva entre o valor previsto e o aprovado. Glosa exige
+  justificativa auditavel e o aprovado nao pode superar o previsto.
+- A medicao aprovada possui acao propria, posterior a medicao prevista, e pode ser
   registrada depois da finalizacao do planejamento, sem alterar o snapshot planejado.
+- O saldo disponivel para uma nova medicao prevista e calculado pela quantidade
+  orcada menos a quantidade efetivamente aprovada em competencias anteriores. Uma
+  previsao anterior nao consome saldo ate ser aprovada pelo orgao.
+- Custos planejados e medicoes possuem modelo XLSX e importacao com preview editavel.
+  O modal permite incluir, remover ou ajustar linhas, possui rolagem independente e
+  mantem a confirmacao acessivel. Somente quantidades maiores que zero sao aplicadas
+  e nenhuma linha pode ultrapassar o saldo orcamentario aplicavel.
 - Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
   titulos `RECEBER`, rateadas para a obra. Custo realizado continua vindo de baixas
   ativas de titulos `PAGAR`.
@@ -326,8 +335,10 @@ das macros com movimento. Sem `obra_id`, consolida todas as obras autorizadas e 
 tambem `obras_resumo`, sem misturar as estruturas micro entre obras.
 
 Na aba Planejamento mensal, as competencias sao apresentadas em cards responsivos com
-os mesmos indicadores do resumo executivo. As acoes existentes de editar ou consultar
-uma competencia permanecem inalteradas.
+os mesmos indicadores do resumo executivo. Ao abrir uma competencia, a barra interna
+oferece planejamento, medicao aprovada (somente obra publica), custo realizado e
+comparativo conforme as permissoes do usuario. Assim, as analises permanecem no
+contexto do mes e da obra sem poluir a navegacao principal.
 
 O antigo painel de status de todas as obras foi substituido por pontos de atencao
 acionaveis: custo acima do planejado, glosa, movimento sem mapeamento, medicao
@@ -362,13 +373,18 @@ de escopo.
 
 ### Fonte oficial e idempotencia
 
-- A aba `Custo realizado` usa exclusivamente titulos financeiros `PAGAR` como razao de
-  custos alocados a obra. Ela nao consulta nem lista pedidos de compra ou solicitacoes.
+- A visao `Custo realizado`, aberta dentro da competencia mensal, usa exclusivamente
+  titulos financeiros `PAGAR` como razao de custos alocados a obra. Ela nao consulta
+  nem lista pedidos de compra ou solicitacoes.
 - A visao principal lista todos os titulos da obra, independentemente do status, e
   permite alternar para os titulos com vencimento dentro da competencia selecionada.
 - Cada titulo apresenta valor alocado a obra, valor pago, saldo, credor, categoria,
   apropriacao e status financeiro. Titulos rateados usam somente a parcela destinada
   a obra; os valores pago e saldo sao proporcionais ao rateio.
+- Os titulos sao agrupados pela etapa macro resolvida pelos vinculos do plano e pelas
+  apropriacoes. Um titulo que alcance mais de uma etapa aparece uma unica vez no grupo
+  de rateio multiplo, impedindo duplicacao dos totais; vinculos ainda nao resolvidos
+  permanecem visiveis em `Sem etapa macro identificada`.
 - Titulos cancelados ou estornados permanecem visiveis para rastreabilidade, mas nao
   compoem os totais ativos de custo.
 - O resumo separa total alocado, saldo em aberto, valor pago e saldo ainda aberto dos
@@ -427,13 +443,15 @@ virgula e protecao contra interpretacao de formulas. O XLSX reutiliza
   acesso nao pode prende-lo.
 - O ponto de partida e `cr_responsaveis_obra.competencia_inicial`. Nenhum mes anterior
   gera pendencia.
-- Em obras publicas, custos planejados e medicao apresentada geram obrigacoes
+- Em obras publicas, custos planejados e medicao prevista geram obrigacoes
   separadas.
 - Em obras privadas, somente custos planejados geram obrigacao manual. Os recebiveis
   contratuais sao sincronizados automaticamente com o Financeiro e nao geram
   pendencia de preenchimento.
 - A medicao aprovada de obra publica pode ser registrada depois da finalizacao,
   quando o orgao responder, e nao integra a obrigacao mensal de preenchimento.
+- O contador de pendencias e vencimentos aparece no cabecalho do modulo em qualquer
+  aba autorizada e direciona para `Obrigacoes e prazos`.
 - Finalizar a competencia cumpre as obrigacoes aplicaveis ao tipo da obra. Reabrir
   torna essas obrigacoes visiveis novamente ate uma nova finalizacao.
 - O prazo padrao e o ultimo dia util do mes, as 18h no horario do servidor. Sabados e

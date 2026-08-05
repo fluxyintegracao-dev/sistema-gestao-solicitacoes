@@ -192,7 +192,7 @@ export async function salvarCustosCompetencia(obraId, competencia, itens) {
       body: JSON.stringify({ itens })
     }
   );
-  return parseResponse(response, 'Erro ao salvar custos previstos');
+  return parseResponse(response, 'Erro ao salvar custos planejados');
 }
 
 export async function salvarRecebiveisCompetencia(obraId, competencia, itens) {

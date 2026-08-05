@@ -13,7 +13,7 @@ const { resolverEscopoObras } = require('../policies/obraScopePolicy');
 
 const REPORT_TYPES = Object.freeze({
   'medicao-recebiveis': 'Medicao e recebiveis',
-  'custos-previstos': 'Custos previstos',
+  'custos-previstos': 'Custos planejados',
   comparativo: 'Comparativo',
   'custo-realizado': 'Custo realizado',
   'solicitacoes-titulos': 'Solicitacoes e titulos',
@@ -179,7 +179,7 @@ async function buildCostsRows(user, works, competencia, deps) {
     'Item micro',
     'Quantidade',
     'Custo unitario (R$)',
-    'Custo previsto (R$)'
+    'Custo planejado (R$)'
   ]];
   for (const work of works) {
     const planning = await safePlanning(user, Number(work.id), competencia, deps);
@@ -326,7 +326,7 @@ async function buildExecutiveRows(user, works, competencia, deps) {
     'Obra',
     'Classificacao',
     'Competencia',
-    'Custo previsto (R$)',
+    'Custo planejado (R$)',
     'Custo realizado (R$)',
     'Desvio (R$)',
     'Nao mapeado (R$)',

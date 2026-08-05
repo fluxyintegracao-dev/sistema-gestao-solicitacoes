@@ -195,6 +195,7 @@ function validateBackendContracts() {
   assert(spreadsheetService.includes('Formulas nao sao permitidas'));
   assert(spreadsheetService.includes('saldo_disponivel'));
   assert(spreadsheetService.includes('quantity === 0'));
+  assert(spreadsheetService.includes('previousRows = await db.CrMedicaoConsolidada.findAll'));
 }
 
 function validateFrontendContracts() {
@@ -228,7 +229,8 @@ function validateFrontendContracts() {
   assert(planning.includes('PRIVATE_STEPS'));
   assert(planning.includes("label: 'Custos planejados'"));
   assert(planning.includes("label: 'Medição prevista'"));
-  assert(planning.includes("label: 'Medição aprovada'"));
+  assert(planning.includes("viewMode = 'planning'"));
+  assert(planning.includes("viewMode === 'approved'"));
   assert(planning.includes("label: 'Recebíveis do período'"));
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
@@ -238,7 +240,7 @@ function validateFrontendContracts() {
   assert(planning.includes('previsao_custo_id'));
   assert(planning.includes('Qtd. orçada'));
   assert(planning.includes('Math.min('));
-  assert(planning.includes('item.item?.quantidade_apresentada_anterior'));
+  assert(planning.includes('item.item?.quantidade_aprovada_anterior'));
   assert(planning.includes('Qtd. medida'));
   assert(planning.includes('Pesquisar subitem desta etapa'));
   assert(planning.includes('usePlanItemSearch'));
@@ -288,6 +290,10 @@ function validateFrontendContracts() {
   assert(planning.includes("renderPlanningSheetActions('medicao-prevista'"));
   assert(planning.includes("renderPlanningSheetActions('medicao-aprovada'"));
   assert(planningImport.includes('Confirmar importação'));
+  assert(planningImport.includes('onConfirm(tipo, result.itens)'));
+  assert(monthlyPlanning.includes("setDetailArea('approved')"));
+  assert(monthlyPlanning.includes('<CrRealizadoView'));
+  assert(monthlyPlanning.includes('<CrComparativoView'));
   assert(planningImport.includes('Validar novamente'));
 }
 

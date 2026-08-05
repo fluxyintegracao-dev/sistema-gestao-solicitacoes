@@ -28,6 +28,8 @@ export default function CrMonthlySummaryCard({
   medicaoAprovadaInformada = true,
   glosa = 0,
   onOpen,
+  onOpenApproved,
+  approvedActionLabel,
   actionLabel = 'Ver detalhes'
 }) {
   const isPublic = String(classification || '').toUpperCase() === 'PUBLICA';
@@ -103,12 +105,19 @@ export default function CrMonthlySummaryCard({
           ) : null}
           <span>{isPublic ? 'Obra pública' : 'Obra privada'}</span>
         </div>
-        {onOpen ? (
-          <button type="button" className="btn btn-outline" onClick={onOpen}>
-            {actionLabel}
-            <HiOutlineArrowRight className="h-4 w-4" />
-          </button>
-        ) : null}
+        <div className="cr-period-card__actions">
+          {onOpenApproved ? (
+            <button type="button" className="btn btn-outline" onClick={onOpenApproved}>
+              {approvedActionLabel || (medicaoAprovadaInformada ? 'Revisar aprovação' : 'Registrar aprovação')}
+            </button>
+          ) : null}
+          {onOpen ? (
+            <button type="button" className="btn btn-outline" onClick={onOpen}>
+              {actionLabel}
+              <HiOutlineArrowRight className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
       </footer>
     </article>
   );

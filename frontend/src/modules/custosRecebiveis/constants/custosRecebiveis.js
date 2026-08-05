@@ -33,7 +33,8 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
   {
     id: 'obras',
     label: 'Obras',
-    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW,
+    hidden: true
   },
   {
     id: 'planejamento',
@@ -43,12 +44,14 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
   {
     id: 'comparativo',
     label: 'Comparativo',
-    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW,
+    hidden: true
   },
   {
     id: 'realizado',
     label: 'Custo realizado',
-    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW,
+    hidden: true
   },
   {
     id: 'obrigacoes',
@@ -58,7 +61,7 @@ export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
   {
     id: 'importacoes',
     label: 'Importações',
-    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_VIEW
+    permission: CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_IMPORT
   },
   {
     id: 'exportacoes',

@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineArrowLeft,
+  HiOutlineBanknotes,
   HiOutlineCalendarDays,
   HiOutlineExclamationTriangle,
-  HiOutlinePlus
+  HiOutlinePlus,
+  HiOutlineScale
 } from 'react-icons/hi2';
 import {
   criarCompetenciaObra,
   listarCompetenciasObra
 } from '../services/custosRecebiveis';
 import CrMonthlySummaryCard from './CrMonthlySummaryCard';
+import CrComparativoView from './CrComparativoView';
 import CrPlanejamentoView from './CrPlanejamentoView';
+import CrRealizadoView from './CrRealizadoView';
 
 function monthLabel(value) {
   if (!/^\d{4}-\d{2}$/.test(String(value || ''))) return value || '-';
@@ -36,6 +40,7 @@ export default function CrPlanejamentoMensalView({
   );
   const [newMonthOpen, setNewMonthOpen] = useState(false);
   const [newMonth, setNewMonth] = useState('');
+  const [detailArea, setDetailArea] = useState('planning');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -65,6 +70,7 @@ export default function CrPlanejamentoMensalView({
 
   useEffect(() => {
     setSelectedCompetencia(autoOpen ? initialCompetencia : null);
+    setDetailArea('planning');
     setNewMonthOpen(false);
     load();
   }, [autoOpen, initialCompetencia, load]);
@@ -108,27 +114,66 @@ export default function CrPlanejamentoMensalView({
   if (selectedCompetencia) {
     return (
       <div className="cr-month-editor">
-        <button
-          type="button"
-          className="btn btn-outline cr-month-back"
-          onClick={() => {
-            setSelectedCompetencia(null);
-            load();
-          }}
-        >
-          <HiOutlineArrowLeft className="h-4 w-4" />
-          Planejamento mensal
-        </button>
-        <CrPlanejamentoView
-          obra={obra}
-          userId={userId}
-          competencia={selectedCompetencia}
-          permissions={permissions}
-          onChanged={async () => {
-            await load();
-            onChanged?.();
-          }}
-        />
+        <div className="cr-month-detail-toolbar">
+          <button
+            type="button"
+            className="btn btn-outline cr-month-back"
+            onClick={() => {
+              setSelectedCompetencia(null);
+              setDetailArea('planning');
+              load();
+            }}
+          >
+            <HiOutlineArrowLeft className="h-4 w-4" />
+            Meses da obra
+          </button>
+          <nav aria-label="Áreas da competência">
+            <button type="button" className={detailArea === 'planning' ? 'is-active' : ''} onClick={() => setDetailArea('planning')}>
+              Planejamento
+            </button>
+            {isPublic && permissions.measurementView ? (
+              <button type="button" className={detailArea === 'approved' ? 'is-active' : ''} onClick={() => setDetailArea('approved')}>
+                Medição aprovada
+              </button>
+            ) : null}
+            {permissions.realizedView ? (
+              <button type="button" className={detailArea === 'realized' ? 'is-active' : ''} onClick={() => setDetailArea('realized')}>
+                <HiOutlineBanknotes className="h-4 w-4" /> Custos realizados
+              </button>
+            ) : null}
+            {permissions.comparativeView ? (
+              <button type="button" className={detailArea === 'comparison' ? 'is-active' : ''} onClick={() => setDetailArea('comparison')}>
+                <HiOutlineScale className="h-4 w-4" /> Comparativo
+              </button>
+            ) : null}
+          </nav>
+        </div>
+        {detailArea === 'planning' || detailArea === 'approved' ? (
+          <CrPlanejamentoView
+            obra={obra}
+            userId={userId}
+            competencia={selectedCompetencia}
+            permissions={permissions}
+            viewMode={detailArea}
+            onChanged={async () => {
+              await load();
+              onChanged?.();
+            }}
+          />
+        ) : null}
+        {detailArea === 'realized' ? (
+          <CrRealizadoView
+            obra={obra}
+            competencia={selectedCompetencia}
+            permissions={{
+              update: permissions.realizedUpdate,
+              reconcile: permissions.realizedReconcile
+            }}
+          />
+        ) : null}
+        {detailArea === 'comparison' ? (
+          <CrComparativoView obra={obra} competencia={selectedCompetencia} />
+        ) : null}
       </div>
     );
   }
@@ -141,7 +186,7 @@ export default function CrPlanejamentoMensalView({
           <h2>Planejamento mensal · {obra.nome}</h2>
           <p>
             {isPublic
-              ? 'Custos planejados, medições previstas e aprovadas, glosas e valores realizados.'
+              ? 'Planeje custos e medição. A aprovação, os realizados e o comparativo ficam no detalhe de cada mês.'
               : 'Custos planejados, recebíveis financeiros do período e valores realizados.'}
           </p>
         </div>
@@ -234,7 +279,17 @@ export default function CrPlanejamentoMensalView({
               medicaoAprovadaInformada={!isPublic || item.medicao_aprovada != null}
               glosa={item.glosa}
               actionLabel={item.estado === 'FINALIZADA' ? 'Ver detalhes' : 'Editar'}
-              onOpen={() => setSelectedCompetencia(item.competencia)}
+              onOpen={() => {
+                setDetailArea('planning');
+                setSelectedCompetencia(item.competencia);
+              }}
+              onOpenApproved={isPublic && permissions.measurementView ? () => {
+                setDetailArea('approved');
+                setSelectedCompetencia(item.competencia);
+              } : null}
+              approvedActionLabel={!permissions.measurement
+                ? 'Ver aprovação'
+                : (item.medicao_aprovada != null ? 'Revisar aprovação' : 'Registrar aprovação')}
             />
           ))}
         </div>

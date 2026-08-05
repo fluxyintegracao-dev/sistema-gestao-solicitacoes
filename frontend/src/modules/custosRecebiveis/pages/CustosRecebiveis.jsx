@@ -36,6 +36,7 @@ import {
   listarCustosRecebiveisObras,
   obterPlanoMicroObra,
   publicarPlanoMicro,
+  listarMinhasObrigacoesCustosRecebiveis,
   validarPlanoMicro
 } from '../services/custosRecebiveis';
 import {
@@ -75,6 +76,7 @@ export default function CustosRecebiveis() {
   const [publishing, setPublishing] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [obligationSummary, setObligationSummary] = useState(null);
 
   const availableTabs = useMemo(
     () => CUSTOS_RECEBIVEIS_TABS.filter((tab) => (
@@ -143,6 +145,22 @@ export default function CustosRecebiveis() {
     reopenApprove: hasExplicitCustosRecebiveisPermission(
       user,
       CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE
+    ),
+    comparativeView: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW
+    ),
+    realizedView: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW
+    ),
+    realizedUpdate: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_UPDATE
+    ),
+    realizedReconcile: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_RECONCILE
     )
   }), [user]);
   const realizedPermissions = useMemo(() => ({
@@ -158,6 +176,10 @@ export default function CustosRecebiveis() {
   const canGrantBypass = hasExplicitCustosRecebiveisPermission(
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS
+  );
+  const canViewObligations = hasExplicitCustosRecebiveisPermission(
+    user,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.OBRIGACOES_VIEW
   );
   const canOpenPlanning = availableTabs.some((tab) => tab.id === 'planejamento');
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
@@ -229,6 +251,19 @@ export default function CustosRecebiveis() {
     }
   }, [canViewStructure, selectedObraId, selectedPlanId]);
 
+  const loadObligationSummary = useCallback(async () => {
+    if (!canViewObligations) {
+      setObligationSummary(null);
+      return;
+    }
+    try {
+      const response = await listarMinhasObrigacoesCustosRecebiveis();
+      setObligationSummary(response?.resumo || null);
+    } catch {
+      setObligationSummary(null);
+    }
+  }, [canViewObligations]);
+
   useEffect(() => {
     if (activeTab && requestedTab !== activeTab) {
       updateQuery({ aba: activeTab }, { replace: true });
@@ -242,6 +277,17 @@ export default function CustosRecebiveis() {
   useEffect(() => {
     loadPlan(selectedObraId, selectedPlanId);
   }, [loadPlan, selectedObraId, selectedPlanId]);
+
+  useEffect(() => {
+    void loadObligationSummary();
+    const refresh = () => void loadObligationSummary();
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [loadObligationSummary, refreshToken]);
 
   function handleOpenObra(obraId) {
     updateQuery({
@@ -386,6 +432,7 @@ export default function CustosRecebiveis() {
   async function handlePlanningChanged() {
     await Promise.all([
       loadObras(),
+      loadObligationSummary(),
       refreshSession().catch(() => null)
     ]);
   }
@@ -406,29 +453,43 @@ export default function CustosRecebiveis() {
     <div className="page cr-page">
       <header className="cr-page-header">
         <div>
-          <span>Controle operacional</span>
+          <span>Planejamento e acompanhamento por obra</span>
           <h1>Custos e Recebíveis</h1>
-          <p>Estrutura micro versionada, vinculada ao orçamento macro sem alterar o cadastro de Obras.</p>
+          <p>Planeje o mês, acompanhe medições e compare com os lançamentos financeiros.</p>
         </div>
-        <button type="button" className="btn btn-outline" onClick={handleRefresh}>
-          <HiOutlineArrowPath className="h-4 w-4" />
-          Atualizar
-        </button>
+        <div className="cr-page-header__actions">
+          {canViewObligations ? (
+            <button
+              type="button"
+              className="cr-obligation-counter"
+              data-overdue={Number(obligationSummary?.vencidas || 0) > 0 || undefined}
+              onClick={() => updateQuery({ aba: 'obrigacoes' })}
+            >
+              <HiOutlineClock className="h-4 w-4" />
+              <span>Prazos</span>
+              <strong>{obligationSummary?.vencidas || 0} vencida(s)</strong>
+              <small>{obligationSummary?.pendentes || 0} pendente(s)</small>
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-outline" onClick={handleRefresh}>
+            <HiOutlineArrowPath className="h-4 w-4" />
+            Atualizar
+          </button>
+        </div>
       </header>
 
       <div className="cr-integrity-banner">
         <HiOutlineCircleStack className="h-5 w-5" />
         <div>
-          <strong>Estrutura independente e rastreável</strong>
+          <strong>Orçamento protegido</strong>
           <span>
-            O módulo consulta os códigos e valores macro em modo somente leitura. Importar ou
-            publicar uma versão grava apenas nas tabelas <code>cr_*</code>.
+            As etapas e os limites vêm do orçamento da obra. O planejamento mensal não altera o orçamento publicado.
           </span>
         </div>
       </div>
 
       <nav className="cr-tabs" aria-label="Áreas de Custos e Recebíveis">
-        {availableTabs.map((tab) => {
+        {availableTabs.filter((tab) => !tab.hidden).map((tab) => {
           const Icon = TAB_ICONS[tab.id] || HiOutlineChartBarSquare;
           return (
             <button

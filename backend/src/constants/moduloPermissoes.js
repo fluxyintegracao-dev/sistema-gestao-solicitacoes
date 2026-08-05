@@ -493,7 +493,7 @@ const MODULO_PERMISSION_GROUPS = [
         key: 'custos_recebiveis.planejamento',
         label: 'Planejamento mensal',
         permissoes: [
-          { key: 'custos_recebiveis.planejamento.preencher_custos', label: 'Preencher custos previstos', descricao: 'Permite registrar custos previstos por competencia.' },
+          { key: 'custos_recebiveis.planejamento.preencher_custos', label: 'Preencher custos planejados', descricao: 'Permite registrar custos planejados por competencia.' },
           { key: 'custos_recebiveis.planejamento.preencher_recebiveis', label: 'Preencher recebiveis previstos', descricao: 'Permite registrar ou confirmar recebiveis previstos por competencia.' },
           { key: 'custos_recebiveis.planejamento.finalizar', label: 'Finalizar planejamento', descricao: 'Permite finalizar e congelar a competencia planejada.' }
         ]

@@ -1081,7 +1081,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
 
 function validateCostRows(rows, allowedItems, allowedMacros) {
   if (!Array.isArray(rows)) {
-    throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos previstos.');
+    throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos planejados.');
   }
   const seen = new Set();
   return rows.map((row, index) => {
@@ -1215,7 +1215,7 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
       competenciaId: competencia.id,
       userId: user?.id,
       event: 'CR_PLANEJAMENTO_CUSTOS_SALVO',
-      description: 'Custos previstos da competencia atualizados.',
+      description: 'Custos planejados da competencia atualizados.',
       payload: { competencia: competenciaCode, quantidade_itens: rows.length, total }
     });
     return { competencia: serializeCompetencia(competencia), total };
@@ -1342,19 +1342,19 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
         transaction
       });
       const previousIds = previousCompetencies.map((item) => Number(item.id));
-      const previousReceipts = previousIds.length
-        ? await deps.CrPrevisaoReceita.findAll({
+      const previousMeasurements = previousIds.length
+        ? await deps.CrMedicaoConsolidada.findAll({
           where: {
             competencia_id: { [Op.in]: previousIds },
-            origem: 'MEDICAO'
+            plano_item_id: { [Op.ne]: null }
           },
           transaction
         })
         : [];
-      previousReceipts.forEach((item) => previousQuantities.set(
+      previousMeasurements.forEach((item) => previousQuantities.set(
         Number(item.plano_item_id),
         number(previousQuantities.get(Number(item.plano_item_id)))
-          + number(item.quantidade_prevista)
+          + number(item.quantidade_medida)
       ));
     }
     const currentCosts = isPublic && saved
@@ -1489,7 +1489,7 @@ async function finalizarCompetencia(
       throw createBusinessError(
         422,
         'CR_JUSTIFICATIVA_CUSTOS_REQUIRED',
-        'Informe a justificativa para finalizar sem custos previstos.'
+        'Informe a justificativa para finalizar sem custos planejados.'
       );
     }
     if (totalReceipts === 0 && !normalizeText(payload.justificativa_sem_receitas)) {

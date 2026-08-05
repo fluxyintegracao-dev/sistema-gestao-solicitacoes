@@ -104,16 +104,7 @@ async function resolveContext(obraIdValue, competenciaValue, typeValue) {
   const previousIds = previousCompetencies.map((item) => Number(item.id));
   let previousRows = [];
   if (previousIds.length && MEASUREMENT_TYPES.has(type)) {
-    previousRows = type === TYPES.MEDICAO_PREVISTA
-      ? await db.CrPrevisaoReceita.findAll({
-        where: {
-          competencia_id: { [Op.in]: previousIds },
-          origem: 'MEDICAO',
-          plano_item_id: { [Op.ne]: null }
-        },
-        raw: true
-      })
-      : await db.CrMedicaoConsolidada.findAll({
+    previousRows = await db.CrMedicaoConsolidada.findAll({
         where: {
           competencia_id: { [Op.in]: previousIds },
           plano_item_id: { [Op.ne]: null }
@@ -124,9 +115,7 @@ async function resolveContext(obraIdValue, competenciaValue, typeValue) {
   const previousByItem = new Map();
   previousRows.forEach((row) => {
     const itemId = Number(row.plano_item_id);
-    const quantity = type === TYPES.MEDICAO_PREVISTA
-      ? number(row.quantidade_prevista)
-      : number(row.quantidade_medida);
+    const quantity = number(row.quantidade_medida);
     previousByItem.set(itemId, number(previousByItem.get(itemId)) + quantity);
   });
   const items = leaves.map((item) => {

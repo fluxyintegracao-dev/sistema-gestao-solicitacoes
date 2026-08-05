@@ -225,7 +225,7 @@ class CustosRecebiveisController {
         req.body
       ));
     } catch (error) {
-      return respondError(res, error, 'Erro ao salvar custos previstos');
+      return respondError(res, error, 'Erro ao salvar custos planejados');
     }
   }
 
