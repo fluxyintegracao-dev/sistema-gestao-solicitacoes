@@ -7,6 +7,17 @@ import {
 } from 'react-icons/hi2';
 import CrStatusPill from './CrStatusPill';
 
+const currency = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+});
+
+const BUDGET_STATUS = Object.freeze({
+  ORCAMENTO_PUBLICADO: { label: 'Orçamento publicado', status: 'PUBLICADA' },
+  RASCUNHO: { label: 'Orçamento em rascunho', status: 'RASCUNHO' },
+  PENDENTE: { label: 'Orçamento pendente', status: 'PENDENTE' }
+});
+
 function ClassificationPill({ value }) {
   const normalized = String(value || '').toUpperCase();
   return (
@@ -16,9 +27,26 @@ function ClassificationPill({ value }) {
   );
 }
 
+function BudgetStatus({ obra }) {
+  const value = BUDGET_STATUS[obra.situacao_orcamento] || BUDGET_STATUS.PENDENTE;
+  return <CrStatusPill status={value.status} label={value.label} />;
+}
+
+function ContractReference({ obra }) {
+  if (!obra.contrato?.referencia) return '-';
+  return (
+    <span title={(obra.contrato.referencias || []).join(' · ')}>
+      {obra.contrato.referencia}
+      {Number(obra.contrato.quantidade) > 1
+        ? ` +${Number(obra.contrato.quantidade) - 1}`
+        : ''}
+    </span>
+  );
+}
+
 function ObraMobileCard({ obra, onOpen }) {
   return (
-    <article className="cr-mobile-record">
+    <article className="cr-mobile-record cr-work-access-card">
       <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-xs font-semibold uppercase text-[var(--c-muted)]">
@@ -33,24 +61,28 @@ function ObraMobileCard({ obra, onOpen }) {
       </div>
       <dl className="cr-mobile-record-grid">
         <div>
-          <dt>Cidade</dt>
-          <dd>{obra.cidade || '-'}</dd>
+          <dt>Contrato</dt>
+          <dd><ContractReference obra={obra} /></dd>
         </div>
         <div>
-          <dt>Responsável</dt>
+          <dt>Valor contratado</dt>
+          <dd>{currency.format(obra.contrato?.valor_total || 0)}</dd>
+        </div>
+        <div>
+          <dt>Valor orçado</dt>
+          <dd>{currency.format(obra.valor_orcado || 0)}</dd>
+        </div>
+        <div>
+          <dt>Eng. responsável</dt>
           <dd>{obra.responsavel?.nome || 'Não definido'}</dd>
         </div>
         <div>
-          <dt>Plano micro</dt>
-          <dd className="mt-1"><CrStatusPill status={obra.plano_atual?.situacao} /></dd>
-        </div>
-        <div>
-          <dt>Competência</dt>
-          <dd>{obra.competencia_atual?.estado || 'Sem registro'}</dd>
+          <dt>Situação</dt>
+          <dd className="mt-1"><BudgetStatus obra={obra} /></dd>
         </div>
       </dl>
       <button type="button" className="btn btn-primary w-full" onClick={() => onOpen(obra.id)}>
-        Abrir workspace
+        Abrir planejamento
       </button>
     </article>
   );
@@ -61,7 +93,8 @@ export default function CrObrasView({
   loading,
   error,
   onReload,
-  onOpen
+  onOpen,
+  showAdministrationLink = false
 }) {
   const [busca, setBusca] = useState('');
   const [classificacao, setClassificacao] = useState('');
@@ -75,27 +108,31 @@ export default function CrObrasView({
         obra.nome,
         obra.cidade,
         obra.empresa?.nome,
-        obra.responsavel?.nome
+        obra.responsavel?.nome,
+        obra.contrato?.referencia,
+        ...(obra.contrato?.referencias || [])
       ].some((value) => String(value || '').toLocaleLowerCase('pt-BR').includes(query));
       const matchesClassification = !classificacao
         || String(obra.classificacao || '').toUpperCase() === classificacao;
       const matchesStatus = !situacao
-        || String(obra.plano_atual?.situacao || 'SEM_PLANO').toUpperCase() === situacao;
+        || String(obra.situacao_orcamento || 'PENDENTE').toUpperCase() === situacao;
       return matchesSearch && matchesClassification && matchesStatus;
     });
   }, [busca, classificacao, obras, situacao]);
 
   return (
-    <section className="cr-section">
+    <section className="cr-section cr-works-access">
       <div className="cr-section-heading">
         <div>
           <h2>Obras no seu escopo</h2>
-          <p>Abra o workspace da obra para consultar a referência macro e as versões da estrutura micro.</p>
+          <p>Abra uma obra para planejar os meses, acompanhar medições e consultar os resultados.</p>
         </div>
-        <Link className="btn btn-outline" to="/obras">
-          <HiOutlineArrowTopRightOnSquare className="h-4 w-4" />
-          Cadastro de Obras
-        </Link>
+        {showAdministrationLink ? (
+          <Link className="btn btn-outline" to="/obras">
+            <HiOutlineArrowTopRightOnSquare className="h-4 w-4" />
+            Cadastro de Obras
+          </Link>
+        ) : null}
       </div>
 
       <div className="cr-filter-grid">
@@ -106,7 +143,7 @@ export default function CrObrasView({
             <input
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Código, nome, empresa ou responsável"
+              placeholder="Código, nome, contrato ou responsável"
             />
           </div>
         </label>
@@ -119,13 +156,12 @@ export default function CrObrasView({
           </select>
         </label>
         <label className="cr-field">
-          <span>Plano micro</span>
+          <span>Situação do orçamento</span>
           <select value={situacao} onChange={(event) => setSituacao(event.target.value)}>
-            <option value="">Todos</option>
-            <option value="PUBLICADA">Publicado</option>
+            <option value="">Todas</option>
+            <option value="ORCAMENTO_PUBLICADO">Publicado</option>
             <option value="RASCUNHO">Rascunho</option>
-            <option value="SUBSTITUIDA">Substituído</option>
-            <option value="SEM_PLANO">Sem plano</option>
+            <option value="PENDENTE">Pendente</option>
           </select>
         </label>
       </div>
@@ -148,17 +184,16 @@ export default function CrObrasView({
         </div>
       ) : (
         <>
-          <div className="cr-table-shell cr-desktop-table">
+          <div className="cr-table-shell cr-desktop-table cr-works-table">
             <table>
               <thead>
                 <tr>
                   <th>Obra</th>
-                  <th>Empresa</th>
-                  <th>Classificação</th>
-                  <th>Cidade</th>
-                  <th>Responsável</th>
-                  <th>Plano micro</th>
-                  <th>Competência</th>
+                  <th>Contrato</th>
+                  <th className="text-right">Valor contratado</th>
+                  <th className="text-right">Valor orçado</th>
+                  <th>Eng. responsável</th>
+                  <th>Situação</th>
                   <th aria-label="Ação" />
                 </tr>
               </thead>
@@ -166,20 +201,20 @@ export default function CrObrasView({
                 {filtered.map((obra) => (
                   <tr key={obra.id}>
                     <td>
-                      <strong>{obra.codigo || `OBRA ${obra.id}`}</strong>
-                      <span>{obra.nome}</span>
+                      <strong>{obra.codigo || `OBRA ${obra.id}`} · {obra.nome}</strong>
+                      <span>{obra.cidade || '-'} · {obra.empresa?.nome || 'Empresa não informada'}</span>
                     </td>
-                    <td>{obra.empresa?.nome || '-'}</td>
-                    <td><ClassificationPill value={obra.classificacao} /></td>
-                    <td>{obra.cidade || '-'}</td>
+                    <td><ContractReference obra={obra} /></td>
+                    <td className="text-right cr-cell-currency">
+                      {currency.format(obra.contrato?.valor_total || 0)}
+                    </td>
+                    <td className="text-right cr-cell-currency">
+                      {currency.format(obra.valor_orcado || 0)}
+                    </td>
                     <td>{obra.responsavel?.nome || 'Não definido'}</td>
-                    <td>
-                      <CrStatusPill status={obra.plano_atual?.situacao} />
-                      {obra.plano_atual ? <small>v{obra.plano_atual.versao}</small> : null}
-                    </td>
-                    <td>{obra.competencia_atual?.estado || 'Sem registro'}</td>
+                    <td><BudgetStatus obra={obra} /></td>
                     <td className="text-right">
-                      <button type="button" className="btn btn-outline" onClick={() => onOpen(obra.id)}>
+                      <button type="button" className="btn btn-primary" onClick={() => onOpen(obra.id)}>
                         Abrir
                       </button>
                     </td>

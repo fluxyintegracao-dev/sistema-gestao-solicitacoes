@@ -129,7 +129,8 @@ function newIdempotencyKey(prefix = 'cr') {
 export async function obterCustosRecebiveisDashboard(
   competencia,
   obraId = null,
-  competencias = []
+  competencias = [],
+  classificacao = ''
 ) {
   const query = new URLSearchParams({ competencia });
   if (Number.isInteger(Number(obraId)) && Number(obraId) > 0) {
@@ -143,6 +144,9 @@ export async function obterCustosRecebiveisDashboard(
   )];
   if (normalizedCompetencias.length) {
     query.set('competencias', normalizedCompetencias.join(','));
+  }
+  if (['PUBLICA', 'PRIVADA'].includes(String(classificacao || '').toUpperCase())) {
+    query.set('classificacao', String(classificacao).toUpperCase());
   }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/dashboard?${query.toString()}`,

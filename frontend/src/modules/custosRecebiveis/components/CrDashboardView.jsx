@@ -123,8 +123,9 @@ export default function CrDashboardView({
       setError('');
       setData(await obterCustosRecebiveisDashboard(
         competencia,
-        null,
-        competenciasParam
+        obraFilterId,
+        competenciasParam,
+        classificacaoFilter
       ));
     } catch (requestError) {
       setData(null);
@@ -132,7 +133,7 @@ export default function CrDashboardView({
     } finally {
       setLoading(false);
     }
-  }, [competencia, competenciasParam]);
+  }, [classificacaoFilter, competencia, competenciasParam, obraFilterId]);
 
   useEffect(() => {
     void load();
@@ -391,8 +392,12 @@ export default function CrDashboardView({
           title="Evolução de recebíveis"
           icon={HiOutlineBanknotes}
           rows={history}
-          primaryKey="recebivel_reconhecido"
-          primaryLabel="Reconhecido"
+          primaryKey={portfolioClassification === 'PUBLICA'
+            ? 'medicao_aprovada'
+            : 'recebivel_reconhecido'}
+          primaryLabel={portfolioClassification === 'PUBLICA'
+            ? 'Medição aprovada'
+            : (portfolioClassification === 'PRIVADA' ? 'Previsto' : 'Reconhecido')}
           secondaryKey="receita_recebida"
           secondaryLabel="Recebido"
         />

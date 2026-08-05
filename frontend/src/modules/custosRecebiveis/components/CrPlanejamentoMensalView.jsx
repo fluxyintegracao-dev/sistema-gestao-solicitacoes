@@ -13,6 +13,7 @@ import {
 } from '../services/custosRecebiveis';
 import CrMonthlySummaryCard from './CrMonthlySummaryCard';
 import CrComparativoView from './CrComparativoView';
+import CrMonthlyDetailView from './CrMonthlyDetailView';
 import CrPlanejamentoView from './CrPlanejamentoView';
 import CrRealizadoView from './CrRealizadoView';
 
@@ -31,12 +32,16 @@ export default function CrPlanejamentoMensalView({
   userId,
   initialCompetencia,
   autoOpen = false,
+  detailMode = null,
+  obligations = [],
+  obligationsServerTime = null,
   permissions,
-  onChanged
+  onChanged,
+  onNavigateDetail
 }) {
   const [data, setData] = useState(null);
   const [selectedCompetencia, setSelectedCompetencia] = useState(
-    autoOpen ? initialCompetencia : null
+    (autoOpen || detailMode) ? initialCompetencia : null
   );
   const [newMonthOpen, setNewMonthOpen] = useState(false);
   const [newMonth, setNewMonth] = useState('');
@@ -69,11 +74,11 @@ export default function CrPlanejamentoMensalView({
   }, [obra?.id]);
 
   useEffect(() => {
-    setSelectedCompetencia(autoOpen ? initialCompetencia : null);
-    setDetailArea('planning');
+    setSelectedCompetencia((autoOpen || detailMode) ? initialCompetencia : null);
+    setDetailArea(detailMode || 'planning');
     setNewMonthOpen(false);
     load();
-  }, [autoOpen, initialCompetencia, load]);
+  }, [autoOpen, detailMode, initialCompetencia, load]);
 
   const existingMonths = useMemo(
     () => new Set((data?.items || []).map((item) => item.competencia)),
@@ -83,6 +88,40 @@ export default function CrPlanejamentoMensalView({
     .filter((item) => !existingMonths.has(item));
   const canCreate = permissions.costs || permissions.receipts;
   const isPublic = obra?.classificacao === 'PUBLICA';
+  const activeObligation = useMemo(() => (
+    (Array.isArray(obligations) ? obligations : [])
+      .filter((item) => (
+        Number(item.obra_id) === Number(obra?.id)
+        && item.situacao !== 'CUMPRIDA'
+      ))
+      .sort((left, right) => String(left.competencia).localeCompare(String(right.competencia)))[0]
+      || null
+  ), [obligations, obra?.id]);
+
+  const deadlineState = useMemo(() => {
+    if (!activeObligation?.prazo_em) return null;
+    const deadline = new Date(activeObligation.prazo_em);
+    const serverNow = obligationsServerTime ? new Date(obligationsServerTime) : new Date();
+    const days = Math.max(0, Math.ceil((deadline.getTime() - serverNow.getTime()) / 86400000));
+    return {
+      days,
+      deadline,
+      overdue: activeObligation.situacao === 'VENCIDA' || deadline <= serverNow
+    };
+  }, [activeObligation, obligationsServerTime]);
+
+  function openDetail(competenciaValue, area) {
+    setSelectedCompetencia(competenciaValue);
+    setDetailArea(area);
+    onNavigateDetail?.(competenciaValue, area);
+  }
+
+  function closeDetail() {
+    setSelectedCompetencia(null);
+    setDetailArea('planning');
+    onNavigateDetail?.(null, null);
+    void load();
+  }
 
   async function createMonth() {
     if (!newMonth || creating) return;
@@ -91,7 +130,7 @@ export default function CrPlanejamentoMensalView({
       setError('');
       const result = await criarCompetenciaObra(obra.id, newMonth);
       setNewMonthOpen(false);
-      setSelectedCompetencia(result.competencia.competencia);
+      openDetail(result.competencia.competencia, 'planning');
       await load();
       onChanged?.();
     } catch (requestError) {
@@ -112,37 +151,45 @@ export default function CrPlanejamentoMensalView({
   }
 
   if (selectedCompetencia) {
+    if (detailArea === 'details') {
+      return (
+        <CrMonthlyDetailView
+          obra={obra}
+          competencia={selectedCompetencia}
+          permissions={permissions}
+          onClose={closeDetail}
+          onEditPlanning={() => openDetail(selectedCompetencia, 'planning')}
+          onOpenApproved={() => openDetail(selectedCompetencia, 'approved')}
+        />
+      );
+    }
     return (
       <div className="cr-month-editor">
         <div className="cr-month-detail-toolbar">
           <button
             type="button"
             className="btn btn-outline cr-month-back"
-            onClick={() => {
-              setSelectedCompetencia(null);
-              setDetailArea('planning');
-              load();
-            }}
+            onClick={closeDetail}
           >
             <HiOutlineArrowLeft className="h-4 w-4" />
             Meses da obra
           </button>
           <nav aria-label="Áreas da competência">
-            <button type="button" className={detailArea === 'planning' ? 'is-active' : ''} onClick={() => setDetailArea('planning')}>
+            <button type="button" className={detailArea === 'planning' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'planning')}>
               Planejamento
             </button>
             {isPublic && permissions.measurementView ? (
-              <button type="button" className={detailArea === 'approved' ? 'is-active' : ''} onClick={() => setDetailArea('approved')}>
+              <button type="button" className={detailArea === 'approved' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'approved')}>
                 Medição aprovada
               </button>
             ) : null}
             {permissions.realizedView ? (
-              <button type="button" className={detailArea === 'realized' ? 'is-active' : ''} onClick={() => setDetailArea('realized')}>
+              <button type="button" className={detailArea === 'realized' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'realized')}>
                 <HiOutlineBanknotes className="h-4 w-4" /> Custos realizados
               </button>
             ) : null}
             {isPublic && permissions.comparativeView ? (
-              <button type="button" className={detailArea === 'comparison' ? 'is-active' : ''} onClick={() => setDetailArea('comparison')}>
+              <button type="button" className={detailArea === 'comparison' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'comparison')}>
                 <HiOutlineScale className="h-4 w-4" /> Comparativo
               </button>
             ) : null}
@@ -180,6 +227,32 @@ export default function CrPlanejamentoMensalView({
 
   return (
     <section className="cr-workspace cr-months-workspace">
+      {activeObligation && deadlineState ? (
+        <div className="cr-planning-deadline" data-overdue={deadlineState.overdue || undefined}>
+          <HiOutlineCalendarDays className="h-5 w-5" />
+          <div>
+            <strong>
+              {deadlineState.overdue
+                ? `O planejamento de ${monthLabel(activeObligation.competencia)} está vencido.`
+                : `Registre a previsão de custos e medição de ${monthLabel(activeObligation.competencia)}.`}
+            </strong>
+            <span>
+              {deadlineState.overdue
+                ? (activeObligation.exige_reabertura
+                  ? 'Solicite a reabertura para concluir o preenchimento.'
+                  : 'A competência está liberada temporariamente para regularização.')
+                : `Restam ${deadlineState.days} dia(s). Prazo até ${deadlineState.deadline.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => openDetail(activeObligation.competencia, 'planning')}
+          >
+            {deadlineState.overdue ? 'Regularizar agora' : 'Registrar agora'}
+          </button>
+        </div>
+      ) : null}
       <header className="cr-workspace-heading">
         <div>
           <span>{obra.codigo || obra.id} · {isPublic ? 'Obra pública' : 'Obra privada'}</span>
@@ -278,14 +351,12 @@ export default function CrPlanejamentoMensalView({
               receitaRecebida={item.receita_recebida}
               medicaoAprovadaInformada={!isPublic || item.medicao_aprovada != null}
               glosa={item.glosa}
-              actionLabel={item.estado === 'FINALIZADA' ? 'Ver detalhes' : 'Editar'}
+              actionLabel="Ver detalhes"
               onOpen={() => {
-                setDetailArea('planning');
-                setSelectedCompetencia(item.competencia);
+                openDetail(item.competencia, 'details');
               }}
               onOpenApproved={isPublic && permissions.measurementView ? () => {
-                setDetailArea('approved');
-                setSelectedCompetencia(item.competencia);
+                openDetail(item.competencia, 'approved');
               } : null}
               approvedActionLabel={!permissions.measurement
                 ? 'Ver aprovação'

@@ -1,5 +1,6 @@
 export const CUSTOS_RECEBIVEIS_PERMISSIONS = Object.freeze({
   MODULE_ACCESS: 'custos_recebiveis.modulo.acessar',
+  ALL_OBRAS_SCOPE: 'custos_recebiveis.escopo.todas_obras',
   DASHBOARD_VIEW: 'custos_recebiveis.dashboard.visualizar',
   COMPARATIVO_VIEW: 'custos_recebiveis.comparativo.visualizar',
   OBRAS_VIEW: 'custos_recebiveis.obras.visualizar',
@@ -27,12 +28,12 @@ export const CUSTOS_RECEBIVEIS_PERMISSIONS = Object.freeze({
 export const CUSTOS_RECEBIVEIS_TABS = Object.freeze([
   {
     id: 'visao-geral',
-    label: 'Visão geral',
+    label: 'Dashboard',
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.DASHBOARD_VIEW
   },
   {
     id: 'obras',
-    label: 'Obras',
+    label: 'Minhas obras',
     permission: CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW,
     hidden: true
   },

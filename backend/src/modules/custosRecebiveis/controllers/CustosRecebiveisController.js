@@ -164,7 +164,8 @@ class CustosRecebiveisController {
         req.user,
         req.query.competencia,
         req.query.obra_id,
-        req.query.competencias
+        req.query.competencias,
+        req.query.classificacao
       ));
     } catch (error) {
       return respondError(res, error, 'Erro ao consultar dashboard de Custos e Recebiveis');

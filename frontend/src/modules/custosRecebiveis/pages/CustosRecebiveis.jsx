@@ -77,6 +77,20 @@ export default function CustosRecebiveis() {
   const [feedback, setFeedback] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
   const [obligationSummary, setObligationSummary] = useState(null);
+  const [obligationData, setObligationData] = useState(null);
+
+  const hasAdministrativeCapability = [
+    CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_IMPORT,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_PUBLISH,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.AUDITORIA_VIEW,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.REPORT_EXPORT
+  ].some((permission) => hasExplicitCustosRecebiveisPermission(user, permission));
+  const operationalExperience = (
+    hasExplicitCustosRecebiveisPermission(user, CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW)
+    && hasExplicitCustosRecebiveisPermission(user, CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_VIEW)
+    && !hasAdministrativeCapability
+  );
 
   const availableTabs = useMemo(
     () => CUSTOS_RECEBIVEIS_TABS.filter((tab) => (
@@ -84,10 +98,28 @@ export default function CustosRecebiveis() {
     )),
     [user]
   );
-  const requestedTab = searchParams.get('aba') || availableTabs[0]?.id || 'obras';
+  const visibleTabs = useMemo(() => {
+    const tabs = availableTabs.filter((tab) => (
+      !tab.hidden || (operationalExperience && tab.id === 'obras')
+    ));
+    if (!operationalExperience) return tabs;
+    const operationalOrder = new Map([
+      ['obras', 0],
+      ['planejamento', 1],
+      ['visao-geral', 2],
+      ['obrigacoes', 3]
+    ]);
+    return [...tabs].sort((left, right) => (
+      (operationalOrder.get(left.id) ?? 99) - (operationalOrder.get(right.id) ?? 99)
+    ));
+  }, [availableTabs, operationalExperience]);
+  const defaultTab = operationalExperience && availableTabs.some((tab) => tab.id === 'obras')
+    ? 'obras'
+    : visibleTabs[0]?.id || availableTabs[0]?.id || 'obras';
+  const requestedTab = searchParams.get('aba') || defaultTab;
   const activeTab = availableTabs.some((tab) => tab.id === requestedTab)
     ? requestedTab
-    : availableTabs[0]?.id || null;
+    : defaultTab || null;
   const selectedObraId = Number(searchParams.get('obra'));
   const selectedPlanId = Number(searchParams.get('plano'));
   const competencia = searchParams.get('competencia') || currentMonth();
@@ -101,6 +133,9 @@ export default function CustosRecebiveis() {
       .map((item) => item.trim())
       .filter((item) => /^\d{4}-\d{2}$/.test(item))
   )];
+  const detailMode = searchParams.get('detalhe') === '1'
+    ? (searchParams.get('painel') || 'details')
+    : null;
   const canViewObras = hasExplicitCustosRecebiveisPermission(
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW
@@ -254,13 +289,16 @@ export default function CustosRecebiveis() {
   const loadObligationSummary = useCallback(async () => {
     if (!canViewObligations) {
       setObligationSummary(null);
+      setObligationData(null);
       return;
     }
     try {
       const response = await listarMinhasObrigacoesCustosRecebiveis();
       setObligationSummary(response?.resumo || null);
+      setObligationData(response || null);
     } catch {
       setObligationSummary(null);
+      setObligationData(null);
     }
   }, [canViewObligations]);
 
@@ -291,10 +329,12 @@ export default function CustosRecebiveis() {
 
   function handleOpenObra(obraId) {
     updateQuery({
-      aba: 'obras',
+      aba: 'planejamento',
       obra: obraId,
-      sub: 'estrutura',
-      plano: null
+      sub: null,
+      plano: null,
+      detalhe: null,
+      painel: null
     });
     requestAnimationFrame(() => {
       document.getElementById('cr-workspace-anchor')?.scrollIntoView({
@@ -406,10 +446,35 @@ export default function CustosRecebiveis() {
   }
 
   function handleOpenPlanning(obraId) {
-    updateQuery({ aba: 'planejamento', obra: obraId, plano: null });
+    updateQuery({
+      aba: 'planejamento',
+      obra: obraId,
+      plano: null,
+      detalhe: null,
+      painel: null
+    });
   }
 
   function handleOpenDashboardArea(item) {
+    if (operationalExperience) {
+      const panelByDestination = {
+        comparativo: 'comparison',
+        realizado: 'realized',
+        planejamento: ['PLANEJAMENTO_AUSENTE', 'OBRIGACAO_VENCIDA'].includes(item?.tipo)
+          ? 'planning'
+          : 'details'
+      };
+      updateQuery({
+        aba: 'planejamento',
+        obra: item?.obra_id || null,
+        competencia: item?.competencia || competencia,
+        detalhe: '1',
+        painel: panelByDestination[item?.destino] || 'details',
+        plano: null,
+        bloqueio: item?.tipo === 'OBRIGACAO_VENCIDA' ? '1' : null
+      });
+      return;
+    }
     updateQuery({
       aba: item?.destino || 'comparativo',
       obra: item?.obra_id || null,
@@ -425,6 +490,8 @@ export default function CustosRecebiveis() {
       obra: item.obra_id,
       competencia: item.competencia,
       plano: null,
+      detalhe: '1',
+      painel: 'planning',
       bloqueio: item.exige_reabertura ? '1' : null
     });
   }
@@ -479,7 +546,7 @@ export default function CustosRecebiveis() {
       </header>
 
       <nav className="cr-tabs" aria-label="Áreas de Custos e Recebíveis">
-        {availableTabs.filter((tab) => !tab.hidden).map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = TAB_ICONS[tab.id] || HiOutlineChartBarSquare;
           return (
             <button
@@ -517,8 +584,15 @@ export default function CustosRecebiveis() {
               ? null
               : values.join(',')
           })}
+          operational={operationalExperience}
+          onPeriodChange={(start, end, values) => updateQuery({
+            competencia: end,
+            competencias: values.join(','),
+            periodo_inicio: start,
+            periodo_fim: end
+          })}
         />
-      ) : (
+      ) : activeTab !== 'obras' ? (
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
           <span>Obra em contexto</span>
@@ -553,7 +627,7 @@ export default function CustosRecebiveis() {
           </small>
         </div>
       </section>
-      )}
+      ) : null}
 
       {feedback && activeTab !== 'importacoes' ? (
         <div className="cr-feedback" data-tone={feedback.tone || 'info'}>
@@ -569,8 +643,9 @@ export default function CustosRecebiveis() {
             error={obrasError}
             onReload={loadObras}
             onOpen={handleOpenObra}
+            showAdministrationLink={!operationalExperience && canViewStructure}
           />
-          {Number.isInteger(selectedObraId) && selectedObraId > 0 ? (
+          {!operationalExperience && Number.isInteger(selectedObraId) && selectedObraId > 0 ? (
             <div id="cr-workspace-anchor">
               <CrPlanoWorkspace
                 data={planData}
@@ -611,8 +686,17 @@ export default function CustosRecebiveis() {
           userId={user?.id}
           initialCompetencia={competencia}
           autoOpen={searchParams.get('bloqueio') === '1'}
+          detailMode={detailMode}
+          obligations={obligationData?.items || []}
+          obligationsServerTime={obligationData?.server_time || null}
           permissions={planningPermissions}
           onChanged={handlePlanningChanged}
+          onNavigateDetail={(competenciaValue, area) => updateQuery({
+            competencia: competenciaValue || competencia,
+            detalhe: competenciaValue ? '1' : null,
+            painel: competenciaValue ? area : null,
+            bloqueio: null
+          })}
         />
       ) : null}
 

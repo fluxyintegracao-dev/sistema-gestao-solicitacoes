@@ -36,6 +36,7 @@ function getDependencies(overrides = {}) {
   return {
     sequelize: db.sequelize,
     Obra: db.Obra,
+    Contrato: db.Contrato,
     EmpresaGrupo: db.EmpresaGrupo,
     Apropriacao: db.Apropriacao,
     User: db.User,
@@ -253,7 +254,7 @@ async function listarObrasNoEscopo(user, query = {}, overrides = {}) {
   if (!obraIds.length) return { items: [], total: 0 };
 
   const currentCompetencia = new Date().toISOString().slice(0, 7);
-  const [plans, responsaveis, competencias] = await Promise.all([
+  const [plans, responsaveis, competencias, contratos] = await Promise.all([
     dependencies.CrPlanoObra.findAll({
       where: { obra_id: { [Op.in]: obraIds } },
       order: [['obra_id', 'ASC'], ['versao', 'DESC']]
@@ -277,13 +278,25 @@ async function listarObrasNoEscopo(user, query = {}, overrides = {}) {
         obra_id: { [Op.in]: obraIds },
         competencia: currentCompetencia
       }
+    }),
+    dependencies.Contrato.findAll({
+      where: {
+        obra_id: { [Op.in]: obraIds },
+        ativo: true
+      },
+      attributes: ['id', 'obra_id', 'codigo', 'ref_contrato', 'valor_total'],
+      order: [['obra_id', 'ASC'], ['id', 'ASC']]
     })
   ]);
 
   const planByObra = new Map();
+  const publishedPlanByObra = new Map();
   plans.forEach((plan) => {
     const obraId = Number(plan.obra_id);
     if (!planByObra.has(obraId)) planByObra.set(obraId, serializePlanHeader(plan));
+    if (plan.situacao === 'PUBLICADA' && !publishedPlanByObra.has(obraId)) {
+      publishedPlanByObra.set(obraId, serializePlanHeader(plan));
+    }
   });
   const responsavelByObra = new Map();
   responsaveis.forEach((responsavel) => {
@@ -305,13 +318,50 @@ async function listarObrasNoEscopo(user, query = {}, overrides = {}) {
       }
     ])
   );
+  const contratosByObra = new Map();
+  contratos.forEach((contratoValue) => {
+    const contrato = asPlain(contratoValue);
+    const obraId = Number(contrato.obra_id);
+    const current = contratosByObra.get(obraId) || {
+      quantidade: 0,
+      valor_total: 0,
+      referencias: []
+    };
+    current.quantidade += 1;
+    current.valor_total += Number(contrato.valor_total || 0);
+    const referencia = contrato.ref_contrato || contrato.codigo;
+    if (referencia) current.referencias.push(String(referencia));
+    contratosByObra.set(obraId, current);
+  });
 
   const items = obras.map((obra) => {
     const serialized = serializeObra(obra);
+    const latestPlan = planByObra.get(serialized.id) || null;
+    const publishedPlan = publishedPlanByObra.get(serialized.id) || null;
+    const contractSummary = contratosByObra.get(serialized.id) || null;
     return {
       ...serialized,
       responsavel: responsavelByObra.get(serialized.id) || null,
-      plano_atual: planByObra.get(serialized.id) || null,
+      plano_atual: latestPlan,
+      plano_publicado: publishedPlan,
+      contrato: contractSummary ? {
+        referencia: contractSummary.referencias[0] || null,
+        referencias: contractSummary.referencias,
+        quantidade: contractSummary.quantidade,
+        valor_total: Math.round(contractSummary.valor_total * 100) / 100
+      } : null,
+      valor_orcado: Number(
+        publishedPlan?.total_micro
+        ?? latestPlan?.total_micro
+        ?? serialized.planilha_geral
+        ?? 0
+      ),
+      origem_valor_orcado: publishedPlan
+        ? 'PLANO_PUBLICADO'
+        : (latestPlan ? 'PLANO_RASCUNHO' : 'CADASTRO_OBRA'),
+      situacao_orcamento: publishedPlan
+        ? 'ORCAMENTO_PUBLICADO'
+        : (latestPlan ? 'RASCUNHO' : 'PENDENTE'),
       competencia_atual: competenciaByObra.get(serialized.id) || null
     };
   });

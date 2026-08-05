@@ -73,9 +73,9 @@ function validateCompetenciaBoundaries() {
       custo_realizado: 120,
       recebivel_previsto: 180,
       recebivel_reconhecido: 150,
+      medicao_aprovada: 150,
       receita_recebida: 90,
       glosa: 30,
-      medicao_aprovada: 150,
       movimentos_sem_mapeamento: 2,
       recebiveis_vencidos: 1
     }]),
@@ -86,6 +86,7 @@ function validateCompetenciaBoundaries() {
       percentual_custo: 120,
       recebivel_previsto: 180,
       recebivel_reconhecido: 150,
+      medicao_aprovada: 150,
       receita_recebida: 90,
       saldo_receber: 60,
       glosa: 30,
@@ -224,6 +225,10 @@ function validateFrontendContracts() {
   const monthlySummary = read(
     '../frontend/src/modules/custosRecebiveis/components/CrMonthlySummaryCard.jsx'
   );
+  const monthlyDetail = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrMonthlyDetailView.jsx'
+  );
+  const worksView = read('../frontend/src/modules/custosRecebiveis/components/CrObrasView.jsx');
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
   const frontendService = read(
     '../frontend/src/modules/custosRecebiveis/services/custosRecebiveis.js'
@@ -276,6 +281,8 @@ function validateFrontendContracts() {
   assert(monthlyPlanning.includes('Novo mês'));
   assert(monthlyPlanning.includes("obra?.classificacao === 'PUBLICA'"));
   assert(monthlyPlanning.includes('<CrMonthlySummaryCard'));
+  assert(monthlyPlanning.includes('<CrMonthlyDetailView'));
+  assert(monthlyPlanning.includes('cr-planning-deadline'));
   assert(monthlySummary.includes('Custo planejado'));
   assert(monthlySummary.includes('Recebível previsto'));
   assert(monthlySummary.includes('Desvio de custo'));
@@ -301,6 +308,17 @@ function validateFrontendContracts() {
   assert(executiveFilters.includes('type="checkbox"'));
   assert(executiveFilters.includes('value="PUBLICA"'));
   assert(executiveFilters.includes('value="PRIVADA"'));
+  assert(executiveFilters.includes('cr-operational-period'));
+  assert(executiveFilters.includes('Todas as minhas obras'));
+  assert(worksView.includes('obra.contrato'));
+  assert(worksView.includes('obra.valor_orcado'));
+  assert(worksView.includes('obra.responsavel'));
+  assert(worksView.includes('Abrir planejamento'));
+  assert(!worksView.includes('Remover'));
+  assert(monthlyDetail.includes('<CostDetail'));
+  assert(monthlyDetail.includes('<MeasurementDetail'));
+  assert(monthlyDetail.includes('<CrRealizadoView'));
+  assert(monthlyDetail.includes('<CrComparativoView'));
   assert(page.includes('canOpenPlanning={canOpenPlanning}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
@@ -309,7 +327,7 @@ function validateFrontendContracts() {
   assert(planning.includes("renderPlanningSheetActions('medicao-aprovada'"));
   assert(planningImport.includes('Confirmar importação'));
   assert(planningImport.includes('onConfirm(tipo, result.itens)'));
-  assert(monthlyPlanning.includes("setDetailArea('approved')"));
+  assert(monthlyPlanning.includes("openDetail(selectedCompetencia, 'approved')"));
   assert(monthlyPlanning.includes('<CrRealizadoView'));
   assert(monthlyPlanning.includes('<CrComparativoView'));
   assert(monthlyPlanning.includes('isPublic && permissions.comparativeView'));

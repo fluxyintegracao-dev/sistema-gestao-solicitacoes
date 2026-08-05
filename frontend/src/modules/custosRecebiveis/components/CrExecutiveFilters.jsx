@@ -30,6 +30,19 @@ function availableMonths(reference, selected) {
   return [...new Set([...months, ...selected].filter(Boolean))].sort().reverse();
 }
 
+function monthsBetween(startValue, endValue) {
+  const start = normalizeMonth(startValue);
+  const end = normalizeMonth(endValue);
+  if (!start || !end || start > end) return [];
+  const result = [];
+  let cursor = start;
+  while (cursor <= end && result.length < 12) {
+    result.push(cursor);
+    cursor = shiftMonth(cursor, 1);
+  }
+  return result;
+}
+
 export default function CrExecutiveFilters({
   obras,
   obraId,
@@ -39,7 +52,9 @@ export default function CrExecutiveFilters({
   onObraChange,
   onClassificacaoChange,
   onCompetenciaReferenciaChange,
-  onCompetenciasChange
+  onCompetenciasChange,
+  operational = false,
+  onPeriodChange
 }) {
   const selectedMonths = [...new Set(competencias.filter(normalizeMonth))].sort().reverse();
   const monthOptions = availableMonths(competenciaReferencia, selectedMonths);
@@ -50,6 +65,9 @@ export default function CrExecutiveFilters({
   const competenceLabel = selectedMonths.length === 1
     ? monthLabel(selectedMonths[0])
     : `${selectedMonths.length} competências selecionadas`;
+  const ascendingMonths = [...selectedMonths].sort();
+  const periodStart = ascendingMonths[0] || competenciaReferencia;
+  const periodEnd = ascendingMonths.at(-1) || competenciaReferencia;
 
   function toggleMonth(value) {
     const exists = selectedMonths.includes(value);
@@ -71,12 +89,19 @@ export default function CrExecutiveFilters({
     }
   }
 
+  function changePeriod(start, end) {
+    const values = monthsBetween(start, end);
+    if (!values.length) return;
+    if (onPeriodChange) onPeriodChange(values[0], values.at(-1), values);
+    else onCompetenciasChange(values);
+  }
+
   return (
-    <section className="cr-context-bar cr-context-bar--executive" aria-label="Filtros executivos">
+    <section className="cr-context-bar cr-context-bar--executive" aria-label="Filtros do dashboard">
       <label className="cr-field">
-        <span>Escopo executivo</span>
+        <span>{operational ? 'Obra' : 'Escopo executivo'}</span>
         <select value={obraId || ''} onChange={(event) => onObraChange(event.target.value)}>
-          <option value="">Todas as obras do seu escopo</option>
+          <option value="">{operational ? 'Todas as minhas obras' : 'Todas as obras do seu escopo'}</option>
           {filteredWorks.map((obra) => (
             <option key={obra.id} value={obra.id}>
               {obra.codigo || obra.id} · {obra.nome}
@@ -87,63 +112,80 @@ export default function CrExecutiveFilters({
 
       <label className="cr-field">
         <span>Classificação</span>
-        <select
-          value={classificacao}
-          onChange={(event) => changeClassification(event.target.value)}
-        >
+        <select value={classificacao} onChange={(event) => changeClassification(event.target.value)}>
           <option value="">Públicas e privadas</option>
           <option value="PUBLICA">Públicas</option>
           <option value="PRIVADA">Privadas</option>
         </select>
       </label>
 
-      <div className="cr-field">
-        <span>Competências dos cards</span>
-        <details className="cr-competence-filter">
-          <summary>
-            <HiOutlineCalendarDays className="h-4 w-4" />
-            <strong>{competenceLabel}</strong>
-            <HiOutlineChevronDown className="h-4 w-4" />
-          </summary>
-          <div className="cr-competence-filter__panel">
-            <label className="cr-field">
-              <span>Mês mais recente disponível</span>
-              <input
-                type="month"
-                value={competenciaReferencia}
-                onChange={(event) => onCompetenciaReferenciaChange(event.target.value)}
-              />
-            </label>
-            <div className="cr-competence-filter__actions">
-              <button type="button" onClick={() => onCompetenciasChange(monthOptions)}>
-                Marcar seis meses
-              </button>
-              <button
-                type="button"
-                onClick={() => onCompetenciasChange([competenciaReferencia])}
-              >
-                Somente referência
-              </button>
+      {operational ? (
+        <div className="cr-operational-period" role="group" aria-label="Período do dashboard">
+          <label className="cr-field">
+            <span>Período inicial</span>
+            <input
+              type="month"
+              value={periodStart}
+              max={periodEnd}
+              onChange={(event) => changePeriod(event.target.value, periodEnd)}
+            />
+          </label>
+          <label className="cr-field">
+            <span>Período final</span>
+            <input
+              type="month"
+              value={periodEnd}
+              min={periodStart}
+              onChange={(event) => changePeriod(periodStart, event.target.value)}
+            />
+          </label>
+        </div>
+      ) : (
+        <div className="cr-field">
+          <span>Competências dos cards</span>
+          <details className="cr-competence-filter">
+            <summary>
+              <HiOutlineCalendarDays className="h-4 w-4" />
+              <strong>{competenceLabel}</strong>
+              <HiOutlineChevronDown className="h-4 w-4" />
+            </summary>
+            <div className="cr-competence-filter__panel">
+              <label className="cr-field">
+                <span>Mês mais recente disponível</span>
+                <input
+                  type="month"
+                  value={competenciaReferencia}
+                  onChange={(event) => onCompetenciaReferenciaChange(event.target.value)}
+                />
+              </label>
+              <div className="cr-competence-filter__actions">
+                <button type="button" onClick={() => onCompetenciasChange(monthOptions)}>
+                  Marcar seis meses
+                </button>
+                <button type="button" onClick={() => onCompetenciasChange([competenciaReferencia])}>
+                  Somente referência
+                </button>
+              </div>
+              <div className="cr-competence-filter__options">
+                {monthOptions.map((item) => (
+                  <label key={item}>
+                    <input
+                      type="checkbox"
+                      checked={selectedMonths.includes(item)}
+                      disabled={selectedMonths.length === 1 && selectedMonths.includes(item)}
+                      onChange={() => toggleMonth(item)}
+                    />
+                    <span>{monthLabel(item)}</span>
+                  </label>
+                ))}
+              </div>
             </div>
-            <div className="cr-competence-filter__options">
-              {monthOptions.map((item) => (
-                <label key={item}>
-                  <input
-                    type="checkbox"
-                    checked={selectedMonths.includes(item)}
-                    disabled={selectedMonths.length === 1 && selectedMonths.includes(item)}
-                    onChange={() => toggleMonth(item)}
-                  />
-                  <span>{monthLabel(item)}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </details>
-      </div>
+          </details>
+        </div>
+      )}
 
       <div className="cr-context-summary">
-        <span>Cards em exibição</span>
+        <span>{operational ? 'Escopo do dashboard' : 'Cards em exibição'}</span>
         <strong>{selectedWork?.nome || `${filteredWorks.length} obra(s)`}</strong>
         <small>{selectedMonths.length} competência(s) selecionada(s)</small>
       </div>

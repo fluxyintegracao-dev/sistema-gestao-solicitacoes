@@ -1987,6 +1987,9 @@ function summarizeDashboardRows(rows) {
   const recebivelReconhecido = money(
     rows.reduce((sum, row) => sum + row.recebivel_reconhecido, 0)
   );
+  const medicaoAprovada = money(
+    rows.reduce((sum, row) => sum + number(row.medicao_aprovada), 0)
+  );
   const receitaRecebida = money(rows.reduce((sum, row) => sum + row.receita_recebida, 0));
   const glosa = money(rows.reduce((sum, row) => sum + row.glosa, 0));
   return {
@@ -1998,6 +2001,7 @@ function summarizeDashboardRows(rows) {
       : null,
     recebivel_previsto: recebivelPrevisto,
     recebivel_reconhecido: recebivelReconhecido,
+    medicao_aprovada: medicaoAprovada,
     receita_recebida: receitaRecebida,
     saldo_receber: money(Math.max(0, recebivelReconhecido - receitaRecebida)),
     glosa,
@@ -2340,6 +2344,7 @@ async function obterDashboard(
   competenciaValue,
   obraIdValue = null,
   competenciasValue = null,
+  classificacaoValue = null,
   overrides = {}
 ) {
   if (
@@ -2350,6 +2355,14 @@ async function obterDashboard(
     overrides = competenciasValue;
     competenciasValue = null;
   }
+  if (
+    classificacaoValue
+    && typeof classificacaoValue === 'object'
+    && !Array.isArray(classificacaoValue)
+  ) {
+    overrides = classificacaoValue;
+    classificacaoValue = null;
+  }
   const deps = dependencies(overrides);
   const competenciaCode = normalizeCompetencia(competenciaValue);
   const competencias = normalizeDashboardCompetencias(
@@ -2359,6 +2372,14 @@ async function obterDashboard(
   const selectedObraId = obraIdValue == null || obraIdValue === ''
     ? null
     : positiveId(obraIdValue, 'Obra');
+  const selectedClassification = normalizeText(classificacaoValue, 20).toUpperCase();
+  if (selectedClassification && !['PUBLICA', 'PRIVADA'].includes(selectedClassification)) {
+    throw createBusinessError(
+      400,
+      'CR_CLASSIFICACAO_INVALIDA',
+      'Classificacao deve ser PUBLICA ou PRIVADA.'
+    );
+  }
   const scope = await deps.resolverEscopoObras(user);
   if (selectedObraId) await assertScope(user, selectedObraId, deps);
   if (!selectedObraId && !scope.todas && scope.obraIds.length === 0) {
@@ -2377,6 +2398,7 @@ async function obterDashboard(
   const obraWhere = {
     ativo: true,
     tipo_centro_custo: 'OBRA',
+    ...(selectedClassification ? { classificacao: selectedClassification } : {}),
     ...(selectedObraId ? { id: selectedObraId } : {})
   };
   if (!selectedObraId && !scope.todas) obraWhere.id = { [Op.in]: scope.obraIds };
@@ -2450,14 +2472,17 @@ async function obterDashboard(
   try {
     const obligationData = await deps.listarMinhasObrigacoes(user);
     const workIds = new Set(obras.map((obra) => Number(obra.id)));
+    const competenceSet = new Set(competencias.map(String));
     overdueObligations = (obligationData?.items || []).filter((item) => (
-      item.situacao === 'VENCIDA' && workIds.has(Number(item.obra_id))
+      item.situacao === 'VENCIDA'
+      && workIds.has(Number(item.obra_id))
+      && competenceSet.has(String(item.competencia))
     ));
   } catch (error) {
     overdueObligations = [];
   }
 
-  const alerts = buildDashboardAlerts(currentRows, overdueObligations);
+  const alerts = buildDashboardAlerts(rows, overdueObligations);
   const workSummaries = summarizeDashboardWorkRows(rows, alerts);
 
   return {
