@@ -266,8 +266,9 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   mantem a confirmacao acessivel. Somente quantidades maiores que zero sao aplicadas
   e nenhuma linha pode ultrapassar o saldo orcamentario aplicavel.
 - Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
-  titulos `RECEBER`, rateadas para a obra. Custo realizado continua vindo de baixas
-  ativas de titulos `PAGAR`.
+  titulos `RECEBER`, rateadas para a obra. No comparativo por item, as colunas
+  separam `Custo realizado`, `Medicao prevista` e `Medicao aprovada`; o custo
+  realizado continua vindo de baixas ativas de titulos `PAGAR`.
 - Obra privada lista automaticamente parcelas contratuais e os respectivos titulos
   a receber com vencimento na competencia. Nao existe marcacao ou confirmacao manual:
   ao finalizar, as fontes oficiais do periodo sao sincronizadas no snapshot.
@@ -351,9 +352,11 @@ recebivel previsto, recebido, saldo e quantidade de titulos vencidos. No consoli
 o valor reconhecido combina medicao publica aprovada e recebiveis privados previstos,
 sem somar a receita recebida ao reconhecimento.
 
-O comparativo detalha item, macro, custo planejado, custo realizado, desvio,
-percentual e estado. Acima do detalhamento, apresenta os quatro indicadores de
-recebiveis sem somar medicao aprovada com entrada financeira.
+O comparativo mensal de obras publicas detalha por item e macro a medicao prevista,
+o valor aprovado pelo orgao, a glosa, o percentual de aprovacao e o estado. O custo
+realizado financeiro permanece na visao propria e continua alimentando os indicadores
+executivos sem ser confundido com aprovacao de medicao. Acima do detalhamento, os
+indicadores de recebiveis nao somam medicao aprovada com entrada financeira.
 
 ## Fase 3 - custo realizado, reconciliacao e exportacoes
 

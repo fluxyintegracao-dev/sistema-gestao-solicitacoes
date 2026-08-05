@@ -141,7 +141,7 @@ export default function CrPlanejamentoMensalView({
                 <HiOutlineBanknotes className="h-4 w-4" /> Custos realizados
               </button>
             ) : null}
-            {permissions.comparativeView ? (
+            {isPublic && permissions.comparativeView ? (
               <button type="button" className={detailArea === 'comparison' ? 'is-active' : ''} onClick={() => setDetailArea('comparison')}>
                 <HiOutlineScale className="h-4 w-4" /> Comparativo
               </button>

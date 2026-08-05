@@ -1786,7 +1786,9 @@ async function buildComparison(obraId, competenciaCode, deps) {
       })
       : [],
     competencia
-      ? deps.CrPrevisaoReceita.findAll({ where: { competencia_id: competencia.id } })
+      ? deps.CrPrevisaoReceita.findAll({
+        where: { competencia_id: competencia.id, origem: 'MEDICAO' }
+      })
       : [],
     competencia
       ? deps.CrMedicaoConsolidada.findAll({ where: { competencia_id: competencia.id } })
@@ -1845,6 +1847,114 @@ async function buildComparison(obraId, competenciaCode, deps) {
     String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
     || String(a.codigo).localeCompare(String(b.codigo))
   ));
+  const costById = new Map(costs.map((cost) => [Number(cost.id), plain(cost)]));
+  const measurementRows = new Map();
+  const ensureMeasurementRow = (sourceValue) => {
+    const source = plain(sourceValue);
+    const key = planningReferenceKey(source);
+    if (!key) return null;
+    const item = source.plano_item_id
+      ? itemById.get(Number(source.plano_item_id))
+      : null;
+    const monthlyCost = source.previsao_custo_id
+      ? serializeMonthlyCost(costById.get(Number(source.previsao_custo_id)))
+      : null;
+    const current = measurementRows.get(key) || {
+      key,
+      plano_item_id: item?.id || null,
+      previsao_custo_id: monthlyCost?.id || null,
+      etapa_macro_codigo: item?.etapa_macro_codigo || monthlyCost?.etapa_macro_codigo || null,
+      codigo: item?.codigo || monthlyCost?.etapa_macro_codigo || '-',
+      descricao: item?.descricao || monthlyCost?.descricao || 'Item sem descricao',
+      previsto: 0,
+      aprovado: 0,
+      tem_aprovacao: false
+    };
+    measurementRows.set(key, current);
+    return current;
+  };
+  presentedRows.forEach((row) => {
+    const current = ensureMeasurementRow(row);
+    if (current) current.previsto = money(current.previsto + number(row.valor_previsto));
+  });
+  approvedRows.forEach((row) => {
+    const current = ensureMeasurementRow(row);
+    if (!current) return;
+    current.aprovado = money(current.aprovado + number(row.valor_medido));
+    current.tem_aprovacao = true;
+  });
+  const measurementResult = [...measurementRows.values()].map((row) => {
+    const difference = money(row.aprovado - row.previsto);
+    const glosa = money(Math.max(0, row.previsto - row.aprovado));
+    let estado = 'AGUARDANDO_APROVACAO';
+    if (row.tem_aprovacao && row.previsto === 0 && row.aprovado > 0) estado = 'SEM_PREVISAO';
+    else if (row.tem_aprovacao && row.aprovado > row.previsto) estado = 'ACIMA_PREVISTO';
+    else if (row.tem_aprovacao && glosa > 0) estado = 'APROVADO_PARCIAL';
+    else if (row.tem_aprovacao) estado = 'APROVADO_INTEGRAL';
+    return {
+      ...row,
+      diferenca: difference,
+      glosa,
+      percentual_aprovacao: row.previsto > 0
+        ? Math.round((row.aprovado / row.previsto) * 10000) / 100
+        : null,
+      estado
+    };
+  }).sort((a, b) => (
+    String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
+    || String(a.codigo).localeCompare(String(b.codigo))
+  ));
+  const actualByReference = new Map();
+  actuals.forEach((actualValue) => {
+    const actual = plain(actualValue);
+    const itemId = actual.plano_item_id ? Number(actual.plano_item_id) : null;
+    const key = itemId
+      ? `plano:${itemId}`
+      : `macro:${actual.etapa_macro_codigo || 'sem-macro'}`;
+    const current = actualByReference.get(key) || {
+      key,
+      plano_item_id: itemId,
+      etapa_macro_codigo: actual.etapa_macro_codigo || null,
+      valor: 0
+    };
+    current.valor = money(current.valor + number(actual.valor));
+    actualByReference.set(key, current);
+  });
+  const usedActualReferences = new Set();
+  const comparisonRows = measurementResult.map((row) => {
+    const actualReference = actualByReference.get(row.key);
+    if (actualReference) usedActualReferences.add(row.key);
+    return {
+      ...row,
+      custo_realizado: money(actualReference?.valor)
+    };
+  });
+  actualByReference.forEach((actualReference, key) => {
+    if (usedActualReferences.has(key)) return;
+    const item = actualReference.plano_item_id
+      ? itemById.get(Number(actualReference.plano_item_id))
+      : null;
+    comparisonRows.push({
+      key: `realizado:${key}`,
+      plano_item_id: item?.id || null,
+      previsao_custo_id: null,
+      etapa_macro_codigo: item?.etapa_macro_codigo || actualReference.etapa_macro_codigo || null,
+      codigo: item?.codigo || actualReference.etapa_macro_codigo || '-',
+      descricao: item?.descricao || 'Custo realizado sem item micro mapeado',
+      previsto: 0,
+      aprovado: 0,
+      tem_aprovacao: false,
+      diferenca: 0,
+      glosa: 0,
+      percentual_aprovacao: null,
+      estado: 'SEM_MEDICAO',
+      custo_realizado: money(actualReference.valor)
+    });
+  });
+  comparisonRows.sort((a, b) => (
+    String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
+    || String(a.codigo).localeCompare(String(b.codigo))
+  ));
   const measurementPresented = money(
     presentedRows.reduce((sum, row) => sum + number(row.valor_previsto), 0)
   );
@@ -1856,6 +1966,8 @@ async function buildComparison(obraId, competenciaCode, deps) {
     competencia: serializeCompetencia(competencia),
     plano: { id: Number(plan.id), versao: Number(plan.versao) },
     linhas: result,
+    linhas_medicao: measurementResult,
+    linhas_comparativo: comparisonRows,
     resumo: {
       previsto: money(result.reduce((sum, row) => sum + row.previsto, 0)),
       realizado: money(result.reduce((sum, row) => sum + row.realizado, 0)),

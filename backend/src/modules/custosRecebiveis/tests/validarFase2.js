@@ -181,6 +181,11 @@ function validateBackendContracts() {
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
   assert(service.includes('buildPlanMacros'));
+  assert(service.includes('linhas_medicao: measurementResult'));
+  assert(service.includes('linhas_comparativo: comparisonRows'));
+  assert(service.includes('custo_realizado: money(actualReference?.valor)'));
+  assert(service.includes("origem: 'MEDICAO'"));
+  assert(service.includes("estado = 'AGUARDANDO_APROVACAO'"));
   assert(service.includes('previsao_custo_id'));
   assert(service.includes('CR_CUSTO_DESATUALIZADO'));
   assert(service.includes('etapa_macro_codigo: macroCode'));
@@ -294,6 +299,12 @@ function validateFrontendContracts() {
   assert(monthlyPlanning.includes("setDetailArea('approved')"));
   assert(monthlyPlanning.includes('<CrRealizadoView'));
   assert(monthlyPlanning.includes('<CrComparativoView'));
+  assert(monthlyPlanning.includes('isPublic && permissions.comparativeView'));
+  assert(comparison.includes('Comparativo operacional por item'));
+  assert(comparison.includes('<th>Custo realizado</th>'));
+  assert(comparison.includes('<th>Medição prevista</th>'));
+  assert(comparison.includes('<th>Medição aprovada</th>'));
+  assert(comparison.includes('data?.linhas_comparativo || data?.linhas_medicao || []'));
   assert(planningImport.includes('Validar novamente'));
 }
 

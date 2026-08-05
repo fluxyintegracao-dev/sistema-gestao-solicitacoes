@@ -205,25 +205,27 @@ async function buildComparisonRows(user, works, competencia, deps) {
     'Macro',
     'Codigo micro',
     'Item micro',
-    'Previsto (R$)',
-    'Realizado (R$)',
-    'Desvio (R$)',
-    'Execucao (%)',
+    'Custo realizado (R$)',
+    'Medicao prevista (R$)',
+    'Medicao aprovada (R$)',
+    'Glosa (R$)',
+    'Aprovacao (%)',
     'Estado'
   ]];
   for (const work of works) {
     const comparison = await safeComparison(user, Number(work.id), competencia, deps);
     if (!comparison) continue;
-    comparison.linhas.forEach((line) => rows.push([
+    (comparison.linhas_comparativo || comparison.linhas_medicao || []).forEach((line) => rows.push([
       `${work.codigo || work.id} - ${work.nome}`,
       competencia,
       line.etapa_macro_codigo || '',
       line.codigo || '',
       line.descricao || '',
+      money(line.custo_realizado),
       money(line.previsto),
-      money(line.realizado),
-      money(line.delta),
-      line.percentual_execucao ?? '',
+      line.tem_aprovacao ? money(line.aprovado) : '',
+      line.tem_aprovacao ? money(line.glosa) : '',
+      line.percentual_aprovacao ?? '',
       line.estado
     ]));
   }
