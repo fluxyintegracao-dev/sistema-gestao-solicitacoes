@@ -266,9 +266,9 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   mantem a confirmacao acessivel. Somente quantidades maiores que zero sao aplicadas
   e nenhuma linha pode ultrapassar o saldo orcamentario aplicavel.
 - Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
-  titulos `RECEBER`, rateadas para a obra. No comparativo por item, as colunas
-  separam `Custo realizado`, `Medicao prevista` e `Medicao aprovada`; o custo
-  realizado continua vindo de baixas ativas de titulos `PAGAR`.
+  titulos `RECEBER`, rateadas para a obra. O comparativo por item separa `Medicao
+  prevista` e `Medicao aprovada`; o custo realizado continua vindo de baixas ativas
+  de titulos `PAGAR` e permanece nas visoes financeiras do modulo.
 - Obra privada lista automaticamente parcelas contratuais e os respectivos titulos
   a receber com vencimento na competencia. Nao existe marcacao ou confirmacao manual:
   ao finalizar, as fontes oficiais do periodo sao sincronizadas no snapshot.

@@ -478,16 +478,6 @@ export default function CustosRecebiveis() {
         </div>
       </header>
 
-      <div className="cr-integrity-banner">
-        <HiOutlineCircleStack className="h-5 w-5" />
-        <div>
-          <strong>Orçamento protegido</strong>
-          <span>
-            As etapas e os limites vêm do orçamento da obra. O planejamento mensal não altera o orçamento publicado.
-          </span>
-        </div>
-      </div>
-
       <nav className="cr-tabs" aria-label="Áreas de Custos e Recebíveis">
         {availableTabs.filter((tab) => !tab.hidden).map((tab) => {
           const Icon = TAB_ICONS[tab.id] || HiOutlineChartBarSquare;

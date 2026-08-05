@@ -1904,57 +1904,6 @@ async function buildComparison(obraId, competenciaCode, deps) {
     String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
     || String(a.codigo).localeCompare(String(b.codigo))
   ));
-  const actualByReference = new Map();
-  actuals.forEach((actualValue) => {
-    const actual = plain(actualValue);
-    const itemId = actual.plano_item_id ? Number(actual.plano_item_id) : null;
-    const key = itemId
-      ? `plano:${itemId}`
-      : `macro:${actual.etapa_macro_codigo || 'sem-macro'}`;
-    const current = actualByReference.get(key) || {
-      key,
-      plano_item_id: itemId,
-      etapa_macro_codigo: actual.etapa_macro_codigo || null,
-      valor: 0
-    };
-    current.valor = money(current.valor + number(actual.valor));
-    actualByReference.set(key, current);
-  });
-  const usedActualReferences = new Set();
-  const comparisonRows = measurementResult.map((row) => {
-    const actualReference = actualByReference.get(row.key);
-    if (actualReference) usedActualReferences.add(row.key);
-    return {
-      ...row,
-      custo_realizado: money(actualReference?.valor)
-    };
-  });
-  actualByReference.forEach((actualReference, key) => {
-    if (usedActualReferences.has(key)) return;
-    const item = actualReference.plano_item_id
-      ? itemById.get(Number(actualReference.plano_item_id))
-      : null;
-    comparisonRows.push({
-      key: `realizado:${key}`,
-      plano_item_id: item?.id || null,
-      previsao_custo_id: null,
-      etapa_macro_codigo: item?.etapa_macro_codigo || actualReference.etapa_macro_codigo || null,
-      codigo: item?.codigo || actualReference.etapa_macro_codigo || '-',
-      descricao: item?.descricao || 'Custo realizado sem item micro mapeado',
-      previsto: 0,
-      aprovado: 0,
-      tem_aprovacao: false,
-      diferenca: 0,
-      glosa: 0,
-      percentual_aprovacao: null,
-      estado: 'SEM_MEDICAO',
-      custo_realizado: money(actualReference.valor)
-    });
-  });
-  comparisonRows.sort((a, b) => (
-    String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
-    || String(a.codigo).localeCompare(String(b.codigo))
-  ));
   const measurementPresented = money(
     presentedRows.reduce((sum, row) => sum + number(row.valor_previsto), 0)
   );
@@ -1967,7 +1916,6 @@ async function buildComparison(obraId, competenciaCode, deps) {
     plano: { id: Number(plan.id), versao: Number(plan.versao) },
     linhas: result,
     linhas_medicao: measurementResult,
-    linhas_comparativo: comparisonRows,
     resumo: {
       previsto: money(result.reduce((sum, row) => sum + row.previsto, 0)),
       realizado: money(result.reduce((sum, row) => sum + row.realizado, 0)),

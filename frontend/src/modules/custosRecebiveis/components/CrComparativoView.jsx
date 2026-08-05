@@ -13,8 +13,7 @@ const APPROVAL_STATUS = {
   APROVADO_INTEGRAL: 'Aprovado integralmente',
   APROVADO_PARCIAL: 'Aprovado parcialmente',
   ACIMA_PREVISTO: 'Aprovado acima do previsto',
-  SEM_PREVISAO: 'Aprovado sem previsão',
-  SEM_MEDICAO: 'Sem medição'
+  SEM_PREVISAO: 'Aprovado sem previsão'
 };
 
 export default function CrComparativoView({ obra, competencia }) {
@@ -66,7 +65,7 @@ export default function CrComparativoView({ obra, competencia }) {
     );
   }
 
-  const rows = data?.linhas_comparativo || data?.linhas_medicao || [];
+  const rows = data?.linhas_medicao || [];
 
   return (
     <section className="cr-section">
@@ -111,7 +110,6 @@ export default function CrComparativoView({ obra, competencia }) {
           <thead>
             <tr>
               <th>Macro / item micro</th>
-              <th>Custo realizado</th>
               <th>Medição prevista</th>
               <th>Medição aprovada</th>
               <th>Glosa</th>
@@ -126,7 +124,6 @@ export default function CrComparativoView({ obra, competencia }) {
                   <strong>{item.codigo} · {item.descricao}</strong>
                   <span>{item.etapa_macro_codigo || 'Sem macro'}</span>
                 </td>
-                <td>{currency.format(item.custo_realizado || 0)}</td>
                 <td>{currency.format(item.previsto)}</td>
                 <td>{item.tem_aprovacao ? currency.format(item.aprovado) : 'Aguardando'}</td>
                 <td data-negative={item.glosa > 0}>{item.tem_aprovacao ? currency.format(item.glosa) : '—'}</td>
@@ -149,7 +146,6 @@ export default function CrComparativoView({ obra, competencia }) {
               <span>{item.etapa_macro_codigo || 'Sem macro'}</span>
             </div>
             <dl className="cr-mobile-record-grid">
-              <div><dt>Custo realizado</dt><dd>{currency.format(item.custo_realizado || 0)}</dd></div>
               <div><dt>Medição prevista</dt><dd>{currency.format(item.previsto)}</dd></div>
               <div><dt>Medição aprovada</dt><dd>{item.tem_aprovacao ? currency.format(item.aprovado) : 'Aguardando'}</dd></div>
               <div><dt>Glosa</dt><dd>{item.tem_aprovacao ? currency.format(item.glosa) : '—'}</dd></div>

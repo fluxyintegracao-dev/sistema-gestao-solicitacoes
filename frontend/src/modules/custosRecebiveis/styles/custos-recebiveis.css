@@ -87,43 +87,6 @@
 .cr-obligation-counter[data-overdue="true"] strong,
 .cr-obligation-counter[data-overdue="true"] svg { color: var(--cr-danger); }
 
-.cr-integrity-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 11px;
-  padding: 12px 14px;
-  border: 1px solid color-mix(in srgb, var(--cr-accent) 38%, var(--ui-border));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--cr-accent) 6%, var(--ui-surface));
-  color: var(--c-text);
-}
-
-.cr-integrity-banner > svg {
-  flex: 0 0 auto;
-  margin-top: 2px;
-  color: var(--cr-accent);
-}
-
-.cr-integrity-banner div {
-  display: grid;
-  gap: 2px;
-}
-
-.cr-integrity-banner strong {
-  font-size: 0.85rem;
-}
-
-.cr-integrity-banner span {
-  color: var(--c-muted);
-  font-size: 0.78rem;
-  line-height: 1.4;
-}
-
-.cr-integrity-banner code {
-  color: var(--c-text);
-  font-weight: 700;
-}
-
 .cr-tabs {
   display: flex;
   gap: 4px;
