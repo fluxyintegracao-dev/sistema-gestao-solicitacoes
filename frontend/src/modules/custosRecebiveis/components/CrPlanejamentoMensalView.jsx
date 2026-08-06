@@ -1,21 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineArrowLeft,
-  HiOutlineBanknotes,
   HiOutlineCalendarDays,
   HiOutlineExclamationTriangle,
-  HiOutlinePlus,
-  HiOutlineScale
+  HiOutlinePlus
 } from 'react-icons/hi2';
 import {
   criarCompetenciaObra,
   listarCompetenciasObra
 } from '../services/custosRecebiveis';
 import CrMonthlySummaryCard from './CrMonthlySummaryCard';
-import CrComparativoView from './CrComparativoView';
 import CrMonthlyDetailView from './CrMonthlyDetailView';
 import CrPlanejamentoView from './CrPlanejamentoView';
-import CrRealizadoView from './CrRealizadoView';
 
 function monthLabel(value) {
   if (!/^\d{4}-\d{2}$/.test(String(value || ''))) return value || '-';
@@ -151,12 +147,18 @@ export default function CrPlanejamentoMensalView({
   }
 
   if (selectedCompetencia) {
-    if (detailArea === 'details') {
+    const detailSectionByArea = {
+      details: '',
+      realized: 'realized',
+      comparison: 'comparison'
+    };
+    if (Object.hasOwn(detailSectionByArea, detailArea)) {
       return (
         <CrMonthlyDetailView
           obra={obra}
           competencia={selectedCompetencia}
           permissions={permissions}
+          initialSection={detailSectionByArea[detailArea]}
           onClose={closeDetail}
           onEditPlanning={() => openDetail(selectedCompetencia, 'planning')}
           onOpenApproved={() => openDetail(selectedCompetencia, 'approved')}
@@ -174,53 +176,18 @@ export default function CrPlanejamentoMensalView({
             <HiOutlineArrowLeft className="h-4 w-4" />
             Meses da obra
           </button>
-          <nav aria-label="Áreas da competência">
-            <button type="button" className={detailArea === 'planning' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'planning')}>
-              Planejamento
-            </button>
-            {isPublic && permissions.measurementView ? (
-              <button type="button" className={detailArea === 'approved' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'approved')}>
-                Medição aprovada
-              </button>
-            ) : null}
-            {permissions.realizedView ? (
-              <button type="button" className={detailArea === 'realized' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'realized')}>
-                <HiOutlineBanknotes className="h-4 w-4" /> Custos realizados
-              </button>
-            ) : null}
-            {isPublic && permissions.comparativeView ? (
-              <button type="button" className={detailArea === 'comparison' ? 'is-active' : ''} onClick={() => openDetail(selectedCompetencia, 'comparison')}>
-                <HiOutlineScale className="h-4 w-4" /> Comparativo
-              </button>
-            ) : null}
-          </nav>
         </div>
-        {detailArea === 'planning' || detailArea === 'approved' ? (
-          <CrPlanejamentoView
-            obra={obra}
-            userId={userId}
-            competencia={selectedCompetencia}
-            permissions={permissions}
-            viewMode={detailArea}
-            onChanged={async () => {
-              await load();
-              onChanged?.();
-            }}
-          />
-        ) : null}
-        {detailArea === 'realized' ? (
-          <CrRealizadoView
-            obra={obra}
-            competencia={selectedCompetencia}
-            permissions={{
-              update: permissions.realizedUpdate,
-              reconcile: permissions.realizedReconcile
-            }}
-          />
-        ) : null}
-        {detailArea === 'comparison' ? (
-          <CrComparativoView obra={obra} competencia={selectedCompetencia} />
-        ) : null}
+        <CrPlanejamentoView
+          obra={obra}
+          userId={userId}
+          competencia={selectedCompetencia}
+          permissions={permissions}
+          viewMode={detailArea}
+          onChanged={async () => {
+            await load();
+            onChanged?.();
+          }}
+        />
       </div>
     );
   }

@@ -199,6 +199,13 @@ export default function CrMonthlyDetailView({
     ...(isPublic && permissions.comparativeView ? [{ id: 'comparison', label: 'Comparativo', icon: HiOutlineScale }] : [])
   ], [isPublic, permissions.comparativeView, permissions.measurementView, permissions.realizedView]);
 
+  useEffect(() => {
+    const requestedSection = initialSection || (isPublic ? 'forecast' : 'costs');
+    setSection(sections.some((item) => item.id === requestedSection)
+      ? requestedSection
+      : sections[0]?.id || 'costs');
+  }, [initialSection, isPublic, sections]);
+
   const load = useCallback(async () => {
     if (!obra?.id || !competencia) return;
     try {

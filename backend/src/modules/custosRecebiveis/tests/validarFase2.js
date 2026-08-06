@@ -328,9 +328,10 @@ function validateFrontendContracts() {
   assert(planningImport.includes('Confirmar importação'));
   assert(planningImport.includes('onConfirm(tipo, result.itens)'));
   assert(monthlyPlanning.includes("openDetail(selectedCompetencia, 'approved')"));
-  assert(monthlyPlanning.includes('<CrRealizadoView'));
-  assert(monthlyPlanning.includes('<CrComparativoView'));
-  assert(monthlyPlanning.includes('isPublic && permissions.comparativeView'));
+  assert(!monthlyPlanning.includes('<CrRealizadoView'));
+  assert(!monthlyPlanning.includes('<CrComparativoView'));
+  assert(monthlyPlanning.includes("realized: 'realized'"));
+  assert(monthlyPlanning.includes("comparison: 'comparison'"));
   assert(comparison.includes('Comparativo operacional por item'));
   assert(comparison.includes('<th>Medição prevista</th>'));
   assert(comparison.includes('<th>Medição aprovada</th>'));
