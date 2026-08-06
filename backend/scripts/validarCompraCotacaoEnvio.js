@@ -302,6 +302,11 @@ function validarPermissaoEBuscaFornecedores() {
       controllerSource.includes('documentoFornecedorSemPontuacao()'),
     'Busca de fornecedores deve comparar CPF/CNPJ sem pontuacao.'
   );
+  assert(
+    controllerSource.includes('{ limit: limite }') &&
+      !controllerSource.includes('? { limit } :'),
+    'Paginacao de fornecedores deve encaminhar o limite validado sem referenciar variavel inexistente.'
+  );
 
   const accessSource = fs.readFileSync(
     path.join(__dirname, '../../frontend/src/utils/acessoProduto.js'),
