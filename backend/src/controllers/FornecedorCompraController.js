@@ -94,7 +94,7 @@ module.exports = {
       let fornecedores = await FornecedorCompra.findAll({
         where,
         order: [['nome', 'ASC']],
-        ...(!categoriaFiltro && limite ? { limit } : {})
+        ...(!categoriaFiltro && limite ? { limit: limite } : {})
       });
 
       // Filtro por categoria (JSON field — feito em JS por compatibilidade)

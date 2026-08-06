@@ -13,7 +13,7 @@ const { resolverEscopoObras } = require('../policies/obraScopePolicy');
 
 const REPORT_TYPES = Object.freeze({
   'medicao-recebiveis': 'Medicao e recebiveis',
-  'custos-previstos': 'Custos previstos',
+  'custos-previstos': 'Custos planejados',
   comparativo: 'Comparativo',
   'custo-realizado': 'Custo realizado',
   'solicitacoes-titulos': 'Solicitacoes e titulos',
@@ -179,7 +179,7 @@ async function buildCostsRows(user, works, competencia, deps) {
     'Item micro',
     'Quantidade',
     'Custo unitario (R$)',
-    'Custo previsto (R$)'
+    'Custo planejado (R$)'
   ]];
   for (const work of works) {
     const planning = await safePlanning(user, Number(work.id), competencia, deps);
@@ -205,25 +205,25 @@ async function buildComparisonRows(user, works, competencia, deps) {
     'Macro',
     'Codigo micro',
     'Item micro',
-    'Previsto (R$)',
-    'Realizado (R$)',
-    'Desvio (R$)',
-    'Execucao (%)',
+    'Medicao prevista (R$)',
+    'Medicao aprovada (R$)',
+    'Glosa (R$)',
+    'Aprovacao (%)',
     'Estado'
   ]];
   for (const work of works) {
     const comparison = await safeComparison(user, Number(work.id), competencia, deps);
     if (!comparison) continue;
-    comparison.linhas.forEach((line) => rows.push([
+    (comparison.linhas_medicao || []).forEach((line) => rows.push([
       `${work.codigo || work.id} - ${work.nome}`,
       competencia,
       line.etapa_macro_codigo || '',
       line.codigo || '',
       line.descricao || '',
       money(line.previsto),
-      money(line.realizado),
-      money(line.delta),
-      line.percentual_execucao ?? '',
+      line.tem_aprovacao ? money(line.aprovado) : '',
+      line.tem_aprovacao ? money(line.glosa) : '',
+      line.percentual_aprovacao ?? '',
       line.estado
     ]));
   }
@@ -326,7 +326,7 @@ async function buildExecutiveRows(user, works, competencia, deps) {
     'Obra',
     'Classificacao',
     'Competencia',
-    'Custo previsto (R$)',
+    'Custo planejado (R$)',
     'Custo realizado (R$)',
     'Desvio (R$)',
     'Nao mapeado (R$)',

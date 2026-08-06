@@ -5,17 +5,13 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlinePlus
 } from 'react-icons/hi2';
-import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import {
   criarCompetenciaObra,
   listarCompetenciasObra
 } from '../services/custosRecebiveis';
+import CrMonthlySummaryCard from './CrMonthlySummaryCard';
+import CrMonthlyDetailView from './CrMonthlyDetailView';
 import CrPlanejamentoView from './CrPlanejamentoView';
-
-const currency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL'
-});
 
 function monthLabel(value) {
   if (!/^\d{4}-\d{2}$/.test(String(value || ''))) return value || '-';
@@ -32,15 +28,20 @@ export default function CrPlanejamentoMensalView({
   userId,
   initialCompetencia,
   autoOpen = false,
+  detailMode = null,
+  obligations = [],
+  obligationsServerTime = null,
   permissions,
-  onChanged
+  onChanged,
+  onNavigateDetail
 }) {
   const [data, setData] = useState(null);
   const [selectedCompetencia, setSelectedCompetencia] = useState(
-    autoOpen ? initialCompetencia : null
+    (autoOpen || detailMode) ? initialCompetencia : null
   );
   const [newMonthOpen, setNewMonthOpen] = useState(false);
   const [newMonth, setNewMonth] = useState('');
+  const [detailArea, setDetailArea] = useState('planning');
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
@@ -69,10 +70,11 @@ export default function CrPlanejamentoMensalView({
   }, [obra?.id]);
 
   useEffect(() => {
-    setSelectedCompetencia(autoOpen ? initialCompetencia : null);
+    setSelectedCompetencia((autoOpen || detailMode) ? initialCompetencia : null);
+    setDetailArea(detailMode || 'planning');
     setNewMonthOpen(false);
     load();
-  }, [autoOpen, initialCompetencia, load]);
+  }, [autoOpen, detailMode, initialCompetencia, load]);
 
   const existingMonths = useMemo(
     () => new Set((data?.items || []).map((item) => item.competencia)),
@@ -82,6 +84,40 @@ export default function CrPlanejamentoMensalView({
     .filter((item) => !existingMonths.has(item));
   const canCreate = permissions.costs || permissions.receipts;
   const isPublic = obra?.classificacao === 'PUBLICA';
+  const activeObligation = useMemo(() => (
+    (Array.isArray(obligations) ? obligations : [])
+      .filter((item) => (
+        Number(item.obra_id) === Number(obra?.id)
+        && item.situacao !== 'CUMPRIDA'
+      ))
+      .sort((left, right) => String(left.competencia).localeCompare(String(right.competencia)))[0]
+      || null
+  ), [obligations, obra?.id]);
+
+  const deadlineState = useMemo(() => {
+    if (!activeObligation?.prazo_em) return null;
+    const deadline = new Date(activeObligation.prazo_em);
+    const serverNow = obligationsServerTime ? new Date(obligationsServerTime) : new Date();
+    const days = Math.max(0, Math.ceil((deadline.getTime() - serverNow.getTime()) / 86400000));
+    return {
+      days,
+      deadline,
+      overdue: activeObligation.situacao === 'VENCIDA' || deadline <= serverNow
+    };
+  }, [activeObligation, obligationsServerTime]);
+
+  function openDetail(competenciaValue, area) {
+    setSelectedCompetencia(competenciaValue);
+    setDetailArea(area);
+    onNavigateDetail?.(competenciaValue, area);
+  }
+
+  function closeDetail() {
+    setSelectedCompetencia(null);
+    setDetailArea('planning');
+    onNavigateDetail?.(null, null);
+    void load();
+  }
 
   async function createMonth() {
     if (!newMonth || creating) return;
@@ -90,7 +126,7 @@ export default function CrPlanejamentoMensalView({
       setError('');
       const result = await criarCompetenciaObra(obra.id, newMonth);
       setNewMonthOpen(false);
-      setSelectedCompetencia(result.competencia.competencia);
+      openDetail(result.competencia.competencia, 'planning');
       await load();
       onChanged?.();
     } catch (requestError) {
@@ -111,24 +147,42 @@ export default function CrPlanejamentoMensalView({
   }
 
   if (selectedCompetencia) {
+    const detailSectionByArea = {
+      details: '',
+      realized: 'realized',
+      comparison: 'comparison'
+    };
+    if (Object.hasOwn(detailSectionByArea, detailArea)) {
+      return (
+        <CrMonthlyDetailView
+          obra={obra}
+          competencia={selectedCompetencia}
+          permissions={permissions}
+          initialSection={detailSectionByArea[detailArea]}
+          onClose={closeDetail}
+          onEditPlanning={() => openDetail(selectedCompetencia, 'planning')}
+          onOpenApproved={() => openDetail(selectedCompetencia, 'approved')}
+        />
+      );
+    }
     return (
       <div className="cr-month-editor">
-        <button
-          type="button"
-          className="btn btn-outline cr-month-back"
-          onClick={() => {
-            setSelectedCompetencia(null);
-            load();
-          }}
-        >
-          <HiOutlineArrowLeft className="h-4 w-4" />
-          Planejamento mensal
-        </button>
+        <div className="cr-month-detail-toolbar">
+          <button
+            type="button"
+            className="btn btn-outline cr-month-back"
+            onClick={closeDetail}
+          >
+            <HiOutlineArrowLeft className="h-4 w-4" />
+            Meses da obra
+          </button>
+        </div>
         <CrPlanejamentoView
           obra={obra}
           userId={userId}
           competencia={selectedCompetencia}
           permissions={permissions}
+          viewMode={detailArea}
           onChanged={async () => {
             await load();
             onChanged?.();
@@ -140,13 +194,39 @@ export default function CrPlanejamentoMensalView({
 
   return (
     <section className="cr-workspace cr-months-workspace">
+      {activeObligation && deadlineState ? (
+        <div className="cr-planning-deadline" data-overdue={deadlineState.overdue || undefined}>
+          <HiOutlineCalendarDays className="h-5 w-5" />
+          <div>
+            <strong>
+              {deadlineState.overdue
+                ? `O planejamento de ${monthLabel(activeObligation.competencia)} está vencido.`
+                : `Registre a previsão de custos e medição de ${monthLabel(activeObligation.competencia)}.`}
+            </strong>
+            <span>
+              {deadlineState.overdue
+                ? (activeObligation.exige_reabertura
+                  ? 'Solicite a reabertura para concluir o preenchimento.'
+                  : 'A competência está liberada temporariamente para regularização.')
+                : `Restam ${deadlineState.days} dia(s). Prazo até ${deadlineState.deadline.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}.`}
+            </span>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => openDetail(activeObligation.competencia, 'planning')}
+          >
+            {deadlineState.overdue ? 'Regularizar agora' : 'Registrar agora'}
+          </button>
+        </div>
+      ) : null}
       <header className="cr-workspace-heading">
         <div>
           <span>{obra.codigo || obra.id} · {isPublic ? 'Obra pública' : 'Obra privada'}</span>
           <h2>Planejamento mensal · {obra.nome}</h2>
           <p>
             {isPublic
-              ? 'Custos planejados, medições previstas e aprovadas, glosas e valores realizados.'
+              ? 'Planeje custos e medição. A aprovação, os realizados e o comparativo ficam no detalhe de cada mês.'
               : 'Custos planejados, recebíveis financeiros do período e valores realizados.'}
           </p>
         </div>
@@ -221,50 +301,34 @@ export default function CrPlanejamentoMensalView({
       ) : null}
 
       {data?.items?.length ? (
-        <div className="cr-month-list">
+        <div className="cr-month-grid">
           {data.items.map((item) => (
-            <article key={item.id} className="cr-month-row">
-              <div className="cr-month-identity">
-                <span>Competência</span>
-                <strong>{monthLabel(item.competencia)}</strong>
-                <span className="cr-status-pill" data-status={item.estado}>
-                  {COMPETENCIA_ESTADO_LABELS[item.estado] || item.estado}
-                </span>
-              </div>
-              <dl>
-                <div><dt>Custo planejado</dt><dd>{currency.format(item.total_custo_previsto || 0)}</dd></div>
-                {isPublic ? (
-                  <>
-                    <div><dt>Medição prevista</dt><dd>{currency.format(item.medicao_apresentada || 0)}</dd></div>
-                    <div>
-                      <dt>Medição aprovada</dt>
-                      <dd>
-                        {item.medicao_aprovada == null
-                          ? 'Aguardando'
-                          : currency.format(item.medicao_aprovada)}
-                      </dd>
-                    </div>
-                    <div data-tone={item.glosa > 0 ? 'negative' : 'neutral'}>
-                      <dt>Glosa</dt>
-                      <dd>{item.glosa == null ? '—' : currency.format(item.glosa)}</dd>
-                    </div>
-                  </>
-                ) : (
-                  <div><dt>Recebíveis do período</dt><dd>{currency.format(item.total_receita_prevista || 0)}</dd></div>
-                )}
-                <div><dt>Custo realizado</dt><dd>{currency.format(item.custo_realizado || 0)}</dd></div>
-                <div data-tone="positive">
-                  <dt>Receita recebida</dt><dd>{currency.format(item.receita_recebida || 0)}</dd>
-                </div>
-              </dl>
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setSelectedCompetencia(item.competencia)}
-              >
-                {item.estado === 'FINALIZADA' ? 'Ver detalhes' : 'Editar'}
-              </button>
-            </article>
+            <CrMonthlySummaryCard
+              key={item.id}
+              title={monthLabel(item.competencia)}
+              eyebrow="Competência"
+              classification={obra.classificacao}
+              status={item.estado}
+              custoPlanejado={item.total_custo_previsto}
+              custoRealizado={item.custo_realizado}
+              recebivelPrevisto={item.medicao_apresentada ?? item.total_receita_prevista}
+              recebivelReconhecido={isPublic
+                ? item.medicao_aprovada
+                : item.total_receita_prevista}
+              receitaRecebida={item.receita_recebida}
+              medicaoAprovadaInformada={!isPublic || item.medicao_aprovada != null}
+              glosa={item.glosa}
+              actionLabel="Ver detalhes"
+              onOpen={() => {
+                openDetail(item.competencia, 'details');
+              }}
+              onOpenApproved={isPublic && permissions.measurementView ? () => {
+                openDetail(item.competencia, 'approved');
+              } : null}
+              approvedActionLabel={!permissions.measurement
+                ? 'Ver aprovação'
+                : (item.medicao_aprovada != null ? 'Revisar aprovação' : 'Registrar aprovação')}
+            />
           ))}
         </div>
       ) : null}

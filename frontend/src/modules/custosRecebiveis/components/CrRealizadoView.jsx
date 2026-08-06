@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineArrowPath,
   HiOutlineArrowsRightLeft,
@@ -156,6 +156,33 @@ export default function CrRealizadoView({
       ...(item.apropriacoes || []).flatMap((entry) => [entry.codigo, entry.nome])
     ].filter(Boolean).join(' ')).includes(normalizedSearch);
   }), [normalizedSearch, scopeFilter, statusFilter, titles]);
+  const groupedTitles = useMemo(() => {
+    const groups = new Map();
+    filteredTitles.forEach((item) => {
+      const macros = item.etapas_macro || [];
+      const macro = macros.length === 1 ? macros[0] : null;
+      const key = macros.length > 1 ? 'MULTIPLAS' : (macro?.codigo || 'SEM_ETAPA');
+      const current = groups.get(key) || {
+        key,
+        codigo: macro?.codigo || null,
+        descricao: macros.length > 1
+          ? 'Rateado em mais de uma etapa macro'
+          : (macro?.descricao || 'Sem etapa macro identificada'),
+        items: [],
+        total: 0
+      };
+      current.items.push(item);
+      current.total += Number(item.valor_alocado || 0);
+      groups.set(key, current);
+    });
+    return [...groups.values()].sort((a, b) => {
+      if (a.key === 'SEM_ETAPA') return 1;
+      if (b.key === 'SEM_ETAPA') return -1;
+      if (a.key === 'MULTIPLAS') return 1;
+      if (b.key === 'MULTIPLAS') return -1;
+      return String(a.codigo).localeCompare(String(b.codigo));
+    });
+  }, [filteredTitles]);
 
   const statusCounts = useMemo(() => titles.reduce((accumulator, item) => {
     const group = item.grupo_status || 'OUTRO';
@@ -352,12 +379,25 @@ export default function CrRealizadoView({
                   </td>
                 </tr>
               ) : null}
-              {!loading && filteredTitles.map((item) => (
-                <tr
-                  key={item.id}
-                  data-in-competence={item.em_competencia ? 'true' : 'false'}
-                  data-inactive={item.ativo_no_custo ? 'false' : 'true'}
-                >
+              {!loading && groupedTitles.map((group) => (
+                <Fragment key={group.key}>
+                  <tr className="cr-cost-ledger__macro-row">
+                    <td colSpan="8">
+                      <span>
+                        {group.codigo ? <strong>{group.codigo}</strong> : null}
+                        <strong>{group.descricao}</strong>
+                      </span>
+                      <small>
+                        {group.items.length} título(s) · {currency(group.total)} alocado
+                      </small>
+                    </td>
+                  </tr>
+                  {group.items.map((item) => (
+                    <tr
+                      key={item.id}
+                      data-in-competence={item.em_competencia ? 'true' : 'false'}
+                      data-inactive={item.ativo_no_custo ? 'false' : 'true'}
+                    >
                   <td data-label="Vencimento">
                     <strong>{formatDate(item.data_vencimento)}</strong>
                     {item.em_competencia ? <small>Na competência</small> : null}
@@ -389,7 +429,9 @@ export default function CrRealizadoView({
                       label={STATUS_LABELS[item.status] || item.status}
                     />
                   </td>
-                </tr>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -413,8 +455,7 @@ export default function CrRealizadoView({
             <div className="cr-cost-ledger__technical-body">
               <div className="cr-cost-ledger__technical-actions">
                 <p>
-                  Esta rotina atualiza somente a projeção <code>cr_*</code>. Nenhum título,
-                  pedido ou movimento financeiro é alterado.
+                  Atualiza o vínculo de análise sem alterar títulos ou movimentos financeiros.
                 </p>
                 {permissions.update ? (
                   <button

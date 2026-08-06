@@ -286,7 +286,7 @@ export default function CrPlanningImportModal({
               type="button"
               className="btn btn-primary"
               disabled={!valid || validating}
-              onClick={() => onConfirm(result.itens)}
+              onClick={() => onConfirm(tipo, result.itens)}
             >
               Confirmar importação
             </button>

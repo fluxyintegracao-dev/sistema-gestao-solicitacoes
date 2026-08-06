@@ -130,7 +130,8 @@ function serializeObra(value) {
     id: Number(item.id),
     codigo: item.codigo || null,
     nome: item.nome,
-    classificacao: item.classificacao || null
+    classificacao: item.classificacao || null,
+    tipo_centro_custo: item.tipo_centro_custo || null
   };
 }
 
@@ -224,7 +225,7 @@ function statusComparativo(previstoValue, realizadoValue) {
 
 async function findObra(obraId, deps, options = {}) {
   const obra = await deps.Obra.findByPk(obraId, {
-    attributes: ['id', 'codigo', 'nome', 'classificacao'],
+    attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo'],
     transaction: options.transaction,
     lock: options.lock
   });
@@ -1080,7 +1081,7 @@ async function obterPlanejamento(user, obraIdValue, competenciaValue, overrides 
 
 function validateCostRows(rows, allowedItems, allowedMacros) {
   if (!Array.isArray(rows)) {
-    throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos previstos.');
+    throw createBusinessError(400, 'CR_CUSTOS_INVALIDOS', 'Informe a lista de custos planejados.');
   }
   const seen = new Set();
   return rows.map((row, index) => {
@@ -1214,7 +1215,7 @@ async function salvarCustos(user, obraIdValue, competenciaValue, payload = {}, o
       competenciaId: competencia.id,
       userId: user?.id,
       event: 'CR_PLANEJAMENTO_CUSTOS_SALVO',
-      description: 'Custos previstos da competencia atualizados.',
+      description: 'Custos planejados da competencia atualizados.',
       payload: { competencia: competenciaCode, quantidade_itens: rows.length, total }
     });
     return { competencia: serializeCompetencia(competencia), total };
@@ -1341,19 +1342,19 @@ async function salvarRecebiveis(user, obraIdValue, competenciaValue, payload = {
         transaction
       });
       const previousIds = previousCompetencies.map((item) => Number(item.id));
-      const previousReceipts = previousIds.length
-        ? await deps.CrPrevisaoReceita.findAll({
+      const previousMeasurements = previousIds.length
+        ? await deps.CrMedicaoConsolidada.findAll({
           where: {
             competencia_id: { [Op.in]: previousIds },
-            origem: 'MEDICAO'
+            plano_item_id: { [Op.ne]: null }
           },
           transaction
         })
         : [];
-      previousReceipts.forEach((item) => previousQuantities.set(
+      previousMeasurements.forEach((item) => previousQuantities.set(
         Number(item.plano_item_id),
         number(previousQuantities.get(Number(item.plano_item_id)))
-          + number(item.quantidade_prevista)
+          + number(item.quantidade_medida)
       ));
     }
     const currentCosts = isPublic && saved
@@ -1488,7 +1489,7 @@ async function finalizarCompetencia(
       throw createBusinessError(
         422,
         'CR_JUSTIFICATIVA_CUSTOS_REQUIRED',
-        'Informe a justificativa para finalizar sem custos previstos.'
+        'Informe a justificativa para finalizar sem custos planejados.'
       );
     }
     if (totalReceipts === 0 && !normalizeText(payload.justificativa_sem_receitas)) {
@@ -1785,7 +1786,9 @@ async function buildComparison(obraId, competenciaCode, deps) {
       })
       : [],
     competencia
-      ? deps.CrPrevisaoReceita.findAll({ where: { competencia_id: competencia.id } })
+      ? deps.CrPrevisaoReceita.findAll({
+        where: { competencia_id: competencia.id, origem: 'MEDICAO' }
+      })
       : [],
     competencia
       ? deps.CrMedicaoConsolidada.findAll({ where: { competencia_id: competencia.id } })
@@ -1844,6 +1847,63 @@ async function buildComparison(obraId, competenciaCode, deps) {
     String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
     || String(a.codigo).localeCompare(String(b.codigo))
   ));
+  const costById = new Map(costs.map((cost) => [Number(cost.id), plain(cost)]));
+  const measurementRows = new Map();
+  const ensureMeasurementRow = (sourceValue) => {
+    const source = plain(sourceValue);
+    const key = planningReferenceKey(source);
+    if (!key) return null;
+    const item = source.plano_item_id
+      ? itemById.get(Number(source.plano_item_id))
+      : null;
+    const monthlyCost = source.previsao_custo_id
+      ? serializeMonthlyCost(costById.get(Number(source.previsao_custo_id)))
+      : null;
+    const current = measurementRows.get(key) || {
+      key,
+      plano_item_id: item?.id || null,
+      previsao_custo_id: monthlyCost?.id || null,
+      etapa_macro_codigo: item?.etapa_macro_codigo || monthlyCost?.etapa_macro_codigo || null,
+      codigo: item?.codigo || monthlyCost?.etapa_macro_codigo || '-',
+      descricao: item?.descricao || monthlyCost?.descricao || 'Item sem descricao',
+      previsto: 0,
+      aprovado: 0,
+      tem_aprovacao: false
+    };
+    measurementRows.set(key, current);
+    return current;
+  };
+  presentedRows.forEach((row) => {
+    const current = ensureMeasurementRow(row);
+    if (current) current.previsto = money(current.previsto + number(row.valor_previsto));
+  });
+  approvedRows.forEach((row) => {
+    const current = ensureMeasurementRow(row);
+    if (!current) return;
+    current.aprovado = money(current.aprovado + number(row.valor_medido));
+    current.tem_aprovacao = true;
+  });
+  const measurementResult = [...measurementRows.values()].map((row) => {
+    const difference = money(row.aprovado - row.previsto);
+    const glosa = money(Math.max(0, row.previsto - row.aprovado));
+    let estado = 'AGUARDANDO_APROVACAO';
+    if (row.tem_aprovacao && row.previsto === 0 && row.aprovado > 0) estado = 'SEM_PREVISAO';
+    else if (row.tem_aprovacao && row.aprovado > row.previsto) estado = 'ACIMA_PREVISTO';
+    else if (row.tem_aprovacao && glosa > 0) estado = 'APROVADO_PARCIAL';
+    else if (row.tem_aprovacao) estado = 'APROVADO_INTEGRAL';
+    return {
+      ...row,
+      diferenca: difference,
+      glosa,
+      percentual_aprovacao: row.previsto > 0
+        ? Math.round((row.aprovado / row.previsto) * 10000) / 100
+        : null,
+      estado
+    };
+  }).sort((a, b) => (
+    String(a.etapa_macro_codigo || '').localeCompare(String(b.etapa_macro_codigo || ''))
+    || String(a.codigo).localeCompare(String(b.codigo))
+  ));
   const measurementPresented = money(
     presentedRows.reduce((sum, row) => sum + number(row.valor_previsto), 0)
   );
@@ -1855,6 +1915,7 @@ async function buildComparison(obraId, competenciaCode, deps) {
     competencia: serializeCompetencia(competencia),
     plano: { id: Number(plan.id), versao: Number(plan.versao) },
     linhas: result,
+    linhas_medicao: measurementResult,
     resumo: {
       previsto: money(result.reduce((sum, row) => sum + row.previsto, 0)),
       realizado: money(result.reduce((sum, row) => sum + row.realizado, 0)),
@@ -1898,12 +1959,36 @@ function dashboardCompetencias(endValue, total = 6) {
   return result;
 }
 
+function normalizeDashboardCompetencias(value, referenceValue) {
+  const reference = normalizeCompetencia(referenceValue);
+  if (value == null || value === '') return dashboardCompetencias(reference);
+  const rawValues = Array.isArray(value) ? value : String(value).split(',');
+  const competencias = [...new Set(
+    rawValues
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .map(normalizeCompetencia)
+  )].sort();
+  if (!competencias.length) return dashboardCompetencias(reference);
+  if (competencias.length > 12) {
+    throw createBusinessError(
+      422,
+      'CR_DASHBOARD_COMPETENCIAS_LIMIT',
+      'Selecione no maximo 12 competencias para o dashboard.'
+    );
+  }
+  return competencias;
+}
+
 function summarizeDashboardRows(rows) {
   const custoPlanejado = money(rows.reduce((sum, row) => sum + row.custo_planejado, 0));
   const custoRealizado = money(rows.reduce((sum, row) => sum + row.custo_realizado, 0));
   const recebivelPrevisto = money(rows.reduce((sum, row) => sum + row.recebivel_previsto, 0));
   const recebivelReconhecido = money(
     rows.reduce((sum, row) => sum + row.recebivel_reconhecido, 0)
+  );
+  const medicaoAprovada = money(
+    rows.reduce((sum, row) => sum + number(row.medicao_aprovada), 0)
   );
   const receitaRecebida = money(rows.reduce((sum, row) => sum + row.receita_recebida, 0));
   const glosa = money(rows.reduce((sum, row) => sum + row.glosa, 0));
@@ -1916,6 +2001,7 @@ function summarizeDashboardRows(rows) {
       : null,
     recebivel_previsto: recebivelPrevisto,
     recebivel_reconhecido: recebivelReconhecido,
+    medicao_aprovada: medicaoAprovada,
     receita_recebida: receitaRecebida,
     saldo_receber: money(Math.max(0, recebivelReconhecido - receitaRecebida)),
     glosa,
@@ -1929,6 +2015,39 @@ function summarizeDashboardRows(rows) {
     ),
     recebiveis_vencidos: rows.reduce((sum, row) => sum + row.recebiveis_vencidos, 0)
   };
+}
+
+function summarizeDashboardWorkRows(rows, alerts = []) {
+  const alertCountByWork = new Map();
+  alerts.forEach((item) => {
+    const obraId = Number(item.obra_id);
+    alertCountByWork.set(obraId, Number(alertCountByWork.get(obraId) || 0) + 1);
+  });
+
+  return rows.map((row) => ({
+    obra: row.obra,
+    competencia: row.competencia,
+    competencia_id: row.competencia_id,
+    estado_competencia: row.estado_competencia,
+    custo_planejado: row.custo_planejado,
+    custo_realizado: row.custo_realizado,
+    desvio_custo: money(row.custo_realizado - row.custo_planejado),
+    percentual_custo: row.custo_planejado > 0
+      ? Math.round((row.custo_realizado / row.custo_planejado) * 10000) / 100
+      : null,
+    recebivel_previsto: row.recebivel_previsto,
+    recebivel_reconhecido: row.recebivel_reconhecido,
+    medicao_aprovada: row.medicao_aprovada,
+    receita_recebida: row.receita_recebida,
+    saldo_receber: money(Math.max(0, row.recebivel_reconhecido - row.receita_recebida)),
+    glosa: row.glosa,
+    recebiveis_vencidos: row.recebiveis_vencidos,
+    alertas: Number(alertCountByWork.get(Number(row.obra.id)) || 0)
+  })).sort((a, b) => (
+    b.alertas - a.alertas
+    || Number(b.desvio_custo > 0) - Number(a.desvio_custo > 0)
+    || String(a.obra.nome || '').localeCompare(String(b.obra.nome || ''), 'pt-BR')
+  ));
 }
 
 async function mapWithConcurrency(items, limit, mapper) {
@@ -2224,13 +2343,43 @@ async function obterDashboard(
   user,
   competenciaValue,
   obraIdValue = null,
+  competenciasValue = null,
+  classificacaoValue = null,
   overrides = {}
 ) {
+  if (
+    competenciasValue
+    && typeof competenciasValue === 'object'
+    && !Array.isArray(competenciasValue)
+  ) {
+    overrides = competenciasValue;
+    competenciasValue = null;
+  }
+  if (
+    classificacaoValue
+    && typeof classificacaoValue === 'object'
+    && !Array.isArray(classificacaoValue)
+  ) {
+    overrides = classificacaoValue;
+    classificacaoValue = null;
+  }
   const deps = dependencies(overrides);
   const competenciaCode = normalizeCompetencia(competenciaValue);
+  const competencias = normalizeDashboardCompetencias(
+    competenciasValue,
+    competenciaCode
+  );
   const selectedObraId = obraIdValue == null || obraIdValue === ''
     ? null
     : positiveId(obraIdValue, 'Obra');
+  const selectedClassification = normalizeText(classificacaoValue, 20).toUpperCase();
+  if (selectedClassification && !['PUBLICA', 'PRIVADA'].includes(selectedClassification)) {
+    throw createBusinessError(
+      400,
+      'CR_CLASSIFICACAO_INVALIDA',
+      'Classificacao deve ser PUBLICA ou PRIVADA.'
+    );
+  }
   const scope = await deps.resolverEscopoObras(user);
   if (selectedObraId) await assertScope(user, selectedObraId, deps);
   if (!selectedObraId && !scope.todas && scope.obraIds.length === 0) {
@@ -2241,26 +2390,27 @@ async function obterDashboard(
       historico: [],
       macros: [],
       alertas: [],
-      obras: []
+      obras: [],
+      obras_resumo: []
     };
   }
 
   const obraWhere = {
     ativo: true,
     tipo_centro_custo: 'OBRA',
+    ...(selectedClassification ? { classificacao: selectedClassification } : {}),
     ...(selectedObraId ? { id: selectedObraId } : {})
   };
   if (!selectedObraId && !scope.todas) obraWhere.id = { [Op.in]: scope.obraIds };
   const obras = await deps.Obra.findAll({
     where: obraWhere,
-    attributes: ['id', 'codigo', 'nome', 'classificacao'],
+    attributes: ['id', 'codigo', 'nome', 'classificacao', 'tipo_centro_custo'],
     order: [['nome', 'ASC']]
   });
   if (selectedObraId && !obras.length) {
     throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
   }
 
-  const competencias = dashboardCompetencias(competenciaCode);
   const rows = await buildDashboardRows(obras, competencias, deps);
   const currentRows = rows.filter((row) => row.competencia === competenciaCode);
   const historico = competencias.map((competencia) => ({
@@ -2322,12 +2472,18 @@ async function obterDashboard(
   try {
     const obligationData = await deps.listarMinhasObrigacoes(user);
     const workIds = new Set(obras.map((obra) => Number(obra.id)));
+    const competenceSet = new Set(competencias.map(String));
     overdueObligations = (obligationData?.items || []).filter((item) => (
-      item.situacao === 'VENCIDA' && workIds.has(Number(item.obra_id))
+      item.situacao === 'VENCIDA'
+      && workIds.has(Number(item.obra_id))
+      && competenceSet.has(String(item.competencia))
     ));
   } catch (error) {
     overdueObligations = [];
   }
+
+  const alerts = buildDashboardAlerts(rows, overdueObligations);
+  const workSummaries = summarizeDashboardWorkRows(rows, alerts);
 
   return {
     competencia: competenciaCode,
@@ -2339,8 +2495,9 @@ async function obterDashboard(
     cards: summarizeDashboardRows(currentRows),
     historico,
     macros: selectedObraId ? macros : [],
-    alertas: buildDashboardAlerts(currentRows, overdueObligations),
-    obras: obras.map(serializeObra)
+    alertas: alerts,
+    obras: obras.map(serializeObra),
+    obras_resumo: workSummaries
   };
 }
 
@@ -2503,6 +2660,7 @@ module.exports = {
   consolidarMedicao,
   criarCompetencia,
   dashboardCompetencias,
+  normalizeDashboardCompetencias,
   decidirReabertura,
   findPrivateSources,
   finalizarCompetencia,
@@ -2520,5 +2678,6 @@ module.exports = {
   solicitarReabertura,
   solicitarReaberturaPorObraCompetencia,
   statusComparativo,
-  summarizeDashboardRows
+  summarizeDashboardRows,
+  summarizeDashboardWorkRows
 };

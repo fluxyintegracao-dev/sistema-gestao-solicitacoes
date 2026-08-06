@@ -13,7 +13,7 @@ const REPORTS = [
   },
   {
     id: 'custos-previstos',
-    label: 'Custos previstos',
+    label: 'Custos planejados',
     description: 'Planejamento detalhado por item micro e etapa macro.'
   },
   {

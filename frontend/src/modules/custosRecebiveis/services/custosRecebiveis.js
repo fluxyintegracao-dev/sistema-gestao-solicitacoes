@@ -126,10 +126,27 @@ function newIdempotencyKey(prefix = 'cr') {
     || `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-export async function obterCustosRecebiveisDashboard(competencia, obraId = null) {
+export async function obterCustosRecebiveisDashboard(
+  competencia,
+  obraId = null,
+  competencias = [],
+  classificacao = ''
+) {
   const query = new URLSearchParams({ competencia });
   if (Number.isInteger(Number(obraId)) && Number(obraId) > 0) {
     query.set('obra_id', String(Number(obraId)));
+  }
+  const selectedCompetencias = Array.isArray(competencias)
+    ? competencias
+    : String(competencias || '').split(',');
+  const normalizedCompetencias = [...new Set(
+    selectedCompetencias.map((item) => String(item || '').trim()).filter(Boolean)
+  )];
+  if (normalizedCompetencias.length) {
+    query.set('competencias', normalizedCompetencias.join(','));
+  }
+  if (['PUBLICA', 'PRIVADA'].includes(String(classificacao || '').toUpperCase())) {
+    query.set('classificacao', String(classificacao).toUpperCase());
   }
   const response = await fetch(
     `${API_URL}/custos-recebiveis/dashboard?${query.toString()}`,
@@ -192,7 +209,7 @@ export async function salvarCustosCompetencia(obraId, competencia, itens) {
       body: JSON.stringify({ itens })
     }
   );
-  return parseResponse(response, 'Erro ao salvar custos previstos');
+  return parseResponse(response, 'Erro ao salvar custos planejados');
 }
 
 export async function salvarRecebiveisCompetencia(obraId, competencia, itens) {

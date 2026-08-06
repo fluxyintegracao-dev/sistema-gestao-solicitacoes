@@ -224,13 +224,31 @@ async function findPlanContext(obraId, competencia, deps, transaction) {
     transaction
   });
   if (!plan) {
-    return { competency, plan: null, items: [], planItemsByAppropriation: new Map() };
+    return {
+      competency,
+      plan: null,
+      items: [],
+      macros: [],
+      planItemsByAppropriation: new Map()
+    };
   }
-  const items = await deps.CrPlanoItem.findAll({
-    where: { plano_id: plan.id, somadora: false },
+  const structure = await deps.CrPlanoItem.findAll({
+    where: { plano_id: plan.id },
     order: [['ordem', 'ASC'], ['codigo', 'ASC']],
     transaction
   });
+  const plainStructure = structure.map(plain);
+  const items = plainStructure.filter((item) => !Boolean(item.somadora));
+  const macroCodes = new Set(items
+    .map((item) => String(item.etapa_macro_codigo || '').trim())
+    .filter(Boolean));
+  const macros = plainStructure
+    .filter((item) => macroCodes.has(String(item.codigo || '').trim()))
+    .map((item) => ({
+      codigo: item.codigo,
+      descricao: item.descricao || item.codigo,
+      ordem: number(item.ordem)
+    }));
   const itemIds = items.map((item) => Number(item.id));
   const links = itemIds.length
     ? await deps.CrPlanoMacroVinculo.findAll({
@@ -238,7 +256,7 @@ async function findPlanContext(obraId, competencia, deps, transaction) {
       transaction
     })
     : [];
-  const itemById = new Map(items.map((item) => [Number(item.id), plain(item)]));
+  const itemById = new Map(items.map((item) => [Number(item.id), item]));
   const planItemsByAppropriation = new Map();
   links.forEach((linkValue) => {
     const link = plain(linkValue);
@@ -248,7 +266,41 @@ async function findPlanContext(obraId, competencia, deps, transaction) {
     list.push(item);
     planItemsByAppropriation.set(Number(link.apropriacao_id), list);
   });
-  return { competency, plan: plain(plan), items: [...itemById.values()], planItemsByAppropriation };
+  return {
+    competency,
+    plan: plain(plan),
+    items: [...itemById.values()],
+    macros,
+    planItemsByAppropriation
+  };
+}
+
+function enrichTitlesWithPlanMacros(titles = [], planContext = {}) {
+  const macroByCode = new Map((planContext.macros || []).map((macro) => (
+    [String(macro.codigo), macro]
+  )));
+  return titles.map((title) => {
+    const macroCodes = new Set();
+    (title.apropriacoes || []).forEach((appropriation) => {
+      const linkedItems = planContext.planItemsByAppropriation?.get(Number(appropriation.id)) || [];
+      linkedItems.forEach((item) => {
+        if (item.etapa_macro_codigo) macroCodes.add(String(item.etapa_macro_codigo));
+      });
+      if (!linkedItems.length && macroByCode.has(String(appropriation.codigo || ''))) {
+        macroCodes.add(String(appropriation.codigo));
+      }
+    });
+    const etapas = [...macroCodes]
+      .map((code) => macroByCode.get(code) || { codigo: code, descricao: code, ordem: 0 })
+      .sort((a, b) => number(a.ordem) - number(b.ordem) || String(a.codigo).localeCompare(String(b.codigo)));
+    return {
+      ...title,
+      etapas_macro: etapas.map((macro) => ({
+        codigo: macro.codigo,
+        descricao: macro.descricao || macro.codigo
+      }))
+    };
+  });
 }
 
 async function getOrCreateCompetency(obraId, competencia, plan, deps, transaction) {
@@ -813,7 +865,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
     listarTitulosFinanceirosAlocados(obraId, competencia, deps)
   ]);
   if (!obra) throw createBusinessError(404, 'CR_OBRA_NOT_FOUND', 'Obra nao encontrada.');
-  const titleSummary = summarizeAllocatedTitles(allocatedTitles);
+  const enrichedTitles = enrichTitlesWithPlanMacros(allocatedTitles, planContext);
+  const titleSummary = summarizeAllocatedTitles(enrichedTitles);
   if (!competency) {
     return {
       obra: plain(obra),
@@ -826,7 +879,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
         ...titleSummary
       },
       itens_plano: planContext.items,
-      titulos: allocatedTitles,
+      etapas_macro: planContext.macros,
+      titulos: enrichedTitles,
       contextos: [],
       items: []
     };
@@ -885,7 +939,8 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
       descricao: item.descricao,
       etapa_macro_codigo: item.etapa_macro_codigo || null
     })),
-    titulos: allocatedTitles,
+    etapas_macro: planContext.macros,
+    titulos: enrichedTitles,
     contextos: [],
     items
   };
@@ -986,6 +1041,7 @@ module.exports = {
   allocateMoney,
   buildProjectionRows,
   dependencies,
+  enrichTitlesWithPlanMacros,
   listarRealizados,
   listarTitulosFinanceirosAlocados,
   monthRange,

@@ -6,6 +6,7 @@ const path = require('path');
 const {
   allocateMoney,
   buildProjectionRows,
+  enrichTitlesWithPlanMacros,
   reprocessarRealizados,
   serializeAllocatedTitle,
   summarizeAllocatedTitles,
@@ -57,6 +58,9 @@ function validateRouteAndPermissionContracts() {
   assert(realizedView.includes('Todos da obra'));
   assert(realizedView.includes('Vencem na competência'));
   assert(realizedView.includes('data?.titulos || []'));
+  assert(realizedView.includes('groupedTitles.map'));
+  assert(realizedView.includes('Rateado em mais de uma etapa macro'));
+  assert(service.includes('etapas_macro: planContext.macros'));
   assert(!realizedView.includes('Cadeia operacional'));
   assert(!service.includes('deps.PedidoCompra.findAll'));
   assert(!service.includes('deps.SolicitacaoCompra.findAll'));
@@ -64,6 +68,34 @@ function validateRouteAndPermissionContracts() {
   assert(!service.includes('TituloFinanceiro.update'));
   assert(!service.includes('PedidoCompra.update'));
   assert(!service.includes('Apropriacao.update'));
+}
+
+function validateMacroGroupingWithoutDuplicatingTitles() {
+  const planContext = {
+    macros: [
+      { codigo: '00.001', descricao: 'Administração', ordem: 1 },
+      { codigo: '00.002', descricao: 'Estrutura', ordem: 2 }
+    ],
+    planItemsByAppropriation: new Map([
+      [7, [{ etapa_macro_codigo: '00.001' }]],
+      [8, [{ etapa_macro_codigo: '00.002' }]]
+    ])
+  };
+  const [single, shared] = enrichTitlesWithPlanMacros([{
+    id: 1,
+    valor_alocado: 100,
+    apropriacoes: [{ id: 7, codigo: '01.001' }]
+  }, {
+    id: 2,
+    valor_alocado: 250,
+    apropriacoes: [{ id: 7 }, { id: 8 }]
+  }], planContext);
+  assert.deepStrictEqual(single.etapas_macro, [{
+    codigo: '00.001',
+    descricao: 'Administração'
+  }]);
+  assert.strictEqual(shared.etapas_macro.length, 2);
+  assert.strictEqual([single, shared].reduce((sum, item) => sum + item.valor_alocado, 0), 350);
 }
 
 function validateFinancialTitleLedger() {
@@ -311,6 +343,7 @@ async function run() {
   validateRouteAndPermissionContracts();
   validateAllocationRounding();
   validateFinancialTitleLedger();
+  validateMacroGroupingWithoutDuplicatingTitles();
   validateOnlyActiveSettlementsBecomeRealized();
   validateRateioAndNonMappedPreservation();
   await validateReversalCorrectionIsIdempotent();

@@ -43,8 +43,7 @@ const currency = new Intl.NumberFormat('pt-BR', {
 const PUBLIC_STEPS = [
   { id: 1, label: 'Custos planejados' },
   { id: 2, label: 'Medição prevista' },
-  { id: 3, label: 'Medição aprovada' },
-  { id: 4, label: 'Revisão e envio' }
+  { id: 3, label: 'Revisão e envio' }
 ];
 
 const PRIVATE_STEPS = [
@@ -138,6 +137,7 @@ export default function CrPlanejamentoView({
   userId,
   competencia,
   permissions,
+  viewMode = 'planning',
   onChanged
 }) {
   const [data, setData] = useState(null);
@@ -161,6 +161,7 @@ export default function CrPlanejamentoView({
   const [sheetType, setSheetType] = useState('');
   const [sheetPreview, setSheetPreview] = useState(null);
   const [sheetLoading, setSheetLoading] = useState('');
+  const [costErrors, setCostErrors] = useState([]);
   const sheetFileRef = useRef(null);
   const sheetTypeRef = useRef('');
   const draftReadyRef = useRef(false);
@@ -225,7 +226,8 @@ export default function CrPlanejamentoView({
       const latestRestoredDraft = [...restoredDrafts].sort(
         (left, right) => Number(right?.meta?.salvo_em || 0) - Number(left?.meta?.salvo_em || 0)
       )[0];
-      const restoredStep = Number(latestRestoredDraft?.meta?.etapa);
+      const rawRestoredStep = Number(latestRestoredDraft?.meta?.etapa);
+      const restoredStep = rawRestoredStep >= 4 ? 3 : rawRestoredStep;
       const maxStep = response.obra?.classificacao === 'PUBLICA' ? PUBLIC_STEPS.length : PRIVATE_STEPS.length;
       if (restoredStep >= 1 && restoredStep <= maxStep) setStep(restoredStep);
       setHasLocalDraft(restoredDrafts.length > 0);
@@ -249,10 +251,12 @@ export default function CrPlanejamentoView({
     setMeasurementJustification('');
     setDraftNotice('');
     setHasLocalDraft(false);
+    setCostErrors([]);
     load();
-  }, [load]);
+  }, [load, viewMode]);
 
   const isPublic = (data?.obra?.classificacao || obra?.classificacao) === 'PUBLICA';
+  const approvedOnly = viewMode === 'approved';
   const steps = isPublic ? PUBLIC_STEPS : PRIVATE_STEPS;
   const readonly = data?.regras?.editavel === false;
   latestDraftRef.current = {
@@ -450,6 +454,7 @@ export default function CrPlanejamentoView({
   }
 
   function updateCost(index, field, value) {
+    setCostErrors((current) => current.filter((item) => item.index !== index));
     setCosts((current) => current.map((item, itemIndex) => {
       if (itemIndex !== index) return item;
       const next = { ...item, [field]: value };
@@ -463,7 +468,7 @@ export default function CrPlanejamentoView({
       if (itemIndex !== index) return item;
       const next = { ...item, [field]: value };
       if (isPublic && field === 'quantidade_prevista') {
-        const previousQuantity = asNumber(item.item?.quantidade_apresentada_anterior);
+        const previousQuantity = asNumber(item.item?.quantidade_aprovada_anterior);
         const availableQuantity = Math.max(
           0,
           asNumber(item.quantidade_base) - previousQuantity
@@ -636,12 +641,14 @@ export default function CrPlanejamentoView({
     };
   }
 
-  function applyPlanningImport(items) {
-    if (sheetType === 'custos') {
+  function applyPlanningImport(type, items) {
+    const importRows = Array.isArray(items) ? items : [];
+    if (type === 'custos') {
       setCosts((current) => {
         const next = [...current];
-        items.forEach((row) => {
-          const identity = `${row.etapa_macro_codigo}|${String(row.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(row.unidade || '').trim().toLocaleLowerCase('pt-BR')}`;
+        importRows.forEach((row) => {
+          const macroCode = String(row.etapa_macro_codigo || '').trim();
+          const identity = `${macroCode}|${String(row.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(row.unidade || '').trim().toLocaleLowerCase('pt-BR')}`;
           const index = next.findIndex((item) => (
             `${item.etapa_macro_codigo}|${String(item.descricao || '').trim().toLocaleLowerCase('pt-BR')}|${String(item.unidade || '').trim().toLocaleLowerCase('pt-BR')}` === identity
           ));
@@ -650,12 +657,12 @@ export default function CrPlanejamentoView({
             id: index >= 0 ? next[index].id : null,
             chave_local: index >= 0 ? next[index].chave_local : newLocalKey('cr-import-cost'),
             plano_item_id: null,
-            etapa_macro_codigo: row.etapa_macro_codigo,
+            etapa_macro_codigo: macroCode,
             descricao: row.descricao,
             unidade: row.unidade,
             ordem: index >= 0
               ? next[index].ordem
-              : next.filter((item) => item.etapa_macro_codigo === row.etapa_macro_codigo).length + 1,
+              : next.filter((item) => item.etapa_macro_codigo === macroCode).length + 1,
             item: null,
             quantidade: asNumber(row.quantidade),
             custo_unitario: asNumber(row.valor_unitario),
@@ -668,11 +675,11 @@ export default function CrPlanejamentoView({
         return next;
       });
       setStep(1);
-    } else if (sheetType === 'medicao-prevista') {
+    } else if (type === 'medicao-prevista') {
       setReceipts((current) => {
         const next = [...current];
-        items.forEach((row) => {
-          const item = budgetItemFromImported(row, 'quantidade_apresentada_anterior');
+        importRows.forEach((row) => {
+          const item = budgetItemFromImported(row, 'quantidade_aprovada_anterior');
           const imported = {
             previsao_custo_id: null,
             plano_item_id: item.id,
@@ -694,10 +701,10 @@ export default function CrPlanejamentoView({
         return next;
       });
       setStep(2);
-    } else if (sheetType === 'medicao-aprovada') {
+    } else if (type === 'medicao-aprovada') {
       setMeasurements((current) => {
         const next = [...current];
-        items.forEach((row) => {
+        importRows.forEach((row) => {
           const item = budgetItemFromImported(row, 'quantidade_aprovada_anterior');
           const imported = {
             previsao_custo_id: null,
@@ -722,10 +729,9 @@ export default function CrPlanejamentoView({
         });
         return next;
       });
-      setStep(3);
     }
     setSheetPreview(null);
-    setFeedback('Importação aplicada ao rascunho. Revise e use o botão Salvar da etapa para gravar.');
+    setFeedback(`${importRows.length} item(ns) aplicados ao rascunho. Revise e salve para gravar.`);
   }
 
   function renderPlanningSheetActions(type, allowed = true) {
@@ -803,8 +809,9 @@ export default function CrPlanejamentoView({
             <tbody>
               {rows.map((item) => {
                 const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
+                const rowError = costErrors.find((entry) => entry.index === index);
                 return (
-                  <tr key={planningRowKey(item)}>
+                  <tr key={planningRowKey(item)} data-invalid={rowError ? 'true' : undefined}>
                     <td>
                       <input
                         value={item.descricao || ''}
@@ -813,6 +820,7 @@ export default function CrPlanejamentoView({
                         disabled={readonly || !permissions.costs}
                         onChange={(event) => updateCost(index, 'descricao', event.target.value)}
                       />
+                      {rowError ? <small>{rowError.messages.join(' · ')}</small> : null}
                     </td>
                     <td>
                       <input
@@ -969,7 +977,7 @@ export default function CrPlanejamentoView({
             <tbody>
               {rows.map((item) => {
                 const index = receipts.findIndex((row) => planningRowKey(row) === planningRowKey(item));
-                const previousQuantity = asNumber(item.item?.quantidade_apresentada_anterior);
+                const previousQuantity = asNumber(item.item?.quantidade_aprovada_anterior);
                 const remainingQuantity = Math.max(
                   0,
                   asNumber(item.quantidade_base) - previousQuantity - asNumber(item.quantidade_prevista)
@@ -1224,12 +1232,35 @@ export default function CrPlanejamentoView({
   }
 
   async function saveCosts() {
+    const isEmpty = (item) => (
+      !String(item.descricao || '').trim()
+      && !String(item.unidade || '').trim()
+      && String(item.quantidade ?? '').trim() === ''
+      && String(item.custo_unitario ?? '').trim() === ''
+    );
+    const rows = costs.filter((item) => !isEmpty(item));
+    const validationErrors = rows.flatMap((item, index) => {
+      const messages = [];
+      if (String(item.descricao || '').trim().length < 2) messages.push('informe a descrição');
+      if (!String(item.unidade || '').trim()) messages.push('informe a unidade');
+      if (asNumber(item.quantidade) <= 0) messages.push('informe uma quantidade maior que zero');
+      if (String(item.custo_unitario ?? '').trim() === '' || asNumber(item.custo_unitario) < 0) {
+        messages.push('informe um valor unitário válido');
+      }
+      return messages.length ? [{ index: costs.indexOf(item), label: index + 1, messages }] : [];
+    });
+    setCostErrors(validationErrors);
+    if (validationErrors.length) {
+      setError(`Revise ${validationErrors.length} subitem(ns) destacado(s) antes de salvar.`);
+      return;
+    }
+    if (rows.length !== costs.length) setCosts(rows);
     await runMutation(
       'costs',
       () => salvarCustosCompetencia(
         obra.id,
         competencia,
-        costs.map((item) => ({
+        rows.map((item) => ({
           id: item.id || null,
           chave_local: item.chave_local || null,
           plano_item_id: item.plano_item_id,
@@ -1264,7 +1295,7 @@ export default function CrPlanejamentoView({
         })),
         measurementJustification
       ),
-      'Medição consolidada com rastreabilidade.',
+      'Medição aprovada registrada.',
       'measurement'
     );
   }
@@ -1275,7 +1306,7 @@ export default function CrPlanejamentoView({
     )) return;
     const justifications = {};
     if (totalCosts === 0) {
-      const value = window.prompt('Justifique a finalização sem custos previstos:');
+      const value = window.prompt('Justifique a finalização sem custos planejados:');
       if (!value) return;
       justifications.justificativa_sem_custos = value;
     }
@@ -1450,7 +1481,7 @@ export default function CrPlanejamentoView({
       <header className="cr-workspace-heading">
         <div>
           <span>Competência {competencia}</span>
-          <h2>Planejamento · {obra.codigo || obra.id} · {obra.nome}</h2>
+          <h2>{approvedOnly ? 'Medição aprovada' : 'Planejamento'} · {obra.codigo || obra.id} · {obra.nome}</h2>
           <p>
             Plano micro v{data?.plano?.versao} · {isPublic ? 'Obra pública com medição' : 'Obra privada com recebíveis contratuais'}
           </p>
@@ -1489,7 +1520,7 @@ export default function CrPlanejamentoView({
       {error ? <div className="cr-feedback" data-tone="error">{error}</div> : null}
       {feedback ? <div className="cr-feedback" data-tone="success">{feedback}</div> : null}
 
-      <nav className="cr-stepper" aria-label="Etapas do planejamento">
+      {!approvedOnly ? <nav className="cr-stepper" aria-label="Etapas do planejamento">
         {steps.map((item) => (
           <button
             key={item.id}
@@ -1501,9 +1532,9 @@ export default function CrPlanejamentoView({
             <span>{item.label}</span>
           </button>
         ))}
-      </nav>
+      </nav> : null}
 
-      {step === 2 && isPublic ? (
+      {!approvedOnly && step === 2 && isPublic ? (
         <div className="cr-planning-panel cr-macro-planning-panel">
           <div className="cr-block-heading">
             <div>
@@ -1536,7 +1567,7 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      {step === 2 && !isPublic ? (
+      {!approvedOnly && step === 2 && !isPublic ? (
         <div className="cr-planning-panel">
           <div className="cr-block-heading">
             <div>
@@ -1590,7 +1621,7 @@ export default function CrPlanejamentoView({
                     {isPublic ? (
                       <>
                         <td>{item.item.quantidade_orcada} {item.item.unidade || 'un'}</td>
-                        <td>{item.item.quantidade_apresentada_anterior || 0}</td>
+                        <td>{item.item.quantidade_aprovada_anterior || 0}</td>
                         <td>
                         <input
                           type="number"
@@ -1606,7 +1637,7 @@ export default function CrPlanejamentoView({
                           {Math.max(
                             0,
                             asNumber(item.item.quantidade_orcada)
-                              - asNumber(item.item.quantidade_apresentada_anterior)
+                              - asNumber(item.item.quantidade_aprovada_anterior)
                               - asNumber(item.quantidade_prevista)
                           )} {item.item.unidade || 'un'}
                         </td>
@@ -1684,7 +1715,7 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      {step === 3 && isPublic ? (
+      {approvedOnly && isPublic ? (
         <div className="cr-planning-panel cr-measurement-panel">
           <div className="cr-block-heading">
             <div>
@@ -1744,7 +1775,7 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      {step === 1 ? (
+      {!approvedOnly && step === 1 ? (
         <div className="cr-planning-panel cr-macro-planning-panel">
           <div className="cr-block-heading">
             <div>
@@ -1756,7 +1787,7 @@ export default function CrPlanejamentoView({
             {renderPlanningSheetActions('custos', permissions.costs)}
           </div>
           <div className="cr-planning-total-banner">
-            <span>Custo previsto no mês</span>
+            <span>Custo planejado no mês</span>
             <strong>{currency.format(totalCosts)}</strong>
             <small>Quantidade × valor unitário compõe o total operacional.</small>
           </div>
@@ -1782,16 +1813,11 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      {step === 4 && isPublic ? (
+      {!approvedOnly && step === 3 && isPublic ? (
         <div className="cr-review-layout">
           <div className="cr-review-summary">
             <div><span>Custos planejados</span><strong>{currency.format(totalCosts)}</strong></div>
             <div><span>Medição prevista</span><strong>{currency.format(totalReceipts)}</strong></div>
-            <div><span>Medição aprovada</span><strong>{currency.format(totalApproved)}</strong></div>
-            <div data-tone={totalGlosa > 0 ? 'negative' : 'positive'}>
-              <span>Glosa registrada</span>
-              <strong>{currency.format(totalGlosa)}</strong>
-            </div>
             <div data-tone={totalReceipts - totalCosts >= 0 ? 'positive' : 'negative'}>
               <span>Margem prevista</span>
               <strong>{currency.format(totalReceipts - totalCosts)}</strong>
@@ -1802,8 +1828,7 @@ export default function CrPlanejamentoView({
             <div>
               <strong>Revisão operacional</strong>
               <span>
-                Ao finalizar, a versão v{data?.plano?.versao} será registrada como snapshot.
-                Duplo clique não cria uma segunda finalização.
+                Ao finalizar, os valores do mês ficam protegidos. Alterações posteriores exigem reabertura aprovada.
               </span>
             </div>
           </div>
@@ -1811,7 +1836,7 @@ export default function CrPlanejamentoView({
         </div>
       ) : null}
 
-      <footer className="cr-step-actions">
+      {!approvedOnly ? <footer className="cr-step-actions">
         <button
           type="button"
           className="btn btn-outline"
@@ -1831,7 +1856,7 @@ export default function CrPlanejamentoView({
           Próxima
           <HiOutlineChevronRight className="h-4 w-4" />
         </button>
-      </footer>
+      </footer> : null}
       {sheetPreview ? (
         <CrPlanningImportModal
           obraId={obra.id}

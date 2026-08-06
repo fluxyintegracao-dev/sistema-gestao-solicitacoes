@@ -18,6 +18,7 @@ import CrComparativoView from '../components/CrComparativoView';
 import CrConfiguracoesView from '../components/CrConfiguracoesView';
 import CrDashboardView from '../components/CrDashboardView';
 import CrExportacoesView from '../components/CrExportacoesView';
+import CrExecutiveFilters from '../components/CrExecutiveFilters';
 import CrImportacoesView from '../components/CrImportacoesView';
 import CrObrasView from '../components/CrObrasView';
 import CrObrigacoesView from '../components/CrObrigacoesView';
@@ -35,6 +36,7 @@ import {
   listarCustosRecebiveisObras,
   obterPlanoMicroObra,
   publicarPlanoMicro,
+  listarMinhasObrigacoesCustosRecebiveis,
   validarPlanoMicro
 } from '../services/custosRecebiveis';
 import {
@@ -74,6 +76,21 @@ export default function CustosRecebiveis() {
   const [publishing, setPublishing] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [obligationSummary, setObligationSummary] = useState(null);
+  const [obligationData, setObligationData] = useState(null);
+
+  const hasAdministrativeCapability = [
+    CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_IMPORT,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.ESTRUTURA_PUBLISH,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.AUDITORIA_VIEW,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.CONFIG_MANAGE,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.REPORT_EXPORT
+  ].some((permission) => hasExplicitCustosRecebiveisPermission(user, permission));
+  const operationalExperience = (
+    hasExplicitCustosRecebiveisPermission(user, CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW)
+    && hasExplicitCustosRecebiveisPermission(user, CUSTOS_RECEBIVEIS_PERMISSIONS.PLANEJAMENTO_VIEW)
+    && !hasAdministrativeCapability
+  );
 
   const availableTabs = useMemo(
     () => CUSTOS_RECEBIVEIS_TABS.filter((tab) => (
@@ -81,13 +98,44 @@ export default function CustosRecebiveis() {
     )),
     [user]
   );
-  const requestedTab = searchParams.get('aba') || availableTabs[0]?.id || 'obras';
+  const visibleTabs = useMemo(() => {
+    const tabs = availableTabs.filter((tab) => (
+      !tab.hidden || (operationalExperience && tab.id === 'obras')
+    ));
+    if (!operationalExperience) return tabs;
+    const operationalOrder = new Map([
+      ['obras', 0],
+      ['planejamento', 1],
+      ['visao-geral', 2],
+      ['obrigacoes', 3]
+    ]);
+    return [...tabs].sort((left, right) => (
+      (operationalOrder.get(left.id) ?? 99) - (operationalOrder.get(right.id) ?? 99)
+    ));
+  }, [availableTabs, operationalExperience]);
+  const defaultTab = operationalExperience && availableTabs.some((tab) => tab.id === 'obras')
+    ? 'obras'
+    : visibleTabs[0]?.id || availableTabs[0]?.id || 'obras';
+  const requestedTab = searchParams.get('aba') || defaultTab;
   const activeTab = availableTabs.some((tab) => tab.id === requestedTab)
     ? requestedTab
-    : availableTabs[0]?.id || null;
+    : defaultTab || null;
   const selectedObraId = Number(searchParams.get('obra'));
   const selectedPlanId = Number(searchParams.get('plano'));
   const competencia = searchParams.get('competencia') || currentMonth();
+  const dashboardObraId = Number(searchParams.get('obra_decisao'));
+  const dashboardClassificacao = ['PUBLICA', 'PRIVADA'].includes(
+    String(searchParams.get('classificacao_decisao') || '').toUpperCase()
+  ) ? String(searchParams.get('classificacao_decisao')).toUpperCase() : '';
+  const dashboardCompetencias = [...new Set(
+    String(searchParams.get('competencias') || competencia)
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => /^\d{4}-\d{2}$/.test(item))
+  )];
+  const detailMode = searchParams.get('detalhe') === '1'
+    ? (searchParams.get('painel') || 'details')
+    : null;
   const canViewObras = hasExplicitCustosRecebiveisPermission(
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBRAS_VIEW
@@ -132,6 +180,22 @@ export default function CustosRecebiveis() {
     reopenApprove: hasExplicitCustosRecebiveisPermission(
       user,
       CUSTOS_RECEBIVEIS_PERMISSIONS.REOPEN_APPROVE
+    ),
+    comparativeView: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.COMPARATIVO_VIEW
+    ),
+    realizedView: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_VIEW
+    ),
+    realizedUpdate: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_UPDATE
+    ),
+    realizedReconcile: hasExplicitCustosRecebiveisPermission(
+      user,
+      CUSTOS_RECEBIVEIS_PERMISSIONS.REALIZADOS_RECONCILE
     )
   }), [user]);
   const realizedPermissions = useMemo(() => ({
@@ -148,9 +212,18 @@ export default function CustosRecebiveis() {
     user,
     CUSTOS_RECEBIVEIS_PERMISSIONS.OBLIGATION_BYPASS
   );
+  const canViewObligations = hasExplicitCustosRecebiveisPermission(
+    user,
+    CUSTOS_RECEBIVEIS_PERMISSIONS.OBRIGACOES_VIEW
+  );
+  const canOpenPlanning = availableTabs.some((tab) => tab.id === 'planejamento');
   const selectedObra = obras.find((obra) => Number(obra.id) === selectedObraId)
     || planData?.obra
     || null;
+  const executiveWorks = useMemo(
+    () => obras.filter((obra) => String(obra.tipo_centro_custo || '').toUpperCase() === 'OBRA'),
+    [obras]
+  );
 
   const updateQuery = useCallback((updates, options = {}) => {
     setSearchParams((current) => {
@@ -213,6 +286,22 @@ export default function CustosRecebiveis() {
     }
   }, [canViewStructure, selectedObraId, selectedPlanId]);
 
+  const loadObligationSummary = useCallback(async () => {
+    if (!canViewObligations) {
+      setObligationSummary(null);
+      setObligationData(null);
+      return;
+    }
+    try {
+      const response = await listarMinhasObrigacoesCustosRecebiveis();
+      setObligationSummary(response?.resumo || null);
+      setObligationData(response || null);
+    } catch {
+      setObligationSummary(null);
+      setObligationData(null);
+    }
+  }, [canViewObligations]);
+
   useEffect(() => {
     if (activeTab && requestedTab !== activeTab) {
       updateQuery({ aba: activeTab }, { replace: true });
@@ -227,12 +316,25 @@ export default function CustosRecebiveis() {
     loadPlan(selectedObraId, selectedPlanId);
   }, [loadPlan, selectedObraId, selectedPlanId]);
 
+  useEffect(() => {
+    void loadObligationSummary();
+    const refresh = () => void loadObligationSummary();
+    const timer = window.setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [loadObligationSummary, refreshToken]);
+
   function handleOpenObra(obraId) {
     updateQuery({
-      aba: 'obras',
+      aba: 'planejamento',
       obra: obraId,
-      sub: 'estrutura',
-      plano: null
+      sub: null,
+      plano: null,
+      detalhe: null,
+      painel: null
     });
     requestAnimationFrame(() => {
       document.getElementById('cr-workspace-anchor')?.scrollIntoView({
@@ -344,10 +446,35 @@ export default function CustosRecebiveis() {
   }
 
   function handleOpenPlanning(obraId) {
-    updateQuery({ aba: 'planejamento', obra: obraId, plano: null });
+    updateQuery({
+      aba: 'planejamento',
+      obra: obraId,
+      plano: null,
+      detalhe: null,
+      painel: null
+    });
   }
 
   function handleOpenDashboardArea(item) {
+    if (operationalExperience) {
+      const panelByDestination = {
+        comparativo: 'comparison',
+        realizado: 'realized',
+        planejamento: ['PLANEJAMENTO_AUSENTE', 'OBRIGACAO_VENCIDA'].includes(item?.tipo)
+          ? 'planning'
+          : 'details'
+      };
+      updateQuery({
+        aba: 'planejamento',
+        obra: item?.obra_id || null,
+        competencia: item?.competencia || competencia,
+        detalhe: '1',
+        painel: panelByDestination[item?.destino] || 'details',
+        plano: null,
+        bloqueio: item?.tipo === 'OBRIGACAO_VENCIDA' ? '1' : null
+      });
+      return;
+    }
     updateQuery({
       aba: item?.destino || 'comparativo',
       obra: item?.obra_id || null,
@@ -363,6 +490,8 @@ export default function CustosRecebiveis() {
       obra: item.obra_id,
       competencia: item.competencia,
       plano: null,
+      detalhe: '1',
+      painel: 'planning',
       bloqueio: item.exige_reabertura ? '1' : null
     });
   }
@@ -370,6 +499,7 @@ export default function CustosRecebiveis() {
   async function handlePlanningChanged() {
     await Promise.all([
       loadObras(),
+      loadObligationSummary(),
       refreshSession().catch(() => null)
     ]);
   }
@@ -390,29 +520,33 @@ export default function CustosRecebiveis() {
     <div className="page cr-page">
       <header className="cr-page-header">
         <div>
-          <span>Controle operacional</span>
+          <span>Planejamento e acompanhamento por obra</span>
           <h1>Custos e Recebíveis</h1>
-          <p>Estrutura micro versionada, vinculada ao orçamento macro sem alterar o cadastro de Obras.</p>
+          <p>Planeje o mês, acompanhe medições e compare com os lançamentos financeiros.</p>
         </div>
-        <button type="button" className="btn btn-outline" onClick={handleRefresh}>
-          <HiOutlineArrowPath className="h-4 w-4" />
-          Atualizar
-        </button>
+        <div className="cr-page-header__actions">
+          {canViewObligations ? (
+            <button
+              type="button"
+              className="cr-obligation-counter"
+              data-overdue={Number(obligationSummary?.vencidas || 0) > 0 || undefined}
+              onClick={() => updateQuery({ aba: 'obrigacoes' })}
+            >
+              <HiOutlineClock className="h-4 w-4" />
+              <span>Prazos</span>
+              <strong>{obligationSummary?.vencidas || 0} vencida(s)</strong>
+              <small>{obligationSummary?.pendentes || 0} pendente(s)</small>
+            </button>
+          ) : null}
+          <button type="button" className="btn btn-outline" onClick={handleRefresh}>
+            <HiOutlineArrowPath className="h-4 w-4" />
+            Atualizar
+          </button>
+        </div>
       </header>
 
-      <div className="cr-integrity-banner">
-        <HiOutlineCircleStack className="h-5 w-5" />
-        <div>
-          <strong>Estrutura independente e rastreável</strong>
-          <span>
-            O módulo consulta os códigos e valores macro em modo somente leitura. Importar ou
-            publicar uma versão grava apenas nas tabelas <code>cr_*</code>.
-          </span>
-        </div>
-      </div>
-
       <nav className="cr-tabs" aria-label="Áreas de Custos e Recebíveis">
-        {availableTabs.map((tab) => {
+        {visibleTabs.map((tab) => {
           const Icon = TAB_ICONS[tab.id] || HiOutlineChartBarSquare;
           return (
             <button
@@ -428,6 +562,37 @@ export default function CustosRecebiveis() {
         })}
       </nav>
 
+      {activeTab === 'visao-geral' ? (
+        <CrExecutiveFilters
+          obras={executiveWorks}
+          obraId={Number.isInteger(dashboardObraId) && dashboardObraId > 0
+            ? dashboardObraId
+            : ''}
+          classificacao={dashboardClassificacao}
+          competenciaReferencia={competencia}
+          competencias={dashboardCompetencias.length ? dashboardCompetencias : [competencia]}
+          onObraChange={(value) => updateQuery({ obra_decisao: value || null })}
+          onClassificacaoChange={(value) => updateQuery({
+            classificacao_decisao: value || null
+          })}
+          onCompetenciaReferenciaChange={(value) => updateQuery({
+            competencia: value,
+            competencias: null
+          })}
+          onCompetenciasChange={(values) => updateQuery({
+            competencias: values.length === 1 && values[0] === competencia
+              ? null
+              : values.join(',')
+          })}
+          operational={operationalExperience}
+          onPeriodChange={(start, end, values) => updateQuery({
+            competencia: end,
+            competencias: values.join(','),
+            periodo_inicio: start,
+            periodo_fim: end
+          })}
+        />
+      ) : activeTab !== 'obras' ? (
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
           <span>Obra em contexto</span>
@@ -462,6 +627,7 @@ export default function CustosRecebiveis() {
           </small>
         </div>
       </section>
+      ) : null}
 
       {feedback && activeTab !== 'importacoes' ? (
         <div className="cr-feedback" data-tone={feedback.tone || 'info'}>
@@ -477,8 +643,9 @@ export default function CustosRecebiveis() {
             error={obrasError}
             onReload={loadObras}
             onOpen={handleOpenObra}
+            showAdministrationLink={!operationalExperience && canViewStructure}
           />
-          {Number.isInteger(selectedObraId) && selectedObraId > 0 ? (
+          {!operationalExperience && Number.isInteger(selectedObraId) && selectedObraId > 0 ? (
             <div id="cr-workspace-anchor">
               <CrPlanoWorkspace
                 data={planData}
@@ -500,9 +667,14 @@ export default function CustosRecebiveis() {
 
       {activeTab === 'visao-geral' ? (
         <CrDashboardView
-          key={`${selectedObraId || 'carteira'}-${competencia}-${refreshToken}`}
+          key={`carteira-${competencia}-${refreshToken}`}
           competencia={competencia}
-          obra={selectedObra}
+          competencias={dashboardCompetencias.length ? dashboardCompetencias : [competencia]}
+          obraFilterId={Number.isInteger(dashboardObraId) && dashboardObraId > 0
+            ? dashboardObraId
+            : null}
+          classificacaoFilter={dashboardClassificacao}
+          canOpenPlanning={canOpenPlanning}
           onOpenArea={handleOpenDashboardArea}
         />
       ) : null}
@@ -514,8 +686,17 @@ export default function CustosRecebiveis() {
           userId={user?.id}
           initialCompetencia={competencia}
           autoOpen={searchParams.get('bloqueio') === '1'}
+          detailMode={detailMode}
+          obligations={obligationData?.items || []}
+          obligationsServerTime={obligationData?.server_time || null}
           permissions={planningPermissions}
           onChanged={handlePlanningChanged}
+          onNavigateDetail={(competenciaValue, area) => updateQuery({
+            competencia: competenciaValue || competencia,
+            detalhe: competenciaValue ? '1' : null,
+            painel: competenciaValue ? area : null,
+            bloqueio: null
+          })}
         />
       ) : null}
 

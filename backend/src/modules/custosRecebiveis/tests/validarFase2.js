@@ -10,12 +10,14 @@ const {
   finalizarCompetencia,
   findPrivateSources,
   monthRange,
+  normalizeDashboardCompetencias,
   normalizeCompetencia,
   pesquisarItensPlano,
   salvarCustos,
   salvarRecebiveis,
   statusComparativo,
-  summarizeDashboardRows
+  summarizeDashboardRows,
+  summarizeDashboardWorkRows
 } = require('../services/planejamentoService');
 const {
   TYPES: PLANNING_SHEET_TYPES,
@@ -58,14 +60,22 @@ function validateCompetenciaBoundaries() {
     ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']
   );
   assert.deepStrictEqual(
+    normalizeDashboardCompetencias('2026-07,2026-08', '2026-07'),
+    ['2026-07', '2026-08']
+  );
+  assert.deepStrictEqual(
+    normalizeDashboardCompetencias(['2026-08', '2026-07', '2026-08'], '2026-07'),
+    ['2026-07', '2026-08']
+  );
+  assert.deepStrictEqual(
     summarizeDashboardRows([{
       custo_planejado: 100,
       custo_realizado: 120,
       recebivel_previsto: 180,
       recebivel_reconhecido: 150,
+      medicao_aprovada: 150,
       receita_recebida: 90,
       glosa: 30,
-      medicao_aprovada: 150,
       movimentos_sem_mapeamento: 2,
       recebiveis_vencidos: 1
     }]),
@@ -76,6 +86,7 @@ function validateCompetenciaBoundaries() {
       percentual_custo: 120,
       recebivel_previsto: 180,
       recebivel_reconhecido: 150,
+      medicao_aprovada: 150,
       receita_recebida: 90,
       saldo_receber: 60,
       glosa: 30,
@@ -85,6 +96,39 @@ function validateCompetenciaBoundaries() {
       recebiveis_vencidos: 1
     }
   );
+
+  const workSummaries = summarizeDashboardWorkRows([
+    {
+      obra: { id: 1, nome: 'Obra sem alerta' },
+      competencia: '2026-08',
+      competencia_id: 10,
+      estado_competencia: 'FINALIZADA',
+      custo_planejado: 100,
+      custo_realizado: 80,
+      recebivel_previsto: 150,
+      recebivel_reconhecido: 140,
+      medicao_aprovada: 140,
+      receita_recebida: 100,
+      glosa: 10
+    },
+    {
+      obra: { id: 2, nome: 'Obra com alerta' },
+      competencia: '2026-08',
+      competencia_id: 11,
+      estado_competencia: 'ABERTA',
+      custo_planejado: 100,
+      custo_realizado: 125,
+      recebivel_previsto: 160,
+      recebivel_reconhecido: 120,
+      medicao_aprovada: 120,
+      receita_recebida: 20,
+      glosa: 40
+    }
+  ], [{ obra_id: 2 }, { obra_id: 2 }]);
+  assert.strictEqual(workSummaries[0].obra.id, 2);
+  assert.strictEqual(workSummaries[0].alertas, 2);
+  assert.strictEqual(workSummaries[0].desvio_custo, 25);
+  assert.strictEqual(workSummaries[0].saldo_receber, 100);
 }
 
 function validateBackendContracts() {
@@ -136,11 +180,21 @@ function validateBackendContracts() {
   assert(!service.includes('Apropriacao.destroy'));
   assert(controller.includes("req.get('Idempotency-Key')"));
   assert(controller.includes('req.query.obra_id'));
+  assert(controller.includes('req.query.competencias'));
   assert(service.includes("tipo: selectedObraId ? 'OBRA' : 'CARTEIRA'"));
   assert(service.includes('macros: selectedObraId ? macros : []'));
+  assert(service.includes('obras_resumo: workSummaries'));
+  assert(service.includes('summarizeDashboardWorkRows(rows, alerts)'));
+  assert(service.includes('recebiveis_vencidos: row.recebiveis_vencidos'));
+  assert(service.includes("tipo_centro_custo: 'OBRA'"));
+  assert(service.includes("'classificacao', 'tipo_centro_custo'"));
+  assert(service.includes('alertas: alerts'));
   assert(service.includes("attributes: ['codigo', 'descricao']"));
   assert(service.includes('macroNameByCode'));
   assert(service.includes('buildPlanMacros'));
+  assert(service.includes('linhas_medicao: measurementResult'));
+  assert(service.includes("origem: 'MEDICAO'"));
+  assert(service.includes("estado = 'AGUARDANDO_APROVACAO'"));
   assert(service.includes('previsao_custo_id'));
   assert(service.includes('CR_CUSTO_DESATUALIZADO'));
   assert(service.includes('etapa_macro_codigo: macroCode'));
@@ -155,6 +209,7 @@ function validateBackendContracts() {
   assert(spreadsheetService.includes('Formulas nao sao permitidas'));
   assert(spreadsheetService.includes('saldo_disponivel'));
   assert(spreadsheetService.includes('quantity === 0'));
+  assert(spreadsheetService.includes('previousRows = await db.CrMedicaoConsolidada.findAll'));
 }
 
 function validateFrontendContracts() {
@@ -167,7 +222,20 @@ function validateFrontendContracts() {
   const monthlyPlanning = read(
     '../frontend/src/modules/custosRecebiveis/components/CrPlanejamentoMensalView.jsx'
   );
+  const monthlySummary = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrMonthlySummaryCard.jsx'
+  );
+  const monthlyDetail = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrMonthlyDetailView.jsx'
+  );
+  const worksView = read('../frontend/src/modules/custosRecebiveis/components/CrObrasView.jsx');
   const dashboard = read('../frontend/src/modules/custosRecebiveis/components/CrDashboardView.jsx');
+  const frontendService = read(
+    '../frontend/src/modules/custosRecebiveis/services/custosRecebiveis.js'
+  );
+  const executiveFilters = read(
+    '../frontend/src/modules/custosRecebiveis/components/CrExecutiveFilters.jsx'
+  );
   const comparison = read('../frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx');
   const planningImport = read('../frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx');
 
@@ -175,13 +243,15 @@ function validateFrontendContracts() {
     assert(constants.includes(`id: '${tab}'`), `Aba ausente: ${tab}`)
   ));
   assert(page.includes('<CrDashboardView'));
+  assert(page.includes('<CrExecutiveFilters'));
   assert(page.includes('<CrPlanejamentoMensalView'));
   assert(page.includes('<CrComparativoView'));
   assert(planning.includes('PUBLIC_STEPS'));
   assert(planning.includes('PRIVATE_STEPS'));
   assert(planning.includes("label: 'Custos planejados'"));
   assert(planning.includes("label: 'Medição prevista'"));
-  assert(planning.includes("label: 'Medição aprovada'"));
+  assert(planning.includes("viewMode = 'planning'"));
+  assert(planning.includes("viewMode === 'approved'"));
   assert(planning.includes("label: 'Recebíveis do período'"));
   assert(planning.includes('Etapa {step} de {steps.length}'));
   assert(planning.includes('Fonte automática: contratos e títulos do Financeiro'));
@@ -191,7 +261,7 @@ function validateFrontendContracts() {
   assert(planning.includes('previsao_custo_id'));
   assert(planning.includes('Qtd. orçada'));
   assert(planning.includes('Math.min('));
-  assert(planning.includes('item.item?.quantidade_apresentada_anterior'));
+  assert(planning.includes('item.item?.quantidade_aprovada_anterior'));
   assert(planning.includes('Qtd. medida'));
   assert(planning.includes('Pesquisar subitem desta etapa'));
   assert(planning.includes('usePlanItemSearch'));
@@ -209,22 +279,63 @@ function validateFrontendContracts() {
   assert(planningDraft.includes('plano_versao'));
   assert(planningDraft.includes('window.localStorage.removeItem'));
   assert(monthlyPlanning.includes('Novo mês'));
-  assert(monthlyPlanning.includes('Recebíveis do período'));
-  assert(monthlyPlanning.includes('Receita recebida'));
   assert(monthlyPlanning.includes("obra?.classificacao === 'PUBLICA'"));
+  assert(monthlyPlanning.includes('<CrMonthlySummaryCard'));
+  assert(monthlyPlanning.includes('<CrMonthlyDetailView'));
+  assert(monthlyPlanning.includes('cr-planning-deadline'));
+  assert(monthlySummary.includes('Custo planejado'));
+  assert(monthlySummary.includes('Recebível previsto'));
+  assert(monthlySummary.includes('Desvio de custo'));
+  assert(monthlySummary.includes('Saldo a receber'));
   assert(dashboard.includes('Pontos de atenção'));
   assert(dashboard.includes('Evolução de custos'));
   assert(dashboard.includes('Evolução de recebíveis'));
+  assert(dashboard.includes('Planejamento mensal por obra'));
+  assert(dashboard.includes('visibleWorkSummaries'));
+  assert(dashboard.includes('filteredPortfolio'));
+  assert(dashboard.includes('competenciasParam'));
+  assert(frontendService.includes("query.set('competencias'"));
+  assert(dashboard.includes("const isWorkContext = data?.escopo?.tipo === 'OBRA'"));
+  assert(dashboard.includes('obra(s) no recorte executivo'));
+  assert(dashboard.includes('label="Medição aprovada"'));
+  assert(dashboard.includes("tipo_centro_custo || '').toUpperCase() === 'OBRA'"));
+  assert(dashboard.includes('item.obra.nome'));
   assert(dashboard.includes('Custos por macro'));
   assert(dashboard.includes("item.nome || 'Macro sem descrição'"));
   assert(!dashboard.includes('Status das etapas'));
-  assert(page.includes('obra={selectedObra}'));
+  assert(executiveFilters.includes('Todas as obras do seu escopo'));
+  assert(executiveFilters.includes('Marcar seis meses'));
+  assert(executiveFilters.includes('type="checkbox"'));
+  assert(executiveFilters.includes('value="PUBLICA"'));
+  assert(executiveFilters.includes('value="PRIVADA"'));
+  assert(executiveFilters.includes('cr-operational-period'));
+  assert(executiveFilters.includes('Todas as minhas obras'));
+  assert(worksView.includes('obra.contrato'));
+  assert(worksView.includes('obra.valor_orcado'));
+  assert(worksView.includes('obra.responsavel'));
+  assert(worksView.includes('Abrir planejamento'));
+  assert(!worksView.includes('Remover'));
+  assert(monthlyDetail.includes('<CostDetail'));
+  assert(monthlyDetail.includes('<MeasurementDetail'));
+  assert(monthlyDetail.includes('<CrRealizadoView'));
+  assert(monthlyDetail.includes('<CrComparativoView'));
+  assert(page.includes('canOpenPlanning={canOpenPlanning}'));
   assert(page.includes('onOpenArea={handleOpenDashboardArea}'));
   assert(comparison.includes('COMPARATIVO_ESTADO_LABELS'));
   assert(planning.includes("renderPlanningSheetActions('custos'"));
   assert(planning.includes("renderPlanningSheetActions('medicao-prevista'"));
   assert(planning.includes("renderPlanningSheetActions('medicao-aprovada'"));
   assert(planningImport.includes('Confirmar importação'));
+  assert(planningImport.includes('onConfirm(tipo, result.itens)'));
+  assert(monthlyPlanning.includes("openDetail(selectedCompetencia, 'approved')"));
+  assert(!monthlyPlanning.includes('<CrRealizadoView'));
+  assert(!monthlyPlanning.includes('<CrComparativoView'));
+  assert(monthlyPlanning.includes("realized: 'realized'"));
+  assert(monthlyPlanning.includes("comparison: 'comparison'"));
+  assert(comparison.includes('Comparativo operacional por item'));
+  assert(comparison.includes('<th>Medição prevista</th>'));
+  assert(comparison.includes('<th>Medição aprovada</th>'));
+  assert(comparison.includes('data?.linhas_medicao || []'));
   assert(planningImport.includes('Validar novamente'));
 }
 
