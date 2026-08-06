@@ -71,6 +71,28 @@ function monthRange(competencia) {
   };
 }
 
+function dateOnlySaoPaulo(value) {
+  if (!value) return null;
+  if (typeof value === 'string') return value.slice(0, 10);
+  const parsed = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const parts = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(parsed);
+  const year = parts.find((part) => part.type === 'year')?.value;
+  const month = parts.find((part) => part.type === 'month')?.value;
+  const day = parts.find((part) => part.type === 'day')?.value;
+  return year && month && day ? `${year}-${month}-${day}` : null;
+}
+
+function titleIssueDate(titleValue) {
+  const title = plain(titleValue);
+  return dateOnlySaoPaulo(title.data_emissao) || dateOnlySaoPaulo(title.createdAt);
+}
+
 async function assertScope(user, obraId, deps) {
   const scope = await deps.resolverEscopoObras(user);
   if (!scope.todas && !scope.obraIds.includes(Number(obraId))) {
@@ -697,6 +719,7 @@ function serializeAllocatedTitle(titleValue, obraId, competencia) {
   ));
   const status = String(title.status || '').trim().toUpperCase() || 'SEM_STATUS';
   const statusGroup = titleStatusGroup(status);
+  const issueDate = titleIssueDate(title);
   const dueDate = title.data_vencimento || null;
   const { first, nextMonth } = monthRange(competencia);
   const directAppropriation = plain(title.apropriacao);
@@ -718,12 +741,14 @@ function serializeAllocatedTitle(titleValue, obraId, competencia) {
     grupo_status: statusGroup,
     origem_titulo: title.origem_titulo || null,
     data_emissao: title.data_emissao || null,
+    data_referencia_custo: issueDate,
+    origem_data_referencia: title.data_emissao ? 'DATA_EMISSAO' : 'DATA_CADASTRO',
     data_vencimento: dueDate,
     data_quitacao: title.data_quitacao || null,
     valor_alocado: allocatedValue,
     valor_pago: paidValue,
     valor_saldo: balanceValue,
-    em_competencia: Boolean(dueDate && dueDate >= first && dueDate < nextMonth),
+    em_competencia: Boolean(issueDate && issueDate >= first && issueDate < nextMonth),
     ativo_no_custo: statusGroup !== 'INATIVO',
     parceiro: partner.id ? {
       id: Number(partner.id),
@@ -747,19 +772,26 @@ function summarizeAllocatedTitles(items = []) {
   const byGroup = (group) => active.filter((item) => item.grupo_status === group);
   const inCompetence = active.filter((item) => item.em_competencia);
   const openInCompetence = inCompetence.filter((item) => number(item.valor_saldo) > 0);
+  const issuedValue = money(
+    inCompetence.reduce((sum, item) => sum + number(item.valor_alocado), 0)
+  );
+  const openIssuedBalance = money(
+    openInCompetence.reduce((sum, item) => sum + number(item.valor_saldo), 0)
+  );
   return {
     titulos: items.length,
     titulos_ativos: active.length,
     total_alocado: money(active.reduce((sum, item) => sum + number(item.valor_alocado), 0)),
     total_pago: money(active.reduce((sum, item) => sum + number(item.valor_pago), 0)),
     saldo_aberto: money(active.reduce((sum, item) => sum + number(item.valor_saldo), 0)),
-    vencimento_competencia: money(
-      inCompetence.reduce((sum, item) => sum + number(item.valor_alocado), 0)
-    ),
+    valor_emitido_competencia: issuedValue,
+    titulos_emitidos_competencia: inCompetence.length,
+    saldo_emitido_competencia: openIssuedBalance,
+    titulos_emitidos_abertos_competencia: openInCompetence.length,
+    // Compatibilidade temporaria com clientes anteriores: a competencia agora e de emissao.
+    vencimento_competencia: issuedValue,
     titulos_competencia: inCompetence.length,
-    saldo_vencimento_competencia: money(
-      openInCompetence.reduce((sum, item) => sum + number(item.valor_saldo), 0)
-    ),
+    saldo_vencimento_competencia: openIssuedBalance,
     titulos_abertos_competencia: openInCompetence.length,
     status: {
       aberto: byGroup('ABERTO').length,
@@ -807,7 +839,8 @@ async function listarTitulosFinanceirosAlocados(obraId, competencia, deps) {
       'valor_baixado',
       'data_emissao',
       'data_vencimento',
-      'data_quitacao'
+      'data_quitacao',
+      'createdAt'
     ],
     include: [
       {
@@ -841,16 +874,78 @@ async function listarTitulosFinanceirosAlocados(obraId, competencia, deps) {
         }]
       }
     ],
-    order: [['data_vencimento', 'DESC'], ['id', 'DESC']]
+    order: [['data_emissao', 'DESC'], ['createdAt', 'DESC'], ['id', 'DESC']]
   });
   return titles
     .map((title) => serializeAllocatedTitle(title, obraId, competencia))
     .filter(Boolean)
     .sort((a, b) => (
       Number(b.em_competencia) - Number(a.em_competencia)
-      || String(b.data_vencimento || '').localeCompare(String(a.data_vencimento || ''))
+      || String(b.data_referencia_custo || '').localeCompare(String(a.data_referencia_custo || ''))
       || b.id - a.id
     ));
+}
+
+async function totalTitulosEmitidosPorCompetencia(obraId, competencias, tipo, depsValue) {
+  const deps = dependencies(depsValue);
+  const months = [...new Set((competencias || []).map(normalizeCompetencia))].sort();
+  if (!months.length) return new Map();
+  const { first } = monthRange(months[0]);
+  const { nextMonth } = monthRange(months[months.length - 1]);
+  const workRateios = await deps.TituloFinanceiroRateio.findAll({
+    where: { obra_id: obraId },
+    attributes: ['titulo_financeiro_id'],
+    raw: true
+  });
+  const rateioTitleIds = [...new Set(workRateios
+    .map((item) => Number(item.titulo_financeiro_id))
+    .filter((id) => id > 0))];
+  const workConditions = [{ obra_id: obraId }];
+  if (rateioTitleIds.length) workConditions.push({ id: { [Op.in]: rateioTitleIds } });
+  const titles = await deps.TituloFinanceiro.findAll({
+    where: {
+      tipo,
+      [Op.and]: [
+        { [Op.or]: workConditions },
+        {
+          [Op.or]: [
+            { data_emissao: { [Op.gte]: first, [Op.lt]: nextMonth } },
+            {
+              data_emissao: null,
+              createdAt: { [Op.gte]: first, [Op.lt]: nextMonth }
+            }
+          ]
+        }
+      ]
+    },
+    attributes: [
+      'id',
+      'obra_id',
+      'possui_rateio',
+      'status',
+      'valor_original',
+      'valor_saldo',
+      'valor_baixado',
+      'data_emissao',
+      'createdAt'
+    ],
+    include: [{
+      model: deps.TituloFinanceiroRateio,
+      as: 'rateios',
+      required: false,
+      attributes: ['obra_id', 'valor_rateio']
+    }]
+  });
+  const totals = new Map(months.map((month) => [month, 0]));
+  titles.forEach((titleValue) => {
+    const issueDate = titleIssueDate(titleValue);
+    const month = String(issueDate || '').slice(0, 7);
+    if (!totals.has(month)) return;
+    const allocated = serializeAllocatedTitle(titleValue, obraId, month);
+    if (!allocated?.ativo_no_custo) return;
+    totals.set(month, money(number(totals.get(month)) + number(allocated.valor_alocado)));
+  });
+  return totals;
 }
 
 async function listarRealizados(user, obraIdValue, competenciaValue, overrides = {}) {
@@ -872,7 +967,7 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
       obra: plain(obra),
       competencia,
       resumo: {
-        realizado: 0,
+        realizado: titleSummary.valor_emitido_competencia,
         nao_mapeado: 0,
         baixas_ativas: 0,
         estornos: 0,
@@ -925,7 +1020,7 @@ async function listarRealizados(user, obraIdValue, competenciaValue, overrides =
     competencia,
     competencia_id: Number(competency.id),
     resumo: {
-      realizado: money(activeItems.reduce((sum, item) => sum + item.valor, 0)),
+      realizado: titleSummary.valor_emitido_competencia,
       nao_mapeado: money(activeItems
         .filter((item) => item.estado === 'NAO_MAPEADO')
         .reduce((sum, item) => sum + item.valor, 0)),
@@ -1052,5 +1147,7 @@ module.exports = {
   resolverObraIdPorRealizado,
   serializeAllocatedTitle,
   summarizeAllocatedTitles,
+  titleIssueDate,
+  totalTitulosEmitidosPorCompetencia,
   titleStatusGroup
 };

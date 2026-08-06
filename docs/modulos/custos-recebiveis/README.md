@@ -32,7 +32,9 @@ implementados no codigo:
 - recebiveis privados provenientes de contrato/titulo sem dupla contagem;
 - competencia finalizada imutavel, com reabertura temporaria aprovada;
 - dashboard e comparativo operacional com cinco estados;
-- projetor idempotente do custo realizado, alimentado somente por baixas ativas;
+- custo realizado mensal calculado pelos titulos `PAGAR` emitidos na competencia,
+  independentemente de vencimento, parcelamento ou pagamento;
+- projetor idempotente de baixas mantido apenas para mapeamento micro e rastreabilidade;
 - rateio resolvido por titulo, apropriacao e solicitacao, na ordem canonica;
 - fila de valores nao mapeados, sem descarte do total financeiro;
 - reconciliacao manual auditada por item micro;
@@ -267,8 +269,9 @@ As mutacoes usam transacao, bloqueio pessimista quando aplicavel e gravam
   e nenhuma linha pode ultrapassar o saldo orcamentario aplicavel.
 - Receita recebida nao e digitada no modulo: vem exclusivamente de baixas ativas de
   titulos `RECEBER`, rateadas para a obra. O comparativo por item separa `Medicao
-  prevista` e `Medicao aprovada`; o custo realizado continua vindo de baixas ativas
-  de titulos `PAGAR` e permanece nas visoes financeiras do modulo.
+  prevista` e `Medicao aprovada`. O custo realizado mensal vem do valor dos titulos
+  `PAGAR` emitidos na competencia e alocados a obra, ainda que estejam abertos,
+  parcelados ou com vencimento em outro mes.
 - A carteira consolidada e os cards por obra usam exatamente as competencias
   selecionadas no filtro executivo. A competencia de referencia permanece como
   contexto para alertas e detalhes, mas nao limita o somatorio multicompetencia.
@@ -382,8 +385,9 @@ de escopo.
 - A visao `Custo realizado`, aberta dentro da competencia mensal, usa exclusivamente
   titulos financeiros `PAGAR` como razao de custos alocados a obra. Ela nao consulta
   nem lista pedidos de compra ou solicitacoes.
-- A visao principal lista todos os titulos da obra, independentemente do status, e
-  permite alternar para os titulos com vencimento dentro da competencia selecionada.
+- A visao principal lista todos os titulos da obra, independentemente do status de
+  pagamento, e inicia filtrada pelos titulos emitidos dentro da competencia
+  selecionada. A opcao `Todos da obra` preserva a consulta historica completa.
 - Cada titulo apresenta valor alocado a obra, valor pago, saldo, credor, categoria,
   apropriacao e status financeiro. Titulos rateados usam somente a parcela destinada
   a obra; os valores pago e saldo sao proporcionais ao rateio.
@@ -393,17 +397,22 @@ de escopo.
   permanecem visiveis em `Sem etapa macro identificada`.
 - Titulos cancelados ou estornados permanecem visiveis para rastreabilidade, mas nao
   compoem os totais ativos de custo.
-- O resumo separa total alocado, saldo em aberto, valor pago e saldo ainda aberto dos
-  titulos com vencimento na competencia selecionada. A competencia de contexto pode
-  ser alterada por mes e ano e recalcula o card e o recorte da lista. Os filtros
-  distinguem aberto, parcial, quitado, previsao e demais estados sem alterar o cadastro
-  financeiro.
-- A projecao `cr_realizados`, usada pelo dashboard, comparativo e exportacoes para
-  representar caixa realizado, continua seguindo as regras de baixas abaixo.
+- O resumo separa total alocado, saldo em aberto, valor pago e valor emitido na
+  competencia selecionada. A competencia do custo usa `data_emissao`; para titulo
+  legado sem essa data, usa a data de cadastro (`createdAt`) no fuso de Sao Paulo.
+- Cada parcela financeira e um titulo proprio e entra uma unica vez pelo respectivo
+  `valor_original`. Se houver rateio, somente `valor_rateio` destinado a obra compoe
+  o custo. Data de vencimento, baixa e status de pagamento nao mudam a competencia do
+  custo realizado.
+- Titulos cancelados ou estornados continuam visiveis para auditoria, mas sao
+  excluidos dos totais. Os demais estados financeiros entram normalmente.
+- A projecao `cr_realizados` nao define mais o total mensal do custo realizado. Ela e
+  mantida como indice tecnico de mapeamento das baixas aos itens micro e segue as
+  regras abaixo.
 - Somente `MovimentoFinanceiro` do tipo `BAIXA`, com `status = ATIVO`, vinculado a
-  titulo `PAGAR`, entra no custo realizado.
-- O valor usa `valor_quitacao`, com fallback para `valor`, e a competencia e o mes de
-  `data_movimento`.
+  titulo `PAGAR`, entra nessa projecao tecnica.
+- O valor da projecao usa `valor_quitacao`, com fallback para `valor`, e sua
+  competencia tecnica e o mes de `data_movimento`.
 - O rateio do titulo e preferencial. Sem ele, o projetor tenta apropriacao do titulo,
   rateio da solicitacao e apropriacao direta da solicitacao, nessa ordem.
 - A divisao proporcional preserva os centavos e a soma exata da baixa.
