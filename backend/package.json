@@ -23,6 +23,7 @@
     "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js",
     "test:security-hardening": "node scripts/validarSecurityHardening.js",
     "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",
+    "audit:fluxos-obra": "node scripts/auditarFluxosSolicitacoesObra.js",
     "test:custos-recebiveis-fase2": "node src/modules/custosRecebiveis/tests/validarFase2.js",
     "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js",
     "test:custos-recebiveis-fase4": "node src/modules/custosRecebiveis/tests/validarFase4.js",
