@@ -4373,10 +4373,9 @@
 }
 
 /* Fluxo operacional do engenheiro: escopo, planejamento e leitura mensal. */
-.cr-works-table table { min-width: 1060px; }
+.cr-works-table table { min-width: 930px; }
 .cr-works-table th:nth-child(1) { min-width: 240px; }
-.cr-works-table th:nth-child(2) { min-width: 130px; }
-.cr-works-table th:nth-child(5) { min-width: 170px; }
+.cr-works-table th:nth-child(4) { min-width: 170px; }
 .cr-cell-currency { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .cr-operational-period {

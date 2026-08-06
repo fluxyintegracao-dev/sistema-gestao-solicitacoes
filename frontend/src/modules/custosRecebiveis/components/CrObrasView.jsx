@@ -32,18 +32,6 @@ function BudgetStatus({ obra }) {
   return <CrStatusPill status={value.status} label={value.label} />;
 }
 
-function ContractReference({ obra }) {
-  if (!obra.contrato?.referencia) return '-';
-  return (
-    <span title={(obra.contrato.referencias || []).join(' · ')}>
-      {obra.contrato.referencia}
-      {Number(obra.contrato.quantidade) > 1
-        ? ` +${Number(obra.contrato.quantidade) - 1}`
-        : ''}
-    </span>
-  );
-}
-
 function ObraMobileCard({ obra, onOpen }) {
   return (
     <article className="cr-mobile-record cr-work-access-card">
@@ -60,10 +48,6 @@ function ObraMobileCard({ obra, onOpen }) {
         <ClassificationPill value={obra.classificacao} />
       </div>
       <dl className="cr-mobile-record-grid">
-        <div>
-          <dt>Contrato</dt>
-          <dd><ContractReference obra={obra} /></dd>
-        </div>
         <div>
           <dt>Valor contratado</dt>
           <dd>{currency.format(obra.contrato?.valor_total || 0)}</dd>
@@ -143,7 +127,7 @@ export default function CrObrasView({
             <input
               value={busca}
               onChange={(event) => setBusca(event.target.value)}
-              placeholder="Código, nome, contrato ou responsável"
+              placeholder="Código, nome ou responsável"
             />
           </div>
         </label>
@@ -189,7 +173,6 @@ export default function CrObrasView({
               <thead>
                 <tr>
                   <th>Obra</th>
-                  <th>Contrato</th>
                   <th className="text-right">Valor contratado</th>
                   <th className="text-right">Valor orçado</th>
                   <th>Eng. responsável</th>
@@ -204,7 +187,6 @@ export default function CrObrasView({
                       <strong>{obra.codigo || `OBRA ${obra.id}`} · {obra.nome}</strong>
                       <span>{obra.cidade || '-'} · {obra.empresa?.nome || 'Empresa não informada'}</span>
                     </td>
-                    <td><ContractReference obra={obra} /></td>
                     <td className="text-right cr-cell-currency">
                       {currency.format(obra.contrato?.valor_total || 0)}
                     </td>

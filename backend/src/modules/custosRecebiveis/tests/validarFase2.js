@@ -322,6 +322,8 @@ function validateFrontendContracts() {
   assert(worksView.includes('obra.valor_orcado'));
   assert(worksView.includes('obra.responsavel'));
   assert(worksView.includes('Abrir planejamento'));
+  assert(!worksView.includes('<th>Contrato</th>'));
+  assert(!worksView.includes('<dt>Contrato</dt>'));
   assert(!worksView.includes('Remover'));
   assert(monthlyDetail.includes('<CostDetail'));
   assert(monthlyDetail.includes('<MeasurementDetail'));
