@@ -231,20 +231,35 @@ export default function CrMonthlyDetailView({
         </div>
         <div className="cr-month-detail-surface__actions">
           {permissions.costs || permissions.receipts ? (
-            <button type="button" className="btn btn-outline" onClick={onEditPlanning}>
-              <HiOutlinePencilSquare className="h-4 w-4" />
-              Editar planejamento
+            <button
+              type="button"
+              className="cr-icon-button"
+              onClick={onEditPlanning}
+              aria-label="Editar planejamento"
+              title="Editar planejamento"
+            >
+              <HiOutlinePencilSquare aria-hidden="true" />
             </button>
           ) : null}
           {isPublic && permissions.measurementView ? (
-            <button type="button" className="btn btn-outline" onClick={onOpenApproved}>
-              <HiOutlineCheckCircle className="h-4 w-4" />
-              {permissions.measurement ? 'Registrar aprovação' : 'Ver aprovação'}
+            <button
+              type="button"
+              className="cr-icon-button"
+              onClick={onOpenApproved}
+              aria-label={permissions.measurement ? 'Registrar aprovação' : 'Ver aprovação'}
+              title={permissions.measurement ? 'Registrar aprovação' : 'Ver aprovação'}
+            >
+              <HiOutlineCheckCircle aria-hidden="true" />
             </button>
           ) : null}
-          <button type="button" className="btn btn-outline" onClick={onClose}>
-            <HiOutlineArrowLeft className="h-4 w-4" />
-            Voltar aos meses
+          <button
+            type="button"
+            className="cr-icon-button"
+            onClick={onClose}
+            aria-label="Voltar aos meses"
+            title="Voltar aos meses"
+          >
+            <HiOutlineArrowLeft aria-hidden="true" />
           </button>
         </div>
       </header>

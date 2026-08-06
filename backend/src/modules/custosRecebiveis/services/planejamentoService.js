@@ -8,6 +8,7 @@ const {
   listarMinhasObrigacoes,
   prazoCompetencia
 } = require('./obrigacaoService');
+const { totalTitulosEmitidosPorCompetencia } = require('./realizadoService');
 
 const VALID_COMPETENCIA = /^\d{4}-(0[1-9]|1[0-2])$/;
 const CONTRACT_ACTIVE_STATUSES = ['RASCUNHO', 'ATIVO', 'INADIMPLENTE', 'QUITADO'];
@@ -591,24 +592,17 @@ async function listarCompetencias(user, obraIdValue, overrides = {}) {
     order: [['competencia', 'DESC'], ['id', 'DESC']]
   });
   const ids = rows.map((item) => Number(item.id));
-  const [measurements, actuals, receivedByMonth] = ids.length
+  const [measurements, costsByMonth, receivedByMonth] = ids.length
     ? await Promise.all([
       deps.CrMedicaoConsolidada.findAll({
         where: { competencia_id: { [Op.in]: ids } }
       }),
-      deps.CrRealizado.findAll({
-        where: {
-          competencia_id: { [Op.in]: ids },
-          valor: { [Op.ne]: 0 }
-        },
-        include: [{
-          model: deps.MovimentoFinanceiro,
-          as: 'movimentoFinanceiro',
-          attributes: [],
-          required: true,
-          where: { status: 'ATIVO', tipo_movimento: 'BAIXA' }
-        }]
-      }),
+      totalTitulosEmitidosPorCompetencia(
+        obraId,
+        rows.map((item) => item.competencia),
+        'PAGAR',
+        deps
+      ),
       totalBaixasFinanceirasPorCompetencia(
         obraId,
         rows.map((item) => item.competencia),
@@ -616,7 +610,7 @@ async function listarCompetencias(user, obraIdValue, overrides = {}) {
         deps
       )
     ])
-    : [[], [], new Map()];
+    : [[], new Map(), new Map()];
   const measurementByCompetency = new Map();
   const competenciesWithMeasurement = new Set();
   measurements.forEach((item) => measurementByCompetency.set(
@@ -625,12 +619,6 @@ async function listarCompetencias(user, obraIdValue, overrides = {}) {
       + number(item.valor_medido))
   ));
   measurements.forEach((item) => competenciesWithMeasurement.add(Number(item.competencia_id)));
-  const actualByCompetency = new Map();
-  actuals.forEach((item) => actualByCompetency.set(
-    Number(item.competencia_id),
-    money(number(actualByCompetency.get(Number(item.competencia_id)))
-      + number(item.valor))
-  ));
   const items = rows.map((rowValue) => {
     const row = plain(rowValue);
     const presented = money(row.total_receita_prevista);
@@ -641,7 +629,7 @@ async function listarCompetencias(user, obraIdValue, overrides = {}) {
       medicao_apresentada: presented,
       medicao_aprovada: hasApprovedMeasurement ? approved : null,
       glosa: hasApprovedMeasurement ? money(Math.max(0, presented - approved)) : null,
-      custo_realizado: money(actualByCompetency.get(Number(row.id))),
+      custo_realizado: money(costsByMonth.get(row.competencia)),
       receita_recebida: money(receivedByMonth.get(row.competencia))
     };
   });
@@ -2070,7 +2058,7 @@ async function buildDashboardRows(obras, competencias, deps) {
     }
   });
   const competenciaIds = competenciaRows.map((item) => Number(item.id));
-  const [actuals, approvedMeasurements, receivedEntries] = await Promise.all([
+  const [actualMappings, approvedMeasurements, costEntries, receivedEntries] = await Promise.all([
     competenciaIds.length
       ? deps.CrRealizado.findAll({
         where: {
@@ -2094,6 +2082,15 @@ async function buildDashboardRows(obras, competencias, deps) {
       : [],
     mapWithConcurrency(obras, 5, async (obra) => [
       Number(obra.id),
+      await totalTitulosEmitidosPorCompetencia(
+        Number(obra.id),
+        competencias,
+        'PAGAR',
+        deps
+      )
+    ]),
+    mapWithConcurrency(obras, 5, async (obra) => [
+      Number(obra.id),
       await totalBaixasFinanceirasPorCompetencia(
         Number(obra.id),
         competencias,
@@ -2107,14 +2104,13 @@ async function buildDashboardRows(obras, competencias, deps) {
     const item = plain(record);
     return [`${Number(item.obra_id)}:${item.competencia}`, item];
   }));
-  const actualByCompetencia = new Map();
-  actuals.forEach((record) => {
+  const mappingByCompetencia = new Map();
+  actualMappings.forEach((record) => {
     const item = plain(record);
     const id = Number(item.competencia_id);
-    const current = actualByCompetencia.get(id) || { total: 0, unmapped: 0 };
-    current.total = money(current.total + number(item.valor));
+    const current = mappingByCompetencia.get(id) || { unmapped: 0 };
     if (item.estado === 'NAO_MAPEADO' || !item.plano_item_id) current.unmapped += 1;
-    actualByCompetencia.set(id, current);
+    mappingByCompetencia.set(id, current);
   });
   const approvedByCompetencia = new Map();
   approvedMeasurements.forEach((record) => {
@@ -2125,6 +2121,7 @@ async function buildDashboardRows(obras, competencias, deps) {
     current.exists = true;
     approvedByCompetencia.set(id, current);
   });
+  const costByWork = new Map(costEntries);
   const receivedByWork = new Map(receivedEntries);
   const today = dataAtualSaoPaulo();
   const settledStatuses = new Set([
@@ -2164,8 +2161,8 @@ async function buildDashboardRows(obras, competencias, deps) {
     competencias.forEach((competencia) => {
       const saved = competenciaByKey.get(`${obra.id}:${competencia}`) || null;
       const actual = saved
-        ? (actualByCompetencia.get(Number(saved.id)) || { total: 0, unmapped: 0 })
-        : { total: 0, unmapped: 0 };
+        ? (mappingByCompetencia.get(Number(saved.id)) || { unmapped: 0 })
+        : { unmapped: 0 };
       const approved = saved
         ? (approvedByCompetencia.get(Number(saved.id)) || null)
         : null;
@@ -2179,7 +2176,7 @@ async function buildDashboardRows(obras, competencias, deps) {
         competencia_id: saved?.id ? Number(saved.id) : null,
         estado_competencia: saved?.estado || 'NAO_INICIADA',
         custo_planejado: money(saved?.total_custo_previsto),
-        custo_realizado: money(actual.total),
+        custo_realizado: money(costByWork.get(obra.id)?.get(competencia)),
         recebivel_previsto: expected,
         recebivel_reconhecido: recognized,
         medicao_aprovada: isPublic && approved?.exists ? money(approved.total) : null,

@@ -97,7 +97,7 @@ export default function CrRealizadoView({
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [scopeFilter, setScopeFilter] = useState('TODOS');
+  const [scopeFilter, setScopeFilter] = useState('COMPETENCIA');
   const [statusFilter, setStatusFilter] = useState('TODOS');
   const [search, setSearch] = useState('');
   const [reconciliation, setReconciliation] = useState(null);
@@ -122,7 +122,7 @@ export default function CrRealizadoView({
   }
 
   useEffect(() => {
-    setScopeFilter('TODOS');
+    setScopeFilter('COMPETENCIA');
     setStatusFilter('TODOS');
     setSearch('');
     load();
@@ -172,7 +172,7 @@ export default function CrRealizadoView({
         total: 0
       };
       current.items.push(item);
-      current.total += Number(item.valor_alocado || 0);
+      current.total += item.ativo_no_custo ? Number(item.valor_alocado || 0) : 0;
       groups.set(key, current);
     });
     return [...groups.values()].sort((a, b) => {
@@ -285,13 +285,11 @@ export default function CrRealizadoView({
             <strong>{currency(summary.total_pago)}</strong>
             <small>Baixas acumuladas dos títulos</small>
           </article>
-          <article
-            data-tone={Number(summary.saldo_vencimento_competencia) > 0 ? 'warning' : 'context'}
-          >
-            <span>Em aberto em {formatMonth(competencia)}</span>
-            <strong>{currency(summary.saldo_vencimento_competencia)}</strong>
+          <article data-tone="context">
+            <span>Emitido em {formatMonth(competencia)}</span>
+            <strong>{currency(summary.valor_emitido_competencia)}</strong>
             <small>
-              {Number(summary.titulos_abertos_competencia || 0)} título(s) com saldo no período
+              {Number(summary.titulos_emitidos_competencia || 0)} título(s), pagos ou em aberto
             </small>
           </article>
         </div>
@@ -311,8 +309,8 @@ export default function CrRealizadoView({
               data-active={scopeFilter === 'COMPETENCIA'}
               onClick={() => setScopeFilter('COMPETENCIA')}
             >
-              Vencem na competência
-              <strong>{Number(summary.titulos_competencia || 0)}</strong>
+              Emitidos na competência
+              <strong>{Number(summary.titulos_emitidos_competencia || 0)}</strong>
             </button>
           </div>
           <label className="cr-cost-ledger__search">
@@ -346,7 +344,7 @@ export default function CrRealizadoView({
             {filteredTitles.length} de {titles.length} título(s)
           </span>
           {scopeFilter === 'COMPETENCIA' ? (
-            <small>Vencimento entre o primeiro e o último dia da competência.</small>
+            <small>Emissão entre o primeiro e o último dia da competência.</small>
           ) : (
             <small>Histórico completo dos custos financeiros alocados à obra.</small>
           )}
@@ -356,7 +354,7 @@ export default function CrRealizadoView({
           <table className="cr-table cr-table--cost-ledger">
             <thead>
               <tr>
-                <th>Vencimento</th>
+                <th>Emissão / vencimento</th>
                 <th>Título / descrição</th>
                 <th>Credor</th>
                 <th>Categoria / apropriação</th>
@@ -398,9 +396,10 @@ export default function CrRealizadoView({
                       data-in-competence={item.em_competencia ? 'true' : 'false'}
                       data-inactive={item.ativo_no_custo ? 'false' : 'true'}
                     >
-                  <td data-label="Vencimento">
-                    <strong>{formatDate(item.data_vencimento)}</strong>
-                    {item.em_competencia ? <small>Na competência</small> : null}
+                  <td data-label="Emissão / vencimento">
+                    <strong>{formatDate(item.data_referencia_custo || item.data_emissao)}</strong>
+                    <small>Vence em {formatDate(item.data_vencimento)}</small>
+                    {item.em_competencia ? <small>Emitido na competência</small> : null}
                   </td>
                   <td data-label="Título">
                     <strong>{titleReference(item)}</strong>

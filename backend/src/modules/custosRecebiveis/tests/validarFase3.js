@@ -10,6 +10,8 @@ const {
   reprocessarRealizados,
   serializeAllocatedTitle,
   summarizeAllocatedTitles,
+  titleIssueDate,
+  totalTitulosEmitidosPorCompetencia,
   titleStatusGroup
 } = require('../services/realizadoService');
 const { createCsvBuffer } = require('../services/exportacaoService');
@@ -56,7 +58,7 @@ function validateRouteAndPermissionContracts() {
   assert(page.includes('<CrExportacoesView'));
   assert(realizedView.includes('Fonte exclusiva: títulos financeiros a pagar'));
   assert(realizedView.includes('Todos da obra'));
-  assert(realizedView.includes('Vencem na competência'));
+  assert(realizedView.includes('Emitidos na competência'));
   assert(realizedView.includes('data?.titulos || []'));
   assert(realizedView.includes('groupedTitles.map'));
   assert(realizedView.includes('Rateado em mais de uma etapa macro'));
@@ -115,7 +117,8 @@ function validateFinancialTitleLedger() {
     valor_original: 1000,
     valor_baixado: 0,
     valor_saldo: 1000,
-    data_vencimento: '2026-08-20',
+    data_emissao: '2026-08-20',
+    data_vencimento: '2026-10-20',
     rateios: []
   }, 3, '2026-08');
   assert.strictEqual(direct.valor_alocado, 1000);
@@ -133,6 +136,7 @@ function validateFinancialTitleLedger() {
     valor_original: 1000,
     valor_baixado: 400,
     valor_saldo: 600,
+    data_emissao: '2026-07-10',
     data_vencimento: '2026-09-10',
     rateios: [
       { obra_id: 3, valor_rateio: 250, apropriacao: { id: 7, codigo: '00.001' } },
@@ -154,6 +158,7 @@ function validateFinancialTitleLedger() {
     valor_original: 300,
     valor_baixado: 0,
     valor_saldo: 300,
+    data_emissao: '2026-08-25',
     data_vencimento: '2026-08-25',
     rateios: []
   }, 3, '2026-08');
@@ -163,12 +168,107 @@ function validateFinancialTitleLedger() {
   assert.strictEqual(summary.total_alocado, 1250);
   assert.strictEqual(summary.total_pago, 100);
   assert.strictEqual(summary.saldo_aberto, 1150);
-  assert.strictEqual(summary.vencimento_competencia, 1000);
-  assert.strictEqual(summary.saldo_vencimento_competencia, 1000);
-  assert.strictEqual(summary.titulos_abertos_competencia, 1);
+  assert.strictEqual(summary.valor_emitido_competencia, 1000);
+  assert.strictEqual(summary.saldo_emitido_competencia, 1000);
+  assert.strictEqual(summary.titulos_emitidos_abertos_competencia, 1);
   assert.strictEqual(summary.status.aberto, 1);
   assert.strictEqual(summary.status.parcial, 1);
   assert.strictEqual(summary.status.inativos, 1);
+
+  assert.strictEqual(
+    titleIssueDate({ data_emissao: null, createdAt: '2026-08-31T15:00:00.000Z' }),
+    '2026-08-31'
+  );
+}
+
+async function validateIssuedTitlesDriveMonthlyCost() {
+  const titles = [
+    {
+      id: 20,
+      obra_id: 3,
+      possui_rateio: false,
+      status: 'ABERTO',
+      valor_original: 100,
+      valor_saldo: 100,
+      valor_baixado: 0,
+      data_emissao: '2026-08-05',
+      data_vencimento: '2026-12-10',
+      rateios: []
+    },
+    {
+      id: 21,
+      obra_id: 3,
+      possui_rateio: false,
+      status: 'QUITADO',
+      valor_original: 60,
+      valor_saldo: 0,
+      valor_baixado: 60,
+      data_emissao: '2026-08-05',
+      data_vencimento: '2026-09-10',
+      grupo_parcelamento_id: 'PARCELADO-1',
+      numero_parcela: 1,
+      total_parcelas: 2,
+      rateios: []
+    },
+    {
+      id: 22,
+      obra_id: 3,
+      possui_rateio: false,
+      status: 'PARCIAL',
+      valor_original: 40,
+      valor_saldo: 20,
+      valor_baixado: 20,
+      data_emissao: '2026-08-05',
+      data_vencimento: '2026-10-10',
+      grupo_parcelamento_id: 'PARCELADO-1',
+      numero_parcela: 2,
+      total_parcelas: 2,
+      rateios: []
+    },
+    {
+      id: 23,
+      obra_id: 4,
+      possui_rateio: true,
+      status: 'ABERTO',
+      valor_original: 1000,
+      valor_saldo: 1000,
+      valor_baixado: 0,
+      data_emissao: null,
+      createdAt: '2026-07-15T15:00:00.000Z',
+      data_vencimento: '2027-01-10',
+      rateios: [
+        { obra_id: 3, valor_rateio: 250 },
+        { obra_id: 4, valor_rateio: 750 }
+      ]
+    },
+    {
+      id: 24,
+      obra_id: 3,
+      possui_rateio: false,
+      status: 'CANCELADO',
+      valor_original: 900,
+      valor_saldo: 900,
+      valor_baixado: 0,
+      data_emissao: '2026-08-07',
+      data_vencimento: '2026-08-20',
+      rateios: []
+    }
+  ];
+  const totals = await totalTitulosEmitidosPorCompetencia(
+    3,
+    ['2026-07', '2026-08'],
+    'PAGAR',
+    {
+      TituloFinanceiroRateio: {
+        findAll: async () => [{ titulo_financeiro_id: 23 }]
+      },
+      TituloFinanceiro: {
+        findAll: async () => titles
+      }
+    }
+  );
+  assert.strictEqual(totals.get('2026-07'), 250);
+  assert.strictEqual(totals.get('2026-08'), 200);
 }
 
 function validateAllocationRounding() {
@@ -343,6 +443,7 @@ async function run() {
   validateRouteAndPermissionContracts();
   validateAllocationRounding();
   validateFinancialTitleLedger();
+  await validateIssuedTitlesDriveMonthlyCost();
   validateMacroGroupingWithoutDuplicatingTitles();
   validateOnlyActiveSettlementsBecomeRealized();
   validateRateioAndNonMappedPreservation();

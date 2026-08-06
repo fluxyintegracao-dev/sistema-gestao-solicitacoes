@@ -3272,6 +3272,39 @@
   gap: 0.35rem;
 }
 
+.cr-icon-button {
+  display: inline-grid;
+  width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 2.35rem;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--cr-border-strong);
+  border-radius: 0.55rem;
+  background: var(--cr-surface);
+  color: var(--cr-text);
+  cursor: pointer;
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.cr-icon-button svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  pointer-events: none;
+}
+
+.cr-icon-button:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--cr-primary) 45%, var(--cr-border));
+  background: color-mix(in srgb, var(--cr-primary) 7%, var(--cr-surface));
+  color: var(--cr-primary);
+}
+
+.cr-icon-button:focus-visible {
+  outline: 2px solid var(--cr-primary);
+  outline-offset: 2px;
+}
+
 .cr-item-picker {
   position: relative;
   padding: 0.75rem 1rem;
@@ -3397,6 +3430,10 @@
 
   .cr-period-card__footer {
     flex-direction: column;
+  }
+
+  .cr-period-card__actions {
+    align-self: flex-end;
   }
 
   .cr-new-month-bar .cr-field,
@@ -4336,10 +4373,9 @@
 }
 
 /* Fluxo operacional do engenheiro: escopo, planejamento e leitura mensal. */
-.cr-works-table table { min-width: 1060px; }
+.cr-works-table table { min-width: 930px; }
 .cr-works-table th:nth-child(1) { min-width: 240px; }
-.cr-works-table th:nth-child(2) { min-width: 130px; }
-.cr-works-table th:nth-child(5) { min-width: 170px; }
+.cr-works-table th:nth-child(4) { min-width: 170px; }
 .cr-cell-currency { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 .cr-operational-period {
@@ -4473,13 +4509,23 @@
     box-shadow: none;
   }
   .cr-month-detail-surface__header { align-items: stretch; flex-direction: column; }
-  .cr-month-detail-surface__actions { display: grid; grid-template-columns: 1fr; }
-  .cr-month-detail-surface__actions .btn { width: 100%; justify-content: center; }
+  .cr-month-detail-surface__actions {
+    display: flex;
+    align-self: flex-end;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .cr-month-read-groups { padding: 8px; }
   .cr-month-read-group > header { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
 
 @media (pointer: coarse) {
+  .cr-icon-button {
+    width: 2.75rem;
+    height: 2.75rem;
+    flex-basis: 2.75rem;
+  }
+
   .cr-month-detail-tabs button,
   .cr-work-access-card .btn { min-height: 44px; }
 }

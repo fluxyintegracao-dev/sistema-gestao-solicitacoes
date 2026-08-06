@@ -217,11 +217,15 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
       { header: 'descricao', key: 'descricao', width: 52 },
       { header: 'unidade', key: 'unidade', width: 13 },
       { header: 'quantidade_orcada', key: 'quantidade_orcada', width: 19 },
-      { header: 'valor_unitario', key: 'valor_unitario', width: 18 },
+      { header: 'quantidade_ja_medida', key: 'quantidade_ja_medida', width: 22 },
       { header: 'saldo_disponivel', key: 'saldo_disponivel', width: 19 },
       { header: 'quantidade', key: 'quantidade', width: 16 }
     ];
-    context.items.forEach((item) => sheet.addRow({ ...item, quantidade: '' }));
+    context.items.forEach((item) => sheet.addRow({
+      ...item,
+      quantidade_ja_medida: item.quantidade_anterior,
+      quantidade: ''
+    }));
     styleWorksheet(sheet, [9]);
     [6, 7, 8, 9].forEach((column) => { sheet.getColumn(column).numFmt = '#,##0.0000'; });
   }
@@ -247,7 +251,7 @@ async function gerarModeloPlanejamento(obraId, competencia, type) {
     ['Preencha apenas linhas com quantidade maior que zero. Linhas zeradas ou vazias serao ignoradas.'],
     [context.type === TYPES.CUSTOS
       ? 'Custos sao livres: selecione a etapa macro ja posicionada e informe descricao, unidade, valor unitario e quantidade nas celulas amarelas.'
-      : 'Codigos, descricoes, unidade, valores e saldo sao protegidos. Informe somente a quantidade nas celulas amarelas.'],
+      : 'Codigos, descricoes, unidade, quantidade orcada, quantidade ja medida e saldo sao protegidos. Informe somente a quantidade nas celulas amarelas.'],
     ['A importacao gera uma previa editavel e nao grava dados ate a confirmacao na tela.'],
     ['Nao renomeie a aba PREENCHIMENTO nem altere os cabecalhos.']
   ].forEach((row, index) => {
@@ -317,12 +321,27 @@ async function parseWorkbook(file) {
 function expectedHeaders(type) {
   return type === TYPES.CUSTOS
     ? ['etapa_macro_codigo', 'etapa_macro_descricao', 'descricao_servico', 'unidade', 'valor_unitario', 'quantidade']
-    : ['etapa_macro_codigo', 'etapa_macro_descricao', 'item_codigo', 'descricao', 'unidade', 'quantidade_orcada', 'valor_unitario', 'saldo_disponivel', 'quantidade'];
+    : ['etapa_macro_codigo', 'etapa_macro_descricao', 'item_codigo', 'descricao', 'unidade', 'quantidade_orcada', 'quantidade_ja_medida', 'saldo_disponivel', 'quantidade'];
 }
 
 function validateHeaders(headers, type) {
-  const expected = expectedHeaders(type);
   const received = headers.filter(Boolean);
+  const currentExpected = expectedHeaders(type);
+  const legacyMeasurementExpected = [
+    'etapa_macro_codigo',
+    'etapa_macro_descricao',
+    'item_codigo',
+    'descricao',
+    'unidade',
+    'quantidade_orcada',
+    'valor_unitario',
+    'saldo_disponivel',
+    'quantidade'
+  ];
+  const legacyMeasurementModel = type !== TYPES.CUSTOS
+    && received.includes('valor_unitario')
+    && !received.includes('quantidade_ja_medida');
+  const expected = legacyMeasurementModel ? legacyMeasurementExpected : currentExpected;
   const missing = expected.filter((header) => !received.includes(header));
   const unknown = received.filter((header) => !expected.includes(header));
   if (missing.length || unknown.length) {
@@ -411,6 +430,7 @@ function validateRows(context, inputRows = []) {
         descricao: text(raw.descricao),
         unidade: text(raw.unidade, 30),
         quantidade_orcada: number(raw.quantidade_orcada),
+        quantidade_anterior: number(raw.quantidade_ja_medida),
         valor_unitario: number(raw.valor_unitario),
         saldo_disponivel: number(raw.saldo_disponivel)
       }),
