@@ -208,6 +208,9 @@ function validateBackendContracts() {
   assert(spreadsheetService.includes("metadata.state = 'veryHidden'"));
   assert(spreadsheetService.includes('Formulas nao sao permitidas'));
   assert(spreadsheetService.includes('saldo_disponivel'));
+  assert(spreadsheetService.includes("header: 'quantidade_ja_medida'"));
+  assert(spreadsheetService.includes('quantidade_ja_medida: item.quantidade_anterior'));
+  assert(spreadsheetService.includes('legacyMeasurementModel'));
   assert(spreadsheetService.includes('quantity === 0'));
   assert(spreadsheetService.includes('previousRows = await db.CrMedicaoConsolidada.findAll'));
 }
@@ -246,6 +249,7 @@ function validateFrontendContracts() {
   assert(page.includes('<CrExecutiveFilters'));
   assert(page.includes('<CrPlanejamentoMensalView'));
   assert(page.includes('<CrComparativoView'));
+  assert(page.includes("activeTab === 'planejamento' && selectedObra"));
   assert(planning.includes('PUBLIC_STEPS'));
   assert(planning.includes('PRIVATE_STEPS'));
   assert(planning.includes("label: 'Custos planejados'"));
@@ -287,6 +291,10 @@ function validateFrontendContracts() {
   assert(monthlySummary.includes('Recebível previsto'));
   assert(monthlySummary.includes('Desvio de custo'));
   assert(monthlySummary.includes('Saldo a receber'));
+  assert(monthlySummary.includes('className="cr-icon-button"'));
+  assert(monthlySummary.includes('aria-label={`${approvedLabel} de ${title}`}'));
+  assert(monthlyDetail.includes('aria-label="Editar planejamento"'));
+  assert(monthlyDetail.includes('aria-label="Voltar aos meses"'));
   assert(dashboard.includes('Pontos de atenção'));
   assert(dashboard.includes('Evolução de custos'));
   assert(dashboard.includes('Evolução de recebíveis'));

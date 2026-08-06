@@ -1,4 +1,7 @@
-import { HiOutlineArrowRight } from 'react-icons/hi2';
+import {
+  HiOutlineClipboardDocumentCheck,
+  HiOutlineEye
+} from 'react-icons/hi2';
 import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -38,6 +41,8 @@ export default function CrMonthlySummaryCard({
   const received = Number(receitaRecebida || 0);
   const balance = Math.max(0, recognized - received);
   const statusLabel = COMPETENCIA_ESTADO_LABELS[status] || status || 'Não iniciada';
+  const approvedLabel = approvedActionLabel
+    || (medicaoAprovadaInformada ? 'Revisar aprovação' : 'Registrar aprovação');
 
   return (
     <article className="cr-period-card" data-alert={costDelta > 0 || Number(glosa) > 0}>
@@ -107,14 +112,25 @@ export default function CrMonthlySummaryCard({
         </div>
         <div className="cr-period-card__actions">
           {onOpenApproved ? (
-            <button type="button" className="btn btn-outline" onClick={onOpenApproved}>
-              {approvedActionLabel || (medicaoAprovadaInformada ? 'Revisar aprovação' : 'Registrar aprovação')}
+            <button
+              type="button"
+              className="cr-icon-button"
+              onClick={onOpenApproved}
+              aria-label={`${approvedLabel} de ${title}`}
+              title={approvedLabel}
+            >
+              <HiOutlineClipboardDocumentCheck aria-hidden="true" />
             </button>
           ) : null}
           {onOpen ? (
-            <button type="button" className="btn btn-outline" onClick={onOpen}>
-              {actionLabel}
-              <HiOutlineArrowRight className="h-4 w-4" />
+            <button
+              type="button"
+              className="cr-icon-button"
+              onClick={onOpen}
+              aria-label={`${actionLabel} de ${title}`}
+              title={actionLabel}
+            >
+              <HiOutlineEye aria-hidden="true" />
             </button>
           ) : null}
         </div>

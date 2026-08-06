@@ -592,7 +592,7 @@ export default function CustosRecebiveis() {
             periodo_fim: end
           })}
         />
-      ) : activeTab !== 'obras' ? (
+      ) : activeTab !== 'obras' && !(activeTab === 'planejamento' && selectedObra) ? (
       <section className="cr-context-bar" aria-label="Contexto do módulo">
         <label className="cr-field">
           <span>Obra em contexto</span>
