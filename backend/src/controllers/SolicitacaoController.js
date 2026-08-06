@@ -1462,6 +1462,7 @@ module.exports = {
         obra_id,
         obra_ids,
         codigo,
+        descricao,
         codigo_contrato,
         numero_solicitacao,
         numero_sienge,
@@ -1990,6 +1991,14 @@ module.exports = {
         if (codigoFiltro) {
           where.codigo = {
             [Op.like]: `%${codigoFiltro}%`
+          };
+        }
+      }
+      if (descricao) {
+        const descricaoFiltro = String(descricao).trim();
+        if (descricaoFiltro) {
+          where.descricao = {
+            [Op.like]: `%${descricaoFiltro}%`
           };
         }
       }

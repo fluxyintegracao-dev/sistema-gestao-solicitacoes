@@ -182,6 +182,7 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   const [filtros, setFiltros] = useState({
     codigo: '',
+    descricao: '',
     numero_sienge: '',
     obra_ids: '',
     area: '',
@@ -447,6 +448,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     if (!item) return false;
 
     const codigo = String(item?.codigo || '');
+    const descricao = String(item?.descricao || '');
     const numeroPedido = String(item?.numero_sienge || item?.numero_pedido || '');
     const obraId = String(item?.obra?.id ?? item?.obra_id ?? '');
     const tipoId = String(item?.tipo?.id ?? item?.tipo_solicitacao_id ?? '');
@@ -472,6 +474,13 @@ export default function Solicitacoes({ arquivadas = false }) {
     );
 
     if (filtros.codigo && !codigo.toLowerCase().includes(String(filtros.codigo).trim().toLowerCase())) {
+      return false;
+    }
+
+    if (
+      filtros.descricao &&
+      !normalizarTextoComparacao(descricao).includes(normalizarTextoComparacao(filtros.descricao))
+    ) {
       return false;
     }
 
