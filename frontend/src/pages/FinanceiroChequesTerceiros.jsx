@@ -50,8 +50,8 @@ function dateBr(value) {
 
 function Modal({ title, subtitle, children, onClose, wide = false }) {
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-3" role="dialog" aria-modal="true">
-      <section className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl bg-[var(--c-card)] shadow-2xl ${wide ? 'max-w-6xl' : 'max-w-2xl'}`}>
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true">
+      <section className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-[var(--modal-border)] bg-[var(--modal-bg)] shadow-2xl ${wide ? 'max-w-6xl' : 'max-w-2xl'}`}>
         <header className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
           <div><h2 className="text-lg font-semibold text-[var(--c-text)]">{title}</h2>{subtitle ? <p className="mt-1 text-sm text-[var(--c-muted)]">{subtitle}</p> : null}</div>
           <button type="button" className="btn btn-outline btn-sm" onClick={onClose} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button>
