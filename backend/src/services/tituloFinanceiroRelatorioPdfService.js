@@ -66,6 +66,16 @@ function truncate(value, maxLength) {
   return `${text.slice(0, Math.max(maxLength - 3, 1)).trim()}...`;
 }
 
+function getCategoriaNomeRelatorio(categoria = null) {
+  const nome = normalizeText(categoria?.nome, 'Sem categoria');
+  const separador = nome.indexOf(' - ');
+  if (separador <= 0) return nome;
+
+  const prefixo = nome.slice(0, separador).trim();
+  const prefixoPareceCodigo = /\d/.test(prefixo) && /^[A-Z0-9._/\-]+$/i.test(prefixo);
+  return prefixoPareceCodigo ? normalizeText(nome.slice(separador + 3), nome) : nome;
+}
+
 function getTituloCodigo(titulo = {}) {
   return titulo.codigo || titulo.codigo_titulo || `#${titulo.id || '-'}`;
 }
@@ -237,7 +247,7 @@ function rowData(titulo) {
     titulo: truncate(getTituloCodigo(titulo), 14),
     credor: `${credor}\n${documento}`,
     obra: truncate(titulo?.obra?.nome || 'Sem obra', 21),
-    categoria: truncate(titulo?.categoriaFinanceira?.nome || 'Sem categoria', 20),
+    categoria: truncate(getCategoriaNomeRelatorio(titulo?.categoriaFinanceira), 20),
     emissao: formatDate(titulo?.data_emissao),
     vencimento: formatDate(titulo?.data_vencimento),
     status: getStatusLabel(titulo?.status),

@@ -245,7 +245,7 @@ function FinanceiroFilterAutocomplete({
         {browseEnabled ? (
           <button
             type="button"
-            className="absolute right-1 top-1/2 flex h-7 w-8 -translate-y-1/2 items-center justify-center rounded-md text-[var(--c-muted)] transition-colors hover:bg-[var(--c-bg)] hover:text-[var(--c-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
+            className="absolute right-1 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setOpen(false);
@@ -332,15 +332,15 @@ function FinanceiroFilterAutocomplete({
               <label className="app-filter-field">
                 <span className="app-filter-label">Pesquisar</span>
                 <div className="relative">
-                  <HiOutlineMagnifyingGlass className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--c-muted)]" />
                   <input
-                    className="input w-full pl-9"
+                    className="input w-full pr-10"
                     value={browseQuery}
                     onChange={(event) => setBrowseQuery(event.target.value)}
                     placeholder={placeholder}
                     autoComplete="off"
                     autoFocus
                   />
+                  <HiOutlineMagnifyingGlass className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--c-primary)]" />
                 </div>
               </label>
               <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--c-muted)]">
