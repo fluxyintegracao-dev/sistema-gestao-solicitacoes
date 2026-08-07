@@ -431,5 +431,6 @@ module.exports = {
   atualizarParceiro,
   buscarParceiros,
   criarParceiro,
+  isValidCpfCnpj,
   normalizarCpfCnpj
 };

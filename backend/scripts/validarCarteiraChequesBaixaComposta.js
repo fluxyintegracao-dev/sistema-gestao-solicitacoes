@@ -43,6 +43,8 @@ function validateSecurityAndTransactions() {
   assert(titleService.includes('baixa_componente_id'));
   assert(titleService.includes('Estorne o grupo completo na tela de Baixas com Multiplas Fontes'));
   assert(titleService.includes("status: 'EM_CARTEIRA'"), 'Estorno deve devolver cheque utilizado para a carteira.');
+  assert(service.includes('isValidCpfCnpj'), 'Cadastro de cheque deve validar CPF/CNPJ do titular.');
+  assert(service.includes('normalizarCpfCnpj'), 'CPF/CNPJ do titular deve ser persistido sem mascara.');
 }
 
 function validateRoutesAndPermissions() {
@@ -79,6 +81,9 @@ function validateFrontend() {
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));
   assert(custody.includes('max-h-[52vh] overflow-auto'), 'Preview da importacao deve permitir rolagem.');
+  assert(custody.includes('maskCpfCnpj'), 'Cadastro de cheque deve aplicar mascara de CPF/CNPJ.');
+  assert(custody.includes('Informe um CPF ou CNPJ válido.'), 'Cadastro deve orientar documento invalido.');
+  assert(!custody.includes("['data_emissao', 'Data de emissão'"), 'Data de emissao nao deve aparecer no cadastro de custodia.');
 }
 
 validateMigration();

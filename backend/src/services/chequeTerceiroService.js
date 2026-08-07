@@ -23,6 +23,7 @@ const {
   sincronizarRealizacaoCompraPorTitulo,
   sincronizarStatusSolicitacaoPorBaixaTitulos
 } = require('./tituloFinanceiroService');
+const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 
 const STATUS_CHEQUE = ['EM_CARTEIRA', 'RESERVADO', 'UTILIZADO', 'DEPOSITADO', 'DEVOLVIDO', 'CANCELADO'];
@@ -142,6 +143,10 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
     if (valor <= 0) throw httpError(400, 'Valor do cheque deve ser maior que zero.');
     if (!texto(payload.numero_cheque)) throw httpError(400, 'Numero do cheque e obrigatorio.');
     if (!texto(payload.titular_nome)) throw httpError(400, 'Titular do cheque e obrigatorio.');
+    const titularDocumento = normalizarCpfCnpj(payload.titular_documento);
+    if (titularDocumento && !isValidCpfCnpj(titularDocumento)) {
+      throw httpError(400, 'CPF/CNPJ do titular invalido.');
+    }
     if (!dataOnly(payload.data_vencimento)) throw httpError(400, 'Data de vencimento valida e obrigatoria.');
     if (!texto(payload.motivo_origem)) throw httpError(400, 'Justificativa da origem e obrigatoria para saldo inicial.');
 
@@ -170,7 +175,7 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
       parceiro_entregou_id: payload.parceiro_entregou_id || null,
       cliente_nome: texto(payload.cliente_nome, 180),
       titular_nome: texto(payload.titular_nome, 180),
-      titular_documento: texto(payload.titular_documento, 30),
+      titular_documento: titularDocumento || null,
       banco: texto(payload.banco, 80),
       agencia: texto(payload.agencia, 30),
       conta: texto(payload.conta, 40),
@@ -317,14 +322,14 @@ async function gerarModeloCheques() {
   const sheet = workbook.addWorksheet('CHEQUES');
   sheet.columns = [
     ['empresa_codigo', 18], ['numero_cheque', 20], ['titular_nome', 30], ['titular_documento', 20],
-    ['banco', 20], ['agencia', 15], ['conta', 18], ['valor', 16], ['data_emissao', 16],
+    ['banco', 20], ['agencia', 15], ['conta', 18], ['valor', 16],
     ['data_vencimento', 18], ['data_entrada', 16], ['cliente_nome', 28], ['obra_codigo', 16],
     ['motivo_origem', 35], ['observacoes', 40]
   ].map(([header, width]) => ({ header, key: header, width }));
   sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
   sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF12325B' } };
   sheet.views = [{ state: 'frozen', ySplit: 1 }];
-  sheet.autoFilter = { from: 'A1', to: 'O1' };
+  sheet.autoFilter = { from: 'A1', to: 'N1' };
   sheet.addRow({ motivo_origem: 'Saldo inicial sem lastro de obra identificado' });
 
   const refs = workbook.addWorksheet('EMPRESAS');
@@ -363,6 +368,7 @@ async function previewImportacao(buffer) {
     const empresa = empresaMap.get(String(empresaCodigo || '').toUpperCase());
     const obraCodigo = texto(value(row, 'obra_codigo'), 60);
     const obra = empresa && obraCodigo ? obraMap.get(`${empresa.id}:${obraCodigo.toUpperCase()}`) : null;
+    const titularDocumento = normalizarCpfCnpj(value(row, 'titular_documento'));
     const item = {
       linha: rowNumber,
       empresa_id: empresa?.id || null,
@@ -371,12 +377,11 @@ async function previewImportacao(buffer) {
       obra_codigo: obraCodigo,
       numero_cheque: numero,
       titular_nome: titular,
-      titular_documento: texto(value(row, 'titular_documento'), 30),
+      titular_documento: titularDocumento || null,
       banco: texto(value(row, 'banco'), 80),
       agencia: texto(value(row, 'agencia'), 30),
       conta: texto(value(row, 'conta'), 40),
       valor: valorCheque,
-      data_emissao: dataOnly(value(row, 'data_emissao')),
       data_vencimento: dataOnly(value(row, 'data_vencimento')),
       data_entrada: dataOnly(value(row, 'data_entrada')) || hoje(),
       cliente_nome: texto(value(row, 'cliente_nome'), 180),
@@ -388,6 +393,7 @@ async function previewImportacao(buffer) {
     if (obraCodigo && !obra) item.erros.push('Obra nao encontrada para a empresa.');
     if (!numero) item.erros.push('Numero do cheque obrigatorio.');
     if (!titular) item.erros.push('Titular obrigatorio.');
+    if (titularDocumento && !isValidCpfCnpj(titularDocumento)) item.erros.push('CPF/CNPJ do titular invalido.');
     if (valorCheque <= 0) item.erros.push('Valor deve ser maior que zero.');
     if (!item.data_vencimento) item.erros.push('Data de vencimento invalida ou ausente.');
     if (!item.motivo_origem) item.erros.push('Motivo da origem obrigatorio.');

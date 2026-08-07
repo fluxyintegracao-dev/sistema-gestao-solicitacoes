@@ -22,6 +22,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { hasPermissao } from '../utils/acessoProduto';
+import { isValidCpfCnpj, maskCpfCnpj, onlyDigits } from '../utils/formatters';
 
 const STATUS_LABELS = {
   EM_CARTEIRA: 'Em carteira',
@@ -32,11 +33,13 @@ const STATUS_LABELS = {
   CANCELADO: 'Cancelado'
 };
 
-const EMPTY_FORM = {
+function createEmptyForm() {
+  return {
   empresa_id: '', numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '',
-  conta: '', valor: '', data_emissao: '', data_vencimento: '', data_entrada: '', cliente_nome: '',
+  conta: '', valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10), cliente_nome: '',
   motivo_origem: 'Saldo inicial sem lastro de obra identificado', observacoes: ''
-};
+  };
+}
 
 function money(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -78,7 +81,8 @@ export default function FinanceiroChequesTerceiros() {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyForm);
+  const [documentError, setDocumentError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState([]);
@@ -115,10 +119,16 @@ export default function FinanceiroChequesTerceiros() {
   const contasEmpresaAcao = useMemo(() => contas.filter((item) => Number(item.empresa_id) === Number(selected?.empresa_id)), [contas, selected]);
 
   async function submitCreate(event) {
-    event.preventDefault(); setSaving(true); setError('');
+    event.preventDefault();
+    const titularDocumento = onlyDigits(form.titular_documento);
+    if (titularDocumento && !isValidCpfCnpj(titularDocumento)) {
+      setDocumentError('Informe um CPF ou CNPJ válido.');
+      return;
+    }
+    setDocumentError(''); setSaving(true); setError('');
     try {
-      await criarChequeTerceiro({ ...form, valor: Number(String(form.valor).replace(',', '.')) });
-      setCreateOpen(false); setForm(EMPTY_FORM); await load();
+      await criarChequeTerceiro({ ...form, titular_documento: titularDocumento || null, valor: Number(String(form.valor).replace(',', '.')) });
+      setCreateOpen(false); setForm(createEmptyForm()); await load();
     } catch (err) { setError(err.message || 'Erro ao cadastrar cheque.'); }
     finally { setSaving(false); }
   }
@@ -174,7 +184,7 @@ export default function FinanceiroChequesTerceiros() {
         <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Financeiro · Custódia</p><h1 className="text-2xl font-bold text-[var(--c-text)]">Cheques de terceiros</h1><p className="text-sm text-[var(--c-muted)]">Controle físico e auditável sem transformar cheques em contas bancárias fictícias.</p></div>
         <div className="flex flex-wrap gap-2">
           {canImport ? <button className="btn btn-outline btn-sm" type="button" onClick={() => setImportOpen(true)}><HiOutlineArrowUpTray className="h-4 w-4" /> Importar</button> : null}
-          {canCreate ? <button className="btn btn-primary btn-sm" type="button" onClick={() => setCreateOpen(true)}><HiOutlinePlus className="h-4 w-4" /> Cadastrar cheque</button> : null}
+          {canCreate ? <button className="btn btn-primary btn-sm" type="button" onClick={() => { setDocumentError(''); setCreateOpen(true); }}><HiOutlinePlus className="h-4 w-4" /> Cadastrar cheque</button> : null}
         </div>
       </header>
 
@@ -199,15 +209,102 @@ export default function FinanceiroChequesTerceiros() {
         <div className="overflow-x-auto">
           <table className="table min-w-[980px]">
             <thead><tr><th>Código / cheque</th><th>Empresa</th><th>Titular</th><th>Banco</th><th>Vencimento</th><th className="text-right">Valor</th><th>Status</th><th className="w-20">Ação</th></tr></thead>
-            <tbody>{(data.cheques || []).map((item) => <tr key={item.id}><td><strong>{item.codigo}</strong><small className="block text-[var(--c-muted)]">Nº {item.numero_cheque || '-'}</small></td><td>{item.empresa?.nome || '-'}</td><td>{item.titular_nome || '-'}<small className="block text-[var(--c-muted)]">{item.titular_documento || item.cliente_nome || ''}</small></td><td>{item.banco || '-'}<small className="block text-[var(--c-muted)]">{[item.agencia, item.conta].filter(Boolean).join(' / ')}</small></td><td>{dateBr(item.data_vencimento)}</td><td className="text-right font-semibold">{money(item.valor)}</td><td><StatusBadge status={item.status} /></td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(item.id)} title="Ver histórico"><HiOutlineEye className="h-4 w-4" /></button></td></tr>)}</tbody>
+            <tbody>{(data.cheques || []).map((item) => <tr key={item.id}><td><strong>{item.codigo}</strong><small className="block text-[var(--c-muted)]">Nº {item.numero_cheque || '-'}</small></td><td>{item.empresa?.nome || '-'}</td><td>{item.titular_nome || '-'}<small className="block text-[var(--c-muted)]">{item.titular_documento ? maskCpfCnpj(item.titular_documento) : (item.cliente_nome || '')}</small></td><td>{item.banco || '-'}<small className="block text-[var(--c-muted)]">{[item.agencia, item.conta].filter(Boolean).join(' / ')}</small></td><td>{dateBr(item.data_vencimento)}</td><td className="text-right font-semibold">{money(item.valor)}</td><td><StatusBadge status={item.status} /></td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(item.id)} title="Ver histórico"><HiOutlineEye className="h-4 w-4" /></button></td></tr>)}</tbody>
           </table>
         </div>
         {!loading && !(data.cheques || []).length ? <div className="p-8 text-center text-sm text-[var(--c-muted)]">Nenhum cheque encontrado para os filtros.</div> : null}
       </section>
 
-      {createOpen ? <Modal title="Cadastrar cheque de terceiro" subtitle="Entrada de saldo inicial legado. Não cria título nem receita." onClose={() => setCreateOpen(false)}><form className="grid gap-3 sm:grid-cols-2" onSubmit={submitCreate}>{[
-        ['numero_cheque', 'Número do cheque', 'text', true], ['titular_nome', 'Titular', 'text', true], ['titular_documento', 'CPF/CNPJ do titular', 'text'], ['banco', 'Banco', 'text'], ['agencia', 'Agência', 'text'], ['conta', 'Conta', 'text'], ['valor', 'Valor', 'number', true], ['data_emissao', 'Data de emissão', 'date'], ['data_vencimento', 'Data de vencimento', 'date', true], ['data_entrada', 'Data de entrada', 'date'], ['cliente_nome', 'Cliente/origem informada', 'text']
-      ].map(([key, label, type, required]) => <label className="form-control" key={key}><span>{label}{required ? ' *' : ''}</span><input className="input" type={type} step={type === 'number' ? '0.01' : undefined} required={required} value={form[key]} onChange={(e) => setForm((v) => ({ ...v, [key]: e.target.value }))} /></label>)}<label className="form-control sm:col-span-2"><span>Empresa detentora *</span><select className="select" required value={form.empresa_id} onChange={(e) => setForm((v) => ({ ...v, empresa_id: e.target.value }))}><option value="">Selecione</option>{empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label><label className="form-control sm:col-span-2"><span>Justificativa da origem *</span><input className="input" required value={form.motivo_origem} onChange={(e) => setForm((v) => ({ ...v, motivo_origem: e.target.value }))} /></label><label className="form-control sm:col-span-2"><span>Observações</span><textarea className="textarea" value={form.observacoes} onChange={(e) => setForm((v) => ({ ...v, observacoes: e.target.value }))} /></label><div className="flex justify-end gap-2 sm:col-span-2"><button type="button" className="btn btn-outline" onClick={() => setCreateOpen(false)}>Cancelar</button><button className="btn btn-primary" disabled={saving}>Salvar cheque</button></div></form></Modal> : null}
+      {createOpen ? (
+        <Modal
+          title="Cadastrar cheque de terceiro"
+          subtitle="Entrada de saldo inicial legado. Não cria título nem receita."
+          onClose={() => { setDocumentError(''); setCreateOpen(false); }}
+        >
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitCreate}>
+            {[
+              ['numero_cheque', 'Número do cheque', 'text', true],
+              ['titular_nome', 'Titular', 'text', true]
+            ].map(([key, label, type, required]) => (
+              <label className="form-control" key={key}>
+                <span>{label}{required ? ' *' : ''}</span>
+                <input
+                  className="input"
+                  type={type}
+                  step={type === 'number' ? '0.01' : undefined}
+                  required={required}
+                  value={form[key]}
+                  onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
+                />
+              </label>
+            ))}
+
+            <label className="form-control">
+              <span>CPF/CNPJ do titular</span>
+              <input
+                className={`input ${documentError ? 'border-rose-400' : ''}`}
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={18}
+                placeholder="000.000.000-00 ou 00.000.000/0000-00"
+                value={form.titular_documento}
+                aria-invalid={Boolean(documentError)}
+                aria-describedby={documentError ? 'cheque-titular-documento-erro' : undefined}
+                onChange={(event) => {
+                  const value = maskCpfCnpj(event.target.value);
+                  setForm((current) => ({ ...current, titular_documento: value }));
+                  if (documentError) setDocumentError(value && !isValidCpfCnpj(value) ? 'Informe um CPF ou CNPJ válido.' : '');
+                }}
+                onBlur={() => setDocumentError(form.titular_documento && !isValidCpfCnpj(form.titular_documento) ? 'Informe um CPF ou CNPJ válido.' : '')}
+              />
+              {documentError ? <small id="cheque-titular-documento-erro" className="text-rose-700">{documentError}</small> : null}
+            </label>
+
+            {[
+              ['banco', 'Banco', 'text'],
+              ['agencia', 'Agência', 'text'],
+              ['conta', 'Conta', 'text'],
+              ['valor', 'Valor', 'number', true],
+              ['data_vencimento', 'Data de vencimento', 'date', true],
+              ['data_entrada', 'Data de entrada', 'date', true],
+              ['cliente_nome', 'Cliente/origem informada', 'text']
+            ].map(([key, label, type, required]) => (
+              <label className="form-control" key={key}>
+                <span>{label}{required ? ' *' : ''}</span>
+                <input
+                  className="input"
+                  type={type}
+                  step={type === 'number' ? '0.01' : undefined}
+                  required={required}
+                  value={form[key]}
+                  onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
+                />
+              </label>
+            ))}
+
+            <label className="form-control sm:col-span-2">
+              <span>Empresa detentora *</span>
+              <select className="select" required value={form.empresa_id} onChange={(event) => setForm((current) => ({ ...current, empresa_id: event.target.value }))}>
+                <option value="">Selecione</option>
+                {empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+              </select>
+            </label>
+            <label className="form-control sm:col-span-2">
+              <span>Justificativa da origem *</span>
+              <input className="input" required value={form.motivo_origem} onChange={(event) => setForm((current) => ({ ...current, motivo_origem: event.target.value }))} />
+            </label>
+            <label className="form-control sm:col-span-2">
+              <span>Observações</span>
+              <textarea className="textarea" value={form.observacoes} onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))} />
+            </label>
+            <div className="flex justify-end gap-2 sm:col-span-2">
+              <button type="button" className="btn btn-outline" onClick={() => { setDocumentError(''); setCreateOpen(false); }}>Cancelar</button>
+              <button className="btn btn-primary" disabled={saving || Boolean(documentError)}>Salvar cheque</button>
+            </div>
+          </form>
+        </Modal>
+      ) : null}
 
       {importOpen ? <Modal wide title="Importar cheques" subtitle="Revise as linhas antes de confirmar. A operação é atômica e auditada." onClose={() => { setImportOpen(false); setImportRows([]); }}><div className="mb-4 flex flex-wrap gap-2"><button type="button" className="btn btn-outline" onClick={downloadModel}><HiOutlineArrowDownTray className="h-4 w-4" /> Baixar modelo</button><label className="btn btn-primary cursor-pointer"><HiOutlineArrowUpTray className="h-4 w-4" /> Selecionar XLSX<input type="file" className="hidden" accept=".xlsx" onChange={(e) => importFile(e.target.files?.[0])} /></label><button type="button" className="btn btn-outline" onClick={() => setImportRows((rows) => [...rows, { linha: `Nova ${rows.length + 1}`, empresa_id: empresas[0]?.id || '', empresa_codigo: empresas[0]?.codigo || '', numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '', conta: '', valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10), motivo_origem: 'Saldo inicial sem lastro de obra identificado', erros: [], valido: true }])}><HiOutlinePlus /> Adicionar linha</button></div>{importRows.length ? <><div className="max-h-[52vh] overflow-auto rounded-xl border border-[var(--c-border)]"><table className="table min-w-[1200px]"><thead><tr><th>Linha</th><th>Empresa</th><th>Número</th><th>Titular</th><th>Banco</th><th>Valor</th><th>Vencimento</th><th>Validação</th><th /></tr></thead><tbody>{importRows.map((row, index) => <tr key={`${row.linha}-${index}`}><td>{row.linha}</td><td><select className="select select-sm min-w-44" value={row.empresa_id || ''} onChange={(e) => { const empresa = empresas.find((item) => Number(item.id) === Number(e.target.value)); setImportRows((rows) => rows.map((item, i) => i === index ? { ...item, empresa_id: empresa?.id || '', empresa_codigo: empresa?.codigo || '', erros: [], valido: true } : item)); }}><option value="">Selecione</option>{empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></td><td><input className="input input-sm min-w-32" value={row.numero_cheque || ''} onChange={(e) => updateImportRow(index, 'numero_cheque', e.target.value)} /></td><td><input className="input input-sm min-w-48" value={row.titular_nome || ''} onChange={(e) => updateImportRow(index, 'titular_nome', e.target.value)} /></td><td><input className="input input-sm min-w-32" value={row.banco || ''} onChange={(e) => updateImportRow(index, 'banco', e.target.value)} /></td><td><input className="input input-sm w-28" type="number" step="0.01" value={row.valor || ''} onChange={(e) => updateImportRow(index, 'valor', e.target.value)} /></td><td><input className="input input-sm" type="date" value={row.data_vencimento || ''} onChange={(e) => updateImportRow(index, 'data_vencimento', e.target.value)} /></td><td className={row.valido ? 'text-emerald-700' : 'text-rose-700'}>{row.valido ? 'Válida' : (row.erros || []).join(' ')}</td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => setImportRows((rows) => rows.filter((_, i) => i !== index))}><HiOutlineXMark /></button></td></tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between"><span className="text-sm text-[var(--c-muted)]">{importRows.length} cheque(s) no lote</span><button type="button" className="btn btn-primary" disabled={saving || importRows.some((row) => !row.valido)} onClick={confirmImport}>Confirmar importação</button></div></> : <div className="rounded-xl border border-dashed border-[var(--c-border)] p-8 text-center text-sm text-[var(--c-muted)]">Baixe o modelo, preencha e selecione o arquivo para gerar o preview.</div>}</Modal> : null}
 
