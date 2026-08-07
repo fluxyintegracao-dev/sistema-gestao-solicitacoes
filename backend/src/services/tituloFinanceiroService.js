@@ -3,6 +3,7 @@ const { Op } = require('sequelize');
 const {
   CartaoFinanceiro,
   ChequeTerceiro,
+  ChequeTerceiroMovimento,
   ConciliacaoBancaria,
   ContaBancaria,
   EmpresaGrupo,
@@ -669,11 +670,15 @@ async function registrarChequeTerceiroRecebido({
   const titularNome = chequePayload.titular_nome || getTituloParceiroNome(titulo) || 'Titular nao informado';
   const numeroCheque = chequePayload.numero_cheque || payload.documento_referencia || `MOV-${movimento.id}`;
 
-  return ChequeTerceiro.create({
+  const cheque = await ChequeTerceiro.create({
     codigo: gerarCodigoChequeTerceiro(),
     titulo_financeiro_id: titulo.id,
     movimento_financeiro_id: movimento.id,
+    movimento_entrada_id: movimento.id,
     parceiro_entregou_id: titulo.parceiro_id || null,
+    empresa_id: titulo.empresa_id || movimento.empresa_id || null,
+    obra_origem_id: titulo.obra_id || null,
+    origem_tipo: 'RECEBIMENTO_TITULO',
     cliente_nome: getTituloParceiroNome(titulo),
     titular_nome: titularNome,
     titular_documento: chequePayload.titular_documento || getTituloParceiroDocumento(titulo),
@@ -684,11 +689,28 @@ async function registrarChequeTerceiroRecebido({
     valor: roundCurrency(valor),
     data_emissao: payload.data_emissao || dataMovimento || null,
     data_vencimento: payload.data_vencimento || dataMovimento || null,
+    data_entrada: dataMovimento || null,
     status: 'EM_CARTEIRA',
     observacoes: payload.observacoes || 'Cheque de terceiro registrado automaticamente pela baixa de recebimento.',
     criado_por: req.user?.id || null,
     atualizado_por: req.user?.id || null
   }, { transaction });
+
+  await ChequeTerceiroMovimento.create({
+    cheque_terceiro_id: cheque.id,
+    tipo_evento: 'ENTRADA',
+    status_anterior: null,
+    status_novo: 'EM_CARTEIRA',
+    empresa_destino_id: cheque.empresa_id,
+    titulo_financeiro_id: titulo.id,
+    movimento_financeiro_id: movimento.id,
+    valor: roundCurrency(valor),
+    data_evento: dataMovimento,
+    observacoes: 'Cheque registrado automaticamente pela baixa do titulo a receber.',
+    criado_por: req.user?.id || null
+  }, { transaction });
+
+  return cheque;
 }
 
 async function consumirChequeTerceiroPagamento({
@@ -701,6 +723,9 @@ async function consumirChequeTerceiroPagamento({
   if (!ChequeTerceiro || !movimento) return null;
 
   const cheque = await obterChequeTerceiroDisponivel(chequeTerceiroId, transaction);
+  if (cheque.empresa_id && movimento.empresa_id && Number(cheque.empresa_id) !== Number(movimento.empresa_id)) {
+    throw createHttpError(400, 'O cheque de terceiro pertence a outra empresa do grupo.');
+  }
   const diferenca = Math.abs(roundCurrency(cheque.valor) - roundCurrency(valor));
   if (diferenca >= 0.01) {
     throw createHttpError(
@@ -711,8 +736,24 @@ async function consumirChequeTerceiroPagamento({
 
   await cheque.update({
     status: 'UTILIZADO',
-    movimento_financeiro_id: movimento.id,
+    movimento_saida_id: movimento.id,
+    data_saida: movimento.data_movimento || null,
     atualizado_por: req.user?.id || null
+  }, { transaction });
+
+  await ChequeTerceiroMovimento.create({
+    cheque_terceiro_id: cheque.id,
+    tipo_evento: 'UTILIZACAO',
+    status_anterior: 'EM_CARTEIRA',
+    status_novo: 'UTILIZADO',
+    empresa_origem_id: cheque.empresa_id || null,
+    titulo_financeiro_id: movimento.titulo_financeiro_id || null,
+    movimento_financeiro_id: movimento.id,
+    baixa_grupo_id: movimento.baixa_grupo_id || null,
+    valor: roundCurrency(valor),
+    data_evento: movimento.data_movimento,
+    observacoes: 'Cheque utilizado em pagamento de titulo financeiro.',
+    criado_por: req.user?.id || null
   }, { transaction });
 
   return cheque;
@@ -3297,7 +3338,7 @@ async function sincronizarRealizacaoCompraPorTitulo({
   });
 }
 
-async function baixarTitulo(req, tituloId, payload = {}) {
+async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
   const valorBaixa = roundCurrency(payload.valor);
   const juros = roundCurrency(payload.juros || 0);
   const multa = roundCurrency(payload.multa || 0);
@@ -3320,7 +3361,8 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     conta
   });
 
-  const transaction = await sequelize.transaction();
+  const ownTransaction = !options.transaction;
+  const transaction = options.transaction || await sequelize.transaction();
   try {
     const titulo = await carregarTituloParaBaixaComLock(req, tituloId, transaction);
     const statusAtual = String(titulo.status || '').trim().toUpperCase();
@@ -3365,6 +3407,8 @@ async function baixarTitulo(req, tituloId, payload = {}) {
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,
       conta_bancaria_id: contaMovimento?.id || null,
+      baixa_grupo_id: payload.baixa_grupo_id || null,
+      baixa_componente_id: payload.baixa_componente_id || null,
       fatura_cartao_id: cartaoBaixa.fatura?.id || null,
       cartao_id: cartaoBaixa.cartao?.id || null,
       empresa_id: empresaBaixaId,
@@ -3456,9 +3500,11 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       }, { transaction });
     }
 
-    await transaction.commit();
+    if (ownTransaction) {
+      await transaction.commit();
+    }
 
-    await registrarEventoSeguranca({
+    if (!options.skipSecurityEvent) await registrarEventoSeguranca({
       req,
       usuarioId: req.user?.id || null,
       tipoEvento: 'FINANCIAL_TITLE_SETTLED',
@@ -3485,6 +3531,18 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       }
     });
 
+    if (!ownTransaction) {
+      return {
+        id: titulo.id,
+        codigo: titulo.codigo,
+        status: novoEstado.status,
+        valor_baixado: novoValorBaixado,
+        valor_saldo: novoEstado.valor_saldo,
+        movimento_financeiro_id: movimento.id,
+        movimento
+      };
+    }
+
     const tituloCompleto = await carregarTituloPorId(req, titulo.id, { includeMovimentos: true });
     const tituloJson = typeof tituloCompleto?.toJSON === 'function'
       ? tituloCompleto.toJSON()
@@ -3509,7 +3567,9 @@ async function baixarTitulo(req, tituloId, payload = {}) {
       }
     };
   } catch (error) {
-    await transaction.rollback();
+    if (ownTransaction) {
+      await transaction.rollback();
+    }
     throw error;
   }
 }
@@ -4035,6 +4095,13 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
     throw createHttpError(400, 'Esta baixa ja foi estornada.');
   }
 
+  if (movimento.baixa_grupo_id) {
+    throw createHttpError(
+      409,
+      'Este movimento pertence a uma baixa com multiplas fontes. Estorne o grupo completo na tela de Baixas com Multiplas Fontes.'
+    );
+  }
+
   const novoValorBaixado = roundCurrency(Number(titulo.valor_baixado || 0) - Number(movimento.valor || 0));
   const valorBaixadoNormalizado = novoValorBaixado < 0 ? 0 : novoValorBaixado;
   const novoEstado = calcularStatusTitulo({
@@ -4052,6 +4119,76 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
       estornado_por: req.user?.id || null,
       estornado_em: new Date()
     }, { transaction });
+
+    const tipoTitulo = getTituloTipo(titulo);
+    if (tipoTitulo === 'PAGAR') {
+      const chequeUtilizado = await ChequeTerceiro.findOne({
+        where: {
+          status: 'UTILIZADO',
+          [Op.or]: [
+            { movimento_saida_id: movimento.id },
+            { movimento_financeiro_id: movimento.id }
+          ]
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (chequeUtilizado) {
+        await chequeUtilizado.update({
+          status: 'EM_CARTEIRA',
+          movimento_saida_id: null,
+          data_saida: null,
+          atualizado_por: req.user?.id || null
+        }, { transaction });
+        await ChequeTerceiroMovimento.create({
+          cheque_terceiro_id: chequeUtilizado.id,
+          tipo_evento: 'ESTORNO_UTILIZACAO',
+          status_anterior: 'UTILIZADO',
+          status_novo: 'EM_CARTEIRA',
+          empresa_destino_id: chequeUtilizado.empresa_id || null,
+          titulo_financeiro_id: titulo.id,
+          movimento_financeiro_id: movimento.id,
+          baixa_grupo_id: movimento.baixa_grupo_id || null,
+          valor: roundCurrency(movimento.valor),
+          data_evento: new Date().toISOString().slice(0, 10),
+          observacoes: payload.observacoes || 'Cheque devolvido a carteira pelo estorno da baixa.',
+          criado_por: req.user?.id || null
+        }, { transaction });
+      }
+    } else if (tipoTitulo === 'RECEBER') {
+      const chequeRecebido = await ChequeTerceiro.findOne({
+        where: {
+          [Op.or]: [
+            { movimento_entrada_id: movimento.id },
+            { movimento_financeiro_id: movimento.id }
+          ]
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (chequeRecebido) {
+        if (String(chequeRecebido.status).toUpperCase() !== 'EM_CARTEIRA') {
+          throw createHttpError(409, 'O cheque recebido ja possui movimentacao posterior. Reverta primeiro a utilizacao ou o deposito.');
+        }
+        await chequeRecebido.update({
+          status: 'CANCELADO',
+          atualizado_por: req.user?.id || null
+        }, { transaction });
+        await ChequeTerceiroMovimento.create({
+          cheque_terceiro_id: chequeRecebido.id,
+          tipo_evento: 'ESTORNO_ENTRADA',
+          status_anterior: 'EM_CARTEIRA',
+          status_novo: 'CANCELADO',
+          empresa_origem_id: chequeRecebido.empresa_id || null,
+          titulo_financeiro_id: titulo.id,
+          movimento_financeiro_id: movimento.id,
+          valor: roundCurrency(movimento.valor),
+          data_evento: new Date().toISOString().slice(0, 10),
+          observacoes: payload.observacoes || 'Entrada cancelada pelo estorno da baixa de recebimento.',
+          criado_por: req.user?.id || null
+        }, { transaction });
+      }
+    }
 
     await titulo.update({
       valor_baixado: valorBaixadoNormalizado,
@@ -4403,6 +4540,8 @@ async function listarChequesTerceirosDisponiveis(req, filters = {}) {
   await assertFinanceAccess(req);
 
   const where = { status: 'EM_CARTEIRA' };
+  const empresaId = Number(filters.empresa_id || 0);
+  if (empresaId > 0) where.empresa_id = empresaId;
   const termo = String(filters.q || filters.busca || '').trim();
   if (termo) {
     where[Op.or] = [
@@ -4453,5 +4592,7 @@ module.exports = {
   listarBaixasRealizadas,
   listarTitulos,
   listarTitulosPorSolicitacao,
-  resolverTipoOperacionalFormaPagamento
+  resolverTipoOperacionalFormaPagamento,
+  sincronizarRealizacaoCompraPorTitulo,
+  sincronizarStatusSolicitacaoPorBaixaTitulos
 };

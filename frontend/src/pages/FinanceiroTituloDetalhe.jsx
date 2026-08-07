@@ -493,7 +493,7 @@ export default function FinanceiroTituloDetalhe() {
       setError('Cartao de debito precisa ter conta bancaria vinculada.');
       return;
     }
-    if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) {
+    if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) {
       setError('Informe a conta bancaria da empresa pagadora.');
       return;
     }
@@ -1457,7 +1457,7 @@ export default function FinanceiroTituloDetalhe() {
                     className="input w-full"
                     value={baixaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={contaBancariaObrigatoria(baixaForm.forma_recebimento) || baixaCartaoDebito}
+                    required={(contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro) || baixaCartaoDebito}
                     disabled={!baixaForm.empresa_id || baixaUsaCartao}
                   >
                     <option value="">
@@ -1690,7 +1690,7 @@ export default function FinanceiroTituloDetalhe() {
                     !baixaForm.forma_recebimento ||
                     (baixaUsaCartao && !baixaForm.cartao_id) ||
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
-                    (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||
+                    (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) ||
                     (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) ||
                     (baixaRecebeChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||
                     !baixaForm.valor ||

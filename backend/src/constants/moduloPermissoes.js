@@ -295,6 +295,29 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'financeiro.cheques',
+        label: 'Carteira de Cheques de Terceiros',
+        permissoes: [
+          { key: 'financeiro.cheques.visualizar', label: 'Visualizar carteira de cheques', descricao: 'Consultar cheques em custodia e o historico de cada documento.' },
+          { key: 'financeiro.cheques.cadastrar', label: 'Cadastrar saldo inicial', descricao: 'Registrar cheques legados sem criar receita ou titulo financeiro.' },
+          { key: 'financeiro.cheques.importar', label: 'Importar cheques', descricao: 'Baixar o modelo, validar e confirmar uma importacao de cheques.' },
+          { key: 'financeiro.cheques.depositar', label: 'Registrar deposito', descricao: 'Retirar um cheque da carteira por deposito identificado.' },
+          { key: 'financeiro.cheques.devolver', label: 'Registrar devolucao', descricao: 'Marcar um cheque como devolvido com motivo auditavel.' },
+          { key: 'financeiro.cheques.cancelar', label: 'Cancelar cheque', descricao: 'Cancelar um registro incorreto ou inutilizavel com justificativa.' },
+          { key: 'financeiro.cheques.transferir', label: 'Transferir custodia', descricao: 'Transferir o cheque para outra empresa do grupo com rastreabilidade.' }
+        ]
+      },
+      {
+        key: 'financeiro.baixas_compostas',
+        label: 'Baixas com Multiplas Fontes',
+        permissoes: [
+          { key: 'financeiro.baixas_compostas.visualizar', label: 'Visualizar baixas compostas', descricao: 'Consultar pagamentos formados por mais de uma conta, forma ou cheque.' },
+          { key: 'financeiro.baixas_compostas.criar', label: 'Preparar baixa composta', descricao: 'Selecionar titulos e montar componentes e rateios do pagamento.' },
+          { key: 'financeiro.baixas_compostas.confirmar', label: 'Confirmar baixa composta', descricao: 'Gravar de forma atomica os componentes e as baixas dos titulos.' },
+          { key: 'financeiro.baixas_compostas.estornar', label: 'Estornar baixa composta', descricao: 'Estornar integralmente o grupo de pagamento e restaurar cheques utilizados.' }
+        ]
+      },
+      {
         key: 'financeiro.relatorios',
         label: 'Relatórios Financeiros',
         permissoes: [

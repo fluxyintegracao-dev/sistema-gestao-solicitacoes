@@ -37,6 +37,7 @@ import { normalizeCurrencyTyping } from '../utils/formatters';
 import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
+import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -777,6 +778,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const canAccessCadastros = hasPermissao(user, 'financeiro.cadastros.visualizar');
   const canExportTitulos = hasPermissao(user, 'financeiro.titulos.exportar');
   const canImportCodigos = hasPermissao(user, 'financeiro.titulos.importar_codigos');
+  const canCreateBaixaComposta = hasPermissao(user, 'financeiro.baixas_compostas.criar')
+    && hasPermissao(user, 'financeiro.baixas_compostas.confirmar');
   const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
     ? String(tipoFixo).toUpperCase()
     : null;
@@ -822,6 +825,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [error, setError] = useState('');
   const [selectedTituloIds, setSelectedTituloIds] = useState([]);
   const [modalBaixaMassaOpen, setModalBaixaMassaOpen] = useState(false);
+  const [modalBaixaCompostaOpen, setModalBaixaCompostaOpen] = useState(false);
   const [baixaMassaForm, setBaixaMassaForm] = useState(() => buildBaixaMassaForm([]));
   const [savingBaixaMassa, setSavingBaixaMassa] = useState(false);
   const [importandoCodigos, setImportandoCodigos] = useState(false);
@@ -1613,7 +1617,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       return;
     }
 
-    if (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
+    if (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) {
       setError('Conta bancaria e obrigatoria para esta forma de baixa.');
       return;
     }
@@ -2585,6 +2589,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               Baixar selecionados
               {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
             </button>
+            {canCreateBaixaComposta && baixaMassaTipoSelecionado === 'PAGAR' ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalBaixaCompostaOpen(true)}
+                disabled={selectedTitulosBaixaveis.length === 0 || savingBaixaMassa}
+                title="Combinar mais de uma conta, forma ou cheque no mesmo pagamento"
+              >
+                Baixa com múltiplas fontes
+                {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-outline btn-sm text-rose-700 hover:border-rose-300 hover:bg-rose-50"
@@ -3006,7 +3022,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     className="input w-full input-sm"
                     value={baixaMassaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={baixaMassaParcelada || contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) || baixaMassaCartaoDebito}
+                    required={baixaMassaParcelada || (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro) || baixaMassaCartaoDebito}
                     disabled={
                       !baixaMassaForm.empresa_id ||
                       (!baixaMassaParcelada && (baixaMassaUsaCartao || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)))
@@ -3400,7 +3416,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
                   (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
                   !baixaMassaForm.forma_pagamento_id ||
-                  (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) ||
+                  (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) ||
                   (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
                   (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||
                   (!baixaMassaParcelada && baixaMassaUsaChequeTerceiro && !baixaMassaForm.cheque_terceiro_id)
@@ -3411,6 +3427,21 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             </div>
           </form>
         </div>
+      ) : null}
+
+      {modalBaixaCompostaOpen ? (
+        <BaixaCompostaModal
+          titulos={selectedTitulosBaixaveis}
+          formas={formasPagamentoBaixaMassa}
+          contas={contasBancarias}
+          cartoes={cartoes}
+          cheques={chequesTerceirosDisponiveis}
+          onClose={() => setModalBaixaCompostaOpen(false)}
+          onConfirmed={() => {
+            setSelectedTituloIds([]);
+            setAppliedFilters((current) => (current ? { ...current } : current));
+          }}
+        />
       ) : null}
 
       {importandoCodigos ? (

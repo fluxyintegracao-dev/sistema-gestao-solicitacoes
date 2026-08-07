@@ -1437,7 +1437,10 @@ function validateFinanceTituloBaixaBody(body = {}) {
   const usarChequeTerceiro = parseBoolean(body.usar_cheque_terceiro, 'Usar cheque de terceiro');
   const chequeTerceiroId = parseInteger(body.cheque_terceiro_id, 'Cheque de terceiro');
   const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
-  const exigeContaBancaria = !formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento);
+  const exigeContaBancaria = (
+    (!formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento))
+    && !(formaRecebimento === 'CHEQUE' && usarChequeTerceiro)
+  );
 
   if (exigeContaBancaria && !contaBancariaId) {
     throw new ValidationError('Conta bancaria e obrigatoria para esta forma de recebimento.');
