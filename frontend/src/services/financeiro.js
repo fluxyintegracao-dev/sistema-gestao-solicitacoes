@@ -34,6 +34,39 @@ export async function getTitulosFinanceiros(params = {}) {
   return parseJson(response, 'Erro ao buscar titulos financeiros');
 }
 
+export async function gerarRelatorioTitulosFinanceirosPdf(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/titulos/relatorio.pdf?${query}`
+    : `${API_URL}/financeiro/titulos/relatorio.pdf`;
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (text) {
+      try {
+        const payload = JSON.parse(text);
+        throw new Error(payload?.error || 'Erro ao gerar relatorio de titulos financeiros');
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
+    }
+    throw new Error(text || 'Erro ao gerar relatorio de titulos financeiros');
+  }
+
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return {
+    blob: await response.blob(),
+    filename: filenameMatch?.[1] || 'relatorio-contas-a-pagar.pdf'
+  };
+}
+
 export async function getFretesPedidosPendentesFinanceiro(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')

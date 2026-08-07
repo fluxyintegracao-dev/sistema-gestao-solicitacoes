@@ -16,6 +16,7 @@ const {
   listarTitulos,
   listarTitulosPorSolicitacao
 } = require('../services/tituloFinanceiroService');
+const { gerarRelatorioTitulosFinanceirosPdf } = require('../services/tituloFinanceiroRelatorioPdfService');
 const { userHasAreaPermission } = require('../services/authorizationService');
 const { responderErroController } = require('../utils/controllerError');
 
@@ -92,6 +93,36 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao listar titulos financeiros');
+    }
+  },
+
+  async relatorioPdf(req, res) {
+    try {
+      const resultado = await listarTitulos(req, {
+        ...(req.query || {}),
+        paginated: true,
+        page: 1,
+        limit: 'all'
+      });
+      const titulos = Array.isArray(resultado) ? resultado : (resultado?.data || []);
+      const pdf = await gerarRelatorioTitulosFinanceirosPdf({
+        titulos,
+        filtros: req.query || {},
+        usuario: req.user
+      });
+      const dataArquivo = new Date().toISOString().slice(0, 10);
+      const naturezaArquivo = String(req.query?.tipo || '').toUpperCase() === 'RECEBER'
+        ? 'contas-a-receber'
+        : 'contas-a-pagar';
+
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="relatorio-${naturezaArquivo}-${dataArquivo}.pdf"`);
+      res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+      res.setHeader('Content-Length', pdf.length);
+      return res.send(pdf);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao gerar relatorio de titulos financeiros');
     }
   },
 
