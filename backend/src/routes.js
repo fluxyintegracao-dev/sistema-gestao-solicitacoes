@@ -242,6 +242,7 @@ const {
   canAccessFinanceiro,
   canAccessFinanceiroRelatorio,
   canImportTitulosFinanceiros,
+  userHasAreaPermission,
   canViewSolicitacaoFinanceiro,
   canAccessTreinamento,
   canAccessComprovantes,
@@ -609,6 +610,16 @@ const allowTituloImportar = permit({
     (await canImportTitulosFinanceiros(req.user))
       ? true
       : 'Acesso negado para importar titulos financeiros'
+  )
+});
+
+const allowTituloImportarCodigos = permit({
+  resource: 'FINANCEIRO_TITULOS_IMPORTAR_CODIGOS',
+  custom: async (req) => (
+    (await canAccessFinanceiro(req.user))
+      && (await userHasAreaPermission(req.user, ['financeiro.titulos.importar_codigos']))
+      ? true
+      : 'Acesso negado para importar codigos de boleto dos titulos'
   )
 });
 
@@ -1695,7 +1706,7 @@ router.post('/financeiro/titulos/importacoes/preview', allowTituloImportar, uplo
 router.get('/financeiro/titulos/importacoes/:id', allowTituloImportar, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.show);
 router.post('/financeiro/titulos/importacoes/:id/confirmar', allowTituloImportar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.confirmar);
 router.get('/financeiro/fretes-pedidos/pendentes', allowFinanceiro, PedidoCompraController.fretesPendentesFinanceiro);
-router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
+router.post('/financeiro/titulos/importar-codigos-barras', allowTituloImportarCodigos, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
 router.post('/financeiro/titulos/excluir-em-massa', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.excluirEmMassa);
 router.post('/financeiro/titulos/baixas/parceladas', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloBaixaParceladaBody }), TituloFinanceiroController.baixarParcelado);
 router.get('/financeiro/cheques-terceiros/disponiveis', allowFinanceiro, TituloFinanceiroController.chequesTerceirosDisponiveis);

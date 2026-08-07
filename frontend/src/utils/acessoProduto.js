@@ -633,6 +633,8 @@ export function canAccessFinanceiro(user) {
       'financeiro.titulos.visualizar',
       'financeiro.titulos.criar',
       'financeiro.titulos.importar',
+      'financeiro.titulos.exportar',
+      'financeiro.titulos.importar_codigos',
       'financeiro.titulos.baixar',
       'financeiro.titulos.excluir',
       'financeiro.titulos.estornar',

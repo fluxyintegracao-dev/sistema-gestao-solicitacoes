@@ -34,7 +34,7 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { normalizeCurrencyTyping } from '../utils/formatters';
-import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros } from '../utils/acessoProduto';
+import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 
@@ -774,6 +774,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
   const canDeleteTitulos = canDeleteTitulosFinanceiros(user);
   const canImportTitulos = canImportTitulosFinanceiros(user);
+  const canAccessCadastros = hasPermissao(user, 'financeiro.cadastros.visualizar');
+  const canExportTitulos = hasPermissao(user, 'financeiro.titulos.exportar');
+  const canImportCodigos = hasPermissao(user, 'financeiro.titulos.importar_codigos');
   const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
     ? String(tipoFixo).toUpperCase()
     : null;
@@ -2592,27 +2595,33 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               Excluir selecionados
               {selectedTitulosExcluiveis.length > 0 ? ` (${selectedTitulosExcluiveis.length})` : ''}
             </button>
-            <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            {canAccessCadastros ? (
+              <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            ) : null}
             <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={exportarTitulos}
-              disabled={loading}
-              title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
-            >
-              Exportar titulos
-            </button>
-            <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
-              {importandoCodigos ? 'Importando...' : 'Importar codigos'}
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={importarCodigosBarras}
-                disabled={importandoCodigos}
-              />
-            </label>
+            {canExportTitulos ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={exportarTitulos}
+                disabled={loading}
+                title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
+              >
+                Exportar titulos
+              </button>
+            ) : null}
+            {canImportCodigos ? (
+              <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
+                {importandoCodigos ? 'Importando...' : 'Importar codigos'}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={importarCodigosBarras}
+                  disabled={importandoCodigos}
+                />
+              </label>
+            ) : null}
             <button
               type="button"
               className="btn btn-outline btn-sm gap-1.5"
