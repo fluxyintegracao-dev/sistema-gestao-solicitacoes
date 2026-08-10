@@ -88,6 +88,9 @@ function validateFrontend() {
   assert(modal.includes('Empresa da fonte'), 'Cada fonte deve permitir selecionar sua propria empresa.');
   assert(modal.includes('Natureza entre empresas'), 'Rateio entre empresas deve exigir classificacao operacional.');
   assert(modal.includes('empresasDisponiveis'), 'Modal deve listar todas as empresas permitidas como fonte.');
+  assert(modal.includes('Cheque de terceiro em carteira'), 'Modal deve identificar claramente os cheques cadastrados em carteira.');
+  assert(modal.includes('Selecione um cheque cadastrado'), 'Opcao vazia do cheque nao pode sugerir uma origem ambigua.');
+  assert(titles.includes("getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 })"), 'Baixa composta deve carregar a mesma carteira exibida na gestao de cheques.');
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));
   assert(custody.includes('max-h-[52vh] overflow-auto'), 'Preview da importacao deve permitir rolagem.');

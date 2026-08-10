@@ -20,7 +20,7 @@ import {
   baixarTitulosFinanceirosEmMassaParcelado,
   getCategoriasFinanceiras,
   getCartoesFinanceiros,
-  getChequesTerceirosDisponiveis,
+  getChequesTerceiros,
   getContasBancarias,
   getFretesPedidosPendentesFinanceiro,
   getFormasPagamentoFinanceiras,
@@ -124,6 +124,7 @@ function compactFilters(filters = {}) {
 
 function normalizeOptionList(data) {
   if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.cheques)) return data.cheques;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.rows)) return data.rows;
@@ -854,7 +855,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       getFormasPagamentoFinanceiras().catch(() => []),
       getContasBancarias().catch(() => []),
       getCartoesFinanceiros().catch(() => []),
-      getChequesTerceirosDisponiveis().catch(() => []),
+      getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 }).catch(() => []),
       getEmpresasGrupo({ ativo: true }).catch(() => [])
     ])
       .then(([obrasData, parceirosData, categoriasData, formasData, contasData, cartoesData, chequesData, empresasData]) => {
@@ -879,6 +880,23 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!modalBaixaCompostaOpen) return undefined;
+    let active = true;
+
+    getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 })
+      .then((data) => {
+        if (active) setChequesTerceiros(normalizeOptionList(data));
+      })
+      .catch(() => {
+        if (active) setError('Nao foi possivel atualizar os cheques de terceiros em carteira.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [modalBaixaCompostaOpen]);
 
   useEffect(() => () => {
     if (relatorioPdfUrl) URL.revokeObjectURL(relatorioPdfUrl);
