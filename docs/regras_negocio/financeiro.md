@@ -54,5 +54,6 @@
 ## Conciliacao
 
 - OFX e conferencia, nao automacao contabil
-- sistema sugere match, mas a confirmacao e manual
+- sistema so sugere match quando valor absoluto em centavos e data forem exatamente iguais; a confirmacao continua manual
+- confirmacao simples revalida valor e data no backend; na associacao multipla, todos os movimentos devem ter a data do extrato e a soma deve fechar exatamente o valor bancario
 - duplicidade de remessa deve ser bloqueada
