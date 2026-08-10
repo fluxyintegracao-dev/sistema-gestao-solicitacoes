@@ -378,6 +378,35 @@ export default function FinanceiroTituloDetalhe() {
   const movimentosAtivosCount = Array.isArray(titulo?.movimentos)
     ? movimentosAtivos.length
     : Number(titulo?.movimentos_ativos_count || 0);
+  const cartoesUtilizados = useMemo(() => {
+    const cartoesPorId = new Map();
+    const movimentosValidos = Array.isArray(titulo?.movimentos)
+      ? titulo.movimentos.filter((movimento) => String(movimento?.status || '').toUpperCase() !== 'ESTORNADO')
+      : [];
+
+    movimentosValidos.forEach((movimento) => {
+      if (movimento?.cartao?.id) {
+        cartoesPorId.set(String(movimento.cartao.id), movimento.cartao);
+      }
+    });
+
+    if (cartoesPorId.size === 0 && titulo?.cartao?.id) {
+      cartoesPorId.set(String(titulo.cartao.id), titulo.cartao);
+    }
+
+    return Array.from(cartoesPorId.values());
+  }, [titulo]);
+  const tituloRelacionadoACartao = useMemo(() => {
+    const formaPagamento = titulo?.formaPagamento || {};
+    const identificacaoForma = [formaPagamento.codigo, formaPagamento.nome, formaPagamento.tipo]
+      .filter(Boolean)
+      .join(' ')
+      .toUpperCase();
+
+    return cartoesUtilizados.length > 0
+      || Boolean(formaPagamento.exige_cartao)
+      || identificacaoForma.includes('CARTAO');
+  }, [cartoesUtilizados, titulo]);
   const pagamentosAtivosCount = Array.isArray(titulo?.paymentIntents)
     ? pagamentosAtivos.length
     : Number(titulo?.payment_intents_ativos_count || 0);
@@ -464,7 +493,7 @@ export default function FinanceiroTituloDetalhe() {
       setError('Cartao de debito precisa ter conta bancaria vinculada.');
       return;
     }
-    if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) {
+    if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) {
       setError('Informe a conta bancaria da empresa pagadora.');
       return;
     }
@@ -664,6 +693,22 @@ export default function FinanceiroTituloDetalhe() {
                 <div className="text-[var(--c-muted)]">Categoria</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
               </div>
+              {tituloRelacionadoACartao && (
+                <div>
+                  <div className="text-[var(--c-muted)]">
+                    {cartoesUtilizados.length > 1 ? 'Cartoes utilizados' : 'Cartao utilizado'}
+                  </div>
+                  {cartoesUtilizados.length > 0 ? (
+                    <div className="space-y-1 font-medium text-[var(--c-text)]">
+                      {cartoesUtilizados.map((cartao) => (
+                        <div key={cartao.id}>{getCartaoLabel(cartao)}</div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="font-medium text-amber-700">Nao informado</div>
+                  )}
+                </div>
+              )}
               <div>
                 <div className="text-[var(--c-muted)]">Entre Empresas</div>
                 <div className="font-medium text-[var(--c-text)]">{titulo.intercompany ? 'Sim' : 'Nao'}</div>
@@ -1412,7 +1457,7 @@ export default function FinanceiroTituloDetalhe() {
                     className="input w-full"
                     value={baixaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={contaBancariaObrigatoria(baixaForm.forma_recebimento) || baixaCartaoDebito}
+                    required={(contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro) || baixaCartaoDebito}
                     disabled={!baixaForm.empresa_id || baixaUsaCartao}
                   >
                     <option value="">
@@ -1645,7 +1690,7 @@ export default function FinanceiroTituloDetalhe() {
                     !baixaForm.forma_recebimento ||
                     (baixaUsaCartao && !baixaForm.cartao_id) ||
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
-                    (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaForm.conta_bancaria_id) ||
+                    (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) ||
                     (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) ||
                     (baixaRecebeChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||
                     !baixaForm.valor ||

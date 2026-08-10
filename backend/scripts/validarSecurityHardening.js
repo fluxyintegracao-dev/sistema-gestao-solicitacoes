@@ -90,10 +90,28 @@ function validateUploadsDecisionIsPreserved() {
   assert(s3.includes("process.env.NODE_ENV !== 'production'"), 'Fallback local nao esta limitado a ambiente nao produtivo.');
 }
 
+function validateFinancialTitleGranularActions() {
+  const { ALL_PERMISSION_KEYS } = require('../src/constants/moduloPermissoes');
+  const routes = read('backend/src/routes.js');
+  const frontend = read('frontend/src/pages/FinanceiroTitulos.jsx');
+
+  assert(ALL_PERMISSION_KEYS.has('financeiro.titulos.exportar'), 'Permissao de exportar titulos ausente.');
+  assert(ALL_PERMISSION_KEYS.has('financeiro.titulos.importar_codigos'), 'Permissao de importar codigos ausente.');
+  assert(
+    routes.includes("userHasAreaPermission(req.user, ['financeiro.titulos.importar_codigos'])")
+      && routes.includes("router.post('/financeiro/titulos/importar-codigos-barras', allowTituloImportarCodigos"),
+    'Importacao de codigos nao esta protegida pela permissao granular.'
+  );
+  assert(frontend.includes("hasPermissao(user, 'financeiro.cadastros.visualizar')"), 'Botao Cadastros nao respeita permissao granular.');
+  assert(frontend.includes("hasPermissao(user, 'financeiro.titulos.exportar')"), 'Botao Exportar titulos nao respeita permissao granular.');
+  assert(frontend.includes("hasPermissao(user, 'financeiro.titulos.importar_codigos')"), 'Botao Importar codigos nao respeita permissao granular.');
+}
+
 validateRemovedBbAutomaticRelease();
 validatePaymentSegregationAndIdempotency();
 validateIdentityHardening();
 validateWebhookAndCorsHardening();
 validateUploadsDecisionIsPreserved();
+validateFinancialTitleGranularActions();
 
 console.log('Validacoes do hardening de seguranca concluidas com sucesso.');

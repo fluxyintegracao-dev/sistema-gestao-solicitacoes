@@ -34,6 +34,39 @@ export async function getTitulosFinanceiros(params = {}) {
   return parseJson(response, 'Erro ao buscar titulos financeiros');
 }
 
+export async function gerarRelatorioTitulosFinanceirosPdf(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const url = query
+    ? `${API_URL}/financeiro/titulos/relatorio.pdf?${query}`
+    : `${API_URL}/financeiro/titulos/relatorio.pdf`;
+  const response = await fetch(url, {
+    cache: 'no-store',
+    headers: authHeaders()
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    if (text) {
+      try {
+        const payload = JSON.parse(text);
+        throw new Error(payload?.error || 'Erro ao gerar relatorio de titulos financeiros');
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error;
+      }
+    }
+    throw new Error(text || 'Erro ao gerar relatorio de titulos financeiros');
+  }
+
+  const disposition = response.headers.get('content-disposition') || '';
+  const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+  return {
+    blob: await response.blob(),
+    filename: filenameMatch?.[1] || 'relatorio-contas-a-pagar.pdf'
+  };
+}
+
 export async function getFretesPedidosPendentesFinanceiro(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -941,6 +974,121 @@ export async function getChequesTerceirosDisponiveis(params = {}) {
   );
 
   return parseJson(response, 'Erro ao buscar cheques de terceiros disponiveis');
+}
+
+export async function getChequesTerceiros(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const response = await fetch(
+    `${API_URL}/financeiro/cheques-terceiros${query ? `?${query}` : ''}`,
+    { headers: authHeaders() }
+  );
+  return parseJson(response, 'Erro ao buscar carteira de cheques');
+}
+
+export async function getChequeTerceiro(id) {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/${id}`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao buscar cheque de terceiro');
+}
+
+export async function criarChequeTerceiro(data) {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao cadastrar cheque de terceiro');
+}
+
+export async function movimentarChequeTerceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/${id}/movimentar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao movimentar cheque de terceiro');
+}
+
+export async function baixarModeloChequesTerceiros() {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/modelo.xlsx`, {
+    headers: authHeaders()
+  });
+  if (!response.ok) await parseJson(response, 'Erro ao baixar modelo de cheques');
+  return response.blob();
+}
+
+export async function previewImportacaoChequesTerceiros(file) {
+  const form = new FormData();
+  form.append('file', file);
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/importacoes/preview`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: form
+  });
+  return parseJson(response, 'Erro ao validar planilha de cheques');
+}
+
+export async function confirmarImportacaoChequesTerceiros(data, idempotencyKey) {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/importacoes/confirmar`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey
+    }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao confirmar importacao de cheques');
+}
+
+export async function previewBaixaFinanceiraComposta(data) {
+  const response = await fetch(`${API_URL}/financeiro/baixas-compostas/preview`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao validar baixa com multiplas fontes');
+}
+
+export async function confirmarBaixaFinanceiraComposta(data, idempotencyKey) {
+  const response = await fetch(`${API_URL}/financeiro/baixas-compostas/confirmar`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey
+    }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao confirmar baixa com multiplas fontes');
+}
+
+export async function getBaixasFinanceirasCompostas(params = {}) {
+  const query = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+  const response = await fetch(
+    `${API_URL}/financeiro/baixas-compostas${query ? `?${query}` : ''}`,
+    { headers: authHeaders() }
+  );
+  return parseJson(response, 'Erro ao buscar baixas com multiplas fontes');
+}
+
+export async function getBaixaFinanceiraComposta(id) {
+  const response = await fetch(`${API_URL}/financeiro/baixas-compostas/${id}`, {
+    headers: authHeaders()
+  });
+  return parseJson(response, 'Erro ao consultar baixa com multiplas fontes');
+}
+
+export async function estornarBaixaFinanceiraComposta(id, motivo) {
+  const response = await fetch(`${API_URL}/financeiro/baixas-compostas/${id}/estornar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ motivo })
+  });
+  return parseJson(response, 'Erro ao estornar baixa composta');
 }
 
 export async function baixarTituloPorConciliacoes(id, data) {

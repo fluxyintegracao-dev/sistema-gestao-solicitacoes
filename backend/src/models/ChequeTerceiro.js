@@ -22,6 +22,15 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    empresa_id: { type: DataTypes.INTEGER, allowNull: true },
+    obra_origem_id: { type: DataTypes.INTEGER, allowNull: true },
+    movimento_entrada_id: { type: DataTypes.INTEGER, allowNull: true },
+    movimento_saida_id: { type: DataTypes.INTEGER, allowNull: true },
+    origem_tipo: { type: DataTypes.STRING(40), allowNull: false, defaultValue: 'RECEBIMENTO_TITULO' },
+    motivo_origem: { type: DataTypes.STRING(255), allowNull: true },
+    data_entrada: { type: DataTypes.DATEONLY, allowNull: true },
+    data_saida: { type: DataTypes.DATEONLY, allowNull: true },
+    chave_importacao: { type: DataTypes.STRING(160), allowNull: true },
     cliente_nome: {
       type: DataTypes.STRING(180),
       allowNull: true

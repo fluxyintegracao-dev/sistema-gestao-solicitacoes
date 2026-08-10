@@ -277,6 +277,8 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.titulos.visualizar', label: 'Visualizar títulos', descricao: 'Ver lista e detalhes dos títulos a pagar e a receber.' },
           { key: 'financeiro.titulos.criar', label: 'Criar conta manual', descricao: 'Abrir novo título financeiro manualmente.' },
           { key: 'financeiro.titulos.importar', label: 'Importar contas a pagar', descricao: 'Exportar o modelo, validar e confirmar títulos a pagar por planilha.' },
+          { key: 'financeiro.titulos.exportar', label: 'Exportar títulos', descricao: 'Exportar em CSV os títulos listados conforme os filtros e colunas visíveis.' },
+          { key: 'financeiro.titulos.importar_codigos', label: 'Importar códigos de boleto', descricao: 'Importar por CSV linha digitável, código de barras e banco dos títulos.' },
           { key: 'financeiro.titulos.baixar', label: 'Registrar baixa / pagamento', descricao: 'Quitar ou baixar parcialmente um título.' },
           { key: 'financeiro.titulos.excluir', label: 'Excluir títulos', descricao: 'Excluir logicamente títulos abertos sem movimentos financeiros ativos.' },
           { key: 'financeiro.titulos.estornar', label: 'Estornar movimento', descricao: 'Reverter uma baixa ou pagamento registrado.' },
@@ -290,6 +292,29 @@ const MODULO_PERMISSION_GROUPS = [
         label: 'Comprovantes',
         permissoes: [
           { key: 'financeiro.comprovantes.excluir', label: 'Excluir comprovantes', descricao: 'Permite excluir comprovantes pendentes ou vinculados.' }
+        ]
+      },
+      {
+        key: 'financeiro.cheques',
+        label: 'Carteira de Cheques de Terceiros',
+        permissoes: [
+          { key: 'financeiro.cheques.visualizar', label: 'Visualizar carteira de cheques', descricao: 'Consultar cheques em custodia e o historico de cada documento.' },
+          { key: 'financeiro.cheques.cadastrar', label: 'Cadastrar saldo inicial', descricao: 'Registrar cheques legados sem criar receita ou titulo financeiro.' },
+          { key: 'financeiro.cheques.importar', label: 'Importar cheques', descricao: 'Baixar o modelo, validar e confirmar uma importacao de cheques.' },
+          { key: 'financeiro.cheques.depositar', label: 'Registrar deposito', descricao: 'Retirar um cheque da carteira por deposito identificado.' },
+          { key: 'financeiro.cheques.devolver', label: 'Registrar devolucao', descricao: 'Marcar um cheque como devolvido com motivo auditavel.' },
+          { key: 'financeiro.cheques.cancelar', label: 'Cancelar cheque', descricao: 'Cancelar um registro incorreto ou inutilizavel com justificativa.' },
+          { key: 'financeiro.cheques.transferir', label: 'Transferir custodia', descricao: 'Transferir o cheque para outra empresa do grupo com rastreabilidade.' }
+        ]
+      },
+      {
+        key: 'financeiro.baixas_compostas',
+        label: 'Baixas com Multiplas Fontes',
+        permissoes: [
+          { key: 'financeiro.baixas_compostas.visualizar', label: 'Visualizar baixas compostas', descricao: 'Consultar pagamentos formados por mais de uma conta, forma ou cheque.' },
+          { key: 'financeiro.baixas_compostas.criar', label: 'Preparar baixa composta', descricao: 'Selecionar titulos e montar componentes e rateios do pagamento.' },
+          { key: 'financeiro.baixas_compostas.confirmar', label: 'Confirmar baixa composta', descricao: 'Gravar de forma atomica os componentes e as baixas dos titulos.' },
+          { key: 'financeiro.baixas_compostas.estornar', label: 'Estornar baixa composta', descricao: 'Estornar integralmente o grupo de pagamento e restaurar cheques utilizados.' }
         ]
       },
       {

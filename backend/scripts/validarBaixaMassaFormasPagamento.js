@@ -21,9 +21,16 @@ function validateContracts() {
   const validator = fs.readFileSync(path.resolve(__dirname, '../src/validators/financialValidators.js'), 'utf8');
   const movement = fs.readFileSync(path.resolve(__dirname, '../src/models/MovimentoFinanceiro.js'), 'utf8');
   const detail = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTituloDetalhe.jsx'), 'utf8');
+  const partnerService = fs.readFileSync(path.resolve(__dirname, '../src/services/parceiroService.js'), 'utf8');
 
   assert(frontend.includes('formasPagamentoBaixaMassa.map'));
   assert(frontend.includes('forma_pagamento_id: baixaMassaForm.forma_pagamento_id'));
+  assert(frontend.includes("buscarParceiros({ ativo: true, incluir_fornecedores_compra: 1, limit: 'all' })"));
+  assert(frontend.includes("browseTitle={draftFilters.tipo === 'PAGAR' ? 'Selecionar credor'"));
+  assert(frontend.includes('Lista unificada de credores cadastrados e fornecedores vinculados'));
+  assert(frontend.includes('browseListClassName="min-w-[620px]"'));
+  assert(partnerService.includes("as: 'fornecedoresCompra'"));
+  assert(partnerService.includes('incluir_fornecedores_compra'));
   assert(!frontend.includes('const FORMAS_RECEBIMENTO ='));
   assert(validator.includes("'forma_pagamento_id'"));
   assert(movement.includes('forma_pagamento_id'));

@@ -68,6 +68,8 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    baixa_grupo_id: { type: DataTypes.INTEGER, allowNull: true },
+    baixa_componente_id: { type: DataTypes.INTEGER, allowNull: true },
     forma_recebimento: {
       type: DataTypes.STRING(30),
       allowNull: true

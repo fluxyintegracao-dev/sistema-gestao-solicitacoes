@@ -242,6 +242,7 @@ const {
   canAccessFinanceiro,
   canAccessFinanceiroRelatorio,
   canImportTitulosFinanceiros,
+  userHasAreaPermission,
   canViewSolicitacaoFinanceiro,
   canAccessTreinamento,
   canAccessComprovantes,
@@ -382,6 +383,7 @@ const CartaoFinanceiroController = require('./controllers/CartaoFinanceiroContro
 const FaturaCartaoFinanceiroController = require('./controllers/FaturaCartaoFinanceiroController');
 const TituloFinanceiroController = require('./controllers/TituloFinanceiroController');
 const TituloFinanceiroImportacaoController = require('./controllers/TituloFinanceiroImportacaoController');
+const ChequeTerceiroController = require('./controllers/ChequeTerceiroController');
 const FinanciamentoBancarioController = require('./controllers/FinanciamentoBancarioController');
 const RelatorioFinanceiroController = require('./controllers/RelatorioFinanceiroController');
 const ConciliacaoBancariaController = require('./controllers/ConciliacaoBancariaController');
@@ -611,6 +613,66 @@ const allowTituloImportar = permit({
       : 'Acesso negado para importar titulos financeiros'
   )
 });
+
+const allowTituloImportarCodigos = permit({
+  resource: 'FINANCEIRO_TITULOS_IMPORTAR_CODIGOS',
+  custom: async (req) => (
+    (await canAccessFinanceiro(req.user))
+      && (await userHasAreaPermission(req.user, ['financeiro.titulos.importar_codigos']))
+      ? true
+      : 'Acesso negado para importar codigos de boleto dos titulos'
+  )
+});
+
+function allowFinanceiroArea(resource, permissionKeys = []) {
+  return permit({
+    resource,
+    custom: async (req) => (
+      (await canAccessFinanceiro(req.user))
+      && (await userHasAreaPermission(req.user, permissionKeys))
+        ? true
+        : 'Acesso negado para esta operacao financeira'
+    )
+  });
+}
+
+const allowChequesVisualizar = allowFinanceiroArea(
+  'FINANCEIRO_CHEQUES_VISUALIZAR',
+  ['financeiro.cheques.visualizar']
+);
+const allowChequesCadastrar = allowFinanceiroArea(
+  'FINANCEIRO_CHEQUES_CADASTRAR',
+  ['financeiro.cheques.cadastrar']
+);
+const allowChequesImportar = allowFinanceiroArea(
+  'FINANCEIRO_CHEQUES_IMPORTAR',
+  ['financeiro.cheques.importar']
+);
+const allowChequesMovimentar = allowFinanceiroArea(
+  'FINANCEIRO_CHEQUES_MOVIMENTAR',
+  [
+    'financeiro.cheques.depositar',
+    'financeiro.cheques.devolver',
+    'financeiro.cheques.cancelar',
+    'financeiro.cheques.transferir'
+  ]
+);
+const allowBaixaCompostaVisualizar = allowFinanceiroArea(
+  'FINANCEIRO_BAIXAS_COMPOSTAS_VISUALIZAR',
+  ['financeiro.baixas_compostas.visualizar']
+);
+const allowBaixaCompostaCriar = allowFinanceiroArea(
+  'FINANCEIRO_BAIXAS_COMPOSTAS_CRIAR',
+  ['financeiro.baixas_compostas.criar']
+);
+const allowBaixaCompostaConfirmar = allowFinanceiroArea(
+  'FINANCEIRO_BAIXAS_COMPOSTAS_CONFIRMAR',
+  ['financeiro.baixas_compostas.confirmar']
+);
+const allowBaixaCompostaEstornar = allowFinanceiroArea(
+  'FINANCEIRO_BAIXAS_COMPOSTAS_ESTORNAR',
+  ['financeiro.baixas_compostas.estornar']
+);
 
 function allowFinanceiroRelatorio(permissionKeys = []) {
   return permit({
@@ -1688,13 +1750,26 @@ router.get('/financeiro/financiamentos-bancarios/:id/auditoria', allowFinanceiro
 router.post('/financeiro/financiamentos-bancarios/:id/gerar-titulos', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Financiamento bancario') }), FinanciamentoBancarioController.gerarTitulos);
 router.patch('/financeiro/financiamentos-bancarios/parcelas/:id', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Parcela do financiamento bancario') }), FinanciamentoBancarioController.atualizarParcela);
 router.get('/financeiro/titulos', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.index);
+router.get('/financeiro/titulos/relatorio.pdf', allowFinanceiro, validateRequest({ query: validateFinanceTituloQuery }), TituloFinanceiroController.relatorioPdf);
 router.post('/financeiro/titulos', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloCreateBody }), TituloFinanceiroController.create);
 router.get('/financeiro/titulos/importacoes/modelo', allowTituloImportar, TituloFinanceiroImportacaoController.modelo);
 router.post('/financeiro/titulos/importacoes/preview', allowTituloImportar, uploadRateLimit, uploadComprovantes.single('file'), TituloFinanceiroImportacaoController.preview);
 router.get('/financeiro/titulos/importacoes/:id', allowTituloImportar, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.show);
 router.post('/financeiro/titulos/importacoes/:id/confirmar', allowTituloImportar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Importacao de titulos') }), TituloFinanceiroImportacaoController.confirmar);
+router.get('/financeiro/cheques-terceiros/modelo.xlsx', allowChequesImportar, ChequeTerceiroController.modelo);
+router.post('/financeiro/cheques-terceiros/importacoes/preview', allowChequesImportar, uploadRateLimit, uploadComprovantes.single('file'), ChequeTerceiroController.importPreview);
+router.post('/financeiro/cheques-terceiros/importacoes/confirmar', allowChequesImportar, criticalRateLimit, ChequeTerceiroController.importConfirm);
+router.get('/financeiro/cheques-terceiros', allowChequesVisualizar, ChequeTerceiroController.index);
+router.post('/financeiro/cheques-terceiros', allowChequesCadastrar, criticalRateLimit, ChequeTerceiroController.create);
+router.post('/financeiro/cheques-terceiros/:id/movimentar', allowChequesMovimentar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.movimentar);
+router.get('/financeiro/cheques-terceiros/:id', allowChequesVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.show);
+router.post('/financeiro/baixas-compostas/preview', allowBaixaCompostaCriar, ChequeTerceiroController.baixaPreview);
+router.post('/financeiro/baixas-compostas/confirmar', allowBaixaCompostaConfirmar, criticalRateLimit, ChequeTerceiroController.baixaConfirm);
+router.get('/financeiro/baixas-compostas', allowBaixaCompostaVisualizar, ChequeTerceiroController.baixas);
+router.post('/financeiro/baixas-compostas/:id/estornar', allowBaixaCompostaEstornar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Baixa composta') }), ChequeTerceiroController.baixaEstornar);
+router.get('/financeiro/baixas-compostas/:id', allowBaixaCompostaVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Baixa composta') }), ChequeTerceiroController.baixaShow);
 router.get('/financeiro/fretes-pedidos/pendentes', allowFinanceiro, PedidoCompraController.fretesPendentesFinanceiro);
-router.post('/financeiro/titulos/importar-codigos-barras', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
+router.post('/financeiro/titulos/importar-codigos-barras', allowTituloImportarCodigos, criticalRateLimit, TituloFinanceiroController.importarCodigosBarras);
 router.post('/financeiro/titulos/excluir-em-massa', allowFinanceiro, criticalRateLimit, TituloFinanceiroController.excluirEmMassa);
 router.post('/financeiro/titulos/baixas/parceladas', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTituloBaixaParceladaBody }), TituloFinanceiroController.baixarParcelado);
 router.get('/financeiro/cheques-terceiros/disponiveis', allowFinanceiro, TituloFinanceiroController.chequesTerceirosDisponiveis);

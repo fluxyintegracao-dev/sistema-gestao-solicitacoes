@@ -98,6 +98,10 @@ db.FinanceiroTituloImportacao = require('./FinanceiroTituloImportacao')(sequeliz
 db.FinanceiroTituloImportacaoLinha = require('./FinanceiroTituloImportacaoLinha')(sequelize, Sequelize);
 db.FinanceiroTituloImportacaoResultado = require('./FinanceiroTituloImportacaoResultado')(sequelize, Sequelize);
 db.ChequeTerceiro = require('./ChequeTerceiro')(sequelize, Sequelize);
+db.ChequeTerceiroMovimento = require('./ChequeTerceiroMovimento')(sequelize, Sequelize);
+db.BaixaFinanceiraGrupo = require('./BaixaFinanceiraGrupo')(sequelize, Sequelize);
+db.BaixaFinanceiraComponente = require('./BaixaFinanceiraComponente')(sequelize, Sequelize);
+db.BaixaFinanceiraAlocacao = require('./BaixaFinanceiraAlocacao')(sequelize, Sequelize);
 db.FinanciamentoBancario = require('./FinanciamentoBancario')(sequelize, Sequelize);
 db.FinanciamentoBancarioParcela = require('./FinanciamentoBancarioParcela')(sequelize, Sequelize);
 db.BoletoCaixaConvenio = require('./BoletoCaixaConvenio')(sequelize, Sequelize);
@@ -2906,6 +2910,39 @@ db.ChequeTerceiro.belongsTo(db.Parceiro, {
   foreignKey: 'parceiro_entregou_id',
   as: 'parceiroEntregou'
 });
+
+db.EmpresaGrupo.hasMany(db.ChequeTerceiro, { foreignKey: 'empresa_id', as: 'chequesTerceiros' });
+db.ChequeTerceiro.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.Obra.hasMany(db.ChequeTerceiro, { foreignKey: 'obra_origem_id', as: 'chequesTerceirosOrigem' });
+db.ChequeTerceiro.belongsTo(db.Obra, { foreignKey: 'obra_origem_id', as: 'obraOrigem' });
+
+db.ChequeTerceiro.hasMany(db.ChequeTerceiroMovimento, { foreignKey: 'cheque_terceiro_id', as: 'historico' });
+db.ChequeTerceiroMovimento.belongsTo(db.ChequeTerceiro, { foreignKey: 'cheque_terceiro_id', as: 'cheque' });
+
+db.EmpresaGrupo.hasMany(db.BaixaFinanceiraGrupo, { foreignKey: 'empresa_id', as: 'baixasCompostas' });
+db.BaixaFinanceiraGrupo.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.Parceiro.hasMany(db.BaixaFinanceiraGrupo, { foreignKey: 'parceiro_id', as: 'baixasCompostas' });
+db.BaixaFinanceiraGrupo.belongsTo(db.Parceiro, { foreignKey: 'parceiro_id', as: 'parceiro' });
+db.BaixaFinanceiraGrupo.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'baixa_grupo_id', as: 'componentes' });
+db.BaixaFinanceiraComponente.belongsTo(db.BaixaFinanceiraGrupo, { foreignKey: 'baixa_grupo_id', as: 'grupo' });
+db.EmpresaGrupo.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'empresa_id', as: 'componentesBaixasCompostasFonte' });
+db.BaixaFinanceiraComponente.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresaFonte' });
+db.FormaPagamentoFinanceira.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'forma_pagamento_id', as: 'componentesBaixasCompostas' });
+db.BaixaFinanceiraComponente.belongsTo(db.FormaPagamentoFinanceira, { foreignKey: 'forma_pagamento_id', as: 'formaPagamento' });
+db.ContaBancaria.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'conta_bancaria_id', as: 'componentesBaixasCompostas' });
+db.BaixaFinanceiraComponente.belongsTo(db.ContaBancaria, { foreignKey: 'conta_bancaria_id', as: 'contaBancaria' });
+db.CartaoFinanceiro.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'cartao_id', as: 'componentesBaixasCompostas' });
+db.BaixaFinanceiraComponente.belongsTo(db.CartaoFinanceiro, { foreignKey: 'cartao_id', as: 'cartao' });
+db.BaixaFinanceiraGrupo.hasMany(db.BaixaFinanceiraAlocacao, { foreignKey: 'baixa_grupo_id', as: 'alocacoes' });
+db.BaixaFinanceiraAlocacao.belongsTo(db.BaixaFinanceiraGrupo, { foreignKey: 'baixa_grupo_id', as: 'grupo' });
+db.BaixaFinanceiraComponente.hasMany(db.BaixaFinanceiraAlocacao, { foreignKey: 'componente_id', as: 'alocacoes' });
+db.BaixaFinanceiraAlocacao.belongsTo(db.BaixaFinanceiraComponente, { foreignKey: 'componente_id', as: 'componente' });
+db.TituloFinanceiro.hasMany(db.BaixaFinanceiraAlocacao, { foreignKey: 'titulo_financeiro_id', as: 'alocacoesBaixasCompostas' });
+db.BaixaFinanceiraAlocacao.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'titulo' });
+db.MovimentoFinanceiro.hasOne(db.BaixaFinanceiraAlocacao, { foreignKey: 'movimento_financeiro_id', as: 'alocacaoBaixaComposta' });
+db.BaixaFinanceiraAlocacao.belongsTo(db.MovimentoFinanceiro, { foreignKey: 'movimento_financeiro_id', as: 'movimento' });
+db.ChequeTerceiro.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'cheque_terceiro_id', as: 'componentesBaixa' });
+db.BaixaFinanceiraComponente.belongsTo(db.ChequeTerceiro, { foreignKey: 'cheque_terceiro_id', as: 'chequeTerceiro' });
 
 db.EmpresaGrupo.hasMany(db.FinanciamentoBancario, {
   foreignKey: 'empresa_id',

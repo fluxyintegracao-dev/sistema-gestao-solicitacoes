@@ -11189,6 +11189,105 @@ body {
   justify-content: space-between;
 }
 
+/* Operacoes financeiras extensas: baixa em massa e multiplas fontes. */
+.finance-operation-modal-overlay {
+  z-index: 130;
+}
+
+.modal-dialog.finance-operation-modal {
+  max-height: min(94dvh, 980px);
+  color: var(--c-text);
+  background: var(--modal-bg);
+  border-color: var(--modal-border);
+  box-shadow: var(--modal-shadow);
+  isolation: isolate;
+}
+
+.modal-dialog.finance-operation-modal--medium {
+  max-width: min(860px, calc(100vw - 2rem));
+}
+
+.modal-dialog.finance-operation-modal--detail {
+  max-width: min(1120px, calc(100vw - 2rem));
+}
+
+.modal-dialog.finance-operation-modal--wide {
+  max-width: min(1280px, calc(100vw - 2rem));
+}
+
+.finance-operation-modal .modal-header,
+.finance-operation-modal .modal-footer {
+  background: color-mix(in srgb, var(--modal-bg) 96%, var(--c-bg));
+}
+
+.finance-operation-modal .modal-body {
+  background: var(--modal-bg);
+  scrollbar-gutter: stable;
+}
+
+.finance-operation-panel,
+.finance-operation-metric,
+.finance-operation-table-shell {
+  border: 1px solid var(--c-border);
+  background: var(--c-surface);
+}
+
+.finance-operation-panel,
+.finance-operation-metric {
+  border-radius: 0.75rem;
+}
+
+.finance-operation-panel--soft {
+  background: color-mix(in srgb, var(--c-surface) 84%, var(--c-bg));
+}
+
+.finance-operation-table-shell {
+  overflow-x: auto;
+  border-radius: 0.65rem;
+}
+
+.finance-operation-table-shell .table {
+  margin: 0;
+  background: var(--c-surface);
+}
+
+.finance-operation-notice {
+  border: 1px solid;
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.finance-operation-notice--warning {
+  border-color: var(--status-pending-border);
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+}
+
+.finance-operation-notice--info {
+  border-color: var(--status-paid-border);
+  background: var(--status-paid-bg);
+  color: var(--status-paid-text);
+}
+
+.finance-operation-notice--success {
+  border-color: var(--status-approved-border);
+  background: var(--status-approved-bg);
+  color: var(--status-approved-text);
+}
+
+.finance-operation-notice--danger {
+  border-color: var(--status-rejected-border);
+  background: var(--status-rejected-bg);
+  color: var(--status-rejected-text);
+}
+
+.finance-operation-modal .finance-operation-value-badge {
+  border: 1px solid var(--c-border);
+  background: var(--c-bg);
+  color: var(--c-text);
+}
+
 /* Scrollbar discreta dentro do modal */
 .modal-body::-webkit-scrollbar {
   width: 6px;
@@ -11217,6 +11316,35 @@ body {
     max-width: 100%;
     max-height: 92vh;
     border-radius: var(--modal-radius) var(--modal-radius) 0 0;
+  }
+
+  .modal-dialog.finance-operation-modal,
+  .modal-dialog.finance-operation-modal--medium,
+  .modal-dialog.finance-operation-modal--detail,
+  .modal-dialog.finance-operation-modal--wide {
+    max-width: 100%;
+    max-height: 94dvh;
+  }
+
+  .finance-operation-modal .modal-header,
+  .finance-operation-modal .modal-body,
+  .finance-operation-modal .modal-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .finance-operation-modal .modal-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .finance-operation-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .finance-operation-actions .btn {
+    width: 100%;
   }
 }
 

@@ -274,13 +274,14 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
                 <span className="text-xs text-[var(--c-muted)]">Nenhuma tarifa ativa configurada.</span>
               ) : tarifasAtivas.map((tarifa) => {
                 const key = `tarifa-${item?.id}-${tarifa.codigo}`;
+                const itemEmProcessamento = String(processingId || '').startsWith(`tarifa-${item?.id}-`);
                 const elegibilidade = tarifaAtalhoAptaParaConciliacao(tarifa);
                 return (
                   <button
                     key={tarifa.codigo}
                     type="button"
                     className="btn btn-outline btn-sm"
-                    disabled={!isSaida || !elegibilidade.ok || processingId === key}
+                    disabled={!isSaida || !elegibilidade.ok || itemEmProcessamento}
                     onClick={() => onConfirmarTarifa(item, tarifa)}
                     title={!isSaida ? 'Tarifas bancarias devem ser lancamentos de saida.' : elegibilidade.motivo}
                   >
@@ -1281,6 +1282,7 @@ export default function FinanceiroConciliacao() {
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [processingId, setProcessingId] = useState(null);
+  const tarifaRequestsEmAndamentoRef = useRef(new Set());
   const [acoesRapidasItem, setAcoesRapidasItem] = useState(null);
   const [acoesRapidasError, setAcoesRapidasError] = useState('');
   const [novoTituloItem, setNovoTituloItem] = useState(null); // item OFX para o modal de novo título
@@ -1808,8 +1810,13 @@ export default function FinanceiroConciliacao() {
   async function handleConfirmarTarifa(item, tarifa) {
     if (!item?.id || !tarifa?.codigo) return;
 
+    const lockKey = `tarifa-${item.id}`;
+    const processingKey = `${lockKey}-${tarifa.codigo}`;
+    if (tarifaRequestsEmAndamentoRef.current.has(lockKey)) return;
+    tarifaRequestsEmAndamentoRef.current.add(lockKey);
+
     try {
-      setProcessingId(`tarifa-${item.id}-${tarifa.codigo}`);
+      setProcessingId(processingKey);
       setError('');
       setAcoesRapidasError('');
       setFeedback('');
@@ -1825,6 +1832,7 @@ export default function FinanceiroConciliacao() {
       setAcoesRapidasError(message);
       setError(message);
     } finally {
+      tarifaRequestsEmAndamentoRef.current.delete(lockKey);
       setProcessingId(null);
     }
   }

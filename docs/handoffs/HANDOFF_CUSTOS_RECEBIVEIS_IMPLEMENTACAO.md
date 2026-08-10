@@ -201,7 +201,7 @@ Passaram:
 - `npm.cmd run test:docs`;
 - `npm.cmd run build` no frontend.
 
-O registro central permanece com 19 grupos, 89 areas e 299 permissoes.
+O registro central possui 19 grupos, 89 areas e 301 permissoes.
 
 Tambem passou a verificacao visual local com APIs simuladas, sem banco e sem ambiente
 remoto. Na Fase 2 foram validados:

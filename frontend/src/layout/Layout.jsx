@@ -73,6 +73,7 @@ import {
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
   canViewFinanceiroRelatorios,
+  hasPermissao,
   canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
@@ -481,6 +482,12 @@ export default function Layout() {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/contas-a-receber', 'Contas a Receber', HiOutlineWallet) : null,
         financeiroAccess ? item('/financeiro/contas-a-pagar', 'Contas a Pagar', HiOutlineWallet) : null,
+        financeiroAccess && hasPermissao(user, 'financeiro.cheques.visualizar')
+          ? item('/financeiro/cheques-terceiros', 'Cheques de Terceiros', HiOutlineCreditCard)
+          : null,
+        financeiroAccess && hasPermissao(user, 'financeiro.baixas_compostas.visualizar')
+          ? item('/financeiro/baixas-compostas', 'Baixas com Multiplas Fontes', HiOutlineReceiptRefund)
+          : null,
         bancosEnterpriseAccess ? item('/financeiro/bancos', 'Bancos Enterprise', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/financiamentos-bancarios', 'Financiamentos Bancarios', HiOutlineBanknotes) : null,
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,

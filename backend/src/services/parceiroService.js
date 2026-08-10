@@ -1,5 +1,5 @@
 const { Op } = require('sequelize');
-const { Parceiro, ParceiroCategoria } = require('../models');
+const { Parceiro, ParceiroCategoria, FornecedorCompra } = require('../models');
 
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
 
@@ -285,6 +285,7 @@ async function buscarParceiros({
   testemunha,
   categoria_id,
   incluir_categorias = '0',
+  incluir_fornecedores_compra = '0',
   ativo = '1',
   limit = 10
 } = {}) {
@@ -361,6 +362,16 @@ async function buscarParceiros({
     });
   }
 
+  if (String(incluir_fornecedores_compra || '0').trim() === '1') {
+    include.push({
+      model: FornecedorCompra,
+      as: 'fornecedoresCompra',
+      attributes: ['id', 'nome', 'cnpj'],
+      where: { ativo: true },
+      required: false
+    });
+  }
+
   const shouldReturnAll = String(limit || '').trim().toLowerCase() === 'all';
   const options = {
     where,
@@ -431,5 +442,6 @@ module.exports = {
   atualizarParceiro,
   buscarParceiros,
   criarParceiro,
+  isValidCpfCnpj,
   normalizarCpfCnpj
 };

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   HiOutlineAdjustmentsHorizontal,
@@ -19,11 +20,12 @@ import {
   baixarTitulosFinanceirosEmMassaParcelado,
   getCategoriasFinanceiras,
   getCartoesFinanceiros,
-  getChequesTerceirosDisponiveis,
+  getChequesTerceiros,
   getContasBancarias,
   getFretesPedidosPendentesFinanceiro,
   getFormasPagamentoFinanceiras,
   getTitulosFinanceiros,
+  gerarRelatorioTitulosFinanceirosPdf,
   excluirTitulosFinanceirosEmMassa,
   exportarModeloImportacaoTitulosPagar,
   importarCodigosBarrasTitulos
@@ -32,9 +34,9 @@ import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { normalizeCurrencyTyping } from '../utils/formatters';
-import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros } from '../utils/acessoProduto';
-import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
+import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
+import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -122,6 +124,7 @@ function compactFilters(filters = {}) {
 
 function normalizeOptionList(data) {
   if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.cheques)) return data.cheques;
   if (Array.isArray(data?.data)) return data.data;
   if (Array.isArray(data?.items)) return data.items;
   if (Array.isArray(data?.rows)) return data.rows;
@@ -133,6 +136,8 @@ function normalizeSearchText(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.\-/]/g, '')
+    .trim()
     .toLowerCase();
 }
 
@@ -148,7 +153,11 @@ function FinanceiroFilterAutocomplete({
   allLabel = 'Todos',
   emptyLabel = 'Nenhum registro encontrado',
   getLabel = (item) => item?.nome || '',
-  getDescription = () => ''
+  getDescription = () => '',
+  browseEnabled = false,
+  browseTitle = 'Selecionar registro',
+  browseDescription = 'Pesquise ou percorra todas as opcoes disponiveis.',
+  browseListClassName = ''
 }) {
   const selected = useMemo(
     () => options.find((item) => String(item?.id) === String(value || '')) || null,
@@ -157,6 +166,8 @@ function FinanceiroFilterAutocomplete({
   const selectedLabel = selected ? getLabel(selected) : '';
   const [query, setQuery] = useState(selectedLabel);
   const [open, setOpen] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
+  const [browseQuery, setBrowseQuery] = useState('');
 
   useEffect(() => {
     if (!open) {
@@ -178,36 +189,81 @@ function FinanceiroFilterAutocomplete({
       .slice(0, 40);
   }, [getDescription, getLabel, options, query]);
 
+  const browseOptions = useMemo(() => {
+    const terms = normalizeSearchText(browseQuery).split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return options;
+    return options.filter((item) => {
+      const searchable = normalizeSearchText(`${getLabel(item)} ${getDescription(item)}`);
+      return terms.every((term) => searchable.includes(term));
+    });
+  }, [browseQuery, getDescription, getLabel, options]);
+
+  useEffect(() => {
+    if (!browseOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setBrowseOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [browseOpen]);
+
   const handleSelect = (nextValue, nextLabel = '') => {
     onChange(nextValue);
     setQuery(nextLabel);
     setOpen(false);
+    setBrowseOpen(false);
   };
 
   return (
     <div key={label} className={`${className} relative`}>
       <span className="app-filter-label">{label}</span>
-      <input
-        className={inputClassName}
-        value={open ? query : selectedLabel}
-        onFocus={() => {
-          setQuery(selectedLabel);
-          setOpen(true);
-        }}
-        onChange={(event) => {
-          setQuery(event.target.value);
-          if (value) {
-            onChange('');
-          }
-          setOpen(true);
-        }}
-        onBlur={() => {
-          window.setTimeout(() => setOpen(false), 120);
-        }}
-        placeholder={placeholder}
-        disabled={disabled}
-        autoComplete="off"
-      />
+      <div className="relative">
+        <input
+          className={`${inputClassName} ${browseEnabled ? 'pr-10' : ''}`}
+          value={open ? query : selectedLabel}
+          onFocus={() => {
+            setQuery(selectedLabel);
+            setOpen(true);
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            if (value) {
+              onChange('');
+            }
+            setOpen(true);
+          }}
+          onBlur={() => {
+            window.setTimeout(() => setOpen(false), 120);
+          }}
+          placeholder={placeholder}
+          disabled={disabled}
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={open}
+        />
+        {browseEnabled ? (
+          <button
+            type="button"
+            className="absolute right-1 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              setOpen(false);
+              setBrowseQuery('');
+              setBrowseOpen(true);
+            }}
+            disabled={disabled}
+            title={`Ver todas as opcoes de ${label.toLowerCase()}`}
+            aria-label={`Ver todas as opcoes de ${label.toLowerCase()}`}
+          >
+            <HiOutlineMagnifyingGlass className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
       {open && !disabled && (
         <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950">
           <button
@@ -246,6 +302,108 @@ function FinanceiroFilterAutocomplete({
           )}
         </div>
       )}
+      {browseEnabled && browseOpen ? createPortal(
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setBrowseOpen(false);
+          }}
+        >
+          <section
+            className="flex h-full w-full flex-col overflow-hidden bg-[var(--c-surface)] shadow-2xl sm:h-[min(88vh,780px)] sm:max-w-4xl sm:rounded-2xl sm:border sm:border-[var(--c-border)]"
+            role="dialog"
+            aria-modal="true"
+            aria-label={browseTitle}
+          >
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
+              <div>
+                <h2 className="text-base font-semibold text-[var(--c-text)] sm:text-lg">{browseTitle}</h2>
+                <p className="mt-0.5 text-xs text-[var(--c-muted)]">{browseDescription}</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm btn-square shrink-0"
+                onClick={() => setBrowseOpen(false)}
+                title="Fechar"
+                aria-label="Fechar"
+              >
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </header>
+
+            <div className="shrink-0 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
+              <label className="app-filter-field">
+                <span className="app-filter-label">Pesquisar</span>
+                <div className="relative">
+                  <input
+                    className="input w-full pr-10"
+                    value={browseQuery}
+                    onChange={(event) => setBrowseQuery(event.target.value)}
+                    placeholder={placeholder}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                  <HiOutlineMagnifyingGlass className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--c-primary)]" />
+                </div>
+              </label>
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs text-[var(--c-muted)]">
+                <span>{browseOptions.length} de {options.length} opcao(oes)</span>
+                {value ? (
+                  <button
+                    type="button"
+                    className="font-semibold text-[var(--c-primary)] hover:underline"
+                    onClick={() => handleSelect('', '')}
+                  >
+                    Limpar selecao
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-3 sm:px-5">
+              {browseOptions.length === 0 ? (
+                <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[var(--c-border)] px-4 text-center text-sm text-[var(--c-muted)]">
+                  {emptyLabel}. Tente pesquisar por outro codigo, nome ou grupo.
+                </div>
+              ) : (
+                <div className={`divide-y divide-[var(--c-border)] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] ${browseListClassName}`}>
+                  {browseOptions.map((item) => {
+                    const itemLabel = getLabel(item);
+                    const description = getDescription(item);
+                    const isSelected = String(item.id) === String(value || '');
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`flex w-full items-start justify-between gap-4 px-3 py-3 text-left transition-colors sm:px-4 ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-950 dark:bg-blue-950/40 dark:text-blue-100'
+                            : 'text-[var(--c-text)] hover:bg-[var(--c-bg)]'
+                        }`}
+                        onClick={() => handleSelect(String(item.id), itemLabel)}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold">{itemLabel}</span>
+                          {description ? (
+                            <span className="mt-0.5 block text-xs text-[var(--c-muted)]">{description}</span>
+                          ) : null}
+                        </span>
+                        {isSelected ? (
+                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                            Selecionada
+                          </span>
+                        ) : null}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>,
+        document.body
+      ) : null}
     </div>
   );
 }
@@ -620,6 +778,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
   const canDeleteTitulos = canDeleteTitulosFinanceiros(user);
   const canImportTitulos = canImportTitulosFinanceiros(user);
+  const canAccessCadastros = hasPermissao(user, 'financeiro.cadastros.visualizar');
+  const canExportTitulos = hasPermissao(user, 'financeiro.titulos.exportar');
+  const canImportCodigos = hasPermissao(user, 'financeiro.titulos.importar_codigos');
+  const canCreateBaixaComposta = hasPermissao(user, 'financeiro.baixas_compostas.criar')
+    && hasPermissao(user, 'financeiro.baixas_compostas.confirmar');
   const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
     ? String(tipoFixo).toUpperCase()
     : null;
@@ -665,6 +828,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [error, setError] = useState('');
   const [selectedTituloIds, setSelectedTituloIds] = useState([]);
   const [modalBaixaMassaOpen, setModalBaixaMassaOpen] = useState(false);
+  const [modalBaixaCompostaOpen, setModalBaixaCompostaOpen] = useState(false);
   const [baixaMassaForm, setBaixaMassaForm] = useState(() => buildBaixaMassaForm([]));
   const [savingBaixaMassa, setSavingBaixaMassa] = useState(false);
   const [importandoCodigos, setImportandoCodigos] = useState(false);
@@ -673,6 +837,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const [erroFretesPendentes, setErroFretesPendentes] = useState('');
   const [importPanelOpen, setImportPanelOpen] = useState(false);
   const [exportingModel, setExportingModel] = useState(false);
+  const [relatorioModalOpen, setRelatorioModalOpen] = useState(false);
+  const [relatorioLoading, setRelatorioLoading] = useState(false);
+  const [relatorioError, setRelatorioError] = useState('');
+  const [relatorioPdfUrl, setRelatorioPdfUrl] = useState('');
+  const [relatorioFilename, setRelatorioFilename] = useState('relatorio-titulos-financeiros.pdf');
+  const relatorioRequestIdRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -680,12 +850,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
     Promise.all([
       getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
-      buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
+      buscarParceiros({ ativo: true, incluir_fornecedores_compra: 1, limit: 'all' }).catch(() => []),
       getCategoriasFinanceiras().catch(() => []),
       getFormasPagamentoFinanceiras().catch(() => []),
       getContasBancarias().catch(() => []),
       getCartoesFinanceiros().catch(() => []),
-      getChequesTerceirosDisponiveis().catch(() => []),
+      getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 }).catch(() => []),
       getEmpresasGrupo({ ativo: true }).catch(() => [])
     ])
       .then(([obrasData, parceirosData, categoriasData, formasData, contasData, cartoesData, chequesData, empresasData]) => {
@@ -710,6 +880,45 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!modalBaixaCompostaOpen) return undefined;
+    let active = true;
+
+    getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 })
+      .then((data) => {
+        if (active) setChequesTerceiros(normalizeOptionList(data));
+      })
+      .catch(() => {
+        if (active) setError('Nao foi possivel atualizar os cheques de terceiros em carteira.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [modalBaixaCompostaOpen]);
+
+  useEffect(() => () => {
+    if (relatorioPdfUrl) URL.revokeObjectURL(relatorioPdfUrl);
+  }, [relatorioPdfUrl]);
+
+  useEffect(() => {
+    if (!relatorioModalOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        relatorioRequestIdRef.current += 1;
+        setRelatorioModalOpen(false);
+        setRelatorioPdfUrl('');
+      }
+    };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [relatorioModalOpen]);
 
   useEffect(() => {
     setVisibleFilterIds(loadVisibleFilterIds(user, visibilityStoragePrefix));
@@ -838,7 +1047,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
     return parceiros.filter((parceiro) => (
       tipo === 'PAGAR'
-        ? parceiro?.fornecedor !== false || parceiro?.corretor === true
+        ? true
         : parceiro?.cliente !== false
     ));
   }, [parceiros, draftFilters.tipo]);
@@ -1428,7 +1637,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       return;
     }
 
-    if (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) {
+    if (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) {
       setError('Conta bancaria e obrigatoria para esta forma de baixa.');
       return;
     }
@@ -1637,6 +1846,61 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     return columns;
   }
 
+  function fecharRelatorio() {
+    relatorioRequestIdRef.current += 1;
+    setRelatorioModalOpen(false);
+    setRelatorioLoading(false);
+    setRelatorioError('');
+    setRelatorioPdfUrl('');
+  }
+
+  async function abrirRelatorio() {
+    if (!appliedFilters || relatorioLoading) return;
+
+    const requestId = relatorioRequestIdRef.current + 1;
+    relatorioRequestIdRef.current = requestId;
+    setRelatorioModalOpen(true);
+    setRelatorioLoading(true);
+    setRelatorioError('');
+    setRelatorioPdfUrl('');
+
+    try {
+      const result = await gerarRelatorioTitulosFinanceirosPdf(
+        compactFilters(pickVisibleFilters(appliedFilters, visibleFilterIds))
+      );
+      const objectUrl = URL.createObjectURL(result.blob);
+      if (relatorioRequestIdRef.current !== requestId) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      setRelatorioFilename(result.filename || `relatorio-${tipoReferencia === 'RECEBER' ? 'contas-a-receber' : 'contas-a-pagar'}.pdf`);
+      setRelatorioPdfUrl(objectUrl);
+    } catch (err) {
+      if (relatorioRequestIdRef.current === requestId) {
+        setRelatorioError(err?.message || 'Erro ao gerar relatorio em PDF.');
+      }
+    } finally {
+      if (relatorioRequestIdRef.current === requestId) {
+        setRelatorioLoading(false);
+      }
+    }
+  }
+
+  function baixarRelatorio() {
+    if (!relatorioPdfUrl) return;
+    const link = document.createElement('a');
+    link.href = relatorioPdfUrl;
+    link.download = relatorioFilename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  function abrirRelatorioNovaAba() {
+    if (!relatorioPdfUrl) return;
+    window.open(relatorioPdfUrl, '_blank', 'noopener,noreferrer');
+  }
+
   function exportarTitulos() {
     const columns = getTituloExportColumns();
     const linhas = [columns.map((column) => column.key)];
@@ -1804,7 +2068,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         );
       case 'parceiro_id':
         return (
-          <ParceiroAutocomplete
+          <FinanceiroFilterAutocomplete
             key={filter.id}
             className={commonClass}
             inputClassName="input w-full input-sm"
@@ -1813,8 +2077,22 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             options={parceirosFiltrados}
             onChange={(nextValue) => setFilter('parceiro_id', nextValue)}
             disabled={loadingOptions}
-            placeholder={draftFilters.tipo === 'PAGAR' ? 'Digite o credor' : 'Digite o cliente'}
+            placeholder={draftFilters.tipo === 'PAGAR' ? 'Nome ou CPF/CNPJ do credor' : 'Nome ou CPF/CNPJ do cliente'}
+            allLabel={draftFilters.tipo === 'PAGAR' ? 'Todos os credores' : 'Todos os clientes'}
             emptyLabel={draftFilters.tipo === 'PAGAR' ? 'Nenhum credor encontrado' : 'Nenhum cliente encontrado'}
+            getLabel={(partner) => partner?.nome || partner?.razao_social || `Cadastro #${partner?.id}`}
+            getDescription={(partner) => [
+              partner?.cpf_cnpj,
+              partner?.fornecedoresCompra?.length ? 'Fornecedor de compras' : null,
+              partner?.corretor === true ? 'Corretor' : null,
+              !partner?.fornecedoresCompra?.length && partner?.corretor !== true ? 'Credor cadastrado' : null
+            ].filter(Boolean).join(' · ')}
+            browseEnabled
+            browseTitle={draftFilters.tipo === 'PAGAR' ? 'Selecionar credor' : 'Selecionar cliente'}
+            browseDescription={draftFilters.tipo === 'PAGAR'
+              ? 'Lista unificada de credores cadastrados e fornecedores vinculados ao cadastro central.'
+              : 'Pesquise por nome ou CPF/CNPJ e selecione o cliente.'}
+            browseListClassName="min-w-[620px]"
           />
         );
       case 'obra_id':
@@ -1877,6 +2155,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               categoria?.codigo ? `${categoria.codigo} - ${categoria.nome}` : categoria?.nome || ''
             )}
             getDescription={(categoria) => [categoria?.dre_grupo, categoria?.dre_subgrupo].filter(Boolean).join(' / ')}
+            browseEnabled
+            browseTitle="Selecionar categoria financeira"
+            browseDescription="Pesquise por codigo, nome ou grupo DRE e escolha uma categoria da lista completa."
           />
         );
       case 'forma_pagamento_id':
@@ -2342,6 +2623,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               Baixar selecionados
               {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
             </button>
+            {canCreateBaixaComposta && baixaMassaTipoSelecionado === 'PAGAR' ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => setModalBaixaCompostaOpen(true)}
+                disabled={selectedTitulosBaixaveis.length === 0 || savingBaixaMassa}
+                title="Combinar mais de uma conta, forma ou cheque no mesmo pagamento"
+              >
+                Baixa com múltiplas fontes
+                {selectedTitulosBaixaveis.length > 0 ? ` (${selectedTitulosBaixaveis.length})` : ''}
+              </button>
+            ) : null}
             <button
               type="button"
               className="btn btn-outline btn-sm text-rose-700 hover:border-rose-300 hover:bg-rose-50"
@@ -2352,28 +2645,45 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               Excluir selecionados
               {selectedTitulosExcluiveis.length > 0 ? ` (${selectedTitulosExcluiveis.length})` : ''}
             </button>
-            <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            {canAccessCadastros ? (
+              <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
+            ) : null}
             <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
+            {canExportTitulos ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={exportarTitulos}
+                disabled={loading}
+                title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
+              >
+                Exportar titulos
+              </button>
+            ) : null}
+            {canImportCodigos ? (
+              <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
+                {importandoCodigos ? 'Importando...' : 'Importar codigos'}
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  className="hidden"
+                  onChange={importarCodigosBarras}
+                  disabled={importandoCodigos}
+                />
+              </label>
+            ) : null}
             <button
               type="button"
-              className="btn btn-outline btn-sm"
-              onClick={exportarTitulos}
-              disabled={loading}
-              title="Exporta os titulos listados com as colunas visiveis e campos de boleto para preenchimento"
+              className="btn btn-outline btn-sm gap-1.5"
+              onClick={abrirRelatorio}
+              disabled={!hasConsulted || loading || relatorioLoading}
+              title={hasConsulted
+                ? 'Gerar PDF com todos os titulos dos filtros aplicados'
+                : 'Consulte os titulos antes de gerar o relatorio'}
             >
-              Exportar titulos
+              <HiOutlineDocumentText className="h-4 w-4" />
+              {relatorioLoading ? 'Gerando...' : 'Gerar relatorio'}
             </button>
-            <label className={`btn btn-outline btn-sm ${importandoCodigos ? 'opacity-60 pointer-events-none' : ''}`}>
-              {importandoCodigos ? 'Importando...' : 'Importar codigos'}
-              <input
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={importarCodigosBarras}
-                disabled={importandoCodigos}
-              />
-            </label>
-            <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Gerar relatorio</Link>
           </div>
         </div>
 
@@ -2498,31 +2808,118 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       </div>
 
+      {relatorioModalOpen ? (
+        <div
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:p-4"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) fecharRelatorio();
+          }}
+        >
+          <section
+            className="flex h-full w-full flex-col overflow-hidden bg-[var(--c-surface)] shadow-2xl sm:h-[min(92vh,920px)] sm:max-w-[min(96vw,1500px)] sm:rounded-2xl sm:border sm:border-[var(--c-border)]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="relatorio-titulos-title"
+          >
+            <header className="flex shrink-0 flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                    <HiOutlineDocumentText className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h2 id="relatorio-titulos-title" className="truncate text-base font-semibold text-[var(--c-text)] sm:text-lg">
+                      Relatorio de {pageTitle}
+                    </h2>
+                    <p className="text-xs text-[var(--c-muted)]">
+                      Todos os titulos encontrados pelos filtros aplicados, respeitando seu escopo de acesso.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {relatorioPdfUrl ? (
+                  <>
+                    <button type="button" className="btn btn-outline btn-sm gap-1.5" onClick={abrirRelatorioNovaAba}>
+                      <HiOutlineEye className="h-4 w-4" />
+                      <span className="hidden sm:inline">Abrir em nova aba</span>
+                      <span className="sm:hidden">Abrir</span>
+                    </button>
+                    <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={baixarRelatorio}>
+                      <HiOutlineArrowDownTray className="h-4 w-4" />
+                      Baixar PDF
+                    </button>
+                  </>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm btn-square"
+                  onClick={fecharRelatorio}
+                  title="Fechar relatorio"
+                  aria-label="Fechar relatorio"
+                >
+                  <HiOutlineXMark className="h-5 w-5" />
+                </button>
+              </div>
+            </header>
+
+            <div className="min-h-0 flex-1 bg-slate-200 p-2 sm:p-3">
+              {relatorioLoading ? (
+                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-slate-300 bg-white">
+                  <div className="text-center">
+                    <span className="loading loading-spinner loading-md text-primary" aria-hidden="true" />
+                    <p className="mt-3 text-sm font-semibold text-slate-800">Preparando o relatorio completo...</p>
+                    <p className="mt-1 text-xs text-slate-500">Aguarde enquanto os titulos filtrados sao consolidados.</p>
+                  </div>
+                </div>
+              ) : relatorioError ? (
+                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-rose-200 bg-white p-5">
+                  <div className="max-w-md text-center">
+                    <h3 className="text-sm font-semibold text-rose-700">Nao foi possivel gerar o relatorio</h3>
+                    <p className="mt-2 text-sm text-slate-600">{relatorioError}</p>
+                    <button type="button" className="btn btn-outline btn-sm mt-4" onClick={abrirRelatorio}>
+                      Tentar novamente
+                    </button>
+                  </div>
+                </div>
+              ) : relatorioPdfUrl ? (
+                <iframe
+                  src={relatorioPdfUrl}
+                  title={`Visualizacao do relatorio de ${pageTitle.toLowerCase()}`}
+                  className="h-full min-h-64 w-full rounded-lg border border-slate-300 bg-white"
+                />
+              ) : null}
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {modalBaixaMassaOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-4 backdrop-blur-sm">
+        <div className="modal-overlay finance-operation-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="baixa-massa-titulo">
           <form
-            className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl"
+            className="modal-dialog finance-operation-modal finance-operation-modal--medium"
             onSubmit={handleBaixaMassaSubmit}
           >
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+            <div className="modal-header">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixa em massa</h2>
-                <p className="text-xs text-[var(--c-muted)]">
+                <h2 id="baixa-massa-titulo" className="modal-title">Baixa em massa</h2>
+                <p className="modal-subtitle">
                   {selectedTitulosBaixaveis.length} titulo(s), saldo total {formatCurrency(selectedSaldo)}.
                 </p>
               </div>
               <button
                 type="button"
-                className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                className="modal-close-btn"
                 onClick={() => setModalBaixaMassaOpen(false)}
                 disabled={savingBaixaMassa}
-                title="Fechar"
+                aria-label="Fechar baixa em massa"
               >
                 <HiOutlineXMark className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="modal-body min-h-0 space-y-4 overflow-y-auto">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="app-filter-field">
                   <span className="app-filter-label">Data da baixa</span>
@@ -2580,7 +2977,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     ))}
                   </select>
                   {formasPagamentoBaixaMassa.length === 0 ? (
-                    <span className="mt-1 text-xs text-amber-700">
+                    <span className="mt-1 text-xs text-[var(--status-pending-text)]">
                       Nenhuma forma ativa e compatível foi encontrada nos cadastros financeiros.
                     </span>
                   ) : null}
@@ -2659,7 +3056,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     className="input w-full input-sm"
                     value={baixaMassaForm.conta_bancaria_id}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, conta_bancaria_id: event.target.value }))}
-                    required={baixaMassaParcelada || contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) || baixaMassaCartaoDebito}
+                    required={baixaMassaParcelada || (contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro) || baixaMassaCartaoDebito}
                     disabled={
                       !baixaMassaForm.empresa_id ||
                       (!baixaMassaParcelada && (baixaMassaUsaCartao || !contaBancariaObrigatoria(baixaMassaForm.forma_recebimento)))
@@ -2717,7 +3114,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   {baixaMassaMostrarIntercompany ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <label className="text-sm md:col-span-2">
-                        <span className="mb-1 block text-slate-500">Natureza da baixa</span>
+                        <span className="mb-1 block text-[var(--c-muted)]">Natureza da baixa</span>
                         <select
                           className="input w-full input-sm"
                           value={baixaMassaForm.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO'}
@@ -2733,7 +3130,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         </span>
                       </label>
                       <label className="text-sm md:col-span-2">
-                        <span className="mb-1 block text-slate-500">Motivo</span>
+                        <span className="mb-1 block text-[var(--c-muted)]">Motivo</span>
                         <input
                           className="input w-full input-sm"
                           value={baixaMassaForm.motivo_intercompany}
@@ -2741,7 +3138,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                           placeholder="Ex.: pagamento feito pela tesouraria"
                         />
                       </label>
-                      <div className="md:col-span-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-[var(--c-muted)]">
+                      <div className="finance-operation-panel finance-operation-panel--soft md:col-span-2 px-3 py-2 text-xs text-[var(--c-muted)]">
                         <div className="font-semibold text-[var(--c-text)]">Impacto financeiro</div>
                         <div>
                           {baixaMassaTemEmpresaDiferente
@@ -2810,7 +3207,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ) : null}
 
                 {isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER' ? (
-                  <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <div className="finance-operation-notice finance-operation-notice--success md:col-span-2 text-xs">
                     Ao baixar recebimentos em cheque, o sistema registra automaticamente o cheque em carteira para uso futuro.
                   </div>
                 ) : null}
@@ -2888,11 +3285,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                           Total das parcelas: {formatCurrency(baixaMassaTotalParcelas)}
                         </strong>
                         {Math.abs(baixaMassaDiferencaParcelas) >= 0.01 ? (
-                          <span className="text-amber-700">
+                          <span className="text-[var(--status-pending-text)]">
                             Diferenca: {formatCurrency(baixaMassaDiferencaParcelas)}
                           </span>
                         ) : (
-                          <span className="text-emerald-700">Parcelas batem com o saldo selecionado.</span>
+                          <span className="text-[var(--status-approved-text)]">Parcelas batem com o saldo selecionado.</span>
                         )}
                       </div>
                     </div>
@@ -2904,7 +3301,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                             <strong className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">
                               Parcela {index + 1}/{baixaMassaForm.parcelas.length}
                             </strong>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                            <span className="finance-operation-value-badge rounded-full px-2 py-1 text-xs font-semibold">
                               {formatCurrency(parseCurrencyInput(parcela.valor))}
                             </span>
                           </div>
@@ -3027,43 +3424,61 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 </label>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="finance-operation-notice finance-operation-notice--warning text-xs">
                 <strong>Conferencia:</strong> a baixa em massa quita os titulos selecionados conforme a forma informada. Para cheque ou cartao parcelado, as parcelas geradas ficam disponiveis para conciliacao.
               </div>
 
-              {error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+              {error ? <p className="finance-operation-notice finance-operation-notice--danger">{error}</p> : null}
             </div>
 
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setModalBaixaMassaOpen(false)}
-                disabled={savingBaixaMassa}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={
-                  savingBaixaMassa ||
-                  !baixaMassaForm.empresa_id ||
-                  (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
-                  (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
-                  (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
-                  !baixaMassaForm.forma_pagamento_id ||
-                  (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaForm.conta_bancaria_id) ||
-                  (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
-                  (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||
-                  (!baixaMassaParcelada && baixaMassaUsaChequeTerceiro && !baixaMassaForm.cheque_terceiro_id)
-                }
-              >
-                {savingBaixaMassa ? 'Registrando...' : 'Registrar baixa'}
-              </button>
+            <div className="modal-footer">
+              <div className="finance-operation-actions flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setModalBaixaMassaOpen(false)}
+                  disabled={savingBaixaMassa}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    savingBaixaMassa ||
+                    !baixaMassaForm.empresa_id ||
+                    (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
+                    (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
+                    (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
+                    !baixaMassaForm.forma_pagamento_id ||
+                    (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) ||
+                    (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
+                    (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||
+                    (!baixaMassaParcelada && baixaMassaUsaChequeTerceiro && !baixaMassaForm.cheque_terceiro_id)
+                  }
+                >
+                  {savingBaixaMassa ? 'Registrando...' : 'Registrar baixa'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
+      ) : null}
+
+      {modalBaixaCompostaOpen ? (
+        <BaixaCompostaModal
+          titulos={selectedTitulosBaixaveis}
+          formas={formasPagamentoBaixaMassa}
+          contas={contasBancarias}
+          cartoes={cartoes}
+          cheques={chequesTerceirosDisponiveis}
+          empresas={empresasGrupo}
+          onClose={() => setModalBaixaCompostaOpen(false)}
+          onConfirmed={() => {
+            setSelectedTituloIds([]);
+            setAppliedFilters((current) => (current ? { ...current } : current));
+          }}
+        />
       ) : null}
 
       {importandoCodigos ? (

@@ -4,6 +4,7 @@ import { HiAdjustmentsHorizontal, HiChevronDown, HiChevronUp, HiEye, HiEyeSlash 
 
 const FILTROS_DISPONIVEIS = [
   { id: 'codigo', label: 'Codigo da solicitacao' },
+  { id: 'descricao', label: 'Descrição' },
   { id: 'numero_sienge', label: 'Numero do pedido' },
   { id: 'obra_ids', label: 'Obra' },
   { id: 'area', label: 'Setor' },
@@ -53,10 +54,16 @@ export default function Filtros({
       const salvo = localStorage.getItem('solicitacoes:filtros-visiveis');
       if (salvo) {
         const filtrosSalvos = JSON.parse(salvo);
-        if (Array.isArray(filtrosSalvos) && !filtrosSalvos.includes('codigo')) {
-          return ['codigo', ...filtrosSalvos];
+        if (Array.isArray(filtrosSalvos)) {
+          const obrigatorios = ['codigo', 'descricao'];
+          const salvosComNovosFiltros = [...filtrosSalvos];
+          obrigatorios.slice().reverse().forEach((filtroId) => {
+            if (!salvosComNovosFiltros.includes(filtroId)) {
+              salvosComNovosFiltros.unshift(filtroId);
+            }
+          });
+          return salvosComNovosFiltros;
         }
-        return filtrosSalvos;
       }
     } catch (error) {
       console.error('Erro ao carregar filtros visíveis', error);
@@ -167,6 +174,7 @@ export default function Filtros({
   function limparFiltros() {
     setFiltros({
       codigo: '',
+      descricao: '',
       numero_sienge: '',
       obra_ids: '',
       area: '',
@@ -419,6 +427,7 @@ export default function Filtros({
 
   const quantidadeFiltrosAtivos = [
     filtros.codigo,
+    filtros.descricao,
     filtros.numero_sienge,
     filtros.obra_ids,
     filtros.area,
@@ -500,6 +509,21 @@ export default function Filtros({
                 value={filtros.codigo || ''}
                 onChange={handleChange}
                 type="text"
+              />
+            </div>
+          )}
+
+          {isFiltroVisivel('descricao') && (
+            <div className="sol-filter-field">
+              <label className="sol-filter-label">Descrição</label>
+              <input
+                name="descricao"
+                placeholder="Digite parte da descrição"
+                className="input"
+                value={filtros.descricao || ''}
+                onChange={handleChange}
+                type="search"
+                autoComplete="off"
               />
             </div>
           )}
