@@ -35,7 +35,6 @@ import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { normalizeCurrencyTyping } from '../utils/formatters';
 import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
-import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 
@@ -136,6 +135,8 @@ function normalizeSearchText(value) {
   return String(value || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[.\-/]/g, '')
+    .trim()
     .toLowerCase();
 }
 
@@ -154,7 +155,8 @@ function FinanceiroFilterAutocomplete({
   getDescription = () => '',
   browseEnabled = false,
   browseTitle = 'Selecionar registro',
-  browseDescription = 'Pesquise ou percorra todas as opcoes disponiveis.'
+  browseDescription = 'Pesquise ou percorra todas as opcoes disponiveis.',
+  browseListClassName = ''
 }) {
   const selected = useMemo(
     () => options.find((item) => String(item?.id) === String(value || '')) || null,
@@ -358,13 +360,13 @@ function FinanceiroFilterAutocomplete({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-3 sm:px-5">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-3 sm:px-5">
               {browseOptions.length === 0 ? (
                 <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[var(--c-border)] px-4 text-center text-sm text-[var(--c-muted)]">
                   {emptyLabel}. Tente pesquisar por outro codigo, nome ou grupo.
                 </div>
               ) : (
-                <div className="divide-y divide-[var(--c-border)] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
+                <div className={`divide-y divide-[var(--c-border)] rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] ${browseListClassName}`}>
                   {browseOptions.map((item) => {
                     const itemLabel = getLabel(item);
                     const description = getDescription(item);
@@ -847,7 +849,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
 
     Promise.all([
       getMinhasObras({ modo: 'FINANCEIRO' }).catch(() => []),
-      buscarParceiros({ ativo: true, limit: 200 }).catch(() => []),
+      buscarParceiros({ ativo: true, incluir_fornecedores_compra: 1, limit: 'all' }).catch(() => []),
       getCategoriasFinanceiras().catch(() => []),
       getFormasPagamentoFinanceiras().catch(() => []),
       getContasBancarias().catch(() => []),
@@ -1027,7 +1029,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     const tipo = String(draftFilters.tipo || '').toUpperCase();
     return parceiros.filter((parceiro) => (
       tipo === 'PAGAR'
-        ? parceiro?.fornecedor !== false || parceiro?.corretor === true
+        ? true
         : parceiro?.cliente !== false
     ));
   }, [parceiros, draftFilters.tipo]);
@@ -2048,7 +2050,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         );
       case 'parceiro_id':
         return (
-          <ParceiroAutocomplete
+          <FinanceiroFilterAutocomplete
             key={filter.id}
             className={commonClass}
             inputClassName="input w-full input-sm"
@@ -2057,8 +2059,22 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             options={parceirosFiltrados}
             onChange={(nextValue) => setFilter('parceiro_id', nextValue)}
             disabled={loadingOptions}
-            placeholder={draftFilters.tipo === 'PAGAR' ? 'Digite o credor' : 'Digite o cliente'}
+            placeholder={draftFilters.tipo === 'PAGAR' ? 'Nome ou CPF/CNPJ do credor' : 'Nome ou CPF/CNPJ do cliente'}
+            allLabel={draftFilters.tipo === 'PAGAR' ? 'Todos os credores' : 'Todos os clientes'}
             emptyLabel={draftFilters.tipo === 'PAGAR' ? 'Nenhum credor encontrado' : 'Nenhum cliente encontrado'}
+            getLabel={(partner) => partner?.nome || partner?.razao_social || `Cadastro #${partner?.id}`}
+            getDescription={(partner) => [
+              partner?.cpf_cnpj,
+              partner?.fornecedoresCompra?.length ? 'Fornecedor de compras' : null,
+              partner?.corretor === true ? 'Corretor' : null,
+              !partner?.fornecedoresCompra?.length && partner?.corretor !== true ? 'Credor cadastrado' : null
+            ].filter(Boolean).join(' · ')}
+            browseEnabled
+            browseTitle={draftFilters.tipo === 'PAGAR' ? 'Selecionar credor' : 'Selecionar cliente'}
+            browseDescription={draftFilters.tipo === 'PAGAR'
+              ? 'Lista unificada de credores cadastrados e fornecedores vinculados ao cadastro central.'
+              : 'Pesquise por nome ou CPF/CNPJ e selecione o cliente.'}
+            browseListClassName="min-w-[620px]"
           />
         );
       case 'obra_id':

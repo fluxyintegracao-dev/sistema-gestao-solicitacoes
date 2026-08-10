@@ -74,6 +74,7 @@ function validateFrontend() {
   const titles = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTitulos.jsx'), 'utf8');
   const modal = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/BaixaCompostaModal.jsx'), 'utf8');
   const custody = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroChequesTerceiros.jsx'), 'utf8');
+  const holderAutocomplete = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/TitularChequeAutocomplete.jsx'), 'utf8');
   assert(titles.includes('BaixaCompostaModal'));
   assert(titles.includes('Baixa com múltiplas fontes'));
   assert(modal.includes('crypto.randomUUID()'));
@@ -84,6 +85,10 @@ function validateFrontend() {
   assert(custody.includes('maskCpfCnpj'), 'Cadastro de cheque deve aplicar mascara de CPF/CNPJ.');
   assert(custody.includes('Informe um CPF ou CNPJ válido.'), 'Cadastro deve orientar documento invalido.');
   assert(!custody.includes("['data_emissao', 'Data de emissão'"), 'Data de emissao nao deve aparecer no cadastro de custodia.');
+  assert(custody.includes('TitularChequeAutocomplete'), 'Cadastro deve usar a consulta de titulares cadastrados.');
+  assert(holderAutocomplete.includes('buscarParceiros'), 'Autocomplete deve consultar o cadastro central de pessoas.');
+  assert(holderAutocomplete.includes('Listar titulares cadastrados'), 'Campo deve oferecer lupa para listar titulares.');
+  assert(holderAutocomplete.includes("limit: 'all'"), 'Modal deve listar todos os titulares ativos.');
 }
 
 validateMigration();

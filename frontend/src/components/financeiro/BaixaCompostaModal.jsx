@@ -125,7 +125,7 @@ export default function BaixaCompostaModal({
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true">
-      <section className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl bg-[var(--c-card)] shadow-2xl">
+      <section className="flex max-h-[94vh] w-full max-w-7xl flex-col overflow-hidden rounded-2xl border border-[var(--modal-border)] bg-[var(--modal-bg)] shadow-2xl">
         <header className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
           <div><h2 className="text-lg font-semibold text-[var(--c-text)]">Baixa com múltiplas fontes</h2><p className="text-sm text-[var(--c-muted)]">Uma operação atômica para combinar PIX, contas, cartões, dinheiro e cheques de terceiros.</p></div>
           <button className="btn btn-outline btn-sm" type="button" onClick={onClose}><HiOutlineXMark className="h-5 w-5" /></button>

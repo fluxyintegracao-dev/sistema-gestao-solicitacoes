@@ -14,6 +14,7 @@ Cheque em carteira nao e conta bancaria e nao cria saldo financeiro ficticio. A 
 - obra de origem e opcional para o saldo legado sem lastro conhecido;
 - numero, titular, valor, vencimento e justificativa da origem sao obrigatorios;
 - CPF/CNPJ do titular e opcional para saldos legados, mas, quando informado, deve ser valido; a interface aplica mascara e o backend persiste somente os digitos;
+- nome e CPF/CNPJ consultam os parceiros ativos por autocomplete; a lupa abre a lista responsiva de cadastros e a selecao apenas copia os dados para o cheque, sem alterar o parceiro;
 - a data operacional da custodia e a `data_entrada`; data de emissao nao e solicitada no cadastro nem no novo modelo de importacao;
 - estados: `EM_CARTEIRA`, `UTILIZADO`, `DEPOSITADO`, `DEVOLVIDO` e `CANCELADO`; `RESERVADO` fica disponivel para evolucao futura;
 - transferencia entre empresas altera a custodia e grava origem, destino, usuario e data;

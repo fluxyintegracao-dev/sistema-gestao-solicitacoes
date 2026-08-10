@@ -9,6 +9,7 @@ import {
   HiOutlinePlus,
   HiOutlineXMark
 } from 'react-icons/hi2';
+import TitularChequeAutocomplete from '../components/financeiro/TitularChequeAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
 import {
   baixarModeloChequesTerceiros,
@@ -223,8 +224,7 @@ export default function FinanceiroChequesTerceiros() {
         >
           <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitCreate}>
             {[
-              ['numero_cheque', 'Número do cheque', 'text', true],
-              ['titular_nome', 'Titular', 'text', true]
+              ['numero_cheque', 'Número do cheque', 'text', true]
             ].map(([key, label, type, required]) => (
               <label className="form-control" key={key}>
                 <span>{label}{required ? ' *' : ''}</span>
@@ -239,27 +239,25 @@ export default function FinanceiroChequesTerceiros() {
               </label>
             ))}
 
-            <label className="form-control">
-              <span>CPF/CNPJ do titular</span>
-              <input
-                className={`input ${documentError ? 'border-rose-400' : ''}`}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={18}
-                placeholder="000.000.000-00 ou 00.000.000/0000-00"
-                value={form.titular_documento}
-                aria-invalid={Boolean(documentError)}
-                aria-describedby={documentError ? 'cheque-titular-documento-erro' : undefined}
-                onChange={(event) => {
-                  const value = maskCpfCnpj(event.target.value);
-                  setForm((current) => ({ ...current, titular_documento: value }));
-                  if (documentError) setDocumentError(value && !isValidCpfCnpj(value) ? 'Informe um CPF ou CNPJ válido.' : '');
-                }}
-                onBlur={() => setDocumentError(form.titular_documento && !isValidCpfCnpj(form.titular_documento) ? 'Informe um CPF ou CNPJ válido.' : '')}
-              />
-              {documentError ? <small id="cheque-titular-documento-erro" className="text-rose-700">{documentError}</small> : null}
-            </label>
+            <TitularChequeAutocomplete
+              nameValue={form.titular_nome}
+              documentValue={form.titular_documento}
+              documentError={documentError}
+              onNameChange={(value) => setForm((current) => ({ ...current, titular_nome: value }))}
+              onDocumentChange={(value) => {
+                setForm((current) => ({ ...current, titular_documento: value }));
+                if (documentError) setDocumentError(value && !isValidCpfCnpj(value) ? 'Informe um CPF ou CNPJ válido.' : '');
+              }}
+              onDocumentBlur={() => setDocumentError(form.titular_documento && !isValidCpfCnpj(form.titular_documento) ? 'Informe um CPF ou CNPJ válido.' : '')}
+              onSelect={(partner) => {
+                setForm((current) => ({
+                  ...current,
+                  titular_nome: partner?.nome || '',
+                  titular_documento: partner?.cpf_cnpj ? maskCpfCnpj(partner.cpf_cnpj) : ''
+                }));
+                setDocumentError('');
+              }}
+            />
 
             {[
               ['banco', 'Banco', 'text'],
