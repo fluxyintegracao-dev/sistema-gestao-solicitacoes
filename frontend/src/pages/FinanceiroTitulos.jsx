@@ -2896,30 +2896,30 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       ) : null}
 
       {modalBaixaMassaOpen ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-4 backdrop-blur-sm">
+        <div className="modal-overlay finance-operation-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="baixa-massa-titulo">
           <form
-            className="flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl"
+            className="modal-dialog finance-operation-modal finance-operation-modal--medium"
             onSubmit={handleBaixaMassaSubmit}
           >
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+            <div className="modal-header">
               <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Baixa em massa</h2>
-                <p className="text-xs text-[var(--c-muted)]">
+                <h2 id="baixa-massa-titulo" className="modal-title">Baixa em massa</h2>
+                <p className="modal-subtitle">
                   {selectedTitulosBaixaveis.length} titulo(s), saldo total {formatCurrency(selectedSaldo)}.
                 </p>
               </div>
               <button
                 type="button"
-                className="rounded-md p-1 text-[var(--c-muted)] hover:bg-[var(--c-bg)] hover:text-[var(--c-text)]"
+                className="modal-close-btn"
                 onClick={() => setModalBaixaMassaOpen(false)}
                 disabled={savingBaixaMassa}
-                title="Fechar"
+                aria-label="Fechar baixa em massa"
               >
                 <HiOutlineXMark className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="modal-body min-h-0 space-y-4 overflow-y-auto">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="app-filter-field">
                   <span className="app-filter-label">Data da baixa</span>
@@ -2977,7 +2977,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     ))}
                   </select>
                   {formasPagamentoBaixaMassa.length === 0 ? (
-                    <span className="mt-1 text-xs text-amber-700">
+                    <span className="mt-1 text-xs text-[var(--status-pending-text)]">
                       Nenhuma forma ativa e compatível foi encontrada nos cadastros financeiros.
                     </span>
                   ) : null}
@@ -3114,7 +3114,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   {baixaMassaMostrarIntercompany ? (
                     <div className="mt-3 grid gap-3 md:grid-cols-2">
                       <label className="text-sm md:col-span-2">
-                        <span className="mb-1 block text-slate-500">Natureza da baixa</span>
+                        <span className="mb-1 block text-[var(--c-muted)]">Natureza da baixa</span>
                         <select
                           className="input w-full input-sm"
                           value={baixaMassaForm.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO'}
@@ -3130,7 +3130,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         </span>
                       </label>
                       <label className="text-sm md:col-span-2">
-                        <span className="mb-1 block text-slate-500">Motivo</span>
+                        <span className="mb-1 block text-[var(--c-muted)]">Motivo</span>
                         <input
                           className="input w-full input-sm"
                           value={baixaMassaForm.motivo_intercompany}
@@ -3138,7 +3138,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                           placeholder="Ex.: pagamento feito pela tesouraria"
                         />
                       </label>
-                      <div className="md:col-span-2 rounded-lg bg-white/70 px-3 py-2 text-xs text-[var(--c-muted)]">
+                      <div className="finance-operation-panel finance-operation-panel--soft md:col-span-2 px-3 py-2 text-xs text-[var(--c-muted)]">
                         <div className="font-semibold text-[var(--c-text)]">Impacto financeiro</div>
                         <div>
                           {baixaMassaTemEmpresaDiferente
@@ -3207,7 +3207,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ) : null}
 
                 {isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER' ? (
-                  <div className="md:col-span-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                  <div className="finance-operation-notice finance-operation-notice--success md:col-span-2 text-xs">
                     Ao baixar recebimentos em cheque, o sistema registra automaticamente o cheque em carteira para uso futuro.
                   </div>
                 ) : null}
@@ -3285,11 +3285,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                           Total das parcelas: {formatCurrency(baixaMassaTotalParcelas)}
                         </strong>
                         {Math.abs(baixaMassaDiferencaParcelas) >= 0.01 ? (
-                          <span className="text-amber-700">
+                          <span className="text-[var(--status-pending-text)]">
                             Diferenca: {formatCurrency(baixaMassaDiferencaParcelas)}
                           </span>
                         ) : (
-                          <span className="text-emerald-700">Parcelas batem com o saldo selecionado.</span>
+                          <span className="text-[var(--status-approved-text)]">Parcelas batem com o saldo selecionado.</span>
                         )}
                       </div>
                     </div>
@@ -3301,7 +3301,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                             <strong className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">
                               Parcela {index + 1}/{baixaMassaForm.parcelas.length}
                             </strong>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+                            <span className="finance-operation-value-badge rounded-full px-2 py-1 text-xs font-semibold">
                               {formatCurrency(parseCurrencyInput(parcela.valor))}
                             </span>
                           </div>
@@ -3424,40 +3424,42 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 </label>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <div className="finance-operation-notice finance-operation-notice--warning text-xs">
                 <strong>Conferencia:</strong> a baixa em massa quita os titulos selecionados conforme a forma informada. Para cheque ou cartao parcelado, as parcelas geradas ficam disponiveis para conciliacao.
               </div>
 
-              {error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
+              {error ? <p className="finance-operation-notice finance-operation-notice--danger">{error}</p> : null}
             </div>
 
-            <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setModalBaixaMassaOpen(false)}
-                disabled={savingBaixaMassa}
-              >
-                Cancelar
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={
-                  savingBaixaMassa ||
-                  !baixaMassaForm.empresa_id ||
-                  (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
-                  (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
-                  (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
-                  !baixaMassaForm.forma_pagamento_id ||
-                  (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) ||
-                  (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
-                  (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||
-                  (!baixaMassaParcelada && baixaMassaUsaChequeTerceiro && !baixaMassaForm.cheque_terceiro_id)
-                }
-              >
-                {savingBaixaMassa ? 'Registrando...' : 'Registrar baixa'}
-              </button>
+            <div className="modal-footer">
+              <div className="finance-operation-actions flex gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => setModalBaixaMassaOpen(false)}
+                  disabled={savingBaixaMassa}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={
+                    savingBaixaMassa ||
+                    !baixaMassaForm.empresa_id ||
+                    (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) ||
+                    (baixaMassaParcelada && !baixaMassaForm.conta_bancaria_id) ||
+                    (!baixaMassaParcelada && baixaMassaCartaoDebito && !baixaMassaForm.conta_bancaria_id) ||
+                    !baixaMassaForm.forma_pagamento_id ||
+                    (!baixaMassaParcelada && contaBancariaObrigatoria(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro && !baixaMassaForm.conta_bancaria_id) ||
+                    (baixaMassaParcelada && Math.abs(baixaMassaDiferencaParcelas) >= 0.01) ||
+                    (baixaMassaParcelada && baixaMassaUsaChequeTerceiro && (baixaMassaForm.parcelas || []).some((parcela) => !parcela.cheque_terceiro_id)) ||
+                    (!baixaMassaParcelada && baixaMassaUsaChequeTerceiro && !baixaMassaForm.cheque_terceiro_id)
+                  }
+                >
+                  {savingBaixaMassa ? 'Registrando...' : 'Registrar baixa'}
+                </button>
+              </div>
             </div>
           </form>
         </div>

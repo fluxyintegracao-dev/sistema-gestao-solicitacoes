@@ -1749,7 +1749,26 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       lock: transaction.LOCK.UPDATE
     });
     if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
-    if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
+
+    const statusConciliacao = String(conciliacao.status || '').toUpperCase();
+    if (statusConciliacao !== 'PENDENTE') {
+      const movimentoExistente = statusConciliacao === 'CONCILIADO' && conciliacao.movimento_financeiro_id
+        ? await MovimentoFinanceiro.findByPk(conciliacao.movimento_financeiro_id, { transaction })
+        : null;
+      const observacoesMovimento = String(movimentoExistente?.observacoes || '').trim().toUpperCase();
+      const mesmaTarifa = movimentoExistente
+        && String(movimentoExistente.tipo_movimento || '').toUpperCase() === 'TARIFA_BANCARIA'
+        && observacoesMovimento.startsWith(`[${String(tarifa.codigo || '').trim().toUpperCase()}]`);
+
+      if (mesmaTarifa) {
+        await transaction.commit();
+        return {
+          ...conciliacao.toJSON(),
+          movimento: movimentoExistente.toJSON(),
+          idempotente: true
+        };
+      }
+
       throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
     }
 
@@ -1801,26 +1820,36 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
 
     await transaction.commit();
 
-    await registrarEventoSeguranca({
-      req,
-      usuarioId: req.user?.id || null,
-      tipoEvento: 'FINANCIAL_BANK_RECONCILED_FEE',
-      recursoTipo: 'CONCILIACAO_BANCARIA',
-      recursoId: conciliacao.id,
-      status: 'SUCCESS',
-      descricao: 'Lancamento bancario conciliado como tarifa bancaria',
-      metadata: {
-        movimento_financeiro_id: movimento.id,
-        conta_bancaria_id: conta.id,
-        categoria_financeira_id: categoria.id,
-        codigo_tarifa: tarifa.codigo,
-        valor
-      }
-    });
+    try {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'FINANCIAL_BANK_RECONCILED_FEE',
+        recursoTipo: 'CONCILIACAO_BANCARIA',
+        recursoId: conciliacao.id,
+        status: 'SUCCESS',
+        descricao: 'Lancamento bancario conciliado como tarifa bancaria',
+        metadata: {
+          movimento_financeiro_id: movimento.id,
+          conta_bancaria_id: conta.id,
+          categoria_financeira_id: categoria.id,
+          codigo_tarifa: tarifa.codigo,
+          valor
+        }
+      });
+    } catch (auditError) {
+      console.error('Falha ao registrar auditoria da conciliacao de tarifa bancaria:', auditError);
+    }
 
-    return loadConciliacaoById(req, conciliacao.id);
+    return {
+      ...conciliacao.toJSON(),
+      movimento: movimento.toJSON(),
+      idempotente: false
+    };
   } catch (error) {
-    await transaction.rollback();
+    if (!transaction.finished) {
+      await transaction.rollback();
+    }
     throw error;
   }
 }

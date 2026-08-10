@@ -14,16 +14,80 @@ const dateBr = (value) => value ? String(value).slice(0, 10).split('-').reverse(
 
 function Modal({ item, onClose, onReverse, canReverse, saving }) {
   const [reason, setReason] = useState('');
-  return <div className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/60 p-3" role="dialog" aria-modal="true">
-    <section className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-[var(--c-card)] shadow-2xl">
-      <header className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4"><div><h2 className="text-lg font-semibold">{item.codigo}</h2><p className="text-sm text-[var(--c-muted)]">{item.parceiro?.nome} · {item.empresa?.nome} · {dateBr(item.data_movimento)}</p></div><button type="button" className="btn btn-outline btn-sm" onClick={onClose}><HiOutlineXMark /></button></header>
-      <div className="min-h-0 flex-1 overflow-y-auto p-5">
-        <div className="mb-4 grid gap-3 sm:grid-cols-3"><div className="card p-3"><small className="text-[var(--c-muted)]">Status</small><strong className="block">{item.status}</strong></div><div className="card p-3"><small className="text-[var(--c-muted)]">Principal</small><strong className="block">{money(item.valor_principal)}</strong></div><div className="card p-3"><small className="text-[var(--c-muted)]">Valor da operação</small><strong className="block">{money(item.valor_quitacao)}</strong></div></div>
-        <div className="space-y-3">{(item.componentes || []).map((component) => <section key={component.id} className="rounded-xl border border-[var(--c-border)] p-4"><div className="flex flex-wrap justify-between gap-2"><strong>Fonte {component.ordem} · {component.formaPagamento?.nome || component.forma_recebimento}</strong><strong>{money(component.valor_quitacao)}</strong></div><p className="mt-1 text-sm text-[var(--c-muted)]">{component.contaBancaria?.nome || component.cartao?.nome || component.chequeTerceiro?.codigo || 'Sem instrumento bancário'}</p><div className="mt-3 overflow-x-auto"><table className="table min-w-[560px]"><thead><tr><th>Título</th><th>Descrição</th><th className="text-right">Valor alocado</th></tr></thead><tbody>{(component.alocacoes || []).map((allocation) => <tr key={allocation.id}><td>{allocation.titulo?.codigo}</td><td>{allocation.titulo?.descricao}</td><td className="text-right">{money(allocation.valor)}</td></tr>)}</tbody></table></div></section>)}</div>
-        {canReverse && item.status === 'CONFIRMADO' ? <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-4"><label className="form-control"><span>Justificativa do estorno *</span><textarea className="textarea" value={reason} onChange={(event) => setReason(event.target.value)} /></label><button type="button" className="btn btn-outline mt-3 text-rose-700" disabled={saving || !reason.trim()} onClick={() => onReverse(reason)}>Estornar grupo completo</button></div> : null}
-      </div>
-    </section>
-  </div>;
+  return (
+    <div className="modal-overlay finance-operation-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="baixa-composta-detalhe-titulo">
+      <section className="modal-dialog finance-operation-modal finance-operation-modal--detail">
+        <header className="modal-header">
+          <div>
+            <h2 id="baixa-composta-detalhe-titulo" className="modal-title">{item.codigo}</h2>
+            <p className="modal-subtitle">
+              {item.parceiro?.nome} · {item.empresa?.nome} · {dateBr(item.data_movimento)}
+            </p>
+          </div>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Fechar detalhes da baixa">
+            <HiOutlineXMark className="h-5 w-5" />
+          </button>
+        </header>
+
+        <div className="modal-body min-h-0 overflow-y-auto">
+          <div className="mb-4 grid gap-3 sm:grid-cols-3">
+            <div className="finance-operation-metric p-3">
+              <small className="text-[var(--c-muted)]">Status</small>
+              <strong className="block">{item.status}</strong>
+            </div>
+            <div className="finance-operation-metric p-3">
+              <small className="text-[var(--c-muted)]">Principal</small>
+              <strong className="block">{money(item.valor_principal)}</strong>
+            </div>
+            <div className="finance-operation-metric p-3">
+              <small className="text-[var(--c-muted)]">Valor da operação</small>
+              <strong className="block">{money(item.valor_quitacao)}</strong>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {(item.componentes || []).map((component) => (
+              <section key={component.id} className="finance-operation-panel p-4">
+                <div className="flex flex-wrap justify-between gap-2">
+                  <strong>Fonte {component.ordem} · {component.formaPagamento?.nome || component.forma_recebimento}</strong>
+                  <strong>{money(component.valor_quitacao)}</strong>
+                </div>
+                <p className="mt-1 text-sm text-[var(--c-muted)]">
+                  {component.contaBancaria?.nome || component.cartao?.nome || component.chequeTerceiro?.codigo || 'Sem instrumento financeiro'}
+                </p>
+                <div className="finance-operation-table-shell mt-3">
+                  <table className="table min-w-[560px]">
+                    <thead><tr><th>Título</th><th>Descrição</th><th className="text-right">Valor alocado</th></tr></thead>
+                    <tbody>
+                      {(component.alocacoes || []).map((allocation) => (
+                        <tr key={allocation.id}>
+                          <td>{allocation.titulo?.codigo}</td>
+                          <td>{allocation.titulo?.descricao}</td>
+                          <td className="text-right">{money(allocation.valor)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            ))}
+          </div>
+
+          {canReverse && item.status === 'CONFIRMADO' ? (
+            <div className="finance-operation-notice finance-operation-notice--danger mt-5 p-4">
+              <label className="form-control">
+                <span>Justificativa do estorno *</span>
+                <textarea className="textarea" value={reason} onChange={(event) => setReason(event.target.value)} />
+              </label>
+              <button type="button" className="btn btn-outline mt-3" disabled={saving || !reason.trim()} onClick={() => onReverse(reason)}>
+                Estornar grupo completo
+              </button>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 export default function FinanceiroBaixasCompostas() {

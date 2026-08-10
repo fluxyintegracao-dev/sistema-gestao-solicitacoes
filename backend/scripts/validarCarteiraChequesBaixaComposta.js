@@ -79,12 +79,19 @@ function validateRoutesAndPermissions() {
 function validateFrontend() {
   const titles = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTitulos.jsx'), 'utf8');
   const modal = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/BaixaCompostaModal.jsx'), 'utf8');
+  const detail = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroBaixasCompostas.jsx'), 'utf8');
+  const styles = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/index.css'), 'utf8');
   const custody = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroChequesTerceiros.jsx'), 'utf8');
   const holderAutocomplete = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/TitularChequeAutocomplete.jsx'), 'utf8');
   assert(titles.includes('BaixaCompostaModal'));
   assert(titles.includes('Baixa com múltiplas fontes'));
   assert(modal.includes('crypto.randomUUID()'));
   assert(modal.includes('overflow-y-auto'), 'Modal composto deve permitir rolagem.');
+  assert(modal.includes('finance-operation-modal--wide'), 'Modal composto deve usar a superficie financeira opaca.');
+  assert(titles.includes('finance-operation-modal--medium'), 'Modal de baixa em massa deve usar a superficie financeira opaca.');
+  assert(detail.includes('finance-operation-modal--detail'), 'Detalhe da baixa deve usar a superficie financeira opaca.');
+  assert(!detail.includes('var(--c-card)'), 'Detalhe da baixa nao pode depender de token de fundo inexistente.');
+  assert(styles.includes('.finance-operation-notice--warning'), 'Avisos financeiros devem possuir contraste tematico.');
   assert(modal.includes('Empresa da fonte'), 'Cada fonte deve permitir selecionar sua propria empresa.');
   assert(modal.includes('Natureza entre empresas'), 'Rateio entre empresas deve exigir classificacao operacional.');
   assert(modal.includes('empresasDisponiveis'), 'Modal deve listar todas as empresas permitidas como fonte.');
