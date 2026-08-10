@@ -10,6 +10,7 @@ function read(relativePath) {
 
 function validateMigration() {
   const migration = read('migrations/202608070001_financeiro_carteira_cheques_baixa_composta.js');
+  const intercompanyMigration = read('migrations/202608100001_baixa_composta_intercompany_fontes.js');
   [
     'baixas_financeiras_grupos',
     'baixas_financeiras_componentes',
@@ -21,6 +22,8 @@ function validateMigration() {
   ].forEach((contract) => assert(migration.includes(contract), `Contrato ausente na migration: ${contract}`));
   assert(migration.includes('idx_cheques_identidade'));
   assert(!migration.includes("'ux_cheques_identidade'"), 'A migration nao pode falhar por duplicidades historicas.');
+  assert(intercompanyMigration.includes("'empresa_id'"), 'Componente deve persistir a empresa de cada fonte.');
+  assert(intercompanyMigration.includes('idx_baixa_componente_empresa'), 'Empresa da fonte deve estar indexada.');
 }
 
 function validateSecurityAndTransactions() {
@@ -31,7 +34,9 @@ function validateSecurityAndTransactions() {
     'sequelize.transaction()',
     'lock: transaction.LOCK.UPDATE',
     'Mesmo credor',
-    'mesma empresa',
+    'Selecione somente titulos do mesmo credor',
+    'Informe a empresa da fonte',
+    'natureza_intercompany_baixa',
     'O mesmo cheque nao pode ser usado em mais de uma operacao',
     'Cartao de credito com geracao de fatura deve usar a baixa simples',
     'deve ser utilizado integralmente',
@@ -41,6 +46,7 @@ function validateSecurityAndTransactions() {
   ].forEach((contract) => assert(service.toLowerCase().includes(contract.toLowerCase()), `Protecao ausente: ${contract}`));
   assert(titleService.includes('baixa_grupo_id'));
   assert(titleService.includes('baixa_componente_id'));
+  assert(titleService.includes('skipTituloIntercompanyUpdate'), 'Baixa composta multifonte deve preservar o titulo e auditar intercompany por movimento.');
   assert(titleService.includes('Estorne o grupo completo na tela de Baixas com Multiplas Fontes'));
   assert(titleService.includes("status: 'EM_CARTEIRA'"), 'Estorno deve devolver cheque utilizado para a carteira.');
   assert(service.includes('isValidCpfCnpj'), 'Cadastro de cheque deve validar CPF/CNPJ do titular.');
@@ -79,6 +85,9 @@ function validateFrontend() {
   assert(titles.includes('Baixa com múltiplas fontes'));
   assert(modal.includes('crypto.randomUUID()'));
   assert(modal.includes('overflow-y-auto'), 'Modal composto deve permitir rolagem.');
+  assert(modal.includes('Empresa da fonte'), 'Cada fonte deve permitir selecionar sua propria empresa.');
+  assert(modal.includes('Natureza entre empresas'), 'Rateio entre empresas deve exigir classificacao operacional.');
+  assert(modal.includes('empresasDisponiveis'), 'Modal deve listar todas as empresas permitidas como fonte.');
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));
   assert(custody.includes('max-h-[52vh] overflow-auto'), 'Preview da importacao deve permitir rolagem.');

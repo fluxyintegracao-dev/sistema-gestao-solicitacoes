@@ -3456,11 +3456,15 @@ async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
       }
     }
 
+    const tituloIntercompanyUpdate = options.skipTituloIntercompanyUpdate
+      ? {}
+      : buildTituloIntercompanyUpdateFromBaixa(movimentoIntercompanyFields);
+
     await titulo.update({
       empresa_id: empresaTituloId,
       cartao_id: cartaoBaixa.cartao?.id || titulo.cartao_id || null,
       fatura_cartao_id: cartaoBaixa.fatura?.id || titulo.fatura_cartao_id || null,
-      ...buildTituloIntercompanyUpdateFromBaixa(movimentoIntercompanyFields),
+      ...tituloIntercompanyUpdate,
       valor_baixado: novoValorBaixado,
       valor_saldo: novoEstado.valor_saldo,
       status: novoEstado.status,

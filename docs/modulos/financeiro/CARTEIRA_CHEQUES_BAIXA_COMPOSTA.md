@@ -37,11 +37,13 @@ Cheque em carteira nao e conta bancaria e nao cria saldo financeiro ficticio. A 
 ### Baixa composta
 
 - somente titulos `PAGAR`, abertos ou parciais;
-- todos os titulos devem pertencer ao mesmo credor e a mesma empresa;
+- todos os titulos devem pertencer ao mesmo credor; podem estar vinculados a empresas diferentes do grupo;
 - cada componente usa uma forma de pagamento ativa cadastrada no sistema;
 - cartao de debito pode compor o grupo; cartao de credito que gera fatura permanece na baixa simples, pois esse fluxo altera vencimento e vinculo da fatura;
-- conta bancaria e cartao devem pertencer a empresa da baixa;
-- cheque de terceiro deve estar `EM_CARTEIRA` e sob custodia da mesma empresa;
+- cada componente informa sua empresa fonte; conta bancaria, cartao ou cheque devem pertencer a essa empresa;
+- cheques `EM_CARTEIRA` de qualquer empresa do grupo podem ser selecionados, respeitando a empresa detentora como origem da fonte;
+- quando a empresa fonte difere da empresa do titulo, cada movimento recebe origem, destino, natureza e grupo intercompany para preservar conciliacao e consolidacao;
+- o cabecalho da baixa conserva uma empresa de referencia, enquanto a empresa efetiva de cada operacao fica persistida no componente e no movimento;
 - o cheque e sempre usado pelo valor integral de face;
 - cada componente deve ser integralmente distribuido entre os titulos;
 - cada titulo nao pode receber valor superior ao saldo e o total das fontes deve ser igual ao total alocado;
@@ -53,12 +55,12 @@ Cheque em carteira nao e conta bancaria e nao cria saldo financeiro ficticio. A 
 
 ## Estrutura tecnica
 
-Migration: `202608070001_financeiro_carteira_cheques_baixa_composta.js`.
+Migrations: `202608070001_financeiro_carteira_cheques_baixa_composta.js` e `202608100001_baixa_composta_intercompany_fontes.js`.
 
 Tabelas novas:
 
 - `baixas_financeiras_grupos`: cabecalho idempotente do pagamento;
-- `baixas_financeiras_componentes`: fontes usadas no grupo;
+- `baixas_financeiras_componentes`: fontes usadas no grupo, incluindo a empresa detentora/pagadora de cada fonte;
 - `baixas_financeiras_alocacoes`: distribuicao de cada fonte por titulo;
 - `cheques_terceiros_movimentos`: historico imutavel de custodia.
 

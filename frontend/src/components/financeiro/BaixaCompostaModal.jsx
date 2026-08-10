@@ -6,6 +6,12 @@ function round(value) { return Math.round((Number(value || 0) + Number.EPSILON) 
 function money(value) { return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
 function today() { return new Date().toISOString().slice(0, 10); }
 
+const NATUREZAS_INTERCOMPANY = [
+  { value: 'OPERACIONAL_TERCEIRO', label: 'Pagamento operacional por outra empresa' },
+  { value: 'TRANSFERENCIA_INTERNA', label: 'Cobertura/transferência interna' },
+  { value: 'REEMBOLSO_COMPENSACAO', label: 'Reembolso ou compensação' }
+];
+
 function operationalType(forma) {
   const raw = [forma?.tipo, forma?.codigo, forma?.nome].filter(Boolean).join(' ').toUpperCase();
   if (raw.includes('PIX')) return 'PIX';
@@ -18,10 +24,12 @@ function operationalType(forma) {
   return 'OUTROS';
 }
 
-function newComponent(formas = []) {
+function newComponent(formas = [], empresaId = '') {
   return {
+    empresa_id: empresaId,
     forma_pagamento_id: formas[0]?.id || '', conta_bancaria_id: '', cartao_id: '',
-    cheque_terceiro_id: '', valor: '', documento_referencia: '', observacoes: '', alocacoes: {}
+    cheque_terceiro_id: '', valor: '', documento_referencia: '', observacoes: '',
+    natureza_intercompany_baixa: 'OPERACIONAL_TERCEIRO', motivo_intercompany: '', alocacoes: {}
   };
 }
 
@@ -38,20 +46,26 @@ function distribute(value, titulos, alreadyByTitle = {}) {
 }
 
 export default function BaixaCompostaModal({
-  titulos = [], formas = [], contas = [], cartoes = [], cheques = [], onClose, onConfirmed
+  titulos = [], formas = [], contas = [], cartoes = [], cheques = [], empresas = [], onClose, onConfirmed
 }) {
   const [dataMovimento, setDataMovimento] = useState(today());
   const [observacoes, setObservacoes] = useState('');
-  const [components, setComponents] = useState(() => [newComponent(formas)]);
+  const [components, setComponents] = useState(() => [newComponent(formas, titulos[0]?.empresa_id || '')]);
   const [preview, setPreview] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const empresaId = Number(titulos[0]?.empresa_id || 0);
   const parceiroId = Number(titulos[0]?.parceiro_id || 0);
-  const compatible = titulos.length > 0 && titulos.every((item) => Number(item.empresa_id) === empresaId && Number(item.parceiro_id) === parceiroId);
-
-  const contasEmpresa = useMemo(() => contas.filter((item) => Number(item.empresa_id) === empresaId), [contas, empresaId]);
-  const chequesEmpresa = useMemo(() => cheques.filter((item) => Number(item.empresa_id) === empresaId && String(item.status).toUpperCase() === 'EM_CARTEIRA'), [cheques, empresaId]);
+  const compatible = titulos.length > 0 && titulos.every((item) => Number(item.parceiro_id) === parceiroId);
+  const empresasDisponiveis = useMemo(() => {
+    const map = new Map();
+    empresas.filter((item) => item?.ativo !== false).forEach((item) => map.set(Number(item.id), item));
+    titulos.forEach((item) => {
+      const id = Number(item.empresa_id || 0);
+      if (id && !map.has(id)) map.set(id, { id, nome: item.empresa?.nome || `Empresa #${id}` });
+    });
+    return Array.from(map.values());
+  }, [empresas, titulos]);
   const totalSaldo = titulos.reduce((sum, item) => sum + Number(item.valor_saldo || 0), 0);
   const totalComponents = components.reduce((sum, item) => sum + Number(item.valor || 0), 0);
 
@@ -74,9 +88,22 @@ export default function BaixaCompostaModal({
       if (field === 'forma_pagamento_id') {
         next.conta_bancaria_id = ''; next.cartao_id = ''; next.cheque_terceiro_id = '';
       }
+      if (field === 'empresa_id') {
+        next.conta_bancaria_id = ''; next.cartao_id = ''; next.cheque_terceiro_id = '';
+      }
+      if (field === 'conta_bancaria_id') {
+        const conta = contas.find((item) => Number(item.id) === Number(value));
+        if (conta?.empresa_id) next.empresa_id = String(conta.empresa_id);
+      }
+      if (field === 'cartao_id') {
+        const cartao = cartoes.find((item) => Number(item.id) === Number(value));
+        const contaCartao = contas.find((item) => Number(item.id) === Number(cartao?.conta_bancaria_id));
+        if (contaCartao?.empresa_id) next.empresa_id = String(contaCartao.empresa_id);
+      }
       if (field === 'cheque_terceiro_id') {
-        const cheque = chequesEmpresa.find((item) => Number(item.id) === Number(value));
+        const cheque = cheques.find((item) => Number(item.id) === Number(value));
         if (cheque) {
+          next.empresa_id = String(cheque.empresa_id || '');
           next.valor = Number(cheque.valor);
           next.alocacoes = distribute(cheque.valor, titulos, allocatedBefore(index));
         }
@@ -95,6 +122,7 @@ export default function BaixaCompostaModal({
   function buildPayload() {
     const componentes = components.map(({ alocacoes, ...component }) => ({
       ...component,
+      empresa_id: Number(component.empresa_id),
       forma_pagamento_id: Number(component.forma_pagamento_id),
       conta_bancaria_id: Number(component.conta_bancaria_id) || null,
       cartao_id: Number(component.cartao_id) || null,
@@ -131,7 +159,8 @@ export default function BaixaCompostaModal({
           <button className="btn btn-outline btn-sm" type="button" onClick={onClose}><HiOutlineXMark className="h-5 w-5" /></button>
         </header>
         <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {!compatible ? <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Selecione somente contas a pagar do mesmo credor e da mesma empresa.</div> : null}
+          {!compatible ? <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">Selecione somente contas a pagar do mesmo credor.</div> : null}
+          {compatible && new Set(titulos.map((item) => Number(item.empresa_id))).size > 1 ? <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">Os títulos pertencem a empresas diferentes. Cada fonte será movimentada na sua empresa e os rateios entre empresas serão registrados individualmente para conciliação.</div> : null}
           {error ? <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">{error}</div> : null}
           <div className="mb-4 grid gap-3 md:grid-cols-[220px_1fr_auto]">
             <label className="form-control"><span>Data do pagamento</span><input className="input" type="date" value={dataMovimento} onChange={(e) => { setDataMovimento(e.target.value); setPreview(null); }} /></label>
@@ -142,17 +171,30 @@ export default function BaixaCompostaModal({
           <div className="space-y-3">{components.map((component, index) => {
             const forma = formas.find((item) => Number(item.id) === Number(component.forma_pagamento_id));
             const type = operationalType(forma);
+            const contasEmpresa = contas.filter((item) => item.ativo !== false && (!component.empresa_id || Number(item.empresa_id) === Number(component.empresa_id)));
+            const chequesEmpresa = cheques.filter((item) => String(item.status).toUpperCase() === 'EM_CARTEIRA' && (!component.empresa_id || Number(item.empresa_id) === Number(component.empresa_id)));
+            const cartoesEmpresa = cartoes.filter((item) => {
+              if (item.ativo === false || !component.empresa_id) return item.ativo !== false;
+              const contaCartao = contas.find((conta) => Number(conta.id) === Number(item.conta_bancaria_id));
+              return Number(contaCartao?.empresa_id) === Number(component.empresa_id);
+            });
+            const temRateioIntercompany = Object.entries(component.alocacoes || {}).some(([tituloId, value]) => {
+              const titulo = titulos.find((item) => Number(item.id) === Number(tituloId));
+              return Number(value) > 0 && Number(titulo?.empresa_id) !== Number(component.empresa_id);
+            });
             const componentAllocated = Object.values(component.alocacoes || {}).reduce((sum, value) => sum + Number(value || 0), 0);
-            return <section key={index} className="rounded-xl border border-[var(--c-border)] p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-[var(--c-text)]">Fonte {index + 1}</h3>{components.length > 1 ? <button type="button" className="btn btn-outline btn-sm text-rose-700" onClick={() => { setComponents((rows) => rows.filter((_, rowIndex) => rowIndex !== index)); setPreview(null); }}><HiOutlineTrash /></button> : null}</div><div className="grid gap-3 lg:grid-cols-4">
+            return <section key={index} className="rounded-xl border border-[var(--c-border)] p-4"><div className="mb-3 flex items-center justify-between"><h3 className="font-semibold text-[var(--c-text)]">Fonte {index + 1}</h3>{components.length > 1 ? <button type="button" className="btn btn-outline btn-sm text-rose-700" onClick={() => { setComponents((rows) => rows.filter((_, rowIndex) => rowIndex !== index)); setPreview(null); }}><HiOutlineTrash /></button> : null}</div><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <label className="form-control"><span>Empresa da fonte *</span><select className="select" value={component.empresa_id} onChange={(e) => updateComponent(index, 'empresa_id', e.target.value)}><option value="">Selecione</option>{empresasDisponiveis.map((item) => <option key={item.id} value={item.id}>{item.nome || item.razao_social || `Empresa #${item.id}`}</option>)}</select></label>
               <label className="form-control"><span>Forma *</span><select className="select" value={component.forma_pagamento_id} onChange={(e) => updateComponent(index, 'forma_pagamento_id', e.target.value)}><option value="">Selecione</option>{formas.filter((item) => item.ativo !== false && !item.gera_fatura).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
               {type === 'CHEQUE' ? <label className="form-control"><span>Cheque de terceiro</span><select className="select" value={component.cheque_terceiro_id} onChange={(e) => updateComponent(index, 'cheque_terceiro_id', e.target.value)}><option value="">Cheque próprio / outra origem</option>{chequesEmpresa.map((item) => <option key={item.id} value={item.id}>{item.codigo} · {item.numero_cheque} · {money(item.valor)}</option>)}</select></label> : null}
               {!['DINHEIRO', 'PERMUTA', 'OUTROS'].includes(type) && !(type === 'CHEQUE' && component.cheque_terceiro_id) ? <label className="form-control"><span>Conta financeira *</span><select className="select" value={component.conta_bancaria_id} onChange={(e) => updateComponent(index, 'conta_bancaria_id', e.target.value)}><option value="">Selecione</option>{contasEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}
-              {type === 'CARTAO' ? <label className="form-control"><span>Cartão *</span><select className="select" value={component.cartao_id} onChange={(e) => updateComponent(index, 'cartao_id', e.target.value)}><option value="">Selecione</option>{cartoes.map((item) => <option key={item.id} value={item.id}>{item.nome || item.descricao || `Cartão #${item.id}`}</option>)}</select></label> : null}
+              {type === 'CARTAO' ? <label className="form-control"><span>Cartão *</span><select className="select" value={component.cartao_id} onChange={(e) => updateComponent(index, 'cartao_id', e.target.value)}><option value="">Selecione</option>{cartoesEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.descricao || `Cartão #${item.id}`}</option>)}</select></label> : null}
               <label className="form-control"><span>Valor da fonte *</span><input className="input" type="number" min="0.01" step="0.01" value={component.valor} readOnly={Boolean(component.cheque_terceiro_id)} onChange={(e) => updateComponent(index, 'valor', e.target.value)} /></label>
               <label className="form-control"><span>Documento</span><input className="input" value={component.documento_referencia} onChange={(e) => updateComponent(index, 'documento_referencia', e.target.value)} /></label>
+              {temRateioIntercompany ? <label className="form-control xl:col-span-2"><span>Natureza entre empresas *</span><select className="select" value={component.natureza_intercompany_baixa} onChange={(e) => updateComponent(index, 'natureza_intercompany_baixa', e.target.value)}>{NATUREZAS_INTERCOMPANY.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label> : null}
             </div><div className="mt-4 overflow-x-auto"><table className="table min-w-[720px]"><thead><tr><th>Título</th><th>Vencimento</th><th className="text-right">Saldo</th><th className="w-52">Valor nesta fonte</th></tr></thead><tbody>{titulos.map((titulo) => <tr key={titulo.id}><td><strong>{titulo.codigo}</strong><small className="block text-[var(--c-muted)]">{titulo.descricao}</small></td><td>{String(titulo.data_vencimento || '').split('-').reverse().join('/')}</td><td className="text-right">{money(titulo.valor_saldo)}</td><td><input className="input input-sm text-right" type="number" min="0" step="0.01" value={component.alocacoes?.[titulo.id] || ''} onChange={(e) => updateAllocation(index, titulo.id, e.target.value)} /></td></tr>)}</tbody><tfoot><tr><th colSpan="3">Distribuído na fonte</th><th className={Math.abs(round(componentAllocated) - round(component.valor)) < 0.01 ? 'text-emerald-700' : 'text-rose-700'}>{money(componentAllocated)} / {money(component.valor)}</th></tr></tfoot></table></div></section>;
           })}</div>
-          <button type="button" className="btn btn-outline mt-3" onClick={() => { setComponents((rows) => [...rows, newComponent(formas)]); setPreview(null); }}><HiOutlinePlus /> Adicionar fonte</button>
+          <button type="button" className="btn btn-outline mt-3" onClick={() => { setComponents((rows) => [...rows, newComponent(formas, titulos[0]?.empresa_id || '')]); setPreview(null); }}><HiOutlinePlus /> Adicionar fonte</button>
 
           {preview ? <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900"><strong>Validação concluída.</strong> {preview.componentes?.length || 0} fonte(s), {preview.titulos?.length || 0} título(s), total principal {money(preview.valor_principal)}.</div> : null}
         </div>

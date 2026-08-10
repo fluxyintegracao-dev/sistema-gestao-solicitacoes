@@ -449,6 +449,7 @@ function normalizarComponentes(payload) {
     return {
       ...item,
       ordem: index + 1,
+      empresa_id: Number(item.empresa_id) || null,
       forma_pagamento_id: Number(item.forma_pagamento_id) || null,
       conta_bancaria_id: Number(item.conta_bancaria_id) || null,
       cartao_id: Number(item.cartao_id) || null,
@@ -462,7 +463,6 @@ function normalizarComponentes(payload) {
 }
 
 async function validarBaixaComposta(payload, transaction, { lock = false } = {}) {
-  const empresa = await empresaAtiva(payload.empresa_id, transaction);
   const dataMovimento = dataOnly(payload.data_movimento);
   if (!dataMovimento) throw httpError(400, 'Data da baixa e obrigatoria.');
   const componentes = normalizarComponentes(payload);
@@ -481,7 +481,9 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
   if (titulos.some((titulo) => !['ABERTO', 'PARCIAL'].includes(String(titulo.status).toUpperCase()))) throw httpError(409, 'Todos os titulos precisam estar abertos ou parciais.');
   const parceiroId = Number(titulos[0].parceiro_id);
   if (titulos.some((titulo) => Number(titulo.parceiro_id) !== parceiroId)) throw httpError(400, 'Selecione somente titulos do mesmo credor.');
-  if (titulos.some((titulo) => Number(titulo.empresa_id) !== Number(empresa.id))) throw httpError(400, 'Os titulos e a empresa pagadora precisam pertencer a mesma empresa. Separe operacoes intercompany.');
+  const empresaReferencia = await empresaAtiva(titulos[0].empresa_id, transaction);
+  const empresasTituloIds = [...new Set(titulos.map((titulo) => Number(titulo.empresa_id)).filter(Boolean))];
+  for (const empresaTituloId of empresasTituloIds) await empresaAtiva(empresaTituloId, transaction);
 
   const tituloMap = new Map(titulos.map((titulo) => [Number(titulo.id), titulo]));
   const formaIds = [...new Set(componentes.map((item) => item.forma_pagamento_id).filter(Boolean))];
@@ -512,12 +514,8 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
     const exigeConta = !['DINHEIRO', 'PERMUTA', 'BENS', 'OUTROS'].includes(tipo) && !(tipo === 'CHEQUE' && chequeTerceiro);
     const conta = item.conta_bancaria_id ? contaMap.get(item.conta_bancaria_id) : null;
     if (exigeConta && !conta) throw httpError(400, `Informe a conta financeira na operacao ${item.ordem}.`);
-    if (conta && Number(conta.empresa_id) !== Number(empresa.id)) throw httpError(400, `A conta da operacao ${item.ordem} pertence a outra empresa.`);
     const cartao = item.cartao_id ? cartaoMap.get(item.cartao_id) : null;
     if (tipo === 'CARTAO' && !cartao) throw httpError(400, `Informe um cartao ativo na operacao ${item.ordem}.`);
-    if (cartao?.contaBancaria?.empresa_id && Number(cartao.contaBancaria.empresa_id) !== Number(empresa.id)) {
-      throw httpError(400, `O cartao da operacao ${item.ordem} pertence a outra empresa.`);
-    }
 
     let cheque = null;
     if (chequeTerceiro) {
@@ -525,14 +523,35 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
       if (chequesSelecionados.has(item.cheque_terceiro_id)) throw httpError(400, `O mesmo cheque nao pode ser usado em mais de uma operacao do grupo.`);
       chequesSelecionados.add(item.cheque_terceiro_id);
       cheque = await ChequeTerceiro.findOne({
-        where: { id: item.cheque_terceiro_id, status: 'EM_CARTEIRA', empresa_id: empresa.id },
+        where: { id: item.cheque_terceiro_id, status: 'EM_CARTEIRA' },
         transaction,
         ...(lock ? { lock: transaction.LOCK.UPDATE } : {})
       });
-      if (!cheque) throw httpError(409, `Cheque da operacao ${item.ordem} indisponivel ou pertence a outra empresa.`);
+      if (!cheque) throw httpError(409, `Cheque da operacao ${item.ordem} indisponivel.`);
       if (Math.abs(round(cheque.valor) - item.valor) >= 0.01) throw httpError(400, `O cheque da operacao ${item.ordem} deve ser utilizado integralmente.`);
     }
-    componentesValidados.push({ ...item, forma, tipo, conta, cartao, cheque });
+
+    const empresasFonte = [
+      Number(item.empresa_id) || null,
+      conta?.empresa_id ? Number(conta.empresa_id) : null,
+      cartao?.contaBancaria?.empresa_id ? Number(cartao.contaBancaria.empresa_id) : null,
+      cheque?.empresa_id ? Number(cheque.empresa_id) : null
+    ].filter(Boolean);
+    const empresaFonteIds = [...new Set(empresasFonte)];
+    if (!empresaFonteIds.length) throw httpError(400, `Informe a empresa da fonte na operacao ${item.ordem}.`);
+    if (empresaFonteIds.length > 1) throw httpError(400, `Conta, cartao ou cheque da operacao ${item.ordem} pertencem a empresas diferentes.`);
+    const empresaFonte = await empresaAtiva(empresaFonteIds[0], transaction);
+
+    componentesValidados.push({
+      ...item,
+      empresa_id: Number(empresaFonte.id),
+      empresaFonte,
+      forma,
+      tipo,
+      conta,
+      cartao,
+      cheque
+    });
   }
 
   const somaComponente = new Map();
@@ -556,7 +575,15 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
     if (valor > saldo) throw httpError(400, `A baixa do titulo ${tituloMap.get(tituloId).codigo || `#${tituloId}`} ultrapassa o saldo.`);
   });
   const valorPrincipal = round(componentesValidados.reduce((sum, item) => sum + item.valor, 0));
-  return { empresa, parceiro_id: parceiroId, data_movimento: dataMovimento, componentes: componentesValidados, alocacoes, titulos, valor_principal: valorPrincipal };
+  return {
+    empresaReferencia,
+    parceiro_id: parceiroId,
+    data_movimento: dataMovimento,
+    componentes: componentesValidados,
+    alocacoes,
+    titulos,
+    valor_principal: valorPrincipal
+  };
 }
 
 async function previewBaixaComposta(payload) {
@@ -568,7 +595,15 @@ async function previewBaixaComposta(payload) {
       valido: true,
       valor_principal: validacao.valor_principal,
       titulos: validacao.titulos.map((titulo) => ({ id: titulo.id, codigo: titulo.codigo, saldo: Number(titulo.valor_saldo) })),
-      componentes: validacao.componentes.map((item) => ({ ordem: item.ordem, tipo: item.tipo, valor: item.valor, conta: item.conta?.nome || null, cheque: item.cheque?.codigo || null }))
+      componentes: validacao.componentes.map((item) => ({
+        ordem: item.ordem,
+        tipo: item.tipo,
+        valor: item.valor,
+        empresa_id: item.empresa_id,
+        empresa: item.empresaFonte?.nome || null,
+        conta: item.conta?.nome || null,
+        cheque: item.cheque?.codigo || null
+      }))
     };
   } catch (error) {
     await transaction.rollback();
@@ -588,7 +623,7 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
       codigo: codigoGrupo(),
       idempotency_key: idempotencyKey,
       tipo: 'PAGAMENTO',
-      empresa_id: validacao.empresa.id,
+      empresa_id: validacao.empresaReferencia.id,
       parceiro_id: validacao.parceiro_id,
       data_movimento: validacao.data_movimento,
       status: 'CONFIRMADO',
@@ -603,6 +638,7 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
       const componente = await BaixaFinanceiraComponente.create({
         baixa_grupo_id: grupo.id,
         ordem: item.ordem,
+        empresa_id: item.empresa_id,
         forma_pagamento_id: item.forma_pagamento_id,
         forma_recebimento: item.tipo,
         conta_bancaria_id: item.conta_bancaria_id,
@@ -619,8 +655,10 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
       const alocacoes = validacao.alocacoes.filter((alocacao) => alocacao.componente_index === componentIndex);
       let primeiroMovimentoId = null;
       for (const alocacao of alocacoes) {
+        const tituloAlocado = validacao.titulos.find((titulo) => Number(titulo.id) === Number(alocacao.titulo_financeiro_id));
+        const intercompany = Number(tituloAlocado?.empresa_id) !== Number(item.empresa_id);
         const resultado = await baixarTitulo(req, alocacao.titulo_financeiro_id, {
-          empresa_id: validacao.empresa.id,
+          empresa_id: item.empresa_id,
           conta_bancaria_id: item.conta_bancaria_id,
           cartao_id: item.cartao_id,
           forma_pagamento_id: item.forma_pagamento_id,
@@ -632,9 +670,13 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
           data_movimento: validacao.data_movimento,
           documento_referencia: item.documento_referencia,
           observacoes: item.observacoes || `Componente ${item.ordem} da baixa composta ${grupo.codigo}.`,
+          intercompany,
+          natureza_intercompany_baixa: item.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO',
+          motivo_intercompany: item.motivo_intercompany || payload.observacoes || `Pagamento intercompany na baixa composta ${grupo.codigo}.`,
+          intercompany_group_id: intercompany ? `IC-${grupo.codigo}-${item.ordem}` : null,
           baixa_grupo_id: grupo.id,
           baixa_componente_id: componente.id
-        }, { transaction, skipSecurityEvent: true });
+        }, { transaction, skipSecurityEvent: true, skipTituloIntercompanyUpdate: true });
         primeiroMovimentoId ||= resultado.movimento_financeiro_id;
         await BaixaFinanceiraAlocacao.create({
           baixa_grupo_id: grupo.id,
@@ -696,6 +738,7 @@ async function obterBaixaComposta(id) {
         model: BaixaFinanceiraComponente,
         as: 'componentes',
         include: [
+          { model: EmpresaGrupo, as: 'empresaFonte', attributes: ['id', 'codigo', 'nome'], required: false },
           { model: FormaPagamentoFinanceira, as: 'formaPagamento', required: false },
           { model: ContaBancaria, as: 'contaBancaria', required: false },
           { model: CartaoFinanceiro, as: 'cartao', required: false },

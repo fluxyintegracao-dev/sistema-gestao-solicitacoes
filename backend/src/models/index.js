@@ -2925,6 +2925,8 @@ db.Parceiro.hasMany(db.BaixaFinanceiraGrupo, { foreignKey: 'parceiro_id', as: 'b
 db.BaixaFinanceiraGrupo.belongsTo(db.Parceiro, { foreignKey: 'parceiro_id', as: 'parceiro' });
 db.BaixaFinanceiraGrupo.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'baixa_grupo_id', as: 'componentes' });
 db.BaixaFinanceiraComponente.belongsTo(db.BaixaFinanceiraGrupo, { foreignKey: 'baixa_grupo_id', as: 'grupo' });
+db.EmpresaGrupo.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'empresa_id', as: 'componentesBaixasCompostasFonte' });
+db.BaixaFinanceiraComponente.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresaFonte' });
 db.FormaPagamentoFinanceira.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'forma_pagamento_id', as: 'componentesBaixasCompostas' });
 db.BaixaFinanceiraComponente.belongsTo(db.FormaPagamentoFinanceira, { foreignKey: 'forma_pagamento_id', as: 'formaPagamento' });
 db.ContaBancaria.hasMany(db.BaixaFinanceiraComponente, { foreignKey: 'conta_bancaria_id', as: 'componentesBaixasCompostas' });

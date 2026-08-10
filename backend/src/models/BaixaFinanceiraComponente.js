@@ -2,6 +2,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define('BaixaFinanceiraComp
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   baixa_grupo_id: { type: DataTypes.INTEGER, allowNull: false },
   ordem: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+  empresa_id: { type: DataTypes.INTEGER, allowNull: false },
   forma_pagamento_id: { type: DataTypes.INTEGER, allowNull: true },
   forma_recebimento: { type: DataTypes.STRING(30), allowNull: false },
   conta_bancaria_id: { type: DataTypes.INTEGER, allowNull: true },

@@ -3452,6 +3452,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           contas={contasBancarias}
           cartoes={cartoes}
           cheques={chequesTerceirosDisponiveis}
+          empresas={empresasGrupo}
           onClose={() => setModalBaixaCompostaOpen(false)}
           onConfirmed={() => {
             setSelectedTituloIds([]);
