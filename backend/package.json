@@ -19,6 +19,7 @@
     "test:ultimo-preco": "node scripts/testarUltimoPrecoInsumo.js",
     "test:importacao-titulos": "node scripts/validarImportacaoTitulos.js",
     "test:baixa-massa-formas": "node scripts/validarBaixaMassaFormasPagamento.js",
+    "test:conciliacao-matches": "node scripts/validarConciliacaoMatchesExatos.js",
     "test:cheques-terceiros": "node scripts/validarCarteiraChequesBaixaComposta.js",
     "test:docs": "node scripts/validarDocumentacao.js",
     "test:smoke-sst": "node scripts/smoke-sst-simplificacao.js",

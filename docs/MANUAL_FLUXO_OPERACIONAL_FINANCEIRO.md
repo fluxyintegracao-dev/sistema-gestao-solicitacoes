@@ -501,10 +501,12 @@ Na pendencia de conciliacao, o sistema tenta sugerir o match com movimentos fina
 Criticos para a sugestao:
 
 - mesma conta bancaria
-- valor compativel
-- data proxima
-- documento
-- parceiro identificado no texto
+- valor absoluto exatamente igual, considerando os centavos
+- mesma data do lancamento bancario
+
+Documento e parceiro identificado no texto servem apenas para ordenar ou desempatar candidatos que
+ja atendam aos requisitos exatos de valor e data. Um movimento com valor ou data divergente nao e
+exibido como opcao de match automatico.
 
 Importante:
 
@@ -548,6 +550,11 @@ Quando o usuario confirma:
 - a pendencia muda para `CONCILIADO`
 - fica registrado quem confirmou e quando confirmou
 
+Antes de confirmar, o backend valida novamente valor e data. Assim, uma sugestao antiga carregada na
+tela ou uma chamada direta nao consegue conciliar movimentos divergentes. Na associacao de varios
+movimentos, todos devem possuir a mesma data do extrato e a soma deve fechar exatamente o valor
+bancario em centavos.
+
 Essa confirmacao e manual de proposito, para manter simplicidade e controle.
 
 O sistema nao faz conciliacao automatica total na V1.
@@ -561,7 +568,7 @@ Quando o filtro atual possui lancamentos com sugestao segura, a tela libera o bo
 Esse botao:
 
 - analisa apenas pendencias do filtro atual
-- concilia somente os casos com sugestao segura
+- concilia somente os casos com valor e data exatamente correspondentes
 - nao força conciliacao em casos ambiguos
 - deixa para conferencia manual os casos sem sugestao ou com mais de uma opcao forte
 

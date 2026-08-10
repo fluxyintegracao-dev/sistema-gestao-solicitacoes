@@ -24,6 +24,11 @@ const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper')
 const { listarTarifasBancariasConfig } = require('./financeiroCadastroService');
 const { criarTituloManualComBaixaAtomica } = require('./tituloFinanceiroService');
 const { criarTransferenciaFinanceira } = require('./transferenciaFinanceiraService');
+const {
+  hasSameConciliacaoDate,
+  hasSameConciliacaoValue,
+  isExactConciliacaoMatch
+} = require('../utils/conciliacaoMatch');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -876,6 +881,7 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
   const documentoPesquisa = normalizeText(searchFilters.documento);
   const numeroDocumentoPesquisa = normalizeText(searchFilters.numero_documento);
   const limit = normalizeSearchLimit(searchFilters.limit, 40);
+  const exactMatchOnly = searchFilters.exact_match === true;
 
   const whereMovimento = {
     status: 'ATIVO',
@@ -918,6 +924,15 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
 
   const filtered = items.filter((item) => {
     if (unavailableIds.has(Number(item.id || 0))) {
+      return false;
+    }
+
+    if (exactMatchOnly && !isExactConciliacaoMatch({
+      bankDate: conciliacao.data_movimento,
+      bankValue: conciliacao.valor,
+      movementDate: item.data_movimento,
+      movementValue: item.valor_quitacao
+    })) {
       return false;
     }
 
@@ -1036,6 +1051,9 @@ function serializeSuggestion(movimento, ranking) {
 async function analyzeSuggestions(req, conciliacao, options = {}) {
   const maxSuggestions = Math.max(Number(options.maxSuggestions || 3), 1);
   const candidates = await queryMovimentoCandidates(req, conciliacao, {
+    data_inicial: conciliacao.data_movimento,
+    data_final: conciliacao.data_movimento,
+    exact_match: true,
     limit: Math.max(maxSuggestions * 3, 20)
   });
 
@@ -1044,7 +1062,7 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
       item,
       ranking: scoreSuggestion(conciliacao, item)
     }))
-    .filter((entry) => entry.ranking.score > 0)
+    .filter((entry) => entry.ranking.diff_dias === 0 && entry.ranking.diff_valor === 0)
     .sort((a, b) => {
       if (b.ranking.score !== a.ranking.score) {
         return b.ranking.score - a.ranking.score;
@@ -1059,9 +1077,7 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
       return Number(b.item.id || 0) - Number(a.item.id || 0);
     });
 
-  const sameDaySameValue = ranked.filter((entry) => (
-    entry.ranking.diff_dias === 0 && entry.ranking.diff_valor <= 0.01
-  ));
+  const sameDaySameValue = ranked;
 
   const sameTopScore = ranked.length > 1 && ranked[0].ranking.score === ranked[1].ranking.score;
   const associacaoManualRecomendada = sameDaySameValue.length > 1 || sameTopScore;
@@ -1443,10 +1459,12 @@ async function resolveMovimentoForConciliacao(req, conciliacao, movimentoId, opt
     throw createHttpError(400, 'O tipo do titulo nao e compativel com o sinal do lancamento bancario.');
   }
 
+  if (!hasSameConciliacaoDate(conciliacao.data_movimento, movimento.data_movimento)) {
+    throw createHttpError(400, 'A data do movimento deve ser igual a data do lancamento bancario importado.');
+  }
+
   if (validarValor) {
-    const valorConciliacao = Math.abs(Number(conciliacao.valor || 0));
-    const valorMovimento = Math.abs(Number(movimento.valor_quitacao || 0));
-    if (Math.abs(valorConciliacao - valorMovimento) > 0.1) {
+    if (!hasSameConciliacaoValue(conciliacao.valor, movimento.valor_quitacao)) {
       throw createHttpError(400, 'O valor do movimento nao confere com o lancamento bancario importado.');
     }
   }
@@ -1916,11 +1934,11 @@ async function confirmarConciliacao(req, conciliacaoId, payload = {}) {
       total + Math.abs(Number(movimento.valor_quitacao || 0))
     ), 0));
 
-    if (valorMovimentos > valorConciliacao + 0.01) {
+    if (valorMovimentos > valorConciliacao) {
       throw createHttpError(400, 'A soma dos movimentos selecionados e maior que o valor do lancamento bancario.');
     }
 
-    if (Math.abs(valorConciliacao - valorMovimentos) > 0.01) {
+    if (valorConciliacao !== valorMovimentos) {
       throw createHttpError(400, 'A soma dos movimentos selecionados precisa fechar com o valor do lancamento bancario.');
     }
   }
