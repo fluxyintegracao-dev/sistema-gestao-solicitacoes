@@ -4298,6 +4298,51 @@ function normalizarLabelEventoAuditoria(tipoEvento) {
   }
 }
 
+function normalizarMetadataAuditoria(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+  try {
+    const parsed = JSON.parse(metadata);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch (_error) {
+    return {};
+  }
+}
+
+function extrairMovimentoIdsAuditoria(metadata = {}) {
+  const ids = [metadata.movimento_id, metadata.movimento_financeiro_id];
+  if (Array.isArray(metadata.movimentos)) {
+    metadata.movimentos.forEach((item) => {
+      ids.push(item?.movimento_id, item?.movimento_financeiro_id);
+    });
+  }
+
+  return [...new Set(ids
+    .map((id) => Number(id || 0))
+    .filter((id) => Number.isInteger(id) && id > 0))];
+}
+
+function serializarEmpresaAuditoria(empresa) {
+  if (!empresa) return null;
+  return {
+    id: empresa.id,
+    codigo: empresa.codigo || null,
+    nome: empresa.nome || empresa.razao_social || null,
+    razao_social: empresa.razao_social || null
+  };
+}
+
+function serializarContaAuditoria(conta) {
+  if (!conta) return null;
+  return {
+    id: conta.id,
+    nome: conta.nome || null,
+    banco: conta.banco || null,
+    agencia: conta.agencia || null,
+    conta: conta.conta || null
+  };
+}
+
 async function listarAuditoriaTitulo(req, tituloId) {
   const titulo = await carregarTituloPorId(req, tituloId, { includeMovimentos: false });
 
@@ -4317,22 +4362,102 @@ async function listarAuditoriaTitulo(req, tituloId) {
     limit: 50
   });
 
-  return eventos.map((evento) => ({
-    id: evento.id,
-    tipo_evento: evento.tipo_evento,
-    label: normalizarLabelEventoAuditoria(evento.tipo_evento),
-    status: evento.status,
-    descricao: evento.descricao,
-    criado_em: evento.createdAt,
-    usuario: evento.usuario
-      ? {
-          id: evento.usuario.id,
-          nome: evento.usuario.nome,
-          email: evento.usuario.email
-        }
-      : null,
-    metadata: evento.metadata || null
+  const eventosComMetadata = eventos.map((evento) => ({
+    evento,
+    metadata: normalizarMetadataAuditoria(evento.metadata)
   }));
+  const movimentoIds = [...new Set(eventosComMetadata.flatMap(({ metadata }) => (
+    extrairMovimentoIdsAuditoria(metadata)
+  )))];
+  const empresaIdsDiretos = [...new Set(eventosComMetadata
+    .map(({ metadata }) => Number(metadata.empresa_baixa_id || 0))
+    .filter((id) => Number.isInteger(id) && id > 0))];
+  const contaIdsDiretos = [...new Set(eventosComMetadata
+    .map(({ metadata }) => Number(metadata.conta_bancaria_id || 0))
+    .filter((id) => Number.isInteger(id) && id > 0))];
+
+  const [movimentos, empresasDiretas, contasDiretas] = await Promise.all([
+    movimentoIds.length
+      ? MovimentoFinanceiro.findAll({
+          where: { id: { [Op.in]: movimentoIds } },
+          attributes: ['id', 'empresa_id', 'conta_bancaria_id'],
+          include: [
+            {
+              model: EmpresaGrupo,
+              as: 'empresa',
+              required: false,
+              attributes: ['id', 'codigo', 'nome', 'razao_social']
+            },
+            {
+              model: ContaBancaria,
+              as: 'contaBancaria',
+              required: false,
+              attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+            }
+          ]
+        })
+      : [],
+    empresaIdsDiretos.length
+      ? EmpresaGrupo.findAll({
+          where: { id: { [Op.in]: empresaIdsDiretos } },
+          attributes: ['id', 'codigo', 'nome', 'razao_social']
+        })
+      : [],
+    contaIdsDiretos.length
+      ? ContaBancaria.findAll({
+          where: { id: { [Op.in]: contaIdsDiretos } },
+          attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
+        })
+      : []
+  ]);
+
+  const movimentoMap = new Map(movimentos.map((movimento) => [Number(movimento.id), movimento]));
+  const empresaMap = new Map(empresasDiretas.map((empresa) => [Number(empresa.id), empresa]));
+  const contaMap = new Map(contasDiretas.map((conta) => [Number(conta.id), conta]));
+
+  return eventosComMetadata.map(({ evento, metadata }) => {
+    const fontesFinanceiras = extrairMovimentoIdsAuditoria(metadata)
+      .map((movimentoId) => movimentoMap.get(movimentoId))
+      .filter(Boolean)
+      .map((movimento) => ({
+        movimento_id: movimento.id,
+        empresa: serializarEmpresaAuditoria(movimento.empresa),
+        conta_bancaria: serializarContaAuditoria(movimento.contaBancaria)
+      }));
+
+    const empresaDireta = empresaMap.get(Number(metadata.empresa_baixa_id || 0));
+    const contaDireta = contaMap.get(Number(metadata.conta_bancaria_id || 0));
+    const referenciaDiretaJaRepresentada = fontesFinanceiras.some((fonte) => (
+      (!empresaDireta || Number(fonte.empresa?.id || 0) === Number(empresaDireta.id))
+      && (!contaDireta || Number(fonte.conta_bancaria?.id || 0) === Number(contaDireta.id))
+    ));
+
+    if ((empresaDireta || contaDireta) && !referenciaDiretaJaRepresentada) {
+      fontesFinanceiras.push({
+        movimento_id: Number(metadata.movimento_id || metadata.movimento_financeiro_id || 0) || null,
+        empresa: serializarEmpresaAuditoria(empresaDireta),
+        conta_bancaria: serializarContaAuditoria(contaDireta)
+      });
+    }
+
+    return {
+      id: evento.id,
+      tipo_evento: evento.tipo_evento,
+      label: normalizarLabelEventoAuditoria(evento.tipo_evento),
+      status: evento.status,
+      descricao: evento.descricao,
+      criado_em: evento.createdAt,
+      usuario: evento.usuario
+        ? {
+            id: evento.usuario.id,
+            nome: evento.usuario.nome,
+            email: evento.usuario.email
+          }
+        : null,
+      metadata: evento.metadata || null,
+      fontes_financeiras: fontesFinanceiras
+    };
+  });
 }
 
 async function importarCodigosBarrasTitulos(req, payload = {}) {
