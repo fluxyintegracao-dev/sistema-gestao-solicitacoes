@@ -35,6 +35,15 @@ function validateContracts() {
   assert(validator.includes("'forma_pagamento_id'"));
   assert(movement.includes('forma_pagamento_id'));
   assert(detail.includes('movimento.formaPagamento?.nome'));
+  assert(detail.includes("fontesFinanceirasAtivas"));
+  assert(detail.includes("fonte.empresa?.nome"));
+  assert(detail.includes("fonte.conta_bancaria?.nome"));
+  assert(detail.includes("hideFinancialReferenceIds"));
+
+  const tituloService = fs.readFileSync(path.resolve(__dirname, '../src/services/tituloFinanceiroService.js'), 'utf8');
+  assert(tituloService.includes('fontes_financeiras: fontesFinanceiras'));
+  assert(tituloService.includes("as: 'empresa'"));
+  assert(tituloService.includes("as: 'contaBancaria'"));
 }
 
 validateMappings();

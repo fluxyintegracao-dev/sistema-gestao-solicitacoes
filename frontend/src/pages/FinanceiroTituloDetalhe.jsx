@@ -259,7 +259,7 @@ function paymentStatusClass(status) {
   return 'bg-slate-100 text-slate-700';
 }
 
-function formatAuditMetadata(metadata) {
+function formatAuditMetadata(metadata, { hideFinancialReferenceIds = false } = {}) {
   if (!metadata || typeof metadata !== 'object') {
     return [];
   }
@@ -296,6 +296,7 @@ function formatAuditMetadata(metadata) {
   };
 
   return Object.entries(metadata)
+    .filter(([key]) => !hideFinancialReferenceIds || !['empresa_baixa_id', 'conta_bancaria_id'].includes(key))
     .filter(([, value]) => value !== null && value !== undefined && value !== '')
     .slice(0, 8)
     .map(([key, value]) => ({
@@ -370,6 +371,23 @@ export default function FinanceiroTituloDetalhe() {
       ? titulo.movimentos.filter((item) => String(item.status || '').toUpperCase() === 'ATIVO')
       : [];
   }, [titulo]);
+  const fontesFinanceirasAtivas = useMemo(() => {
+    const fontesPorDescricao = new Map();
+
+    movimentosAtivos.forEach((movimento) => {
+      const empresaNome = movimento.empresa?.nome || movimento.empresa?.razao_social || 'Empresa nao informada';
+      const contaNome = movimento.contaBancaria?.nome || 'Sem conta bancaria vinculada';
+      const chave = `${empresaNome}::${contaNome}`;
+      if (!fontesPorDescricao.has(chave)) {
+        fontesPorDescricao.set(chave, {
+          empresa_nome: empresaNome,
+          conta_bancaria_nome: contaNome
+        });
+      }
+    });
+
+    return Array.from(fontesPorDescricao.values());
+  }, [movimentosAtivos]);
   const pagamentosAtivos = useMemo(() => {
     return Array.isArray(titulo?.paymentIntents)
       ? titulo.paymentIntents.filter((item) => !['CANCELADO', 'REJEITADO', 'REJEITADO_BANCO'].includes(String(item.status || '').toUpperCase()))
@@ -734,6 +752,28 @@ export default function FinanceiroTituloDetalhe() {
                     </div>
                   </div>
                 </>
+              )}
+              {podeVerMovimentosFinanceiros && fontesFinanceirasAtivas.length > 0 && (
+                <div className="md:col-span-2 border-t border-[var(--c-border)] pt-3">
+                  <div className="mb-2 font-medium text-[var(--c-text)]">
+                    {fontesFinanceirasAtivas.length > 1 ? 'Fontes das baixas' : 'Fonte da baixa'}
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    {fontesFinanceirasAtivas.map((fonte) => (
+                      <div
+                        key={`${fonte.empresa_nome}-${fonte.conta_bancaria_nome}`}
+                        className="rounded-lg bg-[var(--c-bg)] px-3 py-2"
+                      >
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {titulo.tipo === 'PAGAR' ? 'Empresa pagadora' : 'Empresa recebedora'}
+                        </div>
+                        <div className="font-medium text-[var(--c-text)]">{fonte.empresa_nome}</div>
+                        <div className="mt-1 text-xs text-[var(--c-muted)]">Conta bancaria</div>
+                        <div className="font-medium text-[var(--c-text)]">{fonte.conta_bancaria_nome}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1158,7 +1198,12 @@ export default function FinanceiroTituloDetalhe() {
           ) : (
             <div className="space-y-3">
               {auditoria.map((evento) => {
-                const metadata = formatAuditMetadata(evento.metadata);
+                const fontesFinanceiras = Array.isArray(evento.fontes_financeiras)
+                  ? evento.fontes_financeiras
+                  : [];
+                const metadata = formatAuditMetadata(evento.metadata, {
+                  hideFinancialReferenceIds: fontesFinanceiras.length > 0
+                });
 
                 return (
                   <div key={evento.id} className="rounded-xl border border-[var(--c-border)] px-3 py-3">
@@ -1176,6 +1221,27 @@ export default function FinanceiroTituloDetalhe() {
                         <div className="text-xs text-[var(--c-muted)]">
                           {evento.usuario?.nome || evento.usuario?.email || 'Sistema'} - {formatDateTime(evento.criado_em)}
                         </div>
+                        {fontesFinanceiras.length > 0 && (
+                          <div className="grid gap-2 pt-2 sm:grid-cols-2">
+                            {fontesFinanceiras.map((fonte, index) => (
+                              <div
+                                key={`${evento.id}-${fonte.movimento_id || index}`}
+                                className="rounded-lg bg-[var(--c-bg)] px-3 py-2 text-xs"
+                              >
+                                <div className="text-[var(--c-muted)]">
+                                  {titulo.tipo === 'PAGAR' ? 'Empresa pagadora' : 'Empresa recebedora'}
+                                </div>
+                                <div className="font-medium text-[var(--c-text)]">
+                                  {fonte.empresa?.nome || fonte.empresa?.razao_social || 'Empresa nao informada'}
+                                </div>
+                                <div className="mt-1 text-[var(--c-muted)]">Conta bancaria</div>
+                                <div className="font-medium text-[var(--c-text)]">
+                                  {fonte.conta_bancaria?.nome || 'Sem conta bancaria vinculada'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                         {metadata.length > 0 && (
                           <div className="flex flex-wrap gap-2 pt-1">
                             {metadata.map((item) => (

@@ -508,16 +508,19 @@ function buildConciliacaoInclude() {
     {
       model: ContaBancaria,
       as: 'contaBancaria',
+      required: false,
       attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'empresa_id', 'tipo_operacional']
     },
     {
       model: TituloFinanceiro,
       as: 'titulo',
+      required: false,
       attributes: ['id', 'tipo', 'descricao', 'numero_documento', 'obra_id'],
       include: [
         {
           model: Parceiro,
           as: 'parceiro',
+          required: false,
           attributes: ['id', 'nome', 'cpf_cnpj']
         }
       ]
@@ -525,11 +528,13 @@ function buildConciliacaoInclude() {
     {
       model: MovimentoFinanceiro,
       as: 'movimento',
+      required: false,
       attributes: ['id', 'tipo_movimento', 'valor', 'valor_quitacao', 'data_movimento', 'status', 'observacoes', 'documento_referencia'],
       include: [
         {
           model: ContaBancaria,
           as: 'contaBancaria',
+          required: false,
           attributes: ['id', 'nome']
         }
       ]
@@ -537,10 +542,12 @@ function buildConciliacaoInclude() {
     {
       model: FaturaCartaoFinanceiro,
       as: 'faturaCartao',
+      required: false,
       include: [
         {
           model: CartaoFinanceiro,
           as: 'cartao',
+          required: false,
           attributes: ['id', 'nome', 'titular', 'bandeira', 'ultimos_digitos']
         }
       ]
@@ -548,15 +555,18 @@ function buildConciliacaoInclude() {
     {
       model: TransferenciaFinanceira,
       as: 'transferencia',
+      required: false,
       include: [
         {
           model: ContaBancaria,
           as: 'contaOrigem',
+          required: false,
           attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
         },
         {
           model: ContaBancaria,
           as: 'contaDestino',
+          required: false,
           attributes: ['id', 'nome', 'banco', 'agencia', 'conta']
         }
       ]
@@ -564,6 +574,7 @@ function buildConciliacaoInclude() {
     {
       model: User,
       as: 'confirmadoPor',
+      required: false,
       attributes: ['id', 'nome', 'email']
     }
   ];
@@ -1384,17 +1395,21 @@ async function listarImportacoes(req, filters = {}) {
 
 async function loadConciliacaoById(req, conciliacaoId) {
   await assertFinanceAccess(req);
+  const id = parseInteger(conciliacaoId, 'Conciliacao bancaria');
   const conciliacao = await ConciliacaoBancaria.findOne({
     where: {
-      id: parseInteger(conciliacaoId, 'Conciliacao bancaria'),
+      id,
       deleted_at: null
-    },
-    include: buildConciliacaoInclude()
+    }
   });
 
   if (!conciliacao) {
     throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
   }
+
+  await conciliacao.reload({
+    include: buildConciliacaoInclude()
+  });
 
   return conciliacao;
 }
