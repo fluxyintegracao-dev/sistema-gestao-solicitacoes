@@ -70,6 +70,19 @@ function formatCurrency(value) {
   });
 }
 
+function parseCurrencyFilter(value, fieldLabel) {
+  if (value === undefined || value === null || String(value).trim() === '') return null;
+  const raw = String(value).trim().replace(/[R$\s]/gi, '');
+  const normalized = raw.includes(',')
+    ? raw.replace(/\./g, '').replace(',', '.')
+    : raw;
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw createHttpError(400, `${fieldLabel} inválido.`);
+  }
+  return Math.round((parsed + Number.EPSILON) * 100) / 100;
+}
+
 function getHoje() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -2158,6 +2171,16 @@ async function listarTitulos(req, filters = {}) {
   }
   if (filters.solicitacao_id) {
     where.solicitacao_id = Number(filters.solicitacao_id);
+  }
+  const valorMinimo = parseCurrencyFilter(filters.valor_min, 'Valor mínimo');
+  const valorMaximo = parseCurrencyFilter(filters.valor_max, 'Valor máximo');
+  if (valorMinimo !== null && valorMaximo !== null && valorMinimo > valorMaximo) {
+    throw createHttpError(400, 'O valor mínimo não pode ser maior que o valor máximo.');
+  }
+  if (valorMinimo !== null || valorMaximo !== null) {
+    where.valor_original = {};
+    if (valorMinimo !== null) where.valor_original[Op.gte] = valorMinimo;
+    if (valorMaximo !== null) where.valor_original[Op.lte] = valorMaximo;
   }
   if (filters.data_emissao_inicial || filters.data_emissao_final) {
     where.data_emissao = {};

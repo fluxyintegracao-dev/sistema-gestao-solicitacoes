@@ -96,6 +96,8 @@ const FILTER_DEFINITIONS = [
   { id: 'numero_documento', label: 'N. documento', group: 'basic', span: 'xl:col-span-2' },
   { id: 'parceiro_id', label: 'Cliente/Credor', group: 'basic', span: 'xl:col-span-4' },
   { id: 'obra_id', label: 'Obra', group: 'basic', span: 'xl:col-span-4' },
+  { id: 'valor_min', label: 'Valor mínimo', group: 'advanced', span: 'xl:col-span-2' },
+  { id: 'valor_max', label: 'Valor máximo', group: 'advanced', span: 'xl:col-span-2' },
   { id: 'data_emissao_inicial', label: 'Emissao inicio', group: 'basic', span: 'xl:col-span-2' },
   { id: 'data_emissao_final', label: 'Emissao fim', group: 'basic', span: 'xl:col-span-2' },
   { id: 'categoria_financeira_id', label: 'Categoria financeira', group: 'advanced', span: 'xl:col-span-3' },
@@ -115,6 +117,8 @@ function getDefaultFilters(tipo = 'RECEBER') {
     codigo: '',
     obra_id: '',
     parceiro_id: '',
+    valor_min: '',
+    valor_max: '',
     categoria_financeira_id: '',
     forma_pagamento_id: '',
     cartao_id: '',
@@ -137,9 +141,17 @@ function normalizeFilters(filters = {}, forcedTipo = null) {
 }
 
 function compactFilters(filters = {}) {
-  return Object.fromEntries(
+  const compacted = Object.fromEntries(
     Object.entries(filters).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
   );
+
+  ['valor_min', 'valor_max'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(compacted, key)) {
+      compacted[key] = parseCurrencyInput(compacted[key]);
+    }
+  });
+
+  return compacted;
 }
 
 function normalizeOptionList(data) {
@@ -1486,6 +1498,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   function submitFilters(event) {
     event.preventDefault();
     const normalized = normalizeFilters(draftFilters, fixedTipo);
+    const valorMinimo = normalized.valor_min ? parseCurrencyInput(normalized.valor_min) : null;
+    const valorMaximo = normalized.valor_max ? parseCurrencyInput(normalized.valor_max) : null;
+    if (valorMinimo !== null && valorMaximo !== null && valorMinimo > valorMaximo) {
+      setError('O valor mínimo não pode ser maior que o valor máximo.');
+      return;
+    }
     const visibleFilters = pickVisibleFilters(normalized, visibleFilterIds);
     if (Object.keys(compactFilters(visibleFilters)).length === 0) {
       setError('Selecione ao menos um filtro visivel antes de consultar.');
@@ -2159,6 +2177,36 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             getLabel={(obra) => [obra?.codigo, obra?.nome].filter(Boolean).join(' - ') || obra?.nome || ''}
             getDescription={(obra) => [obra?.cidade, obra?.uf].filter(Boolean).join(' - ')}
           />
+        );
+      case 'valor_min':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Valor mínimo</span>
+            <input
+              className="input w-full input-sm"
+              type="text"
+              inputMode="numeric"
+              value={draftFilters.valor_min}
+              onChange={(event) => setFilter('valor_min', normalizeCurrencyTyping(event.target.value))}
+              placeholder="R$ 0,00"
+              autoComplete="off"
+            />
+          </label>
+        );
+      case 'valor_max':
+        return (
+          <label key={filter.id} className={commonClass}>
+            <span className="app-filter-label">Valor máximo</span>
+            <input
+              className="input w-full input-sm"
+              type="text"
+              inputMode="numeric"
+              value={draftFilters.valor_max}
+              onChange={(event) => setFilter('valor_max', normalizeCurrencyTyping(event.target.value))}
+              placeholder="R$ 0,00"
+              autoComplete="off"
+            />
+          </label>
         );
       case 'data_emissao_inicial':
         return (
