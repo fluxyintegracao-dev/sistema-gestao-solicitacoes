@@ -1056,6 +1056,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   { key: 'data', width: 120, minWidth: 105 },
                   { key: 'conta', width: 240, minWidth: 170 },
                   { key: 'status', width: 130, minWidth: 110 },
+                  ...(type === 'conciliacao' ? [{ key: 'natureza', width: 120, minWidth: 105 }] : []),
                   { key: 'titulo', width: 150, minWidth: 120 },
                   { key: 'parceiro', width: 200, minWidth: 150 },
                   { key: 'obra', width: 170, minWidth: 130 },
@@ -1072,6 +1073,7 @@ function ContaReportShell({ title, subtitle, type }) {
                     <ResizableTh columnKey="data">Data</ResizableTh>
                     <ResizableTh columnKey="conta">Conta</ResizableTh>
                     <ResizableTh columnKey="status">{type === 'conciliacao' ? 'Status' : 'Classe'}</ResizableTh>
+                    {type === 'conciliacao' ? <ResizableTh columnKey="natureza">Natureza</ResizableTh> : null}
                     <ResizableTh columnKey="titulo">{type === 'conciliacao' ? 'Vinculo' : 'Titulo'}</ResizableTh>
                     <ResizableTh columnKey="parceiro">Cliente/Fornecedor</ResizableTh>
                     <ResizableTh columnKey="obra">Obra</ResizableTh>
@@ -1089,7 +1091,7 @@ function ContaReportShell({ title, subtitle, type }) {
                 <tbody>
                   {analitico.length === 0 ? (
                     <tr>
-                      <td colSpan={(type === 'movimentacao' ? 10 : 9) + (type === 'conciliacao' && canEstornarTransferencia ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                      <td colSpan={10 + (type === 'conciliacao' && canEstornarTransferencia ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
                     </tr>
                   ) : (
                     analitico.map((item) => {
@@ -1103,6 +1105,13 @@ function ContaReportShell({ title, subtitle, type }) {
                           <td>
                             <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
                           </td>
+                          {type === 'conciliacao' ? (
+                            <td>
+                              <span className={`badge ${item.natureza === 'SAIDA' ? 'badge-danger' : 'badge-success'}`}>
+                                {item.natureza === 'SAIDA' ? 'Saída' : 'Entrada'}
+                              </span>
+                            </td>
+                          ) : null}
                           <td>
                             {item.tipo_conciliacao === 'TRANSFERENCIA'
                               ? `Transferencia #${item.transferencia_financeira_id}`

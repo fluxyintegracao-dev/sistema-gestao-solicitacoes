@@ -37,7 +37,7 @@
 - se a baixa estiver vinculada a uma conciliacao OFX, o estorno deve reabrir o lancamento bancario como `PENDENTE` e remover apenas os vinculos ativos com titulo e movimento; o registro importado e a trilha anterior permanecem preservados
 - se uma conciliacao OFX representar transferencia entre contas, o estorno deve cancelar atomicamente a transferencia e devolver todos os lancamentos OFX vinculados para `PENDENTE`; a transferencia cancelada e o motivo permanecem na auditoria
 - o estorno de transferencia conciliada exige a permissao granular `financeiro.conciliacao.estornar`, motivo obrigatorio e protecao contra repeticao
-- o relatorio de conciliacao bancaria permite localizar registros por periodo, conta, status, natureza, texto e tipo de vinculo (`TRANSFERENCIA`, `TITULO`, `FATURA_CARTAO`, `TARIFA`, `MOVIMENTO` ou `SEM_VINCULO`)
+- o relatorio de conciliacao bancaria permite localizar registros por periodo, conta, status, natureza, texto e tipo de vinculo (`TRANSFERENCIA`, `TITULO`, `FATURA_CARTAO`, `TARIFA`, `MOVIMENTO` ou `SEM_VINCULO`), exibindo explicitamente cada item como Entrada ou Saida
 - a conta do lancamento OFX so pode ser corrigida enquanto a conciliacao estiver `PENDENTE`, sem vinculos financeiros ativos e mediante justificativa auditavel
 - depois de corrigir a conta, o usuario deve registrar a nova baixa na conta correta e conciliar novamente; alterar conta diretamente no banco nao faz parte do fluxo operacional
 - conciliacoes, pagamentos bancarios e comprovantes vinculados devem ser revisados para evitar baixa duplicada ou relatorio inconsistente

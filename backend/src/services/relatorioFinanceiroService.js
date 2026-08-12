@@ -4982,6 +4982,7 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
       conta: buildContaLabel(conta),
       status,
       valor,
+      natureza: valor < 0 ? 'SAIDA' : 'ENTRADA',
       ofx_uid: conciliacao.ofx_uid || null,
       documento: conciliacao.documento || titulo?.numero_documento || null,
       descricao_banco: conciliacao.descricao_banco || null,
