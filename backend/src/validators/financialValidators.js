@@ -412,6 +412,8 @@ function validateFinanceTituloQuery(query = {}) {
       'solicitacao_id',
       'numero_documento',
       'descricao',
+      'valor_min',
+      'valor_max',
       'data_emissao_inicial',
       'data_emissao_final',
       'vencimento_inicial',
@@ -427,6 +429,8 @@ function validateFinanceTituloQuery(query = {}) {
   const dataEmissaoFinal = parseDateOnly(query.data_emissao_final, 'Emissao final');
   const vencimentoInicial = parseDateOnly(query.vencimento_inicial, 'Vencimento inicial');
   const vencimentoFinal = parseDateOnly(query.vencimento_final, 'Vencimento final');
+  const valorMinimo = parseDecimal(query.valor_min, 'Valor minimo', { min: 0 });
+  const valorMaximo = parseDecimal(query.valor_max, 'Valor maximo', { min: 0 });
 
   if (dataEmissaoInicial && dataEmissaoFinal && dataEmissaoInicial > dataEmissaoFinal) {
     throw new ValidationError('Emissao inicial nao pode ser maior que emissao final.');
@@ -434,6 +438,10 @@ function validateFinanceTituloQuery(query = {}) {
 
   if (vencimentoInicial && vencimentoFinal && vencimentoInicial > vencimentoFinal) {
     throw new ValidationError('Vencimento inicial nao pode ser maior que vencimento final.');
+  }
+
+  if (valorMinimo !== undefined && valorMaximo !== undefined && valorMinimo > valorMaximo) {
+    throw new ValidationError('Valor minimo nao pode ser maior que valor maximo.');
   }
 
   return {
@@ -450,6 +458,8 @@ function validateFinanceTituloQuery(query = {}) {
     solicitacao_id: parseInteger(query.solicitacao_id, 'Solicitacao'),
     numero_documento: parseOptionalText(query.numero_documento, 'Numero do documento', 120),
     descricao: parseOptionalText(query.descricao, 'Descricao', 120),
+    valor_min: valorMinimo,
+    valor_max: valorMaximo,
     data_emissao_inicial: dataEmissaoInicial,
     data_emissao_final: dataEmissaoFinal,
     vencimento_inicial: vencimentoInicial,

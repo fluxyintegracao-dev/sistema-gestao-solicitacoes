@@ -73,6 +73,11 @@ assert(
     && suggestionAnalysisSource.includes('? []'),
   'Matches ambiguos de mesma data e valor nao devem expor um titulo como sugestao; exigem associacao manual.'
 );
+assert(
+  serviceSource.includes("as: 'categoriaFinanceira'")
+    && serviceSource.includes('categoria_financeira_nome: movimento.titulo?.categoriaFinanceira?.nome || null'),
+  'As sugestoes da conciliacao devem informar a categoria financeira do titulo.'
+);
 
 assert.deepStrictEqual(
   validateFinanceConciliacaoCorrigirContaBody({
