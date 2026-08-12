@@ -65,6 +65,15 @@ assert(
   'O titulo ainda nao associado deve ser um relacionamento opcional.'
 );
 
+const suggestionAnalysisSource = serviceSource.match(
+  /async function analyzeSuggestions[\s\S]*?\n}\n\nasync function listarConciliacoes/
+)?.[0] || '';
+assert(
+  suggestionAnalysisSource.includes('const sugestoesVisiveis = associacaoManualRecomendada')
+    && suggestionAnalysisSource.includes('? []'),
+  'Matches ambiguos de mesma data e valor nao devem expor um titulo como sugestao; exigem associacao manual.'
+);
+
 assert.deepStrictEqual(
   validateFinanceConciliacaoCorrigirContaBody({
     conta_bancaria_id: 12,

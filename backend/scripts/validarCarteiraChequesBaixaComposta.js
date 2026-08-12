@@ -12,6 +12,7 @@ function validateMigration() {
   const migration = read('migrations/202608070001_financeiro_carteira_cheques_baixa_composta.js');
   const intercompanyMigration = read('migrations/202608100001_baixa_composta_intercompany_fontes.js');
   const chequeSettlementMigration = read('migrations/202608120001_dados_cheque_movimentos_baixas.js');
+  const chequeHolderMigration = read('migrations/202608120002_cheques_titular_parceiro.js');
   [
     'baixas_financeiras_grupos',
     'baixas_financeiras_componentes',
@@ -27,6 +28,7 @@ function validateMigration() {
   assert(intercompanyMigration.includes('idx_baixa_componente_empresa'), 'Empresa da fonte deve estar indexada.');
   ['movimentos_financeiros', 'baixas_financeiras_componentes', 'cheque_numero', 'cheque_emitente', 'cheque_data_vencimento']
     .forEach((contract) => assert(chequeSettlementMigration.includes(contract), `Dados do cheque ausentes na migration: ${contract}`));
+  assert(chequeHolderMigration.includes('titular_parceiro_id'), 'Cheque deve persistir o vinculo com o titular cadastrado.');
 }
 
 function validateSecurityAndTransactions() {
@@ -65,6 +67,7 @@ function validateRoutesAndPermissions() {
     '/financeiro/cheques-terceiros/modelo.xlsx',
     '/financeiro/cheques-terceiros/importacoes/preview',
     '/financeiro/cheques-terceiros/importacoes/confirmar',
+    '/financeiro/cheques-terceiros/clientes',
     '/financeiro/baixas-compostas/preview',
     '/financeiro/baixas-compostas/confirmar',
     '/financeiro/baixas-compostas/:id/estornar'
@@ -87,7 +90,7 @@ function validateFrontend() {
   const detail = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroBaixasCompostas.jsx'), 'utf8');
   const styles = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/index.css'), 'utf8');
   const custody = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroChequesTerceiros.jsx'), 'utf8');
-  const holderAutocomplete = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/TitularChequeAutocomplete.jsx'), 'utf8');
+  const personAutocomplete = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/PessoaChequeAutocomplete.jsx'), 'utf8');
   const chequeFields = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/ChequePagamentoFields.jsx'), 'utf8');
   const titleDetail = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTituloDetalhe.jsx'), 'utf8');
   assert(titles.includes('BaixaCompostaModal'));
@@ -113,13 +116,14 @@ function validateFrontend() {
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));
   assert(custody.includes('max-h-[52vh] overflow-auto'), 'Preview da importacao deve permitir rolagem.');
-  assert(custody.includes('maskCpfCnpj'), 'Cadastro de cheque deve aplicar mascara de CPF/CNPJ.');
-  assert(custody.includes('Informe um CPF ou CNPJ válido.'), 'Cadastro deve orientar documento invalido.');
   assert(!custody.includes("['data_emissao', 'Data de emissão'"), 'Data de emissao nao deve aparecer no cadastro de custodia.');
-  assert(custody.includes('TitularChequeAutocomplete'), 'Cadastro deve usar a consulta de titulares cadastrados.');
-  assert(holderAutocomplete.includes('buscarParceiros'), 'Autocomplete deve consultar o cadastro central de pessoas.');
-  assert(holderAutocomplete.includes('Listar titulares cadastrados'), 'Campo deve oferecer lupa para listar titulares.');
-  assert(holderAutocomplete.includes("limit: 'all'"), 'Modal deve listar todos os titulares ativos.');
+  assert(custody.includes('PessoaChequeAutocomplete'), 'Cadastro deve usar a consulta central de pessoas.');
+  assert(custody.includes('titular_parceiro_id'), 'Cadastro manual deve exigir o titular selecionado.');
+  assert(custody.includes('parceiro_entregou_id'), 'Cliente/origem deve manter o vinculo com a pessoa selecionada.');
+  assert(personAutocomplete.includes('buscarParceiros'), 'Autocomplete deve consultar o cadastro central de pessoas.');
+  assert(personAutocomplete.includes('criarClienteChequeTerceiro'), 'Cadastro rapido deve criar a pessoa como cliente.');
+  assert(personAutocomplete.includes('Listar pessoas cadastradas'), 'Campo deve oferecer lupa para listar pessoas.');
+  assert(personAutocomplete.includes("limit: 'all'"), 'Modal deve listar todas as pessoas ativas.');
 }
 
 validateMigration();

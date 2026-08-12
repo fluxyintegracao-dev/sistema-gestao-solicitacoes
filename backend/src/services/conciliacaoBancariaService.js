@@ -1095,9 +1095,12 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
   const sugestaoAutomatica = ranked.length > 0 && !associacaoManualRecomendada
     ? serializeSuggestion(ranked[0].item, ranked[0].ranking)
     : null;
+  const sugestoesVisiveis = associacaoManualRecomendada
+    ? []
+    : ranked.slice(0, maxSuggestions).map((entry) => serializeSuggestion(entry.item, entry.ranking));
 
   return {
-    sugestoes: ranked.slice(0, maxSuggestions).map((entry) => serializeSuggestion(entry.item, entry.ranking)),
+    sugestoes: sugestoesVisiveis,
     sugestao_automatica: sugestaoAutomatica,
     total_candidatos: ranked.length,
     total_candidatos_exatos_mesmo_dia: sameDaySameValue.length,

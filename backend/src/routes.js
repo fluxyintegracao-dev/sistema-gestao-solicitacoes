@@ -1766,6 +1766,7 @@ router.get('/financeiro/cheques-terceiros/modelo.xlsx', allowChequesImportar, Ch
 router.post('/financeiro/cheques-terceiros/importacoes/preview', allowChequesImportar, uploadRateLimit, uploadComprovantes.single('file'), ChequeTerceiroController.importPreview);
 router.post('/financeiro/cheques-terceiros/importacoes/confirmar', allowChequesImportar, criticalRateLimit, ChequeTerceiroController.importConfirm);
 router.get('/financeiro/cheques-terceiros', allowChequesVisualizar, ChequeTerceiroController.index);
+router.post('/financeiro/cheques-terceiros/clientes', allowChequesCadastrar, criticalRateLimit, auditSuccess({ eventType: 'FINANCEIRO_CHEQUE_CLIENTE_CREATED', resourceType: 'PARCEIRO', description: 'Cliente criado no cadastro de cheque de terceiro' }), ChequeTerceiroController.criarCliente);
 router.post('/financeiro/cheques-terceiros', allowChequesCadastrar, criticalRateLimit, ChequeTerceiroController.create);
 router.post('/financeiro/cheques-terceiros/:id/movimentar', allowChequesMovimentar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.movimentar);
 router.get('/financeiro/cheques-terceiros/:id', allowChequesVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.show);

@@ -1013,6 +1013,15 @@ export async function criarChequeTerceiro(data) {
   return parseJson(response, 'Erro ao cadastrar cheque de terceiro');
 }
 
+export async function criarClienteChequeTerceiro(data) {
+  const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/clientes`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return parseJson(response, 'Erro ao cadastrar cliente');
+}
+
 export async function movimentarChequeTerceiro(id, data) {
   const response = await fetch(`${API_URL}/financeiro/cheques-terceiros/${id}/movimentar`, {
     method: 'POST',

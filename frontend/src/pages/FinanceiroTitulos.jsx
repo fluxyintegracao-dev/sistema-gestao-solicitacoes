@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
@@ -38,10 +38,29 @@ import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao 
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 import ChequePagamentoFields from '../components/financeiro/ChequePagamentoFields';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
 const COLUMN_ORDER_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnOrder';
+const COLUMN_WIDTH_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnWidths';
+const TABLE_COLUMN_WIDTHS = {
+  Titulo: 190,
+  Status: 110,
+  Tipo: 90,
+  Documento: 140,
+  Credor: 200,
+  Cliente: 200,
+  Obra: 180,
+  Categoria: 180,
+  'Forma pagamento': 170,
+  Origem: 140,
+  Emissao: 110,
+  Vencimento: 120,
+  'Valor total': 130,
+  Saldo: 130,
+  Acoes: 112
+};
 const PAGE_SIZE_OPTIONS = ['25', '50', '100', '150', '200', 'all'];
 const NATUREZAS_INTERCOMPANY_BAIXA = [
   {
@@ -452,6 +471,12 @@ function getColumnOrderStorageKey(user, fixedTipo = null) {
   const userToken = user?.id || user?.email || 'anonimo';
   const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
   return `${COLUMN_ORDER_STORAGE_PREFIX}.${scope}.${userToken}`;
+}
+
+function getColumnWidthStorageKey(user, fixedTipo = null) {
+  const userToken = user?.id || user?.email || 'anonimo';
+  const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
+  return `${COLUMN_WIDTH_STORAGE_PREFIX}.${scope}.${userToken}`;
 }
 
 function loadColumnOrder(user, fixedTipo, headers) {
@@ -1117,6 +1142,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
     return [...ordered, ...missing];
   }, [baseTableHeaders, columnOrder]);
+  const resizableTableColumns = useMemo(() => [
+    { key: '__select__', width: 48, minWidth: 44 },
+    ...tableHeaders.map((header) => ({
+      key: header,
+      width: TABLE_COLUMN_WIDTHS[header] || 140,
+      minWidth: header === 'Acoes' ? 96 : 80
+    }))
+  ], [tableHeaders]);
+  const columnWidthStorageKey = useMemo(
+    () => getColumnWidthStorageKey(user, fixedTipo),
+    [fixedTipo, user]
+  );
   const totalColunas = 1 + tableHeaders.length;
   const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
   const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
@@ -2713,10 +2750,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <ResizableTable
+            columns={resizableTableColumns}
+            storageKey={columnWidthStorageKey}
+            className="text-xs"
+          >
             <thead>
               <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap">
+                <ResizableTh
+                  columnKey="__select__"
+                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
+                >
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-[var(--c-primary)]"
@@ -2725,10 +2769,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     onChange={(event) => toggleTodosBaixaveis(event.target.checked)}
                     title="Selecionar todos os titulos filtrados baixaveis"
                   />
-                </th>
+                </ResizableTh>
                 {tableHeaders.map((header) => (
-                  <th
+                  <ResizableTh
                     key={header}
+                    columnKey={header}
                     className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
                   >
                     <span className="inline-flex items-center gap-1">
@@ -2754,7 +2799,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         </button>
                       </span>
                     </span>
-                  </th>
+                  </ResizableTh>
                 ))}
               </tr>
             </thead>
@@ -2810,11 +2855,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       title={isTituloBaixavel(titulo) ? 'Selecionar titulo para baixa' : 'Somente titulos abertos ou parciais podem ser baixados'}
                     />
                   </td>
-                  {tableHeaders.map((header) => renderTituloCell(titulo, header))}
+                  {tableHeaders.map((header) => (
+                    <Fragment key={header}>{renderTituloCell(titulo, header)}</Fragment>
+                  ))}
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
 

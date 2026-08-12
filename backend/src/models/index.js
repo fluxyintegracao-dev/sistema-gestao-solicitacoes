@@ -2911,6 +2911,16 @@ db.ChequeTerceiro.belongsTo(db.Parceiro, {
   as: 'parceiroEntregou'
 });
 
+db.Parceiro.hasMany(db.ChequeTerceiro, {
+  foreignKey: 'titular_parceiro_id',
+  as: 'chequesComoTitular'
+});
+
+db.ChequeTerceiro.belongsTo(db.Parceiro, {
+  foreignKey: 'titular_parceiro_id',
+  as: 'titularParceiro'
+});
+
 db.EmpresaGrupo.hasMany(db.ChequeTerceiro, { foreignKey: 'empresa_id', as: 'chequesTerceiros' });
 db.ChequeTerceiro.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
 db.Obra.hasMany(db.ChequeTerceiro, { foreignKey: 'obra_origem_id', as: 'chequesTerceirosOrigem' });

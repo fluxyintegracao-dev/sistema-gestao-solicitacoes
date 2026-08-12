@@ -102,6 +102,16 @@ async function empresaAtiva(id, transaction) {
   return empresa;
 }
 
+async function pessoaAtiva(id, label, transaction) {
+  if (!id) return null;
+  const pessoa = await Parceiro.findOne({
+    where: { id: Number(id), ativo: true },
+    transaction
+  });
+  if (!pessoa) throw httpError(400, `${label} nao encontrado ou inativo.`);
+  return pessoa;
+}
+
 async function validarDuplicidadeCheque(payload, transaction, excludeId = null) {
   const where = {
     empresa_id: Number(payload.empresa_id),
@@ -140,11 +150,14 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
   const ownTransaction = !options.transaction;
   try {
     const empresa = await empresaAtiva(payload.empresa_id, transaction);
+    const titularParceiro = await pessoaAtiva(payload.titular_parceiro_id, 'Titular', transaction);
+    const clienteOrigem = await pessoaAtiva(payload.parceiro_entregou_id, 'Cliente/origem', transaction);
     const valor = round(payload.valor);
+    const titularNome = titularParceiro?.nome || texto(payload.titular_nome, 180);
+    const titularDocumento = titularParceiro?.cpf_cnpj || normalizarCpfCnpj(payload.titular_documento);
     if (valor <= 0) throw httpError(400, 'Valor do cheque deve ser maior que zero.');
     if (!texto(payload.numero_cheque)) throw httpError(400, 'Numero do cheque e obrigatorio.');
-    if (!texto(payload.titular_nome)) throw httpError(400, 'Titular do cheque e obrigatorio.');
-    const titularDocumento = normalizarCpfCnpj(payload.titular_documento);
+    if (!titularNome) throw httpError(400, 'Titular do cheque e obrigatorio.');
     if (titularDocumento && !isValidCpfCnpj(titularDocumento)) {
       throw httpError(400, 'CPF/CNPJ do titular invalido.');
     }
@@ -173,9 +186,10 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
       codigo: codigoCheque(),
       empresa_id: empresa.id,
       obra_origem_id: obra?.id || null,
-      parceiro_entregou_id: payload.parceiro_entregou_id || null,
-      cliente_nome: texto(payload.cliente_nome, 180),
-      titular_nome: texto(payload.titular_nome, 180),
+      parceiro_entregou_id: clienteOrigem?.id || null,
+      titular_parceiro_id: titularParceiro?.id || null,
+      cliente_nome: clienteOrigem?.nome || texto(payload.cliente_nome, 180),
+      titular_nome: titularNome,
       titular_documento: titularDocumento || null,
       banco: texto(payload.banco, 80),
       agencia: texto(payload.agencia, 30),
@@ -233,7 +247,8 @@ async function listarCheques(req, filters = {}) {
     include: [
       { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome'] },
       { model: Obra, as: 'obraOrigem', attributes: ['id', 'codigo', 'nome'], required: false },
-      { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false }
+      { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
+      { model: Parceiro, as: 'titularParceiro', attributes: ['id', 'nome', 'cpf_cnpj'], required: false }
     ],
     order: [['data_vencimento', 'ASC'], ['id', 'ASC']],
     limit
@@ -252,6 +267,7 @@ async function obterCheque(id) {
       { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome'] },
       { model: Obra, as: 'obraOrigem', attributes: ['id', 'codigo', 'nome'], required: false },
       { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
+      { model: Parceiro, as: 'titularParceiro', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
       { model: ChequeTerceiroMovimento, as: 'historico', separate: true, order: [['id', 'DESC']] }
     ]
   });
