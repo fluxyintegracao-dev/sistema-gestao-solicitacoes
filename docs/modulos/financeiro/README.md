@@ -72,6 +72,8 @@ Regras, endpoints, permissoes e limites: [`CARTEIRA_CHEQUES_BAIXA_COMPOSTA.md`](
 
 OFX serve para conferencia. Importacao bloqueia arquivo/transacao duplicada, sugere candidatos e exige confirmacao humana. Nao cria titulo nem baixa automaticamente.
 
+Transferencias conciliadas podem ser estornadas pela Conciliacao OFX ou pelo relatorio de Conciliacao bancaria quando o usuario possui `financeiro.conciliacao.estornar`. O fluxo cancela a transferencia, reabre os lancamentos OFX vinculados e registra o motivo na auditoria. O relatorio aceita filtros por periodo, conta, status, natureza, tipo de vinculo e texto do extrato.
+
 ## Dependencias e risco
 
 Recebe dimensoes de Parceiros, Empresas, Obras e Apropriacoes; recebe origens de Solicitacoes, Compras, Comercial e RH/DP; alimenta Obras, Provisionamento, Boletos, relatorios e Governanca. Qualquer mudanca em saldo, status ou movimento exige reconciliacao de todos esses consumidores.

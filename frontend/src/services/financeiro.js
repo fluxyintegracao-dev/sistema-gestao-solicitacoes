@@ -419,6 +419,16 @@ export async function confirmarConciliacaoTransferencia(id, data) {
   return parseJson(response, 'Erro ao conciliar transferencia entre contas');
 }
 
+export async function estornarConciliacaoTransferencia(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/estornar-transferencia`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao estornar transferencia conciliada');
+}
+
 export async function confirmarConciliacaoTarifaBancaria(id, data) {
   const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-tarifa`, {
     method: 'POST',

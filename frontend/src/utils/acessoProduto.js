@@ -654,6 +654,7 @@ export function canAccessFinanceiro(user) {
       'financeiro.conciliacao.visualizar',
       'financeiro.conciliacao.importar',
       'financeiro.conciliacao.conciliar',
+      'financeiro.conciliacao.estornar',
       'financeiro.bancos.visualizar',
       'financeiro.bancos.auditar',
       'financeiro.bancos.conciliar',

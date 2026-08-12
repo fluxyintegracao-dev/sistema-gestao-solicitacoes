@@ -180,6 +180,7 @@ const {
   validateFinanceConciliacaoQuery,
   validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
+  validateFinanceConciliacaoEstornoTransferenciaBody,
   validateFinanceCaixaAberturaBody,
   validateFinanceCaixaFechamentoBody,
   validateFinanceCaixaQuery,
@@ -197,6 +198,7 @@ const {
   validateFinanceiroObrasQuery,
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
+  validateFinanceRelatorioConciliacaoQuery,
   validateFinanceTituloBaixaBody,
   validateFinanceTituloBaixaParceladaBody,
   validateFinanceTituloBaixaConciliacoesBody,
@@ -677,6 +679,10 @@ const allowBaixaCompostaEstornar = allowFinanceiroArea(
 const allowConciliacaoCorrigirConta = allowFinanceiroArea(
   'FINANCEIRO_CONCILIACAO_CORRIGIR_CONTA',
   ['financeiro.conciliacao.conciliar']
+);
+const allowConciliacaoEstornar = allowFinanceiroArea(
+  'FINANCEIRO_CONCILIACAO_ESTORNAR',
+  ['financeiro.conciliacao.estornar']
 );
 
 function allowFinanceiroRelatorio(permissionKeys = []) {
@@ -1721,6 +1727,7 @@ router.post('/financeiro/conciliacoes/:id/remover', allowFinanceiro, criticalRat
 router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);
 router.post('/financeiro/conciliacoes/:id/confirmar-fatura', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.confirmarFatura);
 router.post('/financeiro/conciliacoes/:id/confirmar-transferencia', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTransferenciaBody }), ConciliacaoBancariaController.confirmarTransferencia);
+router.post('/financeiro/conciliacoes/:id/estornar-transferencia', allowConciliacaoEstornar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoEstornoTransferenciaBody }), ConciliacaoBancariaController.estornarTransferencia);
 router.post('/financeiro/conciliacoes/:id/confirmar-tarifa', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTarifaBody }), ConciliacaoBancariaController.confirmarTarifa);
 router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: validateFinanceCaixaQuery }), CaixaFinanceiroController.index);
 router.post('/financeiro/caixas/confirmar-conciliacao-dia', allowFinanceiro, criticalRateLimit, CaixaFinanceiroController.confirmarConciliacaoDia);
@@ -1745,7 +1752,7 @@ router.get('/financeiro/relatorios/dre/diagnostico', allowFinanceiroRelatorio(['
 router.get('/financeiro/relatorios/intercompany', allowFinanceiroRelatorio(['financeiro.relatorios.intercompany']), validateRequest({ query: validateFinanceIntercompanyQuery }), RelatorioFinanceiroController.intercompany);
 router.get('/financeiro/relatorios/endividamento', allowFinanceiroRelatorio(['financeiro.relatorios.endividamento']), validateRequest({ query: validateFinanceEndividamentoQuery }), RelatorioFinanceiroController.endividamento);
 router.get('/financeiro/relatorios/movimentacao-contas', allowFinanceiroRelatorio(['financeiro.relatorios.movimentacao_contas']), RelatorioFinanceiroController.movimentacaoContas);
-router.get('/financeiro/relatorios/conciliacao-contas', allowFinanceiroRelatorio(['financeiro.relatorios.conciliacao_contas']), RelatorioFinanceiroController.conciliacaoContas);
+router.get('/financeiro/relatorios/conciliacao-contas', allowFinanceiroRelatorio(['financeiro.relatorios.conciliacao_contas']), validateRequest({ query: validateFinanceRelatorioConciliacaoQuery }), RelatorioFinanceiroController.conciliacaoContas);
 router.get('/financeiro/relatorios/resultado-obras', allowFinanceiroRelatorio(['financeiro.relatorios.resultado_obras']), ResultadoObrasController.index);
 router.get('/financeiro/relatorios/centros-custo', allowFinanceiroRelatorio(['financeiro.relatorios.centros_custo']), ResultadoCentrosCustoController.index);
 router.get('/financeiro/baixas', allowFinanceiro, validateRequest({ query: validateFinanceBaixasQuery }), TituloFinanceiroController.baixas);

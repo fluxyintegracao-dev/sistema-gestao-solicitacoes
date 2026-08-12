@@ -5,12 +5,13 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
   getContasBancarias,
+  estornarConciliacaoTransferencia,
   getRelatorioConciliacaoContas,
   getRelatorioFluxoCaixa,
   getRelatorioMovimentacaoContas
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
-import { canViewFinanceiroRelatorio } from '../utils/acessoProduto';
+import { canViewFinanceiroRelatorio, hasPermissao } from '../utils/acessoProduto';
 
 const FinanceiroExecutivoGrupo = lazy(() => import('./FinanceiroExecutivoGrupo'));
 const FinanceiroFluxoConsolidado = lazy(() => import('./FinanceiroFluxoConsolidado'));
@@ -748,19 +749,29 @@ const CONTAS_REPORT_DEFAULT_FILTERS = {
   periodo: 'MES_ATUAL',
   data_inicial: '',
   data_final: '',
-  conta_bancaria_id: ''
+  conta_bancaria_id: '',
+  status: 'TODOS',
+  tipo_conciliacao: 'TODOS',
+  natureza: 'TODAS',
+  busca: ''
 };
 
-function buildContaReportParams(filters) {
+function buildContaReportParams(filters, type) {
   const params = { periodo: filters.periodo, conta_bancaria_id: filters.conta_bancaria_id };
   if (filters.periodo === 'PERSONALIZADO') {
     params.data_inicial = filters.data_inicial;
     params.data_final = filters.data_final;
   }
+  if (type === 'conciliacao') {
+    params.status = filters.status;
+    params.tipo_conciliacao = filters.tipo_conciliacao;
+    params.natureza = filters.natureza;
+    params.busca = filters.busca;
+  }
   return params;
 }
 
-function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) {
+function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, type }) {
   return (
     <form className="card sol-surface-card p-4 financeiro-conta-report-filters" onSubmit={onSubmit}>
       <div className="financeiro-conta-report-filter-grid">
@@ -777,6 +788,49 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) 
             <option value="PERSONALIZADO">Personalizado</option>
           </select>
         </label>
+        {type === 'conciliacao' ? (
+          <>
+            <label className="field">
+              <span>Status</span>
+              <select value={filters.status} onChange={(event) => setFilters((current) => ({ ...current, status: event.target.value }))}>
+                <option value="TODOS">Todos os status</option>
+                <option value="CONCILIADO">Conciliados</option>
+                <option value="PENDENTE">Pendentes</option>
+                <option value="IGNORADO">Ignorados</option>
+                <option value="REMOVIDO">Removidos</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Tipo de vinculo</span>
+              <select value={filters.tipo_conciliacao} onChange={(event) => setFilters((current) => ({ ...current, tipo_conciliacao: event.target.value }))}>
+                <option value="TODOS">Todos os tipos</option>
+                <option value="TRANSFERENCIA">Transferencias</option>
+                <option value="TITULO">Titulos</option>
+                <option value="FATURA_CARTAO">Faturas de cartao</option>
+                <option value="TARIFA">Tarifas bancarias</option>
+                <option value="MOVIMENTO">Outros movimentos</option>
+                <option value="SEM_VINCULO">Sem vinculo</option>
+              </select>
+            </label>
+            <label className="field">
+              <span>Natureza</span>
+              <select value={filters.natureza} onChange={(event) => setFilters((current) => ({ ...current, natureza: event.target.value }))}>
+                <option value="TODAS">Entradas e saidas</option>
+                <option value="ENTRADA">Entradas</option>
+                <option value="SAIDA">Saidas</option>
+              </select>
+            </label>
+            <label className="field md:col-span-2">
+              <span>Buscar no extrato</span>
+              <input
+                type="search"
+                value={filters.busca}
+                placeholder="Descricao, documento ou identificador OFX"
+                onChange={(event) => setFilters((current) => ({ ...current, busca: event.target.value }))}
+              />
+            </label>
+          </>
+        ) : null}
         <label className="field">
           <span>Data inicial</span>
           <input
@@ -820,12 +874,15 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit }) 
 }
 
 function ContaReportShell({ title, subtitle, type }) {
-  const [filters, setFilters] = useState(CONTAS_REPORT_DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState(CONTAS_REPORT_DEFAULT_FILTERS);
+  const { user } = useAuth();
+  const canEstornarTransferencia = type === 'conciliacao' && hasPermissao(user, 'financeiro.conciliacao.estornar');
+  const [filters, setFilters] = useState({ ...CONTAS_REPORT_DEFAULT_FILTERS });
+  const [appliedFilters, setAppliedFilters] = useState({ ...CONTAS_REPORT_DEFAULT_FILTERS });
   const [contas, setContas] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [estornoModal, setEstornoModal] = useState({ open: false, item: null, motivo: '', processing: false, error: '' });
 
   useEffect(() => {
     let active = true;
@@ -848,7 +905,7 @@ function ContaReportShell({ title, subtitle, type }) {
     setError('');
 
     const loader = type === 'conciliacao' ? getRelatorioConciliacaoContas : getRelatorioMovimentacaoContas;
-    loader(buildContaReportParams(appliedFilters))
+    loader(buildContaReportParams(appliedFilters, type))
       .then((data) => {
         if (active) setRelatorio(data);
       })
@@ -871,6 +928,21 @@ function ContaReportShell({ title, subtitle, type }) {
     setAppliedFilters(filters);
   }
 
+  async function handleEstornarTransferencia(event) {
+    event.preventDefault();
+    const motivo = String(estornoModal.motivo || '').trim();
+    if (!estornoModal.item?.id || !motivo || estornoModal.processing) return;
+    try {
+      setEstornoModal((current) => ({ ...current, processing: true, error: '' }));
+      await estornarConciliacaoTransferencia(estornoModal.item.id, { motivo });
+      setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' });
+      const data = await getRelatorioConciliacaoContas(buildContaReportParams(appliedFilters, type));
+      setRelatorio(data);
+    } catch (err) {
+      setEstornoModal((current) => ({ ...current, processing: false, error: err?.message || 'Erro ao estornar transferencia' }));
+    }
+  }
+
   const resumo = relatorio?.resumo || {};
   const sintetico = Array.isArray(relatorio?.sintetico) ? relatorio.sintetico : [];
   const analitico = Array.isArray(relatorio?.analitico) ? relatorio.analitico : [];
@@ -888,6 +960,7 @@ function ContaReportShell({ title, subtitle, type }) {
         contas={contas}
         loading={loading}
         onSubmit={handleSubmit}
+        type={type}
       />
 
       {error ? <div className="alert alert-danger">{error}</div> : null}
@@ -902,6 +975,7 @@ function ContaReportShell({ title, subtitle, type }) {
                 <RelatorioMetric label="Conciliados" value={resumo.conciliados || 0} positive />
                 <RelatorioMetric label="Pendentes" value={resumo.pendentes || 0} positive={Number(resumo.pendentes || 0) === 0} />
                 <RelatorioMetric label="Ignorados/removidos" value={`${resumo.ignorados || 0}/${resumo.removidos || 0}`} />
+                <RelatorioMetric label="Transferencias" value={resumo.transferencias || 0} />
               </>
             ) : (
               <>
@@ -988,7 +1062,8 @@ function ContaReportShell({ title, subtitle, type }) {
                   { key: 'documento', width: 190, minWidth: 145 },
                   { key: 'valor', width: 140, minWidth: 120 },
                   ...(type === 'movimentacao' ? [{ key: 'saldo', width: 140, minWidth: 120 }] : []),
-                  { key: 'descricao', width: 280, minWidth: 210 }
+                  { key: 'descricao', width: 280, minWidth: 210 },
+                  ...(type === 'conciliacao' && canEstornarTransferencia ? [{ key: 'acoes', width: 130, minWidth: 120 }] : [])
                 ]}
                 className="table financeiro-report-table"
               >
@@ -997,7 +1072,7 @@ function ContaReportShell({ title, subtitle, type }) {
                     <ResizableTh columnKey="data">Data</ResizableTh>
                     <ResizableTh columnKey="conta">Conta</ResizableTh>
                     <ResizableTh columnKey="status">{type === 'conciliacao' ? 'Status' : 'Classe'}</ResizableTh>
-                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
+                    <ResizableTh columnKey="titulo">{type === 'conciliacao' ? 'Vinculo' : 'Titulo'}</ResizableTh>
                     <ResizableTh columnKey="parceiro">Cliente/Fornecedor</ResizableTh>
                     <ResizableTh columnKey="obra">Obra</ResizableTh>
                     <ResizableTh columnKey="documento">Documento</ResizableTh>
@@ -1008,12 +1083,13 @@ function ContaReportShell({ title, subtitle, type }) {
                       <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                     ) : null}
                     <ResizableTh columnKey="descricao">Descricao</ResizableTh>
+                    {type === 'conciliacao' && canEstornarTransferencia ? <ResizableTh columnKey="acoes">Acoes</ResizableTh> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {analitico.length === 0 ? (
                     <tr>
-                      <td colSpan={type === 'movimentacao' ? 10 : 9} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                      <td colSpan={(type === 'movimentacao' ? 10 : 9) + (type === 'conciliacao' && canEstornarTransferencia ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
                     </tr>
                   ) : (
                     analitico.map((item) => {
@@ -1027,7 +1103,15 @@ function ContaReportShell({ title, subtitle, type }) {
                           <td>
                             <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
                           </td>
-                          <td>{item.titulo_codigo || '-'}</td>
+                          <td>
+                            {item.tipo_conciliacao === 'TRANSFERENCIA'
+                              ? `Transferencia #${item.transferencia_financeira_id}`
+                              : item.tipo_conciliacao === 'FATURA_CARTAO'
+                                ? `Fatura #${item.fatura_cartao_id}`
+                                : item.tipo_conciliacao === 'TARIFA'
+                                  ? `Tarifa · mov. #${item.movimento_financeiro_id}`
+                                  : item.titulo_codigo || (item.movimento_financeiro_id ? `Mov. #${item.movimento_financeiro_id}` : '-')}
+                          </td>
                           <td>{item.parceiro || '-'}</td>
                           <td>{item.obra || '-'}</td>
                           <td>{item.documento || item.ofx_uid || '-'}</td>
@@ -1039,7 +1123,20 @@ function ContaReportShell({ title, subtitle, type }) {
                               {formatCurrency(item.saldo_movimento)}
                             </td>
                           ) : null}
-                          <td>{item.descricao_banco || item.categoria || item.observacoes || '-'}</td>
+                          <td>
+                            {item.tipo_conciliacao === 'TRANSFERENCIA'
+                              ? `${item.conta_origem || 'Origem'} → ${item.conta_destino || 'Destino'}${item.transferencia_descricao ? ` · ${item.transferencia_descricao}` : ''}`
+                              : item.descricao_banco || item.categoria || item.observacoes || '-'}
+                          </td>
+                          {type === 'conciliacao' && canEstornarTransferencia ? (
+                            <td>
+                              {item.tipo_conciliacao === 'TRANSFERENCIA' && item.status === 'CONCILIADO' && item.transferencia_status === 'ATIVA' ? (
+                                <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
+                                  Estornar
+                                </button>
+                              ) : '-'}
+                            </td>
+                          ) : null}
                         </tr>
                       );
                     })
@@ -1049,6 +1146,24 @@ function ContaReportShell({ title, subtitle, type }) {
             </div>
           </section>
         </>
+      ) : null}
+
+      {estornoModal.open ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
+          <form className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl" onSubmit={handleEstornarTransferencia}>
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar transferencia conciliada</h3>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">A transferencia sera cancelada e os registros OFX vinculados voltarao para pendente.</p>
+            <label className="mt-4 block text-sm">
+              <span className="mb-1 block font-medium">Motivo do estorno *</span>
+              <textarea className="input min-h-24 w-full resize-y" maxLength={255} value={estornoModal.motivo} onChange={(event) => setEstornoModal((current) => ({ ...current, motivo: event.target.value, error: '' }))} />
+            </label>
+            {estornoModal.error ? <div className="mt-3 alert alert-danger">{estornoModal.error}</div> : null}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" disabled={estornoModal.processing} onClick={() => setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' })}>Cancelar</button>
+              <button type="submit" className="btn btn-danger" disabled={estornoModal.processing || !String(estornoModal.motivo || '').trim()}>{estornoModal.processing ? 'Estornando...' : 'Confirmar estorno'}</button>
+            </div>
+          </form>
+        </div>
       ) : null}
     </div>
   );

@@ -7,6 +7,7 @@ import {
   confirmarConciliacaoFaturaCartao,
   confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
+  estornarConciliacaoTransferencia,
   criarTituloConciliacaoBancaria,
   getConciliacoesBancarias,
   getCategoriasFinanceiras,
@@ -23,6 +24,8 @@ import {
 import { buscarParceiros } from '../services/parceiros';
 import { getMinhasObras } from '../services/obras';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
+import { useAuth } from '../contexts/AuthContext';
+import { hasPermissao } from '../utils/acessoProduto';
 
 const TIPOS_INTERCOMPANY = [
   { value: 'APORTE', label: 'Aporte' },
@@ -716,7 +719,7 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
+function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -886,6 +889,16 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
               <p className="text-[10px] text-[var(--c-muted)]">
                 {item.transferencia.contaOrigem?.nome || 'Origem'} para {item.transferencia.contaDestino?.nome || 'Destino'}
               </p>
+              {canEstornarTransferencia && String(item.transferencia.status || 'ATIVA').toUpperCase() === 'ATIVA' && (
+                <button
+                  type="button"
+                  className="mt-1 text-[10px] font-semibold text-rose-600 underline underline-offset-2 hover:text-rose-700"
+                  disabled={processingId === `estornar-transferencia-${item.id}`}
+                  onClick={() => onEstornarTransferencia?.(item)}
+                >
+                  {processingId === `estornar-transferencia-${item.id}` ? 'Estornando...' : 'Estornar transferencia'}
+                </button>
+              )}
             </div>
           ) : !isPendente ? (
             <div className="flex flex-1 items-center justify-center py-1">
@@ -1334,6 +1347,8 @@ function FooterPaginacao({ meta, onAlterarPagina }) {
 // ─── página principal ─────────────────────────────────────────────────────────
 
 export default function FinanceiroConciliacao() {
+  const { user } = useAuth();
+  const canEstornarTransferencia = hasPermissao(user, 'financeiro.conciliacao.estornar');
   const [contas, setContas] = useState([]);
   const [viewMode, setViewMode] = useState('CONTAS');
   const [dashboardFilters, setDashboardFilters] = useState({ busca: '', banco: '', data_inicial: '', data_final: '' });
@@ -1385,6 +1400,13 @@ export default function FinanceiroConciliacao() {
     tipo_intercompany: '',
     motivo_intercompany: '',
     elimina_consolidado: true,
+    processing: false,
+    error: ''
+  });
+  const [estornoTransferenciaModal, setEstornoTransferenciaModal] = useState({
+    open: false,
+    item: null,
+    motivo: '',
     processing: false,
     error: ''
   });
@@ -1934,6 +1956,36 @@ export default function FinanceiroConciliacao() {
     }
   }
 
+  async function handleEstornarTransferencia(event) {
+    event.preventDefault();
+    const item = estornoTransferenciaModal.item;
+    const motivo = String(estornoTransferenciaModal.motivo || '').trim();
+    if (!item?.id || estornoTransferenciaModal.processing) return;
+    if (!motivo) {
+      setEstornoTransferenciaModal((current) => ({ ...current, error: 'Informe o motivo do estorno.' }));
+      return;
+    }
+
+    try {
+      setProcessingId(`estornar-transferencia-${item.id}`);
+      setEstornoTransferenciaModal((current) => ({ ...current, processing: true, error: '' }));
+      setError('');
+      setFeedback('');
+      await estornarConciliacaoTransferencia(item.id, { motivo });
+      setEstornoTransferenciaModal({ open: false, item: null, motivo: '', processing: false, error: '' });
+      setFeedback('Transferencia estornada. Os lancamentos OFX vinculados voltaram para pendente.');
+      await carregarConciliacoes();
+    } catch (err) {
+      setEstornoTransferenciaModal((current) => ({
+        ...current,
+        processing: false,
+        error: err?.message || 'Erro ao estornar transferencia conciliada'
+      }));
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   async function handleConfirmarTarifa(item, tarifa) {
     if (!item?.id || !tarifa?.codigo) return;
 
@@ -2345,6 +2397,7 @@ export default function FinanceiroConciliacao() {
                     item={item}
                     associacaoPreparada={associacoesPreparadas[Number(item.id)] || null}
                     processingId={processingId}
+                    canEstornarTransferencia={canEstornarTransferencia}
                     selected={conciliacoesSelecionadas.includes(Number(item.id))}
                     onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
@@ -2352,6 +2405,13 @@ export default function FinanceiroConciliacao() {
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
+                    onEstornarTransferencia={(it) => setEstornoTransferenciaModal({
+                      open: true,
+                      item: it,
+                      motivo: '',
+                      processing: false,
+                      error: ''
+                    })}
                     onAcoesRapidas={(it) => {
                       setAcoesRapidasError('');
                       setAcoesRapidasItem(it);
@@ -2373,6 +2433,54 @@ export default function FinanceiroConciliacao() {
           onClose={() => setBaixaExtratosModalOpen(false)}
           onConfirmar={handleBaixarTituloPorExtratos}
         />
+      )}
+
+      {estornoTransferenciaModal.open && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
+          <form
+            className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl"
+            onSubmit={handleEstornarTransferencia}
+          >
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] pb-4">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Estornar transferencia conciliada</h2>
+                <p className="mt-1 text-sm text-[var(--c-muted)]">
+                  A transferencia sera cancelada e todos os lancamentos OFX vinculados voltarao para pendente.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm shrink-0"
+                disabled={estornoTransferenciaModal.processing}
+                onClick={() => setEstornoTransferenciaModal({ open: false, item: null, motivo: '', processing: false, error: '' })}
+              >Fechar</button>
+            </div>
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              Transferencia #{estornoTransferenciaModal.item?.transferencia?.id || '-'} · {formatCurrency(Math.abs(Number(estornoTransferenciaModal.item?.valor || 0)))}
+            </div>
+            <label className="mt-4 block text-sm">
+              <span className="mb-1 block font-medium text-[var(--c-text)]">Motivo do estorno *</span>
+              <textarea
+                className="input min-h-24 w-full resize-y"
+                maxLength={255}
+                value={estornoTransferenciaModal.motivo}
+                onChange={(event) => setEstornoTransferenciaModal((current) => ({ ...current, motivo: event.target.value, error: '' }))}
+                placeholder="Ex.: transferencia conciliada na conta incorreta"
+              />
+            </label>
+            {estornoTransferenciaModal.error && (
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">
+                {estornoTransferenciaModal.error}
+              </div>
+            )}
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" className="btn btn-outline" disabled={estornoTransferenciaModal.processing} onClick={() => setEstornoTransferenciaModal({ open: false, item: null, motivo: '', processing: false, error: '' })}>Cancelar</button>
+              <button type="submit" className="btn btn-danger" disabled={estornoTransferenciaModal.processing || !String(estornoTransferenciaModal.motivo || '').trim()}>
+                {estornoTransferenciaModal.processing ? 'Estornando...' : 'Confirmar estorno'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {acoesRapidasItem && (

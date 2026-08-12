@@ -1778,6 +1778,110 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
   }
 }
 
+async function estornarConciliacaoTransferencia(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const motivo = String(payload.motivo || '').trim();
+  if (!motivo) throw createHttpError(400, 'Informe o motivo do estorno da transferencia.');
+
+  const transaction = await sequelize.transaction();
+  let transferencia;
+  let conciliacoesVinculadas = [];
+
+  try {
+    const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    if (String(conciliacao.status || '').toUpperCase() !== 'CONCILIADO' || !conciliacao.transferencia_financeira_id) {
+      throw createHttpError(400, 'O lancamento nao possui uma transferencia conciliada ativa para estorno.');
+    }
+
+    transferencia = await TransferenciaFinanceira.findByPk(conciliacao.transferencia_financeira_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!transferencia) throw createHttpError(404, 'Transferencia financeira conciliada nao encontrada.');
+    if (String(transferencia.status || '').toUpperCase() !== 'ATIVA') {
+      throw createHttpError(409, 'A transferencia financeira ja foi cancelada ou nao esta ativa.');
+    }
+
+    const conciliacaoIds = [
+      Number(conciliacao.id),
+      Number(transferencia.conciliacao_origem_id),
+      Number(transferencia.conciliacao_destino_id)
+    ].filter(Boolean);
+
+    conciliacoesVinculadas = await ConciliacaoBancaria.findAll({
+      where: {
+        [Op.or]: [
+          { transferencia_financeira_id: transferencia.id },
+          { id: { [Op.in]: conciliacaoIds } }
+        ]
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    if (!conciliacoesVinculadas.length) {
+      throw createHttpError(409, 'Nenhum lancamento OFX vinculado a transferencia foi encontrado.');
+    }
+
+    const vinculoIncompativel = conciliacoesVinculadas.find((item) => (
+      item.movimento_financeiro_id || item.titulo_financeiro_id || item.fatura_cartao_id
+    ));
+    if (vinculoIncompativel) {
+      throw createHttpError(409, 'A transferencia possui conciliacao com outro vinculo financeiro e exige revisao manual.');
+    }
+
+    await transferencia.update({
+      status: 'CANCELADA',
+      cancelado_por: req.user?.id || null,
+      cancelado_em: new Date(),
+      observacoes_cancelamento: motivo,
+      conciliacao_origem_id: null,
+      conciliacao_destino_id: null
+    }, { transaction });
+
+    await ConciliacaoBancaria.update({
+      status: 'PENDENTE',
+      transferencia_financeira_id: null,
+      movimento_financeiro_id: null,
+      titulo_financeiro_id: null,
+      fatura_cartao_id: null,
+      confirmado_por: null,
+      confirmado_em: null
+    }, {
+      where: { id: { [Op.in]: conciliacoesVinculadas.map((item) => item.id) } },
+      transaction
+    });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILIATION_TRANSFER_REVERSED',
+      recursoTipo: 'TRANSFERENCIA_FINANCEIRA',
+      recursoId: transferencia.id,
+      status: 'SUCCESS',
+      descricao: 'Transferencia conciliada estornada e lancamentos OFX reabertos',
+      metadata: {
+        motivo,
+        conciliacao_ids: conciliacoesVinculadas.map((item) => item.id),
+        conta_origem_id: transferencia.conta_origem_id,
+        conta_destino_id: transferencia.conta_destino_id,
+        valor: Number(transferencia.valor || 0)
+      }
+    });
+
+    return loadConciliacaoById(req, conciliacaoId);
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    throw error;
+  }
+}
+
 async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
   await assertFinanceAccess(req);
 
@@ -2387,6 +2491,7 @@ module.exports = {
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
+  estornarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
   importOfx,
