@@ -916,6 +916,11 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
             model: Parceiro,
             as: 'parceiro',
             attributes: ['id', 'nome', 'cpf_cnpj']
+          },
+          {
+            model: CategoriaFinanceira,
+            as: 'categoriaFinanceira',
+            attributes: ['id', 'nome', 'tipo']
           }
         ]
       },
@@ -1048,6 +1053,8 @@ function serializeSuggestion(movimento, ranking) {
     titulo_descricao: movimento.titulo?.descricao || `Titulo #${movimento.titulo?.id || '-'}`,
     tipo: movimento.titulo?.tipo || null,
     parceiro_nome: movimento.titulo?.parceiro?.nome || '-',
+    categoria_financeira_id: movimento.titulo?.categoriaFinanceira?.id || null,
+    categoria_financeira_nome: movimento.titulo?.categoriaFinanceira?.nome || null,
     documento: movimento.titulo?.numero_documento || null,
     data_movimento: movimento.data_movimento,
     valor_quitacao: Number(movimento.valor_quitacao || 0),
@@ -1166,6 +1173,11 @@ async function listarConciliacoes(req, filters = {}) {
               model: Parceiro,
               as: 'parceiro',
               attributes: ['id', 'nome', 'cpf_cnpj']
+            },
+            {
+              model: CategoriaFinanceira,
+              as: 'categoriaFinanceira',
+              attributes: ['id', 'nome', 'tipo']
             }
           ]
         })
@@ -1251,7 +1263,9 @@ async function listarConciliacoes(req, filters = {}) {
             tipo: titulo.tipo,
             descricao: titulo.descricao,
             numero_documento: titulo.numero_documento,
-            parceiro_nome: titulo.parceiro?.nome || '-'
+            parceiro_nome: titulo.parceiro?.nome || '-',
+            categoria_financeira_id: titulo.categoriaFinanceira?.id || null,
+            categoria_financeira_nome: titulo.categoriaFinanceira?.nome || null
           }
         : null,
       movimento: movimento
