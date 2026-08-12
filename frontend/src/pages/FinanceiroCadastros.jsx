@@ -317,6 +317,30 @@ function categoriaAptaParaTarifaBancaria(categoria = {}) {
   );
 }
 
+let tarifaBancariaDraftSequence = 0;
+
+function criarTarifaBancariaDraftId() {
+  tarifaBancariaDraftSequence += 1;
+  return `tarifa-bancaria-${Date.now()}-${tarifaBancariaDraftSequence}`;
+}
+
+function prepararTarifasBancariasParaEdicao(itens) {
+  return (Array.isArray(itens) ? itens : []).map((item) => ({
+    ...item,
+    _draftId: criarTarifaBancariaDraftId()
+  }));
+}
+
+function prepararTarifasBancariasParaSalvar(itens) {
+  return (Array.isArray(itens) ? itens : []).map((item) => ({
+    codigo: String(item.codigo || '').trim(),
+    nome: String(item.nome || '').trim(),
+    descricao: String(item.descricao || '').trim(),
+    categoria_financeira_id: item.categoria_financeira_id ? Number(item.categoria_financeira_id) : null,
+    ativo: item.ativo !== false
+  }));
+}
+
 export default function FinanceiroCadastros() {
   const [contas, setContas] = useState([]);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
@@ -336,6 +360,7 @@ export default function FinanceiroCadastros() {
   const [savingCategoria, setSavingCategoria] = useState(false);
   const [savingFormaPagamento, setSavingFormaPagamento] = useState(false);
   const [savingTarifasBancarias, setSavingTarifasBancarias] = useState(false);
+  const [tarifasBancariasFeedback, setTarifasBancariasFeedback] = useState('');
   const [savingCartao, setSavingCartao] = useState(false);
   const [error, setError] = useState('');
   const [categoriaFiltro, setCategoriaFiltro] = useState('');
@@ -368,7 +393,7 @@ export default function FinanceiroCadastros() {
       setCategorias(Array.isArray(categoriasData) ? categoriasData : []);
       setPaymentAccounts(Array.isArray(paymentAccountsData) ? paymentAccountsData : []);
       setFormasPagamento(Array.isArray(formasData) ? formasData : []);
-      setTarifasBancariasAtalhos(Array.isArray(tarifasData) ? tarifasData : []);
+      setTarifasBancariasAtalhos(prepararTarifasBancariasParaEdicao(tarifasData));
       setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
       setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
     } catch (err) {
@@ -589,19 +614,22 @@ export default function FinanceiroCadastros() {
   }
 
   function handleAdicionarTarifaBancaria() {
+    setTarifasBancariasFeedback('');
     setTarifasBancariasAtalhos((current) => ([
       ...current,
-      { codigo: '', nome: '', descricao: '', categoria_financeira_id: '', ativo: true }
+      { _draftId: criarTarifaBancariaDraftId(), codigo: '', nome: '', descricao: '', categoria_financeira_id: '', ativo: true }
     ]));
   }
 
   function handleAlterarTarifaBancaria(index, field, value) {
+    setTarifasBancariasFeedback('');
     setTarifasBancariasAtalhos((current) => current.map((item, itemIndex) => (
       itemIndex === index ? { ...item, [field]: value } : item
     )));
   }
 
   function handleRemoverTarifaBancaria(index) {
+    setTarifasBancariasFeedback('');
     setTarifasBancariasAtalhos((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
 
@@ -609,14 +637,18 @@ export default function FinanceiroCadastros() {
     try {
       setSavingTarifasBancarias(true);
       setError('');
+      setTarifasBancariasFeedback('');
       const categoriasAptas = new Set(categoriasTarifasBancarias.map((categoria) => String(categoria.id)));
       const tarifaInvalida = tarifasBancariasAtalhos.find((tarifa) => !tarifa.categoria_financeira_id || !categoriasAptas.has(String(tarifa.categoria_financeira_id)));
       if (tarifaInvalida) {
         setError(`O atalho ${tarifaInvalida.nome || tarifaInvalida.codigo || 'de tarifa'} precisa usar uma categoria ativa, de saida e classificada para DRE.`);
         return;
       }
-      await atualizarTarifasBancariasAtalhos({ itens: tarifasBancariasAtalhos });
-      await carregar();
+      const itensSalvos = await atualizarTarifasBancariasAtalhos({
+        itens: prepararTarifasBancariasParaSalvar(tarifasBancariasAtalhos)
+      });
+      setTarifasBancariasAtalhos(prepararTarifasBancariasParaEdicao(itensSalvos));
+      setTarifasBancariasFeedback('Atalhos salvos. Os itens ativos ja estao disponiveis na conciliacao OFX.');
     } catch (err) {
       setError(err?.message || 'Erro ao salvar atalhos de tarifas bancarias');
     } finally {
@@ -1315,7 +1347,7 @@ export default function FinanceiroCadastros() {
               {tarifasBancariasAtalhos.length === 0 ? (
                 <div className="app-note">Nenhum atalho de tarifa configurado.</div>
               ) : tarifasBancariasAtalhos.map((tarifa, index) => (
-                <div key={`${tarifa.codigo || 'nova'}-${index}`} className="rounded-xl border border-[var(--c-border)] p-3">
+                <div key={tarifa._draftId} className="rounded-xl border border-[var(--c-border)] p-3">
                   <div className="grid gap-3 md:grid-cols-2">
                     <input
                       className="input w-full"
@@ -1368,6 +1400,12 @@ export default function FinanceiroCadastros() {
                 </div>
               ))}
             </div>
+
+            {tarifasBancariasFeedback && (
+              <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200">
+                {tarifasBancariasFeedback}
+              </div>
+            )}
 
             <div className="mt-4 flex justify-end">
               <button type="button" className="btn btn-primary" disabled={savingTarifasBancarias} onClick={handleSalvarTarifasBancarias}>

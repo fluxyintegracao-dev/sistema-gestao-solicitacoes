@@ -1449,13 +1449,21 @@ export default function FinanceiroConciliacao() {
     } catch { setContas([]); } finally { setLoadingContas(false); }
   }
 
-  async function carregarTarifasBancarias() {
+  async function carregarTarifasBancarias({ preservarEmErro = false } = {}) {
     try {
       const data = await getTarifasBancariasAtalhos();
       setTarifasBancarias(Array.isArray(data) ? data : []);
     } catch {
-      setTarifasBancarias([]);
+      if (!preservarEmErro) {
+        setTarifasBancarias([]);
+      }
     }
+  }
+
+  function abrirAcoesRapidas(item) {
+    setAcoesRapidasError('');
+    setAcoesRapidasItem(item);
+    carregarTarifasBancarias({ preservarEmErro: true });
   }
 
   async function carregarResumoContas() {
@@ -2426,10 +2434,7 @@ export default function FinanceiroConciliacao() {
                       processing: false,
                       error: ''
                     })}
-                    onAcoesRapidas={(it) => {
-                      setAcoesRapidasError('');
-                      setAcoesRapidasItem(it);
-                    }}
+                    onAcoesRapidas={abrirAcoesRapidas}
                   />
                 ))
             }

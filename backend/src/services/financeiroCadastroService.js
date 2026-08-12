@@ -4,7 +4,8 @@ const {
   ConfiguracaoSistema,
   ContaBancaria,
   EmpresaGrupo,
-  FormaPagamentoFinanceira
+  FormaPagamentoFinanceira,
+  sequelize
 } = require('../models');
 const {
   canAccessFinanceiro
@@ -218,7 +219,8 @@ async function listarTarifasBancariasConfig(req) {
   await assertFinanceAccess(req);
 
   const config = await ConfiguracaoSistema.findOne({
-    where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY }
+    where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },
+    order: [['updatedAt', 'DESC'], ['id', 'DESC']]
   });
 
   const itens = parseTarifasBancariasConfig(config?.valor);
@@ -287,16 +289,38 @@ async function salvarTarifasBancariasConfig(req, payload = {}) {
     }
   }
 
-  const [config] = await ConfiguracaoSistema.findOrCreate({
-    where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },
-    defaults: {
-      chave: TARIFAS_BANCARIAS_CONFIG_KEY,
-      valor: JSON.stringify(itens)
-    }
-  });
+  const valorSerializado = JSON.stringify(itens);
+  const transaction = await sequelize.transaction();
+  try {
+    // A coluna `chave` nao possui restricao UNIQUE nas instalacoes legadas.
+    // Atualizar todas as ocorrencias evita que uma leitura posterior encontre
+    // um registro antigo e aparente que o novo atalho nao foi salvo.
+    const configExistente = await ConfiguracaoSistema.findOne({
+      where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },
+      attributes: ['id'],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
 
-  if (!config.isNewRecord) {
-    await config.update({ valor: JSON.stringify(itens) });
+    if (configExistente) {
+      await ConfiguracaoSistema.update(
+        { valor: valorSerializado },
+        {
+          where: { chave: TARIFAS_BANCARIAS_CONFIG_KEY },
+          transaction
+        }
+      );
+    } else {
+      await ConfiguracaoSistema.create({
+        chave: TARIFAS_BANCARIAS_CONFIG_KEY,
+        valor: valorSerializado
+      }, { transaction });
+    }
+
+    await transaction.commit();
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
   }
 
   await registrarEventoSeguranca({
@@ -310,7 +334,7 @@ async function salvarTarifasBancariasConfig(req, payload = {}) {
     metadata: { total: itens.length }
   });
 
-  return itens;
+  return listarTarifasBancariasConfig(req);
 }
 
 function sanitizeBoolean(value, fallback = false) {
