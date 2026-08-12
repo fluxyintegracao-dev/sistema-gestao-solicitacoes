@@ -8,6 +8,7 @@ const {
   FaturaCartaoFinanceiro,
   CartaoFinanceiro,
   MovimentoFinanceiro,
+  Obra,
   Parceiro,
   sequelize,
   TituloFinanceiro,
@@ -523,6 +524,12 @@ function buildConciliacaoInclude() {
           as: 'parceiro',
           required: false,
           attributes: ['id', 'nome', 'cpf_cnpj']
+        },
+        {
+          model: Obra,
+          as: 'obra',
+          required: false,
+          attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo']
         }
       ]
     },
@@ -922,6 +929,12 @@ async function queryMovimentoCandidates(req, conciliacao, searchFilters = {}) {
             model: CategoriaFinanceira,
             as: 'categoriaFinanceira',
             attributes: ['id', 'nome', 'tipo']
+          },
+          {
+            model: Obra,
+            as: 'obra',
+            required: false,
+            attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo']
           }
         ]
       },
@@ -1056,6 +1069,10 @@ function serializeSuggestion(movimento, ranking) {
     parceiro_nome: movimento.titulo?.parceiro?.nome || '-',
     categoria_financeira_id: movimento.titulo?.categoriaFinanceira?.id || null,
     categoria_financeira_nome: movimento.titulo?.categoriaFinanceira?.nome || null,
+    obra_id: movimento.titulo?.obra?.id || movimento.titulo?.obra_id || null,
+    obra_codigo: movimento.titulo?.obra?.codigo || null,
+    obra_nome: movimento.titulo?.obra?.nome || null,
+    obra_tipo_centro_custo: movimento.titulo?.obra?.tipo_centro_custo || null,
     documento: movimento.titulo?.numero_documento || null,
     data_movimento: movimento.data_movimento,
     valor_quitacao: Number(movimento.valor_quitacao || 0),
@@ -1103,9 +1120,12 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
   const sugestaoAutomatica = ranked.length > 0 && !associacaoManualRecomendada
     ? serializeSuggestion(ranked[0].item, ranked[0].ranking)
     : null;
-  const sugestoesVisiveis = associacaoManualRecomendada
-    ? []
-    : ranked.slice(0, maxSuggestions).map((entry) => serializeSuggestion(entry.item, entry.ranking));
+  const limiteSugestoesVisiveis = associacaoManualRecomendada
+    ? Math.max(maxSuggestions, 20)
+    : maxSuggestions;
+  const sugestoesVisiveis = ranked
+    .slice(0, limiteSugestoesVisiveis)
+    .map((entry) => serializeSuggestion(entry.item, entry.ranking));
 
   return {
     sugestoes: sugestoesVisiveis,
@@ -1273,6 +1293,12 @@ async function listarConciliacoes(req, filters = {}) {
               model: CategoriaFinanceira,
               as: 'categoriaFinanceira',
               attributes: ['id', 'nome', 'tipo']
+            },
+            {
+              model: Obra,
+              as: 'obra',
+              required: false,
+              attributes: ['id', 'codigo', 'nome', 'tipo_centro_custo']
             }
           ]
         })
@@ -1365,7 +1391,11 @@ async function listarConciliacoes(req, filters = {}) {
             numero_documento: titulo.numero_documento,
             parceiro_nome: titulo.parceiro?.nome || '-',
             categoria_financeira_id: titulo.categoriaFinanceira?.id || null,
-            categoria_financeira_nome: titulo.categoriaFinanceira?.nome || null
+            categoria_financeira_nome: titulo.categoriaFinanceira?.nome || null,
+            obra_id: titulo.obra?.id || titulo.obra_id || null,
+            obra_codigo: titulo.obra?.codigo || null,
+            obra_nome: titulo.obra?.nome || null,
+            obra_tipo_centro_custo: titulo.obra?.tipo_centro_custo || null
           }
         : null,
       movimento: movimento

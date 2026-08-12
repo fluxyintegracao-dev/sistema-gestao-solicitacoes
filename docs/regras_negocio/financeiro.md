@@ -64,5 +64,7 @@
 
 - OFX e conferencia, nao automacao contabil
 - sistema so sugere match quando valor absoluto em centavos e data forem exatamente iguais; a confirmacao continua manual
+- quando houver mais de um titulo com data e valor exatos, nenhum deles deve ser escolhido automaticamente; o card lista as opcoes compativeis e a acao `Usar` apenas prepara o titulo, mantendo obrigatorio o clique posterior em `Conciliar`
+- o card do lancamento Fluxy informa a categoria financeira e a obra ou centro de custo vinculados ao titulo, facilitando a conferencia antes da conciliacao
 - confirmacao simples revalida valor e data no backend; na associacao multipla, todos os movimentos devem ter a data do extrato e a soma deve fechar exatamente o valor bancario
 - duplicidade de remessa deve ser bloqueada
