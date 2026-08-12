@@ -251,9 +251,14 @@ export default function PessoaChequeAutocomplete({
             </button>
             {autocomplete}
           </div>
-          <button type="button" className="btn btn-outline shrink-0 px-3" onClick={openCreate}>
-            <HiOutlinePlus className="h-4 w-4" />
-            <span className="hidden lg:inline">{createButtonLabel}</span>
+          <button
+            type="button"
+            className="btn btn-outline btn-icon-only shrink-0"
+            onClick={openCreate}
+            title={createButtonLabel}
+            aria-label={createButtonLabel}
+          >
+            <HiOutlinePlus className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
         <small className="mt-1 text-[var(--c-muted)]">{helperText}</small>

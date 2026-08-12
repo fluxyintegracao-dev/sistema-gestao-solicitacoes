@@ -23,7 +23,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { hasPermissao } from '../utils/acessoProduto';
-import { maskCpfCnpj } from '../utils/formatters';
+import { maskCpfCnpj, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 
 const STATUS_LABELS = {
   EM_CARTEIRA: 'Em carteira',
@@ -128,7 +128,7 @@ export default function FinanceiroChequesTerceiros() {
     setSaving(true); setError('');
     try {
       const { cliente_documento: _clienteDocumento, ...payload } = form;
-      await criarChequeTerceiro({ ...payload, valor: Number(String(form.valor).replace(',', '.')) });
+      await criarChequeTerceiro({ ...payload, valor: parseCurrencyInput(form.valor) });
       setCreateOpen(false); setForm(createEmptyForm()); await load();
     } catch (err) { setError(err.message || 'Erro ao cadastrar cheque.'); }
     finally { setSaving(false); }
@@ -279,7 +279,7 @@ export default function FinanceiroChequesTerceiros() {
               ['banco', 'Banco', 'text'],
               ['agencia', 'Agência', 'text'],
               ['conta', 'Conta', 'text'],
-              ['valor', 'Valor', 'number', true],
+              ['valor', 'Valor', 'currency', true],
               ['data_vencimento', 'Data de vencimento', 'date', true],
               ['data_entrada', 'Data de entrada', 'date', true]
             ].map(([key, label, type, required]) => (
@@ -287,11 +287,17 @@ export default function FinanceiroChequesTerceiros() {
                 <span>{label}{required ? ' *' : ''}</span>
                 <input
                   className="input"
-                  type={type}
+                  type={type === 'currency' ? 'text' : type}
+                  inputMode={type === 'currency' ? 'numeric' : undefined}
                   step={type === 'number' ? '0.01' : undefined}
                   required={required}
                   value={form[key]}
-                  onChange={(event) => setForm((current) => ({ ...current, [key]: event.target.value }))}
+                  onChange={(event) => setForm((current) => ({
+                    ...current,
+                    [key]: type === 'currency' ? normalizeCurrencyTyping(event.target.value) : event.target.value
+                  }))}
+                  placeholder={type === 'currency' ? 'R$ 0,00' : undefined}
+                  autoComplete="off"
                 />
               </label>
             ))}
