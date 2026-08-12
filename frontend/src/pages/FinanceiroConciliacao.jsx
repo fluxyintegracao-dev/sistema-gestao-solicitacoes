@@ -719,7 +719,25 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
+function ContextoObraTitulo({ registro }) {
+  const codigo = String(registro?.obra_codigo || '').trim();
+  const nome = String(registro?.obra_nome || '').trim();
+  if (!codigo && !nome) return null;
+
+  const tipo = String(registro?.obra_tipo_centro_custo || '').trim().toUpperCase();
+  const rotulo = tipo === 'OBRA'
+    ? 'Obra'
+    : (tipo ? 'Centro de custo' : 'Obra/centro de custo');
+  const descricao = [codigo, nome].filter(Boolean).join(' · ');
+
+  return (
+    <p className="truncate text-[10px] text-[var(--c-muted)] leading-tight" title={`${rotulo}: ${descricao}`}>
+      {rotulo}: {descricao}
+    </p>
+  );
+}
+
+function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onPrepararSugestao, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -738,6 +756,13 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
   const outrasSugestoes = isPendente && !temAssociacaoPreparada && !item.associacao_manual_recomendada && item.sugestoes?.length > 1
     ? item.sugestoes.filter((s) => s.movimento_financeiro_id !== topSugestao?.movimento_financeiro_id)
     : [];
+  const sugestoesCompativeis = isPendente && !temAssociacaoPreparada && item.associacao_manual_recomendada && Array.isArray(item.sugestoes)
+    ? item.sugestoes
+    : [];
+  const totalSugestoesCompativeis = Math.max(
+    Number(item.total_candidatos_exatos_mesmo_dia || 0),
+    sugestoesCompativeis.length
+  );
 
   const movimentoIdsConfirmacao = temAssociacaoPreparada
     ? movimentosPreparadosIds
@@ -875,6 +900,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                   Categoria: {item.titulo.categoria_financeira_nome}
                 </p>
               )}
+              <ContextoObraTitulo registro={item.titulo} />
               {item.movimento && <p className="text-[10px] text-[var(--c-muted)]">Mov. #{item.movimento.id}</p>}
             </div>
           ) : !isPendente && item.movimento?.tipo_movimento === 'TARIFA_BANCARIA' ? (
@@ -929,6 +955,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                         Categoria: {movimentosPreparados[0].categoria_financeira_nome}
                       </p>
                     )}
+                    <ContextoObraTitulo registro={movimentosPreparados[0]} />
                     <p className="text-[10px] text-[var(--c-muted)] leading-tight">
                       {formatDate(movimentosPreparados[0]?.data_movimento)} · mov. #{movimentosPreparados[0]?.movimento_financeiro_id}
                     </p>
@@ -943,6 +970,51 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                   Clique em Conciliar para confirmar.
                 </p>
               </div>
+            </div>
+          ) : sugestoesCompativeis.length > 0 ? (
+            <div className="flex flex-1 flex-col justify-center rounded border border-dashed border-[var(--c-border)] bg-[var(--c-bg)] px-2 py-2">
+              <button
+                type="button"
+                className="self-start text-[10px] font-semibold text-[var(--c-primary)] underline underline-offset-2"
+                aria-expanded={expandirSugestoes}
+                onClick={() => setExpandirSugestoes((value) => !value)}
+              >
+                {expandirSugestoes ? 'Ocultar opções' : `+ ${totalSugestoesCompativeis} títulos compatíveis`}
+              </button>
+              <p className="mt-1 text-[10px] leading-tight text-[var(--c-muted)]">
+                Mesma data e valor. Escolha um título para preparar a conciliação.
+              </p>
+              {expandirSugestoes && (
+                <div className="mt-2 max-h-48 space-y-1 overflow-y-auto pr-1">
+                  {sugestoesCompativeis.map((sugestao) => (
+                    <div
+                      key={sugestao.movimento_financeiro_id}
+                      className="flex items-center gap-2 rounded border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1.5"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-[10px] font-semibold text-[var(--c-text)]" title={sugestao.titulo_descricao}>
+                          {sugestao.titulo_descricao}
+                        </p>
+                        <p className="truncate text-[10px] text-[var(--c-muted)]">
+                          {sugestao.parceiro_nome || 'Sem parceiro'}
+                          {sugestao.categoria_financeira_nome ? ` · ${sugestao.categoria_financeira_nome}` : ''}
+                        </p>
+                        <ContextoObraTitulo registro={sugestao} />
+                        <p className="text-[10px] text-[var(--c-muted)]">
+                          {formatDate(sugestao.data_movimento)} · {formatCurrency(sugestao.valor_quitacao)}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm shrink-0 text-[10px]"
+                        onClick={() => onPrepararSugestao(item, sugestao)}
+                      >
+                        Usar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : topSugestao ? (
             <div className="flex flex-col gap-1 flex-1">
@@ -959,6 +1031,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                     Categoria: {topSugestao.categoria_financeira_nome}
                   </p>
                 )}
+                <ContextoObraTitulo registro={topSugestao} />
                 <ValorBanco value={topSugestao.valor_quitacao} size="sm" />
                 <p className="text-[10px] text-[var(--c-muted)] leading-tight">
                   {formatDate(topSugestao.data_movimento)} · {topSugestao.tipo} · mov. #{topSugestao.movimento_financeiro_id}
@@ -984,6 +1057,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                               Categoria: {s.categoria_financeira_nome}
                             </p>
                           )}
+                          <ContextoObraTitulo registro={s} />
                           <p className="text-[10px] text-[var(--c-muted)]">{formatDate(s.data_movimento)} · {formatCurrency(s.valor_quitacao)}</p>
                         </div>
                         <button type="button" className="btn btn-outline btn-sm text-[10px] shrink-0"
@@ -1829,6 +1903,26 @@ export default function FinanceiroConciliacao() {
     fecharAssociacaoManual();
   }
 
+  function prepararSugestaoCompativel(item, sugestao) {
+    const conciliacaoId = Number(item?.id || 0);
+    const movimentoId = Number(sugestao?.movimento_financeiro_id || 0);
+    if (!conciliacaoId || !movimentoId) {
+      setError('Não foi possível preparar o título selecionado para conciliação.');
+      return;
+    }
+
+    setAssociacoesPreparadas((current) => ({
+      ...current,
+      [conciliacaoId]: {
+        movimentoIds: [movimentoId],
+        movimentos: [sugestao],
+        total: valorAbsolutoMovimentoAssociacao(sugestao)
+      }
+    }));
+    setFeedback('Título compatível preparado. Revise as informações e clique em Conciliar para confirmar.');
+    setError('');
+  }
+
   async function carregarFaturasAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
     try {
       setFaturaModal((c) => ({ ...c, open: manterAberto, loading: true, error: '', filters: filtersPayload || c.filters }));
@@ -2425,6 +2519,7 @@ export default function FinanceiroConciliacao() {
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onRemover={handleRemover}
                     onAssociarManual={abrirAssociacaoManual}
+                    onPrepararSugestao={prepararSugestaoCompativel}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
                     onEstornarTransferencia={(it) => setEstornoTransferenciaModal({

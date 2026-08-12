@@ -103,14 +103,28 @@ const suggestionAnalysisSource = serviceSource.match(
   /async function analyzeSuggestions[\s\S]*?\n}\n\nasync function listarConciliacoes/
 )?.[0] || '';
 assert(
-  suggestionAnalysisSource.includes('const sugestoesVisiveis = associacaoManualRecomendada')
-    && suggestionAnalysisSource.includes('? []'),
-  'Matches ambiguos de mesma data e valor nao devem expor um titulo como sugestao; exigem associacao manual.'
+  suggestionAnalysisSource.includes('const limiteSugestoesVisiveis = associacaoManualRecomendada')
+    && suggestionAnalysisSource.includes('.slice(0, limiteSugestoesVisiveis)')
+    && suggestionAnalysisSource.includes('const sugestaoAutomatica = ranked.length > 0 && !associacaoManualRecomendada'),
+  'Matches ambiguos devem listar candidatos exatos, sem selecionar automaticamente um titulo.'
+);
+assert(
+  reconciliationPageSource.includes('onPrepararSugestao')
+    && reconciliationPageSource.includes('sugestoesCompativeis')
+    && reconciliationPageSource.includes('onClick={() => onPrepararSugestao(item, sugestao)}'),
+  'O frontend deve permitir preparar um titulo compativel antes da confirmacao manual.'
 );
 assert(
   serviceSource.includes("as: 'categoriaFinanceira'")
     && serviceSource.includes('categoria_financeira_nome: movimento.titulo?.categoriaFinanceira?.nome || null'),
   'As sugestoes da conciliacao devem informar a categoria financeira do titulo.'
+);
+assert(
+  serviceSource.includes("as: 'obra'")
+    && serviceSource.includes('obra_nome: movimento.titulo?.obra?.nome || null')
+    && serviceSource.includes('obra_tipo_centro_custo: movimento.titulo?.obra?.tipo_centro_custo || null')
+    && reconciliationPageSource.includes('<ContextoObraTitulo registro={topSugestao} />'),
+  'O card do lancamento Fluxy deve informar a obra ou o centro de custo do titulo.'
 );
 
 const exactTransferPairSource = serviceSource.match(
