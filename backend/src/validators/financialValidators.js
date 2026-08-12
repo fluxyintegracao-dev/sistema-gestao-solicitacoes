@@ -970,7 +970,7 @@ function validateFinanceConciliacaoEstornoTransferenciaBody(body = {}) {
   ensureAllowedKeys(
     body,
     ['motivo'],
-    'Estorno de conciliacao bancaria por transferencia'
+    'Estorno de conciliacao bancaria'
   );
 
   return {

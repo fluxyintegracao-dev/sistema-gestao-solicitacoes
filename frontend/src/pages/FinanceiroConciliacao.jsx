@@ -1426,6 +1426,18 @@ export default function FinanceiroConciliacao() {
     getContaEmpresaId(contaContraparteTransferencia) &&
     getContaEmpresaId(contaAtualTransferencia) !== getContaEmpresaId(contaContraparteTransferencia)
   );
+  const transferenciaSaiDaContaAtual = Number(transferenciaModal.item?.valor || 0) < 0;
+  const contaOrigemTransferencia = transferenciaSaiDaContaAtual
+    ? contaAtualTransferencia
+    : contaContraparteTransferencia;
+  const contaDestinoTransferencia = transferenciaSaiDaContaAtual
+    ? contaContraparteTransferencia
+    : contaAtualTransferencia;
+  const contraparteAutomaticaSelecionada = Boolean(
+    transferenciaModal.item?.transferencia_contraparte_automatica?.conta_bancaria_id
+    && String(transferenciaModal.item.transferencia_contraparte_automatica.conta_bancaria_id)
+      === String(transferenciaModal.conta_contraparte_id)
+  );
 
   async function carregarContas() {
     try {
@@ -1889,11 +1901,13 @@ export default function FinanceiroConciliacao() {
   }
 
   function abrirAssociacaoTransferencia(item) {
-    const contasDisponiveis = contas.filter((conta) => String(conta.id) !== String(item?.conta_bancaria_id));
+    const contaContraparteAutomaticaId = item?.transferencia_contraparte_automatica?.conta_bancaria_id;
     setTransferenciaModal({
       open: true,
       item,
-      conta_contraparte_id: String(contasDisponiveis[0]?.id || ''),
+      conta_contraparte_id: contaContraparteAutomaticaId
+        ? String(contaContraparteAutomaticaId)
+        : '',
       descricao: item?.descricao_banco ? `Transferencia - ${item.descricao_banco}` : 'Transferencia entre contas',
       tipo_intercompany: '',
       motivo_intercompany: item?.descricao_banco || '',
@@ -2564,8 +2578,18 @@ export default function FinanceiroConciliacao() {
                 <div className={`rounded-xl border px-4 py-3 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
                   <strong>{transferenciaEntreEmpresas ? 'Transferencia Entre Empresas' : 'Transferencia interna da mesma empresa'}</strong>
                   <div className="mt-1">
-                    {getContaEmpresaNome(contaAtualTransferencia)} para {getContaEmpresaNome(contaContraparteTransferencia)}.
+                    {getContaEmpresaNome(contaOrigemTransferencia)} para {getContaEmpresaNome(contaDestinoTransferencia)}.
                   </div>
+                  {contraparteAutomaticaSelecionada ? (
+                    <div className="mt-2 font-medium">
+                      Par OFX localizado automaticamente pela mesma data e pelo valor oposto.
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+              {transferenciaModal.item?.transferencia_contraparte_ambigua ? (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                  Ha mais de um lancamento OFX com a mesma data e o valor oposto. Confirme a conta contraparte manualmente; nenhum par sera escolhido automaticamente.
                 </div>
               ) : null}
               {transferenciaEntreEmpresas ? (

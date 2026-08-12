@@ -343,7 +343,7 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'financeiro.conciliacao.visualizar', label: 'Visualizar conciliação', descricao: 'Ver movimentos e sugestões de conciliação bancária.' },
           { key: 'financeiro.conciliacao.importar', label: 'Importar arquivo OFX', descricao: 'Fazer upload de extratos bancários em formato OFX.' },
           { key: 'financeiro.conciliacao.conciliar', label: 'Conciliar lançamentos', descricao: 'Confirmar, criar título ou ignorar movimentos bancários.' },
-          { key: 'financeiro.conciliacao.estornar', label: 'Estornar transferência conciliada', descricao: 'Cancelar uma transferência conciliada e devolver os lançamentos OFX vinculados para pendente.' }
+          { key: 'financeiro.conciliacao.estornar', label: 'Estornar conciliação', descricao: 'Desfazer uma conciliação incorreta e devolver o lançamento OFX para conferência manual.' }
         ]
       },
       {

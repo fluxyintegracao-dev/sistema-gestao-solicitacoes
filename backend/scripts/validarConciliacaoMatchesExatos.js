@@ -6,6 +6,7 @@ const path = require('path');
 const {
   hasSameConciliacaoDate,
   hasSameConciliacaoValue,
+  isExactOppositeBankTransfer,
   isExactConciliacaoMatch
 } = require('../src/utils/conciliacaoMatch');
 const {
@@ -38,6 +39,25 @@ assert.strictEqual(isExactConciliacaoMatch({
   movementValue: 1436.16
 }), false);
 
+assert.strictEqual(isExactOppositeBankTransfer({
+  currentDate: '2026-08-04',
+  currentValue: 100,
+  counterpartDate: '2026-08-04',
+  counterpartValue: -100
+}), true);
+assert.strictEqual(isExactOppositeBankTransfer({
+  currentDate: '2026-08-04',
+  currentValue: 100,
+  counterpartDate: '2026-08-04',
+  counterpartValue: 100
+}), false);
+assert.strictEqual(isExactOppositeBankTransfer({
+  currentDate: '2026-08-04',
+  currentValue: 100,
+  counterpartDate: '2026-08-05',
+  counterpartValue: -100
+}), false);
+
 assert.strictEqual(isExactConciliacaoMatch({
   bankDate: '2026-07-06',
   bankValue: -1436.16,
@@ -47,6 +67,15 @@ assert.strictEqual(isExactConciliacaoMatch({
 
 const serviceSource = fs.readFileSync(
   path.resolve(__dirname, '../src/services/conciliacaoBancariaService.js'),
+  'utf8'
+);
+const routesSource = fs.readFileSync(path.resolve(__dirname, '../src/routes.js'), 'utf8');
+const reportSource = fs.readFileSync(
+  path.resolve(__dirname, '../../frontend/src/pages/FinanceiroRelatorios.jsx'),
+  'utf8'
+);
+const reconciliationPageSource = fs.readFileSync(
+  path.resolve(__dirname, '../../frontend/src/pages/FinanceiroConciliacao.jsx'),
   'utf8'
 );
 const loadByIdSource = serviceSource.match(
@@ -82,6 +111,32 @@ assert(
   serviceSource.includes("as: 'categoriaFinanceira'")
     && serviceSource.includes('categoria_financeira_nome: movimento.titulo?.categoriaFinanceira?.nome || null'),
   'As sugestoes da conciliacao devem informar a categoria financeira do titulo.'
+);
+
+const exactTransferPairSource = serviceSource.match(
+  /function isContraparteTransferenciaExata[\s\S]*?\n}\n\nasync function listarConciliacoes/
+)?.[0] || '';
+assert(
+  exactTransferPairSource.includes("status: 'PENDENTE'")
+    && exactTransferPairSource.includes('transferencia_financeira_id: null')
+    && exactTransferPairSource.includes('isExactOppositeBankTransfer'),
+  'O pareamento automatico de transferencias deve exigir OFX pendente, livre, na mesma data e com sinal oposto.'
+);
+
+const transferConfirmationSource = serviceSource.match(
+  /async function confirmarConciliacaoTransferencia[\s\S]*?\n}\n\nasync function estornarConciliacaoTransferencia/
+)?.[0] || '';
+assert(
+  transferConfirmationSource.includes('contrapartesExatas.length === 1')
+    && transferConfirmationSource.includes('conciliacao_origem_id: isSaidaDaContaAtual')
+    && transferConfirmationSource.includes('await conciliacaoContraparte.update'),
+  'Somente uma contraparte OFX exata deve ser vinculada atomicamente a transferencia.'
+);
+assert(
+  reconciliationPageSource.includes('contaOrigemTransferencia')
+    && reconciliationPageSource.includes('contaDestinoTransferencia')
+    && reconciliationPageSource.includes('transferencia_contraparte_automatica'),
+  'A previa deve respeitar o sinal do OFX e preselecionar apenas a contraparte exata.'
 );
 
 assert.deepStrictEqual(
@@ -127,11 +182,11 @@ assert.deepStrictEqual(
 );
 assert(
   ALL_PERMISSION_KEYS.has('financeiro.conciliacao.estornar'),
-  'O estorno de transferencia conciliada deve possuir permissao granular dedicada.'
+  'O estorno de conciliacao deve possuir permissao granular dedicada.'
 );
 
 const transferReversalSource = serviceSource.match(
-  /async function estornarConciliacaoTransferencia[\s\S]*?\n}\n\nasync function corrigirContaConciliacao/
+  /async function estornarConciliacaoTransferencia[\s\S]*?\n}\n\nasync function estornarConciliacao/
 )?.[0] || '';
 assert(
   transferReversalSource.includes('lock: transaction.LOCK.UPDATE')
@@ -142,6 +197,34 @@ assert(
 assert(
   transferReversalSource.includes('FINANCIAL_BANK_RECONCILIATION_TRANSFER_REVERSED'),
   'O estorno da transferencia conciliada deve gerar auditoria dedicada.'
+);
+
+const reconciliationReversalSource = serviceSource.match(
+  /async function estornarConciliacao\([\s\S]*?\n}\n\nasync function confirmarConciliacaoTarifa/
+)?.[0] || '';
+assert(
+  reconciliationReversalSource.includes('lock: transaction.LOCK.UPDATE')
+    && reconciliationReversalSource.includes("status: 'PENDENTE'")
+    && reconciliationReversalSource.includes('movimento_financeiro_id: null')
+    && reconciliationReversalSource.includes('titulo_financeiro_id: null')
+    && reconciliationReversalSource.includes('fatura_cartao_id: null'),
+  'O estorno generico deve bloquear e devolver o OFX para pendente sem manter vinculos ativos.'
+);
+assert(
+  reconciliationReversalSource.includes("tipoEstorno = 'TARIFA_BANCARIA'")
+    && reconciliationReversalSource.includes("status: 'ESTORNADO'")
+    && reconciliationReversalSource.includes('fatura.update({ conciliacao_bancaria_id: null }'),
+  'O estorno generico deve tratar tarifa e fatura conforme a origem da conciliacao.'
+);
+assert(
+  reconciliationReversalSource.includes('FINANCIAL_BANK_RECONCILIATION_REVERSED'),
+  'O estorno generico da conciliacao deve gerar auditoria dedicada.'
+);
+assert(
+  routesSource.includes("router.post('/financeiro/conciliacoes/:id/estornar'")
+    && reportSource.includes("item.status === 'CONCILIADO'")
+    && reportSource.includes('estornarConciliacaoBancaria'),
+  'O relatorio deve disponibilizar o estorno generico para registros conciliados.'
 );
 
 const reopenSource = fs.readFileSync(
