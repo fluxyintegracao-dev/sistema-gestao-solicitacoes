@@ -5,6 +5,7 @@ const {
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
+  estornarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
   importOfx,
@@ -128,6 +129,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao conciliar transferencia entre contas');
+    }
+  },
+
+  async estornarTransferencia(req, res) {
+    try {
+      const data = await estornarConciliacaoTransferencia(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao estornar transferencia conciliada');
     }
   },
 

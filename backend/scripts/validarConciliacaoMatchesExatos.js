@@ -9,8 +9,13 @@ const {
   isExactConciliacaoMatch
 } = require('../src/utils/conciliacaoMatch');
 const {
-  validateFinanceConciliacaoCorrigirContaBody
+  validateFinanceConciliacaoCorrigirContaBody,
+  validateFinanceConciliacaoEstornoTransferenciaBody,
+  validateFinanceRelatorioConciliacaoQuery
 } = require('../src/validators/financialValidators');
+const {
+  ALL_PERMISSION_KEYS
+} = require('../src/constants/moduloPermissoes');
 
 assert.strictEqual(hasSameConciliacaoDate('2026-07-06', '2026-07-06'), true);
 assert.strictEqual(hasSameConciliacaoDate('2026-07-06', '2026-07-10'), false);
@@ -88,6 +93,55 @@ assert.deepStrictEqual(
     conta_bancaria_id: 12,
     motivo: 'OFX conciliado na conta incorreta.'
   }
+);
+
+assert.deepStrictEqual(
+  validateFinanceConciliacaoEstornoTransferenciaBody({
+    motivo: 'Transferencia conciliada na conta incorreta.'
+  }),
+  {
+    motivo: 'Transferencia conciliada na conta incorreta.'
+  }
+);
+assert.deepStrictEqual(
+  validateFinanceRelatorioConciliacaoQuery({
+    periodo: 'PERSONALIZADO',
+    data_inicial: '2026-08-01',
+    data_final: '2026-08-31',
+    conta_bancaria_id: undefined,
+    status: 'CONCILIADO',
+    tipo_conciliacao: 'TRANSFERENCIA',
+    natureza: 'SAIDA',
+    busca: 'permuta entre empresas'
+  }),
+  {
+    periodo: 'PERSONALIZADO',
+    data_inicial: '2026-08-01',
+    data_final: '2026-08-31',
+    conta_bancaria_id: undefined,
+    status: 'CONCILIADO',
+    tipo_conciliacao: 'TRANSFERENCIA',
+    natureza: 'SAIDA',
+    busca: 'permuta entre empresas'
+  }
+);
+assert(
+  ALL_PERMISSION_KEYS.has('financeiro.conciliacao.estornar'),
+  'O estorno de transferencia conciliada deve possuir permissao granular dedicada.'
+);
+
+const transferReversalSource = serviceSource.match(
+  /async function estornarConciliacaoTransferencia[\s\S]*?\n}\n\nasync function corrigirContaConciliacao/
+)?.[0] || '';
+assert(
+  transferReversalSource.includes('lock: transaction.LOCK.UPDATE')
+    && transferReversalSource.includes("status: 'CANCELADA'")
+    && transferReversalSource.includes("status: 'PENDENTE'"),
+  'O estorno da transferencia deve bloquear, cancelar a transferencia e reabrir os OFX na mesma transacao.'
+);
+assert(
+  transferReversalSource.includes('FINANCIAL_BANK_RECONCILIATION_TRANSFER_REVERSED'),
+  'O estorno da transferencia conciliada deve gerar auditoria dedicada.'
 );
 
 const reopenSource = fs.readFileSync(

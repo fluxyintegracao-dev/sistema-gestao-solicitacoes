@@ -4710,6 +4710,8 @@ async function hydrateFinanceiroMaps({ movimentos = [], conciliacoes = [] }) {
   const contaIds = new Set();
   const tituloIds = new Set();
   const categoriaIds = new Set();
+  const movimentoIds = new Set();
+  const transferenciaIds = new Set();
 
   movimentos.forEach((movimento) => {
     if (movimento.conta_bancaria_id) contaIds.add(Number(movimento.conta_bancaria_id));
@@ -4720,6 +4722,29 @@ async function hydrateFinanceiroMaps({ movimentos = [], conciliacoes = [] }) {
   conciliacoes.forEach((conciliacao) => {
     if (conciliacao.conta_bancaria_id) contaIds.add(Number(conciliacao.conta_bancaria_id));
     if (conciliacao.titulo_financeiro_id) tituloIds.add(Number(conciliacao.titulo_financeiro_id));
+    if (conciliacao.movimento_financeiro_id) movimentoIds.add(Number(conciliacao.movimento_financeiro_id));
+    if (conciliacao.transferencia_financeira_id) transferenciaIds.add(Number(conciliacao.transferencia_financeira_id));
+  });
+
+  const movimentosVinculados = movimentoIds.size
+    ? await MovimentoFinanceiro.findAll({ where: { id: { [Op.in]: Array.from(movimentoIds) } }, raw: true })
+    : [];
+  const movimentosCompletos = Array.from(new Map(
+    [...movimentos, ...movimentosVinculados].map((movimento) => [Number(movimento.id), movimento])
+  ).values());
+
+  movimentosCompletos.forEach((movimento) => {
+    if (movimento.conta_bancaria_id) contaIds.add(Number(movimento.conta_bancaria_id));
+    if (movimento.titulo_financeiro_id) tituloIds.add(Number(movimento.titulo_financeiro_id));
+    if (movimento.categoria_financeira_id) categoriaIds.add(Number(movimento.categoria_financeira_id));
+  });
+
+  const transferencias = transferenciaIds.size
+    ? await TransferenciaFinanceira.findAll({ where: { id: { [Op.in]: Array.from(transferenciaIds) } }, raw: true })
+    : [];
+  transferencias.forEach((transferencia) => {
+    if (transferencia.conta_origem_id) contaIds.add(Number(transferencia.conta_origem_id));
+    if (transferencia.conta_destino_id) contaIds.add(Number(transferencia.conta_destino_id));
   });
 
   const contas = contaIds.size
@@ -4754,7 +4779,9 @@ async function hydrateFinanceiroMaps({ movimentos = [], conciliacoes = [] }) {
     titulos: mapById(titulos),
     parceiros: mapById(parceiros),
     obras: mapById(obras),
-    categorias: mapById(categorias)
+    categorias: mapById(categorias),
+    movimentos: mapById(movimentosCompletos),
+    transferencias: mapById(transferencias)
   };
 }
 
@@ -4885,6 +4912,10 @@ async function gerarRelatorioMovimentacaoContas(req, filters = {}) {
 async function gerarRelatorioConciliacaoContas(req, filters = {}) {
   await assertFinanceAccess(req);
   const filtroPeriodo = resolvePeriodo(filters);
+  const statusFiltro = String(filters.status || 'TODOS').toUpperCase();
+  const tipoFiltro = String(filters.tipo_conciliacao || 'TODOS').toUpperCase();
+  const naturezaFiltro = String(filters.natureza || 'TODAS').toUpperCase();
+  const busca = String(filters.busca || '').trim();
   const where = {
     data_movimento: {
       [Op.between]: [filtroPeriodo.data_inicial, filtroPeriodo.data_final]
@@ -4893,6 +4924,20 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
 
   if (filters.conta_bancaria_id) {
     where.conta_bancaria_id = Number(filters.conta_bancaria_id);
+  }
+  if (statusFiltro === 'REMOVIDO') where.deleted_at = { [Op.ne]: null };
+  else if (statusFiltro !== 'TODOS') {
+    where.deleted_at = null;
+    where.status = statusFiltro;
+  }
+  if (naturezaFiltro === 'ENTRADA') where.valor = { [Op.gte]: 0 };
+  if (naturezaFiltro === 'SAIDA') where.valor = { [Op.lt]: 0 };
+  if (busca) {
+    where[Op.or] = [
+      { descricao_banco: { [Op.like]: `%${busca}%` } },
+      { documento: { [Op.like]: `%${busca}%` } },
+      { ofx_uid: { [Op.like]: `%${busca}%` } }
+    ];
   }
 
   const conciliacoes = await ConciliacaoBancaria.findAll({
@@ -4906,21 +4951,29 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
   });
 
   const maps = await hydrateFinanceiroMaps({ conciliacoes });
-  const sinteticoMap = new Map();
-  const analitico = conciliacoes.map((conciliacao) => {
+  const analiticoCompleto = conciliacoes.map((conciliacao) => {
     const conta = maps.contas.get(Number(conciliacao.conta_bancaria_id));
     const titulo = maps.titulos.get(Number(conciliacao.titulo_financeiro_id));
+    const movimento = maps.movimentos.get(Number(conciliacao.movimento_financeiro_id));
+    const transferencia = maps.transferencias.get(Number(conciliacao.transferencia_financeira_id));
     const parceiro = maps.parceiros.get(Number(titulo?.parceiro_id));
     const obra = maps.obras.get(Number(titulo?.obra_id));
     const status = conciliacao.deleted_at ? 'REMOVIDO' : String(conciliacao.status || 'PENDENTE').toUpperCase();
     const valor = toNumber(conciliacao.valor);
-    const contaResumo = ensureSinteticoConta(sinteticoMap, conta);
-
-    contaResumo.movimentos += 1;
-    if (status === 'CONCILIADO') contaResumo.conciliados += 1;
-    else if (status === 'IGNORADO') contaResumo.ignorados += 1;
-    else if (status === 'REMOVIDO') contaResumo.removidos += 1;
-    else contaResumo.pendentes += 1;
+    const tipoMovimento = String(movimento?.tipo_movimento || '').toUpperCase();
+    const tipoConciliacao = transferencia
+      ? 'TRANSFERENCIA'
+      : conciliacao.fatura_cartao_id
+        ? 'FATURA_CARTAO'
+        : titulo
+          ? 'TITULO'
+          : movimento && tipoMovimento === 'TARIFA_BANCARIA'
+            ? 'TARIFA'
+            : movimento
+              ? 'MOVIMENTO'
+              : 'SEM_VINCULO';
+    const contaOrigem = maps.contas.get(Number(transferencia?.conta_origem_id));
+    const contaDestino = maps.contas.get(Number(transferencia?.conta_destino_id));
 
     return {
       id: conciliacao.id,
@@ -4936,6 +4989,13 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
       titulo_codigo: titulo?.codigo || null,
       movimento_financeiro_id: conciliacao.movimento_financeiro_id || null,
       fatura_cartao_id: conciliacao.fatura_cartao_id || null,
+      transferencia_financeira_id: transferencia?.id || null,
+      transferencia_status: transferencia?.status || null,
+      transferencia_descricao: transferencia?.descricao || null,
+      conta_origem: transferencia ? buildContaLabel(contaOrigem) : null,
+      conta_destino: transferencia ? buildContaLabel(contaDestino) : null,
+      tipo_conciliacao: tipoConciliacao,
+      tipo_movimento: movimento?.tipo_movimento || null,
       parceiro: parceiro?.nome || null,
       obra: obra?.nome || null,
       confirmado_em: conciliacao.confirmado_em || null,
@@ -4943,11 +5003,33 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
     };
   });
 
+  const analitico = tipoFiltro === 'TODOS'
+    ? analiticoCompleto
+    : analiticoCompleto.filter((item) => item.tipo_conciliacao === tipoFiltro);
+
+  const sinteticoMap = new Map();
+  analitico.forEach((item) => {
+    const conta = maps.contas.get(Number(item.conta_bancaria_id));
+    const contaResumo = ensureSinteticoConta(sinteticoMap, conta);
+    contaResumo.movimentos += 1;
+    if (item.status === 'CONCILIADO') contaResumo.conciliados += 1;
+    else if (item.status === 'IGNORADO') contaResumo.ignorados += 1;
+    else if (item.status === 'REMOVIDO') contaResumo.removidos += 1;
+    else contaResumo.pendentes += 1;
+  });
+
   const sintetico = Array.from(sinteticoMap.values());
 
   return {
     gerado_em: new Date().toISOString(),
-    filtro: filtroPeriodo,
+    filtro: {
+      ...filtroPeriodo,
+      conta_bancaria_id: filters.conta_bancaria_id || null,
+      status: statusFiltro,
+      tipo_conciliacao: tipoFiltro,
+      natureza: naturezaFiltro,
+      busca: busca || null
+    },
     resumo: {
       contas: sintetico.length,
       movimentos: analitico.length,
@@ -4955,6 +5037,7 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
       pendentes: sintetico.reduce((sum, item) => sum + item.pendentes, 0),
       ignorados: sintetico.reduce((sum, item) => sum + item.ignorados, 0),
       removidos: sintetico.reduce((sum, item) => sum + item.removidos, 0),
+      transferencias: analitico.filter((item) => item.tipo_conciliacao === 'TRANSFERENCIA').length,
       valor_total: roundCurrency(analitico.reduce((sum, item) => sum + Math.abs(item.valor), 0))
     },
     sintetico,

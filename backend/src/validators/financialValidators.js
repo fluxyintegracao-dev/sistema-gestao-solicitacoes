@@ -966,6 +966,46 @@ function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   };
 }
 
+function validateFinanceConciliacaoEstornoTransferenciaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['motivo'],
+    'Estorno de conciliacao bancaria por transferencia'
+  );
+
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo do estorno', 255, { required: true })
+  };
+}
+
+function validateFinanceRelatorioConciliacaoQuery(query = {}) {
+  ensureAllowedKeys(
+    query,
+    ['periodo', 'data_inicial', 'data_final', 'conta_bancaria_id', 'status', 'tipo_conciliacao', 'natureza', 'busca'],
+    'Consulta do relatorio de conciliacao bancaria'
+  );
+
+  const dataInicial = parseDateOnly(query.data_inicial, 'Data inicial');
+  const dataFinal = parseDateOnly(query.data_final, 'Data final');
+  if ((dataInicial && !dataFinal) || (!dataInicial && dataFinal)) {
+    throw new ValidationError('Informe data inicial e data final para o filtro personalizado.');
+  }
+  if (dataInicial && dataFinal && dataInicial > dataFinal) {
+    throw new ValidationError('Data inicial nao pode ser maior que a data final.');
+  }
+
+  return {
+    periodo: parseEnum(query.periodo, 'Periodo', ['HOJE', '7_DIAS', '30_DIAS', '90_DIAS', 'MES_ATUAL', 'PROXIMO_MES', 'PERSONALIZADO']),
+    data_inicial: dataInicial,
+    data_final: dataFinal,
+    conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
+    status: parseEnum(query.status, 'Status', ['TODOS', 'CONCILIADO', 'PENDENTE', 'IGNORADO', 'REMOVIDO']),
+    tipo_conciliacao: parseEnum(query.tipo_conciliacao, 'Tipo de conciliacao', ['TODOS', 'TRANSFERENCIA', 'TITULO', 'FATURA_CARTAO', 'TARIFA', 'MOVIMENTO', 'SEM_VINCULO']),
+    natureza: parseEnum(query.natureza, 'Natureza', ['TODAS', 'ENTRADA', 'SAIDA']),
+    busca: parseOptionalText(query.busca, 'Busca', 120)
+  };
+}
+
 function validateFinanceConciliacaoTarifaBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1948,6 +1988,7 @@ module.exports = {
   validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
+  validateFinanceConciliacaoEstornoTransferenciaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
@@ -1973,6 +2014,7 @@ module.exports = {
   validateFinanceiroObrasQuery,
   validateFinanceIntercompanyQuery,
   validateFinanceRelatorioAnaliticoQuery,
+  validateFinanceRelatorioConciliacaoQuery,
   validateFinanceTituloBaixaBody,
   validateFinanceTituloBaixaParceladaBody,
   validateFinanceTituloBaixaConciliacoesBody,
