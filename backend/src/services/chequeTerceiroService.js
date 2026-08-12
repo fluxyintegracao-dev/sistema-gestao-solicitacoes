@@ -25,6 +25,7 @@ const {
 } = require('./tituloFinanceiroService');
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
 
 const STATUS_CHEQUE = ['EM_CARTEIRA', 'RESERVADO', 'UTILIZADO', 'DEPOSITADO', 'DEVOLVIDO', 'CANCELADO'];
 const EVENTOS_MANUAIS = {
@@ -101,6 +102,16 @@ async function empresaAtiva(id, transaction) {
   return empresa;
 }
 
+async function pessoaAtiva(id, label, transaction) {
+  if (!id) return null;
+  const pessoa = await Parceiro.findOne({
+    where: { id: Number(id), ativo: true },
+    transaction
+  });
+  if (!pessoa) throw httpError(400, `${label} nao encontrado ou inativo.`);
+  return pessoa;
+}
+
 async function validarDuplicidadeCheque(payload, transaction, excludeId = null) {
   const where = {
     empresa_id: Number(payload.empresa_id),
@@ -139,11 +150,14 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
   const ownTransaction = !options.transaction;
   try {
     const empresa = await empresaAtiva(payload.empresa_id, transaction);
+    const titularParceiro = await pessoaAtiva(payload.titular_parceiro_id, 'Titular', transaction);
+    const clienteOrigem = await pessoaAtiva(payload.parceiro_entregou_id, 'Cliente/origem', transaction);
     const valor = round(payload.valor);
+    const titularNome = titularParceiro?.nome || texto(payload.titular_nome, 180);
+    const titularDocumento = titularParceiro?.cpf_cnpj || normalizarCpfCnpj(payload.titular_documento);
     if (valor <= 0) throw httpError(400, 'Valor do cheque deve ser maior que zero.');
     if (!texto(payload.numero_cheque)) throw httpError(400, 'Numero do cheque e obrigatorio.');
-    if (!texto(payload.titular_nome)) throw httpError(400, 'Titular do cheque e obrigatorio.');
-    const titularDocumento = normalizarCpfCnpj(payload.titular_documento);
+    if (!titularNome) throw httpError(400, 'Titular do cheque e obrigatorio.');
     if (titularDocumento && !isValidCpfCnpj(titularDocumento)) {
       throw httpError(400, 'CPF/CNPJ do titular invalido.');
     }
@@ -172,9 +186,10 @@ async function criarChequeSaldoInicial(req, payload, options = {}) {
       codigo: codigoCheque(),
       empresa_id: empresa.id,
       obra_origem_id: obra?.id || null,
-      parceiro_entregou_id: payload.parceiro_entregou_id || null,
-      cliente_nome: texto(payload.cliente_nome, 180),
-      titular_nome: texto(payload.titular_nome, 180),
+      parceiro_entregou_id: clienteOrigem?.id || null,
+      titular_parceiro_id: titularParceiro?.id || null,
+      cliente_nome: clienteOrigem?.nome || texto(payload.cliente_nome, 180),
+      titular_nome: titularNome,
       titular_documento: titularDocumento || null,
       banco: texto(payload.banco, 80),
       agencia: texto(payload.agencia, 30),
@@ -232,7 +247,8 @@ async function listarCheques(req, filters = {}) {
     include: [
       { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome'] },
       { model: Obra, as: 'obraOrigem', attributes: ['id', 'codigo', 'nome'], required: false },
-      { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false }
+      { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
+      { model: Parceiro, as: 'titularParceiro', attributes: ['id', 'nome', 'cpf_cnpj'], required: false }
     ],
     order: [['data_vencimento', 'ASC'], ['id', 'ASC']],
     limit
@@ -251,6 +267,7 @@ async function obterCheque(id) {
       { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome'] },
       { model: Obra, as: 'obraOrigem', attributes: ['id', 'codigo', 'nome'], required: false },
       { model: Parceiro, as: 'parceiroEntregou', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
+      { model: Parceiro, as: 'titularParceiro', attributes: ['id', 'nome', 'cpf_cnpj'], required: false },
       { model: ChequeTerceiroMovimento, as: 'historico', separate: true, order: [['id', 'DESC']] }
     ]
   });
@@ -454,6 +471,14 @@ function normalizarComponentes(payload) {
       conta_bancaria_id: Number(item.conta_bancaria_id) || null,
       cartao_id: Number(item.cartao_id) || null,
       cheque_terceiro_id: Number(item.cheque_terceiro_id) || null,
+      cheque_numero: texto(item.cheque_numero, 60),
+      cheque_emitente: texto(item.cheque_emitente, 160),
+      cheque_titular_documento: texto(item.cheque_titular_documento || item.titular_documento, 40),
+      cheque_banco: texto(item.cheque_banco, 120),
+      cheque_agencia: texto(item.cheque_agencia, 40),
+      cheque_conta: texto(item.cheque_conta, 60),
+      cheque_data_emissao: dataOnly(item.cheque_data_emissao || item.data_emissao),
+      cheque_data_vencimento: dataOnly(item.cheque_data_vencimento || item.data_vencimento),
       valor,
       juros,
       multa,
@@ -516,6 +541,9 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
     if (exigeConta && !conta) throw httpError(400, `Informe a conta financeira na operacao ${item.ordem}.`);
     const cartao = item.cartao_id ? cartaoMap.get(item.cartao_id) : null;
     if (tipo === 'CARTAO' && !cartao) throw httpError(400, `Informe um cartao ativo na operacao ${item.ordem}.`);
+    if (tipo === 'CHEQUE' && !chequeTerceiro && (!item.cheque_numero || !item.cheque_emitente)) {
+      throw httpError(400, `Informe numero e emitente do cheque na operacao ${item.ordem}.`);
+    }
 
     let cheque = null;
     if (chequeTerceiro) {
@@ -650,6 +678,14 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
         desconto: item.desconto,
         valor_quitacao: round(item.valor + item.juros + item.multa - item.desconto),
         documento_referencia: texto(item.documento_referencia, 120),
+        cheque_numero: item.cheque_terceiro_id ? null : item.cheque_numero,
+        cheque_emitente: item.cheque_terceiro_id ? null : item.cheque_emitente,
+        cheque_titular_documento: item.cheque_terceiro_id ? null : item.cheque_titular_documento,
+        cheque_banco: item.cheque_terceiro_id ? null : item.cheque_banco,
+        cheque_agencia: item.cheque_terceiro_id ? null : item.cheque_agencia,
+        cheque_conta: item.cheque_terceiro_id ? null : item.cheque_conta,
+        cheque_data_emissao: item.cheque_terceiro_id ? null : item.cheque_data_emissao,
+        cheque_data_vencimento: item.cheque_terceiro_id ? null : item.cheque_data_vencimento,
         observacoes: texto(item.observacoes, 4000)
       }, { transaction });
       const alocacoes = validacao.alocacoes.filter((alocacao) => alocacao.componente_index === componentIndex);
@@ -669,6 +705,14 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
           desconto: 0,
           data_movimento: validacao.data_movimento,
           documento_referencia: item.documento_referencia,
+          cheque_numero: item.cheque_numero,
+          cheque_emitente: item.cheque_emitente,
+          titular_documento: item.cheque_titular_documento,
+          cheque_banco: item.cheque_banco,
+          cheque_agencia: item.cheque_agencia,
+          cheque_conta: item.cheque_conta,
+          data_emissao: item.cheque_data_emissao,
+          data_vencimento: item.cheque_data_vencimento,
           observacoes: item.observacoes || `Componente ${item.ordem} da baixa composta ${grupo.codigo}.`,
           intercompany,
           natureza_intercompany_baixa: item.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO',
@@ -769,6 +813,7 @@ async function listarBaixasCompostas(filters = {}) {
 
 async function estornarBaixaComposta(req, id, payload = {}) {
   const transaction = await sequelize.transaction();
+  let conciliacoesReabertas = [];
   try {
     const motivoEstorno = texto(payload.motivo || payload.observacoes, 4000);
     if (!motivoEstorno) throw httpError(400, 'Justificativa do estorno e obrigatoria.');
@@ -822,9 +867,23 @@ async function estornarBaixaComposta(req, id, payload = {}) {
         criado_por: req.user?.id || null
       }, transaction);
     }
+    conciliacoesReabertas = await reabrirConciliacoesPorMovimentos({
+      movimentoIds,
+      usuarioId: req.user?.id || null,
+      transaction
+    });
     await grupo.update({ status: 'ESTORNADO', estornado_por: req.user?.id || null, estornado_em: new Date(), observacoes: [grupo.observacoes, `Estorno: ${motivoEstorno}`].filter(Boolean).join('\n') }, { transaction });
     await transaction.commit();
-    await registrarEventoSeguranca({ req, usuarioId: req.user?.id || null, tipoEvento: 'FINANCIAL_COMPOSED_SETTLEMENT_REVERSED', recursoTipo: 'BAIXA_FINANCEIRA_GRUPO', recursoId: grupo.id, status: 'SUCCESS', descricao: 'Baixa composta estornada' });
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_COMPOSED_SETTLEMENT_REVERSED',
+      recursoTipo: 'BAIXA_FINANCEIRA_GRUPO',
+      recursoId: grupo.id,
+      status: 'SUCCESS',
+      descricao: 'Baixa composta estornada',
+      metadata: { conciliacoes_reabertas: conciliacoesReabertas }
+    });
     return obterBaixaComposta(grupo.id);
   } catch (error) {
     await transaction.rollback();

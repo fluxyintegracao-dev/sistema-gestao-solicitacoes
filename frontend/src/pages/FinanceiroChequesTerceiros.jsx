@@ -9,7 +9,7 @@ import {
   HiOutlinePlus,
   HiOutlineXMark
 } from 'react-icons/hi2';
-import TitularChequeAutocomplete from '../components/financeiro/TitularChequeAutocomplete';
+import PessoaChequeAutocomplete from '../components/financeiro/PessoaChequeAutocomplete';
 import { useAuth } from '../contexts/AuthContext';
 import {
   baixarModeloChequesTerceiros,
@@ -23,7 +23,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { hasPermissao } from '../utils/acessoProduto';
-import { isValidCpfCnpj, maskCpfCnpj, onlyDigits } from '../utils/formatters';
+import { maskCpfCnpj } from '../utils/formatters';
 
 const STATUS_LABELS = {
   EM_CARTEIRA: 'Em carteira',
@@ -36,8 +36,9 @@ const STATUS_LABELS = {
 
 function createEmptyForm() {
   return {
-  empresa_id: '', numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '',
-  conta: '', valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10), cliente_nome: '',
+  empresa_id: '', numero_cheque: '', titular_parceiro_id: '', titular_nome: '', titular_documento: '',
+  parceiro_entregou_id: '', cliente_nome: '', cliente_documento: '', banco: '', agencia: '', conta: '',
+  valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10),
   motivo_origem: 'Saldo inicial sem lastro de obra identificado', observacoes: ''
   };
 }
@@ -83,7 +84,6 @@ export default function FinanceiroChequesTerceiros() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [form, setForm] = useState(createEmptyForm);
-  const [documentError, setDocumentError] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [importRows, setImportRows] = useState([]);
@@ -121,14 +121,14 @@ export default function FinanceiroChequesTerceiros() {
 
   async function submitCreate(event) {
     event.preventDefault();
-    const titularDocumento = onlyDigits(form.titular_documento);
-    if (titularDocumento && !isValidCpfCnpj(titularDocumento)) {
-      setDocumentError('Informe um CPF ou CNPJ válido.');
+    if (!form.titular_parceiro_id) {
+      setError('Selecione o titular na pesquisa de pessoas cadastradas.');
       return;
     }
-    setDocumentError(''); setSaving(true); setError('');
+    setSaving(true); setError('');
     try {
-      await criarChequeTerceiro({ ...form, titular_documento: titularDocumento || null, valor: Number(String(form.valor).replace(',', '.')) });
+      const { cliente_documento: _clienteDocumento, ...payload } = form;
+      await criarChequeTerceiro({ ...payload, valor: Number(String(form.valor).replace(',', '.')) });
       setCreateOpen(false); setForm(createEmptyForm()); await load();
     } catch (err) { setError(err.message || 'Erro ao cadastrar cheque.'); }
     finally { setSaving(false); }
@@ -185,7 +185,7 @@ export default function FinanceiroChequesTerceiros() {
         <div><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Financeiro · Custódia</p><h1 className="text-2xl font-bold text-[var(--c-text)]">Cheques de terceiros</h1><p className="text-sm text-[var(--c-muted)]">Controle físico e auditável sem transformar cheques em contas bancárias fictícias.</p></div>
         <div className="flex flex-wrap gap-2">
           {canImport ? <button className="btn btn-outline btn-sm" type="button" onClick={() => setImportOpen(true)}><HiOutlineArrowUpTray className="h-4 w-4" /> Importar</button> : null}
-          {canCreate ? <button className="btn btn-primary btn-sm" type="button" onClick={() => { setDocumentError(''); setCreateOpen(true); }}><HiOutlinePlus className="h-4 w-4" /> Cadastrar cheque</button> : null}
+          {canCreate ? <button className="btn btn-primary btn-sm" type="button" onClick={() => setCreateOpen(true)}><HiOutlinePlus className="h-4 w-4" /> Cadastrar cheque</button> : null}
         </div>
       </header>
 
@@ -220,7 +220,7 @@ export default function FinanceiroChequesTerceiros() {
         <Modal
           title="Cadastrar cheque de terceiro"
           subtitle="Entrada de saldo inicial legado. Não cria título nem receita."
-          onClose={() => { setDocumentError(''); setCreateOpen(false); }}
+          onClose={() => setCreateOpen(false)}
         >
           <form className="grid gap-3 sm:grid-cols-2" onSubmit={submitCreate}>
             {[
@@ -239,24 +239,40 @@ export default function FinanceiroChequesTerceiros() {
               </label>
             ))}
 
-            <TitularChequeAutocomplete
-              nameValue={form.titular_nome}
-              documentValue={form.titular_documento}
-              documentError={documentError}
-              onNameChange={(value) => setForm((current) => ({ ...current, titular_nome: value }))}
-              onDocumentChange={(value) => {
-                setForm((current) => ({ ...current, titular_documento: value }));
-                if (documentError) setDocumentError(value && !isValidCpfCnpj(value) ? 'Informe um CPF ou CNPJ válido.' : '');
-              }}
-              onDocumentBlur={() => setDocumentError(form.titular_documento && !isValidCpfCnpj(form.titular_documento) ? 'Informe um CPF ou CNPJ válido.' : '')}
+            <PessoaChequeAutocomplete
+              label="Titular (nome ou CPF/CNPJ)"
+              required
+              selected={form.titular_parceiro_id ? {
+                id: form.titular_parceiro_id,
+                nome: form.titular_nome,
+                cpf_cnpj: form.titular_documento
+              } : null}
+              createButtonLabel="Cadastrar titular"
               onSelect={(partner) => {
                 setForm((current) => ({
                   ...current,
+                  titular_parceiro_id: partner?.id || '',
                   titular_nome: partner?.nome || '',
-                  titular_documento: partner?.cpf_cnpj ? maskCpfCnpj(partner.cpf_cnpj) : ''
+                  titular_documento: partner?.cpf_cnpj || ''
                 }));
-                setDocumentError('');
               }}
+            />
+
+            <PessoaChequeAutocomplete
+              label="Cliente/origem informada"
+              selected={form.parceiro_entregou_id ? {
+                id: form.parceiro_entregou_id,
+                nome: form.cliente_nome,
+                cpf_cnpj: form.cliente_documento
+              } : null}
+              createButtonLabel="Cadastrar cliente/origem"
+              helperText="Campo opcional. Pesquise qualquer pessoa ativa ou faça um cadastro rápido como cliente."
+              onSelect={(partner) => setForm((current) => ({
+                ...current,
+                parceiro_entregou_id: partner?.id || '',
+                cliente_nome: partner?.nome || '',
+                cliente_documento: partner?.cpf_cnpj || ''
+              }))}
             />
 
             {[
@@ -265,8 +281,7 @@ export default function FinanceiroChequesTerceiros() {
               ['conta', 'Conta', 'text'],
               ['valor', 'Valor', 'number', true],
               ['data_vencimento', 'Data de vencimento', 'date', true],
-              ['data_entrada', 'Data de entrada', 'date', true],
-              ['cliente_nome', 'Cliente/origem informada', 'text']
+              ['data_entrada', 'Data de entrada', 'date', true]
             ].map(([key, label, type, required]) => (
               <label className="form-control" key={key}>
                 <span>{label}{required ? ' *' : ''}</span>
@@ -297,8 +312,8 @@ export default function FinanceiroChequesTerceiros() {
               <textarea className="textarea" value={form.observacoes} onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))} />
             </label>
             <div className="flex justify-end gap-2 sm:col-span-2">
-              <button type="button" className="btn btn-outline" onClick={() => { setDocumentError(''); setCreateOpen(false); }}>Cancelar</button>
-              <button className="btn btn-primary" disabled={saving || Boolean(documentError)}>Salvar cheque</button>
+              <button type="button" className="btn btn-outline" onClick={() => setCreateOpen(false)}>Cancelar</button>
+              <button className="btn btn-primary" disabled={saving || !form.titular_parceiro_id}>Salvar cheque</button>
             </div>
           </form>
         </Modal>
@@ -306,7 +321,7 @@ export default function FinanceiroChequesTerceiros() {
 
       {importOpen ? <Modal wide title="Importar cheques" subtitle="Revise as linhas antes de confirmar. A operação é atômica e auditada." onClose={() => { setImportOpen(false); setImportRows([]); }}><div className="mb-4 flex flex-wrap gap-2"><button type="button" className="btn btn-outline" onClick={downloadModel}><HiOutlineArrowDownTray className="h-4 w-4" /> Baixar modelo</button><label className="btn btn-primary cursor-pointer"><HiOutlineArrowUpTray className="h-4 w-4" /> Selecionar XLSX<input type="file" className="hidden" accept=".xlsx" onChange={(e) => importFile(e.target.files?.[0])} /></label><button type="button" className="btn btn-outline" onClick={() => setImportRows((rows) => [...rows, { linha: `Nova ${rows.length + 1}`, empresa_id: empresas[0]?.id || '', empresa_codigo: empresas[0]?.codigo || '', numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '', conta: '', valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10), motivo_origem: 'Saldo inicial sem lastro de obra identificado', erros: [], valido: true }])}><HiOutlinePlus /> Adicionar linha</button></div>{importRows.length ? <><div className="max-h-[52vh] overflow-auto rounded-xl border border-[var(--c-border)]"><table className="table min-w-[1200px]"><thead><tr><th>Linha</th><th>Empresa</th><th>Número</th><th>Titular</th><th>Banco</th><th>Valor</th><th>Vencimento</th><th>Validação</th><th /></tr></thead><tbody>{importRows.map((row, index) => <tr key={`${row.linha}-${index}`}><td>{row.linha}</td><td><select className="select select-sm min-w-44" value={row.empresa_id || ''} onChange={(e) => { const empresa = empresas.find((item) => Number(item.id) === Number(e.target.value)); setImportRows((rows) => rows.map((item, i) => i === index ? { ...item, empresa_id: empresa?.id || '', empresa_codigo: empresa?.codigo || '', erros: [], valido: true } : item)); }}><option value="">Selecione</option>{empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></td><td><input className="input input-sm min-w-32" value={row.numero_cheque || ''} onChange={(e) => updateImportRow(index, 'numero_cheque', e.target.value)} /></td><td><input className="input input-sm min-w-48" value={row.titular_nome || ''} onChange={(e) => updateImportRow(index, 'titular_nome', e.target.value)} /></td><td><input className="input input-sm min-w-32" value={row.banco || ''} onChange={(e) => updateImportRow(index, 'banco', e.target.value)} /></td><td><input className="input input-sm w-28" type="number" step="0.01" value={row.valor || ''} onChange={(e) => updateImportRow(index, 'valor', e.target.value)} /></td><td><input className="input input-sm" type="date" value={row.data_vencimento || ''} onChange={(e) => updateImportRow(index, 'data_vencimento', e.target.value)} /></td><td className={row.valido ? 'text-emerald-700' : 'text-rose-700'}>{row.valido ? 'Válida' : (row.erros || []).join(' ')}</td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => setImportRows((rows) => rows.filter((_, i) => i !== index))}><HiOutlineXMark /></button></td></tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between"><span className="text-sm text-[var(--c-muted)]">{importRows.length} cheque(s) no lote</span><button type="button" className="btn btn-primary" disabled={saving || importRows.some((row) => !row.valido)} onClick={confirmImport}>Confirmar importação</button></div></> : <div className="rounded-xl border border-dashed border-[var(--c-border)] p-8 text-center text-sm text-[var(--c-muted)]">Baixe o modelo, preencha e selecione o arquivo para gerar o preview.</div>}</Modal> : null}
 
-      {selected && !action ? <Modal title={`${selected.codigo} · cheque ${selected.numero_cheque}`} subtitle={`${selected.empresa?.nome || '-'} · ${money(selected.valor)}`} onClose={() => setSelected(null)}><div className="grid gap-3 sm:grid-cols-3"><div><small className="text-[var(--c-muted)]">Status</small><div className="mt-1"><StatusBadge status={selected.status} /></div></div><div><small className="text-[var(--c-muted)]">Titular</small><strong className="block">{selected.titular_nome}</strong></div><div><small className="text-[var(--c-muted)]">Vencimento</small><strong className="block">{dateBr(selected.data_vencimento)}</strong></div></div>{selected.status === 'EM_CARTEIRA' ? <div className="mt-5 flex flex-wrap gap-2">{canDeposit ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEPOSITAR')}><HiOutlineBanknotes /> Depositar</button> : null}{canTransfer ? <button className="btn btn-outline btn-sm" onClick={() => setAction('TRANSFERIR')}><HiOutlineArrowRight /> Transferir</button> : null}{canReturn ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEVOLVER')}>Devolver</button> : null}{canCancel ? <button className="btn btn-outline btn-sm text-rose-700" onClick={() => setAction('CANCELAR')}>Cancelar</button> : null}</div> : null}<h3 className="mt-6 font-semibold">Histórico</h3><div className="mt-2 space-y-2">{(selected.historico || []).map((item) => <div key={item.id} className="rounded-xl border border-[var(--c-border)] p-3 text-sm"><div className="flex justify-between gap-3"><strong>{item.tipo_evento}</strong><span>{dateBr(item.data_evento)}</span></div><p className="mt-1 text-[var(--c-muted)]">{item.observacoes || `${item.status_anterior || '-'} → ${item.status_novo}`}</p></div>)}</div></Modal> : null}
+      {selected && !action ? <Modal title={`${selected.codigo} · cheque ${selected.numero_cheque}`} subtitle={`${selected.empresa?.nome || '-'} · ${money(selected.valor)}`} onClose={() => setSelected(null)}><div className="grid gap-3 sm:grid-cols-4"><div><small className="text-[var(--c-muted)]">Status</small><div className="mt-1"><StatusBadge status={selected.status} /></div></div><div><small className="text-[var(--c-muted)]">Titular</small><strong className="block">{selected.titularParceiro?.nome || selected.titular_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Cliente/origem</small><strong className="block">{selected.parceiroEntregou?.nome || selected.cliente_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Vencimento</small><strong className="block">{dateBr(selected.data_vencimento)}</strong></div></div>{selected.status === 'EM_CARTEIRA' ? <div className="mt-5 flex flex-wrap gap-2">{canDeposit ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEPOSITAR')}><HiOutlineBanknotes /> Depositar</button> : null}{canTransfer ? <button className="btn btn-outline btn-sm" onClick={() => setAction('TRANSFERIR')}><HiOutlineArrowRight /> Transferir</button> : null}{canReturn ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEVOLVER')}>Devolver</button> : null}{canCancel ? <button className="btn btn-outline btn-sm text-rose-700" onClick={() => setAction('CANCELAR')}>Cancelar</button> : null}</div> : null}<h3 className="mt-6 font-semibold">Histórico</h3><div className="mt-2 space-y-2">{(selected.historico || []).map((item) => <div key={item.id} className="rounded-xl border border-[var(--c-border)] p-3 text-sm"><div className="flex justify-between gap-3"><strong>{item.tipo_evento}</strong><span>{dateBr(item.data_evento)}</span></div><p className="mt-1 text-[var(--c-muted)]">{item.observacoes || `${item.status_anterior || '-'} → ${item.status_novo}`}</p></div>)}</div></Modal> : null}
 
       {selected && action ? <Modal title={actionLabels[action]} subtitle={`${selected.codigo} · ${money(selected.valor)}`} onClose={() => setAction(null)}><form className="space-y-3" onSubmit={submitAction}>{action === 'DEPOSITAR' ? <label className="form-control"><span>Conta de destino *</span><select className="select" required value={actionForm.conta_bancaria_id} onChange={(e) => setActionForm((v) => ({ ...v, conta_bancaria_id: e.target.value }))}><option value="">Selecione</option>{contasEmpresaAcao.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}{action === 'TRANSFERIR' ? <label className="form-control"><span>Empresa de destino *</span><select className="select" required value={actionForm.empresa_destino_id} onChange={(e) => setActionForm((v) => ({ ...v, empresa_destino_id: e.target.value }))}><option value="">Selecione</option>{empresas.filter((item) => Number(item.id) !== Number(selected.empresa_id)).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label> : null}<label className="form-control"><span>Data *</span><input type="date" className="input" required value={actionForm.data_evento} onChange={(e) => setActionForm((v) => ({ ...v, data_evento: e.target.value }))} /></label><label className="form-control"><span>Justificativa / observação *</span><textarea className="textarea" required value={actionForm.observacoes} onChange={(e) => setActionForm((v) => ({ ...v, observacoes: e.target.value }))} /></label><div className="flex justify-end gap-2"><button type="button" className="btn btn-outline" onClick={() => setAction(null)}>Voltar</button><button className="btn btn-primary" disabled={saving}>Confirmar</button></div></form></Modal> : null}
     </div>

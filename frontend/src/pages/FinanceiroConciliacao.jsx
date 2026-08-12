@@ -4,6 +4,7 @@ import {
   baixarTituloPorConciliacoes,
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
+  corrigirContaConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
   confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
@@ -716,24 +717,136 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
+function CorrigirContaConciliacaoModal({ item, contas, onClose, onConfirmar }) {
+  const contasDisponiveis = contas.filter((conta) => (
+    conta.ativo !== false && String(conta.id) !== String(item?.conta_bancaria_id)
+  ));
+  const [contaBancariaId, setContaBancariaId] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (saving) return;
+    if (!contaBancariaId) {
+      setError('Selecione a conta bancaria correta.');
+      return;
+    }
+    if (motivo.trim().length < 10) {
+      setError('Informe uma justificativa com pelo menos 10 caracteres.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError('');
+      await onConfirmar(item.id, {
+        conta_bancaria_id: Number(contaBancariaId),
+        motivo: motivo.trim()
+      });
+    } catch (err) {
+      setError(err?.message || 'Erro ao corrigir conta da conciliacao.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[1px]" role="dialog" aria-modal="true" aria-labelledby="corrigir-conta-title">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 id="corrigir-conta-title" className="text-base font-semibold text-[var(--c-text)]">Corrigir conta do extrato</h2>
+            <p className="mt-1 text-xs text-[var(--c-muted)]">
+              O lancamento permanecera pendente para ser conciliado novamente na conta correta.
+            </p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={onClose} disabled={saving} aria-label="Fechar">Fechar</button>
+        </div>
+
+        <form className="space-y-4 p-5" onSubmit={handleSubmit}>
+          <div className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 text-sm sm:grid-cols-2">
+            <div>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Lancamento</span>
+              <span className="font-medium text-[var(--c-text)]">{item?.descricao_banco || `Conciliacao #${item?.id}`}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Conta atual</span>
+              <span className="font-medium text-[var(--c-text)]">{item?.conta_bancaria_nome || '-'}</span>
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="app-filter-label">Conta bancaria correta *</span>
+            <select className="input mt-1 w-full" value={contaBancariaId} onChange={(event) => setContaBancariaId(event.target.value)} disabled={saving}>
+              <option value="">Selecione</option>
+              {contasDisponiveis.map((conta) => (
+                <option key={conta.id} value={conta.id}>
+                  {getContaNome(conta)} · {getContaEmpresaNome(conta)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="app-filter-label">Justificativa da correcao *</span>
+            <textarea
+              className="input mt-1 min-h-24 w-full resize-y"
+              maxLength={255}
+              value={motivo}
+              onChange={(event) => setMotivo(event.target.value)}
+              placeholder="Ex.: OFX importado e conciliado na conta bancaria incorreta."
+              disabled={saving}
+            />
+            <span className="mt-1 block text-[10px] text-[var(--c-muted)]">A justificativa e as contas anterior e nova ficarao registradas na auditoria.</span>
+          </label>
+
+          {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">{error}</div>}
+
+          <div className="flex justify-end gap-2 border-t border-[var(--c-border)] pt-4">
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || !contasDisponiveis.length}>
+              {saving ? 'Salvando...' : 'Corrigir e manter pendente'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onCorrigirConta, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
+  const movimentosPreparados = Array.isArray(associacaoPreparada?.movimentos)
+    ? associacaoPreparada.movimentos
+    : [];
+  const movimentosPreparadosIds = Array.isArray(associacaoPreparada?.movimentoIds)
+    ? associacaoPreparada.movimentoIds.map(Number).filter(Boolean)
+    : [];
+  const temAssociacaoPreparada = isPendente && movimentosPreparadosIds.length > 0;
 
   // Melhor sugestão: prioriza a sugestão automática marcada pelo backend
-  const topSugestao = isPendente
+  const topSugestao = isPendente && !temAssociacaoPreparada && !item.associacao_manual_recomendada
     ? (item.sugestoes?.find((s) => s.movimento_financeiro_id === item.sugestao_automatica?.movimento_financeiro_id) || item.sugestoes?.[0])
     : null;
-  const outrasSugestoes = isPendente && item.sugestoes?.length > 1
+  const outrasSugestoes = isPendente && !temAssociacaoPreparada && !item.associacao_manual_recomendada && item.sugestoes?.length > 1
     ? item.sugestoes.filter((s) => s.movimento_financeiro_id !== topSugestao?.movimento_financeiro_id)
     : [];
 
-  const pidConfirmar = topSugestao ? `confirmar-${item.id}-${topSugestao.movimento_financeiro_id}` : null;
+  const movimentoIdsConfirmacao = temAssociacaoPreparada
+    ? movimentosPreparadosIds
+    : (topSugestao ? [Number(topSugestao.movimento_financeiro_id)] : []);
+  const pidConfirmar = movimentoIdsConfirmacao.length
+    ? `confirmar-${item.id}-${movimentoIdsConfirmacao.join('-')}`
+    : null;
   const isConfirmando = processingId === pidConfirmar;
   const isIgnorando = processingId === `ignorar-${item.id}`;
   const isRemovendo = processingId === `remover-${item.id}`;
-  const podeConfirmar = isPendente && Boolean(topSugestao) && !isConfirmando;
+  const isCorrigindoConta = processingId === `corrigir-conta-${item.id}`;
+  const podeConfirmar = isPendente && movimentoIdsConfirmacao.length > 0 && !isConfirmando;
 
   return (
     <div className="sol-surface-card card overflow-hidden rounded-lg border border-[var(--c-border)]">
@@ -782,6 +895,14 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
+                className="text-[10px] font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 leading-tight dark:text-blue-300 dark:hover:text-blue-200"
+                disabled={isIgnorando || isRemovendo || isCorrigindoConta}
+                onClick={() => onCorrigirConta(item)}
+              >
+                Corrigir conta
+              </button>
+              <button
+                type="button"
                 className="text-[10px] text-slate-400 hover:text-amber-600 underline underline-offset-2 leading-tight"
                 disabled={isIgnorando || isRemovendo}
                 onClick={() => onIgnorar(item.id)}
@@ -806,9 +927,14 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
             <button
               type="button"
               disabled={!podeConfirmar}
-              onClick={() => topSugestao && onConfirmar(item.id, topSugestao.movimento_financeiro_id)}
+              onClick={() => podeConfirmar && onConfirmar(
+                item.id,
+                temAssociacaoPreparada ? movimentoIdsConfirmacao : movimentoIdsConfirmacao[0]
+              )}
               className={`btn btn-sm text-[11px] font-semibold tracking-wide transition-all ${podeConfirmar ? 'btn-primary' : 'btn-outline text-[var(--c-muted)] cursor-not-allowed opacity-40'}`}
-              title={podeConfirmar ? 'Confirmar sugestão principal' : 'Sem lançamento equivalente encontrado'}
+              title={podeConfirmar
+                ? (temAssociacaoPreparada ? 'Confirmar associação manual preparada' : 'Confirmar sugestão principal')
+                : 'Sem lançamento equivalente encontrado'}
             >
               {isConfirmando ? '...' : 'Conciliar'}
             </button>
@@ -869,6 +995,38 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
             <div className="flex flex-1 items-center justify-center py-1">
               <p className="text-[10px] text-[var(--c-muted)]">{statusLabel(item.status)}</p>
             </div>
+          ) : temAssociacaoPreparada ? (
+            <div className="flex flex-col gap-1 flex-1">
+              <div className="flex-1 rounded border border-blue-300 bg-blue-50 px-2 py-1.5 dark:border-blue-700 dark:bg-blue-950/30">
+                <p className="text-[9px] font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                  Associação manual preparada
+                </p>
+                <p className="font-semibold text-[11px] text-[var(--c-text)] leading-tight">
+                  {movimentosPreparados.length === 1
+                    ? movimentosPreparados[0]?.titulo_descricao
+                    : `${movimentosPreparados.length} movimentos selecionados`}
+                </p>
+                {movimentosPreparados.length === 1 ? (
+                  <>
+                    <p className="text-[10px] text-[var(--c-muted)] leading-tight">
+                      {movimentosPreparados[0]?.parceiro_nome}
+                      {movimentosPreparados[0]?.documento ? ` · Doc. ${movimentosPreparados[0].documento}` : ''}
+                    </p>
+                    <p className="text-[10px] text-[var(--c-muted)] leading-tight">
+                      {formatDate(movimentosPreparados[0]?.data_movimento)} · mov. #{movimentosPreparados[0]?.movimento_financeiro_id}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[10px] text-[var(--c-muted)] leading-tight">
+                    Movimentos #{movimentosPreparadosIds.join(', #')}
+                  </p>
+                )}
+                <ValorBanco value={associacaoPreparada?.total} size="sm" />
+                <p className="mt-1 text-[10px] font-medium text-blue-700 dark:text-blue-300">
+                  Clique em Conciliar para confirmar.
+                </p>
+              </div>
+            </div>
           ) : topSugestao ? (
             <div className="flex flex-col gap-1 flex-1">
               <div className="flex-1 rounded border border-[var(--c-border)] bg-[var(--c-bg)] px-2 py-1.5">
@@ -911,7 +1069,11 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
             </div>
           ) : (
             <div className="flex flex-1 flex-col items-center justify-center rounded border border-dashed border-[var(--c-border)] py-2 text-center">
-              <p className="text-[10px] text-[var(--c-muted)]">Nenhum lançamento equivalente encontrado</p>
+              <p className="text-[10px] text-[var(--c-muted)]">
+                {item.associacao_manual_recomendada
+                  ? 'Mais de um título coincide. Use Associar manualmente.'
+                  : 'Nenhum lançamento equivalente encontrado'}
+              </p>
             </div>
           )}
           {isPendente && <div className="h-[18px]" />}
@@ -1282,6 +1444,7 @@ export default function FinanceiroConciliacao() {
   const [error, setError] = useState('');
   const [feedback, setFeedback] = useState('');
   const [processingId, setProcessingId] = useState(null);
+  const [associacoesPreparadas, setAssociacoesPreparadas] = useState({});
   const tarifaRequestsEmAndamentoRef = useRef(new Set());
   const [acoesRapidasItem, setAcoesRapidasItem] = useState(null);
   const [acoesRapidasError, setAcoesRapidasError] = useState('');
@@ -1310,6 +1473,7 @@ export default function FinanceiroConciliacao() {
   });
   const [conciliacoesSelecionadas, setConciliacoesSelecionadas] = useState([]);
   const [baixaExtratosModalOpen, setBaixaExtratosModalOpen] = useState(false);
+  const [corrigirContaItem, setCorrigirContaItem] = useState(null);
 
   const contaAtualTransferencia = useMemo(
     () => contas.find((conta) => String(conta.id) === String(transferenciaModal.item?.conta_bancaria_id)),
@@ -1547,6 +1711,11 @@ export default function FinanceiroConciliacao() {
           ? { movimento_financeiro_ids: movimentoIds }
           : { movimento_financeiro_id: movimentoIds[0] }
       );
+      setAssociacoesPreparadas((current) => {
+        const next = { ...current };
+        delete next[Number(conciliacaoId)];
+        return next;
+      });
       setFeedback('Conciliacao confirmada com sucesso.');
       if (fecharModal) setAssociacaoModal((c) => ({ ...c, open: false, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: 30 }, itens: [] } }));
       await carregarConciliacoes();
@@ -1580,6 +1749,23 @@ export default function FinanceiroConciliacao() {
     } catch (err) { setError(err?.message || 'Erro ao remover lancamento do extrato'); } finally { setProcessingId(null); }
   }
 
+  async function handleCorrigirConta(conciliacaoId, payload) {
+    try {
+      setProcessingId(`corrigir-conta-${conciliacaoId}`);
+      setError('');
+      setFeedback('');
+      await corrigirContaConciliacaoBancaria(conciliacaoId, payload);
+      setCorrigirContaItem(null);
+      setFeedback('Conta corrigida. O lancamento permanece pendente para uma nova conciliacao.');
+      await carregarResumoContas();
+      await carregarConciliacoes();
+    } catch (err) {
+      throw err;
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   async function handleConciliarSugeridos() {
     if (!window.confirm('Conciliar em lote todos os lançamentos pendentes do filtro atual que tenham sugestão segura?')) return;
     try {
@@ -1591,18 +1777,47 @@ export default function FinanceiroConciliacao() {
     } catch (err) { setError(err?.message || 'Erro ao conciliar sugestoes em lote'); } finally { setBulkReconciling(false); }
   }
 
-  async function carregarMovimentosAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
+  async function carregarMovimentosAssociacao(conciliacaoId, filtersPayload, { manterAberto = true, selecionadosIniciais = null } = {}) {
     try {
-      setAssociacaoModal((c) => ({ ...c, open: manterAberto, loading: true, error: '', selecionados: [], filters: filtersPayload || c.filters }));
+      setAssociacaoModal((c) => ({
+        ...c,
+        open: manterAberto,
+        loading: true,
+        error: '',
+        selecionados: Array.isArray(selecionadosIniciais) ? selecionadosIniciais : c.selecionados,
+        filters: filtersPayload || c.filters
+      }));
       const response = await getMovimentosAssociacaoConciliacao(conciliacaoId, filtersPayload);
-      setAssociacaoModal((c) => ({ ...c, open: true, loading: false, error: '', selecionados: [], dados: { conciliacao: response?.conciliacao || null, meta: { total: Number(response?.meta?.total || 0), limit: Number(response?.meta?.limit || filtersPayload?.limit || c.filters.limit || 30) }, itens: Array.isArray(response?.itens) ? response.itens : [] } }));
+      setAssociacaoModal((c) => {
+        const itens = Array.isArray(response?.itens) ? response.itens : [];
+        const idsDisponiveis = new Set(itens.map((item) => Number(item.movimento_financeiro_id || 0)));
+        const selecionados = (Array.isArray(selecionadosIniciais) ? selecionadosIniciais : c.selecionados)
+          .map(Number)
+          .filter((id) => id && idsDisponiveis.has(id));
+        return {
+          ...c,
+          open: true,
+          loading: false,
+          error: '',
+          selecionados,
+          dados: {
+            conciliacao: response?.conciliacao || null,
+            meta: {
+              total: Number(response?.meta?.total || 0),
+              limit: Number(response?.meta?.limit || filtersPayload?.limit || c.filters.limit || 30)
+            },
+            itens
+          }
+        };
+      });
     } catch (err) { setAssociacaoModal((c) => ({ ...c, open: true, loading: false, error: err?.message || 'Erro ao buscar movimentos' })); }
   }
 
   async function abrirAssociacaoManual(item) {
     const defaults = buildAssociacaoDefaults(item);
-    setAssociacaoModal({ open: true, item, filters: defaults, loading: true, processing: false, error: '', selecionados: [], dados: { conciliacao: null, meta: { total: 0, limit: defaults.limit }, itens: [] } });
-    await carregarMovimentosAssociacao(item.id, defaults);
+    const selecionadosIniciais = associacoesPreparadas[Number(item.id)]?.movimentoIds || [];
+    setAssociacaoModal({ open: true, item, filters: defaults, loading: true, processing: false, error: '', selecionados: selecionadosIniciais, dados: { conciliacao: null, meta: { total: 0, limit: defaults.limit }, itens: [] } });
+    await carregarMovimentosAssociacao(item.id, defaults, { selecionadosIniciais });
   }
 
   function fecharAssociacaoManual() {
@@ -1641,7 +1856,7 @@ export default function FinanceiroConciliacao() {
     });
   }
 
-  async function handleConfirmarAssociacaoSelecionada() {
+  function handleConfirmarAssociacaoSelecionada() {
     const resumo = buildAssociacaoResumo(associacaoModal);
     if (!associacaoModal.item?.id) return;
     if (!resumo.selecionados.length) {
@@ -1657,7 +1872,20 @@ export default function FinanceiroConciliacao() {
       return;
     }
 
-    await handleConfirmar(associacaoModal.item.id, resumo.selecionados, { fecharModal: true });
+    const movimentos = associacaoModal.dados.itens.filter((item) => (
+      resumo.selecionados.includes(Number(item.movimento_financeiro_id || 0))
+    ));
+    setAssociacoesPreparadas((current) => ({
+      ...current,
+      [Number(associacaoModal.item.id)]: {
+        movimentoIds: resumo.selecionados,
+        movimentos,
+        total: resumo.totalSelecionado
+      }
+    }));
+    setFeedback('Associacao manual preparada. Revise as informacoes e clique em Conciliar para confirmar.');
+    setError('');
+    fecharAssociacaoManual();
   }
 
   async function carregarFaturasAssociacao(conciliacaoId, filtersPayload, { manterAberto = true } = {}) {
@@ -2214,11 +2442,15 @@ export default function FinanceiroConciliacao() {
               ? <div className="app-empty-card sol-surface-card">Nenhum lançamento encontrado com os filtros atuais.</div>
               : dados.itens.map((item) => (
                   <ItemConciliacao
-                    key={item.id} item={item} processingId={processingId}
+                    key={item.id}
+                    item={item}
+                    associacaoPreparada={associacoesPreparadas[Number(item.id)] || null}
+                    processingId={processingId}
                     selected={conciliacoesSelecionadas.includes(Number(item.id))}
                     onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onRemover={handleRemover}
+                    onCorrigirConta={setCorrigirContaItem}
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
@@ -2242,6 +2474,15 @@ export default function FinanceiroConciliacao() {
           itens={conciliacoesSelecionadasItens}
           onClose={() => setBaixaExtratosModalOpen(false)}
           onConfirmar={handleBaixarTituloPorExtratos}
+        />
+      )}
+
+      {corrigirContaItem && (
+        <CorrigirContaConciliacaoModal
+          item={corrigirContaItem}
+          contas={contas}
+          onClose={() => setCorrigirContaItem(null)}
+          onConfirmar={handleCorrigirConta}
         />
       )}
 
@@ -2397,7 +2638,9 @@ export default function FinanceiroConciliacao() {
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] pb-4">
               <div>
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Associação manual</h2>
-                <p className="mt-0.5 text-sm text-[var(--c-muted)]">Escolha o movimento correto quando a sugestão automática não for suficiente.</p>
+                <p className="mt-0.5 text-sm text-[var(--c-muted)]">
+                  Escolha o movimento correto. Esta etapa apenas prepara o match; a gravação acontece ao clicar em Conciliar.
+                </p>
                 {associacaoModal.item && (
                   <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
                     <span className="font-medium">{associacaoModal.item.descricao_banco || 'Lançamento'}</span>
@@ -2486,7 +2729,7 @@ export default function FinanceiroConciliacao() {
                 disabled={associacaoModal.processing || !associacaoResumo.fechou}
                 onClick={handleConfirmarAssociacaoSelecionada}
               >
-                {associacaoModal.processing ? 'Associando...' : 'Associar selecionados'}
+                {associacaoModal.processing ? 'Preparando...' : 'Preparar associação'}
               </button>
             </div>
             <div className="hidden">

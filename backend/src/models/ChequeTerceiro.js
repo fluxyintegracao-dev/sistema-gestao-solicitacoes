@@ -22,6 +22,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    titular_parceiro_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     empresa_id: { type: DataTypes.INTEGER, allowNull: true },
     obra_origem_id: { type: DataTypes.INTEGER, allowNull: true },
     movimento_entrada_id: { type: DataTypes.INTEGER, allowNull: true },

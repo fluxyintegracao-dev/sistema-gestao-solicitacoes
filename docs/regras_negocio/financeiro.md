@@ -34,6 +34,9 @@
 - ao estornar uma baixa, o sistema deve recalcular saldo, valor baixado, data de quitacao e status do titulo
 - apos estorno, o titulo pode ser baixado novamente em outra conta bancaria ou com novos valores de juros, multa, desconto e valor de quitacao
 - estorno de baixa deve registrar usuario, data/hora, IP, user agent, motivo e snapshot dos valores anteriores
+- se a baixa estiver vinculada a uma conciliacao OFX, o estorno deve reabrir o lancamento bancario como `PENDENTE` e remover apenas os vinculos ativos com titulo e movimento; o registro importado e a trilha anterior permanecem preservados
+- a conta do lancamento OFX so pode ser corrigida enquanto a conciliacao estiver `PENDENTE`, sem vinculos financeiros ativos e mediante justificativa auditavel
+- depois de corrigir a conta, o usuario deve registrar a nova baixa na conta correta e conciliar novamente; alterar conta diretamente no banco nao faz parte do fluxo operacional
 - conciliacoes, pagamentos bancarios e comprovantes vinculados devem ser revisados para evitar baixa duplicada ou relatorio inconsistente
 
 ## Previsto x Realizado

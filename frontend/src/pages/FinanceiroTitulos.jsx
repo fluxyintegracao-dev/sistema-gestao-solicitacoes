@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
@@ -37,10 +37,30 @@ import { normalizeCurrencyTyping } from '../utils/formatters';
 import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
+import ChequePagamentoFields from '../components/financeiro/ChequePagamentoFields';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
 const COLUMN_ORDER_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnOrder';
+const COLUMN_WIDTH_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnWidths';
+const TABLE_COLUMN_WIDTHS = {
+  Titulo: 190,
+  Status: 110,
+  Tipo: 90,
+  Documento: 140,
+  Credor: 200,
+  Cliente: 200,
+  Obra: 180,
+  Categoria: 180,
+  'Forma pagamento': 170,
+  Origem: 140,
+  Emissao: 110,
+  Vencimento: 120,
+  'Valor total': 130,
+  Saldo: 130,
+  Acoes: 112
+};
 const PAGE_SIZE_OPTIONS = ['25', '50', '100', '150', '200', 'all'];
 const NATUREZAS_INTERCOMPANY_BAIXA = [
   {
@@ -220,7 +240,7 @@ function FinanceiroFilterAutocomplete({
   };
 
   return (
-    <div key={label} className={`${className} relative`}>
+    <div key={label} className={`${className} relative ${open ? 'z-[60]' : 'z-0'}`}>
       <span className="app-filter-label">{label}</span>
       <div className="relative">
         <input
@@ -451,6 +471,12 @@ function getColumnOrderStorageKey(user, fixedTipo = null) {
   const userToken = user?.id || user?.email || 'anonimo';
   const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
   return `${COLUMN_ORDER_STORAGE_PREFIX}.${scope}.${userToken}`;
+}
+
+function getColumnWidthStorageKey(user, fixedTipo = null) {
+  const userToken = user?.id || user?.email || 'anonimo';
+  const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
+  return `${COLUMN_WIDTH_STORAGE_PREFIX}.${scope}.${userToken}`;
 }
 
 function loadColumnOrder(user, fixedTipo, headers) {
@@ -738,6 +764,9 @@ function buildBaixaMassaParcelas(total = 0, quantidade = 2, dataInicial = today(
       cheque_banco: '',
       cheque_agencia: '',
       cheque_conta: '',
+      titular_documento: '',
+      data_emissao: '',
+      data_vencimento: '',
       usar_cheque_terceiro: false,
       cheque_terceiro_id: '',
       observacoes: ''
@@ -764,6 +793,9 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
     cheque_banco: '',
     cheque_agencia: '',
     cheque_conta: '',
+    titular_documento: '',
+    data_emissao: '',
+    data_vencimento: '',
     cheque_terceiro_id: '',
     data_movimento: today(),
     observacoes: '',
@@ -1110,6 +1142,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
     return [...ordered, ...missing];
   }, [baseTableHeaders, columnOrder]);
+  const resizableTableColumns = useMemo(() => [
+    { key: '__select__', width: 48, minWidth: 44 },
+    ...tableHeaders.map((header) => ({
+      key: header,
+      width: TABLE_COLUMN_WIDTHS[header] || 140,
+      minWidth: header === 'Acoes' ? 96 : 80
+    }))
+  ], [tableHeaders]);
+  const columnWidthStorageKey = useMemo(
+    () => getColumnWidthStorageKey(user, fixedTipo),
+    [fixedTipo, user]
+  );
   const totalColunas = 1 + tableHeaders.length;
   const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
   const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
@@ -1681,9 +1725,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       }
     }
 
-    if (!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER') {
+    if (!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro) {
       if (!String(baixaMassaForm.cheque_numero || '').trim() || !String(baixaMassaForm.cheque_emitente || '').trim()) {
-        setError('Para receber em cheque, informe numero e emitente do cheque.');
+        setError('Informe numero e emitente do cheque usado na baixa.');
           return;
       }
     }
@@ -1730,6 +1774,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               cheque_banco: baixaMassaForm.cheque_banco || undefined,
               cheque_agencia: baixaMassaForm.cheque_agencia || undefined,
               cheque_conta: baixaMassaForm.cheque_conta || undefined,
+              titular_documento: baixaMassaForm.titular_documento || undefined,
+              data_emissao: baixaMassaForm.data_emissao || undefined,
+              data_vencimento: baixaMassaForm.data_vencimento || undefined,
               data_movimento: baixaMassaForm.data_movimento,
               observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
             });
@@ -2275,7 +2322,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         />
       )}
 
-      <form className="card sol-surface-card app-toolbar-card" onSubmit={submitFilters}>
+      <form className="card sol-surface-card app-toolbar-card relative z-20 overflow-visible" onSubmit={submitFilters}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -2335,7 +2382,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </div>
 
           <div className={`grid transition-[grid-template-rows] duration-200 ${advancedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-            <div className="overflow-hidden">
+            <div className={advancedOpen ? 'overflow-visible' : 'overflow-hidden'}>
               <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
                 {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
               </div>
@@ -2425,7 +2472,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="relative z-0 grid gap-3 md:grid-cols-4">
         {[
           { label: 'Titulos filtrados', value: String(resumo.quantidade), icon: HiOutlineDocumentText },
           { label: 'Valor total', value: formatCurrency(resumo.total), icon: HiOutlineSparkles },
@@ -2703,10 +2750,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         ) : null}
 
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <ResizableTable
+            columns={resizableTableColumns}
+            storageKey={columnWidthStorageKey}
+            className="text-xs"
+          >
             <thead>
               <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
-                <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap">
+                <ResizableTh
+                  columnKey="__select__"
+                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
+                >
                   <input
                     type="checkbox"
                     className="h-4 w-4 accent-[var(--c-primary)]"
@@ -2715,10 +2769,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                     onChange={(event) => toggleTodosBaixaveis(event.target.checked)}
                     title="Selecionar todos os titulos filtrados baixaveis"
                   />
-                </th>
+                </ResizableTh>
                 {tableHeaders.map((header) => (
-                  <th
+                  <ResizableTh
                     key={header}
+                    columnKey={header}
                     className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
                   >
                     <span className="inline-flex items-center gap-1">
@@ -2744,7 +2799,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         </button>
                       </span>
                     </span>
-                  </th>
+                  </ResizableTh>
                 ))}
               </tr>
             </thead>
@@ -2800,11 +2855,13 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       title={isTituloBaixavel(titulo) ? 'Selecionar titulo para baixa' : 'Somente titulos abertos ou parciais podem ser baixados'}
                     />
                   </td>
-                  {tableHeaders.map((header) => renderTituloCell(titulo, header))}
+                  {tableHeaders.map((header) => (
+                    <Fragment key={header}>{renderTituloCell(titulo, header)}</Fragment>
+                  ))}
                 </tr>
               ))}
             </tbody>
-          </table>
+          </ResizableTable>
         </div>
       </div>
 
@@ -3231,27 +3288,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   </label>
                 ) : null}
 
-                {!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER' ? (
-                  <div className="md:col-span-2 grid gap-2 md:grid-cols-2">
-                    <label className="app-filter-field">
-                      <span className="app-filter-label">Numero do cheque</span>
-                      <input
-                        className="input w-full input-sm"
-                        value={baixaMassaForm.cheque_numero}
-                        onChange={(event) => setBaixaMassaForm((current) => ({ ...current, cheque_numero: event.target.value }))}
-                        required
-                      />
-                    </label>
-                    <label className="app-filter-field">
-                      <span className="app-filter-label">Emitente do cheque</span>
-                      <input
-                        className="input w-full input-sm"
-                        value={baixaMassaForm.cheque_emitente}
-                        onChange={(event) => setBaixaMassaForm((current) => ({ ...current, cheque_emitente: event.target.value }))}
-                        required
-                      />
-                    </label>
-                  </div>
+                {!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro ? (
+                  <ChequePagamentoFields
+                    className="md:col-span-2"
+                    compact
+                    value={baixaMassaForm}
+                    onChange={(field, value) => setBaixaMassaForm((current) => ({ ...current, [field]: value }))}
+                    title={baixaMassaTipoSelecionado === 'RECEBER' ? 'Dados do cheque recebido' : 'Dados do cheque usado no pagamento'}
+                    description={baixaMassaTipoSelecionado === 'RECEBER'
+                      ? 'O cheque sera registrado na carteira de cheques de terceiros ao confirmar a baixa.'
+                      : 'Os dados ficam vinculados ao movimento financeiro de cada titulo selecionado.'}
+                  />
                 ) : null}
 
                 {!baixaMassaParcelada ? (
@@ -3358,52 +3405,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                                   </select>
                                 </label>
                               ) : (
-                                <>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Numero do cheque</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_numero}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_numero', event.target.value)}
-                                      required
-                                    />
-                                  </label>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Emitente do cheque</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_emitente}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_emitente', event.target.value)}
-                                      required
-                                    />
-                                  </label>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Banco</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_banco}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_banco', event.target.value)}
-                                    />
-                                  </label>
-                                  <div className="grid gap-2 sm:grid-cols-2">
-                                    <label className="app-filter-field">
-                                      <span className="app-filter-label">Agencia</span>
-                                      <input
-                                        className="input w-full input-sm"
-                                        value={parcela.cheque_agencia}
-                                        onChange={(event) => updateBaixaMassaParcela(index, 'cheque_agencia', event.target.value)}
-                                      />
-                                    </label>
-                                    <label className="app-filter-field">
-                                      <span className="app-filter-label">Conta</span>
-                                      <input
-                                        className="input w-full input-sm"
-                                        value={parcela.cheque_conta}
-                                        onChange={(event) => updateBaixaMassaParcela(index, 'cheque_conta', event.target.value)}
-                                      />
-                                    </label>
-                                  </div>
-                                </>
+                                <ChequePagamentoFields
+                                  className="md:col-span-2"
+                                  compact
+                                  value={parcela}
+                                  onChange={(field, value) => updateBaixaMassaParcela(index, field, value)}
+                                  title={`Dados do cheque da parcela ${index + 1}`}
+                                  description="Cada parcela deve manter a identificacao do cheque correspondente."
+                                />
                               )}
                             </div>
                           ) : null}

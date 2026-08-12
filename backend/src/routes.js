@@ -173,6 +173,7 @@ const {
   validateFinanceConciliacaoConciliarSugeridosBody,
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConfirmBody,
+  validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
@@ -672,6 +673,10 @@ const allowBaixaCompostaConfirmar = allowFinanceiroArea(
 const allowBaixaCompostaEstornar = allowFinanceiroArea(
   'FINANCEIRO_BAIXAS_COMPOSTAS_ESTORNAR',
   ['financeiro.baixas_compostas.estornar']
+);
+const allowConciliacaoCorrigirConta = allowFinanceiroArea(
+  'FINANCEIRO_CONCILIACAO_CORRIGIR_CONTA',
+  ['financeiro.conciliacao.conciliar']
 );
 
 function allowFinanceiroRelatorio(permissionKeys = []) {
@@ -1710,6 +1715,7 @@ router.post('/financeiro/conciliacoes/conciliar-sugeridos', allowFinanceiro, cri
 router.get('/financeiro/conciliacoes/:id/movimentos', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.movimentos);
 router.post('/financeiro/conciliacoes/:id/criar-titulo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCriarTituloBody }), ConciliacaoBancariaController.criarTitulo);
 router.post('/financeiro/conciliacoes/:id/confirmar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoConfirmBody }), ConciliacaoBancariaController.confirmar);
+router.patch('/financeiro/conciliacoes/:id/conta', allowConciliacaoCorrigirConta, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCorrigirContaBody }), ConciliacaoBancariaController.corrigirConta);
 router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.ignorar);
 router.post('/financeiro/conciliacoes/:id/remover', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.remover);
 router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);
@@ -1760,6 +1766,7 @@ router.get('/financeiro/cheques-terceiros/modelo.xlsx', allowChequesImportar, Ch
 router.post('/financeiro/cheques-terceiros/importacoes/preview', allowChequesImportar, uploadRateLimit, uploadComprovantes.single('file'), ChequeTerceiroController.importPreview);
 router.post('/financeiro/cheques-terceiros/importacoes/confirmar', allowChequesImportar, criticalRateLimit, ChequeTerceiroController.importConfirm);
 router.get('/financeiro/cheques-terceiros', allowChequesVisualizar, ChequeTerceiroController.index);
+router.post('/financeiro/cheques-terceiros/clientes', allowChequesCadastrar, criticalRateLimit, auditSuccess({ eventType: 'FINANCEIRO_CHEQUE_CLIENTE_CREATED', resourceType: 'PARCEIRO', description: 'Cliente criado no cadastro de cheque de terceiro' }), ChequeTerceiroController.criarCliente);
 router.post('/financeiro/cheques-terceiros', allowChequesCadastrar, criticalRateLimit, ChequeTerceiroController.create);
 router.post('/financeiro/cheques-terceiros/:id/movimentar', allowChequesMovimentar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.movimentar);
 router.get('/financeiro/cheques-terceiros/:id', allowChequesVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Cheque de terceiro') }), ChequeTerceiroController.show);

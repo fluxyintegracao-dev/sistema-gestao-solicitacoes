@@ -12,6 +12,7 @@ const {
   previewBaixaComposta,
   previewImportacao
 } = require('../services/chequeTerceiroService');
+const { criarParceiro } = require('../services/parceiroService');
 const { responderErroController } = require('../utils/controllerError');
 const { userHasAreaPermission } = require('../services/authorizationService');
 
@@ -30,8 +31,30 @@ module.exports = {
     catch (error) { return erro(res, error, 'Erro ao consultar cheque'); }
   },
   async create(req, res) {
-    try { return res.status(201).json(await criarChequeSaldoInicial(req, req.body || {})); }
+    try {
+      if (!Number.isInteger(Number(req.body?.titular_parceiro_id)) || Number(req.body?.titular_parceiro_id) <= 0) {
+        const error = new Error('Selecione o titular na pesquisa de pessoas cadastradas.');
+        error.status = 400;
+        throw error;
+      }
+      return res.status(201).json(await criarChequeSaldoInicial(req, req.body || {}));
+    }
     catch (error) { return erro(res, error, 'Erro ao cadastrar cheque'); }
+  },
+  async criarCliente(req, res) {
+    try {
+      const pessoa = await criarParceiro({
+        ...(req.body || {}),
+        cliente: true,
+        fornecedor: false,
+        corretor: false,
+        testemunha: false,
+        ativo: true
+      });
+      return res.status(201).json(pessoa);
+    } catch (error) {
+      return erro(res, error, 'Erro ao cadastrar cliente');
+    }
   },
   async movimentar(req, res) {
     try {

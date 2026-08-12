@@ -359,6 +359,21 @@ Quando o usuario estorna:
 - o valor baixado do titulo e recalculado
 - o saldo volta
 - o status do titulo pode voltar para `ABERTO` ou `PARCIAL`
+- se houver conciliacao OFX vinculada, o lancamento do extrato volta automaticamente para `PENDENTE`
+- em baixas com multiplas fontes, todas as conciliacoes vinculadas aos movimentos do grupo sao reabertas na mesma transacao
+
+### 8.1 Correcao de conta conciliada incorretamente
+
+Fluxo obrigatorio pela interface:
+
+1. Abra o titulo ou o grupo de baixa e registre o estorno com a justificativa.
+2. Acesse `Financeiro > Conciliacao OFX` e filtre os lancamentos `Pendentes`.
+3. No lancamento reaberto, clique em `Corrigir conta`.
+4. Selecione a conta bancaria correta e informe a justificativa da alteracao.
+5. Registre novamente a baixa financeira usando a conta correta.
+6. Confirme novamente a conciliacao somente quando data e valor forem correspondentes.
+
+A troca de conta e bloqueada quando o lancamento ainda esta conciliado, possui vinculos financeiros ativos, aponta para uma conta inativa ou sem empresa, ou ja existe na conta de destino. A auditoria registra conta e empresa anteriores, conta e empresa novas, usuario e justificativa.
 
 Importante:
 

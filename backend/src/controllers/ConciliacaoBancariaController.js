@@ -1,5 +1,6 @@
 const {
   conciliarSugeridos,
+  corrigirContaConciliacao,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
@@ -57,6 +58,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao confirmar conciliacao bancaria');
+    }
+  },
+
+  async corrigirConta(req, res) {
+    try {
+      const data = await corrigirContaConciliacao(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao corrigir conta da conciliacao bancaria');
     }
   },
 

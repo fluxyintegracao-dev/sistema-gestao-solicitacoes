@@ -8,6 +8,9 @@ const {
   hasSameConciliacaoValue,
   isExactConciliacaoMatch
 } = require('../src/utils/conciliacaoMatch');
+const {
+  validateFinanceConciliacaoCorrigirContaBody
+} = require('../src/validators/financialValidators');
 
 assert.strictEqual(hasSameConciliacaoDate('2026-07-06', '2026-07-06'), true);
 assert.strictEqual(hasSameConciliacaoDate('2026-07-06', '2026-07-10'), false);
@@ -60,6 +63,66 @@ const includeSource = serviceSource.match(
 assert(
   includeSource.includes("as: 'titulo',\n      required: false"),
   'O titulo ainda nao associado deve ser um relacionamento opcional.'
+);
+
+const suggestionAnalysisSource = serviceSource.match(
+  /async function analyzeSuggestions[\s\S]*?\n}\n\nasync function listarConciliacoes/
+)?.[0] || '';
+assert(
+  suggestionAnalysisSource.includes('const sugestoesVisiveis = associacaoManualRecomendada')
+    && suggestionAnalysisSource.includes('? []'),
+  'Matches ambiguos de mesma data e valor nao devem expor um titulo como sugestao; exigem associacao manual.'
+);
+
+assert.deepStrictEqual(
+  validateFinanceConciliacaoCorrigirContaBody({
+    conta_bancaria_id: 12,
+    motivo: 'OFX conciliado na conta incorreta.'
+  }),
+  {
+    conta_bancaria_id: 12,
+    motivo: 'OFX conciliado na conta incorreta.'
+  }
+);
+
+const reopenSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/services/conciliacaoEstornoService.js'),
+  'utf8'
+);
+assert(
+  reopenSource.includes("status: 'PENDENTE'")
+    && reopenSource.includes('titulo_financeiro_id: null')
+    && reopenSource.includes('movimento_financeiro_id: null'),
+  'O estorno deve reabrir a conciliacao e limpar somente os vinculos financeiros ativos.'
+);
+assert(
+  reopenSource.includes('lock: transaction.LOCK.UPDATE'),
+  'A reabertura da conciliacao deve bloquear os registros dentro da transacao do estorno.'
+);
+
+const titleServiceSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/services/tituloFinanceiroService.js'),
+  'utf8'
+);
+const titleReversalSource = titleServiceSource.match(
+  /async function estornarMovimentoTitulo[\s\S]*?\n}\n\nasync function atualizarCobrancaTitulo/
+)?.[0] || '';
+assert(
+  titleReversalSource.indexOf('reabrirConciliacoesPorMovimentos') < titleReversalSource.indexOf('await transaction.commit()'),
+  'A conciliacao deve ser reaberta antes do commit do estorno da baixa.'
+);
+
+const accountCorrectionSource = serviceSource.match(
+  /async function corrigirContaConciliacao[\s\S]*?\n}\n\nasync function removerConciliacao/
+)?.[0] || '';
+assert(
+  accountCorrectionSource.includes("status || '').toUpperCase() !== 'PENDENTE'")
+    && accountCorrectionSource.includes('ainda possui vinculos financeiros'),
+  'A troca de conta deve aceitar somente conciliacao pendente e sem vinculos financeiros.'
+);
+assert(
+  accountCorrectionSource.includes('FINANCIAL_BANK_RECONCILIATION_ACCOUNT_CORRECTED'),
+  'A troca de conta deve gerar evento de auditoria dedicado.'
 );
 
 console.log('Validacao de matches exatos da conciliacao concluida com sucesso.');

@@ -98,6 +98,14 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: true
     },
+    cheque_numero: { type: DataTypes.STRING(60), allowNull: true },
+    cheque_emitente: { type: DataTypes.STRING(160), allowNull: true },
+    cheque_titular_documento: { type: DataTypes.STRING(40), allowNull: true },
+    cheque_banco: { type: DataTypes.STRING(120), allowNull: true },
+    cheque_agencia: { type: DataTypes.STRING(40), allowNull: true },
+    cheque_conta: { type: DataTypes.STRING(60), allowNull: true },
+    cheque_data_emissao: { type: DataTypes.DATEONLY, allowNull: true },
+    cheque_data_vencimento: { type: DataTypes.DATEONLY, allowNull: true },
     tipo_movimento: {
       type: DataTypes.STRING(20),
       allowNull: false
