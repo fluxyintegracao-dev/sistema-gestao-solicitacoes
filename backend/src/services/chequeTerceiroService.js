@@ -455,6 +455,14 @@ function normalizarComponentes(payload) {
       conta_bancaria_id: Number(item.conta_bancaria_id) || null,
       cartao_id: Number(item.cartao_id) || null,
       cheque_terceiro_id: Number(item.cheque_terceiro_id) || null,
+      cheque_numero: texto(item.cheque_numero, 60),
+      cheque_emitente: texto(item.cheque_emitente, 160),
+      cheque_titular_documento: texto(item.cheque_titular_documento || item.titular_documento, 40),
+      cheque_banco: texto(item.cheque_banco, 120),
+      cheque_agencia: texto(item.cheque_agencia, 40),
+      cheque_conta: texto(item.cheque_conta, 60),
+      cheque_data_emissao: dataOnly(item.cheque_data_emissao || item.data_emissao),
+      cheque_data_vencimento: dataOnly(item.cheque_data_vencimento || item.data_vencimento),
       valor,
       juros,
       multa,
@@ -517,6 +525,9 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
     if (exigeConta && !conta) throw httpError(400, `Informe a conta financeira na operacao ${item.ordem}.`);
     const cartao = item.cartao_id ? cartaoMap.get(item.cartao_id) : null;
     if (tipo === 'CARTAO' && !cartao) throw httpError(400, `Informe um cartao ativo na operacao ${item.ordem}.`);
+    if (tipo === 'CHEQUE' && !chequeTerceiro && (!item.cheque_numero || !item.cheque_emitente)) {
+      throw httpError(400, `Informe numero e emitente do cheque na operacao ${item.ordem}.`);
+    }
 
     let cheque = null;
     if (chequeTerceiro) {
@@ -651,6 +662,14 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
         desconto: item.desconto,
         valor_quitacao: round(item.valor + item.juros + item.multa - item.desconto),
         documento_referencia: texto(item.documento_referencia, 120),
+        cheque_numero: item.cheque_terceiro_id ? null : item.cheque_numero,
+        cheque_emitente: item.cheque_terceiro_id ? null : item.cheque_emitente,
+        cheque_titular_documento: item.cheque_terceiro_id ? null : item.cheque_titular_documento,
+        cheque_banco: item.cheque_terceiro_id ? null : item.cheque_banco,
+        cheque_agencia: item.cheque_terceiro_id ? null : item.cheque_agencia,
+        cheque_conta: item.cheque_terceiro_id ? null : item.cheque_conta,
+        cheque_data_emissao: item.cheque_terceiro_id ? null : item.cheque_data_emissao,
+        cheque_data_vencimento: item.cheque_terceiro_id ? null : item.cheque_data_vencimento,
         observacoes: texto(item.observacoes, 4000)
       }, { transaction });
       const alocacoes = validacao.alocacoes.filter((alocacao) => alocacao.componente_index === componentIndex);
@@ -670,6 +689,14 @@ async function confirmarBaixaComposta(req, payload, idempotencyKey) {
           desconto: 0,
           data_movimento: validacao.data_movimento,
           documento_referencia: item.documento_referencia,
+          cheque_numero: item.cheque_numero,
+          cheque_emitente: item.cheque_emitente,
+          titular_documento: item.cheque_titular_documento,
+          cheque_banco: item.cheque_banco,
+          cheque_agencia: item.cheque_agencia,
+          cheque_conta: item.cheque_conta,
+          data_emissao: item.cheque_data_emissao,
+          data_vencimento: item.cheque_data_vencimento,
           observacoes: item.observacoes || `Componente ${item.ordem} da baixa composta ${grupo.codigo}.`,
           intercompany,
           natureza_intercompany_baixa: item.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO',

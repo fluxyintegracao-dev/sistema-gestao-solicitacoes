@@ -11,6 +11,7 @@ function read(relativePath) {
 function validateMigration() {
   const migration = read('migrations/202608070001_financeiro_carteira_cheques_baixa_composta.js');
   const intercompanyMigration = read('migrations/202608100001_baixa_composta_intercompany_fontes.js');
+  const chequeSettlementMigration = read('migrations/202608120001_dados_cheque_movimentos_baixas.js');
   [
     'baixas_financeiras_grupos',
     'baixas_financeiras_componentes',
@@ -24,6 +25,8 @@ function validateMigration() {
   assert(!migration.includes("'ux_cheques_identidade'"), 'A migration nao pode falhar por duplicidades historicas.');
   assert(intercompanyMigration.includes("'empresa_id'"), 'Componente deve persistir a empresa de cada fonte.');
   assert(intercompanyMigration.includes('idx_baixa_componente_empresa'), 'Empresa da fonte deve estar indexada.');
+  ['movimentos_financeiros', 'baixas_financeiras_componentes', 'cheque_numero', 'cheque_emitente', 'cheque_data_vencimento']
+    .forEach((contract) => assert(chequeSettlementMigration.includes(contract), `Dados do cheque ausentes na migration: ${contract}`));
 }
 
 function validateSecurityAndTransactions() {
@@ -51,6 +54,8 @@ function validateSecurityAndTransactions() {
   assert(titleService.includes("status: 'EM_CARTEIRA'"), 'Estorno deve devolver cheque utilizado para a carteira.');
   assert(service.includes('isValidCpfCnpj'), 'Cadastro de cheque deve validar CPF/CNPJ do titular.');
   assert(service.includes('normalizarCpfCnpj'), 'CPF/CNPJ do titular deve ser persistido sem mascara.');
+  assert(service.includes('Informe numero e emitente do cheque na operacao'), 'Cheque proprio da baixa composta deve exigir identificacao.');
+  assert(titleService.includes('buildChequeMovimentoFields'), 'Baixa simples deve persistir os dados do cheque no movimento.');
 }
 
 function validateRoutesAndPermissions() {
@@ -83,6 +88,8 @@ function validateFrontend() {
   const styles = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/index.css'), 'utf8');
   const custody = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroChequesTerceiros.jsx'), 'utf8');
   const holderAutocomplete = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/TitularChequeAutocomplete.jsx'), 'utf8');
+  const chequeFields = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/components/financeiro/ChequePagamentoFields.jsx'), 'utf8');
+  const titleDetail = fs.readFileSync(path.resolve(__dirname, '../../frontend/src/pages/FinanceiroTituloDetalhe.jsx'), 'utf8');
   assert(titles.includes('BaixaCompostaModal'));
   assert(titles.includes('Baixa com múltiplas fontes'));
   assert(modal.includes('crypto.randomUUID()'));
@@ -97,6 +104,11 @@ function validateFrontend() {
   assert(modal.includes('empresasDisponiveis'), 'Modal deve listar todas as empresas permitidas como fonte.');
   assert(modal.includes('Cheque de terceiro em carteira'), 'Modal deve identificar claramente os cheques cadastrados em carteira.');
   assert(modal.includes('Selecione um cheque cadastrado'), 'Opcao vazia do cheque nao pode sugerir uma origem ambigua.');
+  assert(modal.includes('ChequePagamentoFields'), 'Baixa composta deve coletar os dados do cheque proprio em cada fonte.');
+  assert(titles.includes('ChequePagamentoFields'), 'Baixa selecionada e em massa devem coletar os dados do cheque.');
+  assert(titleDetail.includes('Cheque nº'), 'Detalhe do titulo deve exibir o cheque vinculado ao movimento.');
+  ['cheque_numero', 'cheque_emitente', 'titular_documento', 'data_vencimento']
+    .forEach((contract) => assert(chequeFields.includes(contract), `Campo de cheque ausente no componente reutilizavel: ${contract}`));
   assert(titles.includes("getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 })"), 'Baixa composta deve carregar a mesma carteira exibida na gestao de cheques.');
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));

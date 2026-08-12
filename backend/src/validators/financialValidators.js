@@ -1467,6 +1467,12 @@ function validateFinanceTituloBaixaBody(body = {}) {
     throw new ValidationError('Selecione o cheque de terceiro que sera usado na baixa.');
   }
 
+  const chequeNumero = parseOptionalText(body.cheque_numero, 'Numero do cheque', 60);
+  const chequeEmitente = parseOptionalText(body.cheque_emitente, 'Emitente do cheque', 160);
+  if (formaRecebimento === 'CHEQUE' && !usarChequeTerceiro && (!chequeNumero || !chequeEmitente)) {
+    throw new ValidationError('Informe numero e emitente do cheque usado na baixa.');
+  }
+
   return {
     empresa_id: empresaId,
     conta_bancaria_id: contaBancariaId,
@@ -1486,8 +1492,8 @@ function validateFinanceTituloBaixaBody(body = {}) {
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     usar_cheque_terceiro: usarChequeTerceiro,
     cheque_terceiro_id: chequeTerceiroId,
-    cheque_numero: parseOptionalText(body.cheque_numero, 'Numero do cheque', 60),
-    cheque_emitente: parseOptionalText(body.cheque_emitente, 'Emitente do cheque', 160),
+    cheque_numero: chequeNumero,
+    cheque_emitente: chequeEmitente,
     cheque_banco: parseOptionalText(body.cheque_banco, 'Banco do cheque', 120),
     cheque_agencia: parseOptionalText(body.cheque_agencia, 'Agencia do cheque', 40),
     cheque_conta: parseOptionalText(body.cheque_conta, 'Conta do cheque', 60),
@@ -1577,6 +1583,8 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
         'cheque_banco',
         'cheque_agencia',
         'cheque_conta',
+        'data_emissao',
+        'data_vencimento',
         'usar_cheque_terceiro',
         'cheque_terceiro_id',
         'titular_documento'
@@ -1597,6 +1605,8 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
       cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque da parcela ${index + 1}`, 40),
       cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 60),
       titular_documento: parseOptionalText(item?.titular_documento, `Documento do titular do cheque da parcela ${index + 1}`, 40),
+      data_emissao: parseDateOnly(item?.data_emissao, `Data de emissao do cheque da parcela ${index + 1}`),
+      data_vencimento: parseDateOnly(item?.data_vencimento, `Data de vencimento do cheque da parcela ${index + 1}`),
       usar_cheque_terceiro: usarChequeTerceiro,
       cheque_terceiro_id: chequeTerceiroId
     };

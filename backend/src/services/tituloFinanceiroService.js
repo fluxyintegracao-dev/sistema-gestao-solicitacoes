@@ -637,6 +637,32 @@ function normalizarChequePayload(payload = {}) {
   };
 }
 
+function buildChequeMovimentoFields(formaRecebimento, payload = {}) {
+  if (!isChequeFormaRecebimento(formaRecebimento) || payload.usar_cheque_terceiro) {
+    return {
+      cheque_numero: null,
+      cheque_emitente: null,
+      cheque_titular_documento: null,
+      cheque_banco: null,
+      cheque_agencia: null,
+      cheque_conta: null,
+      cheque_data_emissao: null,
+      cheque_data_vencimento: null
+    };
+  }
+  const cheque = normalizarChequePayload(payload);
+  return {
+    cheque_numero: cheque.numero_cheque,
+    cheque_emitente: cheque.titular_nome,
+    cheque_titular_documento: cheque.titular_documento,
+    cheque_banco: cheque.banco,
+    cheque_agencia: cheque.agencia,
+    cheque_conta: cheque.conta,
+    cheque_data_emissao: payload.data_emissao || null,
+    cheque_data_vencimento: payload.data_vencimento || null
+  };
+}
+
 async function obterChequeTerceiroDisponivel(chequeTerceiroId, transaction) {
   const id = Number(chequeTerceiroId);
   if (!Number.isInteger(id) || id <= 0) {
@@ -3167,7 +3193,8 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
       categoria_bem: payload.categoria_bem || null,
       descricao_bem: payload.descricao_bem || null,
       valor_referencia_bem: payload.valor_referencia_bem ?? null,
-      documento_referencia: payload.documento_referencia || null,
+      documento_referencia: payload.documento_referencia || payload.cheque_numero || null,
+      ...buildChequeMovimentoFields(formaRecebimento, payload),
       tipo_movimento: 'BAIXA',
       status: 'ATIVO',
       valor: valorBaixa,
@@ -3248,6 +3275,9 @@ async function criarTituloManualComBaixaAtomica(req, payload = {}, { transaction
           movimento_id: movimento.id,
           conta_bancaria_id: conta.id,
           forma_recebimento: formaRecebimento,
+          ...(isChequeFormaRecebimento(formaRecebimento) && !payload.usar_cheque_terceiro
+            ? buildChequeMovimentoFields(formaRecebimento, payload)
+            : {}),
           tipo_permuta: payload.tipo_permuta || null,
           categoria_bem: payload.categoria_bem || null,
           valor: valorBaixa,
@@ -3421,7 +3451,8 @@ async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
       categoria_bem: payload.categoria_bem || null,
       descricao_bem: payload.descricao_bem || null,
       valor_referencia_bem: payload.valor_referencia_bem ?? null,
-      documento_referencia: payload.documento_referencia || null,
+      documento_referencia: payload.documento_referencia || payload.cheque_numero || null,
+      ...buildChequeMovimentoFields(formaMovimento, payload),
       tipo_movimento: 'BAIXA',
       status: 'ATIVO',
       valor: valorBaixa,
@@ -3526,6 +3557,9 @@ async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
           intercompany_group_id: movimentoIntercompanyFields.intercompany_group_id || null,
           tipo_intercompany: movimentoIntercompanyFields.tipo_intercompany || null,
           forma_recebimento: formaMovimento,
+          ...(isChequeFormaRecebimento(formaMovimento) && !payload.usar_cheque_terceiro
+            ? buildChequeMovimentoFields(formaMovimento, payload)
+            : {}),
           tipo_permuta: payload.tipo_permuta || null,
           categoria_bem: payload.categoria_bem || null,
         valor: valorBaixa,
@@ -3847,6 +3881,7 @@ async function baixarTitulosParceladosEmMassa(req, payload = {}) {
         forma_pagamento_id: formaBaixa.formaPagamentoId,
         forma_recebimento: formaRecebimento === 'CARTAO' ? 'CARTAO_PARCELADO' : 'CHEQUE_PARCELADO',
         documento_referencia: documentoReferencia,
+        ...buildChequeMovimentoFields(formaRecebimento, parcela),
         tipo_movimento: 'BAIXA',
         status: 'ATIVO',
         valor: valorParcela,

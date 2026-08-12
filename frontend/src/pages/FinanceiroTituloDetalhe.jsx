@@ -170,9 +170,9 @@ function buildBaixaForm(titulo, contasBancarias, movimento = null) {
       cheque_banco: movimento?.cheque_banco || '',
       cheque_agencia: movimento?.cheque_agencia || '',
       cheque_conta: movimento?.cheque_conta || '',
-      titular_documento: movimento?.titular_documento || '',
-      data_emissao: movimento?.data_emissao || '',
-      data_vencimento: movimento?.data_vencimento || '',
+      titular_documento: movimento?.cheque_titular_documento || '',
+      data_emissao: movimento?.cheque_data_emissao || '',
+      data_vencimento: movimento?.cheque_data_vencimento || '',
       forma_recebimento: normalizeFormaBaixaForm(movimento?.forma_recebimento),
       tipo_permuta: movimento?.tipo_permuta || '',
       categoria_bem: movimento?.categoria_bem || '',
@@ -292,13 +292,21 @@ function formatAuditMetadata(metadata, { hideFinancialReferenceIds = false } = {
     multa: 'Multa',
     desconto: 'Desconto',
     valor_quitacao: 'Quitacao',
-    valor_estornado: 'Valor estornado'
+    valor_estornado: 'Valor estornado',
+    cheque_numero: 'Numero do cheque',
+    cheque_emitente: 'Emitente do cheque',
+    cheque_titular_documento: 'CPF/CNPJ do titular',
+    cheque_banco: 'Banco do cheque',
+    cheque_agencia: 'Agencia do cheque',
+    cheque_conta: 'Conta do cheque',
+    cheque_data_emissao: 'Emissao do cheque',
+    cheque_data_vencimento: 'Vencimento do cheque'
   };
 
   return Object.entries(metadata)
     .filter(([key]) => !hideFinancialReferenceIds || !['empresa_baixa_id', 'conta_bancaria_id'].includes(key))
     .filter(([, value]) => value !== null && value !== undefined && value !== '')
-    .slice(0, 8)
+    .slice(0, 16)
     .map(([key, value]) => ({
       key,
       label: labels[key] || key.replace(/_/g, ' '),
@@ -527,8 +535,8 @@ export default function FinanceiroTituloDetalhe() {
       setError('Selecione o cheque de terceiro que sera usado no pagamento.');
       return;
     }
-    if (baixaRecebeChequeTerceiro && (!String(baixaForm.cheque_numero || '').trim() || !String(baixaForm.cheque_emitente || '').trim())) {
-      setError('Informe numero e emitente do cheque recebido.');
+    if (baixaUsaCheque && !baixaPagaComChequeTerceiro && (!String(baixaForm.cheque_numero || '').trim() || !String(baixaForm.cheque_emitente || '').trim())) {
+      setError('Informe numero e emitente do cheque usado na baixa.');
       return;
     }
     try {
@@ -1124,6 +1132,28 @@ export default function FinanceiroTituloDetalhe() {
                       <div className="text-[var(--c-muted)]">
                         Quitacao {formatCurrency(movimento.valor_quitacao)}
                       </div>
+                      {String(movimento.forma_recebimento || '').toUpperCase().includes('CHEQUE') && movimento.cheque_numero ? (
+                        <div className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                          <strong className="block text-[var(--c-text)]">Cheque nº {movimento.cheque_numero}</strong>
+                          <span>
+                            Emitente: {movimento.cheque_emitente || 'Nao informado'}
+                            {movimento.cheque_titular_documento ? ` · CPF/CNPJ ${movimento.cheque_titular_documento}` : ''}
+                          </span>
+                          {(movimento.cheque_banco || movimento.cheque_agencia || movimento.cheque_conta) ? (
+                            <span className="block">
+                              {movimento.cheque_banco || 'Banco nao informado'}
+                              {movimento.cheque_agencia ? ` · Ag. ${movimento.cheque_agencia}` : ''}
+                              {movimento.cheque_conta ? ` · Conta ${movimento.cheque_conta}` : ''}
+                            </span>
+                          ) : null}
+                          {(movimento.cheque_data_emissao || movimento.cheque_data_vencimento) ? (
+                            <span className="block">
+                              {movimento.cheque_data_emissao ? `Emissao ${formatDate(movimento.cheque_data_emissao)}` : ''}
+                              {movimento.cheque_data_vencimento ? ` · Vencimento ${formatDate(movimento.cheque_data_vencimento)}` : ''}
+                            </span>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {(movimento.intercompany_group_id || movimento.tipo_intercompany) && (
                         <div className="text-[var(--c-muted)]">
                           Entre Empresas: {labelTipoIntercompany(movimento.tipo_intercompany)}
@@ -1439,10 +1469,12 @@ export default function FinanceiroTituloDetalhe() {
                   </div>
                 ) : null}
 
-                {baixaRecebeChequeTerceiro ? (
+                {baixaUsaCheque && !baixaPagaComChequeTerceiro ? (
                   <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900 md:col-span-2">
                     <div className="mb-3 text-xs text-emerald-700">
-                      Ao confirmar uma baixa de recebimento por cheque, o sistema registra automaticamente o cheque em carteira como cheque de terceiro.
+                      {baixaRecebeChequeTerceiro
+                        ? 'Ao confirmar um recebimento por cheque, o sistema registra automaticamente o documento na carteira de cheques de terceiros.'
+                        : 'Informe os dados do cheque emitido para identificar e auditar o pagamento deste titulo.'}
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label>
@@ -1758,7 +1790,7 @@ export default function FinanceiroTituloDetalhe() {
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
                     (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) ||
                     (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) ||
-                    (baixaRecebeChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||
+                    (baixaUsaCheque && !baixaPagaComChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||
                     !baixaForm.valor ||
                     (Boolean(baixaForm.intercompany) && !baixaForm.tipo_intercompany)
                   }

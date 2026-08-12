@@ -37,6 +37,7 @@ import { normalizeCurrencyTyping } from '../utils/formatters';
 import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao } from '../utils/acessoProduto';
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
+import ChequePagamentoFields from '../components/financeiro/ChequePagamentoFields';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -738,6 +739,9 @@ function buildBaixaMassaParcelas(total = 0, quantidade = 2, dataInicial = today(
       cheque_banco: '',
       cheque_agencia: '',
       cheque_conta: '',
+      titular_documento: '',
+      data_emissao: '',
+      data_vencimento: '',
       usar_cheque_terceiro: false,
       cheque_terceiro_id: '',
       observacoes: ''
@@ -764,6 +768,9 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
     cheque_banco: '',
     cheque_agencia: '',
     cheque_conta: '',
+    titular_documento: '',
+    data_emissao: '',
+    data_vencimento: '',
     cheque_terceiro_id: '',
     data_movimento: today(),
     observacoes: '',
@@ -1681,9 +1688,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       }
     }
 
-    if (!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER') {
+    if (!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro) {
       if (!String(baixaMassaForm.cheque_numero || '').trim() || !String(baixaMassaForm.cheque_emitente || '').trim()) {
-        setError('Para receber em cheque, informe numero e emitente do cheque.');
+        setError('Informe numero e emitente do cheque usado na baixa.');
           return;
       }
     }
@@ -1730,6 +1737,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               cheque_banco: baixaMassaForm.cheque_banco || undefined,
               cheque_agencia: baixaMassaForm.cheque_agencia || undefined,
               cheque_conta: baixaMassaForm.cheque_conta || undefined,
+              titular_documento: baixaMassaForm.titular_documento || undefined,
+              data_emissao: baixaMassaForm.data_emissao || undefined,
+              data_vencimento: baixaMassaForm.data_vencimento || undefined,
               data_movimento: baixaMassaForm.data_movimento,
               observacoes: baixaMassaForm.observacoes || `Baixa em massa registrada pela tela de titulos.`
             });
@@ -3231,27 +3241,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   </label>
                 ) : null}
 
-                {!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && baixaMassaTipoSelecionado === 'RECEBER' ? (
-                  <div className="md:col-span-2 grid gap-2 md:grid-cols-2">
-                    <label className="app-filter-field">
-                      <span className="app-filter-label">Numero do cheque</span>
-                      <input
-                        className="input w-full input-sm"
-                        value={baixaMassaForm.cheque_numero}
-                        onChange={(event) => setBaixaMassaForm((current) => ({ ...current, cheque_numero: event.target.value }))}
-                        required
-                      />
-                    </label>
-                    <label className="app-filter-field">
-                      <span className="app-filter-label">Emitente do cheque</span>
-                      <input
-                        className="input w-full input-sm"
-                        value={baixaMassaForm.cheque_emitente}
-                        onChange={(event) => setBaixaMassaForm((current) => ({ ...current, cheque_emitente: event.target.value }))}
-                        required
-                      />
-                    </label>
-                  </div>
+                {!baixaMassaParcelada && isChequeForma(baixaMassaForm.forma_recebimento) && !baixaMassaUsaChequeTerceiro ? (
+                  <ChequePagamentoFields
+                    className="md:col-span-2"
+                    compact
+                    value={baixaMassaForm}
+                    onChange={(field, value) => setBaixaMassaForm((current) => ({ ...current, [field]: value }))}
+                    title={baixaMassaTipoSelecionado === 'RECEBER' ? 'Dados do cheque recebido' : 'Dados do cheque usado no pagamento'}
+                    description={baixaMassaTipoSelecionado === 'RECEBER'
+                      ? 'O cheque sera registrado na carteira de cheques de terceiros ao confirmar a baixa.'
+                      : 'Os dados ficam vinculados ao movimento financeiro de cada titulo selecionado.'}
+                  />
                 ) : null}
 
                 {!baixaMassaParcelada ? (
@@ -3358,52 +3358,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                                   </select>
                                 </label>
                               ) : (
-                                <>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Numero do cheque</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_numero}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_numero', event.target.value)}
-                                      required
-                                    />
-                                  </label>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Emitente do cheque</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_emitente}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_emitente', event.target.value)}
-                                      required
-                                    />
-                                  </label>
-                                  <label className="app-filter-field">
-                                    <span className="app-filter-label">Banco</span>
-                                    <input
-                                      className="input w-full input-sm"
-                                      value={parcela.cheque_banco}
-                                      onChange={(event) => updateBaixaMassaParcela(index, 'cheque_banco', event.target.value)}
-                                    />
-                                  </label>
-                                  <div className="grid gap-2 sm:grid-cols-2">
-                                    <label className="app-filter-field">
-                                      <span className="app-filter-label">Agencia</span>
-                                      <input
-                                        className="input w-full input-sm"
-                                        value={parcela.cheque_agencia}
-                                        onChange={(event) => updateBaixaMassaParcela(index, 'cheque_agencia', event.target.value)}
-                                      />
-                                    </label>
-                                    <label className="app-filter-field">
-                                      <span className="app-filter-label">Conta</span>
-                                      <input
-                                        className="input w-full input-sm"
-                                        value={parcela.cheque_conta}
-                                        onChange={(event) => updateBaixaMassaParcela(index, 'cheque_conta', event.target.value)}
-                                      />
-                                    </label>
-                                  </div>
-                                </>
+                                <ChequePagamentoFields
+                                  className="md:col-span-2"
+                                  compact
+                                  value={parcela}
+                                  onChange={(field, value) => updateBaixaMassaParcela(index, field, value)}
+                                  title={`Dados do cheque da parcela ${index + 1}`}
+                                  description="Cada parcela deve manter a identificacao do cheque correspondente."
+                                />
                               )}
                             </div>
                           ) : null}

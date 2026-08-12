@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineXMark } from 'react-icons/hi2';
 import { confirmarBaixaFinanceiraComposta, previewBaixaFinanceiraComposta } from '../../services/financeiro';
+import ChequePagamentoFields from './ChequePagamentoFields';
 
 function round(value) { return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100; }
 function money(value) { return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
@@ -29,6 +30,8 @@ function newComponent(formas = [], empresaId = '') {
     empresa_id: empresaId,
     forma_pagamento_id: formas[0]?.id || '', conta_bancaria_id: '', cartao_id: '',
     cheque_terceiro_id: '', valor: '', documento_referencia: '', observacoes: '',
+    cheque_numero: '', cheque_emitente: '', titular_documento: '', cheque_banco: '',
+    cheque_agencia: '', cheque_conta: '', data_emissao: '', data_vencimento: '',
     natureza_intercompany_baixa: 'OPERACIONAL_TERCEIRO', motivo_intercompany: '', alocacoes: {}
   };
 }
@@ -106,6 +109,9 @@ export default function BaixaCompostaModal({
           next.empresa_id = String(cheque.empresa_id || '');
           next.valor = Number(cheque.valor);
           next.alocacoes = distribute(cheque.valor, titulos, allocatedBefore(index));
+          next.cheque_numero = ''; next.cheque_emitente = ''; next.titular_documento = '';
+          next.cheque_banco = ''; next.cheque_agencia = ''; next.cheque_conta = '';
+          next.data_emissao = ''; next.data_vencimento = '';
         }
       }
       return next;
@@ -122,6 +128,7 @@ export default function BaixaCompostaModal({
   function buildPayload() {
     const componentes = components.map(({ alocacoes, ...component }) => ({
       ...component,
+      documento_referencia: component.documento_referencia || component.cheque_numero || null,
       empresa_id: Number(component.empresa_id),
       forma_pagamento_id: Number(component.forma_pagamento_id),
       conta_bancaria_id: Number(component.conta_bancaria_id) || null,
@@ -190,9 +197,9 @@ export default function BaixaCompostaModal({
               {!['DINHEIRO', 'PERMUTA', 'OUTROS'].includes(type) && !(type === 'CHEQUE' && component.cheque_terceiro_id) ? <label className="form-control"><span>Conta financeira *</span><select className="select" value={component.conta_bancaria_id} onChange={(e) => updateComponent(index, 'conta_bancaria_id', e.target.value)}><option value="">Selecione</option>{contasEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}
               {type === 'CARTAO' ? <label className="form-control"><span>Cartão *</span><select className="select" value={component.cartao_id} onChange={(e) => updateComponent(index, 'cartao_id', e.target.value)}><option value="">Selecione</option>{cartoesEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.descricao || `Cartão #${item.id}`}</option>)}</select></label> : null}
               <label className="form-control"><span>Valor da fonte *</span><input className="input" type="number" min="0.01" step="0.01" value={component.valor} readOnly={Boolean(component.cheque_terceiro_id)} onChange={(e) => updateComponent(index, 'valor', e.target.value)} /></label>
-              <label className="form-control"><span>{type === 'CHEQUE' ? 'Número/documento do cheque' : 'Documento'}</span><input className="input" value={component.documento_referencia} onChange={(e) => updateComponent(index, 'documento_referencia', e.target.value)} /></label>
+              {type !== 'CHEQUE' ? <label className="form-control"><span>Documento</span><input className="input" value={component.documento_referencia} onChange={(e) => updateComponent(index, 'documento_referencia', e.target.value)} /></label> : null}
               {temRateioIntercompany ? <label className="form-control xl:col-span-2"><span>Natureza entre empresas *</span><select className="select" value={component.natureza_intercompany_baixa} onChange={(e) => updateComponent(index, 'natureza_intercompany_baixa', e.target.value)}>{NATUREZAS_INTERCOMPANY.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label> : null}
-            </div><div className="finance-operation-table-shell mt-4"><table className="table min-w-[720px]"><thead><tr><th>Título</th><th>Vencimento</th><th className="text-right">Saldo</th><th className="w-52">Valor nesta fonte</th></tr></thead><tbody>{titulos.map((titulo) => <tr key={titulo.id}><td><strong>{titulo.codigo}</strong><small className="block text-[var(--c-muted)]">{titulo.descricao}</small></td><td>{String(titulo.data_vencimento || '').split('-').reverse().join('/')}</td><td className="text-right">{money(titulo.valor_saldo)}</td><td><input className="input input-sm text-right" type="number" min="0" step="0.01" value={component.alocacoes?.[titulo.id] || ''} onChange={(e) => updateAllocation(index, titulo.id, e.target.value)} /></td></tr>)}</tbody><tfoot><tr><th colSpan="3">Distribuído na fonte</th><th className={Math.abs(round(componentAllocated) - round(component.valor)) < 0.01 ? 'text-[var(--status-approved-text)]' : 'text-[var(--status-rejected-text)]'}>{money(componentAllocated)} / {money(component.valor)}</th></tr></tfoot></table></div></section>;
+            </div>{type === 'CHEQUE' && !component.cheque_terceiro_id ? <ChequePagamentoFields className="mt-4" compact value={component} onChange={(field, value) => updateComponent(index, field, value)} description="Informe o cheque emitido pela empresa desta fonte. Os dados ficam individualizados neste componente da baixa." /> : null}<div className="finance-operation-table-shell mt-4"><table className="table min-w-[720px]"><thead><tr><th>Título</th><th>Vencimento</th><th className="text-right">Saldo</th><th className="w-52">Valor nesta fonte</th></tr></thead><tbody>{titulos.map((titulo) => <tr key={titulo.id}><td><strong>{titulo.codigo}</strong><small className="block text-[var(--c-muted)]">{titulo.descricao}</small></td><td>{String(titulo.data_vencimento || '').split('-').reverse().join('/')}</td><td className="text-right">{money(titulo.valor_saldo)}</td><td><input className="input input-sm text-right" type="number" min="0" step="0.01" value={component.alocacoes?.[titulo.id] || ''} onChange={(e) => updateAllocation(index, titulo.id, e.target.value)} /></td></tr>)}</tbody><tfoot><tr><th colSpan="3">Distribuído na fonte</th><th className={Math.abs(round(componentAllocated) - round(component.valor)) < 0.01 ? 'text-[var(--status-approved-text)]' : 'text-[var(--status-rejected-text)]'}>{money(componentAllocated)} / {money(component.valor)}</th></tr></tfoot></table></div></section>;
           })}</div>
           <button type="button" className="btn btn-outline mt-3" onClick={() => { setComponents((rows) => [...rows, newComponent(formas, titulos[0]?.empresa_id || '')]); setPreview(null); }}><HiOutlinePlus /> Adicionar fonte</button>
 
