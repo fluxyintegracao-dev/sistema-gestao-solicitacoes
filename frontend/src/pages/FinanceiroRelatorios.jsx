@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
   getContasBancarias,
-  estornarConciliacaoTransferencia,
+  estornarConciliacaoBancaria,
   getRelatorioConciliacaoContas,
   getRelatorioFluxoCaixa,
   getRelatorioMovimentacaoContas
@@ -875,7 +875,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
 
 function ContaReportShell({ title, subtitle, type }) {
   const { user } = useAuth();
-  const canEstornarTransferencia = type === 'conciliacao' && hasPermissao(user, 'financeiro.conciliacao.estornar');
+  const canEstornarConciliacao = type === 'conciliacao' && hasPermissao(user, 'financeiro.conciliacao.estornar');
   const [filters, setFilters] = useState({ ...CONTAS_REPORT_DEFAULT_FILTERS });
   const [appliedFilters, setAppliedFilters] = useState({ ...CONTAS_REPORT_DEFAULT_FILTERS });
   const [contas, setContas] = useState([]);
@@ -928,18 +928,18 @@ function ContaReportShell({ title, subtitle, type }) {
     setAppliedFilters(filters);
   }
 
-  async function handleEstornarTransferencia(event) {
+  async function handleEstornarConciliacao(event) {
     event.preventDefault();
     const motivo = String(estornoModal.motivo || '').trim();
     if (!estornoModal.item?.id || !motivo || estornoModal.processing) return;
     try {
       setEstornoModal((current) => ({ ...current, processing: true, error: '' }));
-      await estornarConciliacaoTransferencia(estornoModal.item.id, { motivo });
+      await estornarConciliacaoBancaria(estornoModal.item.id, { motivo });
       setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' });
       const data = await getRelatorioConciliacaoContas(buildContaReportParams(appliedFilters, type));
       setRelatorio(data);
     } catch (err) {
-      setEstornoModal((current) => ({ ...current, processing: false, error: err?.message || 'Erro ao estornar transferencia' }));
+      setEstornoModal((current) => ({ ...current, processing: false, error: err?.message || 'Erro ao estornar conciliacao' }));
     }
   }
 
@@ -1064,7 +1064,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   { key: 'valor', width: 140, minWidth: 120 },
                   ...(type === 'movimentacao' ? [{ key: 'saldo', width: 140, minWidth: 120 }] : []),
                   { key: 'descricao', width: 280, minWidth: 210 },
-                  ...(type === 'conciliacao' && canEstornarTransferencia ? [{ key: 'acoes', width: 130, minWidth: 120 }] : [])
+                  ...(type === 'conciliacao' && canEstornarConciliacao ? [{ key: 'acoes', width: 130, minWidth: 120 }] : [])
                 ]}
                 className="table financeiro-report-table"
               >
@@ -1085,13 +1085,13 @@ function ContaReportShell({ title, subtitle, type }) {
                       <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
                     ) : null}
                     <ResizableTh columnKey="descricao">Descricao</ResizableTh>
-                    {type === 'conciliacao' && canEstornarTransferencia ? <ResizableTh columnKey="acoes">Acoes</ResizableTh> : null}
+                    {type === 'conciliacao' && canEstornarConciliacao ? <ResizableTh columnKey="acoes">Acoes</ResizableTh> : null}
                   </tr>
                 </thead>
                 <tbody>
                   {analitico.length === 0 ? (
                     <tr>
-                      <td colSpan={10 + (type === 'conciliacao' && canEstornarTransferencia ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
+                      <td colSpan={10 + (type === 'conciliacao' && canEstornarConciliacao ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
                     </tr>
                   ) : (
                     analitico.map((item) => {
@@ -1137,9 +1137,10 @@ function ContaReportShell({ title, subtitle, type }) {
                               ? `${item.conta_origem || 'Origem'} → ${item.conta_destino || 'Destino'}${item.transferencia_descricao ? ` · ${item.transferencia_descricao}` : ''}`
                               : item.descricao_banco || item.categoria || item.observacoes || '-'}
                           </td>
-                          {type === 'conciliacao' && canEstornarTransferencia ? (
+                          {type === 'conciliacao' && canEstornarConciliacao ? (
                             <td>
-                              {item.tipo_conciliacao === 'TRANSFERENCIA' && item.status === 'CONCILIADO' && item.transferencia_status === 'ATIVA' ? (
+                              {item.status === 'CONCILIADO'
+                                && (item.tipo_conciliacao !== 'TRANSFERENCIA' || item.transferencia_status === 'ATIVA') ? (
                                 <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
                                   Estornar
                                 </button>
@@ -1159,9 +1160,15 @@ function ContaReportShell({ title, subtitle, type }) {
 
       {estornoModal.open ? (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
-          <form className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl" onSubmit={handleEstornarTransferencia}>
-            <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar transferencia conciliada</h3>
-            <p className="mt-1 text-sm text-[var(--c-muted)]">A transferencia sera cancelada e os registros OFX vinculados voltarao para pendente.</p>
+          <form className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl" onSubmit={handleEstornarConciliacao}>
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar conciliacao bancaria</h3>
+            <p className="mt-1 text-sm text-[var(--c-muted)]">
+              {estornoModal.item?.tipo_conciliacao === 'TRANSFERENCIA'
+                ? 'A transferencia sera cancelada e os lancamentos OFX vinculados voltarao para pendente.'
+                : estornoModal.item?.tipo_conciliacao === 'TARIFA'
+                  ? 'A tarifa criada pela conciliacao sera estornada e o lancamento OFX voltara para pendente.'
+                  : 'O vinculo sera desfeito sem apagar o registro financeiro original, e o lancamento OFX voltara para pendente.'}
+            </p>
             <label className="mt-4 block text-sm">
               <span className="mb-1 block font-medium">Motivo do estorno *</span>
               <textarea className="input min-h-24 w-full resize-y" maxLength={255} value={estornoModal.motivo} onChange={(event) => setEstornoModal((current) => ({ ...current, motivo: event.target.value, error: '' }))} />

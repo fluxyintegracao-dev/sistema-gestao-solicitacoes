@@ -8,6 +8,14 @@ function toAbsoluteCents(value) {
   return Math.round(Math.abs(normalized) * 100);
 }
 
+function toSignedCents(value) {
+  const normalized = Number(value || 0);
+  if (!Number.isFinite(normalized)) {
+    return null;
+  }
+  return Math.round(normalized * 100);
+}
+
 function normalizeDateOnly(value) {
   if (value instanceof Date && !Number.isNaN(value.getTime())) {
     return value.toISOString().slice(0, 10);
@@ -35,10 +43,22 @@ function isExactConciliacaoMatch({ bankDate, bankValue, movementDate, movementVa
     && hasSameConciliacaoValue(bankValue, movementValue);
 }
 
+function isExactOppositeBankTransfer({ currentDate, currentValue, counterpartDate, counterpartValue }) {
+  const currentCents = toSignedCents(currentValue);
+  const counterpartCents = toSignedCents(counterpartValue);
+  return hasSameConciliacaoDate(currentDate, counterpartDate)
+    && currentCents !== null
+    && counterpartCents !== null
+    && currentCents !== 0
+    && currentCents === -counterpartCents;
+}
+
 module.exports = {
   hasSameConciliacaoDate,
   hasSameConciliacaoValue,
+  isExactOppositeBankTransfer,
   isExactConciliacaoMatch,
   normalizeDateOnly,
-  toAbsoluteCents
+  toAbsoluteCents,
+  toSignedCents
 };

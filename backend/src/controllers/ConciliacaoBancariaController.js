@@ -5,6 +5,7 @@ const {
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
+  estornarConciliacao,
   estornarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
@@ -139,6 +140,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao estornar transferencia conciliada');
+    }
+  },
+
+  async estornar(req, res) {
+    try {
+      const data = await estornarConciliacao(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao estornar conciliacao bancaria');
     }
   },
 

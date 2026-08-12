@@ -27,6 +27,7 @@ const { criarTransferenciaFinanceira } = require('./transferenciaFinanceiraServi
 const {
   hasSameConciliacaoDate,
   hasSameConciliacaoValue,
+  isExactOppositeBankTransfer,
   isExactConciliacaoMatch
 } = require('../utils/conciliacaoMatch');
 
@@ -1116,6 +1117,100 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
   };
 }
 
+function isConciliacaoLivreParaTransferencia(conciliacao) {
+  return String(conciliacao?.status || '').toUpperCase() === 'PENDENTE'
+    && !conciliacao?.deleted_at
+    && !conciliacao?.transferencia_financeira_id
+    && !conciliacao?.movimento_financeiro_id
+    && !conciliacao?.titulo_financeiro_id
+    && !conciliacao?.fatura_cartao_id;
+}
+
+function isContraparteTransferenciaExata(conciliacao, candidata) {
+  return Number(candidata?.id || 0) !== Number(conciliacao?.id || 0)
+    && Number(candidata?.conta_bancaria_id || 0) !== Number(conciliacao?.conta_bancaria_id || 0)
+    && isExactOppositeBankTransfer({
+      currentDate: conciliacao?.data_movimento,
+      currentValue: conciliacao?.valor,
+      counterpartDate: candidata?.data_movimento,
+      counterpartValue: candidata?.valor
+    })
+    && isConciliacaoLivreParaTransferencia(candidata);
+}
+
+async function carregarContrapartesTransferenciaExatas(conciliacoes = [], options = {}) {
+  const itens = conciliacoes.filter(isConciliacaoLivreParaTransferencia);
+  if (!itens.length) return new Map();
+
+  const paresUnicos = new Map();
+  itens.forEach((item) => {
+    const key = `${item.data_movimento}:${roundCurrency(-Number(item.valor || 0))}`;
+    paresUnicos.set(key, {
+      data_movimento: item.data_movimento,
+      valor: roundCurrency(-Number(item.valor || 0))
+    });
+  });
+
+  const where = {
+    status: 'PENDENTE',
+    deleted_at: null,
+    transferencia_financeira_id: null,
+    movimento_financeiro_id: null,
+    titulo_financeiro_id: null,
+    fatura_cartao_id: null,
+    [Op.or]: [...paresUnicos.values()]
+  };
+
+  if (options.contaContraparteId) {
+    where.conta_bancaria_id = Number(options.contaContraparteId);
+  }
+
+  const query = {
+    where,
+    attributes: [
+      'id',
+      'conta_bancaria_id',
+      'empresa_id',
+      'data_movimento',
+      'valor',
+      'descricao_banco',
+      'documento',
+      'status',
+      'deleted_at',
+      'transferencia_financeira_id',
+      'movimento_financeiro_id',
+      'titulo_financeiro_id',
+      'fatura_cartao_id'
+    ],
+    include: [
+      {
+        model: ContaBancaria,
+        as: 'contaBancaria',
+        required: true,
+        attributes: [],
+        where: { ativo: true }
+      }
+    ],
+    transaction: options.transaction || null
+  };
+
+  if (options.lock && options.transaction) {
+    query.lock = options.transaction.LOCK.UPDATE;
+  }
+
+  const candidatas = await ConciliacaoBancaria.findAll(query);
+  const resultado = new Map();
+
+  itens.forEach((item) => {
+    resultado.set(
+      Number(item.id),
+      candidatas.filter((candidata) => isContraparteTransferenciaExata(item, candidata))
+    );
+  });
+
+  return resultado;
+}
+
 async function listarConciliacoes(req, filters = {}) {
   await assertFinanceAccess(req);
 
@@ -1220,6 +1315,7 @@ async function listarConciliacoes(req, filters = {}) {
   const movimentoMap = new Map(movimentos.map((item) => [Number(item.id), item.toJSON()]));
   const faturaMap = new Map(faturas.map((item) => [Number(item.id), item.toJSON()]));
   const usuarioMap = new Map(usuarios.map((item) => [Number(item.id), item.toJSON()]));
+  const contrapartesTransferenciaMap = await carregarContrapartesTransferenciaExatas(itens);
 
   const rows = await Promise.all(itens.map(async (item) => {
     const json = item.toJSON();
@@ -1228,6 +1324,10 @@ async function listarConciliacoes(req, filters = {}) {
     const movimento = movimentoMap.get(Number(json.movimento_financeiro_id || 0));
     const faturaCartao = faturaMap.get(Number(json.fatura_cartao_id || 0));
     const confirmadoPor = usuarioMap.get(Number(json.confirmado_por || 0));
+    const contrapartesTransferencia = contrapartesTransferenciaMap.get(Number(json.id)) || [];
+    const contraparteTransferenciaAutomatica = contrapartesTransferencia.length === 1
+      ? contrapartesTransferencia[0]
+      : null;
     const analise = String(item.status || '').toUpperCase() === 'PENDENTE'
       ? await analyzeSuggestions(req, item)
       : {
@@ -1296,7 +1396,20 @@ async function listarConciliacoes(req, filters = {}) {
       total_candidatos: analise.total_candidatos,
       total_candidatos_exatos_mesmo_dia: analise.total_candidatos_exatos_mesmo_dia,
       associacao_manual_recomendada: analise.associacao_manual_recomendada,
-      conciliacao_em_lote_disponivel: analise.conciliacao_em_lote_disponivel
+      conciliacao_em_lote_disponivel: analise.conciliacao_em_lote_disponivel,
+      transferencia_contraparte_automatica: contraparteTransferenciaAutomatica
+        ? {
+            conciliacao_id: contraparteTransferenciaAutomatica.id,
+            conta_bancaria_id: contraparteTransferenciaAutomatica.conta_bancaria_id,
+            empresa_id: contraparteTransferenciaAutomatica.empresa_id,
+            data_movimento: contraparteTransferenciaAutomatica.data_movimento,
+            valor: Number(contraparteTransferenciaAutomatica.valor || 0),
+            descricao_banco: contraparteTransferenciaAutomatica.descricao_banco || null,
+            documento: contraparteTransferenciaAutomatica.documento || null
+          }
+        : null,
+      transferencia_contrapartes_exatas: contrapartesTransferencia.length,
+      transferencia_contraparte_ambigua: contrapartesTransferencia.length > 1
     };
   }));
 
@@ -1718,6 +1831,15 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
     }
 
     const isSaidaDaContaAtual = Number(conciliacao.valor || 0) < 0;
+    const contrapartesMap = await carregarContrapartesTransferenciaExatas([conciliacao], {
+      contaContraparteId,
+      transaction,
+      lock: true
+    });
+    const contrapartesExatas = contrapartesMap.get(Number(conciliacao.id)) || [];
+    const conciliacaoContraparte = contrapartesExatas.length === 1
+      ? contrapartesExatas[0]
+      : null;
     const payloadTransferencia = {
       conta_origem_id: isSaidaDaContaAtual ? contaAtualId : contaContraparteId,
       conta_destino_id: isSaidaDaContaAtual ? contaContraparteId : contaAtualId,
@@ -1728,8 +1850,8 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
       tipo_intercompany: payload.tipo_intercompany || null,
       motivo_intercompany: payload.motivo_intercompany || null,
       elimina_consolidado: payload.elimina_consolidado === false ? false : true,
-      conciliacao_origem_id: isSaidaDaContaAtual ? conciliacao.id : null,
-      conciliacao_destino_id: isSaidaDaContaAtual ? null : conciliacao.id
+      conciliacao_origem_id: isSaidaDaContaAtual ? conciliacao.id : conciliacaoContraparte?.id || null,
+      conciliacao_destino_id: isSaidaDaContaAtual ? conciliacaoContraparte?.id || null : conciliacao.id
     };
 
     const { transferencia, afterCommit } = await criarTransferenciaFinanceira(
@@ -1747,6 +1869,18 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
       confirmado_por: req.user?.id || null,
       confirmado_em: new Date()
     }, { transaction });
+
+    if (conciliacaoContraparte) {
+      await conciliacaoContraparte.update({
+        transferencia_financeira_id: transferencia.id,
+        movimento_financeiro_id: null,
+        titulo_financeiro_id: null,
+        fatura_cartao_id: null,
+        status: 'CONCILIADO',
+        confirmado_por: req.user?.id || null,
+        confirmado_em: new Date()
+      }, { transaction });
+    }
 
     await transaction.commit();
     if (afterCommit) await afterCommit();
@@ -1767,6 +1901,9 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
         empresa_destino_id: transferencia.empresa_destino_id,
         tipo_intercompany: transferencia.tipo_intercompany,
         elimina_consolidado: transferencia.elimina_consolidado,
+        conciliacao_contraparte_id: conciliacaoContraparte?.id || null,
+        contraparte_localizada_automaticamente: Boolean(conciliacaoContraparte),
+        contrapartes_exatas_encontradas: contrapartesExatas.length,
         valor
       }
     });
@@ -1876,6 +2013,139 @@ async function estornarConciliacaoTransferencia(req, conciliacaoId, payload = {}
     });
 
     return loadConciliacaoById(req, conciliacaoId);
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    throw error;
+  }
+}
+
+async function estornarConciliacao(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const motivo = String(payload.motivo || '').trim();
+  if (!motivo) throw createHttpError(400, 'Informe o motivo do estorno da conciliacao.');
+
+  const referencia = await loadConciliacaoById(req, conciliacaoId);
+  if (referencia.transferencia_financeira_id) {
+    return estornarConciliacaoTransferencia(req, conciliacaoId, payload);
+  }
+
+  const transaction = await sequelize.transaction();
+  let tipoEstorno = 'VINCULO_FINANCEIRO';
+  let movimentosVinculados = [];
+  let fatura = null;
+
+  try {
+    const conciliacao = await ConciliacaoBancaria.findOne({
+      where: {
+        id: parseInteger(conciliacaoId, 'Conciliacao bancaria'),
+        deleted_at: null
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    if (String(conciliacao.status || '').toUpperCase() !== 'CONCILIADO') {
+      throw createHttpError(409, 'Somente lancamentos conciliados podem ser estornados.');
+    }
+    if (conciliacao.transferencia_financeira_id) {
+      throw createHttpError(409, 'A conciliacao passou a representar uma transferencia. Atualize o relatorio e tente novamente.');
+    }
+
+    const movimentoPrincipalId = Number(conciliacao.movimento_financeiro_id || 0) || null;
+    movimentosVinculados = await MovimentoFinanceiro.findAll({
+      where: {
+        [Op.or]: [
+          { conciliacao_bancaria_id: conciliacao.id },
+          ...(movimentoPrincipalId ? [{ id: movimentoPrincipalId }] : [])
+        ]
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+
+    const movimentoComOutroVinculo = movimentosVinculados.find((movimento) => (
+      movimento.conciliacao_bancaria_id
+      && Number(movimento.conciliacao_bancaria_id) !== Number(conciliacao.id)
+    ));
+    if (movimentoComOutroVinculo) {
+      throw createHttpError(409, 'Um movimento financeiro ja esta vinculado a outra conciliacao e exige revisao manual.');
+    }
+
+    const movimentoTarifa = movimentosVinculados.find((movimento) => (
+      String(movimento.tipo_movimento || '').toUpperCase() === 'TARIFA_BANCARIA'
+    ));
+    if (movimentoTarifa) {
+      if (String(movimentoTarifa.status || '').toUpperCase() !== 'ATIVO') {
+        throw createHttpError(409, 'O movimento da tarifa ja foi estornado ou nao esta ativo.');
+      }
+      tipoEstorno = 'TARIFA_BANCARIA';
+      await movimentoTarifa.update({
+        status: 'ESTORNADO',
+        conciliacao_bancaria_id: null,
+        observacoes: `${String(movimentoTarifa.observacoes || '').trim()}\nEstorno da conciliacao: ${motivo}`.trim(),
+        estornado_por: req.user?.id || null,
+        estornado_em: new Date()
+      }, { transaction });
+    }
+
+    for (const movimento of movimentosVinculados) {
+      if (movimentoTarifa && Number(movimento.id) === Number(movimentoTarifa.id)) continue;
+      await movimento.update({ conciliacao_bancaria_id: null }, { transaction });
+    }
+
+    if (conciliacao.fatura_cartao_id) {
+      fatura = await FaturaCartaoFinanceiro.findByPk(conciliacao.fatura_cartao_id, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+      if (!fatura) throw createHttpError(409, 'A fatura vinculada a conciliacao nao foi encontrada.');
+      if (
+        fatura.conciliacao_bancaria_id
+        && Number(fatura.conciliacao_bancaria_id) !== Number(conciliacao.id)
+      ) {
+        throw createHttpError(409, 'A fatura ja esta vinculada a outra conciliacao e exige revisao manual.');
+      }
+      await fatura.update({ conciliacao_bancaria_id: null }, { transaction });
+      tipoEstorno = 'FATURA_CARTAO';
+    } else if (conciliacao.titulo_financeiro_id) {
+      tipoEstorno = 'TITULO_FINANCEIRO';
+    } else if (movimentosVinculados.length && tipoEstorno !== 'TARIFA_BANCARIA') {
+      tipoEstorno = 'MOVIMENTO_FINANCEIRO';
+    }
+
+    await conciliacao.update({
+      status: 'PENDENTE',
+      transferencia_financeira_id: null,
+      movimento_financeiro_id: null,
+      titulo_financeiro_id: null,
+      fatura_cartao_id: null,
+      caixa_sessao_id: null,
+      confirmado_por: null,
+      confirmado_em: null
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILIATION_REVERSED',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: conciliacao.id,
+      status: 'SUCCESS',
+      descricao: 'Conciliacao bancaria estornada e lancamento OFX reaberto',
+      metadata: {
+        motivo,
+        tipo_estorno: tipoEstorno,
+        movimento_financeiro_ids: movimentosVinculados.map((movimento) => movimento.id),
+        titulo_financeiro_id: conciliacao.titulo_financeiro_id || null,
+        fatura_cartao_id: fatura?.id || null,
+        conta_bancaria_id: conciliacao.conta_bancaria_id,
+        valor: Number(conciliacao.valor || 0)
+      }
+    });
+
+    return loadConciliacaoById(req, conciliacao.id);
   } catch (error) {
     if (!transaction.finished) await transaction.rollback();
     throw error;
@@ -2491,6 +2761,7 @@ module.exports = {
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
+  estornarConciliacao,
   estornarConciliacaoTransferencia,
   criarTituloEConciliar,
   ignorarConciliacao,
