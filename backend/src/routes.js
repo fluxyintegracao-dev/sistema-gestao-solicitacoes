@@ -173,6 +173,7 @@ const {
   validateFinanceConciliacaoConciliarSugeridosBody,
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConfirmBody,
+  validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
@@ -672,6 +673,10 @@ const allowBaixaCompostaConfirmar = allowFinanceiroArea(
 const allowBaixaCompostaEstornar = allowFinanceiroArea(
   'FINANCEIRO_BAIXAS_COMPOSTAS_ESTORNAR',
   ['financeiro.baixas_compostas.estornar']
+);
+const allowConciliacaoCorrigirConta = allowFinanceiroArea(
+  'FINANCEIRO_CONCILIACAO_CORRIGIR_CONTA',
+  ['financeiro.conciliacao.conciliar']
 );
 
 function allowFinanceiroRelatorio(permissionKeys = []) {
@@ -1710,6 +1715,7 @@ router.post('/financeiro/conciliacoes/conciliar-sugeridos', allowFinanceiro, cri
 router.get('/financeiro/conciliacoes/:id/movimentos', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.movimentos);
 router.post('/financeiro/conciliacoes/:id/criar-titulo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCriarTituloBody }), ConciliacaoBancariaController.criarTitulo);
 router.post('/financeiro/conciliacoes/:id/confirmar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoConfirmBody }), ConciliacaoBancariaController.confirmar);
+router.patch('/financeiro/conciliacoes/:id/conta', allowConciliacaoCorrigirConta, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCorrigirContaBody }), ConciliacaoBancariaController.corrigirConta);
 router.post('/financeiro/conciliacoes/:id/ignorar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.ignorar);
 router.post('/financeiro/conciliacoes/:id/remover', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.remover);
 router.get('/financeiro/conciliacoes/:id/faturas-cartao', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), query: validateFinanceConciliacaoMovimentosQuery }), ConciliacaoBancariaController.faturas);

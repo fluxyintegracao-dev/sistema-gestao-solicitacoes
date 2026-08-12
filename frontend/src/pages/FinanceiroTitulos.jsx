@@ -220,7 +220,7 @@ function FinanceiroFilterAutocomplete({
   };
 
   return (
-    <div key={label} className={`${className} relative`}>
+    <div key={label} className={`${className} relative ${open ? 'z-[60]' : 'z-0'}`}>
       <span className="app-filter-label">{label}</span>
       <div className="relative">
         <input
@@ -2275,7 +2275,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         />
       )}
 
-      <form className="card sol-surface-card app-toolbar-card" onSubmit={submitFilters}>
+      <form className="card sol-surface-card app-toolbar-card relative z-20 overflow-visible" onSubmit={submitFilters}>
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div>
@@ -2335,7 +2335,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </div>
 
           <div className={`grid transition-[grid-template-rows] duration-200 ${advancedOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}>
-            <div className="overflow-hidden">
+            <div className={advancedOpen ? 'overflow-visible' : 'overflow-hidden'}>
               <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-2 xl:grid-cols-12">
                 {advancedVisibleFilters.map((filter) => renderFilterField(filter))}
               </div>
@@ -2425,7 +2425,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       ) : null}
 
-      <div className="grid gap-3 md:grid-cols-4">
+      <div className="relative z-0 grid gap-3 md:grid-cols-4">
         {[
           { label: 'Titulos filtrados', value: String(resumo.quantidade), icon: HiOutlineDocumentText },
           { label: 'Valor total', value: formatCurrency(resumo.total), icon: HiOutlineSparkles },

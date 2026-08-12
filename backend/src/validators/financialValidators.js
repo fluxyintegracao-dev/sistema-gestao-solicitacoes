@@ -926,6 +926,19 @@ function validateFinanceConciliacaoConfirmBody(body = {}) {
   };
 }
 
+function validateFinanceConciliacaoCorrigirContaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['conta_bancaria_id', 'motivo'],
+    'Correcao da conta da conciliacao bancaria'
+  );
+
+  return {
+    conta_bancaria_id: parseInteger(body.conta_bancaria_id, 'Conta bancaria', { required: true }),
+    motivo: parseOptionalText(body.motivo, 'Justificativa', 255, { required: true })
+  };
+}
+
 function validateFinanceConciliacaoTransferenciaBody(body = {}) {
   ensureAllowedKeys(
     body,
@@ -1912,6 +1925,7 @@ module.exports = {
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConciliarSugeridosBody,
   validateFinanceConciliacaoConfirmBody,
+  validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
   validateFinanceConciliacaoImportBody,

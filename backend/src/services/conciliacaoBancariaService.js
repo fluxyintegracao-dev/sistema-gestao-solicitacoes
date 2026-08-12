@@ -2215,6 +2215,115 @@ async function ignorarConciliacao(req, conciliacaoId) {
   return loadConciliacaoById(req, conciliacao.id);
 }
 
+async function corrigirContaConciliacao(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const contaBancariaId = parseInteger(payload.conta_bancaria_id, 'Conta bancaria');
+  const motivo = String(payload.motivo || '').replace(/\s+/g, ' ').trim();
+  if (motivo.length < 10) {
+    throw createHttpError(400, 'Informe uma justificativa com pelo menos 10 caracteres.');
+  }
+
+  const transaction = await sequelize.transaction();
+  let auditoria = null;
+  try {
+    const conciliacao = await ConciliacaoBancaria.findOne({
+      where: { id: parseInteger(conciliacaoId, 'Conciliacao bancaria'), deleted_at: null },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) {
+      throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    }
+    if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
+      throw createHttpError(409, 'Estorne primeiro a baixa vinculada. Somente lancamentos pendentes podem trocar de conta.');
+    }
+    if (
+      conciliacao.movimento_financeiro_id
+      || conciliacao.titulo_financeiro_id
+      || conciliacao.fatura_cartao_id
+      || conciliacao.transferencia_financeira_id
+      || conciliacao.caixa_sessao_id
+    ) {
+      throw createHttpError(409, 'O lancamento ainda possui vinculos financeiros. Estorne a operacao antes de corrigir a conta.');
+    }
+
+    const contaAnteriorId = Number(conciliacao.conta_bancaria_id || 0) || null;
+    if (contaAnteriorId === contaBancariaId) {
+      throw createHttpError(400, 'Selecione uma conta diferente da conta atual.');
+    }
+
+    const [contaAnterior, contaNova] = await Promise.all([
+      contaAnteriorId
+        ? ContaBancaria.findByPk(contaAnteriorId, { transaction })
+        : null,
+      ContaBancaria.findByPk(contaBancariaId, { transaction, lock: transaction.LOCK.UPDATE })
+    ]);
+    if (!contaNova || contaNova.ativo === false) {
+      throw createHttpError(400, 'A nova conta bancaria e invalida ou esta inativa.');
+    }
+    if (!contaNova.empresa_id) {
+      throw createHttpError(400, 'A nova conta bancaria precisa estar vinculada a uma empresa.');
+    }
+
+    const duplicateWhere = {
+      id: { [Op.ne]: conciliacao.id },
+      conta_bancaria_id: contaNova.id,
+      deleted_at: null
+    };
+    if (conciliacao.ofx_uid) {
+      duplicateWhere.ofx_uid = conciliacao.ofx_uid;
+    } else {
+      duplicateWhere.data_movimento = conciliacao.data_movimento;
+      duplicateWhere.valor = conciliacao.valor;
+      duplicateWhere.documento = conciliacao.documento || null;
+    }
+    const duplicada = await ConciliacaoBancaria.findOne({
+      where: duplicateWhere,
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (duplicada) {
+      throw createHttpError(409, `A conta selecionada ja possui este lancamento no extrato (conciliacao #${duplicada.id}).`);
+    }
+
+    auditoria = {
+      conta_anterior_id: contaAnteriorId,
+      conta_anterior_nome: contaAnterior?.nome || null,
+      empresa_anterior_id: Number(conciliacao.empresa_id || 0) || null,
+      conta_nova_id: contaNova.id,
+      conta_nova_nome: contaNova.nome,
+      empresa_nova_id: Number(contaNova.empresa_id),
+      motivo
+    };
+
+    await conciliacao.update({
+      conta_bancaria_id: contaNova.id,
+      empresa_id: contaNova.empresa_id,
+      confirmado_por: null,
+      confirmado_em: null
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_RECONCILIATION_ACCOUNT_CORRECTED',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: conciliacao.id,
+      status: 'SUCCESS',
+      descricao: 'Conta bancaria do lancamento OFX corrigida apos estorno',
+      metadata: auditoria
+    });
+
+    return loadConciliacaoById(req, conciliacao.id);
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    throw error;
+  }
+}
+
 async function removerConciliacao(req, conciliacaoId, payload = {}) {
   const conciliacao = await loadConciliacaoById(req, conciliacaoId);
   const status = String(conciliacao.status || '').toUpperCase();
@@ -2256,6 +2365,7 @@ async function removerConciliacao(req, conciliacaoId, payload = {}) {
 
 module.exports = {
   conciliarSugeridos,
+  corrigirContaConciliacao,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,

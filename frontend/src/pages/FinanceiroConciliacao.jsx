@@ -4,6 +4,7 @@ import {
   baixarTituloPorConciliacoes,
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
+  corrigirContaConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
   confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
@@ -716,7 +717,106 @@ function NovoTituloRapidoModal({ item, contas, onClose, onConciliar }) {
 
 // ─── ItemConciliacao — layout 2 colunas ──────────────────────────────────────
 
-function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
+function CorrigirContaConciliacaoModal({ item, contas, onClose, onConfirmar }) {
+  const contasDisponiveis = contas.filter((conta) => (
+    conta.ativo !== false && String(conta.id) !== String(item?.conta_bancaria_id)
+  ));
+  const [contaBancariaId, setContaBancariaId] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (saving) return;
+    if (!contaBancariaId) {
+      setError('Selecione a conta bancaria correta.');
+      return;
+    }
+    if (motivo.trim().length < 10) {
+      setError('Informe uma justificativa com pelo menos 10 caracteres.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError('');
+      await onConfirmar(item.id, {
+        conta_bancaria_id: Number(contaBancariaId),
+        motivo: motivo.trim()
+      });
+    } catch (err) {
+      setError(err?.message || 'Erro ao corrigir conta da conciliacao.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-[1px]" role="dialog" aria-modal="true" aria-labelledby="corrigir-conta-title">
+      <div className="w-full max-w-xl overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
+          <div>
+            <h2 id="corrigir-conta-title" className="text-base font-semibold text-[var(--c-text)]">Corrigir conta do extrato</h2>
+            <p className="mt-1 text-xs text-[var(--c-muted)]">
+              O lancamento permanecera pendente para ser conciliado novamente na conta correta.
+            </p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={onClose} disabled={saving} aria-label="Fechar">Fechar</button>
+        </div>
+
+        <form className="space-y-4 p-5" onSubmit={handleSubmit}>
+          <div className="grid gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 text-sm sm:grid-cols-2">
+            <div>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Lancamento</span>
+              <span className="font-medium text-[var(--c-text)]">{item?.descricao_banco || `Conciliacao #${item?.id}`}</span>
+            </div>
+            <div>
+              <span className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">Conta atual</span>
+              <span className="font-medium text-[var(--c-text)]">{item?.conta_bancaria_nome || '-'}</span>
+            </div>
+          </div>
+
+          <label className="block">
+            <span className="app-filter-label">Conta bancaria correta *</span>
+            <select className="input mt-1 w-full" value={contaBancariaId} onChange={(event) => setContaBancariaId(event.target.value)} disabled={saving}>
+              <option value="">Selecione</option>
+              {contasDisponiveis.map((conta) => (
+                <option key={conta.id} value={conta.id}>
+                  {getContaNome(conta)} · {getContaEmpresaNome(conta)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="app-filter-label">Justificativa da correcao *</span>
+            <textarea
+              className="input mt-1 min-h-24 w-full resize-y"
+              maxLength={255}
+              value={motivo}
+              onChange={(event) => setMotivo(event.target.value)}
+              placeholder="Ex.: OFX importado e conciliado na conta bancaria incorreta."
+              disabled={saving}
+            />
+            <span className="mt-1 block text-[10px] text-[var(--c-muted)]">A justificativa e as contas anterior e nova ficarao registradas na auditoria.</span>
+          </label>
+
+          {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-200">{error}</div>}
+
+          <div className="flex justify-end gap-2 border-t border-[var(--c-border)] pt-4">
+            <button type="button" className="btn btn-outline" onClick={onClose} disabled={saving}>Cancelar</button>
+            <button type="submit" className="btn btn-primary" disabled={saving || !contasDisponiveis.length}>
+              {saving ? 'Salvando...' : 'Corrigir e manter pendente'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onCorrigirConta, onAssociarManual, onAssociarFatura, onAssociarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
 
   const isPendente = item.status === 'PENDENTE';
@@ -733,6 +833,7 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
   const isConfirmando = processingId === pidConfirmar;
   const isIgnorando = processingId === `ignorar-${item.id}`;
   const isRemovendo = processingId === `remover-${item.id}`;
+  const isCorrigindoConta = processingId === `corrigir-conta-${item.id}`;
   const podeConfirmar = isPendente && Boolean(topSugestao) && !isConfirmando;
 
   return (
@@ -780,6 +881,14 @@ function ItemConciliacao({ item, processingId, selected = false, onToggleSelecao
           {/* ignorar */}
           {isPendente && (
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="text-[10px] font-medium text-blue-600 hover:text-blue-800 underline underline-offset-2 leading-tight dark:text-blue-300 dark:hover:text-blue-200"
+                disabled={isIgnorando || isRemovendo || isCorrigindoConta}
+                onClick={() => onCorrigirConta(item)}
+              >
+                Corrigir conta
+              </button>
               <button
                 type="button"
                 className="text-[10px] text-slate-400 hover:text-amber-600 underline underline-offset-2 leading-tight"
@@ -1310,6 +1419,7 @@ export default function FinanceiroConciliacao() {
   });
   const [conciliacoesSelecionadas, setConciliacoesSelecionadas] = useState([]);
   const [baixaExtratosModalOpen, setBaixaExtratosModalOpen] = useState(false);
+  const [corrigirContaItem, setCorrigirContaItem] = useState(null);
 
   const contaAtualTransferencia = useMemo(
     () => contas.find((conta) => String(conta.id) === String(transferenciaModal.item?.conta_bancaria_id)),
@@ -1578,6 +1688,23 @@ export default function FinanceiroConciliacao() {
       setFeedback('Lancamento removido do extrato.');
       await carregarConciliacoes();
     } catch (err) { setError(err?.message || 'Erro ao remover lancamento do extrato'); } finally { setProcessingId(null); }
+  }
+
+  async function handleCorrigirConta(conciliacaoId, payload) {
+    try {
+      setProcessingId(`corrigir-conta-${conciliacaoId}`);
+      setError('');
+      setFeedback('');
+      await corrigirContaConciliacaoBancaria(conciliacaoId, payload);
+      setCorrigirContaItem(null);
+      setFeedback('Conta corrigida. O lancamento permanece pendente para uma nova conciliacao.');
+      await carregarResumoContas();
+      await carregarConciliacoes();
+    } catch (err) {
+      throw err;
+    } finally {
+      setProcessingId(null);
+    }
   }
 
   async function handleConciliarSugeridos() {
@@ -2219,6 +2346,7 @@ export default function FinanceiroConciliacao() {
                     onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
                     onRemover={handleRemover}
+                    onCorrigirConta={setCorrigirContaItem}
                     onAssociarManual={abrirAssociacaoManual}
                     onAssociarFatura={abrirAssociacaoFatura}
                     onAssociarTransferencia={abrirAssociacaoTransferencia}
@@ -2242,6 +2370,15 @@ export default function FinanceiroConciliacao() {
           itens={conciliacoesSelecionadasItens}
           onClose={() => setBaixaExtratosModalOpen(false)}
           onConfirmar={handleBaixarTituloPorExtratos}
+        />
+      )}
+
+      {corrigirContaItem && (
+        <CorrigirContaConciliacaoModal
+          item={corrigirContaItem}
+          contas={contas}
+          onClose={() => setCorrigirContaItem(null)}
+          onConfirmar={handleCorrigirConta}
         />
       )}
 

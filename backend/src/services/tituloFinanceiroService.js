@@ -48,6 +48,7 @@ const {
   buildIntercompanyCartaoPayload
 } = require('./tituloIntercompanyCartaoHelper');
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
+const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -4114,6 +4115,7 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
   });
 
   const transaction = await sequelize.transaction();
+  let conciliacoesReabertas = [];
   try {
     await movimento.update({
       status: 'ESTORNADO',
@@ -4227,6 +4229,12 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
       }, { transaction });
     }
 
+    conciliacoesReabertas = await reabrirConciliacoesPorMovimentos({
+      movimentoIds: [movimento.id],
+      usuarioId: req.user?.id || null,
+      transaction
+    });
+
     await transaction.commit();
 
     await registrarEventoSeguranca({
@@ -4239,7 +4247,8 @@ async function estornarMovimentoTitulo(req, tituloId, movimentoId, payload = {})
       descricao: 'Baixa financeira estornada',
       metadata: {
         movimento_id: movimento.id,
-        valor_estornado: Number(movimento.valor || 0)
+        valor_estornado: Number(movimento.valor || 0),
+        conciliacoes_reabertas: conciliacoesReabertas
       }
     });
 

@@ -25,6 +25,7 @@ const {
 } = require('./tituloFinanceiroService');
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
+const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
 
 const STATUS_CHEQUE = ['EM_CARTEIRA', 'RESERVADO', 'UTILIZADO', 'DEPOSITADO', 'DEVOLVIDO', 'CANCELADO'];
 const EVENTOS_MANUAIS = {
@@ -769,6 +770,7 @@ async function listarBaixasCompostas(filters = {}) {
 
 async function estornarBaixaComposta(req, id, payload = {}) {
   const transaction = await sequelize.transaction();
+  let conciliacoesReabertas = [];
   try {
     const motivoEstorno = texto(payload.motivo || payload.observacoes, 4000);
     if (!motivoEstorno) throw httpError(400, 'Justificativa do estorno e obrigatoria.');
@@ -822,9 +824,23 @@ async function estornarBaixaComposta(req, id, payload = {}) {
         criado_por: req.user?.id || null
       }, transaction);
     }
+    conciliacoesReabertas = await reabrirConciliacoesPorMovimentos({
+      movimentoIds,
+      usuarioId: req.user?.id || null,
+      transaction
+    });
     await grupo.update({ status: 'ESTORNADO', estornado_por: req.user?.id || null, estornado_em: new Date(), observacoes: [grupo.observacoes, `Estorno: ${motivoEstorno}`].filter(Boolean).join('\n') }, { transaction });
     await transaction.commit();
-    await registrarEventoSeguranca({ req, usuarioId: req.user?.id || null, tipoEvento: 'FINANCIAL_COMPOSED_SETTLEMENT_REVERSED', recursoTipo: 'BAIXA_FINANCEIRA_GRUPO', recursoId: grupo.id, status: 'SUCCESS', descricao: 'Baixa composta estornada' });
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_COMPOSED_SETTLEMENT_REVERSED',
+      recursoTipo: 'BAIXA_FINANCEIRA_GRUPO',
+      recursoId: grupo.id,
+      status: 'SUCCESS',
+      descricao: 'Baixa composta estornada',
+      metadata: { conciliacoes_reabertas: conciliacoesReabertas }
+    });
     return obterBaixaComposta(grupo.id);
   } catch (error) {
     await transaction.rollback();

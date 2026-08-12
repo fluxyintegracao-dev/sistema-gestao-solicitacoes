@@ -374,6 +374,16 @@ export async function confirmarConciliacaoBancaria(id, data) {
   return parseJson(response, 'Erro ao confirmar conciliacao bancaria');
 }
 
+export async function corrigirContaConciliacaoBancaria(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/conta`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao corrigir conta da conciliacao bancaria');
+}
+
 export async function getFaturasAssociacaoConciliacao(id, params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
