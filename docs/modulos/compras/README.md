@@ -51,6 +51,16 @@ Compras e dono da solicitacao de compra, origem normal/direta, itens, quantidade
 
 Campos e rotas de diretoria ainda presentes no backend atendem somente compras antigas formalmente marcadas com esse fluxo e nao definem a criacao vigente.
 
+## Frete em cotacao e pedido
+
+- a resposta publica do fornecedor e a edicao interna usam o mesmo contrato de frete: `SEM_FRETE`, `EMBUTIDO` ou `TERCEIRO`;
+- o lancamento pode ser `GLOBAL` ou `POR_ITEM`; no modo por item, cada item pode ter frete positivo ou zero;
+- o fechamento proporcional considera somente a quantidade comprada e preserva o saldo de frete para rodadas futuras;
+- o pedido guarda o frete rateado em cada item, o frete total da rodada, o total da aquisicao e o total devido ao fornecedor;
+- frete embutido integra o valor devido ao fornecedor; frete de terceiro integra o custo da aquisicao, mas gera obrigacao financeira separada;
+- edicao e remanejamento recalculam os rateios e totais dentro da transacao existente, sem mudar rotas, permissoes ou estados do pedido;
+- detalhe, comparativo e PDF exibem o frete e o total da aquisicao para evitar que um frete informado fique apenas como texto.
+
 As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/solicitacoes/:id/liberar` respondem `410`. O codigo depois desse retorno e legado inacessivel e nao define a regra vigente.
 
 ## Dependencias

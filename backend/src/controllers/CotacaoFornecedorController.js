@@ -216,16 +216,24 @@ function normalizarPrazoEntrega(options = {}, isRascunho = false) {
   return { dias: null, tipo: null, texto: legado || null };
 }
 
-function normalizarFreteCotacao(options = {}, isRascunho = false) {
+function normalizarFreteCotacao(options = {}, isRascunho = false, respostas = []) {
   const tipo = String(options.frete_tipo || 'SEM_FRETE').trim().toUpperCase();
+  const modo = String(options.frete_modo || 'GLOBAL').trim().toUpperCase();
   if (!['SEM_FRETE', 'EMBUTIDO', 'TERCEIRO'].includes(tipo)) {
     throw new Error('Tipo de frete invalido.');
   }
+  if (!['GLOBAL', 'POR_ITEM'].includes(modo)) {
+    throw new Error('Modo de frete invalido.');
+  }
 
-  const valor = normalizarValorGerencial(options.frete_valor, 'Valor do frete');
+  const valorGlobal = normalizarValorGerencial(options.frete_valor, 'Valor do frete');
+  const valorItens = respostas.reduce((sum, item) => sum + normalizarValorGerencial(item.frete_valor, 'Frete do item'), 0);
+  const valor = Number((modo === 'POR_ITEM' ? valorItens : valorGlobal).toFixed(2));
   const dataVencimento = options.frete_data_vencimento || null;
-  if (!isRascunho && tipo === 'TERCEIRO' && valor <= 0) {
-    throw new Error('Informe o valor do frete pago a terceiro.');
+  if (!isRascunho && tipo !== 'SEM_FRETE' && valor <= 0) {
+    throw new Error(modo === 'POR_ITEM'
+      ? 'Informe o frete de ao menos um item.'
+      : 'Informe o valor do frete.');
   }
   if (!isRascunho && tipo === 'TERCEIRO' && !dataVencimento) {
     throw new Error('Informe a data para pagamento do frete pago a terceiro.');
@@ -233,6 +241,7 @@ function normalizarFreteCotacao(options = {}, isRascunho = false) {
 
   return {
     tipo,
+    modo: tipo === 'SEM_FRETE' ? 'GLOBAL' : modo,
     valor: tipo === 'SEM_FRETE' ? 0 : valor,
     dataVencimento: tipo === 'TERCEIRO' ? dataVencimento : null,
     transportadorNome: String(options.frete_transportador_nome || '').trim() || null,
@@ -415,6 +424,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       desconto_total: cotacaoFornecedor?.desconto_total ?? 0,
       difal_valor: cotacaoFornecedor?.difal_valor ?? 0,
       frete_tipo: cotacaoFornecedor?.frete_tipo || 'SEM_FRETE',
+      frete_modo: cotacaoFornecedor?.frete_modo || 'GLOBAL',
       frete_valor: cotacaoFornecedor?.frete_valor ?? 0,
       frete_data_vencimento: cotacaoFornecedor?.frete_data_vencimento || '',
       frete_transportador_nome: cotacaoFornecedor?.frete_transportador_nome || '',
@@ -452,6 +462,7 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
         ipi_valor: resposta?.ipi_valor ?? 0,
         icms_valor: resposta?.icms_valor ?? 0,
         st_valor: resposta?.st_valor ?? 0,
+        frete_valor: resposta?.frete_valor ?? 0,
         resposta_item_id: resposta?.id || null,
         vencedor: Boolean(resposta?.vencedor)
       };
@@ -475,7 +486,6 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     ? String(options.condicao_pagamento || '').trim() || null
     : normalizarCampoObrigatorio(options.condicao_pagamento, 'a condicao de pagamento');
   const prazoEntrega = normalizarPrazoEntrega(options, isRascunho);
-  const frete = normalizarFreteCotacao(options, isRascunho);
   const observacaoResposta = String(options.observacao_resposta || '').trim() || null;
 
   for (const itemResposta of itensResposta) {
@@ -526,6 +536,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
     const ipiValor = normalizarValorGerencial(itemResposta.ipi_valor, `IPI do item ${itemBase.nome}`);
     const icmsValor = normalizarValorGerencial(itemResposta.icms_valor, `ICMS do item ${itemBase.nome}`);
     const stValor = normalizarValorGerencial(itemResposta.st_valor, `ST do item ${itemBase.nome}`);
+    const freteValor = normalizarValorGerencial(itemResposta.frete_valor, `Frete do item ${itemBase.nome}`);
 
     const statusEfetivo = isRascunho
       ? statusDisponibilidade
@@ -555,9 +566,11 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       ipi_valor: disponivel ? ipiValor : 0,
       icms_valor: disponivel ? icmsValor : 0,
       st_valor: disponivel ? stValor : 0,
+      frete_valor: disponivel ? freteValor : 0,
       vencedor: false
     });
   }
+  const frete = normalizarFreteCotacao(options, isRascunho, respostasPreparadas);
 
   const usuarioInterno = options.usuario_interno || null;
   const transaction = await sequelize.transaction();
@@ -616,7 +629,8 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         'quantidade_disponivel',
         'ipi_valor',
         'icms_valor',
-        'st_valor'
+        'st_valor',
+        'frete_valor'
       ],
       transaction
     });
@@ -684,6 +698,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
       prazo_entrega_dias: prazoEntrega.dias,
       prazo_entrega_tipo: prazoEntrega.tipo,
       frete_tipo: frete.tipo,
+      frete_modo: frete.modo,
       frete_valor: frete.valor,
       frete_data_vencimento: frete.dataVencimento,
       frete_transportador_nome: frete.transportadorNome,
@@ -719,6 +734,7 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
         prazo_entrega_tipo: prazoEntrega.tipo,
         difal_valor: difalValor,
         frete_tipo: frete.tipo,
+        frete_modo: frete.modo,
         frete_valor: frete.valor,
         frete_data_vencimento: frete.dataVencimento,
         frete_transportador_nome: frete.transportadorNome,
@@ -1188,6 +1204,7 @@ module.exports = {
         prazo_entrega_tipo: req.body?.prazo_entrega_tipo,
         difal_valor: req.body?.difal_valor,
         frete_tipo: req.body?.frete_tipo,
+        frete_modo: req.body?.frete_modo,
         frete_valor: req.body?.frete_valor,
         frete_data_vencimento: req.body?.frete_data_vencimento,
         frete_transportador_nome: req.body?.frete_transportador_nome,
@@ -1235,6 +1252,7 @@ module.exports = {
         prazo_entrega_tipo: req.body?.prazo_entrega_tipo,
         difal_valor: req.body?.difal_valor,
         frete_tipo: req.body?.frete_tipo,
+        frete_modo: req.body?.frete_modo,
         frete_valor: req.body?.frete_valor,
         frete_data_vencimento: req.body?.frete_data_vencimento,
         frete_transportador_nome: req.body?.frete_transportador_nome,
@@ -1393,6 +1411,7 @@ module.exports = {
         prazo_entrega_tipo: req.body.prazo_entrega_tipo,
         difal_valor: req.body.difal_valor,
         frete_tipo: req.body.frete_tipo,
+        frete_modo: req.body.frete_modo,
         frete_valor: req.body.frete_valor,
         frete_data_vencimento: req.body.frete_data_vencimento,
         frete_transportador_nome: req.body.frete_transportador_nome,

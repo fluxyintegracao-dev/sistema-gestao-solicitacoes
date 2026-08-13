@@ -63,6 +63,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      frete_valor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
       status_disponibilidade: {
         type: DataTypes.STRING(20),
         allowNull: true

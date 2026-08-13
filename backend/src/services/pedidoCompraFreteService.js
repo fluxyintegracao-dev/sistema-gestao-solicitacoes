@@ -8,6 +8,7 @@ const {
   PedidoCompraFrete,
   PedidoCompraFreteRateio,
   PedidoCompraItem,
+  SolicitacaoCompraAlocacao,
   Solicitacao,
   SolicitacaoCompra,
   TituloFinanceiro,
@@ -19,6 +20,7 @@ const {
   sincronizarFornecedorCompraComParceiro
 } = require('./comprasFornecedorService');
 const { isPedidoCompraStatusLocked } = require('./pedidoCompraStatusConfig');
+const { sincronizarTotaisFretePedido } = require('./pedidoCompraTotaisService');
 
 function asNumber(value) {
   const parsed = Number(value || 0);
@@ -175,6 +177,38 @@ function calcularRateiosProporcionais({ itens, valorTotal, pedido }) {
   });
 }
 
+function calcularRateiosInformados({ itens, valorTotal, pedido, rateiosInformados }) {
+  const itensAtivos = itens.filter((item) => !item.removido);
+  const itensPorId = new Map(itensAtivos.map((item) => [Number(item.id), item]));
+  const recebidos = Array.isArray(rateiosInformados) ? rateiosInformados : [];
+  const rateios = recebidos
+    .map((entry) => ({
+      item: itensPorId.get(Number(entry?.pedido_compra_item_id || 0)),
+      valor: roundMoney(entry?.valor_rateado)
+    }))
+    .filter((entry) => entry.item && entry.valor > 0);
+
+  if (!rateios.length) {
+    throw new Error('Informe ao menos um item com frete para realizar o rateio por item.');
+  }
+  const totalRateado = roundMoney(rateios.reduce((sum, entry) => sum + entry.valor, 0));
+  if (Math.abs(totalRateado - valorTotal) > 0.01) {
+    throw new Error('A soma do frete por item precisa ser igual ao valor total do frete.');
+  }
+
+  return rateios.map(({ item, valor }) => ({
+    pedido_compra_id: pedido.id,
+    pedido_compra_item_id: item.id,
+    solicitacao_compra_item_id: item.solicitacao_compra_item_id || null,
+    solicitacao_compra_item_manual_id: item.solicitacao_compra_item_manual_id || null,
+    obra_id: pedido.obra_id || null,
+    valor_item_base: roundMoney(item.valor_total),
+    percentual_rateio: valorTotal > 0 ? Number(((valor / valorTotal) * 100).toFixed(6)) : 0,
+    valor_rateado: valor,
+    manual: true
+  }));
+}
+
 async function resolverFornecedorFrete(payload, transaction, { permitirSemCredor = false } = {}) {
   if (Number(payload.fornecedor_compra_id || 0) > 0) {
     const fornecedor = await FornecedorCompra.findByPk(Number(payload.fornecedor_compra_id), { transaction });
@@ -244,7 +278,10 @@ async function registrarFretePedido({
   let freteOrigemCancelado = null;
   if (origemCotacaoFornecedorId) {
     const existenteOrigem = await PedidoCompraFrete.findOne({
-      where: { origem_cotacao_fornecedor_id: origemCotacaoFornecedorId },
+      where: {
+        pedido_compra_id: pedido.id,
+        origem_cotacao_fornecedor_id: origemCotacaoFornecedorId
+      },
       transaction
     });
     if (existenteOrigem) {
@@ -281,7 +318,7 @@ async function registrarFretePedido({
   if (!['FECHAMENTO', 'POSTERIOR'].includes(momento)) {
     throw new Error('Momento do frete invalido.');
   }
-  if (!['VALOR_ITENS'].includes(criterioRateio)) {
+  if (!['VALOR_ITENS', 'POR_ITEM'].includes(criterioRateio)) {
     throw new Error('Criterio de rateio ainda nao disponivel para este pedido.');
   }
   if (valorTotal <= 0) {
@@ -306,11 +343,18 @@ async function registrarFretePedido({
     ? JSON.stringify(payload.dados_pagamento)
     : (payload.dados_pagamento ? JSON.stringify({ observacoes: String(payload.dados_pagamento) }) : null);
   const statusFinanceiro = tipo === 'TERCEIRO' ? 'PENDENTE_TITULO' : 'NAO_GERA_TITULO';
-  const rateios = calcularRateiosProporcionais({
-    itens: pedido.itens || [],
-    valorTotal,
-    pedido
-  });
+  const rateios = criterioRateio === 'POR_ITEM'
+    ? calcularRateiosInformados({
+        itens: pedido.itens || [],
+        valorTotal,
+        pedido,
+        rateiosInformados: payload.rateios
+      })
+    : calcularRateiosProporcionais({
+        itens: pedido.itens || [],
+        valorTotal,
+        pedido
+      });
 
   const dadosFrete = {
       pedido_compra_id: pedido.id,
@@ -343,6 +387,7 @@ async function registrarFretePedido({
     rateios.map((rateio) => ({ ...rateio, frete_id: frete.id })),
     { transaction }
   );
+  await sincronizarTotaisFretePedido(pedido.id, transaction);
 
   await registrarLogSolicitacaoCompra({
     solicitacaoCompraId: pedido.solicitacao_compra_id,
@@ -483,12 +528,86 @@ async function registrarHistoricoControleFrete({
   }
 }
 
-async function recalcularRateiosFrete({ pedido, frete, valorTotal, transaction }) {
-  const rateios = calcularRateiosProporcionais({
-    itens: pedido.itens || [],
-    valorTotal,
-    pedido
-  });
+async function recalcularRateiosFrete({ pedido, frete, valorTotal, rateiosInformados, transaction }) {
+  const itensAtivos = (pedido.itens || []).filter((item) => !item.removido);
+  let totalEfetivo = roundMoney(valorTotal);
+  let rateios;
+
+  if (Array.isArray(rateiosInformados) && rateiosInformados.length) {
+    rateios = calcularRateiosInformados({
+      itens: itensAtivos,
+      valorTotal: totalEfetivo,
+      pedido,
+      rateiosInformados
+    });
+  } else if (normalizeToken(frete.criterio_rateio) === 'POR_ITEM' && frete.origem_cotacao_fornecedor_id) {
+    const alocacoes = await SolicitacaoCompraAlocacao.findAll({
+      where: {
+        pedido_compra_id: pedido.id,
+        status: 'ATIVA',
+        frete_rateado: { [Op.gt]: 0 }
+      },
+      attributes: ['pedido_compra_item_id', 'frete_rateado'],
+      transaction
+    });
+    const fretePorItem = new Map();
+    for (const alocacao of alocacoes) {
+      const itemId = Number(alocacao.pedido_compra_item_id || 0);
+      fretePorItem.set(itemId, roundMoney((fretePorItem.get(itemId) || 0) + asNumber(alocacao.frete_rateado)));
+    }
+    const rateiosCotacao = itensAtivos
+      .map((item) => ({
+        pedido_compra_item_id: item.id,
+        valor_rateado: fretePorItem.get(Number(item.id)) || 0
+      }))
+      .filter((item) => item.valor_rateado > 0);
+    totalEfetivo = roundMoney(rateiosCotacao.reduce((sum, item) => sum + item.valor_rateado, 0));
+    rateios = totalEfetivo > 0
+      ? calcularRateiosInformados({
+          itens: itensAtivos,
+          valorTotal: totalEfetivo,
+          pedido,
+          rateiosInformados: rateiosCotacao
+        })
+      : [];
+  } else if (normalizeToken(frete.criterio_rateio) === 'POR_ITEM') {
+    const existentes = await PedidoCompraFreteRateio.findAll({
+      where: { frete_id: frete.id },
+      transaction
+    });
+    const idsAtivos = new Set(itensAtivos.map((item) => Number(item.id)));
+    const preservados = existentes
+      .filter((rateio) => idsAtivos.has(Number(rateio.pedido_compra_item_id)))
+      .map((rateio) => ({
+        pedido_compra_item_id: rateio.pedido_compra_item_id,
+        valor_rateado: asNumber(rateio.valor_rateado)
+      }));
+    const rateiosPositivos = preservados.filter((item) => item.valor_rateado > 0);
+    const basePreservada = rateiosPositivos.reduce((sum, item) => sum + item.valor_rateado, 0);
+    const escalados = basePreservada > 0 ? rateiosPositivos.map((item, index) => ({
+      pedido_compra_item_id: item.pedido_compra_item_id,
+      valor_rateado: index === rateiosPositivos.length - 1
+        ? roundMoney(totalEfetivo - rateiosPositivos.slice(0, -1).reduce(
+            (sum, entry) => sum + roundMoney(totalEfetivo * entry.valor_rateado / basePreservada),
+            0
+          ))
+        : roundMoney(totalEfetivo * item.valor_rateado / basePreservada)
+    })) : [];
+    rateios = escalados.length
+      ? calcularRateiosInformados({
+          itens: itensAtivos,
+          valorTotal: totalEfetivo,
+          pedido,
+          rateiosInformados: escalados
+        })
+      : calcularRateiosProporcionais({ itens: itensAtivos, valorTotal: totalEfetivo, pedido });
+  } else {
+    rateios = calcularRateiosProporcionais({
+      itens: itensAtivos,
+      valorTotal: totalEfetivo,
+      pedido
+    });
+  }
 
   await PedidoCompraFreteRateio.destroy({
     where: { frete_id: frete.id },
@@ -499,6 +618,10 @@ async function recalcularRateiosFrete({ pedido, frete, valorTotal, transaction }
     rateios.map((rateio) => ({ ...rateio, frete_id: frete.id })),
     { transaction }
   );
+  if (roundMoney(frete.valor_total) !== totalEfetivo) {
+    await frete.update({ valor_total: totalEfetivo }, { transaction });
+  }
+  return totalEfetivo;
 }
 
 async function sincronizarRateiosFretesPendentesPedido({
@@ -559,6 +682,8 @@ async function sincronizarRateiosFretesPendentesPedido({
     });
   }
 
+  await sincronizarTotaisFretePedido(pedido.id, transaction);
+
   return fretes.length;
 }
 
@@ -605,7 +730,14 @@ async function atualizarFretePedido({
     { transaction }
   );
 
-  await recalcularRateiosFrete({ pedido, frete, valorTotal, transaction });
+  await recalcularRateiosFrete({
+    pedido,
+    frete,
+    valorTotal,
+    rateiosInformados: payload.rateios,
+    transaction
+  });
+  await sincronizarTotaisFretePedido(pedido.id, transaction);
 
   await registrarHistoricoControleFrete({
     pedido,
@@ -650,6 +782,7 @@ async function cancelarFretePedido({
     },
     { transaction }
   );
+  await sincronizarTotaisFretePedido(pedido.id, transaction);
 
   await registrarHistoricoControleFrete({
     pedido,

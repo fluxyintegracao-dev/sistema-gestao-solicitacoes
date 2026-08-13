@@ -651,6 +651,7 @@ async function carregarSolicitacaoCompra(id) {
               'ipi_valor',
               'icms_valor',
               'st_valor',
+              'frete_valor',
               'vencedor'
             ],
             include: [
@@ -664,6 +665,7 @@ async function carregarSolicitacaoCompra(id) {
                   'icms_rateado',
                   'st_rateado',
                   'difal_rateado',
+                  'frete_rateado',
                   'status'
                 ]
               }
@@ -1279,6 +1281,7 @@ function montarComparativoSolicitacao(solicitacao) {
     prazo_entrega_tipo: cotacaoFornecedor.prazo_entrega_tipo || null,
     difal_valor: Number(cotacaoFornecedor.difal_valor || 0),
     frete_tipo: cotacaoFornecedor.frete_tipo || 'SEM_FRETE',
+    frete_modo: cotacaoFornecedor.frete_modo || 'GLOBAL',
     frete_valor: Number(cotacaoFornecedor.frete_valor || 0),
     frete_data_vencimento: cotacaoFornecedor.frete_data_vencimento || null,
     frete_transportador_nome: cotacaoFornecedor.frete_transportador_nome || '',
@@ -1327,6 +1330,7 @@ function montarComparativoSolicitacao(solicitacao) {
         prazo_entrega_fornecedor: cotacaoFornecedor.prazo_entrega || '',
         difal_valor: Number(cotacaoFornecedor.difal_valor || 0),
         frete_tipo: cotacaoFornecedor.frete_tipo || 'SEM_FRETE',
+        frete_modo: cotacaoFornecedor.frete_modo || 'GLOBAL',
         frete_valor: Number(cotacaoFornecedor.frete_valor || 0),
         frete_data_vencimento: cotacaoFornecedor.frete_data_vencimento || null,
         observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
@@ -1346,6 +1350,7 @@ function montarComparativoSolicitacao(solicitacao) {
         ipi_valor: Number(resposta?.ipi_valor || 0),
         icms_valor: Number(resposta?.icms_valor || 0),
         st_valor: Number(resposta?.st_valor || 0),
+        frete_item_valor: Number(resposta?.frete_valor || 0),
         valor_total_cotado: resposta
           ? arredondarMoeda(
               Number(resposta.quantidade_disponivel ?? (resposta.disponivel ? item.quantidade : 0))
@@ -1353,6 +1358,9 @@ function montarComparativoSolicitacao(solicitacao) {
               + Number(resposta.ipi_valor || 0)
               + Number(resposta.icms_valor || 0)
               + Number(resposta.st_valor || 0)
+              + ((cotacaoFornecedor.frete_modo || 'GLOBAL') === 'POR_ITEM'
+                ? Number(resposta.frete_valor || 0)
+                : 0)
             )
           : 0,
         quantidade_alocada: disponibilidadeFornecedor.quantidade_alocada,

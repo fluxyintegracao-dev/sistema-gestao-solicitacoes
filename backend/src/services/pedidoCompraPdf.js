@@ -310,8 +310,8 @@ function drawFornecedorGrid(doc, context, y) {
 }
 
 function getTableColumns(metrics) {
-  const widths = [32, 188, 62, 74, 74, 46, 80, 82, 124];
-  const labels = ['#', 'Item', 'Origem', 'Qtd. solic.', 'Qtd. pedido', 'Unid.', 'Preco unit.', 'Total', 'Observacoes'];
+  const widths = [28, 148, 54, 62, 62, 40, 70, 66, 76, 156];
+  const labels = ['#', 'Item', 'Origem', 'Qtd. solic.', 'Qtd. pedido', 'Unid.', 'Preco unit.', 'Frete', 'Total aquis.', 'Observacoes'];
   let currentX = metrics.left;
 
   return widths.map((width, index) => {
@@ -354,7 +354,7 @@ function drawTableHeader(doc, y, columns, metrics) {
       .fillColor('#334155')
       .text(column.label, column.x + 4, y + 8, {
         width: column.width - 8,
-        align: ['#', 'Qtd. solic.', 'Qtd. pedido', 'Unid.', 'Preco unit.', 'Total'].includes(column.label) ? 'center' : 'left'
+        align: ['#', 'Qtd. solic.', 'Qtd. pedido', 'Unid.', 'Preco unit.', 'Frete', 'Total aquis.'].includes(column.label) ? 'center' : 'left'
       });
   });
 
@@ -364,7 +364,7 @@ function drawTableHeader(doc, y, columns, metrics) {
 function drawItemRow(doc, item, index, y, columns) {
   const observacoes = item?.observacoes || item?.respostaItem?.observacao || '-';
   const itemHeight = doc.heightOfString(item?.descricao || '-', { width: columns[1].width - 8 });
-  const obsHeight = doc.heightOfString(observacoes, { width: columns[8].width - 8 });
+  const obsHeight = doc.heightOfString(observacoes, { width: columns[9].width - 8 });
   const rowHeight = Math.max(28, Math.ceil(Math.max(itemHeight, obsHeight) + 12));
   const rowFill = index % 2 === 0 ? '#ffffff' : '#f8fafc';
 
@@ -385,8 +385,9 @@ function drawItemRow(doc, item, index, y, columns) {
   drawCellText(doc, formatQuantity(item?.quantidade_pedido), columns[4], y, rowHeight, { align: 'center' });
   drawCellText(doc, item?.unidade || '-', columns[5], y, rowHeight, { align: 'center' });
   drawCellText(doc, formatMoney(item?.preco_unitario), columns[6], y, rowHeight, { align: 'right' });
-  drawCellText(doc, formatMoney(item?.valor_total), columns[7], y, rowHeight, { align: 'right' });
-  drawCellText(doc, observacoes, columns[8], y, rowHeight, { fontSize: 7.5 });
+  drawCellText(doc, formatMoney(item?.frete_rateado), columns[7], y, rowHeight, { align: 'right' });
+  drawCellText(doc, formatMoney(Number(item?.valor_total || 0) + Number(item?.frete_rateado || 0)), columns[8], y, rowHeight, { align: 'right' });
+  drawCellText(doc, observacoes, columns[9], y, rowHeight, { fontSize: 7.5 });
 
   return rowHeight;
 }
@@ -491,7 +492,7 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
 
   cell(tableX,                 wForn, r1y, rowH, 'Fornecedor', pedido?.fornecedor?.nome);
   cell(tableX + wForn,         wObra, r1y, rowH, 'Obra',       pedido?.obra?.nome);
-  cell(tableX + wForn + wObra, wVlr,  r1y, rowH, 'Valor Total',
+  cell(tableX + wForn + wObra, wVlr,  r1y, rowH, 'Total aquisicao',
     formatMoney(pedido?.valor_total),
     { bold: true, fontSize: 11, color: '#1d4ed8', drawRight: false });
   y += rowH;
@@ -541,9 +542,13 @@ function drawNFStyleHeader(doc, context, { continued = false } = {}) {
   const r4y = y;
   const wCost = Math.floor(tableW / 5);
   const wCostLast = tableW - wCost * 4;
+  const freteModo = pedido?.frete_modo_cotacao === 'POR_ITEM' ? 'por item' : 'geral';
+  const freteValorPedido = pedido?.frete_total ?? pedido?.frete_valor_cotacao;
   const freteDescricao = pedido?.frete_tipo_cotacao === 'TERCEIRO'
-    ? `Terceiro ${formatMoney(pedido?.frete_valor_cotacao)}`
-    : (pedido?.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido' : 'Sem frete');
+    ? `Terceiro, ${freteModo}: ${formatMoney(freteValorPedido)}`
+    : (pedido?.frete_tipo_cotacao === 'EMBUTIDO'
+      ? `Embutido, ${freteModo}: ${formatMoney(freteValorPedido)}`
+      : 'Sem frete');
   cell(tableX, wCost, r4y, rowH, 'Mercadorias', formatMoney(pedido?.valor_mercadorias));
   cell(tableX + wCost, wCost, r4y, rowH, 'IPI + ICMS + ST', formatMoney(pedido?.valor_tributos));
   cell(tableX + wCost * 2, wCost, r4y, rowH, 'DIFAL rateado', formatMoney(pedido?.difal_total));
@@ -632,7 +637,7 @@ async function renderPedidoCompraPdf(doc, pedido) {
         Math.ceil(
           Math.max(
             doc.heightOfString(item?.descricao || '-', { width: columns[1].width - 8 }),
-            doc.heightOfString(observacoes, { width: columns[8].width - 8 })
+            doc.heightOfString(observacoes, { width: columns[9].width - 8 })
           ) + 12
         )
       );

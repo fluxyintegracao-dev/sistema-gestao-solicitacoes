@@ -577,6 +577,7 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
       'prazo_entrega_tipo',
       'difal_valor',
       'frete_tipo',
+      'frete_modo',
       'frete_valor',
       'frete_data_vencimento',
       'frete_transportador_nome',
@@ -614,7 +615,8 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
         'quantidade_disponivel',
         'ipi_valor',
         'icms_valor',
-        'st_valor'
+        'st_valor',
+        'frete_valor'
       ],
       `Item ${index + 1} da resposta`
     );
@@ -674,6 +676,11 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
         min: 0,
         scale: 2,
         brazilianFormat: true
+      }) || 0,
+      frete_valor: parseDecimal(entry.frete_valor, `Frete do item ${index + 1}`, {
+        min: 0,
+        scale: 2,
+        brazilianFormat: true
       }) || 0
     };
   });
@@ -702,6 +709,7 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
       brazilianFormat: true
     }) || 0,
     frete_tipo: parseOptionalText(body.frete_tipo, 'Tipo de frete', 20),
+    frete_modo: parseOptionalText(body.frete_modo, 'Modo do frete', 20),
     frete_valor: parseDecimal(body.frete_valor, 'Valor do frete', {
       min: 0,
       scale: 2,
@@ -1294,7 +1302,8 @@ function validateCompraPedidoFreteBody(body = {}) {
       'parceiro_id',
       'novo_fornecedor',
       'dados_pagamento',
-      'observacoes'
+      'observacoes',
+      'rateios'
     ],
     'Frete do pedido'
   );
@@ -1320,7 +1329,7 @@ function validateCompraPedidoFreteBody(body = {}) {
   if (!['FECHAMENTO', 'POSTERIOR'].includes(momento)) {
     throw new ValidationError('Momento do frete invalido.');
   }
-  if (!['VALOR_ITENS'].includes(criterioRateio)) {
+  if (!['VALOR_ITENS', 'POR_ITEM'].includes(criterioRateio)) {
     throw new ValidationError('Criterio de rateio invalido.');
   }
 
@@ -1347,6 +1356,12 @@ function validateCompraPedidoFreteBody(body = {}) {
     parceiro_id: parseInteger(body.parceiro_id, 'Credor'),
     novo_fornecedor: novoFornecedor,
     dados_pagamento: dadosPagamento,
+    rateios: Array.isArray(body.rateios)
+      ? body.rateios.map((rateio) => ({
+          pedido_compra_item_id: parseInteger(rateio?.pedido_compra_item_id, 'Item do pedido', { required: true }),
+          valor_rateado: parseDecimal(rateio?.valor_rateado, 'Frete do item', { required: true, min: 0.01 })
+        }))
+      : undefined,
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 5000)
   };
 }

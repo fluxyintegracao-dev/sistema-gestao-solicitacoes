@@ -39,6 +39,10 @@ const {
 } = require('./pedidoCompraFreteService');
 const { validarResponsavelElegivelDelegacaoCompras } = require('./comprasDelegacaoService');
 const {
+  sincronizarTotaisFretePedido,
+  sincronizarValoresSolicitacaoCompra
+} = require('./pedidoCompraTotaisService');
+const {
   buildCompraFornecedorItemKey,
   calcularDisponibilidadeFornecedorItem,
   montarMapaAlocacoesAtivasPorFornecedorItem
@@ -234,51 +238,6 @@ function isSolicitacaoCompraEncerrada(solicitacao) {
 function getQuantidadeBaseItem(solicitacao, resposta) {
   const baseItem = obterBaseItemPorResposta(solicitacao, resposta);
   return baseItem ? roundQty(baseItem.quantidade_solicitada) : 0;
-}
-
-async function sincronizarValoresSolicitacaoCompra(solicitacaoId, transaction) {
-  const solicitacao = await SolicitacaoCompra.findByPk(Number(solicitacaoId), {
-    transaction,
-    attributes: ['id', 'solicitacao_principal_id']
-  });
-
-  if (!solicitacao) {
-    return null;
-  }
-
-  const pedidos = await PedidoCompra.findAll({
-    where: { solicitacao_compra_id: solicitacao.id },
-    include: [{ model: PedidoCompraItem, as: 'itens' }],
-    transaction
-  });
-
-  const valorFechado = roundMoney(
-    pedidos.reduce((total, pedido) => {
-      if (normalizeText(pedido.status) === 'CANCELADO') {
-        return total;
-      }
-
-      const valorPedido = (pedido.itens || [])
-        .filter((item) => !item.removido)
-        .reduce((sum, item) => sum + asNumber(item.valor_total), 0);
-
-      return total + valorPedido;
-    }, 0)
-  );
-
-  await SolicitacaoCompra.update(
-    { valor_fechado: valorFechado },
-    { where: { id: solicitacao.id }, transaction }
-  );
-
-  if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
-    await Solicitacao.update(
-      { valor: valorFechado },
-      { where: { id: solicitacao.solicitacao_principal_id }, transaction }
-    );
-  }
-
-  return valorFechado;
 }
 
 async function buscarUltimosPrecosPorInsumo(insumoIds, obraIdsEscopo = null, solicitacaoCompraIdIgnorar = null) {
@@ -614,7 +573,7 @@ async function recalcularPedidoPorId(pedidoId, transaction) {
     { transaction }
   );
 
-  await sincronizarValoresSolicitacaoCompra(pedido.solicitacao_compra_id, transaction);
+  await sincronizarTotaisFretePedido(pedido.id, transaction);
 
   return PedidoCompra.findByPk(pedidoId, {
     transaction,
@@ -1268,6 +1227,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     solicitacao?.alocacoes || []
   );
   const tributosAnterioresPorFornecedorItem = new Map();
+  const fretesAnterioresPorFornecedorItem = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
     const fornecedorItemKey = buildCompraFornecedorItemKey(alocacao.fornecedor_compra_id, alocacao);
@@ -1277,9 +1237,14 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       icms: roundMoney(atual.icms + asNumber(alocacao.icms_rateado)),
       st: roundMoney(atual.st + asNumber(alocacao.st_rateado))
     });
+    fretesAnterioresPorFornecedorItem.set(
+      fornecedorItemKey,
+      roundMoney((fretesAnterioresPorFornecedorItem.get(fornecedorItemKey) || 0) + asNumber(alocacao.frete_rateado))
+    );
   }
   const alocadoRodadaPorFornecedorItem = new Map();
   const tributosRodadaPorFornecedorItem = new Map();
+  const fretesRodadaPorFornecedorItem = new Map();
 
   for (const entrada of entradas) {
     const respostaItemId = Number(entrada?.resposta_item_id || entrada?.id || 0);
@@ -1356,11 +1321,22 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const ipiRateado = ratearTributo(resposta.ipi_valor, tributosAnteriores.ipi, tributosRodada.ipi);
     const icmsRateado = ratearTributo(resposta.icms_valor, tributosAnteriores.icms, tributosRodada.icms);
     const stRateado = ratearTributo(resposta.st_valor, tributosAnteriores.st, tributosRodada.st);
+    const freteItemRateado = normalizeText(vinculacaoFornecedor.frete_modo) === 'POR_ITEM'
+      ? ratearTributo(
+          resposta.frete_valor,
+          fretesAnterioresPorFornecedorItem.get(fornecedorItemKey) || 0,
+          fretesRodadaPorFornecedorItem.get(fornecedorItemKey) || 0
+        )
+      : 0;
     tributosRodadaPorFornecedorItem.set(fornecedorItemKey, {
       ipi: roundMoney(tributosRodada.ipi + ipiRateado),
       icms: roundMoney(tributosRodada.icms + icmsRateado),
       st: roundMoney(tributosRodada.st + stRateado)
     });
+    fretesRodadaPorFornecedorItem.set(
+      fornecedorItemKey,
+      roundMoney((fretesRodadaPorFornecedorItem.get(fornecedorItemKey) || 0) + freteItemRateado)
+    );
     const valorMercadoria = roundMoney(quantidadeAlocada * asNumber(resposta.preco));
     alocacoes.push({
       resposta,
@@ -1375,6 +1351,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       icms_rateado: icmsRateado,
       st_rateado: stRateado,
       difal_rateado: 0,
+      frete_rateado: freteItemRateado,
       valor_total: roundMoney(valorMercadoria + ipiRateado + icmsRateado + stRateado)
     });
   }
@@ -1390,6 +1367,7 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
 
   const descontosAtivosPorFornecedor = new Map();
   const difalAtivoPorFornecedor = new Map();
+  const freteAtivoPorFornecedor = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
     const fornecedorId = Number(alocacao.fornecedor_compra_id || 0);
@@ -1400,6 +1378,10 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     difalAtivoPorFornecedor.set(
       fornecedorId,
       roundMoney((difalAtivoPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.difal_rateado))
+    );
+    freteAtivoPorFornecedor.set(
+      fornecedorId,
+      roundMoney((freteAtivoPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.frete_rateado))
     );
   }
 
@@ -1428,6 +1410,21 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       alocacao.difal_rateado = difalRateadoItens[index] || 0;
       alocacao.valor_total = roundMoney(asNumber(alocacao.valor_total) + alocacao.difal_rateado);
     });
+
+    if (normalizeText(vinculacaoFornecedor?.frete_modo) !== 'POR_ITEM') {
+      const freteCotacao = roundMoney(vinculacaoFornecedor?.frete_valor);
+      const freteAnterior = roundMoney(freteAtivoPorFornecedor.get(fornecedorId) || 0);
+      const freteRestante = roundMoney(Math.max(0, freteCotacao - freteAnterior));
+      const basesFrete = grupo.map((alocacao) => alocacao.valor_mercadoria);
+      const baseRodada = basesFrete.reduce((sum, valor) => sum + asNumber(valor), 0);
+      const freteRodada = baseCotada > 0
+        ? roundMoney(Math.min(freteRestante, freteCotacao * (baseRodada / baseCotada)))
+        : 0;
+      const fretesRateados = calcularRateiosMonetarios(freteRodada, basesFrete);
+      grupo.forEach((alocacao, index) => {
+        alocacao.frete_rateado = fretesRateados[index] || 0;
+      });
+    }
 
     const descontoCotacao = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
     const descontoTotal = roundMoney(Math.max(0, descontoCotacao - (descontosAtivosPorFornecedor.get(fornecedorId) || 0)));
@@ -1464,6 +1461,7 @@ async function persistirAlocacoesSolicitacao({ solicitacao, fechamento, alocacoe
         icms_rateado: alocacao.icms_rateado || 0,
         st_rateado: alocacao.st_rateado || 0,
         difal_rateado: alocacao.difal_rateado || 0,
+        frete_rateado: alocacao.frete_rateado || 0,
         status: 'ATIVA',
         criado_por: usuarioId || null
       },
@@ -1498,6 +1496,7 @@ async function criarPedidoPorFornecedorRodada({
       prazo_entrega_dias: vinculacaoFornecedor.prazo_entrega_dias || null,
       prazo_entrega_tipo: vinculacaoFornecedor.prazo_entrega_tipo || null,
       frete_tipo_cotacao: vinculacaoFornecedor.frete_tipo || 'SEM_FRETE',
+      frete_modo_cotacao: vinculacaoFornecedor.frete_modo || 'GLOBAL',
       frete_valor_cotacao: roundMoney(vinculacaoFornecedor.frete_valor),
       frete_data_vencimento: vinculacaoFornecedor.frete_data_vencimento || null,
       frete_transportador_nome: vinculacaoFornecedor.frete_transportador_nome || null,
@@ -1764,25 +1763,37 @@ async function gerarPedidosDosVencedores({
             ipi_valor: roundMoney(registro.ipi_rateado),
             icms_valor: roundMoney(registro.icms_rateado),
             st_valor: roundMoney(registro.st_rateado),
-            difal_rateado: roundMoney(registro.difal_rateado)
+            difal_rateado: roundMoney(registro.difal_rateado),
+            frete_rateado: roundMoney(registro.frete_rateado)
           },
           { transaction }
         );
       }
     }
 
-    const pedidoComCustos = await recalcularPedidoPorId(pedido.id, transaction);
+    await recalcularPedidoPorId(pedido.id, transaction);
+    const valorFreteRodada = roundMoney(
+      grupo.registrosAlocacao.reduce((sum, registro) => sum + asNumber(registro.frete_rateado), 0)
+    );
     if (
-      normalizeText(grupo.vinculacaoFornecedor.frete_tipo) === 'TERCEIRO'
-      && roundMoney(grupo.vinculacaoFornecedor.frete_valor) > 0
+      ['EMBUTIDO', 'TERCEIRO'].includes(normalizeText(grupo.vinculacaoFornecedor.frete_tipo))
+      && valorFreteRodada > 0
     ) {
+      const rateiosFrete = grupo.registrosAlocacao.map((registro) => {
+        const itemPedido = itensPorResposta.get(Number(registro.resposta_item_id || 0));
+        return {
+          pedido_compra_item_id: itemPedido?.id || null,
+          valor_rateado: roundMoney(registro.frete_rateado)
+        };
+      }).filter((item) => item.pedido_compra_item_id && item.valor_rateado > 0);
       await registrarFretePedido({
         pedidoId: pedido.id,
         payload: {
-          tipo: 'TERCEIRO',
+          tipo: normalizeText(grupo.vinculacaoFornecedor.frete_tipo),
           momento: 'FECHAMENTO',
-          criterio_rateio: 'VALOR_ITENS',
-          valor_total: roundMoney(grupo.vinculacaoFornecedor.frete_valor),
+          criterio_rateio: 'POR_ITEM',
+          rateios: rateiosFrete,
+          valor_total: valorFreteRodada,
           data_vencimento: grupo.vinculacaoFornecedor.frete_data_vencimento,
           origem_cotacao_fornecedor_id: grupo.vinculacaoFornecedor.id,
           dados_pagamento: {
@@ -1798,7 +1809,13 @@ async function gerarPedidosDosVencedores({
         transaction
       });
     }
-    pedidosCriados.push(pedidoComCustos);
+    await sincronizarRateiosFretesPendentesPedido({
+      pedidoId: pedido.id,
+      usuarioId,
+      motivo: 'Sincronizacao da rodada de fechamento da cotacao',
+      transaction
+    });
+    pedidosCriados.push(await recalcularPedidoPorId(pedido.id, transaction));
   }
 
   return {
@@ -3703,6 +3720,7 @@ async function reduzirAlocacoesAtivasDoItem({ pedidoItemId, quantidade, usuarioI
     icms_rateado: 0,
     st_rateado: 0,
     difal_rateado: 0,
+    frete_rateado: 0,
     valor_total: 0
   };
   const alocacoes = await SolicitacaoCompraAlocacao.findAll({
@@ -3748,6 +3766,7 @@ async function reduzirAlocacoesAtivasDoItem({ pedidoItemId, quantidade, usuarioI
           icms_rateado: roundMoney(asNumber(alocacao.icms_rateado) - removidosAlocacao.icms_rateado),
           st_rateado: roundMoney(asNumber(alocacao.st_rateado) - removidosAlocacao.st_rateado),
           difal_rateado: roundMoney(asNumber(alocacao.difal_rateado) - removidosAlocacao.difal_rateado),
+          frete_rateado: roundMoney(asNumber(alocacao.frete_rateado) - removidosAlocacao.frete_rateado),
           valor_total: roundMoney(asNumber(alocacao.valor_total) - removidosAlocacao.valor_total)
         },
         { transaction }
@@ -3902,6 +3921,7 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
         icms_rateado: alocacaoDestino.icms_rateado || 0,
         st_rateado: alocacaoDestino.st_rateado || 0,
         difal_rateado: alocacaoDestino.difal_rateado || 0,
+        frete_rateado: alocacaoDestino.frete_rateado || 0,
         pedido_compra_id: pedidoDestino.id,
         pedido_compra_item_id: itemDestino.id,
         status: 'ATIVA',
@@ -3914,7 +3934,8 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
         ipi_valor: roundMoney(asNumber(itemDestino.ipi_valor) + asNumber(alocacaoDestino.ipi_rateado)),
         icms_valor: roundMoney(asNumber(itemDestino.icms_valor) + asNumber(alocacaoDestino.icms_rateado)),
         st_valor: roundMoney(asNumber(itemDestino.st_valor) + asNumber(alocacaoDestino.st_rateado)),
-        difal_rateado: roundMoney(asNumber(itemDestino.difal_rateado) + asNumber(alocacaoDestino.difal_rateado))
+        difal_rateado: roundMoney(asNumber(itemDestino.difal_rateado) + asNumber(alocacaoDestino.difal_rateado)),
+        frete_rateado: roundMoney(asNumber(itemDestino.frete_rateado) + asNumber(alocacaoDestino.frete_rateado))
       },
       { transaction }
     );
@@ -3936,6 +3957,7 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
       icms_valor: roundMoney(Math.max(0, asNumber(itemOrigem.icms_valor) - custosRemovidos.icms_rateado)),
       st_valor: roundMoney(Math.max(0, asNumber(itemOrigem.st_valor) - custosRemovidos.st_rateado)),
       difal_rateado: roundMoney(Math.max(0, asNumber(itemOrigem.difal_rateado) - custosRemovidos.difal_rateado)),
+      frete_rateado: roundMoney(Math.max(0, asNumber(itemOrigem.frete_rateado) - custosRemovidos.frete_rateado)),
       removido: quantidadeRestante <= 0,
       quantidade_cancelada: roundPedidoQty(asNumber(itemOrigem.quantidade_cancelada) + quantidadeRemanejada),
       motivo_cancelamento: String(motivo || '').trim() || itemOrigem.motivo_cancelamento || null
@@ -3979,16 +4001,20 @@ async function remanejarPedidoItem({ pedidoId, itemId, respostaItemIdDestino, qu
   });
 
   if (
-    normalizeText(fornecedorDestino.frete_tipo) === 'TERCEIRO'
-    && roundMoney(fornecedorDestino.frete_valor) > 0
+    ['EMBUTIDO', 'TERCEIRO'].includes(normalizeText(fornecedorDestino.frete_tipo))
+    && roundMoney(alocacaoDestino.frete_rateado) > 0
   ) {
     await registrarFretePedido({
       pedidoId: pedidoDestino.id,
       payload: {
-        tipo: 'TERCEIRO',
+        tipo: normalizeText(fornecedorDestino.frete_tipo),
         momento: 'REMANEJAMENTO',
-        criterio_rateio: 'VALOR_ITENS',
-        valor_total: roundMoney(fornecedorDestino.frete_valor),
+        criterio_rateio: 'POR_ITEM',
+        valor_total: roundMoney(alocacaoDestino.frete_rateado),
+        rateios: [{
+          pedido_compra_item_id: itemDestino.id,
+          valor_rateado: roundMoney(alocacaoDestino.frete_rateado)
+        }],
         data_vencimento: fornecedorDestino.frete_data_vencimento,
         origem_cotacao_fornecedor_id: fornecedorDestino.id,
         dados_pagamento: {

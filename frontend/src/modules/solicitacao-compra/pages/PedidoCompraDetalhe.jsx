@@ -321,7 +321,9 @@ function triggerBlobDownload(blob, fileName) {
 const FRETE_FORM_INICIAL = {
   tipo: 'EMBUTIDO',
   momento: 'FECHAMENTO',
+  criterio_rateio: 'VALOR_ITENS',
   valor_total: '',
+  rateios: [],
   data_vencimento: '',
   fornecedor_compra_id: '',
   parceiro_id: '',
@@ -664,7 +666,13 @@ export default function PedidoCompraDetalhe() {
       ...FRETE_FORM_INICIAL,
       tipo: String(frete.tipo || 'EMBUTIDO').toUpperCase(),
       momento: String(frete.momento || 'FECHAMENTO').toUpperCase(),
+      criterio_rateio: String(frete.criterio_rateio || 'VALOR_ITENS').toUpperCase(),
       valor_total: formatMoneyInput(frete.valor_total),
+      rateios: (frete.rateios || []).map((rateio) => ({
+        pedido_compra_item_id: Number(rateio.pedido_compra_item_id),
+        descricao: rateio.item?.descricao || 'Item do pedido',
+        valor_rateado: formatMoneyInput(rateio.valor_rateado)
+      })),
       data_vencimento: frete.data_vencimento ? String(frete.data_vencimento).slice(0, 10) : '',
       fornecedor_compra_id: credor?.fornecedor_compra_id ? String(credor.fornecedor_compra_id) : '',
       parceiro_id: credor?.parceiro_id ? String(credor.parceiro_id) : '',
@@ -694,6 +702,17 @@ export default function PedidoCompraDetalhe() {
     setFreteForm((current) => ({
       ...current,
       ...changes
+    }));
+  }
+
+  function atualizarRateioFrete(itemId, valor) {
+    setFreteForm((current) => ({
+      ...current,
+      rateios: (current.rateios || []).map((rateio) => (
+        Number(rateio.pedido_compra_item_id) === Number(itemId)
+          ? { ...rateio, valor_rateado: valor }
+          : rateio
+      ))
     }));
   }
 
@@ -820,10 +839,25 @@ export default function PedidoCompraDetalhe() {
     const payload = {
       tipo,
       momento: permiteFreteEmbutido ? freteForm.momento : 'POSTERIOR',
-      criterio_rateio: 'VALOR_ITENS',
+      criterio_rateio: freteForm.criterio_rateio || 'VALOR_ITENS',
       valor_total: valorTotal,
       observacoes: freteForm.observacoes
     };
+
+    if (payload.criterio_rateio === 'POR_ITEM') {
+      const rateios = (freteForm.rateios || [])
+        .map((rateio) => ({
+          pedido_compra_item_id: Number(rateio.pedido_compra_item_id),
+          valor_rateado: parseBrazilianMoney(rateio.valor_rateado)
+        }))
+        .filter((rateio) => rateio.pedido_compra_item_id > 0 && rateio.valor_rateado > 0);
+      const totalRateado = rateios.reduce((total, rateio) => total + rateio.valor_rateado, 0);
+      if (!rateios.length || Math.abs(totalRateado - valorTotal) > 0.01) {
+        alert('A soma do frete informado nos itens precisa ser igual ao valor total do frete.');
+        return;
+      }
+      payload.rateios = rateios;
+    }
 
     if (tipo === 'TERCEIRO') {
       if (!freteForm.data_vencimento) {
@@ -1453,8 +1487,14 @@ export default function PedidoCompraDetalhe() {
                 </div>
               ) : null}
               <div>
-                <div className="text-[var(--c-muted)]">Valor total</div>
+                <div className="text-[var(--c-muted)]">Total da aquisicao</div>
                 <div className="font-semibold">{formatMoney(pedido.valor_total)}</div>
+                <div className="text-xs text-[var(--c-muted)]">Itens, tributos, DIFAL e fretes</div>
+              </div>
+              <div>
+                <div className="text-[var(--c-muted)]">Total devido ao fornecedor</div>
+                <div className="font-semibold">{formatMoney(pedido.valor_total_fornecedor ?? pedido.valor_total)}</div>
+                <div className="text-xs text-[var(--c-muted)]">Frete de terceiro fica separado</div>
               </div>
               <div>
                 <div className="text-[var(--c-muted)]">Mercadorias</div>
@@ -1469,12 +1509,17 @@ export default function PedidoCompraDetalhe() {
                 <div className="font-semibold">{formatMoney(pedido.difal_total)}</div>
               </div>
               <div>
-                <div className="text-[var(--c-muted)]">Frete informado na cotacao</div>
+                <div className="text-[var(--c-muted)]">Frete deste pedido</div>
                 <div className="font-semibold">
-                  {pedido.frete_tipo_cotacao === 'TERCEIRO'
-                    ? `Pago a terceiro - ${formatMoney(pedido.frete_valor_cotacao)}`
-                    : (pedido.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido nos precos' : 'Sem frete')}
+                  {pedido.frete_tipo_cotacao === 'SEM_FRETE'
+                    ? 'Sem frete'
+                    : `${pedido.frete_tipo_cotacao === 'TERCEIRO' ? 'Pago a terceiro' : 'Embutido'} - ${formatMoney(pedido.frete_total ?? pedido.frete_valor_cotacao)}`}
                 </div>
+                {pedido.frete_tipo_cotacao !== 'SEM_FRETE' ? (
+                  <div className="text-xs text-[var(--c-muted)]">
+                    Lancamento {pedido.frete_modo_cotacao === 'POR_ITEM' ? 'por item' : 'global'}
+                  </div>
+                ) : null}
                 {pedido.frete_data_vencimento ? (
                   <div className="text-xs text-[var(--c-muted)]">Vencimento: {formatDate(pedido.frete_data_vencimento)}</div>
                 ) : null}
@@ -1563,7 +1608,7 @@ export default function PedidoCompraDetalhe() {
                       <div className="mt-1 font-semibold">{formatMoney(frete.valor_total)}</div>
                       <div className="mt-1 text-xs text-[var(--c-muted)]">
                         {frete.fornecedor?.nome || frete.parceiro?.nome ? `${frete.fornecedor?.nome || frete.parceiro?.nome} - ` : ''}
-                        {frete.rateios?.length || 0} rateio(s) por valor dos itens
+                        {frete.rateios?.length || 0} item(ns) com frete · {frete.criterio_rateio === 'POR_ITEM' ? 'valor informado por item' : 'rateio proporcional'}
                         {frete.data_vencimento ? ` - vence em ${formatDate(frete.data_vencimento)}` : ''}
                       </div>
                       {frete.tituloFinanceiro?.id ? (
@@ -1782,7 +1827,7 @@ export default function PedidoCompraDetalhe() {
               <div className="app-summary-card">
                 <span className="app-summary-label">Valor total</span>
                 <strong className="app-summary-value">{formatMoney(pedido.valor_total)}</strong>
-                <span className="app-summary-subvalue">Consolidado do pedido</span>
+                <span className="app-summary-subvalue">Total da aquisicao com frete</span>
               </div>
             </div>
 
@@ -1796,7 +1841,9 @@ export default function PedidoCompraDetalhe() {
                       <th>Origem</th>
                       <th>Solicitado</th>
                       <th>Pedido</th>
-                      <th>Valor total</th>
+                      <th>Itens</th>
+                      <th>Frete</th>
+                      <th>Total aquisicao</th>
                       <th>Situacao</th>
                       <th></th>
                     </tr>
@@ -1847,6 +1894,8 @@ export default function PedidoCompraDetalhe() {
                           <td>{formatQuantityLabel(item.quantidade_solicitada, item.unidade)}</td>
                           <td>{formatQuantityLabel(item.quantidade_pedido, item.unidade)}</td>
                           <td>{formatMoney(item.valor_total)}</td>
+                          <td>{formatMoney(item.frete_rateado)}</td>
+                          <td>{formatMoney(Number(item.valor_total || 0) + Number(item.frete_rateado || 0))}</td>
                           <td>
                             <span className={situacao.className}>{situacao.label}</span>
                           </td>
@@ -2382,11 +2431,44 @@ export default function PedidoCompraDetalhe() {
                   <div>
                     <div className="font-semibold">Rateio do frete</div>
                     <p className="mt-1 text-xs text-[var(--c-muted)]">
-                      Nesta etapa o sistema distribui o valor proporcionalmente ao valor dos itens ativos do pedido.
+                      {freteForm.criterio_rateio === 'POR_ITEM'
+                        ? 'O valor foi informado por item na cotacao. Ajuste os valores abaixo quando necessario.'
+                        : 'O sistema distribui o valor proporcionalmente ao valor dos itens ativos do pedido.'}
                     </p>
                   </div>
-                  <span className="app-status-pill bg-blue-50 text-blue-700">Por valor dos itens</span>
+                  <span className="app-status-pill bg-blue-50 text-blue-700">
+                    {freteForm.criterio_rateio === 'POR_ITEM' ? 'Informado por item' : 'Proporcional aos itens'}
+                  </span>
                 </div>
+                {freteForm.criterio_rateio === 'POR_ITEM' ? (
+                  <div className="mt-3 grid gap-2">
+                    {(freteForm.rateios || []).map((rateio) => (
+                      <label
+                        key={rateio.pedido_compra_item_id}
+                        className="grid items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 sm:grid-cols-[minmax(0,1fr)_150px]"
+                      >
+                        <span className="min-w-0 truncate text-xs font-medium" title={rateio.descricao}>
+                          {rateio.descricao}
+                        </span>
+                        <input
+                          className="input h-9 text-right text-sm"
+                          inputMode="decimal"
+                          value={rateio.valor_rateado}
+                          onChange={(event) => atualizarRateioFrete(
+                            rateio.pedido_compra_item_id,
+                            sanitizeMoneyInput(event.target.value)
+                          )}
+                          onBlur={(event) => atualizarRateioFrete(
+                            rateio.pedido_compra_item_id,
+                            formatMoneyInput(event.target.value)
+                          )}
+                          disabled={salvandoFrete}
+                          aria-label={`Frete do item ${rateio.descricao}`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                ) : null}
               </div>
 
               {freteForm.tipo === 'TERCEIRO' ? (
