@@ -45,16 +45,25 @@ function run() {
   includesAll(controller, [
     "['SEM_FRETE', 'EMBUTIDO', 'TERCEIRO']",
     "freteTipoCompraDireta === 'TERCEIRO' ? freteValorCompraDireta : 0",
+    "freteTipoCompraDireta !== 'SEM_FRETE' && freteValorCompraDireta <= 0",
     'Selecione um credor ativo para o frete pago a terceiro.',
-    'Informe os dados para pagamento do frete.'
+    'Informe os dados para pagamento do frete.',
+    'Informe a data de vencimento da compra direta.',
+    'isFormaPagamentoFopag',
+    'FOPAG nao esta disponivel para solicitacoes de compra.'
   ], 'regras backend');
 
   includesAll(novaCompra, [
-    'Frete embutido',
-    'Frete pago a terceiro',
+    'Condições comerciais e comprovantes',
+    'Embutido',
+    'Pago a terceiro',
     'Credor do frete *',
     'Dados para pagamento do frete *',
-    'valorTotalSolicitacaoCompraDireta'
+    'Comprovantes da Despesa',
+    'resumoFormasPagamento',
+    'formaPagamentoEhFopag',
+    'Informe um valor maior que zero para o frete embutido.',
+    'Informe a data de vencimento.'
   ], 'formulario');
   includesAll(revisao, ['Credor do frete', 'Valor total da solicitação'], 'revisao');
   includesAll(financeiro, [

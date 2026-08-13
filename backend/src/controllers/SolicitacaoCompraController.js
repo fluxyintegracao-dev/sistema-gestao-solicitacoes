@@ -1046,6 +1046,12 @@ function isFormaPagamentoBoleto(forma) {
   return Boolean(forma?.gera_boleto) || texto.includes('BOLETO');
 }
 
+function isFormaPagamentoFopag(forma) {
+  return [forma?.codigo, forma?.nome]
+    .map((valor) => normalizeTextCompra(valor).trim())
+    .some((valor) => valor === 'FOPAG');
+}
+
 function formatarFormaPagamentoResumo(forma) {
   return forma?.nome || forma?.codigo || `Forma ${forma?.id}`;
 }
@@ -2116,7 +2122,7 @@ module.exports = {
         order: [['ordem', 'ASC'], ['nome', 'ASC']]
       });
 
-      return res.json(formas);
+      return res.json(formas.filter((forma) => !isFormaPagamentoFopag(forma)));
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao listar formas de pagamento ativas' });
@@ -3473,6 +3479,11 @@ module.exports = {
         return res.status(400).json({ error: 'Informe obra e ao menos um item' });
       }
 
+      if (compraDireta && !necessario_para) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe a data de vencimento da compra direta.' });
+      }
+
       const obra = await Obra.findByPk(obra_id, { transaction });
       if (!obra) {
         await transaction.rollback();
@@ -3556,9 +3567,13 @@ module.exports = {
       const freteValorCompraDireta = compraDireta && freteTipoCompraDireta !== 'SEM_FRETE'
         ? arredondarMoeda(parseValorMonetario(frete_valor))
         : 0;
-      if (freteTipoCompraDireta === 'TERCEIRO' && freteValorCompraDireta <= 0) {
+      if (freteTipoCompraDireta !== 'SEM_FRETE' && freteValorCompraDireta <= 0) {
         await transaction.rollback();
-        return res.status(400).json({ error: 'Informe o valor do frete pago a terceiro.' });
+        return res.status(400).json({
+          error: freteTipoCompraDireta === 'EMBUTIDO'
+            ? 'Informe o valor do frete embutido.'
+            : 'Informe o valor do frete pago a terceiro.'
+        });
       }
       if (freteTipoCompraDireta === 'TERCEIRO' && !frete_data_vencimento) {
         await transaction.rollback();
@@ -3606,6 +3621,12 @@ module.exports = {
         ) {
           await transaction.rollback();
           return res.status(400).json({ error: 'Selecione ao menos uma forma de pagamento ativa para a compra direta.' });
+        }
+
+
+        if (formasPagamentoCompraDireta.some(isFormaPagamentoFopag)) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'FOPAG nao esta disponivel para solicitacoes de compra.' });
         }
 
         if (formasPagamentoCompraDireta.some(isFormaPagamentoBoleto)) {
