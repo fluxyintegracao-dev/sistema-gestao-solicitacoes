@@ -75,7 +75,13 @@ const corsOptions = {
     return callback(createCorsBlockedError(origin));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-CSRF-Token', 'Idempotency-Key'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-CSRF-Token',
+    'Idempotency-Key',
+    'X-Audit-Session-Id'
+  ],
   exposedHeaders: ['X-CSRF-Token', 'X-Idempotent-Replay'],
   credentials: true
 };

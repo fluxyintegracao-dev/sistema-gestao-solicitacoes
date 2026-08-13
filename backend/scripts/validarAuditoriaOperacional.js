@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
 const {
   MAX_RANGE_DAYS,
   inferEventType,
@@ -65,11 +67,20 @@ function validatePeriodGuard() {
   );
 }
 
+function validateCorsAuditHeader() {
+  const appSource = fs.readFileSync(path.resolve(__dirname, '../src/app.js'), 'utf8');
+  assert(
+    appSource.includes("'X-Audit-Session-Id'"),
+    'O cabecalho de sessao da auditoria operacional precisa estar liberado no CORS.'
+  );
+}
+
 function run() {
   validateRouteNormalization();
   validateClassification();
   validatePrivacySanitization();
   validatePeriodGuard();
+  validateCorsAuditHeader();
   console.log('Auditoria operacional validada com sucesso.');
 }
 
