@@ -276,6 +276,7 @@ db.EsocialSoapLog = require('../modules/esocial/models/EsocialSoapLog')(sequeliz
 ===================== */
 db.GovernancaSnapshot = require('../modules/governanca/models/GovernancaSnapshot')(sequelize, Sequelize);
 db.GovernancaAccessLog = require('../modules/governanca/models/GovernancaAccessLog')(sequelize, Sequelize);
+db.GovernancaEventoOperacional = require('../modules/governanca/models/GovernancaEventoOperacional')(sequelize, Sequelize);
 
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
@@ -4269,6 +4270,9 @@ db.EsocialSoapLog.belongsTo(db.EsocialLote, { foreignKey: 'lote_id', as: 'lote' 
 
 db.GovernancaAccessLog.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
 db.User.hasMany(db.GovernancaAccessLog, { foreignKey: 'usuario_id', as: 'governancaAccessLogs' });
+db.GovernancaEventoOperacional.belongsTo(db.User, { foreignKey: 'usuario_id', as: 'usuario' });
+db.GovernancaEventoOperacional.belongsTo(db.Setor, { foreignKey: 'setor_id', as: 'setor' });
+db.User.hasMany(db.GovernancaEventoOperacional, { foreignKey: 'usuario_id', as: 'governancaEventosOperacionais' });
 
 /* ===== TREINAMENTO ===== */
 db.TreinamentoConteudo.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });

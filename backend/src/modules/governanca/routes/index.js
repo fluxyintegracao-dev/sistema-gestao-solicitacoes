@@ -3,7 +3,11 @@
 const express = require('express');
 const permit = require('../../../middlewares/permissions');
 const {
+  canExportOperationalAudit,
   canManageSystemGovernance,
+  canViewOperationalAudit,
+  canViewOperationalAuditDetails,
+  canViewOperationalAuditUsers,
   canViewSystemAudit,
   canViewSystemGovernance,
   canViewSystemProductEvolution,
@@ -58,6 +62,26 @@ const allowProductEvolution = permit({
   )
 });
 
+const allowOperationalAudit = permit({
+  resource: 'SYSTEM_OPERATIONAL_AUDIT',
+  custom: async (req) => (await canViewOperationalAudit(req.user)) || 'Acesso negado para Auditoria Operacional'
+});
+
+const allowOperationalAuditDetails = permit({
+  resource: 'SYSTEM_OPERATIONAL_AUDIT_DETAILS',
+  custom: async (req) => (await canViewOperationalAuditDetails(req.user)) || 'Acesso negado para detalhes da Auditoria Operacional'
+});
+
+const allowOperationalAuditUsers = permit({
+  resource: 'SYSTEM_OPERATIONAL_AUDIT_USERS',
+  custom: async (req) => (await canViewOperationalAuditUsers(req.user)) || 'Acesso negado para atividade por usuario'
+});
+
+const allowOperationalAuditExport = permit({
+  resource: 'SYSTEM_OPERATIONAL_AUDIT_EXPORT',
+  custom: async (req) => (await canExportOperationalAudit(req.user)) || 'Acesso negado para exportar Auditoria Operacional'
+});
+
 router.get('/dashboard', allowGovernanceView, GovernancaController.dashboard);
 router.get('/executiva', allowGovernanceView, GovernancaController.executiva);
 router.get('/adocao', allowGovernanceView, GovernancaController.adocao);
@@ -68,5 +92,11 @@ router.get('/produto', allowProductEvolution, GovernancaController.produto);
 router.get('/snapshots', allowGovernanceView, GovernancaController.snapshots);
 router.post('/snapshots/gerar', allowGovernanceManage, GovernancaController.gerarSnapshot);
 router.get('/export', allowGovernanceView, GovernancaController.exportar);
+router.post('/auditoria-operacional/navegacao', GovernancaController.auditoriaOperacionalNavegacao);
+router.get('/auditoria-operacional/resumo', allowOperationalAudit, GovernancaController.auditoriaOperacionalResumo);
+router.get('/auditoria-operacional/usuarios', allowOperationalAuditUsers, GovernancaController.auditoriaOperacionalUsuarios);
+router.get('/auditoria-operacional/opcoes', allowOperationalAudit, GovernancaController.auditoriaOperacionalOpcoes);
+router.get('/auditoria-operacional/eventos', allowOperationalAuditDetails, GovernancaController.auditoriaOperacionalEventos);
+router.get('/auditoria-operacional/export', allowOperationalAuditExport, GovernancaController.auditoriaOperacionalExportar);
 
 module.exports = router;

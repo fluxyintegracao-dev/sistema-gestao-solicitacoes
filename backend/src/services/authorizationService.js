@@ -557,6 +557,29 @@ const SYSTEM_AUDIT_VIEW_KEYS = [
   'governanca.sistema.gerenciar'
 ];
 
+const SYSTEM_OPERATIONAL_AUDIT_VIEW_KEYS = [
+  'governanca.operacional.visualizar_resumo',
+  'governanca.operacional.visualizar_usuarios',
+  'governanca.operacional.visualizar_detalhes',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_OPERATIONAL_AUDIT_DETAIL_KEYS = [
+  'governanca.operacional.visualizar_detalhes',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_OPERATIONAL_AUDIT_USER_KEYS = [
+  'governanca.operacional.visualizar_usuarios',
+  'governanca.operacional.visualizar_detalhes',
+  'governanca.sistema.gerenciar'
+];
+
+const SYSTEM_OPERATIONAL_AUDIT_EXPORT_KEYS = [
+  'governanca.operacional.exportar',
+  'governanca.sistema.gerenciar'
+];
+
 const SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS = [
   'governanca.produto.visualizar',
   'governanca.sistema.gerenciar'
@@ -2864,6 +2887,38 @@ async function canViewSystemAudit(user) {
   return false;
 }
 
+async function canViewOperationalAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_OPERATIONAL_AUDIT_VIEW_KEYS);
+  }
+  return false;
+}
+
+async function canViewOperationalAuditDetails(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_OPERATIONAL_AUDIT_DETAIL_KEYS);
+  }
+  return false;
+}
+
+async function canViewOperationalAuditUsers(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_OPERATIONAL_AUDIT_USER_KEYS);
+  }
+  return false;
+}
+
+async function canExportOperationalAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, SYSTEM_OPERATIONAL_AUDIT_EXPORT_KEYS);
+  }
+  return false;
+}
+
 async function canViewSystemProductEvolution(user) {
   if (isBusinessAdmin(user)) return true;
   if (await userHasConfiguredAreaPermissions(user)) {
@@ -3039,6 +3094,10 @@ module.exports = {
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
   canViewSystemAudit,
+  canViewOperationalAudit,
+  canViewOperationalAuditDetails,
+  canViewOperationalAuditUsers,
+  canExportOperationalAudit,
   canViewSystemGovernance,
   canViewSystemProductEvolution,
   canViewSystemTechMonitor,

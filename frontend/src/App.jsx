@@ -55,6 +55,7 @@ import {
   canCreateCrmLeads,
   canManageFiscalConfig,
   canViewSystemGovernance,
+  canViewOperationalAudit,
   canManageUsers,
   canViewCrmAtendimento,
   canViewCrmAutomacoes,
@@ -250,6 +251,7 @@ const SstProducaoMonitoramento = lazy(() => import('./modules/sst/pages/SstProdu
 const SstObservabilidadeAvancada = lazy(() => import('./modules/sst/pages/SstObservabilidadeAvancada'));
 const SstEsocial = lazy(() => import('./modules/sst/pages/SstEsocial'));
 const GovernancaSistema = lazy(() => import('./modules/governanca/pages/GovernancaSistema'));
+const AuditoriaOperacional = lazy(() => import('./modules/governanca/pages/AuditoriaOperacional'));
 
 function PublicPage({ children }) {
   return (
@@ -659,6 +661,14 @@ function GovernancaSistemaRoute({ children }) {
   return children;
 }
 
+function AuditoriaOperacionalRoute({ children }) {
+  const { user } = useAuth();
+  if (!canViewOperationalAudit(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
 function PrioridadesDiretoriaRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessPrioridadesDiretoria(user)) {
@@ -898,6 +908,7 @@ export default function App() {
         <Route path="permissoes-areas" element={<ConfiguracoesAreaRoute area="permissoes"><PermissoesAreas /></ConfiguracoesAreaRoute>} />
         <Route path="permissoes-areas-padroes" element={<ConfiguracoesAreaRoute area="permissoes"><PermissoesAreasPadroes /></ConfiguracoesAreaRoute>} />
         <Route path="governanca" element={<GovernancaSistemaRoute><GovernancaSistema /></GovernancaSistemaRoute>} />
+        <Route path="governanca/auditoria-operacional" element={<AuditoriaOperacionalRoute><AuditoriaOperacional /></AuditoriaOperacionalRoute>} />
         <Route path="arquivos-modelos-config" element={<SuperadminRoute><ArquivosModelosConfig /></SuperadminRoute>} />
         <Route path="configuracoes-cotacao" element={<EnabledModuleRoute moduleKey="COMPRAS"><EnabledModuleRoute moduleKey="COTACOES"><ComprasConfiguracoesRoute><ConfiguracoesCotacao /></ComprasConfiguracoesRoute></EnabledModuleRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-status-pedidos-compra" element={<EnabledModuleRoute moduleKey="COMPRAS"><ComprasConfiguracoesRoute><ConfiguracoesStatusPedidoCompra /></ComprasConfiguracoesRoute></EnabledModuleRoute>} />

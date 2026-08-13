@@ -998,6 +998,16 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'governanca.operacional',
+        label: 'Auditoria Operacional',
+        permissoes: [
+          { key: 'governanca.operacional.visualizar_resumo', label: 'Visualizar resumo operacional', descricao: 'Consultar indicadores agregados de atividade, sem abrir a linha do tempo detalhada.' },
+          { key: 'governanca.operacional.visualizar_usuarios', label: 'Visualizar atividade por usuario', descricao: 'Comparar volume e distribuicao das atividades dos usuarios no periodo.' },
+          { key: 'governanca.operacional.visualizar_detalhes', label: 'Visualizar detalhes operacionais', descricao: 'Abrir a linha do tempo de paginas acessadas e operacoes executadas.' },
+          { key: 'governanca.operacional.exportar', label: 'Exportar auditoria operacional', descricao: 'Gerar arquivo CSV da trilha conforme os filtros aplicados.' }
+        ]
+      },
+      {
         key: 'governanca.produto',
         label: 'Evolucao do Produto',
         permissoes: [
