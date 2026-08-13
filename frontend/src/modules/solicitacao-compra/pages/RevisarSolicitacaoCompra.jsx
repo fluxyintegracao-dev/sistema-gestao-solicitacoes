@@ -151,7 +151,17 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
   const prontoParaCriar = confirmado && previewVisualizado;
   const valorBrutoCompraDireta = Number(draft?.resumo?.valor_bruto || draft?.resumo?.valor_total || 0);
   const descontoCompraDireta = Number(draft?.resumo?.desconto_total || 0);
-  const valorLiquidoCompraDireta = Number(draft?.resumo?.valor_total || 0);
+  const valorLiquidoItensCompraDireta = Number(
+    draft?.resumo?.valor_total_itens ?? draft?.resumo?.valor_total ?? 0
+  );
+  const valorTotalCompraDireta = Number(draft?.resumo?.valor_total || valorLiquidoItensCompraDireta || 0);
+  const freteTipoCompraDireta = String(draft?.payload?.frete_tipo || 'SEM_FRETE').toUpperCase();
+  const freteValorCompraDireta = Number(draft?.payload?.frete_valor || 0);
+  const freteTipoLabel = freteTipoCompraDireta === 'TERCEIRO'
+    ? 'Frete pago a terceiro'
+    : freteTipoCompraDireta === 'EMBUTIDO'
+      ? 'Frete embutido'
+      : 'Sem frete';
   const temDescontoCompraDireta = modoCompraDireta && descontoCompraDireta > 0;
 
   const conteudoPreviewPdf = useMemo(() => {
@@ -200,7 +210,11 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
           <div class="meta"><strong>Solicitante:</strong> ${escapeHtml(draft.resumo?.solicitante_nome || '-')}</div>
           ${temDescontoCompraDireta ? `<div class="meta"><strong>Valor bruto:</strong> ${escapeHtml(formatarMoeda(valorBrutoCompraDireta))}</div>` : ''}
           ${temDescontoCompraDireta ? `<div class="meta"><strong>Desconto concedido:</strong> ${escapeHtml(formatarMoeda(descontoCompraDireta))}</div>` : ''}
-          ${modoCompraDireta ? `<div class="meta"><strong>Valor total${temDescontoCompraDireta ? ' liquido' : ''}:</strong> ${escapeHtml(formatarMoeda(valorLiquidoCompraDireta))}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Valor líquido dos itens:</strong> ${escapeHtml(formatarMoeda(valorLiquidoItensCompraDireta))}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Frete:</strong> ${escapeHtml(freteTipoLabel)}${freteTipoCompraDireta !== 'SEM_FRETE' ? ` - ${escapeHtml(formatarMoeda(freteValorCompraDireta))}` : ''}</div>` : ''}
+          ${modoCompraDireta && freteTipoCompraDireta === 'TERCEIRO' ? `<div class="meta"><strong>Credor do frete:</strong> ${escapeHtml(draft.resumo?.frete_credor_nome || '-')}</div>` : ''}
+          ${modoCompraDireta && freteTipoCompraDireta === 'TERCEIRO' ? `<div class="meta"><strong>Pagamento do frete:</strong> ${escapeHtml(formatarData(draft.payload?.frete_data_vencimento))} - ${escapeHtml(draft.payload?.frete_dados_pagamento || '-')}</div>` : ''}
+          ${modoCompraDireta ? `<div class="meta"><strong>Valor total da solicitação:</strong> ${escapeHtml(formatarMoeda(valorTotalCompraDireta))}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Credor:</strong> ${escapeHtml(draft.resumo?.credor_nome || '-')}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Formas de pagamento:</strong> ${escapeHtml(formatarFormasPagamento(draft.resumo?.formas_pagamento))}</div>` : ''}
           ${modoCompraDireta ? `<div class="meta"><strong>Dados para pagamento:</strong> ${escapeHtml(draft.payload?.dados_pagamento || '-')}</div>` : ''}
@@ -234,7 +248,11 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
     modoCompraDireta,
     temDescontoCompraDireta,
     valorBrutoCompraDireta,
-    valorLiquidoCompraDireta
+    freteTipoCompraDireta,
+    freteTipoLabel,
+    freteValorCompraDireta,
+    valorLiquidoItensCompraDireta,
+    valorTotalCompraDireta
   ]);
 
   function abrirPreviaPdf() {
@@ -355,9 +373,13 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
               <CardMetrica titulo="Itens" valor={totalItens} detalhe="Total revisado nesta compra" />
               {modoCompraDireta && (
                 <CardMetrica
-                  titulo={temDescontoCompraDireta ? 'Total liquido' : 'Total'}
-                  valor={formatarMoeda(valorLiquidoCompraDireta)}
-                  detalhe={temDescontoCompraDireta ? `Bruto ${formatarMoeda(valorBrutoCompraDireta)} - desconto ${formatarMoeda(descontoCompraDireta)}` : 'Valor que sera levado para a solicitacao'}
+                  titulo="Total da solicitação"
+                  valor={formatarMoeda(valorTotalCompraDireta)}
+                  detalhe={freteTipoCompraDireta === 'TERCEIRO'
+                    ? `Itens ${formatarMoeda(valorLiquidoItensCompraDireta)} + frete ${formatarMoeda(freteValorCompraDireta)}`
+                    : temDescontoCompraDireta
+                      ? `Bruto ${formatarMoeda(valorBrutoCompraDireta)} - desconto ${formatarMoeda(descontoCompraDireta)}`
+                      : 'Valor que será levado para a solicitação'}
                 />
               )}
               <CardMetrica
@@ -470,9 +492,18 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                   <LinhaResumo titulo="Desconto concedido" valor={formatarMoeda(descontoCompraDireta)} />
                 )}
                 <LinhaResumo
-                  titulo={temDescontoCompraDireta ? 'Valor total liquido' : 'Valor total'}
-                  valor={formatarMoeda(valorLiquidoCompraDireta)}
+                  titulo="Valor líquido dos itens"
+                  valor={formatarMoeda(valorLiquidoItensCompraDireta)}
                 />
+                <LinhaResumo titulo="Frete" valor={`${freteTipoLabel}${freteTipoCompraDireta !== 'SEM_FRETE' ? ` - ${formatarMoeda(freteValorCompraDireta)}` : ''}`} />
+                {freteTipoCompraDireta === 'TERCEIRO' && (
+                  <>
+                    <LinhaResumo titulo="Credor do frete" valor={textoOuPadrao(draft.resumo?.frete_credor_nome)} />
+                    <LinhaResumo titulo="Vencimento do frete" valor={textoOuPadrao(formatarData(draft.payload?.frete_data_vencimento))} />
+                    <LinhaResumo titulo="Dados para pagamento do frete" valor={textoOuPadrao(draft.payload?.frete_dados_pagamento)} className="whitespace-pre-wrap" />
+                  </>
+                )}
+                <LinhaResumo titulo="Valor total da solicitação" valor={formatarMoeda(valorTotalCompraDireta)} />
                 <LinhaResumo
                   titulo="Notas/Guias anexadas"
                   valor={`${draft.resumo?.anexos_cabecalho?.length || 0} arquivo(s)`}

@@ -107,6 +107,28 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.DECIMAL(14, 2),
         allowNull: false,
         defaultValue: 0
+      },
+      frete_tipo: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'SEM_FRETE'
+      },
+      frete_valor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      frete_data_vencimento: {
+        type: DataTypes.DATEONLY,
+        allowNull: true
+      },
+      frete_parceiro_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      frete_dados_pagamento: {
+        type: DataTypes.TEXT,
+        allowNull: true
       }
     },
     {

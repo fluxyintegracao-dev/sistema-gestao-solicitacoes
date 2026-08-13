@@ -246,14 +246,23 @@ function buildParcelasDetalhadas(
   }));
 }
 
-function createPagamento(solicitacao, valor = '', categoriaFinanceiraId = '') {
+function getFreteTerceiroCompraDireta(solicitacao) {
+  const compraDireta = solicitacao?.compra_direta;
+  if (String(compraDireta?.frete_tipo || '').toUpperCase() !== 'TERCEIRO') return null;
+  if (!compraDireta?.freteCredor?.id || Number(compraDireta?.frete_valor || 0) <= 0) return null;
+  return compraDireta;
+}
+
+function createPagamento(solicitacao, valor = '', categoriaFinanceiraId = '', options = {}) {
+  const parceiro = options.parceiro || solicitacao?.parceiro || null;
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    parceiro_id: solicitacao?.parceiro?.id ? String(solicitacao.parceiro.id) : '',
-    parceiro_nome: solicitacao?.parceiro?.nome || '',
+    parceiro_id: parceiro?.id ? String(parceiro.id) : '',
+    parceiro_nome: parceiro?.nome || '',
     categoria_financeira_id: categoriaFinanceiraId ? String(categoriaFinanceiraId) : '',
     valor,
-    data_vencimento: solicitacao?.data_vencimento || today(),
+    data_vencimento: options.data_vencimento || solicitacao?.data_vencimento || today(),
+    observacoes: options.observacoes || '',
     competencia_data: '',
     forma_pagamento_id: '',
     cartao_id: '',
@@ -276,6 +285,20 @@ function createRateio(valor = '') {
 
 function buildDefaultForm(solicitacao) {
   const valorSolicitacao = solicitacao?.valor ? formatCurrencyInput(solicitacao.valor) : '';
+  const freteTerceiro = getFreteTerceiroCompraDireta(solicitacao);
+  const valorItens = freteTerceiro
+    ? formatCurrencyInput(solicitacao?.compra_direta?.valor_fechado || 0)
+    : valorSolicitacao;
+  const pagamentos = freteTerceiro
+    ? [
+        createPagamento(solicitacao, valorItens),
+        createPagamento(solicitacao, formatCurrencyInput(freteTerceiro.frete_valor), '', {
+          parceiro: freteTerceiro.freteCredor,
+          data_vencimento: freteTerceiro.frete_data_vencimento,
+          observacoes: `Frete pago a terceiro. Dados para pagamento: ${freteTerceiro.frete_dados_pagamento || '-'}`
+        })
+      ]
+    : [createPagamento(solicitacao, valorSolicitacao)];
   return {
     tipo: 'PAGAR',
     status: 'ABERTO',
@@ -303,7 +326,7 @@ function buildDefaultForm(solicitacao) {
     transferencia_interna: true,
     parcelas: [],
     rateios: [],
-    pagamentos: [createPagamento(solicitacao, valorSolicitacao)]
+    pagamentos
   };
 }
 
@@ -525,6 +548,7 @@ export default function FinanceiroCard({
   onSolicitacaoAtualizada,
   podeAcessarModuloFinanceiro = false
 }) {
+  const freteTerceiroObrigatorio = Boolean(getFreteTerceiroCompraDireta(solicitacao));
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -555,11 +579,13 @@ export default function FinanceiroCard({
   const [obras, setObras] = useState([]);
   const [loadingObras, setLoadingObras] = useState(false);
   const [loadingPagamento, setLoadingPagamento] = useState(false);
-  const [geracaoMultiplaTitulos, setGeracaoMultiplaTitulos] = useState(false);
+  const [geracaoMultiplaTitulos, setGeracaoMultiplaTitulos] = useState(
+    () => Boolean(getFreteTerceiroCompraDireta(solicitacao))
+  );
 
   function resetModalState(baseSolicitacao = solicitacao) {
     setForm(buildDefaultForm(baseSolicitacao));
-    setGeracaoMultiplaTitulos(false);
+    setGeracaoMultiplaTitulos(Boolean(getFreteTerceiroCompraDireta(baseSolicitacao)));
     setSelectedPartner(baseSolicitacao?.parceiro || null);
     setSelectedCategory(null);
     setPartnerSearch('');
@@ -1010,6 +1036,9 @@ export default function FinanceiroCard({
   }
 
   function toggleGeracaoMultiplaTitulos(checked) {
+    if (!checked && freteTerceiroObrigatorio) {
+      return;
+    }
     setGeracaoMultiplaTitulos(checked);
     if (!checked) {
       setForm((current) => {
@@ -1256,6 +1285,7 @@ export default function FinanceiroCard({
             quantidade_parcelas: pagamento.quantidade_parcelas || undefined,
             data_compra: isFormaCartao(forma) ? pagamento.data_compra : undefined,
             data_vencimento: !isFormaCartao(forma) && !usaDetalhe ? pagamento.data_vencimento : undefined,
+            observacoes: pagamento.observacoes || undefined,
             parcelas: usaDetalhe ? pagamento.parcelas : undefined
           };
         })
@@ -2072,10 +2102,16 @@ export default function FinanceiroCard({
                       <input
                         type="checkbox"
                         checked={geracaoMultiplaTitulos}
+                        disabled={freteTerceiroObrigatorio}
                         onChange={(event) => toggleGeracaoMultiplaTitulos(event.target.checked)}
                       />
                       Gerar multiplos titulos
                     </label>
+                    {freteTerceiroObrigatorio ? (
+                      <div className="mt-1 text-xs text-amber-700">
+                        Obrigatorio para separar a compra do frete pago ao terceiro.
+                      </div>
+                    ) : null}
                   </div>
                   {geracaoMultiplaTitulos ? (
                     <button type="button" className="btn btn-outline shrink-0" onClick={adicionarPagamento}>

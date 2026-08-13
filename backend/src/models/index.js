@@ -1979,6 +1979,11 @@ db.SolicitacaoCompra.belongsTo(db.Solicitacao, {
   as: 'solicitacaoPrincipal'
 });
 
+db.SolicitacaoCompra.belongsTo(db.Parceiro, {
+  foreignKey: 'frete_parceiro_id',
+  as: 'freteCredor'
+});
+
 db.SolicitacaoCompra.hasMany(db.SolicitacaoCompraItem, {
   foreignKey: 'solicitacao_compra_id',
   as: 'itens',

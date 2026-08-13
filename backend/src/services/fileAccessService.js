@@ -129,6 +129,88 @@ function tokensContainAreaValue(tokens, value) {
   return candidates.some((candidate) => normalizedTokens.includes(candidate));
 }
 
+function parseHistoricoMetadata(metadata) {
+  if (!metadata) return {};
+  if (typeof metadata === 'object') return metadata;
+
+  try {
+    return JSON.parse(metadata);
+  } catch (_) {
+    return {};
+  }
+}
+
+function parseObservacaoEnvioSetor(observacao) {
+  const texto = String(observacao || '').trim();
+  const match = texto.match(/^De\s+(.+?)\s+para\s+(.+)$/i);
+  if (!match) return null;
+
+  return {
+    origem: String(match[1] || '').trim(),
+    destino: String(match[2] || '').trim()
+  };
+}
+
+function extrairSetoresEnvioHistorico(historico) {
+  if (!historico || normalizeAccessToken(historico.acao) !== 'ENVIADA_SETOR') {
+    return { origem: null, destino: null };
+  }
+
+  const metadata = parseHistoricoMetadata(historico.metadata);
+  const envioTexto =
+    parseObservacaoEnvioSetor(historico.observacao) ||
+    parseObservacaoEnvioSetor(historico.descricao);
+
+  return {
+    origem:
+      metadata.setor_origem ||
+      metadata.setorOrigem ||
+      metadata.origem ||
+      envioTexto?.origem ||
+      null,
+    destino:
+      metadata.setor_destino ||
+      metadata.setorDestino ||
+      metadata.destino ||
+      envioTexto?.destino ||
+      historico.setor ||
+      null
+  };
+}
+
+function historicoPertenceAoEscopoSetor(historico, tokens = []) {
+  if (!historico || normalizeAccessToken(historico.acao) !== 'ENVIADA_SETOR') {
+    return false;
+  }
+
+  const envio = extrairSetoresEnvioHistorico(historico);
+  return (
+    tokensContainAreaValue(tokens, envio.origem) ||
+    tokensContainAreaValue(tokens, envio.destino)
+  );
+}
+
+async function userSetorParticipatedInSolicitacao(user, solicitacaoId, tokens = null) {
+  if (!solicitacaoId) return false;
+
+  const userScopeTokens = Array.isArray(tokens)
+    ? tokens
+    : await buildUserScopeTokens(user);
+  if (!userScopeTokens.length) return false;
+
+  const historicos = await Historico.findAll({
+    where: {
+      solicitacao_id: solicitacaoId,
+      acao: 'ENVIADA_SETOR'
+    },
+    attributes: ['acao', 'setor', 'observacao', 'descricao', 'metadata']
+  });
+
+  return historicos.some((historico) => (
+    historicoPertenceAoEscopoSetor(historico, userScopeTokens)
+  ));
+}
+
 async function userParticipatedInSolicitacao(user, solicitacaoId) {
   const usuarioId = Number(user?.id);
   if (!usuarioId || !solicitacaoId) return false;
@@ -278,10 +360,13 @@ async function canAccessSolicitacaoFile(req, solicitacaoId) {
     return { allowed: true };
   }
 
-  if (
-    await userParticipatedInSolicitacao(req.user, solicitacao.id) ||
-    await userMentionedInSolicitacao(req.user, solicitacao.id)
-  ) {
+  const [setorParticipou, usuarioParticipou, usuarioMencionado] = await Promise.all([
+    userSetorParticipatedInSolicitacao(req.user, solicitacao.id, userScopeTokens),
+    userParticipatedInSolicitacao(req.user, solicitacao.id),
+    userMentionedInSolicitacao(req.user, solicitacao.id)
+  ]);
+
+  if (setorParticipou || usuarioParticipou || usuarioMencionado) {
     return { allowed: true };
   }
 
@@ -766,5 +851,6 @@ module.exports = {
   assertRegisteredFileAccess,
   canAccessSolicitacaoFile,
   getRegisteredFilePath,
+  historicoPertenceAoEscopoSetor,
   resolveRegisteredFileResource
 };

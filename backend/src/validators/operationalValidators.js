@@ -373,7 +373,12 @@ function validateCompraQuery(query = {}) {
         'origem',
         'forma_pagamento_ids',
         'desconto_total',
-        'anexos_cabecalho'
+        'anexos_cabecalho',
+        'frete_tipo',
+        'frete_valor',
+        'frete_data_vencimento',
+        'frete_parceiro_id',
+        'frete_dados_pagamento'
       ],
       'Compra direta'
     );
@@ -412,6 +417,11 @@ function validateCompraQuery(query = {}) {
       origem: 'COMPRA_DIRETA',
       forma_pagamento_ids: formaPagamentoIds,
       desconto_total: parseDecimal(body.desconto_total, 'Desconto concedido', { min: 0, scale: 2 }) || 0,
+      frete_tipo: parseOptionalText(body.frete_tipo, 'Tipo de frete', 20),
+      frete_valor: parseDecimal(body.frete_valor, 'Valor do frete', { min: 0, scale: 2 }) || 0,
+      frete_data_vencimento: parseDateOnly(body.frete_data_vencimento, 'Vencimento do frete'),
+      frete_parceiro_id: parseInteger(body.frete_parceiro_id, 'Credor do frete', { positiveOnly: true }),
+      frete_dados_pagamento: parseOptionalText(body.frete_dados_pagamento, 'Dados para pagamento do frete', 1500),
       anexos_cabecalho: body.anexos_cabecalho || [],
       itens: body.itens
     };

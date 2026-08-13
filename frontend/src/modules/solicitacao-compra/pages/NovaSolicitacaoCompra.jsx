@@ -180,6 +180,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const importacaoItensInputRef = useRef(null);
   const importacaoEmAndamentoRef = useRef(false);
   const buscaCredorRequestRef = useRef(0);
+  const buscaCredorFreteRequestRef = useRef(0);
   const [obras, setObras] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -191,6 +192,17 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [observacoes, setObservacoes] = useState('');
   const [dadosPagamento, setDadosPagamento] = useState('');
   const [descontoTotal, setDescontoTotal] = useState('');
+  const [freteTipo, setFreteTipo] = useState('SEM_FRETE');
+  const [freteValor, setFreteValor] = useState('');
+  const [freteDataVencimento, setFreteDataVencimento] = useState('');
+  const [freteParceiroId, setFreteParceiroId] = useState('');
+  const [freteParceiroBusca, setFreteParceiroBusca] = useState('');
+  const [freteDadosPagamento, setFreteDadosPagamento] = useState('');
+  const [freteParceiros, setFreteParceiros] = useState([]);
+  const [buscandoCredoresFrete, setBuscandoCredoresFrete] = useState(false);
+  const [autocompleteFreteAberto, setAutocompleteFreteAberto] = useState(false);
+  const [erroBuscaCredorFrete, setErroBuscaCredorFrete] = useState('');
+  const [freteCredorAtivoIndex, setFreteCredorAtivoIndex] = useState(0);
   const [anexosCabecalho, setAnexosCabecalho] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [formaPagamentoIds, setFormaPagamentoIds] = useState([]);
@@ -287,6 +299,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     setObservacoes('');
     setDadosPagamento('');
     setDescontoTotal('');
+    setFreteTipo('SEM_FRETE');
+    setFreteValor('');
+    setFreteDataVencimento('');
+    setFreteParceiroId('');
+    setFreteParceiroBusca('');
+    setFreteDadosPagamento('');
+    setFreteParceiros([]);
     setAnexosCabecalho([]);
     setFormaPagamentoIds([]);
     setParceiroId('');
@@ -369,6 +388,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       setObservacoes(payload.observacoes || '');
       setDadosPagamento(payload.dados_pagamento || '');
       setDescontoTotal(payload.desconto_total ? String(payload.desconto_total) : '');
+      setFreteTipo(String(payload.frete_tipo || 'SEM_FRETE').toUpperCase());
+      setFreteValor(payload.frete_valor ? String(payload.frete_valor) : '');
+      setFreteDataVencimento(payload.frete_data_vencimento || '');
+      setFreteParceiroId(payload.frete_parceiro_id ? String(payload.frete_parceiro_id) : '');
+      setFreteParceiroBusca(dados?.resumo?.frete_credor_nome || '');
+      setFreteDadosPagamento(payload.frete_dados_pagamento || '');
       setAnexosCabecalho(Array.isArray(payload.anexos_cabecalho) ? payload.anexos_cabecalho : []);
       setFormaPagamentoIds(
         Array.isArray(payload.forma_pagamento_ids)
@@ -426,7 +451,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       || suspenderAutosaveAteRef.current > Date.now()
     ) return undefined;
     const possuiConteudo = Boolean(
-      obraId || necessarioPara || observacoes || dadosPagamento || parceiroId || itens.length
+      obraId || necessarioPara || observacoes || dadosPagamento || parceiroId || freteTipo !== 'SEM_FRETE' || itens.length
     );
     if (!possuiConteudo) return undefined;
 
@@ -439,6 +464,11 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           observacoes: observacoes || '',
           dados_pagamento: dadosPagamento || '',
           desconto_total: descontoTotal || '',
+          frete_tipo: freteTipo,
+          frete_valor: freteTipo === 'SEM_FRETE' ? '' : freteValor || '',
+          frete_data_vencimento: freteTipo === 'TERCEIRO' ? freteDataVencimento || null : null,
+          frete_parceiro_id: freteTipo === 'TERCEIRO' ? freteParceiroId || null : null,
+          frete_dados_pagamento: freteTipo === 'TERCEIRO' ? freteDadosPagamento || '' : '',
           anexos_cabecalho: anexosCabecalho,
           forma_pagamento_ids: formaPagamentoIds,
           parceiro_id: parceiroId || null,
@@ -447,6 +477,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         resumo: {
           solicitante_nome: user?.nome || '',
           credor_nome: parceiroBusca || '',
+          frete_credor_nome: freteParceiroBusca || '',
           itens
         },
         contexto: {
@@ -464,6 +495,12 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     descontoTotal,
     draftKey,
     formaPagamentoIds,
+    freteDataVencimento,
+    freteDadosPagamento,
+    freteParceiroBusca,
+    freteParceiroId,
+    freteTipo,
+    freteValor,
     itens,
     necessarioPara,
     obraId,
@@ -529,9 +566,26 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     [valorBrutoCompraDireta, descontoCompraDireta]
   );
 
+  const freteValorNumero = useMemo(
+    () => arredondarMoeda(Math.max(0, parseValorMonetario(freteValor))),
+    [freteValor]
+  );
+
+  const valorTotalSolicitacaoCompraDireta = useMemo(
+    () => arredondarMoeda(
+      valorTotalCompraDireta + (freteTipo === 'TERCEIRO' ? freteValorNumero : 0)
+    ),
+    [freteTipo, freteValorNumero, valorTotalCompraDireta]
+  );
+
   const parceiroSelecionado = useMemo(
     () => parceiros.find((parceiro) => String(parceiro.id) === String(parceiroId)) || null,
     [parceiroId, parceiros]
+  );
+
+  const freteCredorSelecionado = useMemo(
+    () => freteParceiros.find((parceiro) => String(parceiro.id) === String(freteParceiroId)) || null,
+    [freteParceiroId, freteParceiros]
   );
 
   useEffect(() => {
@@ -574,6 +628,46 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     return () => window.clearTimeout(timeoutId);
   }, [modoCompraDireta, parceiroBusca, parceiroId]);
 
+  useEffect(() => {
+    if (!modoCompraDireta || freteTipo !== 'TERCEIRO' || freteParceiroId) {
+      return undefined;
+    }
+
+    const termo = String(freteParceiroBusca || '').trim();
+    const buscaAtual = buscaCredorFreteRequestRef.current + 1;
+    buscaCredorFreteRequestRef.current = buscaAtual;
+    setFreteCredorAtivoIndex(0);
+    setErroBuscaCredorFrete('');
+
+    if (termo.length < 2) {
+      setFreteParceiros([]);
+      setBuscandoCredoresFrete(false);
+      return undefined;
+    }
+
+    setFreteParceiros([]);
+    setBuscandoCredoresFrete(true);
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 10 });
+        if (buscaCredorFreteRequestRef.current !== buscaAtual) return;
+        setFreteParceiros(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (buscaCredorFreteRequestRef.current !== buscaAtual) return;
+        console.error(error);
+        setFreteParceiros([]);
+        setErroBuscaCredorFrete(error.message || 'Erro ao buscar credores do frete.');
+      } finally {
+        if (buscaCredorFreteRequestRef.current === buscaAtual) {
+          setBuscandoCredoresFrete(false);
+        }
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [freteParceiroBusca, freteParceiroId, freteTipo, modoCompraDireta]);
+
   function selecionarCredorCompraDireta(parceiro) {
     if (!parceiro) return;
     buscaCredorRequestRef.current += 1;
@@ -611,6 +705,61 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
     if (event.key === 'Escape') {
       setAutocompleteCredorAberto(false);
+    }
+  }
+
+  function selecionarCredorFrete(parceiro) {
+    if (!parceiro) return;
+    buscaCredorFreteRequestRef.current += 1;
+    setFreteParceiroId(String(parceiro.id));
+    setFreteParceiroBusca(formatarCredor(parceiro));
+    setFreteParceiros((atual) => [
+      parceiro,
+      ...atual.filter((item) => Number(item.id) !== Number(parceiro.id))
+    ]);
+    setBuscandoCredoresFrete(false);
+    setErroBuscaCredorFrete('');
+    setAutocompleteFreteAberto(false);
+    setFreteCredorAtivoIndex(0);
+  }
+
+  function tratarTecladoCredorFrete(event) {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setAutocompleteFreteAberto(true);
+      setFreteCredorAtivoIndex((atual) => Math.min(atual + 1, Math.max(freteParceiros.length - 1, 0)));
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setFreteCredorAtivoIndex((atual) => Math.max(atual - 1, 0));
+      return;
+    }
+
+    if (event.key === 'Enter' && autocompleteFreteAberto && freteParceiros.length > 0) {
+      event.preventDefault();
+      selecionarCredorFrete(freteParceiros[freteCredorAtivoIndex] || freteParceiros[0]);
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      setAutocompleteFreteAberto(false);
+    }
+  }
+
+  function alterarFreteTipo(tipo) {
+    setFreteTipo(tipo);
+    if (tipo === 'SEM_FRETE') {
+      setFreteValor('');
+    }
+    if (tipo !== 'TERCEIRO') {
+      setFreteDataVencimento('');
+      setFreteParceiroId('');
+      setFreteParceiroBusca('');
+      setFreteDadosPagamento('');
+      setFreteParceiros([]);
+      setAutocompleteFreteAberto(false);
     }
   }
 
@@ -1080,6 +1229,25 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       return;
     }
 
+    if (modoCompraDireta && freteTipo === 'TERCEIRO') {
+      if (freteValorNumero <= 0) {
+        alert('Informe um valor maior que zero para o frete pago a terceiro.');
+        return;
+      }
+      if (!freteParceiroId) {
+        alert('Selecione o credor responsável pelo frete.');
+        return;
+      }
+      if (!freteDataVencimento) {
+        alert('Informe a data para pagamento do frete.');
+        return;
+      }
+      if (!String(freteDadosPagamento || '').trim()) {
+        alert('Informe os dados para pagamento do frete.');
+        return;
+      }
+    }
+
     try {
       setLoading(true);
 
@@ -1106,6 +1274,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
         observacoes: observacoes || null,
         dados_pagamento: modoCompraDireta ? dadosPagamento || null : undefined,
         desconto_total: modoCompraDireta ? descontoCompraDireta : undefined,
+        frete_tipo: modoCompraDireta ? freteTipo : undefined,
+        frete_valor: modoCompraDireta && freteTipo !== 'SEM_FRETE' ? freteValorNumero : undefined,
+        frete_data_vencimento: modoCompraDireta && freteTipo === 'TERCEIRO' ? freteDataVencimento : undefined,
+        frete_parceiro_id: modoCompraDireta && freteTipo === 'TERCEIRO' ? Number(freteParceiroId) : undefined,
+        frete_dados_pagamento: modoCompraDireta && freteTipo === 'TERCEIRO'
+          ? String(freteDadosPagamento || '').trim()
+          : undefined,
         forma_pagamento_ids: modoCompraDireta ? formaPagamentoIds.map((id) => Number(id)).filter((id) => id > 0) : undefined,
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : undefined,
         itens: itensNormalizados.map((item) => ({
@@ -1142,7 +1317,15 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           : [],
         valor_bruto: modoCompraDireta ? valorBrutoCompraDireta : null,
         desconto_total: modoCompraDireta ? descontoCompraDireta : null,
-        valor_total: modoCompraDireta ? valorTotalCompraDireta : null,
+        valor_total_itens: modoCompraDireta ? valorTotalCompraDireta : null,
+        frete_tipo: modoCompraDireta ? freteTipo : null,
+        frete_valor: modoCompraDireta && freteTipo !== 'SEM_FRETE' ? freteValorNumero : 0,
+        frete_credor_nome: modoCompraDireta && freteTipo === 'TERCEIRO'
+          ? (freteCredorSelecionado ? formatarCredor(freteCredorSelecionado) : freteParceiroBusca || '')
+          : '',
+        frete_data_vencimento: modoCompraDireta && freteTipo === 'TERCEIRO' ? freteDataVencimento : null,
+        frete_dados_pagamento: modoCompraDireta && freteTipo === 'TERCEIRO' ? freteDadosPagamento : '',
+        valor_total: modoCompraDireta ? valorTotalSolicitacaoCompraDireta : null,
         dados_pagamento: modoCompraDireta ? dadosPagamento || '' : '',
         anexos_cabecalho: modoCompraDireta ? anexosCabecalho : [],
         itens: itensNormalizados.map((item) => ({
@@ -1368,10 +1551,15 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
             </div>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-right text-emerald-800">
               <div className="text-xs uppercase tracking-[0.14em]">Total da solicitação</div>
-              <div className="mt-1 text-2xl font-semibold">{formatarMoeda(valorTotalCompraDireta)}</div>
+              <div className="mt-1 text-2xl font-semibold">{formatarMoeda(valorTotalSolicitacaoCompraDireta)}</div>
               {descontoCompraDireta > 0 && (
                 <div className="mt-1 text-xs">
                   Bruto {formatarMoeda(valorBrutoCompraDireta)} - desconto {formatarMoeda(descontoCompraDireta)}
+                </div>
+              )}
+              {freteTipo === 'TERCEIRO' && (
+                <div className="mt-1 text-xs">
+                  Itens {formatarMoeda(valorTotalCompraDireta)} + frete {formatarMoeda(freteValorNumero)}
                 </div>
               )}
             </div>
@@ -1389,6 +1577,127 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
               <p className="mt-1 text-xs text-[var(--c-muted)]">
                 O desconto sera rateado proporcionalmente entre os itens para apurar o custo liquido da compra.
               </p>
+            </div>
+
+            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--c-text)]">Frete</h3>
+                  <p className="mt-1 text-xs text-[var(--c-muted)]">
+                    Informe se o frete já compõe os itens ou se será pago separadamente a outro credor.
+                  </p>
+                </div>
+                {freteTipo === 'TERCEIRO' && (
+                  <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                    Gera título separado
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-1.5">
+                  <label className="text-sm font-medium">Tipo de frete *</label>
+                  <select className="input" value={freteTipo} onChange={(event) => alterarFreteTipo(event.target.value)}>
+                    <option value="SEM_FRETE">Sem frete</option>
+                    <option value="EMBUTIDO">Frete embutido</option>
+                    <option value="TERCEIRO">Frete pago a terceiro</option>
+                  </select>
+                </div>
+
+                {freteTipo !== 'SEM_FRETE' && (
+                  <div className="grid gap-1.5">
+                    <label className="text-sm font-medium">
+                      Valor do frete {freteTipo === 'TERCEIRO' ? '*' : '(informativo)'}
+                    </label>
+                    <input
+                      className="input"
+                      value={freteValor}
+                      onChange={(event) => setFreteValor(event.target.value)}
+                      placeholder="R$ 0,00"
+                      inputMode="decimal"
+                    />
+                    <span className="text-xs text-[var(--c-muted)]">
+                      {freteTipo === 'EMBUTIDO'
+                        ? 'Não será somado novamente ao total dos itens.'
+                        : 'Será somado à solicitação e separado do credor principal.'}
+                    </span>
+                  </div>
+                )}
+
+                {freteTipo === 'TERCEIRO' && (
+                  <>
+                    <div className="relative grid gap-1.5 md:col-span-2">
+                      <label className="text-sm font-medium">Credor do frete *</label>
+                      <input
+                        className="input w-full"
+                        value={freteParceiroBusca}
+                        onChange={(event) => {
+                          buscaCredorFreteRequestRef.current += 1;
+                          setFreteParceiroBusca(event.target.value);
+                          setFreteParceiroId('');
+                          setAutocompleteFreteAberto(true);
+                        }}
+                        onFocus={() => setAutocompleteFreteAberto(true)}
+                        onBlur={() => window.setTimeout(() => setAutocompleteFreteAberto(false), 120)}
+                        onKeyDown={tratarTecladoCredorFrete}
+                        placeholder="Digite nome, CPF ou CNPJ"
+                        autoComplete="off"
+                        role="combobox"
+                        aria-autocomplete="list"
+                        aria-expanded={autocompleteFreteAberto}
+                        aria-controls="compra-direta-frete-credores-opcoes"
+                      />
+                      {autocompleteFreteAberto && !freteParceiroId && String(freteParceiroBusca || '').trim().length >= 2 && (
+                        <div
+                          id="compra-direta-frete-credores-opcoes"
+                          className="absolute left-0 right-0 top-full z-[100] mt-1 max-h-64 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+                          role="listbox"
+                        >
+                          {buscandoCredoresFrete && <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Buscando credores...</div>}
+                          {!buscandoCredoresFrete && erroBuscaCredorFrete && <div className="px-3 py-2 text-sm text-red-600">{erroBuscaCredorFrete}</div>}
+                          {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-[var(--c-muted)]">Nenhum credor encontrado.</div>
+                          )}
+                          {!buscandoCredoresFrete && !erroBuscaCredorFrete && freteParceiros.map((parceiro, index) => (
+                            <button
+                              key={parceiro.id}
+                              type="button"
+                              className={`w-full rounded-md px-3 py-2 text-left text-sm transition-colors ${index === freteCredorAtivoIndex ? 'bg-[var(--c-primary)] text-white' : 'text-[var(--c-text)] hover:bg-[var(--c-surface-hover)]'}`}
+                              onMouseEnter={() => setFreteCredorAtivoIndex(index)}
+                              onMouseDown={(event) => {
+                                event.preventDefault();
+                                selecionarCredorFrete(parceiro);
+                              }}
+                              role="option"
+                              aria-selected={index === freteCredorAtivoIndex}
+                            >
+                              <span className="block truncate font-medium">{parceiro.nome || parceiro.razao_social || `Credor ${parceiro.id}`}</span>
+                              {parceiro.cpf_cnpj && (
+                                <span className={`block truncate text-xs ${index === freteCredorAtivoIndex ? 'text-white/80' : 'text-[var(--c-muted)]'}`}>{parceiro.cpf_cnpj}</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-1.5">
+                      <label className="text-sm font-medium">Data para pagamento *</label>
+                      <input type="date" className="input" value={freteDataVencimento} onChange={(event) => setFreteDataVencimento(event.target.value)} />
+                    </div>
+
+                    <div className="grid gap-1.5 md:col-span-2 xl:col-span-4">
+                      <label className="text-sm font-medium">Dados para pagamento do frete *</label>
+                      <textarea
+                        className="input min-h-[80px]"
+                        value={freteDadosPagamento}
+                        onChange={(event) => setFreteDadosPagamento(event.target.value)}
+                        placeholder="Informe PIX, banco/agência/conta, linha digitável ou instruções para o financeiro."
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
 
             <label className={`btn btn-outline w-fit cursor-pointer ${uploadingAnexoCabecalho ? 'pointer-events-none opacity-60' : ''}`}>

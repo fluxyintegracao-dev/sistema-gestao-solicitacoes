@@ -596,6 +596,7 @@ async function carregarSolicitacaoCompra(id) {
       { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
       { model: User, as: 'solicitante', attributes: ['id', 'nome', 'email'] },
       { model: User, as: 'compradorResponsavel', attributes: ['id', 'nome', 'email'] },
+      { model: Parceiro, as: 'freteCredor', attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email'] },
       { model: Solicitacao, as: 'solicitacaoPrincipal', attributes: ['id', 'codigo', 'descricao', 'valor', 'area_responsavel', 'status_global'] },
       {
         model: SolicitacaoCompraItem,
@@ -3458,7 +3459,12 @@ module.exports = {
         parceiro_id,
         forma_pagamento_ids,
         desconto_total,
-        anexos_cabecalho
+        anexos_cabecalho,
+        frete_tipo,
+        frete_valor,
+        frete_data_vencimento,
+        frete_parceiro_id,
+        frete_dados_pagamento
       } = req.body;
       const compraDireta = normalizeTextCompra(origem) === 'COMPRA_DIRETA';
 
@@ -3539,6 +3545,46 @@ module.exports = {
         return res.status(400).json({ error: 'Informe o valor dos itens da compra direta.' });
       }
 
+      const freteTipoCompraDireta = compraDireta
+        ? String(frete_tipo || 'SEM_FRETE').trim().toUpperCase()
+        : 'SEM_FRETE';
+      if (!['SEM_FRETE', 'EMBUTIDO', 'TERCEIRO'].includes(freteTipoCompraDireta)) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Selecione um tipo de frete valido.' });
+      }
+
+      const freteValorCompraDireta = compraDireta && freteTipoCompraDireta !== 'SEM_FRETE'
+        ? arredondarMoeda(parseValorMonetario(frete_valor))
+        : 0;
+      if (freteTipoCompraDireta === 'TERCEIRO' && freteValorCompraDireta <= 0) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe o valor do frete pago a terceiro.' });
+      }
+      if (freteTipoCompraDireta === 'TERCEIRO' && !frete_data_vencimento) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe a data para pagamento do frete.' });
+      }
+      if (freteTipoCompraDireta === 'TERCEIRO' && !String(frete_dados_pagamento || '').trim()) {
+        await transaction.rollback();
+        return res.status(400).json({ error: 'Informe os dados para pagamento do frete.' });
+      }
+
+      let freteCredorCompraDireta = null;
+      if (freteTipoCompraDireta === 'TERCEIRO') {
+        freteCredorCompraDireta = await Parceiro.findByPk(frete_parceiro_id, {
+          attributes: ['id', 'nome', 'cpf_cnpj', 'ativo', 'fornecedor'],
+          transaction
+        });
+        if (!freteCredorCompraDireta || freteCredorCompraDireta.ativo === false || freteCredorCompraDireta.fornecedor !== true) {
+          await transaction.rollback();
+          return res.status(400).json({ error: 'Selecione um credor ativo para o frete pago a terceiro.' });
+        }
+      }
+
+      const valorTotalSolicitacaoCompraDireta = compraDireta
+        ? arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta === 'TERCEIRO' ? freteValorCompraDireta : 0))
+        : 0;
+
       let formasPagamentoCompraDireta = [];
       if (compraDireta) {
         const formaPagamentoIds = Array.isArray(forma_pagamento_ids)
@@ -3609,7 +3655,14 @@ module.exports = {
           necessario_para: necessario_para || null,
           link_geral: link_geral || null,
           valor_fechado: compraDireta ? valorTotalCompraDireta : 0,
-          desconto_total: compraDireta ? descontoTotalCompraDireta : 0
+          desconto_total: compraDireta ? descontoTotalCompraDireta : 0,
+          frete_tipo: freteTipoCompraDireta,
+          frete_valor: freteValorCompraDireta,
+          frete_data_vencimento: freteTipoCompraDireta === 'TERCEIRO' ? frete_data_vencimento : null,
+          frete_parceiro_id: freteTipoCompraDireta === 'TERCEIRO' ? freteCredorCompraDireta.id : null,
+          frete_dados_pagamento: freteTipoCompraDireta === 'TERCEIRO'
+            ? String(frete_dados_pagamento || '').trim()
+            : null
         },
         { transaction }
       );
@@ -3689,7 +3742,14 @@ module.exports = {
         compraDireta && dados_pagamento ? `Dados para pagamento: ${dados_pagamento}` : null,
         compraDireta && descontoTotalCompraDireta > 0 ? `Valor bruto: R$ ${formatCurrencyPdf(valorBrutoCompraDireta)}` : null,
         compraDireta && descontoTotalCompraDireta > 0 ? `Desconto concedido: R$ ${formatCurrencyPdf(descontoTotalCompraDireta)}` : null,
-        compraDireta ? `Valor total: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
+        compraDireta ? `Valor liquido dos itens: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
+        compraDireta && freteTipoCompraDireta === 'EMBUTIDO'
+          ? `Frete embutido nos itens${freteValorCompraDireta > 0 ? `: R$ ${formatCurrencyPdf(freteValorCompraDireta)}` : ''}`
+          : null,
+        compraDireta && freteTipoCompraDireta === 'TERCEIRO'
+          ? `Frete pago a terceiro: R$ ${formatCurrencyPdf(freteValorCompraDireta)} - Credor: ${freteCredorCompraDireta.nome || freteCredorCompraDireta.cpf_cnpj || freteCredorCompraDireta.id} - Vencimento: ${frete_data_vencimento} - Dados: ${String(frete_dados_pagamento || '').trim()}`
+          : null,
+        compraDireta ? `Valor total da solicitacao: R$ ${formatCurrencyPdf(valorTotalSolicitacaoCompraDireta)}` : null,
         observacoes ? `Observações: ${observacoes}` : null
       ]
         .filter(Boolean)
@@ -3702,7 +3762,7 @@ module.exports = {
           parceiro_id: compraDireta ? parceiroCompraDireta?.id || null : null,
           tipo_solicitacao_id: tipoSolicitacao.id,
           descricao,
-          valor: compraDireta ? valorTotalCompraDireta : null,
+          valor: compraDireta ? valorTotalSolicitacaoCompraDireta : null,
           status_global: 'PENDENTE',
           area_responsavel: fluxoCompra.areaResponsavel,
           fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
@@ -3740,7 +3800,12 @@ module.exports = {
             dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
             valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
             desconto_total: compraDireta ? descontoTotalCompraDireta : null,
-            valor_total: compraDireta ? valorTotalCompraDireta : null,
+            valor_total_itens: compraDireta ? valorTotalCompraDireta : null,
+            frete_tipo: compraDireta ? freteTipoCompraDireta : null,
+            frete_valor: compraDireta ? freteValorCompraDireta : null,
+            frete_parceiro_id: compraDireta ? freteCredorCompraDireta?.id || null : null,
+            frete_data_vencimento: compraDireta ? frete_data_vencimento || null : null,
+            valor_total: compraDireta ? valorTotalSolicitacaoCompraDireta : null,
             fluxo_aprovacao_diretoria: fluxoCompra.usaFluxoDiretoria,
             diretoria_fluxo_codigo: fluxoCompra.diretoriaFluxoCodigo,
             setor_destino_pos_aprovacao: fluxoCompra.setorDestinoPosAprovacao
@@ -3775,7 +3840,12 @@ module.exports = {
           dados_pagamento: compraDireta ? dados_pagamento || null : undefined,
           valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
           desconto_total: compraDireta ? descontoTotalCompraDireta : null,
-          valor_total: compraDireta ? valorTotalCompraDireta : null
+          valor_total_itens: compraDireta ? valorTotalCompraDireta : null,
+          frete_tipo: compraDireta ? freteTipoCompraDireta : null,
+          frete_valor: compraDireta ? freteValorCompraDireta : null,
+          frete_parceiro_id: compraDireta ? freteCredorCompraDireta?.id || null : null,
+          frete_data_vencimento: compraDireta ? frete_data_vencimento || null : null,
+          valor_total: compraDireta ? valorTotalSolicitacaoCompraDireta : null
         },
         transaction
       });
@@ -3815,7 +3885,16 @@ module.exports = {
         dados_pagamento: compraDireta ? dados_pagamento || null : null,
         valor_bruto: compraDireta ? valorBrutoCompraDireta : null,
         desconto_total: compraDireta ? descontoTotalCompraDireta : null,
-        valor_total: compraDireta ? valorTotalCompraDireta : null
+        valor_total_itens: compraDireta ? valorTotalCompraDireta : null,
+        frete_tipo: compraDireta ? freteTipoCompraDireta : null,
+        frete_valor: compraDireta ? freteValorCompraDireta : null,
+        frete_credor: compraDireta && freteCredorCompraDireta ? {
+          id: freteCredorCompraDireta.id,
+          nome: freteCredorCompraDireta.nome,
+          cpf_cnpj: freteCredorCompraDireta.cpf_cnpj
+        } : null,
+        frete_data_vencimento: compraDireta ? frete_data_vencimento || null : null,
+        valor_total: compraDireta ? valorTotalSolicitacaoCompraDireta : null
       });
     } catch (error) {
       await transaction.rollback();
