@@ -174,6 +174,7 @@ const {
   validateFinanceConciliacaoCriarTituloBody,
   validateFinanceConciliacaoConfirmBody,
   validateFinanceConciliacaoCorrigirContaBody,
+  validateFinanceConciliacaoCreditoRotativoBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
   validateFinanceConciliacaoMovimentosQuery,
@@ -1732,6 +1733,7 @@ router.post('/financeiro/conciliacoes/:id/confirmar-transferencia', allowFinance
 router.post('/financeiro/conciliacoes/:id/estornar-transferencia', allowConciliacaoEstornar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoEstornoTransferenciaBody }), ConciliacaoBancariaController.estornarTransferencia);
 router.post('/financeiro/conciliacoes/:id/estornar', allowConciliacaoEstornar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoEstornoTransferenciaBody }), ConciliacaoBancariaController.estornar);
 router.post('/financeiro/conciliacoes/:id/confirmar-tarifa', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTarifaBody }), ConciliacaoBancariaController.confirmarTarifa);
+router.post('/financeiro/conciliacoes/:id/confirmar-credito-rotativo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCreditoRotativoBody }), ConciliacaoBancariaController.confirmarCreditoRotativo);
 router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: validateFinanceCaixaQuery }), CaixaFinanceiroController.index);
 router.post('/financeiro/caixas/confirmar-conciliacao-dia', allowFinanceiro, criticalRateLimit, CaixaFinanceiroController.confirmarConciliacaoDia);
 router.post('/financeiro/caixas/abrir', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCaixaAberturaBody }), CaixaFinanceiroController.abrir);

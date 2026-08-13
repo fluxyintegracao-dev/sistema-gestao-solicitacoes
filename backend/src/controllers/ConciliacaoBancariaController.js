@@ -3,6 +3,7 @@ const {
   corrigirContaConciliacao,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
+  confirmarConciliacaoCreditoRotativo,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
   estornarConciliacao,
@@ -160,6 +161,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao conciliar tarifa bancaria');
+    }
+  },
+
+  async confirmarCreditoRotativo(req, res) {
+    try {
+      const data = await confirmarConciliacaoCreditoRotativo(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao conciliar credito rotativo');
     }
   },
 

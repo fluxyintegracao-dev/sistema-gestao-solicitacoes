@@ -5,6 +5,7 @@ import {
   conciliarSugestoesBancarias,
   confirmarConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
+  confirmarConciliacaoCreditoRotativo,
   confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
   estornarConciliacaoTransferencia,
@@ -232,9 +233,11 @@ function ValorBanco({ value, size = 'lg' }) {
 
 // ─── NovoTituloRapidoModal ────────────────────────────────────────────────────
 
-function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onClose, onNovoTitulo, onConfirmarTarifa }) {
+function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onClose, onNovoTitulo, onConfirmarCreditoRotativo, onConfirmarTarifa }) {
   const tarifasAtivas = Array.isArray(tarifas) ? tarifas.filter((tarifa) => tarifa.ativo !== false) : [];
   const isSaida = Number(item?.valor || 0) < 0;
+  const creditoRotativoNatureza = isSaida ? 'amortizacao' : 'liberacao';
+  const creditoRotativoKey = `credito-rotativo-${item?.id}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
@@ -263,6 +266,27 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
             <span className="block text-sm font-semibold text-[var(--c-text)]">Criar titulo + baixa</span>
             <span className="mt-0.5 block text-xs text-[var(--c-muted)]">Usa o fluxo completo de contas a pagar/receber e concilia o movimento.</span>
           </button>
+
+          <div className="rounded-xl border border-[var(--c-border)] px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--c-text)]">Credito rotativo</p>
+                <p className="text-xs text-[var(--c-muted)]">
+                  Registra {creditoRotativoNatureza} no caixa e no endividamento, sem compor a DRE.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm shrink-0"
+                disabled={processingId === creditoRotativoKey}
+                onClick={() => onConfirmarCreditoRotativo(item)}
+              >
+                {processingId === creditoRotativoKey
+                  ? 'Registrando...'
+                  : isSaida ? 'Registrar amortizacao' : 'Registrar liberacao'}
+              </button>
+            </div>
+          </div>
 
           <div className="rounded-xl border border-dashed border-[var(--c-border)] p-3">
             <div className="flex items-center justify-between gap-2">
@@ -2132,6 +2156,33 @@ export default function FinanceiroConciliacao() {
     }
   }
 
+  async function handleConfirmarCreditoRotativo(item) {
+    if (!item?.id) return;
+
+    const processingKey = `credito-rotativo-${item.id}`;
+    try {
+      setProcessingId(processingKey);
+      setError('');
+      setAcoesRapidasError('');
+      setFeedback('');
+      const response = await confirmarConciliacaoCreditoRotativo(item.id, {
+        descricao: item.descricao_banco || ''
+      });
+      const natureza = String(response?.natureza || '').toUpperCase();
+      setFeedback(natureza === 'AMORTIZACAO'
+        ? 'Amortizacao de credito rotativo conciliada.'
+        : 'Liberacao de credito rotativo conciliada.');
+      setAcoesRapidasItem(null);
+      await carregarConciliacoes();
+    } catch (err) {
+      const message = err?.message || 'Erro ao conciliar credito rotativo';
+      setAcoesRapidasError(message);
+      setError(message);
+    } finally {
+      setProcessingId(null);
+    }
+  }
+
   function aplicarFiltros(event) {
     event.preventDefault();
     setAppliedFilters({ ...filters, page: 1 });
@@ -2612,6 +2663,7 @@ export default function FinanceiroConciliacao() {
             setAcoesRapidasItem(null);
             setNovoTituloItem(item);
           }}
+          onConfirmarCreditoRotativo={handleConfirmarCreditoRotativo}
           onConfirmarTarifa={handleConfirmarTarifa}
         />
       )}

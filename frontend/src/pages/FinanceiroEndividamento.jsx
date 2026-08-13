@@ -36,6 +36,14 @@ const TITULOS_COLUMNS = [
   { key: 'saldo', width: 132, minWidth: 112 }
 ];
 
+const CREDITO_ROTATIVO_COLUMNS = [
+  { key: 'data', width: 116, minWidth: 98 },
+  { key: 'empresa', width: 190, minWidth: 140 },
+  { key: 'natureza', width: 130, minWidth: 112 },
+  { key: 'documento', width: 150, minWidth: 120 },
+  { key: 'valor', width: 138, minWidth: 118 }
+];
+
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -149,6 +157,10 @@ export default function FinanceiroEndividamento() {
   const empresasResumo = Array.isArray(relatorio?.empresas) ? relatorio.empresas : [];
   const categoriasResumo = Array.isArray(relatorio?.categorias) ? relatorio.categorias : [];
   const titulos = Array.isArray(relatorio?.titulos) ? relatorio.titulos : [];
+  const creditoRotativo = relatorio?.credito_rotativo || {};
+  const movimentosCreditoRotativo = Array.isArray(creditoRotativo.movimentacoes)
+    ? creditoRotativo.movimentacoes
+    : [];
   const schemaPendencias = Array.isArray(relatorio?.schema?.pendencias)
     ? relatorio.schema.pendencias
     : [];
@@ -271,6 +283,9 @@ export default function FinanceiroEndividamento() {
         <Metric label="Vence em 30 dias" value={formatCurrency(resumo.saldo_30_dias)} detail="Compromisso de curto prazo" />
         <Metric label="Valor original" value={formatCurrency(resumo.valor_original_total)} detail="Principal classificado como divida" />
         <Metric label="Valor baixado" value={formatCurrency(resumo.valor_baixado_total)} detail="Amortizacao ja registrada" />
+        <Metric label="Credito rotativo aberto" value={formatCurrency(resumo.credito_rotativo_saldo)} detail="Liberacoes menos amortizacoes" critical={Number(resumo.credito_rotativo_saldo || 0) > 0} />
+        <Metric label="Liberado no periodo" value={formatCurrency(resumo.credito_rotativo_liberado_periodo)} detail={periodoTexto || 'Periodo selecionado'} />
+        <Metric label="Amortizado no periodo" value={formatCurrency(resumo.credito_rotativo_amortizado_periodo)} detail={periodoTexto || 'Periodo selecionado'} />
       </div>
 
       {loading ? (
@@ -388,6 +403,49 @@ export default function FinanceiroEndividamento() {
                       </tr>
                     ))
                   )}
+                </tbody>
+              </ResizableTable>
+            </div>
+          </section>
+
+          <section className="card sol-surface-card app-table-shell xl:col-span-3">
+            <div className="border-b border-[var(--c-border)] px-4 py-3">
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Movimentacoes de credito rotativo</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Liberacoes e amortizacoes conciliadas pelo extrato, sem cadastro de linha e sem impacto na DRE.
+              </p>
+            </div>
+            <div className="table-wrapper">
+              <ResizableTable
+                className="table"
+                columns={CREDITO_ROTATIVO_COLUMNS}
+                storageKey="fluxy.financeiro.endividamento.creditoRotativo.columnWidths"
+              >
+                <thead>
+                  <tr>
+                    <ResizableTh columnKey="data">Data</ResizableTh>
+                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
+                    <ResizableTh columnKey="natureza">Natureza</ResizableTh>
+                    <ResizableTh columnKey="documento">Documento</ResizableTh>
+                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimentosCreditoRotativo.length === 0 ? (
+                    <EmptyRow colSpan={5} message="Nenhuma movimentacao de credito rotativo encontrada." />
+                  ) : movimentosCreditoRotativo.map((movimento) => (
+                    <tr key={movimento.id}>
+                      <td>{formatDate(movimento.data_movimento)}</td>
+                      <td>{movimento.empresa_nome}</td>
+                      <td>
+                        <span className={`badge ${movimento.natureza === 'LIBERACAO' ? 'badge-success' : 'badge-danger'}`}>
+                          {movimento.natureza === 'LIBERACAO' ? 'Liberacao' : 'Amortizacao'}
+                        </span>
+                      </td>
+                      <td>{movimento.documento || '-'}</td>
+                      <td className="text-right font-semibold">{formatCurrency(movimento.valor)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </ResizableTable>
             </div>

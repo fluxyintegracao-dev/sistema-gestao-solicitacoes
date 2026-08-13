@@ -2846,7 +2846,77 @@ function emptyEndividamentoResumo() {
     valor_original_total: 0,
     valor_baixado_total: 0,
     empresas_com_divida: 0,
-    categorias_com_divida: 0
+    categorias_com_divida: 0,
+    credito_rotativo_saldo: 0,
+    credito_rotativo_liberado_periodo: 0,
+    credito_rotativo_amortizado_periodo: 0,
+    movimentos_credito_rotativo: 0
+  };
+}
+
+function summarizeCreditoRotativo(movimentos = [], periodo) {
+  const porEmpresa = new Map();
+  let saldoAberto = 0;
+  let liberadoPeriodo = 0;
+  let amortizadoPeriodo = 0;
+
+  for (const movimentoModel of movimentos) {
+    const movimento = toPlain(movimentoModel);
+    const tipo = String(movimento.tipo_movimento || '').toUpperCase();
+    const valor = roundCurrency(movimento.valor_quitacao || movimento.valor || 0);
+    const isLiberacao = tipo === 'LIBERACAO_CREDITO_ROTATIVO';
+    const impacto = isLiberacao ? valor : -valor;
+    const noPeriodo = movimento.data_movimento >= periodo.data_inicial
+      && movimento.data_movimento <= periodo.data_final;
+    const empresaId = movimento.empresa_id || null;
+    const key = String(empresaId || 'SEM_EMPRESA');
+    const empresa = porEmpresa.get(key) || {
+      empresa_id: empresaId,
+      empresa_nome: getEmpresaNome(movimento.empresa),
+      saldo_aberto: 0,
+      liberado_periodo: 0,
+      amortizado_periodo: 0,
+      movimentos: 0
+    };
+
+    saldoAberto = roundCurrency(saldoAberto + impacto);
+    empresa.saldo_aberto = roundCurrency(empresa.saldo_aberto + impacto);
+    empresa.movimentos += 1;
+    if (noPeriodo && isLiberacao) {
+      liberadoPeriodo = roundCurrency(liberadoPeriodo + valor);
+      empresa.liberado_periodo = roundCurrency(empresa.liberado_periodo + valor);
+    }
+    if (noPeriodo && !isLiberacao) {
+      amortizadoPeriodo = roundCurrency(amortizadoPeriodo + valor);
+      empresa.amortizado_periodo = roundCurrency(empresa.amortizado_periodo + valor);
+    }
+    porEmpresa.set(key, empresa);
+  }
+
+  return {
+    saldo_aberto: roundCurrency(Math.max(0, saldoAberto)),
+    liberado_periodo: liberadoPeriodo,
+    amortizado_periodo: amortizadoPeriodo,
+    movimentos: movimentos.length,
+    empresas: Array.from(porEmpresa.values())
+      .map((item) => ({ ...item, saldo_aberto: roundCurrency(Math.max(0, item.saldo_aberto)) }))
+      .sort((a, b) => Number(b.saldo_aberto || 0) - Number(a.saldo_aberto || 0)),
+    movimentacoes: movimentos
+      .map((movimentoModel) => {
+        const movimento = toPlain(movimentoModel);
+        const tipo = String(movimento.tipo_movimento || '').toUpperCase();
+        return {
+          id: movimento.id,
+          data_movimento: movimento.data_movimento,
+          natureza: tipo === 'LIBERACAO_CREDITO_ROTATIVO' ? 'LIBERACAO' : 'AMORTIZACAO',
+          valor: roundCurrency(movimento.valor_quitacao || movimento.valor || 0),
+          empresa_id: movimento.empresa_id || null,
+          empresa_nome: getEmpresaNome(movimento.empresa),
+          documento: movimento.documento_referencia || null,
+          descricao: movimento.observacoes || null
+        };
+      })
+      .sort((a, b) => String(b.data_movimento || '').localeCompare(String(a.data_movimento || '')))
   };
 }
 
@@ -3028,6 +3098,7 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
     empresas: [],
     categorias: [],
     titulos: [],
+    credito_rotativo: summarizeCreditoRotativo([], periodo),
     schema: {
       pronto: schema.pronto,
       pendencias: [
@@ -3091,6 +3162,34 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
     limit: filters.limit || 1000
   });
 
+  const movimentosCreditoRotativo = filters.obra_id ? [] : await MovimentoFinanceiro.findAll({
+    where: {
+      status: 'ATIVO',
+      tipo_movimento: {
+        [Op.in]: ['LIBERACAO_CREDITO_ROTATIVO', 'AMORTIZACAO_CREDITO_ROTATIVO']
+      },
+      data_movimento: { [Op.lte]: periodo.data_final },
+      ...companyScopeWhere
+    },
+    include: [{
+      model: EmpresaGrupo,
+      as: 'empresa',
+      attributes: schema.empresaAttributes,
+      required: false
+    }],
+    order: [['data_movimento', 'DESC'], ['id', 'DESC']]
+  });
+
+  const endividamentoTitulos = summarizeEndividamento(titulos, periodo);
+  const creditoRotativo = summarizeCreditoRotativo(movimentosCreditoRotativo, periodo);
+  endividamentoTitulos.resumo.saldo_total = roundCurrency(
+    endividamentoTitulos.resumo.saldo_total + creditoRotativo.saldo_aberto
+  );
+  endividamentoTitulos.resumo.credito_rotativo_saldo = creditoRotativo.saldo_aberto;
+  endividamentoTitulos.resumo.credito_rotativo_liberado_periodo = creditoRotativo.liberado_periodo;
+  endividamentoTitulos.resumo.credito_rotativo_amortizado_periodo = creditoRotativo.amortizado_periodo;
+  endividamentoTitulos.resumo.movimentos_credito_rotativo = creditoRotativo.movimentos;
+
   return {
     filtro: {
       periodo: periodo.periodo,
@@ -3103,7 +3202,8 @@ async function gerarRelatorioEndividamento(req, filters = {}) {
       excluir_intercompany: filters.excluir_intercompany !== false,
       classificacao_gerencial: 'ENDIVIDAMENTO'
     },
-    ...summarizeEndividamento(titulos, periodo),
+    ...endividamentoTitulos,
+    credito_rotativo: creditoRotativo,
     schema: {
       pronto: schema.pronto,
       pendencias: [
@@ -4679,6 +4779,12 @@ function classifyMovimentoBancario(movimento, titulo) {
   if (tipoMovimento === 'TARIFA_BANCARIA') {
     return 'SAIDA';
   }
+  if (tipoMovimento === 'LIBERACAO_CREDITO_ROTATIVO') {
+    return 'ENTRADA';
+  }
+  if (tipoMovimento === 'AMORTIZACAO_CREDITO_ROTATIVO') {
+    return 'SAIDA';
+  }
 
   if (tipoMovimento.includes('ENTRADA') || tipoMovimento.includes('RECEB')) {
     return 'ENTRADA';
@@ -4969,6 +5075,8 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
           ? 'TITULO'
           : movimento && tipoMovimento === 'TARIFA_BANCARIA'
             ? 'TARIFA'
+            : movimento && ['LIBERACAO_CREDITO_ROTATIVO', 'AMORTIZACAO_CREDITO_ROTATIVO'].includes(tipoMovimento)
+              ? 'CREDITO_ROTATIVO'
             : movimento
               ? 'MOVIMENTO'
               : 'SEM_VINCULO';

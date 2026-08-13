@@ -2101,25 +2101,31 @@ async function estornarConciliacao(req, conciliacaoId, payload = {}) {
       throw createHttpError(409, 'Um movimento financeiro ja esta vinculado a outra conciliacao e exige revisao manual.');
     }
 
-    const movimentoTarifa = movimentosVinculados.find((movimento) => (
-      String(movimento.tipo_movimento || '').toUpperCase() === 'TARIFA_BANCARIA'
+    const tiposAvulsosEstornaveis = new Set([
+      'TARIFA_BANCARIA',
+      'LIBERACAO_CREDITO_ROTATIVO',
+      'AMORTIZACAO_CREDITO_ROTATIVO'
+    ]);
+    const movimentoAvulso = movimentosVinculados.find((movimento) => (
+      tiposAvulsosEstornaveis.has(String(movimento.tipo_movimento || '').toUpperCase())
     ));
-    if (movimentoTarifa) {
-      if (String(movimentoTarifa.status || '').toUpperCase() !== 'ATIVO') {
-        throw createHttpError(409, 'O movimento da tarifa ja foi estornado ou nao esta ativo.');
+    if (movimentoAvulso) {
+      if (String(movimentoAvulso.status || '').toUpperCase() !== 'ATIVO') {
+        throw createHttpError(409, 'O movimento avulso ja foi estornado ou nao esta ativo.');
       }
-      tipoEstorno = 'TARIFA_BANCARIA';
-      await movimentoTarifa.update({
+      const tipoMovimentoAvulso = String(movimentoAvulso.tipo_movimento || '').toUpperCase();
+      tipoEstorno = tipoMovimentoAvulso === 'TARIFA_BANCARIA' ? 'TARIFA_BANCARIA' : 'CREDITO_ROTATIVO';
+      await movimentoAvulso.update({
         status: 'ESTORNADO',
         conciliacao_bancaria_id: null,
-        observacoes: `${String(movimentoTarifa.observacoes || '').trim()}\nEstorno da conciliacao: ${motivo}`.trim(),
+        observacoes: `${String(movimentoAvulso.observacoes || '').trim()}\nEstorno da conciliacao: ${motivo}`.trim(),
         estornado_por: req.user?.id || null,
         estornado_em: new Date()
       }, { transaction });
     }
 
     for (const movimento of movimentosVinculados) {
-      if (movimentoTarifa && Number(movimento.id) === Number(movimentoTarifa.id)) continue;
+      if (movimentoAvulso && Number(movimento.id) === Number(movimentoAvulso.id)) continue;
       await movimento.update({ conciliacao_bancaria_id: null }, { transaction });
     }
 
@@ -2139,7 +2145,7 @@ async function estornarConciliacao(req, conciliacaoId, payload = {}) {
       tipoEstorno = 'FATURA_CARTAO';
     } else if (conciliacao.titulo_financeiro_id) {
       tipoEstorno = 'TITULO_FINANCEIRO';
-    } else if (movimentosVinculados.length && tipoEstorno !== 'TARIFA_BANCARIA') {
+    } else if (movimentosVinculados.length && !['TARIFA_BANCARIA', 'CREDITO_ROTATIVO'].includes(tipoEstorno)) {
       tipoEstorno = 'MOVIMENTO_FINANCEIRO';
     }
 
@@ -2304,6 +2310,121 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
     if (!transaction.finished) {
       await transaction.rollback();
     }
+    throw error;
+  }
+}
+
+async function confirmarConciliacaoCreditoRotativo(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+
+  const transaction = await sequelize.transaction();
+  try {
+    const conciliacao = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+
+    const valorBanco = Number(conciliacao.valor || 0);
+    if (!Number.isFinite(valorBanco) || valorBanco === 0) {
+      throw createHttpError(400, 'Valor do lancamento bancario invalido para credito rotativo.');
+    }
+
+    const tipoMovimento = valorBanco > 0
+      ? 'LIBERACAO_CREDITO_ROTATIVO'
+      : 'AMORTIZACAO_CREDITO_ROTATIVO';
+    const natureza = valorBanco > 0 ? 'LIBERACAO' : 'AMORTIZACAO';
+    const statusConciliacao = String(conciliacao.status || '').toUpperCase();
+
+    if (statusConciliacao !== 'PENDENTE') {
+      const movimentoExistente = statusConciliacao === 'CONCILIADO' && conciliacao.movimento_financeiro_id
+        ? await MovimentoFinanceiro.findByPk(conciliacao.movimento_financeiro_id, { transaction })
+        : null;
+      if (String(movimentoExistente?.tipo_movimento || '').toUpperCase() === tipoMovimento) {
+        await transaction.commit();
+        return {
+          ...conciliacao.toJSON(),
+          movimento: movimentoExistente.toJSON(),
+          natureza,
+          idempotente: true
+        };
+      }
+      throw createHttpError(409, 'Somente conciliacoes pendentes podem ser registradas como credito rotativo.');
+    }
+
+    const { conta, empresaId } = await validarEmpresaConciliacaoComConta(conciliacao, { transaction });
+    const valor = roundCurrency(Math.abs(valorBanco));
+    const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
+    const descricaoPadrao = natureza === 'LIBERACAO'
+      ? 'Liberacao de credito rotativo'
+      : 'Amortizacao de credito rotativo';
+    const descricao = String(payload.descricao || conciliacao.descricao_banco || descricaoPadrao).trim().slice(0, 255);
+
+    const movimento = await MovimentoFinanceiro.create({
+      titulo_financeiro_id: null,
+      categoria_financeira_id: null,
+      conta_bancaria_id: conta.id,
+      empresa_id: empresaId,
+      caixa_sessao_id: sessao?.id || null,
+      conciliacao_bancaria_id: conciliacao.id,
+      tipo_movimento: tipoMovimento,
+      status: 'ATIVO',
+      valor,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      valor_quitacao: valor,
+      data_movimento: conciliacao.data_movimento,
+      documento_referencia: conciliacao.documento || `CR-${conciliacao.id}`,
+      observacoes: `[CREDITO_ROTATIVO:${natureza}] ${descricao}`,
+      criado_por: req.user?.id || null
+    }, { transaction });
+
+    await conciliacao.update({
+      transferencia_financeira_id: null,
+      movimento_financeiro_id: movimento.id,
+      titulo_financeiro_id: null,
+      fatura_cartao_id: null,
+      empresa_id: empresaId,
+      caixa_sessao_id: sessao?.id || null,
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: new Date()
+    }, { transaction });
+
+    await transaction.commit();
+
+    try {
+      await registrarEventoSeguranca({
+        req,
+        usuarioId: req.user?.id || null,
+        tipoEvento: 'FINANCIAL_BANK_RECONCILED_REVOLVING_CREDIT',
+        recursoTipo: 'CONCILIACAO_BANCARIA',
+        recursoId: conciliacao.id,
+        status: 'SUCCESS',
+        descricao: natureza === 'LIBERACAO'
+          ? 'Liberacao de credito rotativo conciliada'
+          : 'Amortizacao de credito rotativo conciliada',
+        metadata: {
+          movimento_financeiro_id: movimento.id,
+          conta_bancaria_id: conta.id,
+          empresa_id: empresaId,
+          natureza,
+          valor
+        }
+      });
+    } catch (auditError) {
+      console.error('Falha ao registrar auditoria de credito rotativo:', auditError);
+    }
+
+    return {
+      ...conciliacao.toJSON(),
+      movimento: movimento.toJSON(),
+      natureza,
+      idempotente: false
+    };
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
     throw error;
   }
 }
@@ -2788,6 +2909,7 @@ module.exports = {
   conciliarSugeridos,
   corrigirContaConciliacao,
   confirmarConciliacao,
+  confirmarConciliacaoCreditoRotativo,
   confirmarConciliacaoFatura,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
