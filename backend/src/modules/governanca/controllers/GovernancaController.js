@@ -3,6 +3,8 @@
 const metricsService = require('../services/governancaMetricsService');
 const { buildExport } = require('../services/governancaExportService');
 const { logAccess } = require('../services/governancaAccessLogService');
+const operationalAudit = require('../services/auditoriaOperacionalService');
+const { canViewOperationalAuditUsers } = require('../../../services/authorizationService');
 
 async function dashboard(req, res, next) {
   try {
@@ -106,9 +108,57 @@ async function exportar(req, res, next) {
   }
 }
 
+async function auditoriaOperacionalResumo(req, res, next) {
+  try {
+    res.json(await operationalAudit.getSummary(req.query));
+  } catch (error) { next(error); }
+}
+
+async function auditoriaOperacionalUsuarios(req, res, next) {
+  try {
+    res.json(await operationalAudit.getUsers(req.query));
+  } catch (error) { next(error); }
+}
+
+async function auditoriaOperacionalEventos(req, res, next) {
+  try {
+    res.json(await operationalAudit.getEvents(req.query));
+  } catch (error) { next(error); }
+}
+
+async function auditoriaOperacionalOpcoes(req, res, next) {
+  try {
+    const options = await operationalAudit.getOptions(req.query);
+    if (!(await canViewOperationalAuditUsers(req.user))) options.usuarios = [];
+    res.json(options);
+  } catch (error) { next(error); }
+}
+
+async function auditoriaOperacionalNavegacao(req, res, next) {
+  try {
+    await operationalAudit.recordNavigation(req, req.body);
+    res.status(202).json({ ok: true });
+  } catch (error) { next(error); }
+}
+
+async function auditoriaOperacionalExportar(req, res, next) {
+  try {
+    const csv = await operationalAudit.exportCsv(req.query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="auditoria-operacional-${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send(csv);
+  } catch (error) { next(error); }
+}
+
 module.exports = {
   adocao,
   auditoria,
+  auditoriaOperacionalEventos,
+  auditoriaOperacionalExportar,
+  auditoriaOperacionalNavegacao,
+  auditoriaOperacionalOpcoes,
+  auditoriaOperacionalResumo,
+  auditoriaOperacionalUsuarios,
   dashboard,
   eficiencia,
   executiva,

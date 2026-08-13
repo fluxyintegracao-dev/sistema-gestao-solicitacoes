@@ -1384,6 +1384,10 @@ const SYSTEM_GOVERNANCE_VIEW_KEYS = ['governanca.sistema.visualizar', 'governanc
 const SYSTEM_GOVERNANCE_MANAGE_KEYS = ['governanca.sistema.gerenciar'];
 const SYSTEM_TECH_MONITOR_VIEW_KEYS = ['governanca.tecnico.visualizar', 'governanca.sistema.gerenciar'];
 const SYSTEM_AUDIT_VIEW_KEYS = ['governanca.auditoria.visualizar', 'governanca.sistema.gerenciar'];
+const SYSTEM_OPERATIONAL_AUDIT_VIEW_KEYS = ['governanca.operacional.visualizar_resumo', 'governanca.operacional.visualizar_usuarios', 'governanca.operacional.visualizar_detalhes', 'governanca.sistema.gerenciar'];
+const SYSTEM_OPERATIONAL_AUDIT_DETAIL_KEYS = ['governanca.operacional.visualizar_detalhes', 'governanca.sistema.gerenciar'];
+const SYSTEM_OPERATIONAL_AUDIT_USER_KEYS = ['governanca.operacional.visualizar_usuarios', 'governanca.operacional.visualizar_detalhes', 'governanca.sistema.gerenciar'];
+const SYSTEM_OPERATIONAL_AUDIT_EXPORT_KEYS = ['governanca.operacional.exportar', 'governanca.sistema.gerenciar'];
 const SYSTEM_PRODUCT_EVOLUTION_VIEW_KEYS = ['governanca.produto.visualizar', 'governanca.sistema.gerenciar'];
 
 export function canViewSystemGovernance(user) {
@@ -1416,6 +1420,26 @@ export function canViewSystemAudit(user) {
     return hasAnyPermissao(user, SYSTEM_AUDIT_VIEW_KEYS);
   }
   return false;
+}
+
+export function canViewOperationalAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  return hasConfiguredAreaPermissions(user) && hasAnyPermissao(user, SYSTEM_OPERATIONAL_AUDIT_VIEW_KEYS);
+}
+
+export function canViewOperationalAuditDetails(user) {
+  if (isBusinessAdmin(user)) return true;
+  return hasConfiguredAreaPermissions(user) && hasAnyPermissao(user, SYSTEM_OPERATIONAL_AUDIT_DETAIL_KEYS);
+}
+
+export function canViewOperationalAuditUsers(user) {
+  if (isBusinessAdmin(user)) return true;
+  return hasConfiguredAreaPermissions(user) && hasAnyPermissao(user, SYSTEM_OPERATIONAL_AUDIT_USER_KEYS);
+}
+
+export function canExportOperationalAudit(user) {
+  if (isBusinessAdmin(user)) return true;
+  return hasConfiguredAreaPermissions(user) && hasAnyPermissao(user, SYSTEM_OPERATIONAL_AUDIT_EXPORT_KEYS);
 }
 
 export function canViewSystemProductEvolution(user) {

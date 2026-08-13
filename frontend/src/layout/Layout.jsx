@@ -93,6 +93,7 @@ import {
   canViewFiscalDocuments,
   canViewFiscalLogs,
   canViewSystemGovernance,
+  canViewOperationalAudit,
   canCreateCompraSolicitacao,
   canManageComprasConfiguracoes,
   canManageComprasCotacoes,
@@ -116,6 +117,7 @@ import {
 import { canAccessCustosRecebiveis } from '../modules/custosRecebiveis/utils/access';
 import { isNativeApp, registerNativeBackButtonHandler } from '../mobile/runtime';
 import { getFallbackRoute, hasSafeBrowserHistory } from '../utils/navigation';
+import OperationalAuditTracker from '../modules/governanca/components/OperationalAuditTracker';
 
 const SST_SIMPLIFIED_ICONS = {
   pgr: HiOutlineExclamationTriangle,
@@ -377,6 +379,7 @@ export default function Layout() {
   const sstAccess = canAccessSst(user);
   const sstDashboardAccess = canViewSstDashboard(user);
   const governancaSistemaAccess = canViewSystemGovernance(user);
+  const auditoriaOperacionalAccess = canViewOperationalAudit(user);
   const obrasAccess = canAccessCadastroObras(user);
   const contratosAccess = canAccessContratos(user);
   const bibliotecaAccess = canAccessBiblioteca(user);
@@ -644,9 +647,10 @@ export default function Layout() {
       ]);
     }
 
-    if (governancaSistemaAccess) {
+    if (governancaSistemaAccess || auditoriaOperacionalAccess) {
       addGroup('Administração', [
-        item('/governanca', 'Governança do Sistema', HiOutlineShieldCheck)
+        governancaSistemaAccess ? item('/governanca', 'Governança do Sistema', HiOutlineShieldCheck) : null,
+        auditoriaOperacionalAccess ? item('/governanca/auditoria-operacional', 'Auditoria Operacional', HiOutlineClipboardDocumentList) : null
       ]);
     }
 
@@ -714,6 +718,7 @@ export default function Layout() {
     financeiroModuleEnabled,
     gestaoUsuarios,
     governancaSistemaAccess,
+    auditoriaOperacionalAccess,
     moduloBibliotecaHabilitado,
     moduloCotacoesHabilitado,
     obrasAccess,
@@ -774,6 +779,7 @@ export default function Layout() {
   return (
     <div className={theme === 'dark' ? 'dark' : ''}>
       <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''} ${custosRecebiveisResponsiveRoute ? 'custos-recebiveis-layout-scope' : ''}`}>
+        <OperationalAuditTracker />
         <div className="layout-shell-backdrop" aria-hidden="true" />
 
         <aside

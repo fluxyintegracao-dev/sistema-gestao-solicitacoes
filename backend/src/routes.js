@@ -537,8 +537,10 @@ router.post('/crm/webhooks/google', crmWebhookRateLimit, requireEnabledModule('C
 router.post('/webhooks/d4sign', d4signWebhookRateLimit, uploadComprovantes.none(), ComercialContratoDocumentoController.webhookD4Sign);
 router.post('/payments/bb/webhook', bbWebhookRateLimit, PaymentController.bbWebhook);
 const auth = require('./middlewares/auth');
+const auditoriaOperacional = require('./middlewares/auditoriaOperacional');
 router.use(auth);
 router.use(csrfProtection);
+router.use(auditoriaOperacional);
 router.get('/auth/me', AuthController.me);
 router.post('/auth/logout', AuthController.logout);
 router.post('/auth/heartbeat', AuthController.heartbeat);

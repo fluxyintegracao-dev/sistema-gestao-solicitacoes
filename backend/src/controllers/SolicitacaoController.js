@@ -3143,6 +3143,33 @@ module.exports = {
         );
 
       const payload = solicitacao.toJSON ? solicitacao.toJSON() : solicitacao;
+      const compraDiretaVinculada = await SolicitacaoCompra.findOne({
+        where: {
+          solicitacao_principal_id: solicitacao.id,
+          origem: 'COMPRA_DIRETA'
+        },
+        attributes: [
+          'id',
+          'valor_fechado',
+          'desconto_total',
+          'frete_tipo',
+          'frete_valor',
+          'frete_data_vencimento',
+          'frete_parceiro_id',
+          'frete_dados_pagamento'
+        ],
+        include: [
+          {
+            model: Parceiro,
+            as: 'freteCredor',
+            attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email'],
+            required: false
+          }
+        ]
+      });
+      payload.compra_direta = compraDiretaVinculada
+        ? (compraDiretaVinculada.toJSON ? compraDiretaVinculada.toJSON() : compraDiretaVinculada)
+        : null;
       const resumoFinanceiro = calcularResumoFinanceiroSolicitacao(payload);
       payload.valor_total = resumoFinanceiro.valorTotal;
       payload.valor_pago_acumulado = resumoFinanceiro.valorPagoAcumulado;

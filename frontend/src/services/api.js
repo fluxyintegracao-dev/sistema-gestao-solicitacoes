@@ -11,6 +11,21 @@ let currentAuthToken = null;
 let currentCsrfToken = null;
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const CSRF_COOKIE_NAME = 'fluxy_csrf';
+const AUDIT_SESSION_KEY = 'fluxy_audit_session_id';
+
+export function getAuditSessionId() {
+  if (typeof window === 'undefined') return null;
+  try {
+    let value = sessionStorage.getItem(AUDIT_SESSION_KEY);
+    if (!value) {
+      value = globalThis.crypto?.randomUUID?.() || `audit-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      sessionStorage.setItem(AUDIT_SESSION_KEY, value);
+    }
+    return value;
+  } catch {
+    return null;
+  }
+}
 
 function getCookieValue(name) {
   if (typeof document === 'undefined') return null;
@@ -64,6 +79,11 @@ export function installFetchSecurityDefaults() {
       if (csrfToken) {
         headers.set(CSRF_HEADER_NAME, csrfToken);
       }
+    }
+
+    const auditSessionId = getAuditSessionId();
+    if (auditSessionId && !headers.has('X-Audit-Session-Id')) {
+      headers.set('X-Audit-Session-Id', auditSessionId);
     }
 
     const response = await nativeFetch(input, {

@@ -19,6 +19,10 @@ Governanca oferece visao institucional de auditoria, saude tecnica, eventos de r
 
 Consome auditoria, logs, modulos habilitados, usuarios, eventos de risco e indicadores agregados. Nao recebe acesso irrestrito ao conteudo de RH/DP, SST ou documentos privados apenas por ser Governanca.
 
+## Auditoria operacional
+
+A trilha transversal de navegacoes e operacoes autenticadas esta documentada em [AUDITORIA_OPERACIONAL.md](./AUDITORIA_OPERACIONAL.md). Ela registra metadados operacionais, sem copiar conteudo de formularios, documentos ou credenciais.
+
 ## Mudanca segura
 
 Validar fonte dos indicadores, permissoes, jobs, duplicidade de alertas, volume de consultas e ausencia de efeitos de escrita nos dominios observados.

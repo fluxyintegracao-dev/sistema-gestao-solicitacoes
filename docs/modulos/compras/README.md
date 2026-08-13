@@ -22,6 +22,11 @@ Compras e dono da solicitacao de compra, origem normal/direta, itens, quantidade
 - permite localizar o credor na base de Parceiros ou cadastra-lo no proprio fluxo;
 - cadastro rapido exige nome, CPF/CNPJ e telefone e aceita email;
 - valores, desconto, anexos, itens e apropriacoes sao validados no backend.
+- o frete pode ser informado como ausente, embutido nos itens ou pago a terceiro;
+- frete embutido e apenas informativo e nao e somado novamente ao valor dos itens;
+- frete pago a terceiro exige valor, credor ativo, vencimento e dados para pagamento, compondo o total da solicitacao;
+- ao gerar as contas da solicitacao, o financeiro recebe dois titulos preconfigurados: itens para o credor principal e frete para o credor informado, preservando valores e vencimentos separados;
+- a criacao e a revisao exibem valor liquido dos itens, frete e valor total para impedir dupla contabilizacao.
 
 ## Importacao de itens na solicitacao normal
 
