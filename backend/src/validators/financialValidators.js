@@ -1000,7 +1000,7 @@ function validateFinanceRelatorioConciliacaoQuery(query = {}) {
     data_final: dataFinal,
     conta_bancaria_id: parseInteger(query.conta_bancaria_id, 'Conta bancaria'),
     status: parseEnum(query.status, 'Status', ['TODOS', 'CONCILIADO', 'PENDENTE', 'IGNORADO', 'REMOVIDO']),
-    tipo_conciliacao: parseEnum(query.tipo_conciliacao, 'Tipo de conciliacao', ['TODOS', 'TRANSFERENCIA', 'TITULO', 'FATURA_CARTAO', 'TARIFA', 'CREDITO_ROTATIVO', 'MOVIMENTO', 'SEM_VINCULO']),
+    tipo_conciliacao: parseEnum(query.tipo_conciliacao, 'Tipo de conciliacao', ['TODOS', 'TRANSFERENCIA', 'TITULO', 'FATURA_CARTAO', 'TARIFA', 'ESTORNO_TARIFA', 'CREDITO_ROTATIVO', 'MOVIMENTO', 'SEM_VINCULO']),
     natureza: parseEnum(query.natureza, 'Natureza', ['TODAS', 'ENTRADA', 'SAIDA']),
     busca: parseOptionalText(query.busca, 'Busca', 120)
   };
@@ -1015,6 +1015,19 @@ function validateFinanceConciliacaoTarifaBody(body = {}) {
 
   return {
     codigo: parseOptionalText(body.codigo, 'Codigo da tarifa', 80, { required: true }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 255)
+  };
+}
+
+function validateFinanceConciliacaoEstornoTarifaBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['movimento_tarifa_id', 'descricao'],
+    'Conciliacao bancaria por estorno de tarifa'
+  );
+
+  return {
+    movimento_tarifa_id: parseInteger(body.movimento_tarifa_id, 'Movimento da tarifa', { required: true }),
     descricao: parseOptionalText(body.descricao, 'Descricao', 255)
   };
 }
@@ -1999,6 +2012,7 @@ module.exports = {
   validateFinanceConciliacaoConfirmBody,
   validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoCreditoRotativoBody,
+  validateFinanceConciliacaoEstornoTarifaBody,
   validateFinanceConciliacaoTarifaBody,
   validateFinanceConciliacaoTransferenciaBody,
   validateFinanceConciliacaoEstornoTransferenciaBody,

@@ -3925,6 +3925,16 @@ db.MovimentoFinanceiro.belongsTo(db.ConciliacaoBancaria, {
   as: 'conciliacaoBancaria'
 });
 
+db.MovimentoFinanceiro.belongsTo(db.MovimentoFinanceiro, {
+  foreignKey: 'movimento_origem_id',
+  as: 'movimentoOrigem'
+});
+
+db.MovimentoFinanceiro.hasMany(db.MovimentoFinanceiro, {
+  foreignKey: 'movimento_origem_id',
+  as: 'movimentosDerivados'
+});
+
 /* ===== CRM ===== */
 db.CrmPipeline.hasMany(db.CrmPipelineStage, { foreignKey: 'pipeline_id', as: 'etapas' });
 db.CrmPipelineStage.belongsTo(db.CrmPipeline, { foreignKey: 'pipeline_id', as: 'pipeline' });

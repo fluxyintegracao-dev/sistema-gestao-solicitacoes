@@ -808,6 +808,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
                 <option value="TITULO">Titulos</option>
                 <option value="FATURA_CARTAO">Faturas de cartao</option>
                 <option value="TARIFA">Tarifas bancarias</option>
+                <option value="ESTORNO_TARIFA">Estornos de tarifa</option>
                 <option value="CREDITO_ROTATIVO">Credito rotativo</option>
                 <option value="MOVIMENTO">Outros movimentos</option>
                 <option value="SEM_VINCULO">Sem vinculo</option>
@@ -1120,6 +1121,8 @@ function ContaReportShell({ title, subtitle, type }) {
                                 ? `Fatura #${item.fatura_cartao_id}`
                                 : item.tipo_conciliacao === 'TARIFA'
                                   ? `Tarifa · mov. #${item.movimento_financeiro_id}`
+                                  : item.tipo_conciliacao === 'ESTORNO_TARIFA'
+                                    ? `Estorno de tarifa - mov. #${item.movimento_financeiro_id}`
                                   : item.tipo_conciliacao === 'CREDITO_ROTATIVO'
                                     ? `${item.natureza === 'SAIDA' ? 'Amortizacao' : 'Liberacao'} · mov. #${item.movimento_financeiro_id}`
                                   : item.titulo_codigo || (item.movimento_financeiro_id ? `Mov. #${item.movimento_financeiro_id}` : '-')}
@@ -1170,6 +1173,8 @@ function ContaReportShell({ title, subtitle, type }) {
                 ? 'A transferencia sera cancelada e os lancamentos OFX vinculados voltarao para pendente.'
                 : estornoModal.item?.tipo_conciliacao === 'TARIFA'
                   ? 'A tarifa criada pela conciliacao sera estornada e o lancamento OFX voltara para pendente.'
+                  : estornoModal.item?.tipo_conciliacao === 'ESTORNO_TARIFA'
+                    ? 'O credito de estorno sera desfeito e o lancamento OFX voltara para pendente. A tarifa original permanecera ativa.'
                   : estornoModal.item?.tipo_conciliacao === 'CREDITO_ROTATIVO'
                     ? 'O movimento de credito rotativo sera estornado e o lancamento OFX voltara para pendente.'
                   : 'O vinculo sera desfeito sem apagar o registro financeiro original, e o lancamento OFX voltara para pendente.'}
