@@ -138,7 +138,12 @@ function EventItem({ event }) {
           <span>{event.usuario?.nome || 'Usuario removido'}</span>
           <span>{event.modulo}</span>
           {event.setor?.nome && <span>{event.setor.nome}</span>}
-          {event.recurso_id && <span>{event.recurso_tipo} #{event.recurso_id}</span>}
+          {event.recurso_id && (
+            <span>
+              {event.recurso_tipo} #{event.recurso_id}
+              {event.recurso_codigo ? ` · ${event.recurso_codigo}` : ''}
+            </span>
+          )}
         </div>
       </div>
       <time>{formatDateTime(event.ocorrido_em)}</time>

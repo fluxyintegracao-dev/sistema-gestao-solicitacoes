@@ -22,6 +22,33 @@ function normalizeResourceId(value) {
   return /^\d{1,18}$/.test(normalized) ? normalized : null;
 }
 
+function normalizeResourceCode(value) {
+  const normalized = clampText(value, 120);
+  if (!normalized || !/^[a-z0-9][a-z0-9._/-]{0,119}$/i.test(normalized)) return null;
+  return normalized;
+}
+
+function extractResponseResource(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+
+  const queue = [{ value: payload, depth: 0 }];
+  while (queue.length) {
+    const current = queue.shift();
+    const value = current.value;
+    const id = normalizeResourceId(value?.id);
+    if (id) {
+      return { id, code: normalizeResourceCode(value.codigo) };
+    }
+    if (current.depth >= 2) continue;
+    Object.values(value).forEach((item) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        queue.push({ value: item, depth: current.depth + 1 });
+      }
+    });
+  }
+  return null;
+}
+
 function sanitizeMetadata(value, depth = 0) {
   if (depth > 2 || value == null) return null;
   if (Array.isArray(value)) return value.slice(0, 10).map((item) => sanitizeMetadata(item, depth + 1));
@@ -144,12 +171,18 @@ async function recordEvent(payload) {
   }
 }
 
-function recordHttpEvent(req, statusCode) {
+function recordHttpEvent(req, statusCode, responseResource = null) {
   const route = req.originalUrl || req.url || '/';
   const normalized = normalizeRoute(route);
   const moduleName = inferModule(normalized);
   const type = inferEventType(req.method, normalized);
-  const resource = extractResource(route);
+  const routeResource = extractResource(route);
+  const responseId = statusCode < 400 ? normalizeResourceId(responseResource?.id) : null;
+  const resource = {
+    id: routeResource.id || responseId,
+    type: routeResource.type,
+    code: routeResource.id ? null : normalizeResourceCode(responseResource?.code)
+  };
   const result = statusCode < 400 ? 'SUCCESS' : [401, 403].includes(statusCode) ? 'DENIED' : 'FAILED';
   return recordEvent({
     usuario_id: req.user?.id,
@@ -163,6 +196,7 @@ function recordHttpEvent(req, statusCode) {
     rota_padrao: normalized,
     recurso_tipo: resource.type,
     recurso_id: resource.id,
+    recurso_codigo: resource.code,
     empresa_id: req.body?.empresa_id || req.body?.empresa_pagadora_id || null,
     obra_id: req.body?.obra_id || null,
     acao_chave: `${req.method}:${normalized}`,
@@ -372,10 +406,10 @@ function csvCell(value) {
 
 async function exportCsv(query) {
   const result = await getEvents({ ...query, page: 1, limit: MAX_EXPORT_ROWS }, { maxLimit: MAX_EXPORT_ROWS });
-  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Recurso', 'ID'];
+  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Recurso', 'ID', 'Codigo'];
   const lines = result.rows.map((item) => [
     item.ocorrido_em, item.usuario?.nome, item.setor?.nome, item.modulo, item.categoria,
-    item.tipo_evento, item.resultado, item.resumo, item.recurso_tipo, item.recurso_id
+    item.tipo_evento, item.resultado, item.resumo, item.recurso_tipo, item.recurso_id, item.recurso_codigo
   ].map(csvCell).join(';'));
   return `\ufeff${header.map(csvCell).join(';')}\n${lines.join('\n')}`;
 }
@@ -384,6 +418,7 @@ module.exports = {
   MAX_RANGE_DAYS,
   buildWhere,
   exportCsv,
+  extractResponseResource,
   getEvents,
   getOptions,
   getSummary,
@@ -391,6 +426,7 @@ module.exports = {
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeResourceCode,
   normalizeResourceId,
   normalizeRoute,
   recordEvent,

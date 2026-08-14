@@ -5,9 +5,11 @@ const fs = require('fs');
 const path = require('path');
 const {
   MAX_RANGE_DAYS,
+  extractResponseResource,
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeResourceCode,
   normalizeResourceId,
   normalizeRoute,
   sanitizeMetadata
@@ -83,6 +85,19 @@ function validateNavigationResourcePrivacy() {
   );
 }
 
+function validateCreatedResourceExtraction() {
+  assert.deepStrictEqual(
+    extractResponseResource({ solicitacao: { id: 3862, codigo: 'SOL-3862' } }),
+    { id: '3862', code: 'SOL-3862' }
+  );
+  assert.deepStrictEqual(
+    extractResponseResource({ data: { titulo: { id: 4901, codigo: 'TIT-004901' } } }),
+    { id: '4901', code: 'TIT-004901' }
+  );
+  assert.strictEqual(extractResponseResource({ token: 'segredo', cpf: '123' }), null);
+  assert.strictEqual(normalizeResourceCode('codigo com espaco'), null);
+}
+
 function validateCorsAuditHeader() {
   const appSource = fs.readFileSync(path.resolve(__dirname, '../src/app.js'), 'utf8');
   assert(
@@ -97,6 +112,7 @@ function run() {
   validatePrivacySanitization();
   validatePeriodGuard();
   validateNavigationResourcePrivacy();
+  validateCreatedResourceExtraction();
   validateCorsAuditHeader();
   console.log('Auditoria operacional validada com sucesso.');
 }

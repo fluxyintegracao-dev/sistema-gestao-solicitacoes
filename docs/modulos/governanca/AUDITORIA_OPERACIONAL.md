@@ -13,6 +13,7 @@ A trilha passa a existir a partir da aplicacao da migration `202608120003_govern
 - usuario, setor e perfil existentes no momento do evento;
 - modulo, rota normalizada, tipo da operacao, resultado e horario;
 - identificador tecnico do recurso quando ele estiver presente na URL;
+- identificador e codigo tecnico devolvidos pela API ao criar um registro, quando disponiveis;
 - falha ou bloqueio retornado pela API;
 - identificador de sessao gerado pelo navegador para correlacao operacional.
 
@@ -54,6 +55,8 @@ O ritmo diario representa somente eventos registrados. Ele nao calcula jornada, 
 
 Ao navegar entre registros numericos diferentes de uma mesma pagina, cada acesso e registrado separadamente com o identificador tecnico do recurso. Tokens publicos e outros identificadores potencialmente sensiveis nao sao armazenados como recurso de navegacao.
 
+Nas operacoes de criacao, o middleware observa somente os campos tecnicos `id` e `codigo` da resposta ja produzida pela API. O corpo da resposta nao e persistido nem alterado, e tokens ou campos pessoais nao sao usados para identificar o recurso.
+
 ## APIs
 
 - `POST /api/governanca/auditoria-operacional/navegacao` registra uma navegacao autenticada;
@@ -92,6 +95,7 @@ Nao foi criado job automatico de exclusao: a retencao deve ser aprovada antes de
 | Usuario abre dois registros na mesma pagina | Os dois acessos aparecem com seus respectivos IDs tecnicos |
 | URL contem token publico | O token nao e armazenado como identificador do recurso |
 | Usuario cria ou altera um registro | Operacao aparece com tipo, rota normalizada, recurso e sucesso |
+| Criacao retorna `id` e `codigo` | Linha do tempo identifica o novo registro sem armazenar o restante da resposta |
 | API rejeita acao por permissao | Evento aparece como bloqueado, sem conteudo da requisicao |
 | Usuario sem permissao abre URL diretamente | Rota protegida impede o acesso |
 | Usuario possui apenas resumo | Ve indicadores, mas nao ve usuarios nem linha do tempo |
