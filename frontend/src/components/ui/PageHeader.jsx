@@ -12,8 +12,8 @@ export default function PageHeader({ title, subtitle, actions, back }) {
   const navigate = useNavigate();
 
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="flex items-start gap-3">
+    <div className="app-component-page-header flex flex-wrap items-start justify-between gap-3">
+      <div className="app-component-page-header__leading flex min-w-0 items-start gap-3">
         {back && (
           <button
             type="button"
@@ -30,14 +30,14 @@ export default function PageHeader({ title, subtitle, actions, back }) {
             </svg>
           </button>
         )}
-        <div>
+        <div className="min-w-0">
           <h1 className="page-title">{title}</h1>
           {subtitle && <p className="page-subtitle">{subtitle}</p>}
         </div>
       </div>
 
       {actions && (
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div className="app-component-page-header__actions flex flex-wrap items-center gap-2">{actions}</div>
       )}
     </div>
   );

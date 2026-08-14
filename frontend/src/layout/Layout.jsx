@@ -162,8 +162,8 @@ export default function Layout() {
   const [collapsed, setCollapsed] = useState(false);
   const [openGroupId, setOpenGroupId] = useState(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
-  const [isMobileViewport, setIsMobileViewport] = useState(() =>
-    typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false
+  const [isCompactViewport, setIsCompactViewport] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(max-width: 1023px)').matches : false
   );
   const [inboxNovasCount, setInboxNovasCount] = useState(0);
   const [saidaNovasCount, setSaidaNovasCount] = useState(0);
@@ -178,7 +178,7 @@ export default function Layout() {
   const comprasResponsiveRoute = isComprasResponsiveRoute(location.pathname);
   const custosRecebiveisResponsiveRoute = location.pathname.startsWith('/custos-recebiveis');
 
-  const sidebarWidth = isMobileViewport ? 304 : (collapsed ? 86 : 286);
+  const sidebarWidth = isCompactViewport ? 304 : (collapsed ? 86 : 286);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -191,9 +191,9 @@ export default function Layout() {
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
-    const media = window.matchMedia('(max-width: 767px)');
-    const listener = (event) => setIsMobileViewport(event.matches);
-    setIsMobileViewport(media.matches);
+    const media = window.matchMedia('(max-width: 1023px)');
+    const listener = (event) => setIsCompactViewport(event.matches);
+    setIsCompactViewport(media.matches);
 
     if (media.addEventListener) {
       media.addEventListener('change', listener);
@@ -205,7 +205,7 @@ export default function Layout() {
   }, []);
 
   useEffect(() => {
-    if (!isMobileViewport) {
+    if (!isCompactViewport) {
       document.body.style.overflow = '';
       return undefined;
     }
@@ -214,11 +214,11 @@ export default function Layout() {
     return () => {
       document.body.style.overflow = '';
     };
-  }, [menuAberto, isMobileViewport]);
+  }, [menuAberto, isCompactViewport]);
 
   useEffect(() => {
-    if (isMobileViewport) setMenuAberto(false);
-  }, [location.pathname, isMobileViewport]);
+    if (isCompactViewport) setMenuAberto(false);
+  }, [location.pathname, isCompactViewport]);
 
   useEffect(() => {
     if (!menuAberto) return undefined;
@@ -764,7 +764,7 @@ export default function Layout() {
 
   const toggleTheme = () => setTheme((current) => (current === 'light' ? 'dark' : 'light'));
   const closeMobileSidebar = () => {
-    if (isMobileViewport) setMenuAberto(false);
+    if (isCompactViewport) setMenuAberto(false);
   };
 
   const handleSelect = (groupLabel) => {
@@ -783,8 +783,9 @@ export default function Layout() {
         <div className="layout-shell-backdrop" aria-hidden="true" />
 
         <aside
-          className={`sidebar ${collapsed ? 'collapsed' : ''} fixed md:sticky top-0 left-0 h-full z-40 transform transition-all duration-300 ${
-            menuAberto ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          id="app-sidebar"
+          className={`sidebar ${collapsed ? 'collapsed' : ''} fixed lg:sticky top-0 left-0 h-full z-40 transform transition-all duration-300 ${
+            menuAberto ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
           style={{ width: `${sidebarWidth}px` }}
           role="navigation"
@@ -810,7 +811,7 @@ export default function Layout() {
 
               <button
                 onClick={() => setMenuAberto(false)}
-                className="chevron-btn md:hidden"
+                className="chevron-btn lg:hidden"
                 aria-label="Fechar menu"
                 type="button"
               >
@@ -937,7 +938,7 @@ export default function Layout() {
 
           <button
             onClick={() => setCollapsed((current) => !current)}
-            className="sidebar-toggle-rail hidden md:inline-flex"
+            className="sidebar-toggle-rail hidden lg:inline-flex"
             aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
             aria-expanded={!collapsed}
             type="button"
@@ -951,7 +952,7 @@ export default function Layout() {
         {menuAberto && (
           <button
             type="button"
-            className="sidebar-overlay fixed inset-0 md:hidden z-30"
+            className="sidebar-overlay fixed inset-0 lg:hidden z-30"
             onClick={() => setMenuAberto(false)}
             aria-label="Fechar menu lateral"
           />
@@ -963,8 +964,10 @@ export default function Layout() {
               <div className="topbar-leading">
                 <button
                   onClick={() => setMenuAberto(true)}
-                  className="topbar-menu-button md:hidden"
+                  className="topbar-menu-button lg:hidden"
                   aria-label="Abrir menu"
+                  aria-controls="app-sidebar"
+                  aria-expanded={menuAberto}
                   type="button"
                 >
                   <HiOutlineBars3 size={20} />

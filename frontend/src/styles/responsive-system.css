@@ -1,0 +1,530 @@
+/*
+ * Responsividade transversal do Fluxy.
+ *
+ * Este arquivo e carregado depois dos estilos historicos para corrigir o shell
+ * e oferecer garantias comuns a todas as rotas sem alterar regras de negocio.
+ * As tabelas deliberadamente largas continuam largas, mas passam a rolar
+ * dentro do proprio bloco em vez de deslocar o documento inteiro.
+ */
+
+html,
+body,
+#root {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 100%;
+  overflow-x: clip;
+}
+
+body {
+  min-height: 100dvh;
+  overscroll-behavior-x: none;
+}
+
+.layout-shell.fluxy-app-shell,
+.layout-shell.fluxy-app-shell > .layout-main,
+.layout-content-shell {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.layout-shell.fluxy-app-shell > .layout-main {
+  position: relative;
+  z-index: 1;
+}
+
+.layout-shell.fluxy-app-shell > .layout-shell-backdrop {
+  position: fixed;
+  z-index: 0;
+}
+
+.layout-main :where(
+  main,
+  form,
+  section,
+  article,
+  .page,
+  .card,
+  .sol-surface-card,
+  .app-page-header,
+  .app-page-header-row,
+  .app-page-actions,
+  .app-toolbar-card,
+  .app-filters-card,
+  .app-filters-grid,
+  .app-summary-grid,
+  .app-table-shell,
+  .table-wrapper,
+  .sol-table-wrapper
+) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.layout-main :where(img, video, canvas) {
+  max-width: 100%;
+  height: auto;
+}
+
+.layout-main :where(h1, h2, h3, h4, p, label, td, th, a, button) {
+  overflow-wrap: anywhere;
+}
+
+.layout-main :where(pre, code) {
+  max-width: 100%;
+}
+
+.layout-main pre {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+}
+
+.app-filters-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
+
+.layout-main :where(
+  .table-wrapper,
+  .table-responsive,
+  .sol-table-wrapper,
+  .app-table-shell,
+  .app-dense-table-wrapper,
+  .compras-table-wrapper,
+  .compras-responsive-table,
+  .finance-operation-table-shell,
+  [data-table-scroll]
+) {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-table-scroll,
+.resizable-table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}
+
+.resizable-table-scroll:focus-visible {
+  outline: 2px solid var(--c-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.app-component-page-header,
+.app-component-page-header__leading,
+.app-component-page-header__actions {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.layout-main :where(
+  .table-wrapper,
+  .table-responsive,
+  .sol-table-wrapper,
+  .app-table-shell,
+  .app-dense-table-wrapper,
+  .compras-table-wrapper,
+  .compras-responsive-table,
+  .finance-operation-table-shell,
+  .responsive-table-scroll,
+  .resizable-table-scroll
+)::-webkit-scrollbar {
+  height: 8px;
+}
+
+.layout-main :where(
+  .table-wrapper,
+  .table-responsive,
+  .sol-table-wrapper,
+  .app-table-shell,
+  .app-dense-table-wrapper,
+  .compras-table-wrapper,
+  .compras-responsive-table,
+  .finance-operation-table-shell,
+  .responsive-table-scroll,
+  .resizable-table-scroll
+)::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--shell-muted, #64748b) 58%, transparent);
+  background-clip: padding-box;
+}
+
+.layout-main :where(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.layout-main :where([role="listbox"], .autocomplete-dropdown, .dropdown-menu) {
+  max-width: min(calc(100vw - 1.5rem), 42rem);
+  max-height: min(22rem, calc(100dvh - 10rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+/* Tablet e smartphone usam drawer; o menu nao participa do flex da pagina. */
+@media (max-width: 1023px) {
+  .layout-shell.fluxy-app-shell {
+    display: block;
+    min-height: 100dvh;
+  }
+
+  .layout-shell.fluxy-app-shell > .sidebar {
+    position: fixed !important;
+    top: max(0.7rem, env(safe-area-inset-top));
+    bottom: max(0.7rem, env(safe-area-inset-bottom));
+    left: max(0.7rem, env(safe-area-inset-left));
+    z-index: 40;
+    height: auto;
+    max-height: calc(100dvh - max(1.4rem, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+    margin: 0;
+    will-change: transform;
+  }
+
+  .layout-shell.fluxy-app-shell > .sidebar-overlay {
+    position: fixed !important;
+    z-index: 30;
+  }
+
+  .layout-shell.fluxy-app-shell > .layout-main {
+    width: 100% !important;
+    min-height: 100dvh;
+    margin: 0 !important;
+  }
+
+  .layout-content-shell {
+    padding-top: max(0.85rem, env(safe-area-inset-top));
+    padding-right: max(0.85rem, env(safe-area-inset-right));
+    padding-bottom: max(1.4rem, env(safe-area-inset-bottom));
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+  }
+
+  .topbar-shell {
+    top: max(0.65rem, env(safe-area-inset-top));
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .topbar-leading,
+  .topbar-context,
+  .topbar-title-row {
+    min-width: 0;
+  }
+
+  .topbar-title,
+  .topbar-subtitle,
+  .topbar-breadcrumb {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-tray {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .app-page-header-row,
+  .app-toolbar-card,
+  .app-component-page-header {
+    align-items: stretch;
+  }
+
+  .app-page-actions,
+  .app-component-page-header__actions {
+    justify-content: flex-start;
+  }
+
+  .app-summary-grid,
+  .app-summary-grid--compact {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 145px), 1fr));
+  }
+
+  .layout-main .grid.grid-cols-4,
+  .layout-main .grid.grid-cols-5,
+  .layout-main .grid.grid-cols-6,
+  .layout-main .grid.grid-cols-7,
+  .layout-main .grid.grid-cols-8,
+  .layout-main .grid.grid-cols-9,
+  .layout-main .grid.grid-cols-10,
+  .layout-main .grid.grid-cols-11,
+  .layout-main .grid.grid-cols-12 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .modal-overlay,
+  .layout-main .fixed.inset-0 {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+    padding-right: max(0.75rem, env(safe-area-inset-right));
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    padding-left: max(0.75rem, env(safe-area-inset-left));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .modal-dialog {
+    max-width: calc(100vw - max(1.5rem, env(safe-area-inset-left) + env(safe-area-inset-right)));
+    max-height: calc(100dvh - max(1.5rem, env(safe-area-inset-top) + env(safe-area-inset-bottom)));
+  }
+
+  .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-footer {
+    flex-wrap: wrap;
+    padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  }
+}
+
+@media (min-width: 1024px) {
+  .layout-shell.fluxy-app-shell > .sidebar {
+    position: sticky !important;
+    top: 0;
+    height: 100vh;
+  }
+}
+
+@media (max-width: 767px) {
+  .layout-content-shell {
+    padding-right: max(0.65rem, env(safe-area-inset-right));
+    padding-left: max(0.65rem, env(safe-area-inset-left));
+  }
+
+  .layout-shell.fluxy-app-shell > .sidebar {
+    width: min(19rem, calc(100vw - 1.4rem)) !important;
+    border-radius: 1.25rem;
+  }
+
+  .sidebar .sidebar-footer-note {
+    display: none;
+  }
+
+  .sidebar .nav-btn,
+  .sidebar .nav-group-toggle {
+    min-height: 44px;
+  }
+
+  .topbar-shell {
+    margin-bottom: 0.85rem;
+    padding: 0.75rem;
+    border-radius: 1.1rem;
+  }
+
+  .topbar-leading {
+    gap: 0.65rem;
+  }
+
+  .topbar-breadcrumb,
+  .topbar-subtitle,
+  .topbar-status-chip {
+    display: none;
+  }
+
+  .topbar-title {
+    font-size: clamp(1rem, 5vw, 1.25rem);
+  }
+
+  .topbar-menu-button,
+  .topbar-tray :where(button, a),
+  .notification-trigger {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 0.85rem;
+  }
+
+  .topbar-tray {
+    gap: 0.45rem;
+  }
+
+  .topbar-tray .theme-toggle > span.hidden {
+    display: none !important;
+  }
+
+  .card,
+  .sol-surface-card,
+  .app-filters-card,
+  .app-table-shell {
+    border-radius: 1rem;
+  }
+
+  .app-page-header-row,
+  .app-toolbar-card,
+  .app-page-actions,
+  .app-component-page-header,
+  .app-component-page-header__actions {
+    width: 100%;
+  }
+
+  .app-page-actions,
+  .app-component-page-header__actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-page-actions > :where(.btn, button, a, label),
+  .app-component-page-header__actions > :where(.btn, button, a, label) {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .app-filters-grid,
+  .layout-main .grid.grid-cols-2,
+  .layout-main .grid.grid-cols-3,
+  .layout-main .grid.grid-cols-4,
+  .layout-main .grid.grid-cols-5,
+  .layout-main .grid.grid-cols-6,
+  .layout-main .grid.grid-cols-7,
+  .layout-main .grid.grid-cols-8,
+  .layout-main .grid.grid-cols-9,
+  .layout-main .grid.grid-cols-10,
+  .layout-main .grid.grid-cols-11,
+  .layout-main .grid.grid-cols-12 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-filter-field {
+    min-height: 0;
+    padding: 0.6rem;
+  }
+
+  .app-summary-grid,
+  .app-summary-grid--compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .app-summary-card {
+    min-height: 0;
+    padding: 0.65rem;
+  }
+
+  .layout-main :where(input, select, textarea) {
+    font-size: 16px;
+  }
+
+  .layout-main :where(.btn, button, a[role="button"]) {
+    min-height: 42px;
+  }
+
+  /* Garante rolagem local mesmo nas tabelas historicas sem wrapper nomeado. */
+  .layout-main :where(div, section, article):has(> table:not(.solicitacoes-table--mobile)) {
+    max-width: 100%;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .layout-main table:not(.solicitacoes-table--mobile) {
+    width: max-content;
+    min-width: 100%;
+  }
+
+  .layout-shell .table:not(.solicitacoes-table--mobile) {
+    min-width: max-content;
+  }
+
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top));
+    border-radius: 1rem 1rem 0 0;
+  }
+
+  .modal-header,
+  .modal-body,
+  .modal-footer {
+    padding-right: max(0.85rem, env(safe-area-inset-right));
+    padding-left: max(0.85rem, env(safe-area-inset-left));
+  }
+
+  .modal-footer {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+  }
+
+  .modal-footer > :where(.btn, button, a) {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 419px) {
+  .app-page-actions,
+  .app-component-page-header__actions,
+  .modal-footer,
+  .finance-operation-actions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-summary-grid,
+  .app-summary-grid--compact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (pointer: coarse) {
+  .layout-main :where(button, .btn, a[role="button"], input, select) {
+    min-height: 44px;
+  }
+
+  .resizable-th-handle {
+    display: none;
+  }
+
+  .layout-main :where(
+    .table-wrapper,
+    .table-responsive,
+    .sol-table-wrapper,
+    .app-table-shell,
+    .app-dense-table-wrapper,
+    .compras-table-wrapper,
+    .compras-responsive-table,
+    .responsive-table-scroll,
+    .resizable-table-scroll
+  ) {
+    scrollbar-width: auto;
+  }
+}
+
+@media (hover: none) {
+  .layout-main :where(.app-dense-icon-action, .btn, button, a) {
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout-shell *,
+  .layout-shell *::before,
+  .layout-shell *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
