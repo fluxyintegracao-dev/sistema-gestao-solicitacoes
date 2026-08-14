@@ -68,6 +68,10 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    movimento_origem_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
     baixa_grupo_id: { type: DataTypes.INTEGER, allowNull: true },
     baixa_componente_id: { type: DataTypes.INTEGER, allowNull: true },
     forma_recebimento: {
@@ -107,7 +111,7 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     cheque_data_emissao: { type: DataTypes.DATEONLY, allowNull: true },
     cheque_data_vencimento: { type: DataTypes.DATEONLY, allowNull: true },
     tipo_movimento: {
-      type: DataTypes.STRING(20),
+      type: DataTypes.STRING(40),
       allowNull: false
     },
     status: {

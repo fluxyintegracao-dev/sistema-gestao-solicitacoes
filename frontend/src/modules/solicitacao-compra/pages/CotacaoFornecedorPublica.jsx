@@ -71,12 +71,13 @@ function numeroCotacao(valor) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function calcularTotalItemCotacao(item) {
+function calcularTotalItemCotacao(item, incluirFrete = false) {
   return (
     numeroCotacao(item?.preco) * numeroCotacao(item?.quantidade_disponivel)
     + numeroCotacao(item?.ipi_valor)
     + numeroCotacao(item?.icms_valor)
     + numeroCotacao(item?.st_valor)
+    + (incluirFrete ? numeroCotacao(item?.frete_valor) : 0)
   );
 }
 
@@ -244,6 +245,7 @@ export default function CotacaoFornecedorPublica() {
   const [prazoEntregaTipo, setPrazoEntregaTipo] = useState('DIAS_CORRIDOS');
   const [difalValor, setDifalValor] = useState('');
   const [freteTipo, setFreteTipo] = useState('SEM_FRETE');
+  const [freteModo, setFreteModo] = useState('GLOBAL');
   const [freteValor, setFreteValor] = useState('');
   const [freteDataVencimento, setFreteDataVencimento] = useState('');
   const [freteTransportadorNome, setFreteTransportadorNome] = useState('');
@@ -266,7 +268,8 @@ export default function CotacaoFornecedorPublica() {
                 ),
                 ipi_valor: normalizarDecimalDaApi(item.ipi_valor, 2),
                 icms_valor: normalizarDecimalDaApi(item.icms_valor, 2),
-                st_valor: normalizarDecimalDaApi(item.st_valor, 2)
+                st_valor: normalizarDecimalDaApi(item.st_valor, 2),
+                frete_valor: normalizarDecimalDaApi(item.frete_valor, 2)
               }))
           : []
       );
@@ -277,6 +280,7 @@ export default function CotacaoFornecedorPublica() {
       setPrazoEntregaTipo(data?.cotacao?.prazo_entrega_tipo || 'DIAS_CORRIDOS');
       setDifalValor(data?.cotacao?.difal_valor ?? '');
       setFreteTipo(data?.cotacao?.frete_tipo || 'SEM_FRETE');
+      setFreteModo(data?.cotacao?.frete_modo || 'GLOBAL');
       setFreteValor(data?.cotacao?.frete_valor ?? '');
       setFreteDataVencimento(data?.cotacao?.frete_data_vencimento || '');
       setFreteTransportadorNome(data?.cotacao?.frete_transportador_nome || '');
@@ -339,8 +343,11 @@ export default function CotacaoFornecedorPublica() {
       return false;
     }
 
-    if (freteTipo === 'TERCEIRO' && numeroCotacao(freteValor) <= 0) {
-      alert('Informe o valor do frete pago a terceiro.');
+    const valorFreteInformado = freteModo === 'POR_ITEM'
+      ? itens.reduce((total, item) => total + numeroCotacao(item.frete_valor), 0)
+      : numeroCotacao(freteValor);
+    if (freteTipo !== 'SEM_FRETE' && valorFreteInformado <= 0) {
+      alert(freteModo === 'POR_ITEM' ? 'Informe o frete de ao menos um item.' : 'Informe o valor do frete.');
       return false;
     }
 
@@ -380,7 +387,10 @@ export default function CotacaoFornecedorPublica() {
         quantidade_disponivel: quantidadeDisponivel,
         ipi_valor: normalizarNumeroResposta(item.ipi_valor) || 0,
         icms_valor: normalizarNumeroResposta(item.icms_valor) || 0,
-        st_valor: normalizarNumeroResposta(item.st_valor) || 0
+        st_valor: normalizarNumeroResposta(item.st_valor) || 0,
+        frete_valor: freteTipo !== 'SEM_FRETE' && freteModo === 'POR_ITEM'
+          ? normalizarNumeroResposta(item.frete_valor) || 0
+          : 0
       };
     });
 
@@ -393,7 +403,8 @@ export default function CotacaoFornecedorPublica() {
       prazo_entrega_tipo: prazoEntregaTipo,
       difal_valor: difalValor,
       frete_tipo: freteTipo,
-      frete_valor: freteTipo === 'SEM_FRETE' ? 0 : freteValor,
+      frete_modo: freteModo,
+      frete_valor: freteTipo === 'SEM_FRETE' || freteModo === 'POR_ITEM' ? 0 : freteValor,
       frete_data_vencimento: freteTipo === 'TERCEIRO' ? freteDataVencimento : null,
       frete_transportador_nome: freteTransportadorNome,
       frete_transportador_cpf_cnpj: freteTransportadorCpfCnpj,
@@ -485,7 +496,11 @@ export default function CotacaoFornecedorPublica() {
     (total, item) => total + numeroCotacao(item.ipi_valor) + numeroCotacao(item.icms_valor) + numeroCotacao(item.st_valor),
     0
   );
-  const valorFreteAdicional = freteTipo === 'TERCEIRO' ? numeroCotacao(freteValor) : 0;
+  const valorFreteAdicional = freteTipo === 'SEM_FRETE'
+    ? 0
+    : (freteModo === 'POR_ITEM'
+      ? itens.reduce((total, item) => total + numeroCotacao(item.frete_valor), 0)
+      : numeroCotacao(freteValor));
   const valorTotalProposta = Math.max(
     0,
     valorMercadorias + valorTributos + numeroCotacao(difalValor) + valorFreteAdicional - numeroCotacao(descontoTotal)
@@ -635,7 +650,16 @@ export default function CotacaoFornecedorPublica() {
                 </label>
                 {freteTipo !== 'SEM_FRETE' ? (
                   <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
-                    Valor do frete {freteTipo === 'TERCEIRO' ? '*' : ''}
+                    Aplicacao do frete
+                    <select className="input h-7 px-2 text-xs normal-case" value={freteModo} disabled={formularioBloqueado} onChange={(event) => setFreteModo(event.target.value)}>
+                      <option value="GLOBAL">Frete global da proposta</option>
+                      <option value="POR_ITEM">Frete informado por item</option>
+                    </select>
+                  </label>
+                ) : null}
+                {freteTipo !== 'SEM_FRETE' && freteModo === 'GLOBAL' ? (
+                  <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)]">
+                    Valor do frete *
                     <CurrencyInput
                       className="input h-7 px-2 text-xs normal-case"
                       value={freteValor}
@@ -767,7 +791,7 @@ export default function CotacaoFornecedorPublica() {
         {/* Tabela */}
         <div className="sol-surface-card rounded-lg solicitacoes-table-shell solicitacoes-table-compact cotacao-publica-table-shell">
           <div className="solicitacoes-table-scroll scrollbar-thin" style={{ scrollbarGutter: 'stable both-edges' }}>
-            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: '1436px', fontSize: '11px' }}>
+            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: freteModo === 'POR_ITEM' ? '1540px' : '1436px', fontSize: '11px' }}>
               <colgroup>
                 <col style={{ width: '220px' }} />
                 <col style={{ width: '88px' }} />
@@ -776,6 +800,7 @@ export default function CotacaoFornecedorPublica() {
                 <col style={{ width: '112px' }} />
                 <col style={{ width: '118px' }} />
                 <col style={{ width: '104px' }} />
+                {freteModo === 'POR_ITEM' ? <col style={{ width: '104px' }} /> : null}
                 <col style={{ width: '104px' }} />
                 <col style={{ width: '104px' }} />
                 <col style={{ width: '118px' }} />
@@ -792,6 +817,7 @@ export default function CotacaoFornecedorPublica() {
                   <th>IPI</th>
                   <th>ICMS</th>
                   <th>ST</th>
+                  {freteModo === 'POR_ITEM' ? <th>Frete</th> : null}
                   <th>Qtd. min.</th>
                   <th>Observacao</th>
                 </tr>
@@ -842,7 +868,7 @@ export default function CotacaoFornecedorPublica() {
                         />
                       </td>
                       <td className="font-semibold text-[var(--c-fg)]">
-                        {formatarMoeda(calcularTotalItemCotacao(item))}
+                        {formatarMoeda(calcularTotalItemCotacao(item, freteModo === 'POR_ITEM'))}
                       </td>
                       {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
                         <td key={campo}>
@@ -855,6 +881,11 @@ export default function CotacaoFornecedorPublica() {
                           />
                         </td>
                       ))}
+                      {freteModo === 'POR_ITEM' ? (
+                        <td>
+                          <CurrencyInput className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]" value={item.frete_valor} disabled={formularioBloqueado} onChange={(valor) => atualizarItem(index, 'frete_valor', valor)} zeroComoVazio />
+                        </td>
+                      ) : null}
                       <td>
                         <input
                           className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
@@ -900,7 +931,7 @@ export default function CotacaoFornecedorPublica() {
 
                 {itens.length === 0 && (
                   <tr>
-                    <td colSpan="12" className="cotacao-publica-table-empty text-xs">
+                    <td colSpan={freteModo === 'POR_ITEM' ? 12 : 11} className="cotacao-publica-table-empty text-xs">
                       Nenhum item disponivel para resposta.
                     </td>
                   </tr>
@@ -914,7 +945,7 @@ export default function CotacaoFornecedorPublica() {
           <div><span className="block text-[var(--sol-text-soft)]">Mercadorias</span><strong>{formatarMoeda(valorMercadorias)}</strong></div>
           <div><span className="block text-[var(--sol-text-soft)]">IPI + ICMS + ST</span><strong>{formatarMoeda(valorTributos)}</strong></div>
           <div><span className="block text-[var(--sol-text-soft)]">DIFAL</span><strong>{formatarMoeda(numeroCotacao(difalValor))}</strong></div>
-          <div><span className="block text-[var(--sol-text-soft)]">Frete adicional</span><strong>{formatarMoeda(valorFreteAdicional)}</strong></div>
+          <div><span className="block text-[var(--sol-text-soft)]">Frete {freteModo === 'POR_ITEM' ? 'por item' : 'global'}</span><strong>{formatarMoeda(valorFreteAdicional)}</strong></div>
           <div><span className="block text-[var(--sol-text-soft)]">Desconto</span><strong>- {formatarMoeda(numeroCotacao(descontoTotal))}</strong></div>
           <div className="rounded-md bg-slate-900 px-2 py-1.5 text-white"><span className="block text-slate-300">Total estimado</span><strong>{formatarMoeda(valorTotalProposta)}</strong></div>
         </div>

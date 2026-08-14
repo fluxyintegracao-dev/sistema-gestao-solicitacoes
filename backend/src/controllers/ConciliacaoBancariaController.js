@@ -3,6 +3,8 @@ const {
   corrigirContaConciliacao,
   confirmarConciliacao,
   confirmarConciliacaoFatura,
+  confirmarConciliacaoCreditoRotativo,
+  confirmarConciliacaoEstornoTarifa,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
   estornarConciliacao,
@@ -14,6 +16,7 @@ const {
   listarImportacoes,
   listarConciliacoes,
   listarMovimentosAssociacao,
+  listarTarifasParaEstorno,
   removerConciliacao
 } = require('../services/conciliacaoBancariaService');
 const { responderErroController } = require('../utils/controllerError');
@@ -160,6 +163,36 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao conciliar tarifa bancaria');
+    }
+  },
+
+  async tarifasEstorno(req, res) {
+    try {
+      const data = await listarTarifasParaEstorno(req, req.params.id);
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao localizar tarifas para estorno');
+    }
+  },
+
+  async confirmarEstornoTarifa(req, res) {
+    try {
+      const data = await confirmarConciliacaoEstornoTarifa(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao conciliar estorno de tarifa bancaria');
+    }
+  },
+
+  async confirmarCreditoRotativo(req, res) {
+    try {
+      const data = await confirmarConciliacaoCreditoRotativo(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao conciliar credito rotativo');
     }
   },
 

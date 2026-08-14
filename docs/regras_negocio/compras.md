@@ -53,7 +53,9 @@
 - IPI, ICMS e ST sao valores em reais fechados para toda a quantidade disponivel daquele item;
 - DIFAL e informado em reais no cabecalho e rateado proporcionalmente pelo valor das mercadorias efetivamente compradas;
 - os valores fiscais sao gerenciais para decisao e custo interno; a escrituracao contabil continua baseada na nota fiscal e na contabilidade;
-- frete pode ser sem frete, embutido ou pago a terceiro; para terceiro, valor e data de pagamento sao obrigatorios, enquanto transportador e CPF/CNPJ sao opcionais;
+- frete pode ser sem frete, embutido ou pago a terceiro e pode ser informado de forma global ou por item;
+- no modo por item, cada resposta informa seu proprio valor de frete e itens sem frete permanecem com valor zero; o cabecalho consolida a soma para comparacao;
+- para frete pago a terceiro, valor e data de pagamento sao obrigatorios, enquanto transportador e CPF/CNPJ sao opcionais;
 - pode informar minimo por item, minimo do pedido e desconto total;
 - respostas podem ser enviadas pela pagina ou por arquivos suportados pelo fluxo;
 - status, visualizacao e resposta ficam rastreados;
@@ -97,7 +99,10 @@
 - status configuravel ou cotacao encerrada pode bloquear alteracao posterior;
 - cancelamento e frete possuem regras e permissoes separadas.
 - IPI, ICMS, ST e DIFAL rateados compoem o valor gerencial do item e do pedido;
-- frete pago a terceiro gera pendencia para Contas a Pagar; se a cotacao nao identificar o transportador, o Financeiro define o credor ao gerar o titulo.
+- o frete e rateado na quantidade efetivamente comprada e aparece separadamente em cada item, no total do pedido e no total fechado da solicitacao de compra;
+- o total da aquisicao inclui itens, tributos, DIFAL e fretes; o total devido ao fornecedor inclui somente o frete embutido, pois o frete pago a terceiro segue separado;
+- frete pago a terceiro gera pendencia para Contas a Pagar; se a cotacao nao identificar o transportador, o Financeiro define o credor ao gerar o titulo;
+- pedidos historicos com frete embutido global sao migrados para a nova composicao sem alterar itens ou gerar novo titulo.
 
 ## Delegacao
 

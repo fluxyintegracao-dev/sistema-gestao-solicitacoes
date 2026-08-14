@@ -42,6 +42,11 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: 0
       },
+      valor_total_fornecedor: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
       valor_minimo_pedido: {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true
@@ -82,7 +87,17 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.STRING(20),
         allowNull: true
       },
+      frete_modo_cotacao: {
+        type: DataTypes.STRING(20),
+        allowNull: false,
+        defaultValue: 'GLOBAL'
+      },
       frete_valor_cotacao: {
+        type: DataTypes.DECIMAL(14, 2),
+        allowNull: false,
+        defaultValue: 0
+      },
+      frete_total: {
         type: DataTypes.DECIMAL(14, 2),
         allowNull: false,
         defaultValue: 0

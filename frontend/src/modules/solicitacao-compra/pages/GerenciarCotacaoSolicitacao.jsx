@@ -221,6 +221,7 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
     prazo_entrega_tipo: cotacaoFornecedor?.prazo_entrega_tipo || 'DIAS_CORRIDOS',
     difal_valor: decimalApiParaInput(cotacaoFornecedor?.difal_valor, 2),
     frete_tipo: cotacaoFornecedor?.frete_tipo || 'SEM_FRETE',
+    frete_modo: cotacaoFornecedor?.frete_modo || 'GLOBAL',
     frete_valor: decimalApiParaInput(cotacaoFornecedor?.frete_valor, 2),
     frete_data_vencimento: cotacaoFornecedor?.frete_data_vencimento || '',
     frete_transportador_nome: cotacaoFornecedor?.frete_transportador_nome || '',
@@ -243,18 +244,20 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
         ipi_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.ipi_valor, 2), 2),
         icms_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.icms_valor, 2), 2),
         st_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.st_valor, 2), 2),
+        frete_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.frete_valor, 2), 2),
         observacao: resposta?.observacao || ''
       };
     })
   };
 }
 
-function calcularTotalRespostaInternaItem(item) {
+function calcularTotalRespostaInternaItem(item, incluirFrete = false) {
   return (
     parseNumeroCompra(item?.preco) * parseNumeroCompraDigitado(item?.quantidade_disponivel)
     + parseNumeroCompra(item?.ipi_valor)
     + parseNumeroCompra(item?.icms_valor)
     + parseNumeroCompra(item?.st_valor)
+    + (incluirFrete ? parseNumeroCompra(item?.frete_valor) : 0)
   );
 }
 
@@ -285,7 +288,11 @@ function ModalRespostaInternaCotacao({
     (total, item) => total + parseNumeroCompra(item.ipi_valor) + parseNumeroCompra(item.icms_valor) + parseNumeroCompra(item.st_valor),
     0
   );
-  const freteAdicional = form.frete_tipo === 'TERCEIRO' ? parseNumeroCompra(form.frete_valor) : 0;
+  const freteAdicional = form.frete_tipo === 'SEM_FRETE'
+    ? 0
+    : form.frete_modo === 'POR_ITEM'
+      ? form.itens.reduce((total, item) => total + parseNumeroCompra(item.frete_valor), 0)
+      : parseNumeroCompra(form.frete_valor);
   const valorTotalResposta = Math.max(
     0,
     valorMercadorias + valorTributos + parseNumeroCompra(form.difal_valor) + freteAdicional - parseNumeroCompra(form.desconto_total)
@@ -386,7 +393,7 @@ function ModalRespostaInternaCotacao({
           </div>
 
           <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3">
-            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
               <label className="app-filter-field">
                 <span className="app-filter-label">Frete</span>
                 <select className="input" value={form.frete_tipo} onChange={(e) => onChange('frete_tipo', e.target.value)}>
@@ -397,7 +404,16 @@ function ModalRespostaInternaCotacao({
               </label>
               {form.frete_tipo !== 'SEM_FRETE' ? (
                 <label className="app-filter-field">
-                  <span className="app-filter-label">Valor do frete {form.frete_tipo === 'TERCEIRO' ? '*' : ''}</span>
+                  <span className="app-filter-label">Informar frete</span>
+                  <select className="input" value={form.frete_modo} onChange={(e) => onChange('frete_modo', e.target.value)}>
+                    <option value="GLOBAL">Valor global da proposta</option>
+                    <option value="POR_ITEM">Valor por item</option>
+                  </select>
+                </label>
+              ) : null}
+              {form.frete_tipo !== 'SEM_FRETE' && form.frete_modo !== 'POR_ITEM' ? (
+                <label className="app-filter-field">
+                  <span className="app-filter-label">Valor do frete *</span>
                   <input className="input" inputMode="decimal" value={form.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChange('frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} />
                 </label>
               ) : null}
@@ -426,7 +442,7 @@ function ModalRespostaInternaCotacao({
           </label>
 
           <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
-            <table className="table min-w-[1340px] text-xs">
+            <table className={`table ${form.frete_modo === 'POR_ITEM' ? 'min-w-[1460px]' : 'min-w-[1340px]'} text-xs`}>
               <thead>
                 <tr>
                   <th>Item</th>
@@ -437,6 +453,7 @@ function ModalRespostaInternaCotacao({
                   <th>IPI</th>
                   <th>ICMS</th>
                   <th>ST</th>
+                  {form.frete_modo === 'POR_ITEM' ? <th>Frete</th> : null}
                   <th>Qtd. min.</th>
                   <th>Observacao</th>
                 </tr>
@@ -460,12 +477,15 @@ function ModalRespostaInternaCotacao({
                     </td>
                     <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} /></td>
                     <td><input className="input min-w-[115px]" inputMode="decimal" value={item.quantidade_disponivel} onChange={(e) => onChangeItem(index, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))} /></td>
-                    <td className="min-w-[120px] font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item))}</td>
+                    <td className="min-w-[120px] font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item, form.frete_modo === 'POR_ITEM'))}</td>
                     {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
                       <td key={campo}>
                         <input className="input min-w-[110px]" inputMode="decimal" value={item[campo]} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, campo, formatarMoedaCotacaoInput(e.target.value, 2))} />
                       </td>
                     ))}
+                    {form.frete_modo === 'POR_ITEM' ? (
+                      <td><input className="input min-w-[110px]" inputMode="decimal" value={item.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} /></td>
+                    ) : null}
                     <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} /></td>
                     <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
                   </tr>
@@ -477,7 +497,7 @@ function ModalRespostaInternaCotacao({
             <div><span className="block text-[var(--c-muted)]">Mercadorias</span><strong>{fmtMoeda(valorMercadorias)}</strong></div>
             <div><span className="block text-[var(--c-muted)]">IPI + ICMS + ST</span><strong>{fmtMoeda(valorTributos)}</strong></div>
             <div><span className="block text-[var(--c-muted)]">DIFAL</span><strong>{fmtMoeda(parseNumeroCompra(form.difal_valor))}</strong></div>
-            <div><span className="block text-[var(--c-muted)]">Frete adicional</span><strong>{fmtMoeda(freteAdicional)}</strong></div>
+            <div><span className="block text-[var(--c-muted)]">Frete</span><strong>{fmtMoeda(freteAdicional)}</strong></div>
             <div><span className="block text-[var(--c-muted)]">Desconto</span><strong>- {fmtMoeda(parseNumeroCompra(form.desconto_total))}</strong></div>
             <div className="rounded-md bg-slate-900 px-2 py-1.5 text-white"><span className="block text-slate-300">Total estimado</span><strong>{fmtMoeda(valorTotalResposta)}</strong></div>
           </div>
@@ -1646,6 +1666,9 @@ function SecaoComparativo({
           <span>IPI: {fmtMoeda(resposta.ipi_valor)}</span>
           <span>ICMS: {fmtMoeda(resposta.icms_valor)}</span>
           <span>ST: {fmtMoeda(resposta.st_valor)}</span>
+          {parseNumeroCompra(resposta.frete_item_valor) > 0 ? (
+            <span>Frete do item: {fmtMoeda(resposta.frete_item_valor)}</span>
+          ) : null}
           <span>Qtd. min.: {resposta.quantidade_minima_item || '-'}</span>
           <span className="col-span-2 truncate" title={resposta.condicao_pagamento || ''}>
             Cond.: {resposta.condicao_pagamento || '-'}
@@ -1766,7 +1789,9 @@ function SecaoComparativo({
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-semibold">{fornecedor.nome}</span>
                         <span className="block text-[10px] text-[var(--c-muted)]">
-                          DIFAL {fmtMoeda(fornecedor.difal_valor)} · Frete {fornecedor.frete_tipo === 'TERCEIRO' ? `terceiro ${fmtMoeda(fornecedor.frete_valor)}` : (fornecedor.frete_tipo === 'EMBUTIDO' ? 'embutido' : 'sem frete')}
+                          DIFAL {fmtMoeda(fornecedor.difal_valor)} · Frete {fornecedor.frete_tipo === 'SEM_FRETE'
+                            ? 'sem frete'
+                            : `${fornecedor.frete_tipo === 'TERCEIRO' ? 'terceiro' : 'embutido'} ${fmtMoeda(fornecedor.frete_valor)}${fornecedor.frete_modo === 'POR_ITEM' ? ' por item' : ' global'}`}
                         </span>
                       </span>
                       <span className="text-[10px] uppercase tracking-[0.08em] text-[var(--c-muted)]">{fmtStatus(fornecedor.status)}</span>
@@ -1789,7 +1814,9 @@ function SecaoComparativo({
                             <span className="min-w-0">
                               <span className="block truncate" title={fornecedor.nome}>{fornecedor.nome}</span>
                               <span className="block text-[9px] font-normal text-[var(--c-muted)]">
-                                DIFAL {fmtMoeda(fornecedor.difal_valor)} · {fornecedor.frete_tipo === 'TERCEIRO' ? `frete terceiro ${fmtMoeda(fornecedor.frete_valor)}` : (fornecedor.frete_tipo === 'EMBUTIDO' ? 'frete embutido' : 'sem frete')}
+                                DIFAL {fmtMoeda(fornecedor.difal_valor)} · {fornecedor.frete_tipo === 'SEM_FRETE'
+                                  ? 'sem frete'
+                                  : `frete ${fornecedor.frete_tipo === 'TERCEIRO' ? 'terceiro' : 'embutido'} ${fmtMoeda(fornecedor.frete_valor)}${fornecedor.frete_modo === 'POR_ITEM' ? ' por item' : ' global'}`}
                               </span>
                             </span>
                             <button
@@ -1914,9 +1941,9 @@ function SecaoComparativo({
                           <td>{fmtMoeda(resp.st_valor)}</td>
                           <td>{fmtMoeda(resp.difal_valor)}</td>
                           <td className="max-w-[130px] text-xs">
-                            {resp.frete_tipo === 'TERCEIRO'
-                              ? `Terceiro ${fmtMoeda(resp.frete_valor)}`
-                              : (resp.frete_tipo === 'EMBUTIDO' ? 'Embutido' : 'Sem frete')}
+                            {resp.frete_tipo === 'SEM_FRETE'
+                              ? 'Sem frete'
+                              : `${resp.frete_tipo === 'TERCEIRO' ? 'Terceiro' : 'Embutido'} ${fmtMoeda(resp.frete_item_valor || resp.frete_valor)}${resp.frete_modo === 'POR_ITEM' ? ' (item)' : ' (global)'}`}
                           </td>
                           <td>{resp.prazo_entrega_fornecedor || '-'}</td>
                           <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
@@ -2445,12 +2472,17 @@ export default function GerenciarCotacaoSolicitacao() {
       alert('Informe a condicao de pagamento e o prazo de entrega para finalizar a resposta.');
       return;
     }
-    if (
-      finalizar
-      && formRespostaInterna.frete_tipo === 'TERCEIRO'
-      && (parseNumeroCompra(formRespostaInterna.frete_valor) <= 0 || !formRespostaInterna.frete_data_vencimento)
-    ) {
-      alert('Informe o valor e a data para pagamento do frete pago a terceiro.');
+    const valorFreteInformado = formRespostaInterna.frete_modo === 'POR_ITEM'
+      ? formRespostaInterna.itens.reduce((total, item) => total + parseNumeroCompra(item.frete_valor), 0)
+      : parseNumeroCompra(formRespostaInterna.frete_valor);
+    if (finalizar && formRespostaInterna.frete_tipo !== 'SEM_FRETE' && valorFreteInformado <= 0) {
+      alert(formRespostaInterna.frete_modo === 'POR_ITEM'
+        ? 'Informe o frete de ao menos um item.'
+        : 'Informe o valor do frete.');
+      return;
+    }
+    if (finalizar && formRespostaInterna.frete_tipo === 'TERCEIRO' && !formRespostaInterna.frete_data_vencimento) {
+      alert('Informe a data para pagamento do frete pago a terceiro.');
       return;
     }
 
@@ -2487,7 +2519,8 @@ export default function GerenciarCotacaoSolicitacao() {
         prazo_entrega_tipo: formRespostaInterna.prazo_entrega_tipo,
         difal_valor: normalizarMoedaCotacaoParaEnvio(formRespostaInterna.difal_valor) || 0,
         frete_tipo: formRespostaInterna.frete_tipo,
-        frete_valor: formRespostaInterna.frete_tipo === 'SEM_FRETE'
+        frete_modo: formRespostaInterna.frete_modo,
+        frete_valor: formRespostaInterna.frete_tipo === 'SEM_FRETE' || formRespostaInterna.frete_modo === 'POR_ITEM'
           ? 0
           : normalizarMoedaCotacaoParaEnvio(formRespostaInterna.frete_valor) || 0,
         frete_data_vencimento: formRespostaInterna.frete_tipo === 'TERCEIRO'
@@ -2510,6 +2543,9 @@ export default function GerenciarCotacaoSolicitacao() {
           ipi_valor: normalizarMoedaCotacaoParaEnvio(item.ipi_valor) || 0,
           icms_valor: normalizarMoedaCotacaoParaEnvio(item.icms_valor) || 0,
           st_valor: normalizarMoedaCotacaoParaEnvio(item.st_valor) || 0,
+          frete_valor: formRespostaInterna.frete_tipo !== 'SEM_FRETE' && formRespostaInterna.frete_modo === 'POR_ITEM'
+            ? normalizarMoedaCotacaoParaEnvio(item.frete_valor) || 0
+            : 0,
           observacao: item.observacao || null
         }))
       });

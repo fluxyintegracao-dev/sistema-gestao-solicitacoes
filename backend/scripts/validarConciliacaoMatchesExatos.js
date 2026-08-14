@@ -11,6 +11,8 @@ const {
 } = require('../src/utils/conciliacaoMatch');
 const {
   validateFinanceConciliacaoCorrigirContaBody,
+  validateFinanceConciliacaoCreditoRotativoBody,
+  validateFinanceConciliacaoEstornoTarifaBody,
   validateFinanceConciliacaoEstornoTransferenciaBody,
   validateFinanceRelatorioConciliacaoQuery
 } = require('../src/validators/financialValidators');
@@ -225,10 +227,13 @@ assert(
   'O estorno generico deve bloquear e devolver o OFX para pendente sem manter vinculos ativos.'
 );
 assert(
-  reconciliationReversalSource.includes("tipoEstorno = 'TARIFA_BANCARIA'")
+  reconciliationReversalSource.includes("'TARIFA_BANCARIA',")
+    && reconciliationReversalSource.includes("'ESTORNO_TARIFA_BANCARIA',")
+    && reconciliationReversalSource.includes("'LIBERACAO_CREDITO_ROTATIVO',")
+    && reconciliationReversalSource.includes("'AMORTIZACAO_CREDITO_ROTATIVO'")
     && reconciliationReversalSource.includes("status: 'ESTORNADO'")
     && reconciliationReversalSource.includes('fatura.update({ conciliacao_bancaria_id: null }'),
-  'O estorno generico deve tratar tarifa e fatura conforme a origem da conciliacao.'
+  'O estorno generico deve tratar tarifa, credito rotativo e fatura conforme a origem da conciliacao.'
 );
 assert(
   reconciliationReversalSource.includes('FINANCIAL_BANK_RECONCILIATION_REVERSED'),
@@ -239,6 +244,69 @@ assert(
     && reportSource.includes("item.status === 'CONCILIADO'")
     && reportSource.includes('estornarConciliacaoBancaria'),
   'O relatorio deve disponibilizar o estorno generico para registros conciliados.'
+);
+
+assert.deepStrictEqual(
+  validateFinanceConciliacaoCreditoRotativoBody({ descricao: 'Renovacao operacional' }),
+  { descricao: 'Renovacao operacional' }
+);
+assert.throws(
+  () => validateFinanceConciliacaoCreditoRotativoBody({ valor: 100 }),
+  /campos nao permitidos/i,
+  'Valor e natureza devem ser derivados exclusivamente do OFX.'
+);
+assert(
+  routesSource.includes("router.post('/financeiro/conciliacoes/:id/confirmar-credito-rotativo'")
+    && serviceSource.includes("? 'LIBERACAO_CREDITO_ROTATIVO'")
+    && serviceSource.includes(": 'AMORTIZACAO_CREDITO_ROTATIVO'")
+    && serviceSource.includes('categoria_financeira_id: null'),
+  'Credito rotativo deve derivar a natureza do sinal bancario e permanecer fora da DRE.'
+);
+assert(
+  reconciliationReversalSource.includes("'LIBERACAO_CREDITO_ROTATIVO'")
+    && reconciliationReversalSource.includes("'AMORTIZACAO_CREDITO_ROTATIVO'")
+    && reconciliationReversalSource.includes("'CREDITO_ROTATIVO'"),
+  'Liberacao e amortizacao de credito rotativo devem ser estornaveis pelo fluxo da conciliacao.'
+);
+
+assert.deepStrictEqual(
+  validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }),
+  { movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }
+);
+assert.throws(
+  () => validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, valor: 100 }),
+  /campos nao permitidos/i,
+  'O valor do estorno de tarifa deve ser derivado do OFX.'
+);
+assert(
+  routesSource.includes("router.get('/financeiro/conciliacoes/:id/tarifas-estorno'")
+    && routesSource.includes("router.post('/financeiro/conciliacoes/:id/confirmar-estorno-tarifa'")
+    && serviceSource.includes("tipo_movimento: 'ESTORNO_TARIFA_BANCARIA'")
+    && serviceSource.includes('movimento_origem_id: tarifaOriginal.id')
+    && serviceSource.includes('A tarifa selecionada ja possui estorno bancario ativo.'),
+  'Estorno bancario de tarifa deve localizar a origem, vincular o movimento e impedir duplicidade.'
+);
+
+const financialReportServiceSource = fs.readFileSync(
+  path.resolve(__dirname, '../src/services/relatorioFinanceiroService.js'),
+  'utf8'
+);
+assert(
+  financialReportServiceSource.includes("tipoMovimento === 'LIBERACAO_CREDITO_ROTATIVO'")
+    && financialReportServiceSource.includes("tipoMovimento === 'AMORTIZACAO_CREDITO_ROTATIVO'")
+    && financialReportServiceSource.includes("? 'CREDITO_ROTATIVO'"),
+  'Relatorios devem distinguir o credito rotativo e respeitar entrada/saida.'
+);
+assert(
+  financialReportServiceSource.includes("tipoMovimento === 'ESTORNO_TARIFA_BANCARIA'")
+    && financialReportServiceSource.includes("? 'ESTORNO_TARIFA'"),
+  'Relatorios devem classificar o estorno de tarifa como entrada vinculada.'
+);
+assert(
+  reconciliationPageSource.includes('Registrar liberacao')
+    && reconciliationPageSource.includes('Registrar amortizacao')
+    && reconciliationPageSource.includes('Estorno de tarifa bancaria'),
+  'A conferencia OFX deve expor a acao conforme o sinal do lancamento.'
 );
 
 const reopenSource = fs.readFileSync(

@@ -66,5 +66,10 @@
 - sistema so sugere match quando valor absoluto em centavos e data forem exatamente iguais; a confirmacao continua manual
 - quando houver mais de um titulo com data e valor exatos, nenhum deles deve ser escolhido automaticamente; o card lista as opcoes compativeis e a acao `Usar` apenas prepara o titulo, mantendo obrigatorio o clique posterior em `Conciliar`
 - o card do lancamento Fluxy informa a categoria financeira e a obra ou centro de custo vinculados ao titulo, facilitando a conferencia antes da conciliacao
+- credito rotativo nao possui cadastro de linha nesta fase; sua liberacao e amortizacao sao movimentos avulsos derivados do OFX
+- credito bancario conciliado como credito rotativo representa liberacao e debito representa amortizacao; valor, data, empresa e conta sao herdados do extrato
+- movimentos de credito rotativo afetam caixa e endividamento, aparecem nos relatorios de movimentacao e conciliacao, permanecem fora da DRE e podem ser estornados para devolver o OFX a conferencia manual
+- credito bancario que devolve uma tarifa deve ser conciliado como `ESTORNO_TARIFA_BANCARIA`, sempre vinculado ao movimento `TARIFA_BANCARIA` original; tarifa e estorno permanecem no historico e se neutralizam no caixa e na DRE
+- a associacao do estorno exige mesma conta, mesma empresa, valor integral exato e tarifa em data igual ou anterior; tarifas ja estornadas nao podem ser reutilizadas e ambiguidades exigem selecao manual
 - confirmacao simples revalida valor e data no backend; na associacao multipla, todos os movimentos devem ter a data do extrato e a soma deve fechar exatamente o valor bancario
 - duplicidade de remessa deve ser bloqueada

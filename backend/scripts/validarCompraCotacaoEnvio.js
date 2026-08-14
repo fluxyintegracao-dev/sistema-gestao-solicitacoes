@@ -128,6 +128,7 @@ function validarPrazoGeralRespostaInterna() {
     prazo_entrega_tipo: 'DIAS_UTEIS',
     difal_valor: '21,00',
     frete_tipo: 'TERCEIRO',
+    frete_modo: 'GLOBAL',
     frete_valor: '150,00',
     frete_data_vencimento: '2026-08-10',
     frete_transportador_nome: 'Transportador opcional',
@@ -144,8 +145,96 @@ function validarPrazoGeralRespostaInterna() {
   assert.strictEqual(resultado.prazo_entrega_tipo, 'DIAS_UTEIS');
   assert.strictEqual(resultado.difal_valor, 21);
   assert.strictEqual(resultado.frete_tipo, 'TERCEIRO');
+  assert.strictEqual(resultado.frete_modo, 'GLOBAL');
   assert.strictEqual(resultado.frete_valor, 150);
   assert.strictEqual(resultado.frete_data_vencimento, '2026-08-10');
+}
+
+function validarFretePorItemRespostaInterna() {
+  const resultado = validateCompraCotacaoRespostaInternaBody({
+    itens: [
+      {
+        item_tipo: 'CADASTRADO',
+        item_referencia_id: 71,
+        status_disponibilidade: 'DISPONIVEL',
+        preco: '100,00',
+        quantidade_disponivel: '2',
+        frete_valor: '18,90'
+      },
+      {
+        item_tipo: 'MANUAL',
+        item_referencia_id: 72,
+        status_disponibilidade: 'DISPONIVEL',
+        preco: '50,00',
+        quantidade_disponivel: '1',
+        frete_valor: '0,00'
+      }
+    ],
+    frete_tipo: 'EMBUTIDO',
+    frete_modo: 'POR_ITEM',
+    frete_valor: '0,00',
+    finalizar: true
+  });
+
+  assert.strictEqual(resultado.frete_tipo, 'EMBUTIDO');
+  assert.strictEqual(resultado.frete_modo, 'POR_ITEM');
+  assert.strictEqual(resultado.frete_valor, 0);
+  assert.strictEqual(resultado.itens[0].frete_valor, 18.9);
+  assert.strictEqual(resultado.itens[1].frete_valor, 0);
+}
+
+function validarContratoFretePorItemETotais() {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../src/controllers/CotacaoFornecedorController.js'),
+    'utf8'
+  );
+  assert(
+    controllerSource.includes('normalizarFreteCotacao(options = {}, isRascunho = false, respostas = [])') &&
+      controllerSource.includes("modo === 'POR_ITEM' ? valorItens : valorGlobal"),
+    'Cotacao deve consolidar o frete informado em cada item.'
+  );
+
+  const pedidoSource = fs.readFileSync(
+    path.join(__dirname, '../src/services/pedidoCompraService.js'),
+    'utf8'
+  );
+  assert(
+    pedidoSource.includes('frete_rateado: freteItemRateado') &&
+      pedidoSource.includes("criterio_rateio: 'POR_ITEM'") &&
+      pedidoSource.includes('sincronizarTotaisFretePedido'),
+    'Fechamento deve ratear o frete por item e sincronizar os totais do pedido.'
+  );
+
+  const totalsSource = fs.readFileSync(
+    path.join(__dirname, '../src/services/pedidoCompraTotaisService.js'),
+    'utf8'
+  );
+  assert(
+    totalsSource.includes('valorItens + freteTotal') &&
+      totalsSource.includes('valor_total_fornecedor'),
+    'Total do pedido deve incluir frete e separar o valor devido ao fornecedor.'
+  );
+
+  const publicPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx'),
+    'utf8'
+  );
+  const detailSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/PedidoCompraDetalhe.jsx'),
+    'utf8'
+  );
+  assert(
+    publicPageSource.includes('Frete informado por item') &&
+      detailSource.includes('Total da aquisicao') &&
+      detailSource.includes('item.frete_rateado'),
+    'Frontend deve permitir frete por item e exibir sua composicao no pedido.'
+  );
+
+  const migrationPath = path.join(
+    __dirname,
+    '../migrations/202608130004_compras_frete_por_item_totais.js'
+  );
+  assert(fs.existsSync(migrationPath), 'Migration de frete por item e totais nao encontrada.');
 }
 
 function validarCompatibilidadeDataChegadaLegada() {
@@ -345,6 +434,8 @@ validarFechamentoExcedenteAuditavel();
 validarEncerramentoSemPedido();
 validarPermissaoEncerramentoSemPedido();
 validarPrazoGeralRespostaInterna();
+validarFretePorItemRespostaInterna();
+validarContratoFretePorItemETotais();
 validarCompatibilidadeDataChegadaLegada();
 validarDisponibilidadeHistoricaPorFornecedorItem();
 validarSnapshotCondicaoPagamentoPedido();

@@ -255,7 +255,9 @@ function buildViewModel(pedido, options = {}) {
           ? 'Pago a terceiro'
           : (pedido?.frete_tipo_cotacao === 'EMBUTIDO' ? 'Embutido' : 'Sem frete')
       ),
-      freteValor: formatMoneyBr(pedido?.frete_valor_cotacao),
+      freteModo: pedido?.frete_modo_cotacao === 'POR_ITEM' ? 'Por item' : 'Geral',
+      freteValor: formatMoneyBr(pedido?.frete_total ?? pedido?.frete_valor_cotacao),
+      valorTotalFornecedor: formatMoneyBr(pedido?.valor_total_fornecedor ?? pedido?.valor_total),
       valorTotal: formatMoneyBr(pedido?.valor_total),
       pedidoMinimo: pedido?.valor_minimo_pedido ? formatMoneyBr(pedido.valor_minimo_pedido) : '-',
       atingiuPedidoMinimo: Boolean(pedido?.atingiu_pedido_minimo),
@@ -266,7 +268,8 @@ function buildViewModel(pedido, options = {}) {
       quantidade: formatQuantity(item?.quantidade_pedido),
       unidade: withFallback(item?.unidade),
       precoUnitario: formatMoneyBr(item?.preco_unitario),
-      total: formatMoneyBr(item?.valor_total),
+      frete: formatMoneyBr(item?.frete_rateado),
+      total: formatMoneyBr(Number(item?.valor_total || 0) + Number(item?.frete_rateado || 0)),
       observacao: withFallback(item?.observacoes || item?.respostaItem?.observacao)
     }))
   };
@@ -276,7 +279,7 @@ function renderItensRows(itens) {
   if (!itens.length) {
     return `
       <tr>
-        <td colspan="6" class="items-table__empty">Nenhum item ativo encontrado para este pedido.</td>
+        <td colspan="7" class="items-table__empty">Nenhum item ativo encontrado para este pedido.</td>
       </tr>
     `;
   }
@@ -289,6 +292,7 @@ function renderItensRows(itens) {
           <td class="is-number">${escapeHtml(item.quantidade)}</td>
           <td class="is-center">${escapeHtml(item.unidade)}</td>
           <td class="is-number">${escapeHtml(item.precoUnitario)}</td>
+          <td class="is-number">${escapeHtml(item.frete)}</td>
           <td class="is-number">${escapeHtml(item.total)}</td>
           <td>${escapeHtml(item.observacao)}</td>
         </tr>
@@ -723,7 +727,7 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
                 <span class="doc-data-cell__value">${escapeHtml(h.obraNome)}</span>
               </div>
               <div class="doc-data-cell">
-                <span class="doc-data-cell__label">Valor total</span>
+                <span class="doc-data-cell__label">Total da aquisicao</span>
                 <span class="doc-data-cell__value doc-data-cell__value--accent">${escapeHtml(h.valorTotal)}</span>
               </div>
             </div>
@@ -775,12 +779,13 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
               <table class="items-table">
                 <thead>
                   <tr>
-                    <th style="width:35%;">Item</th>
+                    <th style="width:29%;">Item</th>
                     <th class="is-number" style="width:11%;">Qtd.</th>
                     <th class="is-center" style="width:9%;">Un.</th>
                     <th class="is-number" style="width:14%;">Preco unit.</th>
-                    <th class="is-number" style="width:14%;">Total</th>
-                    <th style="width:17%;">Observacao</th>
+                    <th class="is-number" style="width:12%;">Frete</th>
+                    <th class="is-number" style="width:14%;">Total aquis.</th>
+                    <th style="width:11%;">Observacao</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -819,12 +824,16 @@ function renderPedidoCompraPdfHtml(pedido, options = {}) {
                   <span class="doc-financial__value">${escapeHtml(h.difalTotal)}</span>
                 </div>
                 <div class="doc-financial__item">
-                  <span class="doc-financial__label">Frete da cotacao</span>
+                  <span class="doc-financial__label">Frete deste pedido (${escapeHtml(h.freteModo)})</span>
                   <span class="doc-financial__value">${escapeHtml(h.freteTipo)} · ${escapeHtml(h.freteValor)}</span>
+                </div>
+                <div class="doc-financial__item">
+                  <span class="doc-financial__label">Devido ao fornecedor</span>
+                  <span class="doc-financial__value">${escapeHtml(h.valorTotalFornecedor)}</span>
                 </div>
               </div>
               <div>
-                <span class="doc-financial__total-label">Valor total do pedido</span>
+                <span class="doc-financial__total-label">Total da aquisicao</span>
                 <span class="doc-financial__total-value">${escapeHtml(h.valorTotal)}</span>
               </div>
             </div>
