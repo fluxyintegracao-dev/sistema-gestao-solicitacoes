@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineArrowDownTray,
+  HiOutlineArrowTopRightOnSquare,
   HiOutlineArrowPath,
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
@@ -13,6 +14,7 @@ import {
   HiOutlineSquares2X2,
   HiOutlineUserGroup
 } from 'react-icons/hi2';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canExportOperationalAudit,
@@ -26,6 +28,7 @@ import {
   getAuditoriaOperacionalResumo,
   getAuditoriaOperacionalUsuarios
 } from '../services/governancaApi';
+import { buildAuditedRecordLink } from '../utils/auditoriaOperacionalLinks';
 import './AuditoriaOperacional.css';
 
 function isoDate(date) {
@@ -116,8 +119,19 @@ function UserRow({ item, selected, onClick }) {
         <strong>{item.operacoes}</strong><span>acoes</span>
         <strong>{item.navegacoes}</strong><span>acessos</span>
       </div>
-      <small>{formatDateTime(item.ultima_atividade)}</small>
+      <small>{item.sessoes_observadas || 0} sessao(oes) observada(s) - ultimo evento {formatDateTime(item.ultima_atividade)}</small>
     </button>
+  );
+}
+
+function SessionDivider({ event }) {
+  return (
+    <div className="ao-session-divider">
+      <HiOutlineClock />
+      <span>Sessao observada</span>
+      <strong>{event.sessao_ref}</strong>
+      <small>{event.usuario?.nome || 'Usuario removido'}</small>
+    </div>
   );
 }
 
@@ -125,6 +139,9 @@ function EventItem({ event }) {
   const failed = event.resultado !== 'SUCCESS';
   const navigation = event.tipo_evento === 'PAGE_VIEW';
   const Icon = failed ? HiOutlineExclamationTriangle : navigation ? HiOutlineComputerDesktop : HiOutlinePencilSquare;
+  const recordLink = buildAuditedRecordLink(event);
+  const fields = event.metadata?.campos_alterados || event.metadata?.campos_informados || [];
+  const route = event.rota_padrao || event.metadata?.rota;
   return (
     <article className={`ao-event ${failed ? 'failed' : ''}`}>
       <div className="ao-event-icon"><Icon /></div>
@@ -144,7 +161,10 @@ function EventItem({ event }) {
               {event.recurso_codigo ? ` · ${event.recurso_codigo}` : ''}
             </span>
           )}
+          {event.metadata?.method && route && <span>{event.metadata.method} {route}</span>}
         </div>
+        {fields.length > 0 && <div className="ao-event-fields"><strong>Campos:</strong> {fields.join(', ')}</div>}
+        {recordLink && <Link className="ao-record-link" to={recordLink}><HiOutlineArrowTopRightOnSquare /> Abrir registro</Link>}
       </div>
       <time>{formatDateTime(event.ocorrido_em)}</time>
     </article>
@@ -262,7 +282,16 @@ export default function AuditoriaOperacional() {
           {canDetails ? (
             <>
               <div className="ao-events-list">
-                {events.rows.map((event) => <EventItem key={event.id} event={event} />)}
+                {events.rows.map((event, index) => {
+                  const previous = events.rows[index - 1];
+                  const startsSession = event.sessao_ref && event.sessao_ref !== previous?.sessao_ref;
+                  return (
+                    <div className="ao-event-group" key={event.id}>
+                      {startsSession && <SessionDivider event={event} />}
+                      <EventItem event={event} />
+                    </div>
+                  );
+                })}
                 {!loading && !events.rows.length && <div className="ao-empty large"><HiOutlineSquares2X2 />Nenhum evento detalhado no recorte selecionado.</div>}
               </div>
               {events.pages > 1 && <div className="ao-pagination"><button type="button" disabled={page <= 1} onClick={() => setPage((old) => old - 1)}><HiOutlineChevronLeft /></button><span>Pagina {events.page} de {events.pages}</span><button type="button" disabled={page >= events.pages} onClick={() => setPage((old) => old + 1)}><HiOutlineChevronRight /></button></div>}
@@ -273,7 +302,7 @@ export default function AuditoriaOperacional() {
         </div>
       </div>
 
-      <footer className="ao-retention-note"><HiOutlineShieldCheck /> A trilha e append-only e passa a existir a partir da implantacao desta funcionalidade. Nenhum historico anterior e inferido artificialmente.</footer>
+      <footer className="ao-retention-note"><HiOutlineShieldCheck /> A trilha e append-only na aplicacao e segue a retencao operacional configurada. Nenhum historico anterior e inferido artificialmente.</footer>
     </section>
   );
 }

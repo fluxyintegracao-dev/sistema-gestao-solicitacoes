@@ -10,6 +10,9 @@ const {
 
 const MAX_RANGE_DAYS = 90;
 const MAX_EXPORT_ROWS = 10000;
+const DEFAULT_RETENTION_DAYS = 365;
+const MIN_RETENTION_DAYS = 90;
+const MAX_RETENTION_DAYS = 3650;
 const SENSITIVE_KEY = /(senha|password|token|authorization|cookie|secret|mfa|chave|pix|cpf|cnpj|conta|agencia|documento|arquivo|anexo|conteudo|body)/i;
 
 function clampText(value, maxLength) {
@@ -26,6 +29,12 @@ function normalizeResourceCode(value) {
   const normalized = clampText(value, 120);
   if (!normalized || !/^[a-z0-9][a-z0-9._/-]{0,119}$/i.test(normalized)) return null;
   return normalized;
+}
+
+function buildSessionReference(value) {
+  const normalized = clampText(value, 80);
+  if (!normalized) return null;
+  return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 10).toUpperCase();
 }
 
 function extractResponseResource(payload) {
@@ -62,8 +71,20 @@ function sanitizeMetadata(value, depth = 0) {
   return clampText(value, 240);
 }
 
+function extractChangedFieldNames(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  return Object.keys(value)
+    .filter((key) => !SENSITIVE_KEY.test(key))
+    .map((key) => clampText(key, 60))
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
 function normalizeRoute(rawPath) {
-  const path = String(rawPath || '/').split('?')[0].replace(/\/+$/, '') || '/';
+  const path = String(rawPath || '/')
+    .split('?')[0]
+    .replace(/^\/api(?=\/|$)/i, '')
+    .replace(/\/+$/, '') || '/';
   return path
     .split('/')
     .map((segment) => {
@@ -184,6 +205,13 @@ function recordHttpEvent(req, statusCode, responseResource = null) {
     code: routeResource.id ? null : normalizeResourceCode(responseResource?.code)
   };
   const result = statusCode < 400 ? 'SUCCESS' : [401, 403].includes(statusCode) ? 'DENIED' : 'FAILED';
+  const changedFields = extractChangedFieldNames(req.body);
+  const fieldsMetadataKey = req.method === 'POST'
+    ? 'campos_informados'
+    : ['PATCH', 'PUT'].includes(req.method) ? 'campos_alterados' : null;
+  const fieldsMetadata = changedFields.length && fieldsMetadataKey
+    ? { [fieldsMetadataKey]: changedFields }
+    : {};
   return recordEvent({
     usuario_id: req.user?.id,
     setor_id: req.user?.setor_id,
@@ -206,7 +234,7 @@ function recordHttpEvent(req, statusCode, responseResource = null) {
     request_id: req.headers?.['x-request-id'],
     ip_hash: hashIp(req),
     user_agent_resumo: clampText(req.headers?.['user-agent'], 160),
-    metadata: { method: req.method, status_code: statusCode, rota: normalized }
+    metadata: { method: req.method, status_code: statusCode, rota: normalized, ...fieldsMetadata }
   });
 }
 
@@ -345,7 +373,8 @@ async function getUsers(query) {
       [literal("SUM(CASE WHEN tipo_evento = 'CREATE' THEN 1 ELSE 0 END)"), 'criacoes'],
       [literal("SUM(CASE WHEN tipo_evento = 'UPDATE' THEN 1 ELSE 0 END)"), 'alteracoes'],
       [literal("SUM(CASE WHEN tipo_evento IN ('CLOSE','APPROVE','RECONCILE') THEN 1 ELSE 0 END)"), 'conclusoes'],
-      [literal('COUNT(DISTINCT modulo)'), 'modulos']
+      [literal('COUNT(DISTINCT modulo)'), 'modulos'],
+      [literal('COUNT(DISTINCT sessao_id)'), 'sessoes_observadas']
     ],
     include: [{ model: User, as: 'usuario', attributes: ['id', 'nome', 'email', 'perfil'], required: false }],
     group: ['usuario_id', 'usuario.id', 'usuario.nome', 'usuario.email', 'usuario.perfil'],
@@ -358,7 +387,8 @@ async function getUsers(query) {
     eventos: Number(row.eventos || 0), navegacoes: Number(row.navegacoes || 0),
     operacoes: Number(row.operacoes || 0), criacoes: Number(row.criacoes || 0),
     alteracoes: Number(row.alteracoes || 0), conclusoes: Number(row.conclusoes || 0),
-    modulos: Number(row.modulos || 0)
+    modulos: Number(row.modulos || 0),
+    sessoes_observadas: Number(row.sessoes_observadas || 0)
   }));
 }
 
@@ -379,6 +409,7 @@ async function getEvents(query, options = {}) {
     rows: rows.map((row) => {
       const plain = row.get({ plain: true });
       try { plain.metadata = plain.metadata_json ? JSON.parse(plain.metadata_json) : null; } catch { plain.metadata = null; }
+      plain.sessao_ref = buildSessionReference(plain.sessao_id);
       delete plain.metadata_json;
       delete plain.ip_hash;
       delete plain.sessao_id;
@@ -404,20 +435,63 @@ function csvCell(value) {
   return `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
 }
 
+function normalizeRetentionDays(value) {
+  const parsed = Number(value == null || value === '' ? DEFAULT_RETENTION_DAYS : value);
+  if (!Number.isInteger(parsed) || parsed < MIN_RETENTION_DAYS || parsed > MAX_RETENTION_DAYS) {
+    throw Object.assign(
+      new Error(`A retencao deve estar entre ${MIN_RETENTION_DAYS} e ${MAX_RETENTION_DAYS} dias.`),
+      { statusCode: 400 }
+    );
+  }
+  return parsed;
+}
+
+function buildRetentionCutoff(retentionDays, now = new Date()) {
+  const days = normalizeRetentionDays(retentionDays);
+  const reference = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(reference.getTime())) throw new Error('Data de referencia da retencao invalida.');
+  return new Date(reference.getTime() - (days * 86400000));
+}
+
+async function purgeExpiredEvents({ retentionDays, confirm = false, now = new Date() } = {}) {
+  const days = normalizeRetentionDays(retentionDays ?? process.env.AUDITORIA_OPERACIONAL_RETENCAO_DIAS);
+  const cutoff = buildRetentionCutoff(days, now);
+  const where = { ocorrido_em: { [Op.lt]: cutoff } };
+  const candidates = await GovernancaEventoOperacional.count({ where });
+  const removed = confirm && candidates
+    ? await GovernancaEventoOperacional.destroy({ where })
+    : 0;
+  return {
+    modo: confirm ? 'APLICADO' : 'SIMULACAO',
+    retencao_dias: days,
+    data_corte: cutoff.toISOString(),
+    candidatos: Number(candidates || 0),
+    removidos: Number(removed || 0)
+  };
+}
+
 async function exportCsv(query) {
   const result = await getEvents({ ...query, page: 1, limit: MAX_EXPORT_ROWS }, { maxLimit: MAX_EXPORT_ROWS });
-  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Recurso', 'ID', 'Codigo'];
+  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Rota', 'Metodo', 'Campos', 'Sessao', 'Recurso', 'ID', 'Codigo'];
   const lines = result.rows.map((item) => [
     item.ocorrido_em, item.usuario?.nome, item.setor?.nome, item.modulo, item.categoria,
-    item.tipo_evento, item.resultado, item.resumo, item.recurso_tipo, item.recurso_id, item.recurso_codigo
+    item.tipo_evento, item.resultado, item.resumo, item.rota_padrao, item.metadata?.method,
+    (item.metadata?.campos_alterados || item.metadata?.campos_informados || []).join(', '),
+    item.sessao_ref, item.recurso_tipo, item.recurso_id, item.recurso_codigo
   ].map(csvCell).join(';'));
   return `\ufeff${header.map(csvCell).join(';')}\n${lines.join('\n')}`;
 }
 
 module.exports = {
+  DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
   MAX_RANGE_DAYS,
+  MIN_RETENTION_DAYS,
+  buildRetentionCutoff,
+  buildSessionReference,
   buildWhere,
   exportCsv,
+  extractChangedFieldNames,
   extractResponseResource,
   getEvents,
   getOptions,
@@ -426,11 +500,13 @@ module.exports = {
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeRetentionDays,
   normalizeResourceCode,
   normalizeResourceId,
   normalizeRoute,
   recordEvent,
   recordHttpEvent,
   recordNavigation,
+  purgeExpiredEvents,
   sanitizeMetadata
 };
