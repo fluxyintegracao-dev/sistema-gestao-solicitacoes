@@ -27,6 +27,7 @@
     "test:security-hardening": "node scripts/validarSecurityHardening.js",
     "test:anexos-acesso": "node scripts/validarAcessoAnexosSolicitacoes.js",
     "test:auditoria-operacional": "node scripts/validarAuditoriaOperacional.js",
+    "test:solicitacao-vencimento": "node scripts/validarSolicitacaoDataVencimento.js",
     "auditoria-operacional:retencao:simular": "node scripts/limparAuditoriaOperacional.js",
     "auditoria-operacional:retencao:aplicar": "node scripts/limparAuditoriaOperacional.js --confirm",
     "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",
