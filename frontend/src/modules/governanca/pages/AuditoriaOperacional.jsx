@@ -135,12 +135,22 @@ function SessionDivider({ event }) {
   );
 }
 
+function eventOperationalContext(event) {
+  if (event.tipo_evento === 'PAGE_VIEW') return event.metadata?.pagina_nome || 'Pagina do sistema';
+  if (event.metadata?.status_destino) return `Status: ${event.metadata.status_destino}`;
+  if (event.metadata?.setor_destino) return `Destino: ${event.metadata.setor_destino}`;
+  return event.metadata?.interacao_tipo || '';
+}
+
 function EventItem({ event }) {
   const failed = event.resultado !== 'SUCCESS';
   const navigation = event.tipo_evento === 'PAGE_VIEW';
   const Icon = failed ? HiOutlineExclamationTriangle : navigation ? HiOutlineComputerDesktop : HiOutlinePencilSquare;
   const recordLink = buildAuditedRecordLink(event);
-  const fields = event.metadata?.campos_alterados || event.metadata?.campos_informados || [];
+  const operationalContext = eventOperationalContext(event);
+  const contextualFields = new Set(['status', 'setor_destino', 'solicitacao_id']);
+  const fields = (event.metadata?.campos_alterados || event.metadata?.campos_informados || [])
+    .filter((field) => !contextualFields.has(field));
   const route = event.rota_padrao || event.metadata?.rota;
   return (
     <article className={`ao-event ${failed ? 'failed' : ''}`}>
@@ -153,7 +163,10 @@ function EventItem({ event }) {
         <p>{event.resumo}</p>
         <div className="ao-event-meta">
           <span>{event.usuario?.nome || 'Usuario removido'}</span>
-          <span>{event.modulo}</span>
+          <span className="ao-module-context">
+            <strong>{event.modulo}</strong>
+            {operationalContext && <> · {operationalContext}</>}
+          </span>
           {event.setor?.nome && <span>{event.setor.nome}</span>}
           {event.recurso_id && (
             <span>
@@ -164,7 +177,11 @@ function EventItem({ event }) {
           {event.metadata?.method && route && <span>{event.metadata.method} {route}</span>}
         </div>
         {fields.length > 0 && <div className="ao-event-fields"><strong>Campos:</strong> {fields.join(', ')}</div>}
-        {recordLink && <Link className="ao-record-link" to={recordLink}><HiOutlineArrowTopRightOnSquare /> Abrir registro</Link>}
+        {recordLink && (
+          <Link className="ao-record-link" to={recordLink}>
+            <HiOutlineArrowTopRightOnSquare /> {navigation ? 'Abrir pagina' : 'Abrir registro'}
+          </Link>
+        )}
       </div>
       <time>{formatDateTime(event.ocorrido_em)}</time>
     </article>

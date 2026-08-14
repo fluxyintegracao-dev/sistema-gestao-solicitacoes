@@ -17,6 +17,10 @@ A trilha passa a existir a partir da aplicacao da migration `202608120003_govern
 - falha ou bloqueio retornado pela API;
 - identificador de sessao gerado pelo navegador para correlacao operacional.
 - nomes tecnicos nao sensiveis dos campos informados ou alterados, sem seus valores;
+- nome operacional da pagina acessada, derivado no backend a partir da rota normalizada;
+- destino de mudancas de status e de envios para outro setor;
+- tipo da interacao executada, como comentario registrado ou arquivo anexado;
+- quantidade de arquivos enviados, sem nome, conteudo ou URL do arquivo.
 
 As operacoes sao classificadas, quando aplicavel, como criacao, alteracao, exclusao, mudanca de status, aprovacao, recusa, delegacao, comentario, importacao, exportacao, conciliacao ou estorno.
 
@@ -58,11 +62,13 @@ O ritmo diario representa somente eventos registrados. Ele nao calcula jornada, 
 
 A linha do tempo agrupa eventos consecutivos pela sessao observada no navegador. A interface recebe apenas uma referencia abreviada gerada por hash; o identificador bruto da sessao continua oculto. O contador por usuario representa sessoes com eventos registrados e nao equivale a login, jornada, permanencia ou horas trabalhadas.
 
-Ao navegar entre registros numericos diferentes de uma mesma pagina, cada acesso e registrado separadamente com o identificador tecnico do recurso. Tokens publicos e outros identificadores potencialmente sensiveis nao sao armazenados como recurso de navegacao.
+Ao navegar entre registros numericos diferentes de uma mesma pagina, cada acesso e registrado separadamente com o identificador tecnico do recurso. A linha do tempo apresenta o nome operacional da pagina e oferece **Abrir pagina** quando a rota interna e segura. Tokens publicos e outros identificadores potencialmente sensiveis nao sao armazenados como recurso de navegacao.
 
 Nas operacoes de criacao, o middleware observa somente os campos tecnicos `id` e `codigo` da resposta ja produzida pela API. O corpo da resposta nao e persistido nem alterado, e tokens ou campos pessoais nao sao usados para identificar o recurso.
 
-Quando o tipo de recurso e reconhecido e existe uma rota interna segura, a linha do tempo oferece **Abrir registro**. O link respeita as permissoes normais do modulo de destino; a Auditoria Operacional nao concede acesso adicional. Recursos sem mapeamento inequivoco permanecem sem link. A rota HTTP normalizada e o metodo tambem ficam visiveis para apoiar a investigacao.
+Quando o tipo de recurso e reconhecido e existe uma rota interna segura, a linha do tempo oferece **Abrir registro**. Uploads associados a solicitacoes, compras, pedidos ou titulos usam apenas o identificador tecnico do registro relacionado para montar esse link; o arquivo e seu conteudo continuam fora da trilha. O link respeita as permissoes normais do modulo de destino; a Auditoria Operacional nao concede acesso adicional. Recursos sem mapeamento inequivoco permanecem sem link. A rota HTTP normalizada e o metodo tambem ficam visiveis para apoiar a investigacao.
+
+Mudancas de status exibem o status de destino, envios exibem o setor de destino e interacoes exibem o tipo da interacao logo apos o nome do modulo. Comentarios e anexos nunca tem seu conteudo copiado para a auditoria. O enriquecimento vale para eventos registrados depois da implantacao; historicos anteriores nao sao inferidos nem reescritos.
 
 ## APIs
 
@@ -111,9 +117,14 @@ Os indices cobrem data, usuario, setor, modulo, tipo, recurso e resultado. O lim
 | Cenario | Resultado esperado |
 | --- | --- |
 | Usuario abre duas paginas autenticadas | Duas navegacoes aparecem com usuario, modulo e horario |
+| Usuario acessa uma pagina reconhecida | Nome operacional e **Abrir pagina** aparecem na linha do tempo |
 | Usuario abre dois registros na mesma pagina | Os dois acessos aparecem com seus respectivos IDs tecnicos |
 | URL contem token publico | O token nao e armazenado como identificador do recurso |
 | Usuario cria ou altera um registro | Operacao aparece com tipo, rota normalizada, recurso e sucesso |
+| Usuario muda o status de uma solicitacao | Linha informa o novo status e permite abrir o registro |
+| Usuario envia solicitacao para outro setor | Linha informa o setor de destino e permite abrir o registro |
+| Usuario registra comentario | Linha identifica **Comentario registrado**, sem copiar o texto |
+| Usuario envia arquivo para uma solicitacao | Linha identifica o envio e permite abrir a solicitacao, sem expor nome ou conteudo do arquivo |
 | Alteracao possui campos comuns e sensiveis | Somente os nomes dos campos comuns aparecem; nenhum valor e persistido |
 | Criacao retorna `id` e `codigo` | Linha do tempo identifica o novo registro sem armazenar o restante da resposta |
 | API rejeita acao por permissao | Evento aparece como bloqueado, sem conteudo da requisicao |

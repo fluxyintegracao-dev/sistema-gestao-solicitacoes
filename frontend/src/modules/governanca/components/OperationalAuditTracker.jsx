@@ -51,9 +51,7 @@ export default function OperationalAuditTracker() {
       rota: path,
       pagina_chave: path,
       modulo,
-      ...resource,
-      titulo_pagina: document.title,
-      resumo: `Acessou uma pagina em ${modulo}`
+      ...resource
     }).catch(() => {});
   }, [location.pathname]);
 

@@ -13,6 +13,7 @@ const {
   extractChangedFieldNames,
   extractResponseResource,
   inferEventType,
+  inferPageName,
   inferModule,
   normalizeFilters,
   normalizeRetentionDays,
@@ -51,7 +52,10 @@ function validateClassification() {
   assert.strictEqual(inferModule('/solicitacoes-compra/:id/cotacao'), 'COMPRAS');
   assert.strictEqual(inferEventType('POST', '/financeiro/conciliacoes/:id/confirmar'), 'RECONCILE');
   assert.strictEqual(inferEventType('PATCH', '/solicitacoes/:id/status'), 'STATUS_CHANGE');
+  assert.strictEqual(inferEventType('POST', '/solicitacoes/:id/enviar-setor'), 'ASSIGN');
   assert.strictEqual(inferEventType('DELETE', '/contratos/:id'), 'DELETE');
+  assert.strictEqual(inferPageName('/solicitacoes/:id'), 'Detalhe da solicitacao');
+  assert.strictEqual(inferPageName('/financeiro/contas-a-pagar'), 'Contas a pagar');
 }
 
 function validatePrivacySanitization() {
@@ -150,8 +154,19 @@ function validateContextualInvestigation() {
   );
   assert(pageSource.includes('campos_alterados'), 'A linha do tempo deve exibir apenas nomes seguros dos campos alterados.');
   assert(pageSource.includes('buildAuditedRecordLink'), 'A linha do tempo deve oferecer navegacao segura ao registro conhecido.');
+  assert(pageSource.includes('pagina_nome'), 'A linha do tempo deve exibir o nome exato da pagina acessada.');
+  assert(pageSource.includes('status_destino'), 'A linha do tempo deve exibir o status de destino.');
+  assert(pageSource.includes('setor_destino'), 'A linha do tempo deve exibir o setor de destino.');
   assert(linksSource.includes("/financeiro/titulos/${id}"), 'Titulos financeiros devem possuir link contextual permitido.');
   assert(linksSource.includes("/solicitacoes/${id}"), 'Solicitacoes devem possuir link contextual permitido.');
+  assert(linksSource.includes("event?.tipo_evento !== 'PAGE_VIEW'"), 'Acessos devem oferecer link seguro para a pagina visitada.');
+
+  const serviceSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/modules/governanca/services/auditoriaOperacionalService.js'),
+    'utf8'
+  );
+  ['status_destino', 'setor_destino', 'interacao_tipo', 'solicitacao_id']
+    .forEach((field) => assert(serviceSource.includes(field), `Contexto operacional ausente: ${field}`));
 }
 
 function validateRetentionPolicy() {

@@ -115,7 +115,7 @@ function inferEventType(method, route) {
   const keywordMap = [
     [/estorn|reverter/, 'REVERSE'], [/concili/, 'RECONCILE'], [/aprova/, 'APPROVE'],
     [/rejeit|recus/, 'REJECT'], [/reabr/, 'REOPEN'], [/encerr|finaliz|fechar/, 'CLOSE'],
-    [/status/, 'STATUS_CHANGE'], [/deleg|atribui|assum/, 'ASSIGN'], [/coment|mensag/, 'COMMENT'],
+    [/status/, 'STATUS_CHANGE'], [/deleg|atribui|assum|enviar-setor|encaminh/, 'ASSIGN'], [/coment|mensag/, 'COMMENT'],
     [/import/, 'IMPORT'], [/export|relatorio|pdf/, 'EXPORT'], [/upload|anexo/, 'UPLOAD'],
     [/download|baixar-modelo|presign/, 'DOWNLOAD']
   ];
@@ -125,6 +125,109 @@ function inferEventType(method, route) {
   if (method === 'PATCH' || method === 'PUT') return 'UPDATE';
   if (method === 'DELETE') return 'DELETE';
   return 'ACTION';
+}
+
+const PAGE_NAMES = [
+  [/^\/$/, 'Painel'],
+  [/^\/solicitacoes\/:id$/, 'Detalhe da solicitacao'],
+  [/^\/solicitacoes\/relatorios\/operacional$/, 'Relatorio operacional de solicitacoes'],
+  [/^\/solicitacoes\/relatorios$/, 'Relatorios de solicitacoes'],
+  [/^\/solicitacoes-arquivadas$/, 'Solicitacoes arquivadas'],
+  [/^\/solicitacoes$/, 'Solicitacoes'],
+  [/^\/nova-solicitacao$/, 'Nova solicitacao'],
+  [/^\/solicitacoes-compra\/:id\/cotacao$/, 'Cotacao da solicitacao de compra'],
+  [/^\/solicitacoes-compra\/finalizada\/:id$/, 'Solicitacao de compra finalizada'],
+  [/^\/solicitacoes-compra\/nova$/, 'Nova solicitacao de compra'],
+  [/^\/solicitacoes-compra\/revisar$/, 'Revisao da solicitacao de compra'],
+  [/^\/solicitacoes-compra\/:id$/, 'Detalhe da solicitacao de compra'],
+  [/^\/solicitacoes-compra$/, 'Solicitacoes de compra'],
+  [/^\/solicitacoes-compra-direta\/nova$/, 'Nova compra direta'],
+  [/^\/solicitacoes-compra-direta\/revisar$/, 'Revisao da compra direta'],
+  [/^\/pedidos-compra\/:id$/, 'Detalhe do pedido de compra'],
+  [/^\/pedidos-compra$/, 'Pedidos de compra'],
+  [/^\/gestao-fornecedores$/, 'Fornecedores de compras'],
+  [/^\/cotacoes$/, 'Cotacoes'],
+  [/^\/compras\/delegacao$/, 'Delegacao de compras'],
+  [/^\/financeiro\/contas-a-pagar$/, 'Contas a pagar'],
+  [/^\/financeiro\/contas-a-receber$/, 'Contas a receber'],
+  [/^\/financeiro\/titulos\/novo$/, 'Novo titulo financeiro'],
+  [/^\/financeiro\/titulos\/:id\/editar$/, 'Edicao do titulo financeiro'],
+  [/^\/financeiro\/titulos\/:id$/, 'Detalhe do titulo financeiro'],
+  [/^\/financeiro\/conciliacao$/, 'Conciliacao bancaria'],
+  [/^\/financeiro\/relatorios(?:\/.*)?$/, 'Relatorios financeiros'],
+  [/^\/financeiro\/baixas$/, 'Baixas realizadas'],
+  [/^\/financeiro\/cheques-terceiros$/, 'Cheques de terceiros'],
+  [/^\/financeiro\/baixas-compostas$/, 'Baixas com multiplas fontes'],
+  [/^\/custos-recebiveis$/, 'Custos e Recebiveis'],
+  [/^\/governanca\/auditoria-operacional$/, 'Auditoria Operacional'],
+  [/^\/usuarios\/:id\/editar$/, 'Edicao do usuario'],
+  [/^\/usuarios\/:id$/, 'Detalhe do usuario'],
+  [/^\/usuarios\/novo$/, 'Novo usuario'],
+  [/^\/usuarios$/, 'Usuarios'],
+  [/^\/obras\/:id$/, 'Gestao da obra'],
+  [/^\/obras$/, 'Obras']
+];
+
+function humanizeRouteSegment(value) {
+  const normalized = String(value || '').replace(/^:/, '').replace(/[-_]+/g, ' ').trim();
+  if (!normalized) return 'Pagina do sistema';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function inferPageName(route) {
+  const normalized = normalizeRoute(route);
+  const known = PAGE_NAMES.find(([pattern]) => pattern.test(normalized));
+  if (known) return known[1];
+  const segments = normalized.split('/').filter((segment) => segment && segment !== ':id');
+  return humanizeRouteSegment(segments[segments.length - 1]);
+}
+
+function extractLinkedResource(type, body = {}) {
+  if (type !== 'UPLOAD') return null;
+  const candidates = [
+    ['solicitacao_id', 'solicitacoes'],
+    ['solicitacao_compra_id', 'solicitacoes-compra'],
+    ['pedido_compra_id', 'pedidos-compra'],
+    ['titulo_financeiro_id', 'financeiro.titulos'],
+    ['titulo_id', 'financeiro.titulos']
+  ];
+  for (const [field, resourceType] of candidates) {
+    const id = normalizeResourceId(body?.[field]);
+    if (id) return { id, type: resourceType };
+  }
+  return null;
+}
+
+function buildOperationalContext(req, type, normalizedRoute) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const metadata = {};
+  let summary = null;
+
+  if (type === 'STATUS_CHANGE') {
+    const status = clampText(body.status, 120);
+    if (status) {
+      metadata.status_destino = status;
+      metadata.interacao_tipo = 'Status alterado';
+      summary = `Alterou o status para ${status}`;
+    }
+  } else if (type === 'ASSIGN' && /enviar-setor|encaminh/i.test(normalizedRoute)) {
+    const sector = clampText(body.setor_destino, 120);
+    if (sector) {
+      metadata.setor_destino = sector;
+      metadata.interacao_tipo = 'Envio para outro setor';
+      summary = `Enviou o registro para o setor ${sector}`;
+    }
+  } else if (type === 'COMMENT') {
+    metadata.interacao_tipo = /mensag/i.test(normalizedRoute) ? 'Mensagem enviada' : 'Comentario registrado';
+    summary = metadata.interacao_tipo;
+  } else if (type === 'UPLOAD') {
+    const fileCount = Array.isArray(req.files) ? req.files.length : (req.file ? 1 : 0);
+    metadata.interacao_tipo = 'Arquivo anexado';
+    if (fileCount) metadata.quantidade_itens = fileCount;
+    summary = fileCount > 1 ? `Enviou ${fileCount} arquivos` : 'Enviou um arquivo';
+  }
+
+  return { metadata, summary };
 }
 
 function eventSummary(type, moduleName, result) {
@@ -198,10 +301,11 @@ function recordHttpEvent(req, statusCode, responseResource = null) {
   const moduleName = inferModule(normalized);
   const type = inferEventType(req.method, normalized);
   const routeResource = extractResource(route);
+  const linkedResource = extractLinkedResource(type, req.body);
   const responseId = statusCode < 400 ? normalizeResourceId(responseResource?.id) : null;
   const resource = {
-    id: routeResource.id || responseId,
-    type: routeResource.type,
+    id: routeResource.id || responseId || linkedResource?.id,
+    type: linkedResource?.type || routeResource.type,
     code: routeResource.id ? null : normalizeResourceCode(responseResource?.code)
   };
   const result = statusCode < 400 ? 'SUCCESS' : [401, 403].includes(statusCode) ? 'DENIED' : 'FAILED';
@@ -212,6 +316,7 @@ function recordHttpEvent(req, statusCode, responseResource = null) {
   const fieldsMetadata = changedFields.length && fieldsMetadataKey
     ? { [fieldsMetadataKey]: changedFields }
     : {};
+  const operationalContext = buildOperationalContext(req, type, normalized);
   return recordEvent({
     usuario_id: req.user?.id,
     setor_id: req.user?.setor_id,
@@ -228,13 +333,21 @@ function recordHttpEvent(req, statusCode, responseResource = null) {
     empresa_id: req.body?.empresa_id || req.body?.empresa_pagadora_id || null,
     obra_id: req.body?.obra_id || null,
     acao_chave: `${req.method}:${normalized}`,
-    resumo: eventSummary(type, moduleName, result),
+    resumo: result === 'SUCCESS' && operationalContext.summary
+      ? `${operationalContext.summary} em ${moduleName}`
+      : eventSummary(type, moduleName, result),
     resultado: result,
     origem: 'BACKEND',
     request_id: req.headers?.['x-request-id'],
     ip_hash: hashIp(req),
     user_agent_resumo: clampText(req.headers?.['user-agent'], 160),
-    metadata: { method: req.method, status_code: statusCode, rota: normalized, ...fieldsMetadata }
+    metadata: {
+      method: req.method,
+      status_code: statusCode,
+      rota: normalized,
+      ...fieldsMetadata,
+      ...operationalContext.metadata
+    }
   });
 }
 
@@ -242,6 +355,7 @@ async function recordNavigation(req, body = {}) {
   const normalized = normalizeRoute(body.rota || '/');
   const moduleName = clampText(body.modulo, 80) || inferModule(normalized);
   const resourceId = normalizeResourceId(body.recurso_id);
+  const pageName = inferPageName(normalized);
   return recordEvent({
     evento_uuid: body.evento_uuid,
     usuario_id: req.user?.id,
@@ -255,12 +369,12 @@ async function recordNavigation(req, body = {}) {
     rota_padrao: normalized,
     recurso_tipo: resourceId ? clampText(body.recurso_tipo, 120) : null,
     recurso_id: resourceId,
-    resumo: clampText(body.resumo, 500) || eventSummary('PAGE_VIEW', moduleName, 'SUCCESS'),
+    resumo: `Acessou ${pageName}`,
     resultado: 'SUCCESS',
     origem: 'FRONTEND',
     ip_hash: hashIp(req),
     user_agent_resumo: clampText(req.headers?.['user-agent'], 160),
-    metadata: { titulo_pagina: body.titulo_pagina }
+    metadata: { pagina_nome: pageName }
   });
 }
 
@@ -497,6 +611,7 @@ module.exports = {
   getOptions,
   getSummary,
   getUsers,
+  inferPageName,
   inferEventType,
   inferModule,
   normalizeFilters,
