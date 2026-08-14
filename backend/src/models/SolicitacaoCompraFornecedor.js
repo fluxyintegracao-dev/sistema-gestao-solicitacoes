@@ -104,6 +104,10 @@ module.exports = (sequelize, DataTypes) => {
       pdf_resposta_url: {
         type: DataTypes.TEXT,
         allowNull: true
+      },
+      arquivos_resposta: {
+        type: DataTypes.JSON,
+        allowNull: true
       }
     },
     {

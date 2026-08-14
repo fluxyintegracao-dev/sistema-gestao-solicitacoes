@@ -5,6 +5,7 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineChatBubbleLeftRight,
   HiOutlineClipboardDocument,
+  HiOutlinePaperClip,
   HiOutlineArrowPath,
   HiOutlinePencilSquare,
   HiOutlineXMark
@@ -24,7 +25,8 @@ import {
   recusarSolicitacaoCompra,
   reabrirCotacaoCompra,
   atualizarQuantidadeItemSolicitacaoCompra,
-  salvarRespostaInternaCotacao
+  salvarRespostaInternaCotacao,
+  uploadArquivosRespostaInternaCotacao
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -265,10 +267,13 @@ function ModalRespostaInternaCotacao({
   cotacao,
   form,
   salvando,
+  enviandoArquivos,
   solicitacaoEncerrada = false,
   onChange,
   onChangeItem,
   onSalvar,
+  onUploadArquivos,
+  onAbrirArquivo,
   onFechar
 }) {
   const [condicoesAbertas, setCondicoesAbertas] = useState(false);
@@ -297,6 +302,15 @@ function ModalRespostaInternaCotacao({
     0,
     valorMercadorias + valorTributos + parseNumeroCompra(form.difal_valor) + freteAdicional - parseNumeroCompra(form.desconto_total)
   );
+  const arquivosResposta = Array.isArray(cotacao.arquivos_resposta) && cotacao.arquivos_resposta.length
+    ? cotacao.arquivos_resposta
+    : (cotacao.arquivo_resposta_url || cotacao.pdf_resposta_url
+      ? [{
+          chave: 'legado',
+          url: cotacao.arquivo_resposta_url || cotacao.pdf_resposta_url,
+          nome_original: 'Arquivo anexado'
+        }]
+      : []);
 
   function alternarCondicao(opcao) {
     const partesLivres = String(form.condicao_pagamento || '')
@@ -320,7 +334,14 @@ function ModalRespostaInternaCotacao({
               {cotacao.fornecedor?.nome || 'Fornecedor'} - a alteracao sera registrada na auditoria como resposta interna.
             </p>
           </div>
-          <button type="button" className="compras-icon-action" onClick={onFechar} title="Fechar" aria-label="Fechar">
+          <button
+            type="button"
+            className="compras-icon-action"
+            onClick={onFechar}
+            title="Fechar"
+            aria-label="Fechar"
+            disabled={salvando || enviandoArquivos}
+          >
             <HiOutlineXMark />
           </button>
         </div>
@@ -441,6 +462,48 @@ function ModalRespostaInternaCotacao({
             <textarea className="input mt-1 min-h-[64px] w-full" value={form.observacao_resposta} onChange={(e) => onChange('observacao_resposta', e.target.value)} />
           </label>
 
+          <div className="mt-3 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 dark:bg-slate-950/20">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-xs font-semibold text-[var(--c-text)]">Arquivos da resposta</div>
+                <div className="text-[11px] text-[var(--c-muted)]">PDF, PNG, JPG ou JPEG. Ate 10 arquivos por envio.</div>
+              </div>
+              <label className={`btn btn-outline btn-sm cursor-pointer ${enviandoArquivos ? 'pointer-events-none opacity-60' : ''}`}>
+                <input
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  multiple
+                  disabled={enviandoArquivos}
+                  onChange={(event) => {
+                    onUploadArquivos(event.target.files);
+                    event.target.value = '';
+                  }}
+                />
+                <HiOutlinePaperClip />
+                {enviandoArquivos ? 'Enviando...' : 'Adicionar arquivos'}
+              </label>
+            </div>
+            {arquivosResposta.length ? (
+              <div className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                {arquivosResposta.map((arquivo, index) => (
+                  <button
+                    key={arquivo.chave || `${arquivo.url}-${index}`}
+                    type="button"
+                    className="flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1.5 text-left text-[11px] hover:border-blue-300"
+                    title={arquivo.nome_original || `Arquivo ${index + 1}`}
+                    onClick={() => onAbrirArquivo(arquivo, index)}
+                  >
+                    <HiOutlinePaperClip className="shrink-0" />
+                    <span className="truncate">{arquivo.nome_original || `Arquivo ${index + 1}`}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="mt-2 text-[11px] text-[var(--c-muted)]">Nenhum arquivo anexado.</div>
+            )}
+          </div>
+
           <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
             <table className={`table ${form.frete_modo === 'POR_ITEM' ? 'min-w-[1460px]' : 'min-w-[1340px]'} text-xs`}>
               <thead>
@@ -504,11 +567,11 @@ function ModalRespostaInternaCotacao({
         </div>
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
-          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando}>Cancelar</button>
+          <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando || enviandoArquivos}>Cancelar</button>
           {!solicitacaoEncerrada ? (
-            <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
+            <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
           ) : null}
-          <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
+          <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
         </div>
       </div>
     </div>
@@ -2051,6 +2114,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const [cotacaoRespostaInterna, setCotacaoRespostaInterna] = useState(null);
   const [formRespostaInterna, setFormRespostaInterna] = useState(null);
   const [salvandoRespostaInterna, setSalvandoRespostaInterna] = useState(false);
+  const [enviandoArquivosRespostaInterna, setEnviandoArquivosRespostaInterna] = useState(false);
   const [encerrando, setEncerrando] = useState(false);
   const [modalEncerrarSemPedido, setModalEncerrarSemPedido] = useState(false);
   const [justificativaEncerrarSemPedido, setJustificativaEncerrarSemPedido] = useState('');
@@ -2460,6 +2524,49 @@ export default function GerenciarCotacaoSolicitacao() {
       ...atual,
       itens: atual.itens.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item)
     }));
+  }
+
+  async function handleUploadArquivosRespostaInterna(files) {
+    const selecionados = Array.from(files || []);
+    if (!selecionados.length || !cotacaoRespostaInterna) return;
+    if (selecionados.length > 10) {
+      alert('Selecione no maximo 10 arquivos por vez.');
+      return;
+    }
+
+    try {
+      setEnviandoArquivosRespostaInterna(true);
+      const resposta = await uploadArquivosRespostaInternaCotacao(id, cotacaoRespostaInterna.id, selecionados);
+      setCotacaoRespostaInterna((atual) => ({ ...atual, ...(resposta?.cotacao || {}) }));
+      await carregarTudo();
+      alert(`${selecionados.length} arquivo(s) anexado(s) e registrado(s) na auditoria.`);
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao anexar arquivos na resposta da cotacao');
+    } finally {
+      setEnviandoArquivosRespostaInterna(false);
+    }
+  }
+
+  async function handleAbrirArquivoRespostaInterna(arquivo, index) {
+    try {
+      const caminho = String(arquivo?.url || '');
+      const url = /[?&]X-Amz-/i.test(caminho)
+        ? caminho
+        : await obterUrlAssinadaCompra(caminho);
+      if (!url) {
+        alert('Arquivo nao encontrado.');
+        return;
+      }
+      setPreviewArquivo(await criarPreviewCompra({
+        title: 'Arquivo da resposta da cotacao',
+        name: arquivo?.nome_original || `Arquivo ${index + 1}`,
+        url
+      }));
+    } catch (error) {
+      console.error(error);
+      alert(error.message || 'Erro ao abrir arquivo da resposta');
+    }
   }
 
   async function handleSalvarRespostaInterna(finalizar) {
@@ -3138,7 +3245,11 @@ export default function GerenciarCotacaoSolicitacao() {
                         const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
                         const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
                         const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
-                        const possuiRespostaArquivo = Boolean(cotacaoFornecedor.pdf_resposta_url);
+                        const possuiRespostaArquivo = Boolean(
+                          cotacaoFornecedor.pdf_resposta_url
+                          || cotacaoFornecedor.arquivo_resposta_url
+                          || cotacaoFornecedor.arquivos_resposta?.length
+                        );
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
                         const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
                         const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
@@ -3303,12 +3414,15 @@ export default function GerenciarCotacaoSolicitacao() {
         cotacao={cotacaoRespostaInterna}
         form={formRespostaInterna}
         salvando={salvandoRespostaInterna}
+        enviandoArquivos={enviandoArquivosRespostaInterna}
         solicitacaoEncerrada={statusSolicitacao === 'encerrado'}
         onChange={alterarRespostaInterna}
         onChangeItem={alterarItemRespostaInterna}
         onSalvar={handleSalvarRespostaInterna}
+        onUploadArquivos={handleUploadArquivosRespostaInterna}
+        onAbrirArquivo={handleAbrirArquivoRespostaInterna}
         onFechar={() => {
-          if (salvandoRespostaInterna) return;
+          if (salvandoRespostaInterna || enviandoArquivosRespostaInterna) return;
           setCotacaoRespostaInterna(null);
           setFormRespostaInterna(null);
         }}

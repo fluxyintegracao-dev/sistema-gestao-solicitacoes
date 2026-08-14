@@ -4,7 +4,7 @@ import {
   obterCotacaoPublica,
   responderCotacaoPublica,
   salvarRascunhoCotacaoPublica,
-  uploadPlanilhaCotacaoPublica
+  uploadArquivosCotacaoPublica
 } from '../../../services/compras';
 
 function formatarData(data) {
@@ -444,20 +444,22 @@ export default function CotacaoFornecedorPublica() {
     }
   }
 
-  async function handleUploadArquivo(file) {
+  async function handleUploadArquivos(files) {
     try {
-      if (!file) return;
+      const selecionados = Array.from(files || []);
+      if (!selecionados.length) return;
+      if (selecionados.length > 10) {
+        alert('Selecione no maximo 10 arquivos por vez.');
+        return;
+      }
 
       setEnviandoPlanilha(true);
-      const resposta = await uploadPlanilhaCotacaoPublica(token, file);
+      await uploadArquivosCotacaoPublica(token, selecionados);
       await carregar();
-      const tipoArquivoResposta = resposta?.cotacao?.arquivo_resposta_tipo;
-      alert(tipoArquivoResposta
-        ? 'Arquivo anexado. Para finalizar, confira os dados do cabecalho e clique em Enviar resposta.'
-        : 'Planilha importada com sucesso.');
+      alert(`${selecionados.length} arquivo(s) anexado(s). Para finalizar, confira os dados e clique em Enviar resposta.`);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao importar arquivo');
+      alert(error.message || 'Erro ao anexar arquivos');
     } finally {
       setEnviandoPlanilha(false);
     }
@@ -480,9 +482,17 @@ export default function CotacaoFornecedorPublica() {
   }
 
   const statusCotacao = dados.cotacao?.status || 'EM ABERTO';
-  const arquivoRespostaUrl = dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url || null;
-  const arquivoRespostaTipo = dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO';
-  const arquivoRespostaIsImage = Boolean(dados.cotacao?.arquivo_resposta_is_image);
+  const arquivosResposta = Array.isArray(dados.cotacao?.arquivos_resposta) && dados.cotacao.arquivos_resposta.length
+    ? dados.cotacao.arquivos_resposta
+    : (dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url
+      ? [{
+          chave: 'legado',
+          url: dados.cotacao?.arquivo_resposta_url || dados.cotacao?.pdf_resposta_url,
+          nome_original: 'Arquivo anexado',
+          tipo: dados.cotacao?.arquivo_resposta_tipo || 'ARQUIVO',
+          is_image: Boolean(dados.cotacao?.arquivo_resposta_is_image)
+        }]
+      : []);
   const respostaFinalizada = ['RESPONDIDO', 'FINALIZADA'].includes(String(statusCotacao).toUpperCase());
   const formularioBloqueado = dados.somente_leitura || respostaFinalizada;
   const itensDisponiveis = itens.filter(
@@ -543,26 +553,28 @@ export default function CotacaoFornecedorPublica() {
             </div>
           )}
 
-          {arquivoRespostaUrl && (
-            <div className="mb-2 flex items-center gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
-              {arquivoRespostaIsImage && (
-                <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                  <img
-                    src={arquivoRespostaUrl}
-                    alt="Resposta anexada"
-                    className="h-12 w-16 rounded border border-blue-200 bg-white object-cover"
-                  />
-                </a>
-              )}
-              <span>
-                {respostaFinalizada
-                  ? `Resposta finalizada com arquivo anexado (${arquivoRespostaTipo}).`
-                  : `Arquivo anexado (${arquivoRespostaTipo}). O envio so sera concluido ao clicar em Enviar resposta.`}
-              </span>
-              <a href={arquivoRespostaUrl} target="_blank" rel="noopener noreferrer"
-                className="ml-auto shrink-0 rounded border border-blue-300 px-2 py-0.5 text-[11px] hover:bg-blue-100">
-                Ver arquivo
-              </a>
+          {arquivosResposta.length > 0 && (
+            <div className="mb-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <span className="font-semibold">{arquivosResposta.length} arquivo(s) anexado(s)</span>
+                <span className="text-[10px] text-blue-700">
+                  {respostaFinalizada ? 'Resposta finalizada' : 'Finalize em Enviar resposta'}
+                </span>
+              </div>
+              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                {arquivosResposta.map((arquivo, index) => (
+                  <a
+                    key={arquivo.chave || `${arquivo.url}-${index}`}
+                    href={arquivo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="truncate rounded border border-blue-200 bg-white/80 px-2 py-1 text-[11px] hover:bg-white"
+                    title={arquivo.nome_original || `Arquivo ${index + 1}`}
+                  >
+                    {arquivo.nome_original || `Arquivo ${index + 1}`} ({arquivo.tipo || 'ARQUIVO'})
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 
@@ -749,22 +761,23 @@ export default function CotacaoFornecedorPublica() {
                 type="file"
                 className="hidden"
                 accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                multiple
+                disabled={enviandoPlanilha || formularioBloqueado}
                 onChange={(event) => {
-                  const [file] = Array.from(event.target.files || []);
-                  void handleUploadArquivo(file);
+                  void handleUploadArquivos(event.target.files);
                   event.target.value = '';
                 }}
               />
-              {enviandoPlanilha ? 'Enviando...' : 'Importar arquivo'}
+              {enviandoPlanilha ? 'Enviando...' : 'Adicionar arquivos'}
             </label>
-            <span className="text-[10px] text-[var(--sol-text-soft)]">PDF ou imagem</span>
+            <span className="text-[10px] text-[var(--sol-text-soft)]">Ate 10 PDFs ou imagens por vez</span>
             {!dados.somente_leitura && (
               <>
                 <button
                   type="button"
                   className="btn btn-outline btn-sm text-xs h-7 px-3 ml-auto"
                   onClick={handleSalvarRascunho}
-                  disabled={salvandoRascunho || salvando || respostaFinalizada}
+                  disabled={salvandoRascunho || salvando || enviandoPlanilha || respostaFinalizada}
                   title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
                 >
                   {salvandoRascunho ? 'Salvando...' : 'Salvar rascunho'}
@@ -773,7 +786,7 @@ export default function CotacaoFornecedorPublica() {
                   type="button"
                   className="btn btn-primary btn-sm text-xs h-7 px-3"
                   onClick={handleSalvarOnline}
-                  disabled={salvando || salvandoRascunho || respostaFinalizada}
+                  disabled={salvando || salvandoRascunho || enviandoPlanilha || respostaFinalizada}
                   title={respostaFinalizada ? 'Cotacao ja respondida.' : undefined}
                 >
                   {respostaFinalizada ? 'Resposta enviada' : salvando ? 'Enviando...' : 'Enviar resposta'}

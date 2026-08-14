@@ -1288,6 +1288,9 @@ function montarComparativoSolicitacao(solicitacao) {
     frete_transportador_cpf_cnpj: cotacaoFornecedor.frete_transportador_cpf_cnpj || '',
     condicao_pagamento: cotacaoFornecedor.condicao_pagamento || '',
     observacao_resposta: cotacaoFornecedor.observacao_resposta || '',
+    arquivos_resposta: Array.isArray(cotacaoFornecedor.arquivos_resposta)
+      ? cotacaoFornecedor.arquivos_resposta
+      : [],
     arquivo_resposta_url: cotacaoFornecedor.pdf_resposta_url || null,
     status: cotacaoFornecedor.status,
     token: cotacaoFornecedor.token,

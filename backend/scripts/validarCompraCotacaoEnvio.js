@@ -427,6 +427,52 @@ function validarPermissaoEBuscaFornecedores() {
   );
 }
 
+function validarMultiplosArquivosRespostaCotacao() {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../src/controllers/CotacaoFornecedorController.js'),
+    'utf8'
+  );
+  const routesSource = fs.readFileSync(path.join(__dirname, '../src/routes.js'), 'utf8');
+  const modelSource = fs.readFileSync(
+    path.join(__dirname, '../src/models/SolicitacaoCompraFornecedor.js'),
+    'utf8'
+  );
+  const publicPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx'),
+    'utf8'
+  );
+  const internalPageSource = fs.readFileSync(
+    path.join(__dirname, '../../frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx'),
+    'utf8'
+  );
+
+  assert(
+    controllerSource.includes('registrarArquivosRespostaCotacao') &&
+      controllerSource.includes('validarArquivosRespostaCotacao'),
+    'Controller deve validar e persistir varios arquivos da resposta.'
+  );
+  assert(
+    routesSource.includes("name: 'files', maxCount: 10") &&
+      routesSource.includes('/arquivos-resposta'),
+    'Rotas publica e interna devem aceitar ate 10 arquivos por envio.'
+  );
+  assert(
+    modelSource.includes('arquivos_resposta') &&
+      modelSource.includes('type: DataTypes.JSON'),
+    'Cotacao do fornecedor deve persistir a colecao de arquivos em JSON.'
+  );
+  assert(
+    publicPageSource.includes('multiple') &&
+      publicPageSource.includes('uploadArquivosCotacaoPublica'),
+    'Tela publica deve permitir selecionar varios arquivos.'
+  );
+  assert(
+    internalPageSource.includes('multiple') &&
+      internalPageSource.includes('uploadArquivosRespostaInternaCotacao'),
+    'Edicao interna deve permitir selecionar varios arquivos.'
+  );
+}
+
 validarItensPorFornecedor();
 validarItensGlobaisLegados();
 validarFechamentoParcial();
@@ -440,5 +486,6 @@ validarCompatibilidadeDataChegadaLegada();
 validarDisponibilidadeHistoricaPorFornecedorItem();
 validarSnapshotCondicaoPagamentoPedido();
 validarPermissaoEBuscaFornecedores();
+validarMultiplosArquivosRespostaCotacao();
 
 console.log('Validacao do envio de cotacao concluida com sucesso.');
