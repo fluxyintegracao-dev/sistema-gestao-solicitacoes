@@ -54,6 +54,56 @@ function SummaryItem({ label, value, tone = 'default' }) {
   return <div className={`ao-summary-item tone-${tone}`}><span>{label}</span><strong>{Number(value || 0).toLocaleString('pt-BR')}</strong></div>;
 }
 
+function OperationalPanorama({ summary }) {
+  const modules = Array.isArray(summary.por_modulo) ? summary.por_modulo.slice(0, 6) : [];
+  const days = Array.isArray(summary.por_dia) ? summary.por_dia : [];
+  const maxModuleOperations = Math.max(1, ...modules.map((item) => Number(item.operacoes || 0)));
+  const maxDayOperations = Math.max(1, ...days.map((item) => Number(item.operacoes || 0)));
+
+  if (!modules.length && !days.length) return null;
+
+  return (
+    <section className="ao-panorama" aria-label="Distribuicao operacional do periodo">
+      <div className="ao-panorama-block">
+        <div className="ao-panorama-title">
+          <div><HiOutlineSquares2X2 /><strong>Operacoes por modulo</strong></div>
+          <span>ate 6 modulos com maior movimento</span>
+        </div>
+        <div className="ao-module-list">
+          {modules.map((item) => (
+            <div className="ao-distribution-row" key={item.modulo}>
+              <span className="ao-distribution-label">{item.modulo}</span>
+              <div className="ao-distribution-track" aria-hidden="true">
+                <span style={{ '--ao-progress': `${Math.max(3, (Number(item.operacoes || 0) / maxModuleOperations) * 100)}%` }} />
+              </div>
+              <strong>{Number(item.operacoes || 0).toLocaleString('pt-BR')}</strong>
+              {Number(item.falhas || 0) > 0 && <small>{item.falhas} falha(s)</small>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="ao-panorama-block">
+        <div className="ao-panorama-title">
+          <div><HiOutlineClock /><strong>Ritmo diario observado</strong></div>
+          <span>acoes registradas, sem estimar horas trabalhadas</span>
+        </div>
+        <div className="ao-day-list">
+          {days.map((item) => (
+            <div className="ao-day-column" key={item.data} title={`${item.operacoes} operacoes e ${item.usuarios} usuarios`}>
+              <div className="ao-day-track">
+                <span style={{ '--ao-day-progress': `${Math.max(4, (Number(item.operacoes || 0) / maxDayOperations) * 100)}%` }} />
+              </div>
+              <strong>{Number(item.operacoes || 0).toLocaleString('pt-BR')}</strong>
+              <span>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(new Date(`${item.data}T12:00:00`))}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function UserRow({ item, selected, onClick }) {
   return (
     <button type="button" className={`ao-user-row ${selected ? 'selected' : ''}`} onClick={onClick}>
@@ -184,6 +234,8 @@ export default function AuditoriaOperacional() {
         <SummaryItem label="Conclusoes" value={summary.conclusoes} tone="success" />
         <SummaryItem label="Falhas ou bloqueios" value={summary.falhas} tone={summary.falhas ? 'danger' : 'default'} />
       </div>
+
+      <OperationalPanorama summary={summary} />
 
       <div className={`ao-workspace ${!canUsers ? 'summary-only' : ''}`}>
         {canUsers && (

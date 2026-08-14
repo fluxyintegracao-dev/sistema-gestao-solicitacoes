@@ -43,6 +43,17 @@ SUPERADMIN e administradores de negocio continuam com o bypass administrativo ex
 
 A rota do frontend e `/governanca/auditoria-operacional`. O recorte padrao e o dia atual. Os filtros disponiveis sao periodo, usuario, setor, modulo, categoria, evento e resultado. O backend aceita no maximo 90 dias por consulta e a exportacao e limitada a 10.000 eventos por arquivo.
 
+A leitura do recorte tambem apresenta:
+
+- distribuicao das operacoes pelos modulos mais movimentados;
+- ritmo diario de operacoes e usuarios observados no periodo;
+- comparativo de acessos e operacoes por usuario;
+- falhas e bloqueios destacados para investigacao.
+
+O ritmo diario representa somente eventos registrados. Ele nao calcula jornada, tempo produtivo ou qualidade do trabalho.
+
+Ao navegar entre registros numericos diferentes de uma mesma pagina, cada acesso e registrado separadamente com o identificador tecnico do recurso. Tokens publicos e outros identificadores potencialmente sensiveis nao sao armazenados como recurso de navegacao.
+
 ## APIs
 
 - `POST /api/governanca/auditoria-operacional/navegacao` registra uma navegacao autenticada;
@@ -78,6 +89,8 @@ Nao foi criado job automatico de exclusao: a retencao deve ser aprovada antes de
 | Cenario | Resultado esperado |
 | --- | --- |
 | Usuario abre duas paginas autenticadas | Duas navegacoes aparecem com usuario, modulo e horario |
+| Usuario abre dois registros na mesma pagina | Os dois acessos aparecem com seus respectivos IDs tecnicos |
+| URL contem token publico | O token nao e armazenado como identificador do recurso |
 | Usuario cria ou altera um registro | Operacao aparece com tipo, rota normalizada, recurso e sucesso |
 | API rejeita acao por permissao | Evento aparece como bloqueado, sem conteudo da requisicao |
 | Usuario sem permissao abre URL diretamente | Rota protegida impede o acesso |

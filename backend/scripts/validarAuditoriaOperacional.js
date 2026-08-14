@@ -8,6 +8,7 @@ const {
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeResourceId,
   normalizeRoute,
   sanitizeMetadata
 } = require('../src/modules/governanca/services/auditoriaOperacionalService');
@@ -67,6 +68,21 @@ function validatePeriodGuard() {
   );
 }
 
+function validateNavigationResourcePrivacy() {
+  assert.strictEqual(normalizeResourceId('3862'), '3862');
+  assert.strictEqual(normalizeResourceId('cotacao-token-secreto'), null);
+  assert.strictEqual(normalizeResourceId('1234567890123456789'), null);
+
+  const trackerSource = fs.readFileSync(
+    path.resolve(__dirname, '../../frontend/src/modules/governanca/components/OperationalAuditTracker.jsx'),
+    'utf8'
+  );
+  assert(
+    trackerSource.includes('lastPath.current === rawPath'),
+    'A navegacao entre registros diferentes da mesma rota normalizada precisa ser auditada.'
+  );
+}
+
 function validateCorsAuditHeader() {
   const appSource = fs.readFileSync(path.resolve(__dirname, '../src/app.js'), 'utf8');
   assert(
@@ -80,6 +96,7 @@ function run() {
   validateClassification();
   validatePrivacySanitization();
   validatePeriodGuard();
+  validateNavigationResourcePrivacy();
   validateCorsAuditHeader();
   console.log('Auditoria operacional validada com sucesso.');
 }

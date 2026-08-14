@@ -17,6 +17,11 @@ function clampText(value, maxLength) {
   return normalized ? normalized.slice(0, maxLength) : null;
 }
 
+function normalizeResourceId(value) {
+  const normalized = String(value || '');
+  return /^\d{1,18}$/.test(normalized) ? normalized : null;
+}
+
 function sanitizeMetadata(value, depth = 0) {
   if (depth > 2 || value == null) return null;
   if (Array.isArray(value)) return value.slice(0, 10).map((item) => sanitizeMetadata(item, depth + 1));
@@ -174,6 +179,7 @@ function recordHttpEvent(req, statusCode) {
 async function recordNavigation(req, body = {}) {
   const normalized = normalizeRoute(body.rota || '/');
   const moduleName = clampText(body.modulo, 80) || inferModule(normalized);
+  const resourceId = normalizeResourceId(body.recurso_id);
   return recordEvent({
     evento_uuid: body.evento_uuid,
     usuario_id: req.user?.id,
@@ -185,6 +191,8 @@ async function recordNavigation(req, body = {}) {
     modulo: moduleName,
     pagina_chave: clampText(body.pagina_chave, 120) || normalized,
     rota_padrao: normalized,
+    recurso_tipo: resourceId ? clampText(body.recurso_tipo, 120) : null,
+    recurso_id: resourceId,
     resumo: clampText(body.resumo, 500) || eventSummary('PAGE_VIEW', moduleName, 'SUCCESS'),
     resultado: 'SUCCESS',
     origem: 'FRONTEND',
@@ -234,7 +242,10 @@ function buildWhere(filters) {
 async function getSummary(query) {
   const filters = normalizeFilters(query);
   const where = buildWhere(filters);
-  const [total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes] = await Promise.all([
+  const [
+    total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes,
+    modules, days
+  ] = await Promise.all([
     GovernancaEventoOperacional.count({ where }),
     GovernancaEventoOperacional.count({ where, distinct: true, col: 'usuario_id' }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'PAGE_VIEW' } }),
@@ -242,9 +253,47 @@ async function getSummary(query) {
     GovernancaEventoOperacional.count({ where: { ...where, resultado: { [Op.ne]: 'SUCCESS' } } }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'CREATE' } }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'UPDATE' } }),
-    GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: { [Op.in]: ['CLOSE', 'APPROVE', 'RECONCILE'] } } })
+    GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: { [Op.in]: ['CLOSE', 'APPROVE', 'RECONCILE'] } } }),
+    GovernancaEventoOperacional.findAll({
+      where,
+      attributes: [
+        'modulo',
+        [fn('COUNT', col('id')), 'eventos'],
+        [literal("SUM(CASE WHEN categoria = 'OPERACAO' THEN 1 ELSE 0 END)"), 'operacoes'],
+        [literal("SUM(CASE WHEN resultado <> 'SUCCESS' THEN 1 ELSE 0 END)"), 'falhas']
+      ],
+      group: ['modulo'],
+      order: [[literal('eventos'), 'DESC']],
+      raw: true
+    }),
+    GovernancaEventoOperacional.findAll({
+      where,
+      attributes: [
+        [fn('DATE', col('ocorrido_em')), 'data'],
+        [fn('COUNT', col('id')), 'eventos'],
+        [literal("SUM(CASE WHEN categoria = 'OPERACAO' THEN 1 ELSE 0 END)"), 'operacoes'],
+        [literal("COUNT(DISTINCT usuario_id)"), 'usuarios']
+      ],
+      group: [fn('DATE', col('ocorrido_em'))],
+      order: [[fn('DATE', col('ocorrido_em')), 'ASC']],
+      raw: true
+    })
   ]);
-  return { total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes };
+  return {
+    total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes,
+    por_modulo: modules.map((item) => ({
+      modulo: item.modulo,
+      eventos: Number(item.eventos || 0),
+      operacoes: Number(item.operacoes || 0),
+      falhas: Number(item.falhas || 0)
+    })),
+    por_dia: days.map((item) => ({
+      data: item.data,
+      eventos: Number(item.eventos || 0),
+      operacoes: Number(item.operacoes || 0),
+      usuarios: Number(item.usuarios || 0)
+    }))
+  };
 }
 
 async function getUsers(query) {
@@ -342,6 +391,7 @@ module.exports = {
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeResourceId,
   normalizeRoute,
   recordEvent,
   recordHttpEvent,
