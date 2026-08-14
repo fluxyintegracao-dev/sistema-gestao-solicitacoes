@@ -108,6 +108,49 @@ function getNomeTipoArquivoResposta(tipo = 'ARQUIVO') {
   return 'arquivo';
 }
 
+function normalizarArquivosResposta(value) {
+  if (Array.isArray(value)) return value.filter((item) => item && item.url);
+  if (!value) return [];
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed.filter((item) => item && item.url) : [];
+  } catch {
+    return [];
+  }
+}
+
+function obterArquivosUpload(req) {
+  const files = req.files;
+  if (Array.isArray(files)) return files;
+  if (files && typeof files === 'object') {
+    return [...(files.files || []), ...(files.file || [])];
+  }
+  return req.file ? [req.file] : [];
+}
+
+function validarArquivosRespostaCotacao(files) {
+  if (!files.length) {
+    const error = new Error('Nenhum arquivo enviado.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (files.length > 10) {
+    const error = new Error('Envie no maximo 10 arquivos por vez.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const extensoesPermitidas = new Set(['.pdf', '.png', '.jpg', '.jpeg']);
+  for (const file of files) {
+    const extension = path.extname(String(file.originalname || '')).toLowerCase();
+    if (!extensoesPermitidas.has(extension)) {
+      const error = new Error(`Formato invalido em ${file.originalname || 'um dos arquivos'}. Envie PDF, PNG, JPG ou JPEG.`);
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+}
+
 async function identificarUsuarioInternoOpcional(req) {
   try {
     const authHeader = String(req.headers?.authorization || '').trim();
@@ -390,9 +433,34 @@ async function carregarCotacaoPorToken(token) {
 async function serializarCotacaoPublica(cotacaoFornecedor, req) {
   const itensCotaveis = obterItensCotaveisDaCotacao(cotacaoFornecedor);
   const configuracoes = await obterConfiguracaoPublicaCotacao();
-  const arquivoRespostaUrl = await resolvePublicAttachmentUrl(req, cotacaoFornecedor?.pdf_resposta_url);
-  const arquivoRespostaExtension = path.extname(String(cotacaoFornecedor?.pdf_resposta_url || '').split('?')[0]).toLowerCase();
-  const arquivoRespostaTipo = arquivoRespostaUrl ? getTipoArquivoResposta(arquivoRespostaExtension) : null;
+  const arquivosPersistidos = normalizarArquivosResposta(cotacaoFornecedor?.arquivos_resposta);
+  if (!arquivosPersistidos.length && cotacaoFornecedor?.pdf_resposta_url) {
+    const extensionLegada = path.extname(String(cotacaoFornecedor.pdf_resposta_url).split('?')[0]).toLowerCase();
+    arquivosPersistidos.push({
+      url: cotacaoFornecedor.pdf_resposta_url,
+      nome_original: path.basename(String(cotacaoFornecedor.pdf_resposta_url).split('?')[0]) || 'Arquivo anexado',
+      tipo: getTipoArquivoResposta(extensionLegada),
+      origem: 'LEGADO'
+    });
+  }
+  const arquivosResposta = (await Promise.all(arquivosPersistidos.map(async (arquivo, index) => {
+    const url = await resolvePublicAttachmentUrl(req, arquivo.url);
+    if (!url) return null;
+    const extension = path.extname(String(arquivo.nome_original || arquivo.url || '').split('?')[0]).toLowerCase();
+    const tipo = arquivo.tipo || getTipoArquivoResposta(extension);
+    return {
+      chave: arquivo.chave || `${arquivo.criado_em || 'legado'}-${index}`,
+      url,
+      nome_original: arquivo.nome_original || `Arquivo ${index + 1}`,
+      tipo,
+      is_image: tipo === 'IMAGEM',
+      mime: arquivo.mime || null,
+      tamanho: Number(arquivo.tamanho || 0) || null,
+      origem: arquivo.origem || null,
+      criado_em: arquivo.criado_em || null
+    };
+  }))).filter(Boolean);
+  const arquivoRespostaPrincipal = arquivosResposta[arquivosResposta.length - 1] || null;
   const respostasPorItem = new Map(
     (cotacaoFornecedor?.respostas || []).map((resposta) => {
       const itemReferenciaId =
@@ -431,10 +499,11 @@ async function serializarCotacaoPublica(cotacaoFornecedor, req) {
       frete_transportador_cpf_cnpj: cotacaoFornecedor?.frete_transportador_cpf_cnpj || '',
       condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
       observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
-      pdf_resposta_url: arquivoRespostaUrl || null,
-      arquivo_resposta_url: arquivoRespostaUrl || null,
-      arquivo_resposta_tipo: arquivoRespostaTipo,
-      arquivo_resposta_is_image: Boolean(arquivoRespostaUrl && arquivoRespostaTipo === 'IMAGEM')
+      arquivos_resposta: arquivosResposta,
+      pdf_resposta_url: arquivoRespostaPrincipal?.url || null,
+      arquivo_resposta_url: arquivoRespostaPrincipal?.url || null,
+      arquivo_resposta_tipo: arquivoRespostaPrincipal?.tipo || null,
+      arquivo_resposta_is_image: Boolean(arquivoRespostaPrincipal?.is_image)
     },
     configuracoes,
     somente_leitura: somenteLeitura,
@@ -765,31 +834,55 @@ async function salvarRespostasCotacao(cotacaoFornecedor, itensResposta, options 
   }
 }
 
-async function registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo = 'ARQUIVO', options = {}) {
-  const url = await uploadToS3(req.file, `cotacoes-respostas/${String(tipoArquivo || 'arquivo').toLowerCase()}`);
+async function registrarArquivosRespostaCotacao(cotacaoFornecedor, files, options = {}) {
+  const arquivosAtuais = normalizarArquivosResposta(cotacaoFornecedor.arquivos_resposta);
+  const usuarioInterno = options.usuario_interno || null;
+  const novosArquivos = [];
+
+  for (const file of files) {
+    const extension = path.extname(String(file.originalname || '')).toLowerCase();
+    const tipoArquivo = getTipoArquivoResposta(extension);
+    const url = await uploadToS3(file, `cotacoes-respostas/${String(tipoArquivo).toLowerCase()}`);
+    const arquivo = {
+      chave: `${Date.now()}-${novosArquivos.length + 1}`,
+      url,
+      nome_original: file.originalname || `Arquivo ${arquivosAtuais.length + novosArquivos.length + 1}`,
+      tipo: tipoArquivo,
+      mime: file.mimetype || null,
+      tamanho: Number(file.size || 0) || null,
+      origem: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
+      usuario_interno_id: usuarioInterno?.id || null,
+      criado_em: new Date().toISOString()
+    };
+    novosArquivos.push(arquivo);
+
+    await registrarLogSolicitacaoCompra({
+      solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
+      usuarioId: usuarioInterno?.id || null,
+      fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
+      tipoAcao: usuarioInterno ? 'ANEXO_RESPOSTA_INTERNA' : 'ANEXO_RESPOSTA_FORNECEDOR',
+      descricao: usuarioInterno
+        ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} anexou ${getNomeTipoArquivoResposta(tipoArquivo)} para o fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
+        : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} anexou ${getNomeTipoArquivoResposta(tipoArquivo)} na cotacao`,
+      metadados: {
+        cotacao_fornecedor_id: cotacaoFornecedor.id,
+        tipo: tipoArquivo,
+        arquivo_nome: file.originalname || null,
+        arquivo_tamanho: Number(file.size || 0) || null,
+        origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
+        usuario_interno_id: usuarioInterno?.id || null,
+        usuario_interno_nome: usuarioInterno?.nome || null
+      }
+    });
+  }
+
+  const ultimoArquivo = novosArquivos[novosArquivos.length - 1];
   await cotacaoFornecedor.update({
     visualizado_em: cotacaoFornecedor.visualizado_em || new Date(),
-    pdf_resposta_url: url
+    arquivos_resposta: [...arquivosAtuais, ...novosArquivos],
+    pdf_resposta_url: ultimoArquivo?.url || cotacaoFornecedor.pdf_resposta_url
   });
-  const usuarioInterno = options.usuario_interno || null;
-  await registrarLogSolicitacaoCompra({
-    solicitacaoCompraId: cotacaoFornecedor.solicitacao.id,
-    usuarioId: usuarioInterno?.id || null,
-    fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-    tipoAcao: usuarioInterno ? 'ANEXO_RESPOSTA_INTERNA' : 'ANEXO_RESPOSTA_FORNECEDOR',
-    descricao: usuarioInterno
-      ? `Usuario interno ${usuarioInterno.nome || usuarioInterno.id} anexou ${getNomeTipoArquivoResposta(tipoArquivo)} para o fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id}`
-      : `Fornecedor ${cotacaoFornecedor.fornecedor?.nome || cotacaoFornecedor.fornecedor_compra_id} anexou ${getNomeTipoArquivoResposta(tipoArquivo)} na cotacao`,
-    metadados: {
-      cotacao_fornecedor_id: cotacaoFornecedor.id,
-      tipo: tipoArquivo,
-      arquivo_nome: req.file?.originalname || null,
-      origem_resposta: usuarioInterno ? 'INTERNA' : 'FORNECEDOR',
-      usuario_interno_id: usuarioInterno?.id || null,
-      usuario_interno_nome: usuarioInterno?.nome || null
-    }
-  });
-  return url;
+  return novosArquivos;
 }
 
 function pdfText(value, fallback = '-') {
@@ -1436,6 +1529,42 @@ module.exports = {
     }
   },
 
+  async uploadInterno(req, res) {
+    try {
+      const cotacaoBase = await SolicitacaoCompraFornecedor.findByPk(req.params.cotacaoId, {
+        attributes: ['id', 'token', 'solicitacao_compra_id']
+      });
+      if (!cotacaoBase || Number(cotacaoBase.solicitacao_compra_id) !== Number(req.params.id)) {
+        return res.status(404).json({ error: 'Cotacao nao encontrada para esta solicitacao de compra.' });
+      }
+
+      const cotacaoFornecedor = await carregarCotacaoPorToken(cotacaoBase.token);
+      if (!cotacaoFornecedor) {
+        return res.status(404).json({ error: 'Cotacao nao encontrada.' });
+      }
+
+      const solicitacaoEncerrada = normalizeText(cotacaoFornecedor.solicitacao?.status) === 'ENCERRADO';
+      if (!solicitacaoEncerrada) {
+        assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'anexar resposta');
+      }
+      assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'anexar resposta');
+
+      const files = obterArquivosUpload(req);
+      validarArquivosRespostaCotacao(files);
+      await registrarArquivosRespostaCotacao(cotacaoFornecedor, files, {
+        usuario_interno: req.user
+      });
+
+      const atualizada = await carregarCotacaoPorToken(cotacaoBase.token);
+      return res.status(201).json(await serializarCotacaoPublica(atualizada, req));
+    } catch (error) {
+      console.error(error);
+      return responderErroController(res, error, 'Erro ao anexar arquivos na resposta da cotacao', {
+        status: 400
+      });
+    }
+  },
+
   async reabrir(req, res) {
     const transaction = await sequelize.transaction();
     try {
@@ -1515,17 +1644,8 @@ module.exports = {
         return res.status(400).json({ error: 'Informe o token da cotacao' });
       }
 
-      if (!req.file) {
-        return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-      }
-
-      const extension = path.extname(String(req.file.originalname || '')).toLowerCase();
-      const extensoesPermitidas = ['.pdf', '.png', '.jpg', '.jpeg'];
-      if (extension && !extensoesPermitidas.includes(extension)) {
-        return res.status(400).json({
-          error: 'Formato invalido. Envie um arquivo PDF ou imagem.'
-        });
-      }
+      const files = obterArquivosUpload(req);
+      validarArquivosRespostaCotacao(files);
 
       const cotacaoFornecedor = await carregarCotacaoPorToken(token);
       if (!cotacaoFornecedor) {
@@ -1535,9 +1655,8 @@ module.exports = {
       assertSolicitacaoCompraAceitaCotacao(cotacaoFornecedor.solicitacao, 'anexar resposta');
       assertCotacaoFornecedorAtiva(cotacaoFornecedor, 'anexar resposta');
 
-      const tipoArquivo = getTipoArquivoResposta(extension);
       const usuarioInterno = await identificarUsuarioInternoOpcional(req);
-      await registrarRespostaArquivoCotacao(cotacaoFornecedor, req, tipoArquivo, {
+      await registrarArquivosRespostaCotacao(cotacaoFornecedor, files, {
         usuario_interno: usuarioInterno
       });
       const atualizada = await carregarCotacaoPorToken(token);

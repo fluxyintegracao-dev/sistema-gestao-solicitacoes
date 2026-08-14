@@ -433,6 +433,20 @@ export async function salvarRespostaInternaCotacao(solicitacaoId, cotacaoId, dat
   return handleJsonResponse(response, 'Erro ao editar resposta da cotacao');
 }
 
+export async function uploadArquivosRespostaInternaCotacao(solicitacaoId, cotacaoId, files) {
+  const formData = new FormData();
+  Array.from(files || []).forEach((file) => formData.append('files', file));
+  const response = await fetch(
+    `${API_URL}/compras/solicitacoes/${solicitacaoId}/cotacoes/${cotacaoId}/arquivos-resposta`,
+    {
+      method: 'POST',
+      headers: authHeaders(),
+      body: formData
+    }
+  );
+  return handleJsonResponse(response, 'Erro ao anexar arquivos na resposta da cotacao');
+}
+
 export async function obterComparativoSolicitacaoCompra(id) {
   const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/comparativo`, {
     headers: authHeaders()
@@ -877,16 +891,20 @@ export async function reabrirCotacaoCompra(id, data = {}) {
   return handleJsonResponse(response, 'Erro ao reabrir cotacao');
 }
 
-export async function uploadPlanilhaCotacaoPublica(token, file, data = {}) {
+export async function uploadArquivosCotacaoPublica(token, files) {
   const formData = new FormData();
   formData.append('token', token);
-  formData.append('file', file);
+  Array.from(files || []).forEach((file) => formData.append('files', file));
 
   const response = await fetch(`${API_URL}/cotacoes/upload`, {
     method: 'POST',
     body: formData
   });
   return handleJsonResponse(response, 'Erro ao enviar arquivo da cotacao');
+}
+
+export async function uploadPlanilhaCotacaoPublica(token, file) {
+  return uploadArquivosCotacaoPublica(token, file ? [file] : []);
 }
 
 export function obterUrlPdfCotacaoPublica(token) {
