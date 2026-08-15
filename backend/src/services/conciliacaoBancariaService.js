@@ -705,6 +705,15 @@ async function importSingleOfxFile(req, file, payload = {}) {
     throw createHttpError(409, 'Todos os lancamentos deste arquivo ja foram importados anteriormente.');
   }
 
+  for (const conciliacao of imported) {
+    try {
+      await registrarClassificacaoInicialMatch(req, conciliacao);
+    } catch (error) {
+      // A classificacao e analitica e nao pode invalidar uma importacao OFX valida.
+      console.error(`Falha ao classificar match inicial da conciliacao #${conciliacao.id}:`, error.message);
+    }
+  }
+
   const importacao = await ConciliacaoBancariaImportacao.create({
     conta_bancaria_id: contaFinalId,
     empresa_id: empresaContaId,
@@ -1135,6 +1144,33 @@ async function analyzeSuggestions(req, conciliacao, options = {}) {
     associacao_manual_recomendada: associacaoManualRecomendada,
     conciliacao_em_lote_disponivel: Boolean(sugestaoAutomatica)
   };
+}
+
+async function registrarClassificacaoInicialMatch(req, conciliacao) {
+  const analise = await analyzeSuggestions(req, conciliacao, { maxSuggestions: 20 });
+  const tipo = analise.sugestao_automatica
+    ? 'AUTO_UNICO'
+    : analise.total_candidatos > 1
+      ? 'AMBIGUO'
+      : 'SEM_MATCH';
+
+  await conciliacao.update({
+    match_inicial_tipo: tipo,
+    match_inicial_candidatos: Number(analise.total_candidatos || 0),
+    match_inicial_movimento_id: analise.sugestao_automatica?.movimento_financeiro_id || null,
+    match_inicial_avaliado_em: new Date()
+  });
+
+  return tipo;
+}
+
+function inferirResolucaoConciliacao(conciliacao, movimentoId, { batch = false } = {}) {
+  if (batch) return 'AUTO_LOTE';
+  if (
+    String(conciliacao?.match_inicial_tipo || '').toUpperCase() === 'AUTO_UNICO'
+    && Number(conciliacao?.match_inicial_movimento_id || 0) === Number(movimentoId || 0)
+  ) return 'AUTO_CONFIRMADO';
+  return 'MANUAL_EXISTENTE';
 }
 
 function isConciliacaoLivreParaTransferencia(conciliacao) {
@@ -2691,7 +2727,8 @@ async function finalizarConciliacao(req, conciliacao, movimento, { batch = false
     titulo_financeiro_id: movimento.titulo?.id || null,
     status: 'CONCILIADO',
     confirmado_por: req.user?.id || null,
-    confirmado_em: new Date()
+    confirmado_em: new Date(),
+    resolucao_tipo: inferirResolucaoConciliacao(conciliacao, movimento.id, { batch })
   });
 
   await registrarEventoSeguranca({
@@ -2762,7 +2799,8 @@ async function confirmarConciliacao(req, conciliacaoId, payload = {}) {
     titulo_financeiro_id: movimentoPrincipal.titulo?.id || null,
     status: 'CONCILIADO',
     confirmado_por: req.user?.id || null,
-    confirmado_em: new Date()
+    confirmado_em: new Date(),
+    resolucao_tipo: inferirResolucaoConciliacao(conciliacao, movimentoPrincipal.id)
   });
 
   await registrarEventoSeguranca({
@@ -2838,7 +2876,8 @@ async function criarTituloEConciliar(req, conciliacaoId, payload = {}) {
       titulo_financeiro_id: titulo.id,
       status: 'CONCILIADO',
       confirmado_por: req.user?.id || null,
-      confirmado_em: new Date()
+      confirmado_em: new Date(),
+      resolucao_tipo: 'TITULO_CRIADO'
     }, { transaction });
 
     await transaction.commit();

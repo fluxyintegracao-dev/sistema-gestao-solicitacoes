@@ -58,6 +58,23 @@ A leitura do recorte tambem apresenta:
 - comparativo de acessos e operacoes por usuario;
 - falhas e bloqueios destacados para investigacao.
 
+### Produtividade financeira
+
+A mesma tela possui um bloco analitico financeiro nos niveis **geral**, **por setor** e **por usuario**. Cada indicador apresenta o valor do periodo filtrado e o acumulado historico:
+
+- titulos financeiros cadastrados;
+- titulos distintos baixados e quantidade de operacoes de baixa;
+- lancamentos importados por OFX;
+- lancamentos que, no instante da importacao, possuíam um unico match exato de data e valor;
+- lancamentos ambiguos, com mais de um titulo compativel;
+- lancamentos sem match;
+- conciliacoes confirmadas;
+- intervencoes em que o usuario precisou criar um titulo durante a conciliacao.
+
+Titulos e baixas usam os registros financeiros existentes e, por isso, possuem acumulado anterior a esta funcionalidade. A fotografia da qualidade do match OFX passa a ser persistida apenas a partir da migration `202608140002_conciliacao_match_auditoria.js`; conciliacoes anteriores permanecem explicitamente sem classificacao e nao sao inferidas artificialmente.
+
+O responsavel pela importacao recebe a atribuicao dos indicadores de qualidade do arquivo OFX. O responsavel pela confirmacao recebe a atribuicao da conciliacao e de eventual titulo criado nesse fluxo. O agrupamento por setor usa o setor atual do usuario, porque o cadastro historico de lotacao nao existe no runtime atual.
+
 O ritmo diario representa somente eventos registrados. Ele nao calcula jornada, tempo produtivo ou qualidade do trabalho.
 
 A linha do tempo agrupa eventos consecutivos pela sessao observada no navegador. A interface recebe apenas uma referencia abreviada gerada por hash; o identificador bruto da sessao continua oculto. O contador por usuario representa sessoes com eventos registrados e nao equivale a login, jornada, permanencia ou horas trabalhadas.
@@ -74,6 +91,8 @@ Mudancas de status exibem o status de destino, envios exibem o setor de destino 
 
 - `POST /api/governanca/auditoria-operacional/navegacao` registra uma navegacao autenticada;
 - `GET /api/governanca/auditoria-operacional/resumo` retorna indicadores agregados;
+- `GET /api/governanca/auditoria-operacional/indicadores-financeiros` retorna produtividade financeira geral, por setor e por usuario;
+- a visao individual e o filtro por usuario exigem `governanca.operacional.visualizar_usuarios`; sem essa permissao, a API retorna somente o consolidado geral e por setor;
 - `GET /api/governanca/auditoria-operacional/usuarios` agrega por usuario;
 - `GET /api/governanca/auditoria-operacional/opcoes` fornece opcoes dos filtros;
 - `GET /api/governanca/auditoria-operacional/eventos` retorna a linha do tempo paginada;
@@ -134,6 +153,11 @@ Os indices cobrem data, usuario, setor, modulo, tipo, recurso e resultado. O lim
 | Evento possui recurso reconhecido | **Abrir registro** leva ao modulo de origem, que reaplica suas permissoes |
 | Evento nao possui recurso inequivoco | Nenhum link contextual e exibido |
 | Usuario possui eventos em duas sessoes | Linha do tempo separa as sessoes por referencias protegidas, sem exibir o identificador bruto |
+| Usuario cadastra titulos e registra baixas | Indicadores do periodo e acumulados sao atualizados para o usuario e seu setor atual |
+| OFX encontra exatamente um titulo por data e valor | Lancamento e classificado como match automatico unico na importacao |
+| OFX encontra mais de um titulo compativel | Lancamento e classificado como ambiguo, sem escolher automaticamente um titulo |
+| OFX nao encontra titulo compativel | Lancamento e classificado como sem match |
+| Usuario cria titulo durante a conciliacao | Confirmacao e contabilizada como intervencao com titulo criado |
 | Exportacao sem permissao | API retorna acesso negado |
 | Filtro acima de 90 dias | API rejeita o periodo |
 | Formulario contem dado sensivel | Auditoria nao armazena o corpo nem o dado sensivel |

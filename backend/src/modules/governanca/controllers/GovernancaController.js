@@ -4,6 +4,7 @@ const metricsService = require('../services/governancaMetricsService');
 const { buildExport } = require('../services/governancaExportService');
 const { logAccess } = require('../services/governancaAccessLogService');
 const operationalAudit = require('../services/auditoriaOperacionalService');
+const operationalFinancialAudit = require('../services/auditoriaOperacionalFinanceiraService');
 const { canViewOperationalAuditUsers } = require('../../../services/authorizationService');
 
 async function dashboard(req, res, next) {
@@ -120,6 +121,18 @@ async function auditoriaOperacionalUsuarios(req, res, next) {
   } catch (error) { next(error); }
 }
 
+async function auditoriaOperacionalIndicadoresFinanceiros(req, res, next) {
+  try {
+    const podeVisualizarUsuarios = await canViewOperationalAuditUsers(req.user);
+    const query = podeVisualizarUsuarios
+      ? req.query
+      : { ...req.query, usuario_id: undefined };
+    const indicadores = await operationalFinancialAudit.getFinancialIndicators(query);
+    if (!podeVisualizarUsuarios) indicadores.por_usuario = [];
+    res.json(indicadores);
+  } catch (error) { next(error); }
+}
+
 async function auditoriaOperacionalEventos(req, res, next) {
   try {
     res.json(await operationalAudit.getEvents(req.query));
@@ -155,6 +168,7 @@ module.exports = {
   auditoria,
   auditoriaOperacionalEventos,
   auditoriaOperacionalExportar,
+  auditoriaOperacionalIndicadoresFinanceiros,
   auditoriaOperacionalNavegacao,
   auditoriaOperacionalOpcoes,
   auditoriaOperacionalResumo,

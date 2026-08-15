@@ -215,6 +215,53 @@ function validatePermissionMatrixAndIndexes() {
     .forEach((indexName) => assert(migrationSource.includes(indexName), `Indice ausente: ${indexName}`));
 }
 
+function validateFinancialOperationalIndicators() {
+  const serviceSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/modules/governanca/services/auditoriaOperacionalFinanceiraService.js'),
+    'utf8'
+  );
+  const conciliationSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/services/conciliacaoBancariaService.js'),
+    'utf8'
+  );
+  const migrationSource = fs.readFileSync(
+    path.resolve(__dirname, '../migrations/202608140002_conciliacao_match_auditoria.js'),
+    'utf8'
+  );
+  const routeSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/modules/governanca/routes/index.js'),
+    'utf8'
+  );
+  const controllerSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/modules/governanca/controllers/GovernancaController.js'),
+    'utf8'
+  );
+  const pageSource = fs.readFileSync(
+    path.resolve(__dirname, '../../frontend/src/modules/governanca/pages/AuditoriaOperacional.jsx'),
+    'utf8'
+  );
+
+  [
+    'titulos_criados',
+    'titulos_baixados',
+    'baixas_registradas',
+    'matches_automaticos',
+    'matches_ambiguos',
+    'sem_match',
+    'titulos_criados_via_conciliacao'
+  ].forEach((metric) => assert(serviceSource.includes(metric), `Indicador financeiro ausente: ${metric}`));
+  assert(serviceSource.includes("ofx_uid: { [Op.ne]: null }"), 'A qualidade de match deve considerar somente lancamentos OFX.');
+  assert(conciliationSource.includes('registrarClassificacaoInicialMatch'), 'A classificacao do match deve ocorrer na importacao OFX.');
+  assert(conciliationSource.includes("resolucao_tipo: 'TITULO_CRIADO'"), 'A intervencao com criacao de titulo deve ser identificada.');
+  ['match_inicial_tipo', 'match_inicial_candidatos', 'match_inicial_movimento_id', 'resolucao_tipo']
+    .forEach((field) => assert(migrationSource.includes(field), `Campo historico ausente: ${field}`));
+  assert(routeSource.includes('/auditoria-operacional/indicadores-financeiros'), 'Endpoint dos indicadores financeiros ausente.');
+  assert(pageSource.includes('Por setor') && pageSource.includes('Por usuario'), 'A interface deve oferecer os tres niveis de consolidacao.');
+  assert(controllerSource.includes('indicadores.por_usuario = []'), 'O backend deve ocultar indicadores por usuario sem permissao granular.');
+  assert(controllerSource.includes('usuario_id: undefined'), 'O backend deve ignorar filtro de usuario sem permissao granular.');
+  assert(pageSource.includes("canUsers ? ['GERAL', 'SETORES', 'USUARIOS']"), 'A interface deve ocultar a visao por usuario sem permissao granular.');
+}
+
 function run() {
   validateRouteNormalization();
   validateSafeFieldNames();
@@ -228,6 +275,7 @@ function run() {
   validateContextualInvestigation();
   validateRetentionPolicy();
   validatePermissionMatrixAndIndexes();
+  validateFinancialOperationalIndicators();
   console.log('Auditoria operacional validada com sucesso.');
 }
 

@@ -24,6 +24,7 @@ import {
 import {
   downloadAuditoriaOperacional,
   getAuditoriaOperacionalEventos,
+  getAuditoriaOperacionalIndicadoresFinanceiros,
   getAuditoriaOperacionalOpcoes,
   getAuditoriaOperacionalResumo,
   getAuditoriaOperacionalUsuarios
@@ -102,6 +103,87 @@ function OperationalPanorama({ summary }) {
             </div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+const FINANCIAL_METRICS = [
+  ['titulos_criados', 'Titulos cadastrados'],
+  ['titulos_baixados', 'Titulos baixados'],
+  ['baixas_registradas', 'Operacoes de baixa'],
+  ['ofx_lancamentos_importados', 'Lancamentos OFX importados'],
+  ['matches_automaticos', 'Match automatico unico'],
+  ['matches_ambiguos', 'Mais de um match'],
+  ['sem_match', 'Sem match na importacao'],
+  ['titulos_criados_via_conciliacao', 'Titulo criado pela conciliacao'],
+  ['conciliacoes_confirmadas', 'Conciliacoes confirmadas']
+];
+
+function FinancialIndicators({ data, canUsers }) {
+  const [view, setView] = useState('GERAL');
+  const rows = view === 'USUARIOS' ? data?.por_usuario : data?.por_setor;
+  const availableViews = canUsers ? ['GERAL', 'SETORES', 'USUARIOS'] : ['GERAL', 'SETORES'];
+  const periodLabel = data?.periodo?.inicio
+    ? `${new Intl.DateTimeFormat('pt-BR').format(new Date(data.periodo.inicio))} a ${new Intl.DateTimeFormat('pt-BR').format(new Date(data.periodo.fim))}`
+    : 'periodo selecionado';
+
+  return (
+    <section className="ao-financial" aria-label="Indicadores financeiros operacionais">
+      <div className="ao-financial-heading">
+        <div>
+          <span>PRODUTIVIDADE FINANCEIRA</span>
+          <strong>Titulos, baixas e qualidade do match OFX</strong>
+          <small>{periodLabel}</small>
+        </div>
+        <div className="ao-view-switch" role="tablist" aria-label="Agrupamento dos indicadores">
+          {availableViews.map((item) => (
+            <button type="button" role="tab" aria-selected={view === item} className={view === item ? 'active' : ''} key={item} onClick={() => setView(item)}>
+              {item === 'GERAL' ? 'Geral' : item === 'SETORES' ? 'Por setor' : 'Por usuario'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === 'GERAL' ? (
+        <div className="ao-financial-grid">
+          {FINANCIAL_METRICS.map(([key, label]) => (
+            <div className="ao-financial-metric" key={key}>
+              <span>{label}</span>
+              <strong>{Number(data?.geral?.periodo?.[key] || 0).toLocaleString('pt-BR')}</strong>
+              <small>Acumulado: {Number(data?.geral?.acumulado?.[key] || 0).toLocaleString('pt-BR')}</small>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ao-financial-table-wrap">
+          <table className="ao-financial-table">
+            <thead><tr>
+              <th>{view === 'USUARIOS' ? 'Usuario / setor' : 'Setor'}</th>
+              <th>Titulos cadastrados</th><th>Titulos baixados</th><th>Baixas</th>
+              <th>Match automatico</th><th>Sem match</th><th>Mais de um match</th><th>Titulo criado na conciliacao</th>
+            </tr></thead>
+            <tbody>
+              {(rows || []).map((item) => (
+                <tr key={view === 'USUARIOS' ? item.usuario.id : item.setor.id || 'sem-setor'}>
+                  <td><strong>{view === 'USUARIOS' ? item.usuario.nome : item.setor.nome}</strong>{view === 'USUARIOS' && <small>{item.setor?.nome || 'Sem setor atual'}</small>}</td>
+                  <td>{item.periodo.titulos_criados}<small>Total {item.acumulado.titulos_criados}</small></td>
+                  <td>{item.periodo.titulos_baixados}<small>Total {item.acumulado.titulos_baixados}</small></td>
+                  <td>{item.periodo.baixas_registradas}<small>Total {item.acumulado.baixas_registradas}</small></td>
+                  <td>{item.periodo.matches_automaticos}<small>Total {item.acumulado.matches_automaticos}</small></td>
+                  <td>{item.periodo.sem_match}<small>Total {item.acumulado.sem_match}</small></td>
+                  <td>{item.periodo.matches_ambiguos}<small>Total {item.acumulado.matches_ambiguos}</small></td>
+                  <td>{item.periodo.titulos_criados_via_conciliacao}<small>Total {item.acumulado.titulos_criados_via_conciliacao}</small></td>
+                </tr>
+              ))}
+              {!rows?.length && <tr><td colSpan="8" className="ao-financial-empty">Nenhuma atividade financeira atribuida neste recorte.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="ao-financial-note">
+        <HiOutlineShieldCheck />
+        <span>{data?.cobertura?.observacao} {data?.cobertura?.atribuicao_setor}</span>
       </div>
     </section>
   );
@@ -196,6 +278,7 @@ export default function AuditoriaOperacional() {
   const [filters, setFilters] = useState(initialFilters);
   const [applied, setApplied] = useState(initialFilters);
   const [summary, setSummary] = useState({});
+  const [financialIndicators, setFinancialIndicators] = useState({});
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState({ rows: [], page: 1, pages: 1, total: 0 });
   const [options, setOptions] = useState({ usuarios: [], setores: [], modulos: [] });
@@ -210,13 +293,15 @@ export default function AuditoriaOperacional() {
     setLoading(true);
     setError('');
     try {
-      const [summaryData, optionsData, usersData, eventsData] = await Promise.all([
+      const [summaryData, financialData, optionsData, usersData, eventsData] = await Promise.all([
         getAuditoriaOperacionalResumo(query),
+        getAuditoriaOperacionalIndicadoresFinanceiros(query),
         getAuditoriaOperacionalOpcoes(query),
         canUsers ? getAuditoriaOperacionalUsuarios(query) : Promise.resolve([]),
         canDetails ? getAuditoriaOperacionalEventos(query) : Promise.resolve({ rows: [], page: 1, pages: 1, total: 0 })
       ]);
       setSummary(summaryData);
+      setFinancialIndicators(financialData);
       setOptions(optionsData);
       setUsers(usersData);
       setEvents(eventsData);
@@ -276,6 +361,8 @@ export default function AuditoriaOperacional() {
         <SummaryItem label="Conclusoes" value={summary.conclusoes} tone="success" />
         <SummaryItem label="Falhas ou bloqueios" value={summary.falhas} tone={summary.falhas ? 'danger' : 'default'} />
       </div>
+
+      <FinancialIndicators data={financialIndicators} canUsers={canUsers} />
 
       <OperationalPanorama summary={summary} />
 

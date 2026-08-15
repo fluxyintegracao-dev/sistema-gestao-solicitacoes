@@ -59,6 +59,26 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       defaultValue: 'PENDENTE'
     },
+    match_inicial_tipo: {
+      type: DataTypes.STRING(30),
+      allowNull: true
+    },
+    match_inicial_candidatos: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    match_inicial_movimento_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    match_inicial_avaliado_em: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    resolucao_tipo: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
     confirmado_por: {
       type: DataTypes.INTEGER,
       allowNull: true
