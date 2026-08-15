@@ -94,6 +94,7 @@ router.post('/snapshots/gerar', allowGovernanceManage, GovernancaController.gera
 router.get('/export', allowGovernanceView, GovernancaController.exportar);
 router.post('/auditoria-operacional/navegacao', GovernancaController.auditoriaOperacionalNavegacao);
 router.get('/auditoria-operacional/resumo', allowOperationalAudit, GovernancaController.auditoriaOperacionalResumo);
+router.get('/auditoria-operacional/indicadores-financeiros', allowOperationalAudit, GovernancaController.auditoriaOperacionalIndicadoresFinanceiros);
 router.get('/auditoria-operacional/usuarios', allowOperationalAuditUsers, GovernancaController.auditoriaOperacionalUsuarios);
 router.get('/auditoria-operacional/opcoes', allowOperationalAudit, GovernancaController.auditoriaOperacionalOpcoes);
 router.get('/auditoria-operacional/eventos', allowOperationalAuditDetails, GovernancaController.auditoriaOperacionalEventos);

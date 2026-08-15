@@ -39,6 +39,7 @@ export function ResizableTable({
   storageKey,
   className = '',
   minColumnWidth = 72,
+  scrollLabel = 'Tabela com rolagem horizontal',
   children,
   ...props
 }) {
@@ -138,22 +139,30 @@ export function ResizableTable({
 
   return (
     <ResizableTableContext.Provider value={contextValue}>
-      <table
-        className={`resizable-table ${className}`.trim()}
-        style={{
-          minWidth: `${Math.max(tableMinWidth, 320)}px`,
-          width: `${Math.max(tableMinWidth, 320)}px`
-        }}
-        {...props}
+      <div
+        className="resizable-table-scroll"
+        data-table-scroll
+        role="region"
+        aria-label={scrollLabel}
+        tabIndex={0}
       >
-        <colgroup>
-          {normalizedColumns.map((column) => {
-            const key = getColumnKey(column);
-            return <col key={key} style={{ width: `${widths[key] || column.width || 140}px` }} />;
-          })}
-        </colgroup>
-        {children}
-      </table>
+        <table
+          className={`resizable-table ${className}`.trim()}
+          style={{
+            minWidth: `${Math.max(tableMinWidth, 320)}px`,
+            width: `${Math.max(tableMinWidth, 320)}px`
+          }}
+          {...props}
+        >
+          <colgroup>
+            {normalizedColumns.map((column) => {
+              const key = getColumnKey(column);
+              return <col key={key} style={{ width: `${widths[key] || column.width || 140}px` }} />;
+            })}
+          </colgroup>
+          {children}
+        </table>
+      </div>
     </ResizableTableContext.Provider>
   );
 }

@@ -10,11 +10,52 @@ const {
 
 const MAX_RANGE_DAYS = 90;
 const MAX_EXPORT_ROWS = 10000;
+const DEFAULT_RETENTION_DAYS = 365;
+const MIN_RETENTION_DAYS = 90;
+const MAX_RETENTION_DAYS = 3650;
 const SENSITIVE_KEY = /(senha|password|token|authorization|cookie|secret|mfa|chave|pix|cpf|cnpj|conta|agencia|documento|arquivo|anexo|conteudo|body)/i;
 
 function clampText(value, maxLength) {
   const normalized = String(value == null ? '' : value).replace(/[\r\n\t]+/g, ' ').trim();
   return normalized ? normalized.slice(0, maxLength) : null;
+}
+
+function normalizeResourceId(value) {
+  const normalized = String(value || '');
+  return /^\d{1,18}$/.test(normalized) ? normalized : null;
+}
+
+function normalizeResourceCode(value) {
+  const normalized = clampText(value, 120);
+  if (!normalized || !/^[a-z0-9][a-z0-9._/-]{0,119}$/i.test(normalized)) return null;
+  return normalized;
+}
+
+function buildSessionReference(value) {
+  const normalized = clampText(value, 80);
+  if (!normalized) return null;
+  return crypto.createHash('sha256').update(normalized).digest('hex').slice(0, 10).toUpperCase();
+}
+
+function extractResponseResource(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) return null;
+
+  const queue = [{ value: payload, depth: 0 }];
+  while (queue.length) {
+    const current = queue.shift();
+    const value = current.value;
+    const id = normalizeResourceId(value?.id);
+    if (id) {
+      return { id, code: normalizeResourceCode(value.codigo) };
+    }
+    if (current.depth >= 2) continue;
+    Object.values(value).forEach((item) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        queue.push({ value: item, depth: current.depth + 1 });
+      }
+    });
+  }
+  return null;
 }
 
 function sanitizeMetadata(value, depth = 0) {
@@ -30,8 +71,20 @@ function sanitizeMetadata(value, depth = 0) {
   return clampText(value, 240);
 }
 
+function extractChangedFieldNames(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return [];
+  return Object.keys(value)
+    .filter((key) => !SENSITIVE_KEY.test(key))
+    .map((key) => clampText(key, 60))
+    .filter(Boolean)
+    .slice(0, 30);
+}
+
 function normalizeRoute(rawPath) {
-  const path = String(rawPath || '/').split('?')[0].replace(/\/+$/, '') || '/';
+  const path = String(rawPath || '/')
+    .split('?')[0]
+    .replace(/^\/api(?=\/|$)/i, '')
+    .replace(/\/+$/, '') || '/';
   return path
     .split('/')
     .map((segment) => {
@@ -62,7 +115,7 @@ function inferEventType(method, route) {
   const keywordMap = [
     [/estorn|reverter/, 'REVERSE'], [/concili/, 'RECONCILE'], [/aprova/, 'APPROVE'],
     [/rejeit|recus/, 'REJECT'], [/reabr/, 'REOPEN'], [/encerr|finaliz|fechar/, 'CLOSE'],
-    [/status/, 'STATUS_CHANGE'], [/deleg|atribui|assum/, 'ASSIGN'], [/coment|mensag/, 'COMMENT'],
+    [/status/, 'STATUS_CHANGE'], [/deleg|atribui|assum|enviar-setor|encaminh/, 'ASSIGN'], [/coment|mensag/, 'COMMENT'],
     [/import/, 'IMPORT'], [/export|relatorio|pdf/, 'EXPORT'], [/upload|anexo/, 'UPLOAD'],
     [/download|baixar-modelo|presign/, 'DOWNLOAD']
   ];
@@ -72,6 +125,109 @@ function inferEventType(method, route) {
   if (method === 'PATCH' || method === 'PUT') return 'UPDATE';
   if (method === 'DELETE') return 'DELETE';
   return 'ACTION';
+}
+
+const PAGE_NAMES = [
+  [/^\/$/, 'Painel'],
+  [/^\/solicitacoes\/:id$/, 'Detalhe da solicitacao'],
+  [/^\/solicitacoes\/relatorios\/operacional$/, 'Relatorio operacional de solicitacoes'],
+  [/^\/solicitacoes\/relatorios$/, 'Relatorios de solicitacoes'],
+  [/^\/solicitacoes-arquivadas$/, 'Solicitacoes arquivadas'],
+  [/^\/solicitacoes$/, 'Solicitacoes'],
+  [/^\/nova-solicitacao$/, 'Nova solicitacao'],
+  [/^\/solicitacoes-compra\/:id\/cotacao$/, 'Cotacao da solicitacao de compra'],
+  [/^\/solicitacoes-compra\/finalizada\/:id$/, 'Solicitacao de compra finalizada'],
+  [/^\/solicitacoes-compra\/nova$/, 'Nova solicitacao de compra'],
+  [/^\/solicitacoes-compra\/revisar$/, 'Revisao da solicitacao de compra'],
+  [/^\/solicitacoes-compra\/:id$/, 'Detalhe da solicitacao de compra'],
+  [/^\/solicitacoes-compra$/, 'Solicitacoes de compra'],
+  [/^\/solicitacoes-compra-direta\/nova$/, 'Nova compra direta'],
+  [/^\/solicitacoes-compra-direta\/revisar$/, 'Revisao da compra direta'],
+  [/^\/pedidos-compra\/:id$/, 'Detalhe do pedido de compra'],
+  [/^\/pedidos-compra$/, 'Pedidos de compra'],
+  [/^\/gestao-fornecedores$/, 'Fornecedores de compras'],
+  [/^\/cotacoes$/, 'Cotacoes'],
+  [/^\/compras\/delegacao$/, 'Delegacao de compras'],
+  [/^\/financeiro\/contas-a-pagar$/, 'Contas a pagar'],
+  [/^\/financeiro\/contas-a-receber$/, 'Contas a receber'],
+  [/^\/financeiro\/titulos\/novo$/, 'Novo titulo financeiro'],
+  [/^\/financeiro\/titulos\/:id\/editar$/, 'Edicao do titulo financeiro'],
+  [/^\/financeiro\/titulos\/:id$/, 'Detalhe do titulo financeiro'],
+  [/^\/financeiro\/conciliacao$/, 'Conciliacao bancaria'],
+  [/^\/financeiro\/relatorios(?:\/.*)?$/, 'Relatorios financeiros'],
+  [/^\/financeiro\/baixas$/, 'Baixas realizadas'],
+  [/^\/financeiro\/cheques-terceiros$/, 'Cheques de terceiros'],
+  [/^\/financeiro\/baixas-compostas$/, 'Baixas com multiplas fontes'],
+  [/^\/custos-recebiveis$/, 'Custos e Recebiveis'],
+  [/^\/governanca\/auditoria-operacional$/, 'Auditoria Operacional'],
+  [/^\/usuarios\/:id\/editar$/, 'Edicao do usuario'],
+  [/^\/usuarios\/:id$/, 'Detalhe do usuario'],
+  [/^\/usuarios\/novo$/, 'Novo usuario'],
+  [/^\/usuarios$/, 'Usuarios'],
+  [/^\/obras\/:id$/, 'Gestao da obra'],
+  [/^\/obras$/, 'Obras']
+];
+
+function humanizeRouteSegment(value) {
+  const normalized = String(value || '').replace(/^:/, '').replace(/[-_]+/g, ' ').trim();
+  if (!normalized) return 'Pagina do sistema';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function inferPageName(route) {
+  const normalized = normalizeRoute(route);
+  const known = PAGE_NAMES.find(([pattern]) => pattern.test(normalized));
+  if (known) return known[1];
+  const segments = normalized.split('/').filter((segment) => segment && segment !== ':id');
+  return humanizeRouteSegment(segments[segments.length - 1]);
+}
+
+function extractLinkedResource(type, body = {}) {
+  if (type !== 'UPLOAD') return null;
+  const candidates = [
+    ['solicitacao_id', 'solicitacoes'],
+    ['solicitacao_compra_id', 'solicitacoes-compra'],
+    ['pedido_compra_id', 'pedidos-compra'],
+    ['titulo_financeiro_id', 'financeiro.titulos'],
+    ['titulo_id', 'financeiro.titulos']
+  ];
+  for (const [field, resourceType] of candidates) {
+    const id = normalizeResourceId(body?.[field]);
+    if (id) return { id, type: resourceType };
+  }
+  return null;
+}
+
+function buildOperationalContext(req, type, normalizedRoute) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const metadata = {};
+  let summary = null;
+
+  if (type === 'STATUS_CHANGE') {
+    const status = clampText(body.status, 120);
+    if (status) {
+      metadata.status_destino = status;
+      metadata.interacao_tipo = 'Status alterado';
+      summary = `Alterou o status para ${status}`;
+    }
+  } else if (type === 'ASSIGN' && /enviar-setor|encaminh/i.test(normalizedRoute)) {
+    const sector = clampText(body.setor_destino, 120);
+    if (sector) {
+      metadata.setor_destino = sector;
+      metadata.interacao_tipo = 'Envio para outro setor';
+      summary = `Enviou o registro para o setor ${sector}`;
+    }
+  } else if (type === 'COMMENT') {
+    metadata.interacao_tipo = /mensag/i.test(normalizedRoute) ? 'Mensagem enviada' : 'Comentario registrado';
+    summary = metadata.interacao_tipo;
+  } else if (type === 'UPLOAD') {
+    const fileCount = Array.isArray(req.files) ? req.files.length : (req.file ? 1 : 0);
+    metadata.interacao_tipo = 'Arquivo anexado';
+    if (fileCount) metadata.quantidade_itens = fileCount;
+    summary = fileCount > 1 ? `Enviou ${fileCount} arquivos` : 'Enviou um arquivo';
+  }
+
+  return { metadata, summary };
 }
 
 function eventSummary(type, moduleName, result) {
@@ -139,13 +295,28 @@ async function recordEvent(payload) {
   }
 }
 
-function recordHttpEvent(req, statusCode) {
+function recordHttpEvent(req, statusCode, responseResource = null) {
   const route = req.originalUrl || req.url || '/';
   const normalized = normalizeRoute(route);
   const moduleName = inferModule(normalized);
   const type = inferEventType(req.method, normalized);
-  const resource = extractResource(route);
+  const routeResource = extractResource(route);
+  const linkedResource = extractLinkedResource(type, req.body);
+  const responseId = statusCode < 400 ? normalizeResourceId(responseResource?.id) : null;
+  const resource = {
+    id: routeResource.id || responseId || linkedResource?.id,
+    type: linkedResource?.type || routeResource.type,
+    code: routeResource.id ? null : normalizeResourceCode(responseResource?.code)
+  };
   const result = statusCode < 400 ? 'SUCCESS' : [401, 403].includes(statusCode) ? 'DENIED' : 'FAILED';
+  const changedFields = extractChangedFieldNames(req.body);
+  const fieldsMetadataKey = req.method === 'POST'
+    ? 'campos_informados'
+    : ['PATCH', 'PUT'].includes(req.method) ? 'campos_alterados' : null;
+  const fieldsMetadata = changedFields.length && fieldsMetadataKey
+    ? { [fieldsMetadataKey]: changedFields }
+    : {};
+  const operationalContext = buildOperationalContext(req, type, normalized);
   return recordEvent({
     usuario_id: req.user?.id,
     setor_id: req.user?.setor_id,
@@ -158,22 +329,33 @@ function recordHttpEvent(req, statusCode) {
     rota_padrao: normalized,
     recurso_tipo: resource.type,
     recurso_id: resource.id,
+    recurso_codigo: resource.code,
     empresa_id: req.body?.empresa_id || req.body?.empresa_pagadora_id || null,
     obra_id: req.body?.obra_id || null,
     acao_chave: `${req.method}:${normalized}`,
-    resumo: eventSummary(type, moduleName, result),
+    resumo: result === 'SUCCESS' && operationalContext.summary
+      ? `${operationalContext.summary} em ${moduleName}`
+      : eventSummary(type, moduleName, result),
     resultado: result,
     origem: 'BACKEND',
     request_id: req.headers?.['x-request-id'],
     ip_hash: hashIp(req),
     user_agent_resumo: clampText(req.headers?.['user-agent'], 160),
-    metadata: { method: req.method, status_code: statusCode, rota: normalized }
+    metadata: {
+      method: req.method,
+      status_code: statusCode,
+      rota: normalized,
+      ...fieldsMetadata,
+      ...operationalContext.metadata
+    }
   });
 }
 
 async function recordNavigation(req, body = {}) {
   const normalized = normalizeRoute(body.rota || '/');
   const moduleName = clampText(body.modulo, 80) || inferModule(normalized);
+  const resourceId = normalizeResourceId(body.recurso_id);
+  const pageName = inferPageName(normalized);
   return recordEvent({
     evento_uuid: body.evento_uuid,
     usuario_id: req.user?.id,
@@ -185,12 +367,14 @@ async function recordNavigation(req, body = {}) {
     modulo: moduleName,
     pagina_chave: clampText(body.pagina_chave, 120) || normalized,
     rota_padrao: normalized,
-    resumo: clampText(body.resumo, 500) || eventSummary('PAGE_VIEW', moduleName, 'SUCCESS'),
+    recurso_tipo: resourceId ? clampText(body.recurso_tipo, 120) : null,
+    recurso_id: resourceId,
+    resumo: `Acessou ${pageName}`,
     resultado: 'SUCCESS',
     origem: 'FRONTEND',
     ip_hash: hashIp(req),
     user_agent_resumo: clampText(req.headers?.['user-agent'], 160),
-    metadata: { titulo_pagina: body.titulo_pagina }
+    metadata: { pagina_nome: pageName }
   });
 }
 
@@ -234,7 +418,10 @@ function buildWhere(filters) {
 async function getSummary(query) {
   const filters = normalizeFilters(query);
   const where = buildWhere(filters);
-  const [total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes] = await Promise.all([
+  const [
+    total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes,
+    modules, days
+  ] = await Promise.all([
     GovernancaEventoOperacional.count({ where }),
     GovernancaEventoOperacional.count({ where, distinct: true, col: 'usuario_id' }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'PAGE_VIEW' } }),
@@ -242,9 +429,47 @@ async function getSummary(query) {
     GovernancaEventoOperacional.count({ where: { ...where, resultado: { [Op.ne]: 'SUCCESS' } } }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'CREATE' } }),
     GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: 'UPDATE' } }),
-    GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: { [Op.in]: ['CLOSE', 'APPROVE', 'RECONCILE'] } } })
+    GovernancaEventoOperacional.count({ where: { ...where, tipo_evento: { [Op.in]: ['CLOSE', 'APPROVE', 'RECONCILE'] } } }),
+    GovernancaEventoOperacional.findAll({
+      where,
+      attributes: [
+        'modulo',
+        [fn('COUNT', col('id')), 'eventos'],
+        [literal("SUM(CASE WHEN categoria = 'OPERACAO' THEN 1 ELSE 0 END)"), 'operacoes'],
+        [literal("SUM(CASE WHEN resultado <> 'SUCCESS' THEN 1 ELSE 0 END)"), 'falhas']
+      ],
+      group: ['modulo'],
+      order: [[literal('eventos'), 'DESC']],
+      raw: true
+    }),
+    GovernancaEventoOperacional.findAll({
+      where,
+      attributes: [
+        [fn('DATE', col('ocorrido_em')), 'data'],
+        [fn('COUNT', col('id')), 'eventos'],
+        [literal("SUM(CASE WHEN categoria = 'OPERACAO' THEN 1 ELSE 0 END)"), 'operacoes'],
+        [literal("COUNT(DISTINCT usuario_id)"), 'usuarios']
+      ],
+      group: [fn('DATE', col('ocorrido_em'))],
+      order: [[fn('DATE', col('ocorrido_em')), 'ASC']],
+      raw: true
+    })
   ]);
-  return { total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes };
+  return {
+    total, usuarios, navegacoes, operacoes, falhas, criacoes, alteracoes, conclusoes,
+    por_modulo: modules.map((item) => ({
+      modulo: item.modulo,
+      eventos: Number(item.eventos || 0),
+      operacoes: Number(item.operacoes || 0),
+      falhas: Number(item.falhas || 0)
+    })),
+    por_dia: days.map((item) => ({
+      data: item.data,
+      eventos: Number(item.eventos || 0),
+      operacoes: Number(item.operacoes || 0),
+      usuarios: Number(item.usuarios || 0)
+    }))
+  };
 }
 
 async function getUsers(query) {
@@ -262,7 +487,8 @@ async function getUsers(query) {
       [literal("SUM(CASE WHEN tipo_evento = 'CREATE' THEN 1 ELSE 0 END)"), 'criacoes'],
       [literal("SUM(CASE WHEN tipo_evento = 'UPDATE' THEN 1 ELSE 0 END)"), 'alteracoes'],
       [literal("SUM(CASE WHEN tipo_evento IN ('CLOSE','APPROVE','RECONCILE') THEN 1 ELSE 0 END)"), 'conclusoes'],
-      [literal('COUNT(DISTINCT modulo)'), 'modulos']
+      [literal('COUNT(DISTINCT modulo)'), 'modulos'],
+      [literal('COUNT(DISTINCT sessao_id)'), 'sessoes_observadas']
     ],
     include: [{ model: User, as: 'usuario', attributes: ['id', 'nome', 'email', 'perfil'], required: false }],
     group: ['usuario_id', 'usuario.id', 'usuario.nome', 'usuario.email', 'usuario.perfil'],
@@ -275,7 +501,8 @@ async function getUsers(query) {
     eventos: Number(row.eventos || 0), navegacoes: Number(row.navegacoes || 0),
     operacoes: Number(row.operacoes || 0), criacoes: Number(row.criacoes || 0),
     alteracoes: Number(row.alteracoes || 0), conclusoes: Number(row.conclusoes || 0),
-    modulos: Number(row.modulos || 0)
+    modulos: Number(row.modulos || 0),
+    sessoes_observadas: Number(row.sessoes_observadas || 0)
   }));
 }
 
@@ -296,6 +523,7 @@ async function getEvents(query, options = {}) {
     rows: rows.map((row) => {
       const plain = row.get({ plain: true });
       try { plain.metadata = plain.metadata_json ? JSON.parse(plain.metadata_json) : null; } catch { plain.metadata = null; }
+      plain.sessao_ref = buildSessionReference(plain.sessao_id);
       delete plain.metadata_json;
       delete plain.ip_hash;
       delete plain.sessao_id;
@@ -321,30 +549,79 @@ function csvCell(value) {
   return `"${String(value == null ? '' : value).replace(/"/g, '""')}"`;
 }
 
+function normalizeRetentionDays(value) {
+  const parsed = Number(value == null || value === '' ? DEFAULT_RETENTION_DAYS : value);
+  if (!Number.isInteger(parsed) || parsed < MIN_RETENTION_DAYS || parsed > MAX_RETENTION_DAYS) {
+    throw Object.assign(
+      new Error(`A retencao deve estar entre ${MIN_RETENTION_DAYS} e ${MAX_RETENTION_DAYS} dias.`),
+      { statusCode: 400 }
+    );
+  }
+  return parsed;
+}
+
+function buildRetentionCutoff(retentionDays, now = new Date()) {
+  const days = normalizeRetentionDays(retentionDays);
+  const reference = now instanceof Date ? now : new Date(now);
+  if (Number.isNaN(reference.getTime())) throw new Error('Data de referencia da retencao invalida.');
+  return new Date(reference.getTime() - (days * 86400000));
+}
+
+async function purgeExpiredEvents({ retentionDays, confirm = false, now = new Date() } = {}) {
+  const days = normalizeRetentionDays(retentionDays ?? process.env.AUDITORIA_OPERACIONAL_RETENCAO_DIAS);
+  const cutoff = buildRetentionCutoff(days, now);
+  const where = { ocorrido_em: { [Op.lt]: cutoff } };
+  const candidates = await GovernancaEventoOperacional.count({ where });
+  const removed = confirm && candidates
+    ? await GovernancaEventoOperacional.destroy({ where })
+    : 0;
+  return {
+    modo: confirm ? 'APLICADO' : 'SIMULACAO',
+    retencao_dias: days,
+    data_corte: cutoff.toISOString(),
+    candidatos: Number(candidates || 0),
+    removidos: Number(removed || 0)
+  };
+}
+
 async function exportCsv(query) {
   const result = await getEvents({ ...query, page: 1, limit: MAX_EXPORT_ROWS }, { maxLimit: MAX_EXPORT_ROWS });
-  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Recurso', 'ID'];
+  const header = ['Data/hora', 'Usuario', 'Setor', 'Modulo', 'Categoria', 'Evento', 'Resultado', 'Resumo', 'Rota', 'Metodo', 'Campos', 'Sessao', 'Recurso', 'ID', 'Codigo'];
   const lines = result.rows.map((item) => [
     item.ocorrido_em, item.usuario?.nome, item.setor?.nome, item.modulo, item.categoria,
-    item.tipo_evento, item.resultado, item.resumo, item.recurso_tipo, item.recurso_id
+    item.tipo_evento, item.resultado, item.resumo, item.rota_padrao, item.metadata?.method,
+    (item.metadata?.campos_alterados || item.metadata?.campos_informados || []).join(', '),
+    item.sessao_ref, item.recurso_tipo, item.recurso_id, item.recurso_codigo
   ].map(csvCell).join(';'));
   return `\ufeff${header.map(csvCell).join(';')}\n${lines.join('\n')}`;
 }
 
 module.exports = {
+  DEFAULT_RETENTION_DAYS,
+  MAX_RETENTION_DAYS,
   MAX_RANGE_DAYS,
+  MIN_RETENTION_DAYS,
+  buildRetentionCutoff,
+  buildSessionReference,
   buildWhere,
   exportCsv,
+  extractChangedFieldNames,
+  extractResponseResource,
   getEvents,
   getOptions,
   getSummary,
   getUsers,
+  inferPageName,
   inferEventType,
   inferModule,
   normalizeFilters,
+  normalizeRetentionDays,
+  normalizeResourceCode,
+  normalizeResourceId,
   normalizeRoute,
   recordEvent,
   recordHttpEvent,
   recordNavigation,
+  purgeExpiredEvents,
   sanitizeMetadata
 };

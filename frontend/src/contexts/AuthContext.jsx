@@ -8,17 +8,24 @@ import {
   getCurrentSession,
   logoutRequest
 } from '../services/auth';
-import { clearAuthToken, setAuthToken } from '../services/api';
+import { clearAuthToken, getAuthToken, setAuthToken } from '../services/api';
 
 export const AuthContext = createContext();
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 20;
 const IDLE_TIMEOUT_STORAGE_KEY = 'timeout_inatividade_minutos';
+const SESSION_RESTORE_DELAYS_MS = [0, 300, 900];
+
+function wait(ms) {
+  if (!ms) return Promise.resolve();
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [sessionExpiresAt, setSessionExpiresAt] = useState(null);
   const [authReady, setAuthReady] = useState(false);
+  const [authRestoreError, setAuthRestoreError] = useState(null);
   const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(() => {
     const value = Number(localStorage.getItem(IDLE_TIMEOUT_STORAGE_KEY));
     return Number.isNaN(value) || value <= 0 ? DEFAULT_IDLE_TIMEOUT_MINUTES : value;
@@ -33,7 +40,7 @@ export function AuthProvider({ children }) {
 
   function applySession(data) {
     const nextUser = data?.user || null;
-    const nextToken = data?.token || null;
+    const nextToken = data?.token || getAuthToken() || null;
     const nextExpiresAt = Number(data?.session_expires_at || 0) || null;
 
     setUser(nextUser);
@@ -44,11 +51,13 @@ export function AuthProvider({ children }) {
   }
 
   async function login(data) {
+    setAuthRestoreError(null);
     applySession(data);
   }
 
   async function refreshSession() {
     const data = await getCurrentSession();
+    setAuthRestoreError(null);
     applySession({
       ...data,
       token: data?.token || token
@@ -94,6 +103,7 @@ export function AuthProvider({ children }) {
     setAuthToken(null);
     clearAuthToken();
     tokenExpireHandledRef.current = false;
+    setAuthRestoreError(null);
   }
 
   function handleTokenExpired() {
@@ -107,23 +117,42 @@ export function AuthProvider({ children }) {
     let cancelado = false;
 
     async function restoreSession() {
-      try {
-        const data = await getCurrentSession();
-        if (cancelado) return;
-        applySession(data);
-      } catch {
-        if (cancelado) return;
+      let lastError = null;
 
+      for (const delay of SESSION_RESTORE_DELAYS_MS) {
+        if (cancelado) return;
+        await wait(delay);
+
+        try {
+          const data = await getCurrentSession();
+          if (cancelado) return;
+          setAuthRestoreError(null);
+          applySession(data);
+          setAuthReady(true);
+          return;
+        } catch (error) {
+          lastError = error;
+          const status = Number(error?.status || 0);
+          if ([401, 403].includes(status)) {
+            break;
+          }
+        }
+      }
+
+      if (cancelado) return;
+
+      const status = Number(lastError?.status || 0);
+      if ([401, 403].includes(status)) {
         setUser(null);
         setToken(null);
         setSessionExpiresAt(null);
         clearAuthToken();
+        setAuthRestoreError(null);
         tokenExpireHandledRef.current = false;
-      } finally {
-        if (!cancelado) {
-          setAuthReady(true);
-        }
+      } else {
+        setAuthRestoreError(lastError || new Error('Nao foi possivel restaurar a sessao.'));
       }
+      setAuthReady(true);
     }
 
     void restoreSession();
@@ -263,6 +292,7 @@ export function AuthProvider({ children }) {
         idleTimeoutMinutes,
         isAuthenticated,
         authReady,
+        authRestoreError,
         login,
         refreshSession,
         logout,

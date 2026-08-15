@@ -20,6 +20,16 @@ function normalizePath(pathname) {
     .join('/');
 }
 
+function resourceFor(pathname) {
+  const segments = String(pathname || '/').split('/').filter(Boolean);
+  const resourceId = [...segments].reverse().find((part) => /^\d{1,18}$/.test(part)) || '';
+  const normalized = normalizePath(pathname);
+  return {
+    recurso_id: resourceId,
+    recurso_tipo: normalized.split('/').filter(Boolean).slice(0, 3).join('.')
+  };
+}
+
 function moduleFor(pathname) {
   return ROUTE_MODULES.find(([pattern]) => pattern.test(pathname))?.[1] || (pathname === '/' ? 'PAINEL' : 'SISTEMA');
 }
@@ -29,18 +39,19 @@ export default function OperationalAuditTracker() {
   const lastPath = useRef(null);
 
   useEffect(() => {
-    const path = normalizePath(location.pathname);
-    if (lastPath.current === path) return;
-    lastPath.current = path;
+    const rawPath = location.pathname || '/';
+    const path = normalizePath(rawPath);
+    if (lastPath.current === rawPath) return;
+    lastPath.current = rawPath;
     const modulo = moduleFor(location.pathname);
+    const resource = resourceFor(rawPath);
     const eventoUuid = globalThis.crypto?.randomUUID?.() || `nav-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     registrarNavegacaoOperacional({
       evento_uuid: eventoUuid,
       rota: path,
       pagina_chave: path,
       modulo,
-      titulo_pagina: document.title,
-      resumo: `Acessou uma pagina em ${modulo}`
+      ...resource
     }).catch(() => {});
   }, [location.pathname]);
 

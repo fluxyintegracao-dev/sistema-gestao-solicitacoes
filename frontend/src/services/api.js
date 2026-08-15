@@ -7,7 +7,33 @@ function normalizeApiUrl(value) {
 export const API_URL = normalizeApiUrl(import.meta.env.VITE_API_URL);
 export const API_ORIGIN = String(API_URL).replace(/\/api\/?$/, '');
 
-let currentAuthToken = null;
+const AUTH_SESSION_TOKEN_KEY = 'fluxy_auth_session_token';
+
+function readSessionAuthToken() {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    return sessionStorage.getItem(AUTH_SESSION_TOKEN_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionAuthToken(token) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    if (token) {
+      sessionStorage.setItem(AUTH_SESSION_TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(AUTH_SESSION_TOKEN_KEY);
+    }
+  } catch {
+    // Alguns navegadores podem bloquear o storage; o cookie HttpOnly continua sendo o meio principal.
+  }
+}
+
+let currentAuthToken = readSessionAuthToken();
 let currentCsrfToken = null;
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const CSRF_COOKIE_NAME = 'fluxy_csrf';
@@ -112,11 +138,13 @@ export function getAuthToken() {
 
 export function setAuthToken(token) {
   currentAuthToken = token || null;
+  persistSessionAuthToken(currentAuthToken);
 }
 
 export function clearAuthToken() {
   currentAuthToken = null;
   currentCsrfToken = null;
+  persistSessionAuthToken(null);
 }
 
 export function authHeaders(extra = {}) {

@@ -16,11 +16,31 @@ function isCustosRecebiveisAllowedRoute(pathname) {
 }
 
 export default function PrivateRoute({ children }) {
-  const { isAuthenticated, authReady, user } = useAuth();
+  const { isAuthenticated, authReady, authRestoreError, user } = useAuth();
   const location = useLocation();
 
   if (!authReady) {
     return <AppRouteFallback fullScreen />;
+  }
+
+  if (authRestoreError && !isAuthenticated) {
+    return (
+      <main className="min-h-screen bg-[var(--c-bg)] px-4 py-8 flex items-center justify-center">
+        <section className="w-full max-w-lg rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] p-6 shadow-sm">
+          <h1 className="text-lg font-semibold text-[var(--c-text)]">Nao foi possivel restaurar sua sessao</h1>
+          <p className="mt-2 text-sm text-[var(--c-muted)]">
+            Verifique a conexao e tente novamente. Sua sessao local nao foi apagada.
+          </p>
+          <button
+            type="button"
+            className="btn btn-primary mt-5"
+            onClick={() => window.location.reload()}
+          >
+            Tentar novamente
+          </button>
+        </section>
+      </main>
+    );
   }
 
   if (!isAuthenticated) {

@@ -11,9 +11,9 @@ async function parseJsonSafe(response) {
   }
 }
 
-function buildError(data, fallbackMessage) {
+function buildError(data, fallbackMessage, responseStatus = 0) {
   const error = new Error(data?.error || fallbackMessage);
-  error.status = Number(data?.status || 0) || 0;
+  error.status = Number(responseStatus || data?.status || 0) || 0;
   error.data = data;
   return error;
 }
@@ -30,7 +30,7 @@ export async function loginRequest(payload) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao efetuar login.');
+    throw buildError(data, 'Erro ao efetuar login.', response.status);
   }
 
   return data;
@@ -48,18 +48,20 @@ export async function loginMfaRequest(payload) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao validar autenticacao em duas etapas.');
+    throw buildError(data, 'Erro ao validar autenticacao em duas etapas.', response.status);
   }
 
   return data;
 }
 
 export async function getCurrentSession() {
-  const response = await fetch(`${API_URL}/auth/me`);
+  const response = await fetch(`${API_URL}/auth/me`, {
+    credentials: 'include'
+  });
   const data = await parseJsonSafe(response);
 
   if (!response.ok) {
-    throw buildError(data, 'Erro ao restaurar sessao.');
+    throw buildError(data, 'Erro ao restaurar sessao.', response.status);
   }
 
   return data;
@@ -72,7 +74,7 @@ export async function logoutRequest() {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao encerrar sessao.');
+    throw buildError(data, 'Erro ao encerrar sessao.', response.status);
   }
 
   return data;
@@ -87,7 +89,7 @@ export async function forgotPasswordRequest(email) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao solicitar recuperacao de senha.');
+    throw buildError(data, 'Erro ao solicitar recuperacao de senha.', response.status);
   }
 
   return data;
@@ -105,7 +107,7 @@ export async function resetPasswordRequest({ token, senha }) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao definir nova senha.');
+    throw buildError(data, 'Erro ao definir nova senha.', response.status);
   }
 
   return data;
@@ -118,7 +120,7 @@ export async function startMfaSetupRequest() {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao iniciar configuracao do MFA.');
+    throw buildError(data, 'Erro ao iniciar configuracao do MFA.', response.status);
   }
 
   return data;
@@ -133,7 +135,7 @@ export async function enableMfaRequest(codigo) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao habilitar MFA.');
+    throw buildError(data, 'Erro ao habilitar MFA.', response.status);
   }
 
   return data;
@@ -148,7 +150,7 @@ export async function disableMfaRequest(codigo) {
 
   const data = await parseJsonSafe(response);
   if (!response.ok) {
-    throw buildError(data, 'Erro ao desabilitar MFA.');
+    throw buildError(data, 'Erro ao desabilitar MFA.', response.status);
   }
 
   return data;

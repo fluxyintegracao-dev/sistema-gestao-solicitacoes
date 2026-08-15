@@ -54,6 +54,10 @@ export function getAuditoriaOperacionalResumo(params) {
   return request(`/auditoria-operacional/resumo${queryString(params)}`);
 }
 
+export function getAuditoriaOperacionalIndicadoresFinanceiros(params) {
+  return request(`/auditoria-operacional/indicadores-financeiros${queryString(params)}`);
+}
+
 export function getAuditoriaOperacionalUsuarios(params) {
   return request(`/auditoria-operacional/usuarios${queryString(params)}`);
 }

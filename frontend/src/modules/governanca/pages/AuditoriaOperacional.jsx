@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HiOutlineArrowDownTray,
+  HiOutlineArrowTopRightOnSquare,
   HiOutlineArrowPath,
   HiOutlineChevronLeft,
   HiOutlineChevronRight,
@@ -13,6 +14,7 @@ import {
   HiOutlineSquares2X2,
   HiOutlineUserGroup
 } from 'react-icons/hi2';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canExportOperationalAudit,
@@ -22,10 +24,12 @@ import {
 import {
   downloadAuditoriaOperacional,
   getAuditoriaOperacionalEventos,
+  getAuditoriaOperacionalIndicadoresFinanceiros,
   getAuditoriaOperacionalOpcoes,
   getAuditoriaOperacionalResumo,
   getAuditoriaOperacionalUsuarios
 } from '../services/governancaApi';
+import { buildAuditedRecordLink } from '../utils/auditoriaOperacionalLinks';
 import './AuditoriaOperacional.css';
 
 function isoDate(date) {
@@ -54,6 +58,137 @@ function SummaryItem({ label, value, tone = 'default' }) {
   return <div className={`ao-summary-item tone-${tone}`}><span>{label}</span><strong>{Number(value || 0).toLocaleString('pt-BR')}</strong></div>;
 }
 
+function OperationalPanorama({ summary }) {
+  const modules = Array.isArray(summary.por_modulo) ? summary.por_modulo.slice(0, 6) : [];
+  const days = Array.isArray(summary.por_dia) ? summary.por_dia : [];
+  const maxModuleOperations = Math.max(1, ...modules.map((item) => Number(item.operacoes || 0)));
+  const maxDayOperations = Math.max(1, ...days.map((item) => Number(item.operacoes || 0)));
+
+  if (!modules.length && !days.length) return null;
+
+  return (
+    <section className="ao-panorama" aria-label="Distribuicao operacional do periodo">
+      <div className="ao-panorama-block">
+        <div className="ao-panorama-title">
+          <div><HiOutlineSquares2X2 /><strong>Operacoes por modulo</strong></div>
+          <span>ate 6 modulos com maior movimento</span>
+        </div>
+        <div className="ao-module-list">
+          {modules.map((item) => (
+            <div className="ao-distribution-row" key={item.modulo}>
+              <span className="ao-distribution-label">{item.modulo}</span>
+              <div className="ao-distribution-track" aria-hidden="true">
+                <span style={{ '--ao-progress': `${Math.max(3, (Number(item.operacoes || 0) / maxModuleOperations) * 100)}%` }} />
+              </div>
+              <strong>{Number(item.operacoes || 0).toLocaleString('pt-BR')}</strong>
+              {Number(item.falhas || 0) > 0 && <small>{item.falhas} falha(s)</small>}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="ao-panorama-block">
+        <div className="ao-panorama-title">
+          <div><HiOutlineClock /><strong>Ritmo diario observado</strong></div>
+          <span>acoes registradas, sem estimar horas trabalhadas</span>
+        </div>
+        <div className="ao-day-list">
+          {days.map((item) => (
+            <div className="ao-day-column" key={item.data} title={`${item.operacoes} operacoes e ${item.usuarios} usuarios`}>
+              <div className="ao-day-track">
+                <span style={{ '--ao-day-progress': `${Math.max(4, (Number(item.operacoes || 0) / maxDayOperations) * 100)}%` }} />
+              </div>
+              <strong>{Number(item.operacoes || 0).toLocaleString('pt-BR')}</strong>
+              <span>{new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit' }).format(new Date(`${item.data}T12:00:00`))}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const FINANCIAL_METRICS = [
+  ['titulos_criados', 'Titulos cadastrados'],
+  ['titulos_baixados', 'Titulos baixados'],
+  ['baixas_registradas', 'Operacoes de baixa'],
+  ['ofx_lancamentos_importados', 'Lancamentos OFX importados'],
+  ['matches_automaticos', 'Match automatico unico'],
+  ['matches_ambiguos', 'Mais de um match'],
+  ['sem_match', 'Sem match na importacao'],
+  ['titulos_criados_via_conciliacao', 'Titulo criado pela conciliacao'],
+  ['conciliacoes_confirmadas', 'Conciliacoes confirmadas']
+];
+
+function FinancialIndicators({ data, canUsers }) {
+  const [view, setView] = useState('GERAL');
+  const rows = view === 'USUARIOS' ? data?.por_usuario : data?.por_setor;
+  const availableViews = canUsers ? ['GERAL', 'SETORES', 'USUARIOS'] : ['GERAL', 'SETORES'];
+  const periodLabel = data?.periodo?.inicio
+    ? `${new Intl.DateTimeFormat('pt-BR').format(new Date(data.periodo.inicio))} a ${new Intl.DateTimeFormat('pt-BR').format(new Date(data.periodo.fim))}`
+    : 'periodo selecionado';
+
+  return (
+    <section className="ao-financial" aria-label="Indicadores financeiros operacionais">
+      <div className="ao-financial-heading">
+        <div>
+          <span>PRODUTIVIDADE FINANCEIRA</span>
+          <strong>Titulos, baixas e qualidade do match OFX</strong>
+          <small>{periodLabel}</small>
+        </div>
+        <div className="ao-view-switch" role="tablist" aria-label="Agrupamento dos indicadores">
+          {availableViews.map((item) => (
+            <button type="button" role="tab" aria-selected={view === item} className={view === item ? 'active' : ''} key={item} onClick={() => setView(item)}>
+              {item === 'GERAL' ? 'Geral' : item === 'SETORES' ? 'Por setor' : 'Por usuario'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {view === 'GERAL' ? (
+        <div className="ao-financial-grid">
+          {FINANCIAL_METRICS.map(([key, label]) => (
+            <div className="ao-financial-metric" key={key}>
+              <span>{label}</span>
+              <strong>{Number(data?.geral?.periodo?.[key] || 0).toLocaleString('pt-BR')}</strong>
+              <small>Acumulado: {Number(data?.geral?.acumulado?.[key] || 0).toLocaleString('pt-BR')}</small>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="ao-financial-table-wrap">
+          <table className="ao-financial-table">
+            <thead><tr>
+              <th>{view === 'USUARIOS' ? 'Usuario / setor' : 'Setor'}</th>
+              <th>Titulos cadastrados</th><th>Titulos baixados</th><th>Baixas</th>
+              <th>Match automatico</th><th>Sem match</th><th>Mais de um match</th><th>Titulo criado na conciliacao</th>
+            </tr></thead>
+            <tbody>
+              {(rows || []).map((item) => (
+                <tr key={view === 'USUARIOS' ? item.usuario.id : item.setor.id || 'sem-setor'}>
+                  <td><strong>{view === 'USUARIOS' ? item.usuario.nome : item.setor.nome}</strong>{view === 'USUARIOS' && <small>{item.setor?.nome || 'Sem setor atual'}</small>}</td>
+                  <td>{item.periodo.titulos_criados}<small>Total {item.acumulado.titulos_criados}</small></td>
+                  <td>{item.periodo.titulos_baixados}<small>Total {item.acumulado.titulos_baixados}</small></td>
+                  <td>{item.periodo.baixas_registradas}<small>Total {item.acumulado.baixas_registradas}</small></td>
+                  <td>{item.periodo.matches_automaticos}<small>Total {item.acumulado.matches_automaticos}</small></td>
+                  <td>{item.periodo.sem_match}<small>Total {item.acumulado.sem_match}</small></td>
+                  <td>{item.periodo.matches_ambiguos}<small>Total {item.acumulado.matches_ambiguos}</small></td>
+                  <td>{item.periodo.titulos_criados_via_conciliacao}<small>Total {item.acumulado.titulos_criados_via_conciliacao}</small></td>
+                </tr>
+              ))}
+              {!rows?.length && <tr><td colSpan="8" className="ao-financial-empty">Nenhuma atividade financeira atribuida neste recorte.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="ao-financial-note">
+        <HiOutlineShieldCheck />
+        <span>{data?.cobertura?.observacao} {data?.cobertura?.atribuicao_setor}</span>
+      </div>
+    </section>
+  );
+}
+
 function UserRow({ item, selected, onClick }) {
   return (
     <button type="button" className={`ao-user-row ${selected ? 'selected' : ''}`} onClick={onClick}>
@@ -66,15 +201,39 @@ function UserRow({ item, selected, onClick }) {
         <strong>{item.operacoes}</strong><span>acoes</span>
         <strong>{item.navegacoes}</strong><span>acessos</span>
       </div>
-      <small>{formatDateTime(item.ultima_atividade)}</small>
+      <small>{item.sessoes_observadas || 0} sessao(oes) observada(s) - ultimo evento {formatDateTime(item.ultima_atividade)}</small>
     </button>
   );
+}
+
+function SessionDivider({ event }) {
+  return (
+    <div className="ao-session-divider">
+      <HiOutlineClock />
+      <span>Sessao observada</span>
+      <strong>{event.sessao_ref}</strong>
+      <small>{event.usuario?.nome || 'Usuario removido'}</small>
+    </div>
+  );
+}
+
+function eventOperationalContext(event) {
+  if (event.tipo_evento === 'PAGE_VIEW') return event.metadata?.pagina_nome || 'Pagina do sistema';
+  if (event.metadata?.status_destino) return `Status: ${event.metadata.status_destino}`;
+  if (event.metadata?.setor_destino) return `Destino: ${event.metadata.setor_destino}`;
+  return event.metadata?.interacao_tipo || '';
 }
 
 function EventItem({ event }) {
   const failed = event.resultado !== 'SUCCESS';
   const navigation = event.tipo_evento === 'PAGE_VIEW';
   const Icon = failed ? HiOutlineExclamationTriangle : navigation ? HiOutlineComputerDesktop : HiOutlinePencilSquare;
+  const recordLink = buildAuditedRecordLink(event);
+  const operationalContext = eventOperationalContext(event);
+  const contextualFields = new Set(['status', 'setor_destino', 'solicitacao_id']);
+  const fields = (event.metadata?.campos_alterados || event.metadata?.campos_informados || [])
+    .filter((field) => !contextualFields.has(field));
+  const route = event.rota_padrao || event.metadata?.rota;
   return (
     <article className={`ao-event ${failed ? 'failed' : ''}`}>
       <div className="ao-event-icon"><Icon /></div>
@@ -86,10 +245,25 @@ function EventItem({ event }) {
         <p>{event.resumo}</p>
         <div className="ao-event-meta">
           <span>{event.usuario?.nome || 'Usuario removido'}</span>
-          <span>{event.modulo}</span>
+          <span className="ao-module-context">
+            <strong>{event.modulo}</strong>
+            {operationalContext && <> · {operationalContext}</>}
+          </span>
           {event.setor?.nome && <span>{event.setor.nome}</span>}
-          {event.recurso_id && <span>{event.recurso_tipo} #{event.recurso_id}</span>}
+          {event.recurso_id && (
+            <span>
+              {event.recurso_tipo} #{event.recurso_id}
+              {event.recurso_codigo ? ` · ${event.recurso_codigo}` : ''}
+            </span>
+          )}
+          {event.metadata?.method && route && <span>{event.metadata.method} {route}</span>}
         </div>
+        {fields.length > 0 && <div className="ao-event-fields"><strong>Campos:</strong> {fields.join(', ')}</div>}
+        {recordLink && (
+          <Link className="ao-record-link" to={recordLink}>
+            <HiOutlineArrowTopRightOnSquare /> {navigation ? 'Abrir pagina' : 'Abrir registro'}
+          </Link>
+        )}
       </div>
       <time>{formatDateTime(event.ocorrido_em)}</time>
     </article>
@@ -104,6 +278,7 @@ export default function AuditoriaOperacional() {
   const [filters, setFilters] = useState(initialFilters);
   const [applied, setApplied] = useState(initialFilters);
   const [summary, setSummary] = useState({});
+  const [financialIndicators, setFinancialIndicators] = useState({});
   const [users, setUsers] = useState([]);
   const [events, setEvents] = useState({ rows: [], page: 1, pages: 1, total: 0 });
   const [options, setOptions] = useState({ usuarios: [], setores: [], modulos: [] });
@@ -118,13 +293,15 @@ export default function AuditoriaOperacional() {
     setLoading(true);
     setError('');
     try {
-      const [summaryData, optionsData, usersData, eventsData] = await Promise.all([
+      const [summaryData, financialData, optionsData, usersData, eventsData] = await Promise.all([
         getAuditoriaOperacionalResumo(query),
+        getAuditoriaOperacionalIndicadoresFinanceiros(query),
         getAuditoriaOperacionalOpcoes(query),
         canUsers ? getAuditoriaOperacionalUsuarios(query) : Promise.resolve([]),
         canDetails ? getAuditoriaOperacionalEventos(query) : Promise.resolve({ rows: [], page: 1, pages: 1, total: 0 })
       ]);
       setSummary(summaryData);
+      setFinancialIndicators(financialData);
       setOptions(optionsData);
       setUsers(usersData);
       setEvents(eventsData);
@@ -185,6 +362,10 @@ export default function AuditoriaOperacional() {
         <SummaryItem label="Falhas ou bloqueios" value={summary.falhas} tone={summary.falhas ? 'danger' : 'default'} />
       </div>
 
+      <FinancialIndicators data={financialIndicators} canUsers={canUsers} />
+
+      <OperationalPanorama summary={summary} />
+
       <div className={`ao-workspace ${!canUsers ? 'summary-only' : ''}`}>
         {canUsers && (
           <aside className="ao-users-panel">
@@ -205,7 +386,16 @@ export default function AuditoriaOperacional() {
           {canDetails ? (
             <>
               <div className="ao-events-list">
-                {events.rows.map((event) => <EventItem key={event.id} event={event} />)}
+                {events.rows.map((event, index) => {
+                  const previous = events.rows[index - 1];
+                  const startsSession = event.sessao_ref && event.sessao_ref !== previous?.sessao_ref;
+                  return (
+                    <div className="ao-event-group" key={event.id}>
+                      {startsSession && <SessionDivider event={event} />}
+                      <EventItem event={event} />
+                    </div>
+                  );
+                })}
                 {!loading && !events.rows.length && <div className="ao-empty large"><HiOutlineSquares2X2 />Nenhum evento detalhado no recorte selecionado.</div>}
               </div>
               {events.pages > 1 && <div className="ao-pagination"><button type="button" disabled={page <= 1} onClick={() => setPage((old) => old - 1)}><HiOutlineChevronLeft /></button><span>Pagina {events.page} de {events.pages}</span><button type="button" disabled={page >= events.pages} onClick={() => setPage((old) => old + 1)}><HiOutlineChevronRight /></button></div>}
@@ -216,7 +406,7 @@ export default function AuditoriaOperacional() {
         </div>
       </div>
 
-      <footer className="ao-retention-note"><HiOutlineShieldCheck /> A trilha e append-only e passa a existir a partir da implantacao desta funcionalidade. Nenhum historico anterior e inferido artificialmente.</footer>
+      <footer className="ao-retention-note"><HiOutlineShieldCheck /> A trilha e append-only na aplicacao e segue a retencao operacional configurada. Nenhum historico anterior e inferido artificialmente.</footer>
     </section>
   );
 }
