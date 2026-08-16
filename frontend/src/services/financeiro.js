@@ -1747,3 +1747,79 @@ export async function confirmarBaixaPaymentIntent(id, data = {}) {
 
   return parseJson(response, 'Erro ao confirmar baixa do pagamento');
 }
+
+function buildDdaQuery(params = {}) {
+  return new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  ).toString();
+}
+
+async function ddaRequest(path, options = {}, fallbackMessage = 'Erro ao consultar DDA') {
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    cache: 'no-store',
+    headers: authHeaders({
+      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      ...(options.headers || {})
+    })
+  });
+  return parseJson(response, fallbackMessage);
+}
+
+export function getFinanceiroDdaResumo(params = {}) {
+  const query = buildDdaQuery(params);
+  return ddaRequest(`/financeiro/dda/resumo${query ? `?${query}` : ''}`, {}, 'Erro ao carregar resumo DDA');
+}
+
+export function getFinanceiroDdaBoletos(params = {}) {
+  const query = buildDdaQuery(params);
+  return ddaRequest(`/financeiro/dda/boletos${query ? `?${query}` : ''}`, {}, 'Erro ao listar documentos DDA');
+}
+
+export function getFinanceiroDdaBoleto(id) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}`, {}, 'Erro ao consultar documento DDA');
+}
+
+export function getFinanceiroDdaCandidatos(id) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}/candidatos`, {}, 'Erro ao buscar titulos candidatos');
+}
+
+export function getFinanceiroDdaSincronizacoes(params = {}) {
+  const query = buildDdaQuery(params);
+  return ddaRequest(`/financeiro/dda/sincronizacoes${query ? `?${query}` : ''}`, {}, 'Erro ao consultar sincronizacoes DDA');
+}
+
+export function sincronizarFinanceiroDda(data = {}) {
+  return ddaRequest('/financeiro/dda/sincronizar', {
+    method: 'POST',
+    body: JSON.stringify(data)
+  }, 'Erro ao sincronizar DDA');
+}
+
+export function reprocessarFinanceiroDdaMatch(id) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}/reprocessar-match`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  }, 'Erro ao reprocessar correspondencia DDA');
+}
+
+export function vincularFinanceiroDda(id, tituloId) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}/vincular`, {
+    method: 'POST',
+    body: JSON.stringify({ titulo_id: Number(tituloId) })
+  }, 'Erro ao vincular documento DDA');
+}
+
+export function confirmarFinanceiroDdaSugestao(id) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}/confirmar-sugestao`, {
+    method: 'POST',
+    body: JSON.stringify({})
+  }, 'Erro ao confirmar sugestao DDA');
+}
+
+export function ignorarFinanceiroDda(id, motivo) {
+  return ddaRequest(`/financeiro/dda/boletos/${id}/ignorar`, {
+    method: 'POST',
+    body: JSON.stringify({ motivo })
+  }, 'Erro ao ignorar documento DDA');
+}

@@ -56,6 +56,7 @@ import {
   canAccessDashboard,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessFinanceiroDda,
   canAccessBancosEnterprise,
   canAccessFiscal,
   canAccessPagamentos,
@@ -350,6 +351,7 @@ export default function Layout() {
   const prioridadesDiretoriaAccess = canAccessPrioridadesDiretoria(user);
   const solicitacoesRelatoriosAccess = canViewSolicitacoesRelatorios(user);
   const financeiroAccess = canAccessFinanceiro(user);
+  const financeiroDdaAccess = canAccessFinanceiroDda(user);
   const financeiroRelatoriosAccess = canViewFinanceiroRelatorios(user);
   const bancosEnterpriseAccess = canAccessBancosEnterprise(user);
   const fiscalAccess = canAccessFiscal(user);
@@ -481,7 +483,7 @@ export default function Layout() {
       ]);
     }
 
-    if (financeiroAccess || financeiroRelatoriosAccess || bancosEnterpriseAccess || pagamentosAccess || boletosAccess) {
+    if (financeiroAccess || financeiroDdaAccess || financeiroRelatoriosAccess || bancosEnterpriseAccess || pagamentosAccess || boletosAccess) {
       addGroup('Financeiro', [
         financeiroAccess ? item('/financeiro/contas-a-receber', 'Contas a Receber', HiOutlineWallet) : null,
         financeiroAccess ? item('/financeiro/contas-a-pagar', 'Contas a Pagar', HiOutlineWallet) : null,
@@ -494,6 +496,7 @@ export default function Layout() {
         bancosEnterpriseAccess ? item('/financeiro/bancos', 'Bancos Enterprise', HiOutlineBanknotes) : null,
         financeiroAccess ? item('/financeiro/financiamentos-bancarios', 'Financiamentos Bancarios', HiOutlineBanknotes) : null,
         pagamentosAccess ? item('/financeiro/pagamentos', 'Pagamentos em Massa', HiOutlinePaperAirplane) : null,
+        financeiroDdaAccess ? item('/financeiro/dda', 'DDA Bancario', HiOutlineClipboardDocumentCheck) : null,
         boletosAccess ? item('/financeiro/boletos', 'Boletos', HiOutlineDocumentText) : null,
         financeiroAccess ? item('/financeiro/faturas-cartao', 'Faturas de Cartao', HiOutlineCreditCard) : null,
         financeiroRelatoriosAccess ? item('/financeiro/relatorios', 'Relatórios Financeiros', HiOutlineDocumentText) : null,
@@ -709,6 +712,7 @@ export default function Layout() {
     crmLeadsAccess,
     crmLeadsCreateAccess,
     financeiroAccess,
+    financeiroDdaAccess,
     fiscalAccess,
     fiscalConfigAccess,
     fiscalDocumentsAccess,

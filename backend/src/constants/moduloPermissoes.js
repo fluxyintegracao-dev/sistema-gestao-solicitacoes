@@ -384,6 +384,18 @@ const MODULO_PERMISSION_GROUPS = [
         ]
       },
       {
+        key: 'financeiro.dda',
+        label: 'DDA Bancario',
+        permissoes: [
+          { key: 'financeiro.dda.visualizar', label: 'Visualizar DDA', descricao: 'Consultar boletos eletronicamente apresentados e seus vinculos financeiros.' },
+          { key: 'financeiro.dda.sincronizar', label: 'Sincronizar DDA', descricao: 'Solicitar consulta de documentos DDA no provedor bancario quando a integracao estiver homologada.' },
+          { key: 'financeiro.dda.vincular', label: 'Vincular titulos', descricao: 'Confirmar sugestoes exatas ou vincular manualmente um documento DDA a um titulo a pagar.' },
+          { key: 'financeiro.dda.ignorar', label: 'Ignorar documentos', descricao: 'Ignorar documento DDA mediante justificativa auditavel.' },
+          { key: 'financeiro.dda.auditar', label: 'Auditar DDA', descricao: 'Consultar sincronizacoes, eventos, divergencias e decisoes de vinculo.' },
+          { key: 'financeiro.dda.configurar', label: 'Configurar DDA', descricao: 'Gerenciar futuramente contas, escopos e provider do DDA.' }
+        ]
+      },
+      {
         key: 'financeiro.favorecidos',
         label: 'Favorecidos Bancarios',
         permissoes: [
