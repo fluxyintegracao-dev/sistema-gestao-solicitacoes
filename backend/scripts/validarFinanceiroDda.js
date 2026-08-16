@@ -34,6 +34,7 @@ function validateSchemaAndModels() {
 
 function validateMatchingAndSafety() {
   const service = readBackend('src/services/financeiroDdaService.js');
+  const paymentAccount = readBackend('src/models/PaymentAccount.js');
   [
     'MATCH_EXATO',
     'AMBIGUO',
@@ -52,6 +53,10 @@ function validateMatchingAndSafety() {
   assert(!service.includes('gerarPagamento'), 'DDA nao pode disparar pagamento automaticamente.');
   assert(!service.includes('enviarLote'), 'DDA nao pode enviar lote bancario automaticamente.');
   assert(!service.includes('aprovarLote'), 'DDA nao pode aprovar lote bancario automaticamente.');
+  assert(!service.includes("attributes: ['id', 'apelido'"), 'Consulta DDA nao pode solicitar coluna inexistente em PaymentAccount.');
+  ['conta_bancaria_id', 'banco_codigo', 'agencia', 'conta'].forEach((field) => {
+    assert(paymentAccount.includes(field), `Campo de PaymentAccount usado pelo DDA nao existe no model: ${field}`);
+  });
 }
 
 function validateRoutesPermissionsAndUi() {

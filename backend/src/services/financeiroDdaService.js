@@ -74,7 +74,11 @@ function titleInclude() {
 function boletoInclude({ detail = false } = {}) {
   const includes = [
     { model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome', 'razao_social'] },
-    { model: PaymentAccount, as: 'paymentAccount', attributes: ['id', 'apelido', 'banco_codigo', 'agencia', 'conta'] },
+    {
+      model: PaymentAccount,
+      as: 'paymentAccount',
+      attributes: ['id', 'conta_bancaria_id', 'banco_codigo', 'agencia', 'conta']
+    },
     { model: TituloFinanceiro, as: 'titulo', include: titleInclude() },
     { model: TituloFinanceiro, as: 'tituloSugerido', include: titleInclude() }
   ];

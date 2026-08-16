@@ -165,7 +165,7 @@ export default function FinanceiroDda() {
 
       <div className="flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950">
         <HiOutlineShieldCheck className="mt-0.5 shrink-0 text-lg" />
-        <div><strong>Integracao externa bloqueada.</strong> A consulta real ao BB sera habilitada somente depois da aplicacao, dos escopos e do certificado mTLS serem homologados. Nenhum titulo e criado, vinculado ou pago automaticamente.</div>
+        <div><strong>Integracao externa bloqueada.</strong> A consulta real sera habilitada quando o adapter DDA estiver configurado com os endpoints e escopos liberados na aplicacao BB existente. Nenhum titulo e criado, vinculado ou pago automaticamente.</div>
       </div>
 
       {message && (
