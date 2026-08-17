@@ -68,6 +68,8 @@ function validateBackendContracts() {
   assert(service.includes('if (!contaEhCaixaFisico(conta))'), 'Caixa fisico deve ignorar a trava de conciliacao OFX na abertura.');
   assert(service.includes('movimentoWhereVinculadoSessao'), 'Movimentos novos devem usar o vinculo canonico com a sessao do caixa.');
   assert(service.includes('movimentoWhereLegadoSessao'), 'Movimentos antigos devem manter compatibilidade por conta e periodo.');
+  assert(service.includes('model: TituloFinanceiro.unscoped()'), 'Livro do caixa deve ignorar o escopo de exclusao logica do titulo opcional.');
+  assert(service.includes("as: 'titulo',") && service.includes('required: false'), 'Titulo e usuario devem ser associacoes opcionais no livro do caixa.');
   assert(service.includes('const resumoAnterior = await calcularResumoSessao'), 'Movimento manual deve partir do resumo bloqueado da sessao.');
   assert(service.includes('detalheAtualizado = await montarDetalheSessaoCaixa(sessaoAudit.id);'), 'Livro do caixa deve ser recarregado somente depois do commit do movimento.');
   assert(!service.includes("Nenhum lancamento foi mantido"), 'Releitura de apresentacao nao deve provocar rollback de um INSERT valido.');

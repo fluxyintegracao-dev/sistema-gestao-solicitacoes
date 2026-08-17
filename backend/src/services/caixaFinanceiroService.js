@@ -255,14 +255,20 @@ function movimentoWhereLegadoSessao(sessao) {
 async function carregarMovimentosSessao(sessao, { transaction = null } = {}) {
   const include = [
     {
-      model: TituloFinanceiro,
+      // Movimentos manuais de caixa nao possuem titulo financeiro. O escopo
+      // padrao de TituloFinanceiro adiciona `deleted_at IS NULL` e, sem tornar
+      // a associacao explicitamente opcional, o Sequelize pode gerar INNER
+      // JOIN e ocultar justamente esses movimentos do livro do caixa.
+      model: TituloFinanceiro.unscoped(),
       as: 'titulo',
-      attributes: ['id', 'codigo', 'descricao', 'tipo']
+      attributes: ['id', 'codigo', 'descricao', 'tipo'],
+      required: false
     },
     {
       model: User,
       as: 'criadoPor',
-      attributes: ['id', 'nome', 'email']
+      attributes: ['id', 'nome', 'email'],
+      required: false
     }
   ];
   const queryOptions = {
