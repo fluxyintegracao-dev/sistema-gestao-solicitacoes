@@ -115,6 +115,7 @@ function buildIncludeRateiosItem() {
   return {
     model: SolicitacaoCompraItemApropriacao,
     as: 'apropriacoes',
+    separate: true,
     include: [
       { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES }
     ]
@@ -125,6 +126,7 @@ function buildIncludeRateiosItemManual() {
   return {
     model: SolicitacaoCompraItemManualApropriacao,
     as: 'apropriacoes',
+    separate: true,
     include: [
       { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES }
     ]
@@ -601,6 +603,7 @@ async function carregarSolicitacaoCompra(id) {
       {
         model: SolicitacaoCompraItem,
         as: 'itens',
+        separate: true,
         include: [
           { model: Insumo, as: 'insumo', attributes: ['id', 'nome', 'codigo'] },
           { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
@@ -611,6 +614,7 @@ async function carregarSolicitacaoCompra(id) {
       {
         model: SolicitacaoCompraItemManual,
         as: 'itensManuais',
+        separate: true,
         include: [
           { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES },
           buildIncludeRateiosItemManual()
@@ -619,6 +623,7 @@ async function carregarSolicitacaoCompra(id) {
       {
         model: SolicitacaoCompraFornecedor,
         as: 'fornecedores',
+        separate: true,
         include: [
           {
             model: FornecedorCompra,
@@ -628,11 +633,13 @@ async function carregarSolicitacaoCompra(id) {
           {
             model: SolicitacaoCompraFornecedorItem,
             as: 'itensSelecionados',
+            separate: true,
             required: false
           },
           {
             model: SolicitacaoCompraRespostaItem,
             as: 'respostas',
+            separate: true,
             where: { deleted_at: null },
             required: false,
             attributes: [
@@ -658,6 +665,7 @@ async function carregarSolicitacaoCompra(id) {
               {
                 model: SolicitacaoCompraAlocacao,
                 as: 'alocacoes',
+                separate: true,
                 attributes: [
                   'id',
                   'quantidade_alocada',
@@ -691,6 +699,7 @@ async function carregarSolicitacaoCompra(id) {
       {
         model: PedidoCompra,
         as: 'pedidos',
+        separate: true,
         include: [
           {
             model: FornecedorCompra,
@@ -700,6 +709,7 @@ async function carregarSolicitacaoCompra(id) {
           {
             model: PedidoCompraItem,
             as: 'itens',
+            separate: true,
             attributes: ['id', 'valor_total', 'removido']
           }
         ]
