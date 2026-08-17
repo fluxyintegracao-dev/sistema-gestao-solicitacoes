@@ -233,41 +233,62 @@ function obterNaturezaMovimento(movimento) {
   return 'SAIDA';
 }
 
-function movimentoWhereSessao(sessao) {
+function movimentoWhereVinculadoSessao(sessao) {
   return {
     status: 'ATIVO',
-    [Op.or]: [
-      { caixa_sessao_id: sessao.id },
-      {
-        caixa_sessao_id: null,
-        conta_bancaria_id: sessao.conta_bancaria_id,
-        data_movimento: {
-          [Op.gte]: sessao.data_abertura,
-          [Op.lte]: sessao.data_fechamento || today()
-        }
-      }
-    ]
+    caixa_sessao_id: sessao.id
+  };
+}
+
+function movimentoWhereLegadoSessao(sessao) {
+  return {
+    status: 'ATIVO',
+    caixa_sessao_id: null,
+    conta_bancaria_id: sessao.conta_bancaria_id,
+    data_movimento: {
+      [Op.gte]: sessao.data_abertura,
+      [Op.lte]: sessao.data_fechamento || today()
+    }
   };
 }
 
 async function carregarMovimentosSessao(sessao, { transaction = null } = {}) {
-  return MovimentoFinanceiro.findAll({
-    where: movimentoWhereSessao(sessao),
-    include: [
-      {
-        model: TituloFinanceiro,
-        as: 'titulo',
-        attributes: ['id', 'codigo', 'descricao', 'tipo']
-      },
-      {
-        model: User,
-        as: 'criadoPor',
-        attributes: ['id', 'nome', 'email']
-      }
-    ],
+  const include = [
+    {
+      model: TituloFinanceiro,
+      as: 'titulo',
+      attributes: ['id', 'codigo', 'descricao', 'tipo']
+    },
+    {
+      model: User,
+      as: 'criadoPor',
+      attributes: ['id', 'nome', 'email']
+    }
+  ];
+  const queryOptions = {
+    include,
     order: [['data_movimento', 'DESC'], ['id', 'DESC']],
     transaction
+  };
+
+  // O vinculo explicito com a sessao e a fonte canonica dos movimentos novos.
+  // A busca por conta/data existe apenas para movimentos antigos, anteriores ao
+  // campo caixa_sessao_id. Consultas separadas evitam que a compatibilidade
+  // legada esconda um movimento recem-criado na mesma transacao.
+  const movimentosVinculados = await MovimentoFinanceiro.findAll({
+    ...queryOptions,
+    where: movimentoWhereVinculadoSessao(sessao)
   });
+  const movimentosLegados = await MovimentoFinanceiro.findAll({
+    ...queryOptions,
+    where: movimentoWhereLegadoSessao(sessao)
+  });
+
+  return [...movimentosVinculados, ...movimentosLegados]
+    .sort((a, b) => (
+      String(b.data_movimento || '').localeCompare(String(a.data_movimento || ''))
+      || Number(b.id) - Number(a.id)
+    ));
 }
 
 async function carregarTransferenciasSessao(sessao, { transaction = null } = {}) {
@@ -302,17 +323,7 @@ async function carregarTransferenciasSessao(sessao, { transaction = null } = {})
 }
 
 async function calcularResumoSessao(sessao, { transaction = null } = {}) {
-  const movimentos = await MovimentoFinanceiro.findAll({
-    where: movimentoWhereSessao(sessao),
-    include: [
-      {
-        model: TituloFinanceiro,
-        as: 'titulo',
-        attributes: ['id', 'tipo']
-      }
-    ],
-    transaction
-  });
+  const movimentos = await carregarMovimentosSessao(sessao, { transaction });
 
   let totalEntradas = 0;
   let totalSaidas = 0;
@@ -597,12 +608,39 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
     movimentoId = movimento.id;
     sessaoAudit = sessao;
 
-    detalheAtualizado = await montarDetalheSessaoCaixa(sessao.id, { transaction });
-    const movimentoConfirmado = detalheAtualizado.movimentos_detalhados.some((item) => (
-      item.origem === 'MOVIMENTO' && Number(item.id) === Number(movimento.id)
-    ));
+    const movimentoConfirmado = await MovimentoFinanceiro.findOne({
+      where: {
+        id: movimento.id,
+        caixa_sessao_id: sessao.id,
+        status: 'ATIVO'
+      },
+      include: [
+        {
+          model: TituloFinanceiro,
+          as: 'titulo',
+          attributes: ['id', 'codigo', 'descricao', 'tipo']
+        },
+        {
+          model: User,
+          as: 'criadoPor',
+          attributes: ['id', 'nome', 'email']
+        }
+      ],
+      transaction
+    });
     if (!movimentoConfirmado) {
       throw createHttpError(500, 'Nao foi possivel confirmar o movimento no livro do caixa. Nenhum lancamento foi mantido.');
+    }
+
+    detalheAtualizado = await montarDetalheSessaoCaixa(sessao.id, { transaction });
+    const movimentoEstaNaLista = detalheAtualizado.movimentos_detalhados.some((item) => (
+      item.origem === 'MOVIMENTO' && Number(item.id) === Number(movimento.id)
+    ));
+    if (!movimentoEstaNaLista) {
+      detalheAtualizado.movimentos_detalhados = [
+        serializarMovimentoSessao(movimentoConfirmado, sessao),
+        ...detalheAtualizado.movimentos_detalhados
+      ].slice(0, 300);
     }
 
     await sessao.update({
