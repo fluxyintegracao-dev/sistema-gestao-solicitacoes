@@ -8,6 +8,7 @@ import {
   HiOutlineClock,
   HiOutlineLockClosed,
   HiOutlineLockOpen,
+  HiOutlinePlus,
   HiOutlineScale,
   HiOutlineXMark
 } from 'react-icons/hi2';
@@ -40,8 +41,8 @@ const FECHAMENTO_COLUMNS = [
   { key: 'entradas', width: 140, minWidth: 116 },
   { key: 'saidas', width: 140, minWidth: 116 },
   { key: 'saldo_contado', width: 158, minWidth: 132 },
-  { key: 'diferenca', width: 140, minWidth: 116 },
-  { key: 'responsavel', width: 210, minWidth: 160 }
+  { key: 'diferenca', width: 156, minWidth: 132 },
+  { key: 'responsavel', width: 220, minWidth: 180 }
 ];
 
 function today() {
@@ -337,13 +338,17 @@ export default function FinanceiroCaixas() {
         {caixaFisico ? (
           <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
             <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="text-base font-semibold text-[var(--c-text)]">Registrar entrada ou saída</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Use para dinheiro físico ainda não registrado por outro fluxo financeiro.</p></div>
-            <form className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleMovimento}>
-              <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
-              <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
-              <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input w-full" type="number" min="0.01" step="0.01" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: event.target.value }))} required /></label>
-              <label className="sol-filter-field sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
-              <label className="sol-filter-field sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
-              <button type="submit" className="btn btn-primary w-full sm:col-span-2 xl:col-span-1" disabled={saving}>Registrar</button>
+            <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input mt-auto w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input mt-auto w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input mt-auto w-full" type="number" min="0.01" step="0.01" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input mt-auto w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input mt-auto w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
+              <div className="flex items-center justify-end sm:col-span-2 xl:col-span-1">
+                <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Registrar entrada ou saída" title="Registrar entrada ou saída">
+                  <HiOutlinePlus className="h-5 w-5" />
+                </button>
+              </div>
             </form>
           </section>
         ) : null}
@@ -367,12 +372,16 @@ export default function FinanceiroCaixas() {
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
           <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineCheckCircle className="h-5 w-5 text-[var(--c-primary)]" /> Conferir e fechar caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.</p></div>
-          <form className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleFechar}>
-            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input w-full" type="date" value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
-            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input w-full" type="number" step="0.01" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: event.target.value }))} required /></label>
-            <div className={`rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
-            <label className="sol-filter-field sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
-            <button type="submit" className="btn btn-primary w-full sm:col-span-2 xl:col-span-2" disabled={saving}><HiOutlineLockClosed className="h-4 w-4" /> Fechar caixa</button>
+          <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="number" step="0.01" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: event.target.value }))} required /></label>
+            <div className={`flex h-full min-h-[88px] flex-col justify-center rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
+            <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input mt-auto w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
+            <div className="flex items-center justify-end sm:col-span-2 xl:col-span-2">
+              <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Fechar caixa" title="Fechar caixa">
+                <HiOutlineLockClosed className="h-5 w-5" />
+              </button>
+            </div>
           </form>
         </section>
       </> : null}
@@ -385,8 +394,8 @@ export default function FinanceiroCaixas() {
           ) : <>
             <div className="hidden overflow-x-auto md:block">
               <ResizableTable columns={FECHAMENTO_COLUMNS} storageKey="fluxy.financeiro.caixas.fechamentos.columns" className="app-table" scrollLabel="Histórico de fechamentos com colunas redimensionáveis">
-                <thead><tr><ResizableTh columnKey="abertura">Abertura</ResizableTh><ResizableTh columnKey="fechamento">Fechamento</ResizableTh><ResizableTh columnKey="saldo_inicial" className="text-right">Saldo inicial</ResizableTh><ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh><ResizableTh columnKey="saidas" className="text-right">Saídas</ResizableTh><ResizableTh columnKey="saldo_contado" className="text-right">Saldo contado</ResizableTh><ResizableTh columnKey="diferenca" className="text-right">Diferença</ResizableTh><ResizableTh columnKey="responsavel">Responsável</ResizableTh></tr></thead>
-                <tbody>{sessoesFechadas.map((sessao) => <tr key={sessao.id}><td>{formatDate(sessao.data_abertura)}</td><td>{formatDate(sessao.data_fechamento)}</td><td className="text-right">{formatCurrency(sessao.saldo_abertura)}</td><td className="text-right text-emerald-600">{formatCurrency(sessao.total_entradas)}</td><td className="text-right text-rose-600">{formatCurrency(sessao.total_saidas)}</td><td className="text-right font-semibold">{formatCurrency(sessao.saldo_informado)}</td><td className={`text-right font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</td><td>{sessao.fechadoPor?.nome || '-'}</td></tr>)}</tbody>
+                <thead><tr><ResizableTh columnKey="abertura">Abertura</ResizableTh><ResizableTh columnKey="fechamento">Fechamento</ResizableTh><ResizableTh columnKey="saldo_inicial" className="text-right">Saldo inicial</ResizableTh><ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh><ResizableTh columnKey="saidas" className="text-right">Saídas</ResizableTh><ResizableTh columnKey="saldo_contado" className="text-right">Saldo contado</ResizableTh><ResizableTh columnKey="diferenca" className="pr-4 text-right">Diferença</ResizableTh><ResizableTh columnKey="responsavel" className="border-l border-[var(--c-border)] pl-4">Responsável</ResizableTh></tr></thead>
+                <tbody>{sessoesFechadas.map((sessao) => <tr key={sessao.id}><td>{formatDate(sessao.data_abertura)}</td><td>{formatDate(sessao.data_fechamento)}</td><td className="text-right">{formatCurrency(sessao.saldo_abertura)}</td><td className="text-right text-emerald-600">{formatCurrency(sessao.total_entradas)}</td><td className="text-right text-rose-600">{formatCurrency(sessao.total_saidas)}</td><td className="text-right font-semibold">{formatCurrency(sessao.saldo_informado)}</td><td className={`pr-4 text-right font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</td><td className="border-l border-[var(--c-border)] pl-4 whitespace-normal">{sessao.fechadoPor?.nome || '-'}</td></tr>)}</tbody>
               </ResizableTable>
             </div>
             <div className="grid gap-3 p-3 md:hidden">
