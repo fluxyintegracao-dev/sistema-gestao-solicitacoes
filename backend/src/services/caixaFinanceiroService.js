@@ -588,6 +588,12 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
     if (dataMovimento < sessao.data_abertura) {
       throw createHttpError(400, 'A data do movimento nao pode ser anterior a abertura do caixa.');
     }
+    // Calcula a base antes do INSERT. A sessao esta bloqueada para UPDATE, entao
+    // dois lancamentos manuais no mesmo caixa nao atualizam os totais em paralelo.
+    // A recarga completa do livro e feita somente depois do commit: em alguns
+    // ambientes MySQL a releitura ORM dentro desta transacao nao enxergava a
+    // linha recem-criada e provocava um rollback indevido.
+    const resumoAnterior = await calcularResumoSessao(sessao, { transaction });
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: null,
       conta_bancaria_id: sessao.conta_bancaria_id,
@@ -608,50 +614,30 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
     movimentoId = movimento.id;
     sessaoAudit = sessao;
 
-    const movimentoConfirmado = await MovimentoFinanceiro.findOne({
-      where: {
-        id: movimento.id,
-        caixa_sessao_id: sessao.id,
-        status: 'ATIVO'
-      },
-      include: [
-        {
-          model: TituloFinanceiro,
-          as: 'titulo',
-          attributes: ['id', 'codigo', 'descricao', 'tipo']
-        },
-        {
-          model: User,
-          as: 'criadoPor',
-          attributes: ['id', 'nome', 'email']
-        }
-      ],
-      transaction
-    });
-    if (!movimentoConfirmado) {
-      throw createHttpError(500, 'Nao foi possivel confirmar o movimento no livro do caixa. Nenhum lancamento foi mantido.');
-    }
-
-    detalheAtualizado = await montarDetalheSessaoCaixa(sessao.id, { transaction });
-    const movimentoEstaNaLista = detalheAtualizado.movimentos_detalhados.some((item) => (
-      item.origem === 'MOVIMENTO' && Number(item.id) === Number(movimento.id)
-    ));
-    if (!movimentoEstaNaLista) {
-      detalheAtualizado.movimentos_detalhados = [
-        serializarMovimentoSessao(movimentoConfirmado, sessao),
-        ...detalheAtualizado.movimentos_detalhados
-      ].slice(0, 300);
-    }
+    const totalEntradas = roundCurrency(
+      resumoAnterior.total_entradas + (natureza === 'ENTRADA' ? valor : 0)
+    );
+    const totalSaidas = roundCurrency(
+      resumoAnterior.total_saidas + (natureza === 'SAIDA' ? valor : 0)
+    );
+    const saldoSistema = roundCurrency(
+      Number(sessao.saldo_abertura || 0) + totalEntradas - totalSaidas
+    );
 
     await sessao.update({
-      total_entradas: detalheAtualizado.resumo_atual.total_entradas,
-      total_saidas: detalheAtualizado.resumo_atual.total_saidas,
-      saldo_sistema: detalheAtualizado.resumo_atual.saldo_sistema
+      total_entradas: totalEntradas,
+      total_saidas: totalSaidas,
+      saldo_sistema: saldoSistema
     }, { transaction });
-    detalheAtualizado.total_entradas = detalheAtualizado.resumo_atual.total_entradas;
-    detalheAtualizado.total_saidas = detalheAtualizado.resumo_atual.total_saidas;
-    detalheAtualizado.saldo_sistema = detalheAtualizado.resumo_atual.saldo_sistema;
   });
+
+  // Fora da transacao, a listagem consulta apenas dados efetivamente commitados.
+  // O INSERT e a atualizacao dos totais continuam atomicos: qualquer erro dentro
+  // do bloco acima reverte ambos antes de chegar a esta recarga.
+  detalheAtualizado = await montarDetalheSessaoCaixa(sessaoAudit.id);
+  detalheAtualizado.total_entradas = detalheAtualizado.resumo_atual.total_entradas;
+  detalheAtualizado.total_saidas = detalheAtualizado.resumo_atual.total_saidas;
+  detalheAtualizado.saldo_sistema = detalheAtualizado.resumo_atual.saldo_sistema;
 
   await registrarEventoSeguranca({
     req,

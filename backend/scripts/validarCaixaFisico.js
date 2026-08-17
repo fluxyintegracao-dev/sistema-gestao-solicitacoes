@@ -68,11 +68,11 @@ function validateBackendContracts() {
   assert(service.includes('if (!contaEhCaixaFisico(conta))'), 'Caixa fisico deve ignorar a trava de conciliacao OFX na abertura.');
   assert(service.includes('movimentoWhereVinculadoSessao'), 'Movimentos novos devem usar o vinculo canonico com a sessao do caixa.');
   assert(service.includes('movimentoWhereLegadoSessao'), 'Movimentos antigos devem manter compatibilidade por conta e periodo.');
-  assert(service.includes('const movimentoConfirmado = await MovimentoFinanceiro.findOne'), 'Movimento manual deve ser confirmado diretamente antes da resposta de sucesso.');
-  assert(service.includes('movimentoEstaNaLista'), 'Movimento confirmado deve ser incluido na lista retornada ao frontend.');
-  assert(service.includes("Nenhum lancamento foi mantido"), 'Falha de confirmacao deve provocar rollback explicito.');
+  assert(service.includes('const resumoAnterior = await calcularResumoSessao'), 'Movimento manual deve partir do resumo bloqueado da sessao.');
+  assert(service.includes('detalheAtualizado = await montarDetalheSessaoCaixa(sessaoAudit.id);'), 'Livro do caixa deve ser recarregado somente depois do commit do movimento.');
+  assert(!service.includes("Nenhum lancamento foi mantido"), 'Releitura de apresentacao nao deve provocar rollback de um INSERT valido.');
   assert(service.includes("...sessao.get({ plain: true })"), 'Detalhe do caixa deve ser serializado explicitamente para o frontend.');
-  assert(service.includes('total_entradas: detalheAtualizado.resumo_atual.total_entradas'), 'Resumo persistido deve acompanhar o movimento confirmado.');
+  assert(service.includes('total_entradas: totalEntradas'), 'Resumo persistido deve acompanhar atomicamente o movimento criado.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos'"), 'Rota de movimento manual ausente.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos/:movimentoId/estornar'"), 'Rota de estorno manual ausente.');
   assert(routes.includes('criticalRateLimit'), 'Rotas criticas do caixa devem manter rate limit.');
