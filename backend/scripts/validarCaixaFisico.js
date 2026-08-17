@@ -50,6 +50,7 @@ function validatePayloads() {
 
 function validateBackendContracts() {
   const service = readBackend('src/services/caixaFinanceiroService.js');
+  const sessionHelper = readBackend('src/services/financeiroCaixaSessionHelper.js');
   const routes = readBackend('src/routes.js');
   const controller = readBackend('src/controllers/CaixaFinanceiroController.js');
 
@@ -77,6 +78,8 @@ function validateBackendContracts() {
   assert(!service.includes("Nenhum lancamento foi mantido"), 'Releitura de apresentacao nao deve provocar rollback de um INSERT valido.');
   assert(service.includes("...sessao.get({ plain: true })"), 'Detalhe do caixa deve ser serializado explicitamente para o frontend.');
   assert(service.includes('total_entradas: totalEntradas'), 'Resumo persistido deve acompanhar atomicamente o movimento criado.');
+  assert(sessionHelper.includes('Number(valorConfigurado) === 1'), 'Flag numerica do controle diario deve ser interpretada corretamente.');
+  assert(sessionHelper.includes(".trim().toLowerCase() === 'true'"), 'Flag textual do controle diario deve aceitar somente true explicito.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos'"), 'Rota de movimento manual ausente.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos/:movimentoId/estornar'"), 'Rota de estorno manual ausente.');
   assert(routes.includes('criticalRateLimit'), 'Rotas criticas do caixa devem manter rate limit.');

@@ -1525,8 +1525,11 @@ function validateFinanceTituloBaixaBody(body = {}) {
   const usarChequeTerceiro = parseBoolean(body.usar_cheque_terceiro, 'Usar cheque de terceiro');
   const chequeTerceiroId = parseInteger(body.cheque_terceiro_id, 'Cheque de terceiro');
   const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
+  if (formaRecebimento === 'DINHEIRO' && !contaBancariaId) {
+    throw new ValidationError('Selecione o caixa fisico usado na baixa em dinheiro.');
+  }
   const exigeContaBancaria = (
-    (!formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento))
+    (!formaRecebimento || !['CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento))
     && !(formaRecebimento === 'CHEQUE' && usarChequeTerceiro)
   );
 

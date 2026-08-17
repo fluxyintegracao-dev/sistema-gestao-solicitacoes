@@ -57,6 +57,9 @@ function validateSecurityAndTransactions() {
   assert(service.includes('isValidCpfCnpj'), 'Cadastro de cheque deve validar CPF/CNPJ do titular.');
   assert(service.includes('normalizarCpfCnpj'), 'CPF/CNPJ do titular deve ser persistido sem mascara.');
   assert(service.includes('Informe numero e emitente do cheque na operacao'), 'Cheque proprio da baixa composta deve exigir identificacao.');
+  assert(service.includes("tipo === 'DINHEIRO'"), 'Baixa composta deve reconhecer a fonte em dinheiro.');
+  assert(service.includes('em dinheiro deve usar um caixa fisico com controle de abertura e fechamento'), 'Dinheiro deve exigir conta de caixa fisico.');
+  assert(service.includes('obterSessaoAbertaParaConta'), 'Dinheiro deve validar a sessao aberta do caixa.');
   assert(titleService.includes('buildChequeMovimentoFields'), 'Baixa simples deve persistir os dados do cheque no movimento.');
 }
 
@@ -108,6 +111,9 @@ function validateFrontend() {
   assert(modal.includes('Cheque de terceiro em carteira'), 'Modal deve identificar claramente os cheques cadastrados em carteira.');
   assert(modal.includes('Selecione um cheque cadastrado'), 'Opcao vazia do cheque nao pode sugerir uma origem ambigua.');
   assert(modal.includes('ChequePagamentoFields'), 'Baixa composta deve coletar os dados do cheque proprio em cada fonte.');
+  assert(modal.includes('validateCashSources'), 'Baixa composta deve validar as fontes em dinheiro antes do envio.');
+  assert(modal.includes('Caixa físico *'), 'Fonte em dinheiro deve identificar o seletor de caixa fisico.');
+  assert(modal.includes('contaExigeControleDiario'), 'Fonte em dinheiro deve filtrar apenas contas fisicas controladas.');
   assert(titles.includes('ChequePagamentoFields'), 'Baixa selecionada e em massa devem coletar os dados do cheque.');
   assert(titleDetail.includes('Cheque nº'), 'Detalhe do titulo deve exibir o cheque vinculado ao movimento.');
   ['cheque_numero', 'cheque_emitente', 'titular_documento', 'data_vencimento']

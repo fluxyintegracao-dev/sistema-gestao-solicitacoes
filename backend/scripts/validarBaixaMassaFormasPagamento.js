@@ -33,17 +33,26 @@ function validateContracts() {
   assert(partnerService.includes('incluir_fornecedores_compra'));
   assert(!frontend.includes('const FORMAS_RECEBIMENTO ='));
   assert(validator.includes("'forma_pagamento_id'"));
+  assert(validator.includes('Selecione o caixa fisico usado na baixa em dinheiro.'));
   assert(movement.includes('forma_pagamento_id'));
   assert(detail.includes('movimento.formaPagamento?.nome'));
   assert(detail.includes("fontesFinanceirasAtivas"));
   assert(detail.includes("fonte.empresa?.nome"));
   assert(detail.includes("fonte.conta_bancaria?.nome"));
   assert(detail.includes("hideFinancialReferenceIds"));
+  assert(detail.includes('baixaUsaDinheiro'));
+  assert(detail.includes('Caixa fisico *'));
+  assert(detail.includes('loadingChequesTerceiros'));
+  assert(frontend.includes('baixaMassaUsaDinheiro'));
+  assert(frontend.includes('contasFinanceirasCompativeisBaixaMassa'));
 
   const tituloService = fs.readFileSync(path.resolve(__dirname, '../src/services/tituloFinanceiroService.js'), 'utf8');
   assert(tituloService.includes('fontes_financeiras: fontesFinanceiras'));
   assert(tituloService.includes("as: 'empresa'"));
   assert(tituloService.includes("as: 'contaBancaria'"));
+  assert(tituloService.includes("formaMovimento === 'DINHEIRO'"));
+  assert(tituloService.includes('contaExigeSessao(contaMovimento)'));
+  assert(tituloService.includes("exigir: formaMovimento === 'DINHEIRO'"));
 }
 
 validateMappings();

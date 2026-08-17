@@ -41,7 +41,7 @@ const {
   obterOuCriarFaturaCartao,
   vincularTituloAFatura
 } = require('./faturaCartaoFinanceiroService');
-const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
+const { contaExigeSessao, obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
 const {
@@ -3455,8 +3455,23 @@ async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
     const contaMovimento = cartaoBaixa.conta || conta;
     const formaMovimento = cartaoBaixa.formaRecebimento;
 
+    if (formaMovimento === 'DINHEIRO') {
+      if (!contaMovimento) {
+        throw createHttpError(400, 'Selecione o caixa fisico usado na baixa em dinheiro.');
+      }
+      if (!contaExigeSessao(contaMovimento)) {
+        throw createHttpError(
+          400,
+          'A baixa em dinheiro deve usar uma conta de caixa fisico com controle de abertura e fechamento.'
+        );
+      }
+    }
+
     const caixaSessao = contaMovimento
-      ? await obterSessaoAbertaParaConta(contaMovimento, payload.data_movimento, { transaction })
+      ? await obterSessaoAbertaParaConta(contaMovimento, payload.data_movimento, {
+        transaction,
+        exigir: formaMovimento === 'DINHEIRO'
+      })
       : null;
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: titulo.id,

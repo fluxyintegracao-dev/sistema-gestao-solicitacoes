@@ -25,6 +25,16 @@ function operationalType(forma) {
   return 'OUTROS';
 }
 
+function contaExigeControleDiario(conta) {
+  const valorConfigurado = conta?.exige_abertura_fechamento;
+  const exigeAberturaFechamento = valorConfigurado === true
+    || Number(valorConfigurado) === 1
+    || String(valorConfigurado || '').trim().toLowerCase() === 'true';
+
+  return exigeAberturaFechamento
+    || String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
+}
+
 function newComponent(formas = [], empresaId = '') {
   return {
     empresa_id: empresaId,
@@ -142,7 +152,21 @@ export default function BaixaCompostaModal({
     return { empresa_id: empresaId, data_movimento: dataMovimento, observacoes, componentes, alocacoes };
   }
 
+  function validateCashSources() {
+    const fonteDinheiroInvalida = components.find((component) => {
+      const forma = formas.find((item) => Number(item.id) === Number(component.forma_pagamento_id));
+      if (operationalType(forma) !== 'DINHEIRO') return false;
+      const conta = contas.find((item) => Number(item.id) === Number(component.conta_bancaria_id));
+      return !contaExigeControleDiario(conta);
+    });
+
+    if (!fonteDinheiroInvalida) return true;
+    setError('Cada fonte em dinheiro deve usar um caixa fisico com controle de abertura e fechamento.');
+    return false;
+  }
+
   async function review() {
+    if (!validateCashSources()) return;
     setSaving(true); setError('');
     try { setPreview(await previewBaixaFinanceiraComposta(buildPayload())); }
     catch (err) { setError(err.message || 'Revise as fontes e os rateios.'); }
@@ -150,6 +174,7 @@ export default function BaixaCompostaModal({
   }
 
   async function confirm() {
+    if (!validateCashSources()) return;
     setSaving(true); setError('');
     try {
       const result = await confirmarBaixaFinanceiraComposta(buildPayload(), crypto.randomUUID());
@@ -179,6 +204,9 @@ export default function BaixaCompostaModal({
             const forma = formas.find((item) => Number(item.id) === Number(component.forma_pagamento_id));
             const type = operationalType(forma);
             const contasEmpresa = contas.filter((item) => item.ativo !== false && (!component.empresa_id || Number(item.empresa_id) === Number(component.empresa_id)));
+            const contasCompativeis = type === 'DINHEIRO'
+              ? contasEmpresa.filter((item) => contaExigeControleDiario(item))
+              : contasEmpresa;
             const chequesEmpresa = cheques.filter((item) => String(item.status).toUpperCase() === 'EM_CARTEIRA' && (!component.empresa_id || Number(item.empresa_id) === Number(component.empresa_id)));
             const cartoesEmpresa = cartoes.filter((item) => {
               if (item.ativo === false || !component.empresa_id) return item.ativo !== false;
@@ -194,7 +222,7 @@ export default function BaixaCompostaModal({
               <label className="form-control"><span>Empresa da fonte *</span><select className="select" value={component.empresa_id} onChange={(e) => updateComponent(index, 'empresa_id', e.target.value)}><option value="">Selecione</option>{empresasDisponiveis.map((item) => <option key={item.id} value={item.id}>{item.nome || item.razao_social || `Empresa #${item.id}`}</option>)}</select></label>
               <label className="form-control"><span>Forma *</span><select className="select" value={component.forma_pagamento_id} onChange={(e) => updateComponent(index, 'forma_pagamento_id', e.target.value)}><option value="">Selecione</option>{formas.filter((item) => item.ativo !== false && !item.gera_fatura).map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></label>
               {type === 'CHEQUE' ? <label className="form-control"><span>Cheque de terceiro em carteira</span><select className="select" value={component.cheque_terceiro_id} onChange={(e) => updateComponent(index, 'cheque_terceiro_id', e.target.value)}><option value="">Selecione um cheque cadastrado</option>{chequesEmpresa.map((item) => <option key={item.id} value={item.id}>{item.codigo} · Nº {item.numero_cheque} · {money(item.valor)}</option>)}</select>{!component.cheque_terceiro_id ? <small className="mt-1 text-xs text-[var(--c-muted)]">Sem seleção, informe a conta e o número do cheque emitido pela empresa.</small> : null}</label> : null}
-              {!['DINHEIRO', 'PERMUTA', 'OUTROS'].includes(type) && !(type === 'CHEQUE' && component.cheque_terceiro_id) ? <label className="form-control"><span>Conta financeira *</span><select className="select" value={component.conta_bancaria_id} onChange={(e) => updateComponent(index, 'conta_bancaria_id', e.target.value)}><option value="">Selecione</option>{contasEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select></label> : null}
+              {!['PERMUTA', 'OUTROS'].includes(type) && !(type === 'CHEQUE' && component.cheque_terceiro_id) ? <label className="form-control"><span>{type === 'DINHEIRO' ? 'Caixa físico *' : 'Conta financeira *'}</span><select className="select" value={component.conta_bancaria_id} onChange={(e) => updateComponent(index, 'conta_bancaria_id', e.target.value)}><option value="">{type === 'DINHEIRO' ? 'Selecione o caixa físico' : 'Selecione'}</option>{contasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome || item.banco_nome || `Conta #${item.id}`}</option>)}</select>{type === 'DINHEIRO' ? <small className="mt-1 text-xs text-[var(--c-muted)]">O caixa deve estar aberto e abranger a data do pagamento.{component.empresa_id && contasCompativeis.length === 0 ? ' Nenhum caixa físico ativo foi encontrado para esta empresa.' : ''}</small> : null}</label> : null}
               {type === 'CARTAO' ? <label className="form-control"><span>Cartão *</span><select className="select" value={component.cartao_id} onChange={(e) => updateComponent(index, 'cartao_id', e.target.value)}><option value="">Selecione</option>{cartoesEmpresa.map((item) => <option key={item.id} value={item.id}>{item.nome || item.descricao || `Cartão #${item.id}`}</option>)}</select></label> : null}
               <label className="form-control"><span>Valor da fonte *</span><input className="input" type="number" min="0.01" step="0.01" value={component.valor} readOnly={Boolean(component.cheque_terceiro_id)} onChange={(e) => updateComponent(index, 'valor', e.target.value)} /></label>
               {type !== 'CHEQUE' ? <label className="form-control"><span>Documento</span><input className="input" value={component.documento_referencia} onChange={(e) => updateComponent(index, 'documento_referencia', e.target.value)} /></label> : null}
