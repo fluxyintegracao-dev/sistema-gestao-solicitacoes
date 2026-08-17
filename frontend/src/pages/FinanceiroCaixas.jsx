@@ -244,10 +244,29 @@ export default function FinanceiroCaixas() {
   const sessoesFechadas = useMemo(() => sessoes.filter((sessao) => sessao.status === 'FECHADO'), [sessoes]);
   const resumo = sessaoDetalhe?.resumo_atual || sessaoAberta?.resumo_atual || {};
   const movimentos = Array.isArray(sessaoDetalhe?.movimentos_detalhados) ? sessaoDetalhe.movimentos_detalhados : [];
+  const dataMinimaFechamento = useMemo(() => {
+    const datasValidas = [
+      today(),
+      String(sessaoAberta?.data_abertura || ''),
+      ...movimentos.map((movimento) => String(movimento?.data || ''))
+    ]
+      .filter((data) => /^\d{4}-\d{2}-\d{2}$/.test(data))
+      .sort();
+
+    return datasValidas[datasValidas.length - 1] || today();
+  }, [movimentos, sessaoAberta?.data_abertura]);
   const saldoSistema = Number(resumo.saldo_sistema ?? sessaoAberta?.saldo_sistema ?? 0);
   const saldoInformado = parseCurrencyInput(fecharForm.saldo_informado);
   const diferencaFechamento = Number.isFinite(saldoInformado) ? saldoInformado - saldoSistema : 0;
   const caixaFisico = contaEhCaixaFisico(contaSelecionada);
+
+  useEffect(() => {
+    setFecharForm((current) => (
+      current.data_fechamento >= dataMinimaFechamento
+        ? current
+        : { ...current, data_fechamento: dataMinimaFechamento }
+    ));
+  }, [dataMinimaFechamento]);
 
   async function executar(acao, mensagemErro) {
     try {
@@ -303,6 +322,10 @@ export default function FinanceiroCaixas() {
   async function handleFechar(event) {
     event.preventDefault();
     if (!sessaoAberta) return;
+    if (fecharForm.data_fechamento < dataMinimaFechamento) {
+      setError(`A data de fechamento nao pode ser anterior a ${formatDate(dataMinimaFechamento)}.`);
+      return;
+    }
     await executar(async () => {
       await fecharCaixaFinanceiro(sessaoAberta.id, {
         ...fecharForm,
@@ -439,7 +462,7 @@ export default function FinanceiroCaixas() {
         <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
           <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineCheckCircle className="h-5 w-5 text-[var(--c-primary)]" /> Conferir e fechar caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.</p></div>
           <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
-            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" min={dataMinimaFechamento} value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
             <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
             <div className={`flex h-full min-h-[88px] flex-col justify-center rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
             <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input mt-auto w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
@@ -473,7 +496,7 @@ export default function FinanceiroCaixas() {
 
       {loading ? <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando controle de caixa...</div> : null}
 
-      {estorno.movimento ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="estorno-caixa-title"><form className="w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-2xl" onSubmit={handleEstornar}><div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4"><div><h2 id="estorno-caixa-title" className="text-base font-semibold text-[var(--c-text)]">Estornar movimento</h2><p className="mt-1 text-sm text-[var(--c-muted)]">O registro será preservado e marcado como estornado na auditoria.</p></div><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento: null, motivo: '' })} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button></div><div className="space-y-3 p-4"><div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3 text-sm"><strong className="block text-[var(--c-text)]">{estorno.movimento.descricao}</strong><span className="text-[var(--c-muted)]">{formatDate(estorno.movimento.data)} · {formatCurrency(estorno.movimento.valor)}</span></div><label className="sol-filter-field"><span className="sol-filter-label">Motivo do estorno *</span><textarea className="input min-h-24 w-full" minLength={10} maxLength={4000} value={estorno.motivo} onChange={(event) => setEstorno((current) => ({ ...current, motivo: event.target.value }))} placeholder="Explique o motivo com pelo menos 10 caracteres" required /></label></div><div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4"><button type="button" className="btn btn-secondary" onClick={() => setEstorno({ movimento: null, motivo: '' })}>Cancelar</button><button type="submit" className="btn btn-primary" disabled={saving}>Confirmar estorno</button></div></form></div> : null}
+      {estorno.movimento ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="estorno-caixa-title"><form className="isolate w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--modal-bg)] text-[var(--c-text)] shadow-2xl" onSubmit={handleEstornar}><div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4"><div><h2 id="estorno-caixa-title" className="text-base font-semibold text-[var(--c-text)]">Estornar movimento</h2><p className="mt-1 text-sm text-[var(--c-muted)]">O registro será preservado e marcado como estornado na auditoria.</p></div><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento: null, motivo: '' })} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button></div><div className="space-y-3 p-4"><div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3 text-sm"><strong className="block text-[var(--c-text)]">{estorno.movimento.descricao}</strong><span className="text-[var(--c-muted)]">{formatDate(estorno.movimento.data)} · {formatCurrency(estorno.movimento.valor)}</span></div><label className="sol-filter-field"><span className="sol-filter-label">Motivo do estorno *</span><textarea className="input min-h-24 w-full" minLength={10} maxLength={4000} value={estorno.motivo} onChange={(event) => setEstorno((current) => ({ ...current, motivo: event.target.value }))} placeholder="Explique o motivo com pelo menos 10 caracteres" required /></label></div><div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4"><button type="button" className="btn btn-secondary" onClick={() => setEstorno({ movimento: null, motivo: '' })}>Cancelar</button><button type="submit" className="btn btn-primary" disabled={saving}>Confirmar estorno</button></div></form></div> : null}
     </div>
   );
 }

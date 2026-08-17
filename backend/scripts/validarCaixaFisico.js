@@ -68,6 +68,8 @@ function validateBackendContracts() {
   assert(service.includes('if (!contaEhCaixaFisico(conta))'), 'Caixa fisico deve ignorar a trava de conciliacao OFX na abertura.');
   assert(service.includes('movimentoWhereVinculadoSessao'), 'Movimentos novos devem usar o vinculo canonico com a sessao do caixa.');
   assert(service.includes('movimentoWhereLegadoSessao'), 'Movimentos antigos devem manter compatibilidade por conta e periodo.');
+  assert(service.includes('obterDataMinimaFechamento'), 'Fechamento deve considerar hoje e o movimento mais recente da sessao.');
+  assert(service.includes('Data de fechamento nao pode ser retroativa'), 'Backend deve bloquear fechamento retroativo do caixa.');
   assert(service.includes('model: TituloFinanceiro.unscoped()'), 'Livro do caixa deve ignorar o escopo de exclusao logica do titulo opcional.');
   assert(service.includes("as: 'titulo',") && service.includes('required: false'), 'Titulo e usuario devem ser associacoes opcionais no livro do caixa.');
   assert(service.includes('const resumoAnterior = await calcularResumoSessao'), 'Movimento manual deve partir do resumo bloqueado da sessao.');
@@ -97,6 +99,7 @@ function validateFrontendContracts() {
   ].forEach((contract) => assert(page.includes(contract), `Contrato de interface ausente: ${contract}`));
 
   assert(page.includes("tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO'"), 'Interface deve distinguir caixa fisico de conta bancaria.');
+  assert(page.includes('min={dataMinimaFechamento}'), 'Interface deve impedir a selecao de data de fechamento retroativa.');
   assert(api.includes('registrarMovimentoCaixaFinanceiro'), 'Cliente da API de movimento manual ausente.');
   assert(api.includes('estornarMovimentoCaixaFinanceiro'), 'Cliente da API de estorno manual ausente.');
 }

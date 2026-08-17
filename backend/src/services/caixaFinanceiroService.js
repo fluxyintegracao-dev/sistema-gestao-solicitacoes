@@ -328,6 +328,58 @@ async function carregarTransferenciasSessao(sessao, { transaction = null } = {})
   });
 }
 
+async function obterDataMinimaFechamento(sessao, { transaction = null } = {}) {
+  const ultimoMovimento = await MovimentoFinanceiro.findOne({
+    attributes: ['data_movimento'],
+    where: {
+      status: 'ATIVO',
+      [Op.or]: [
+        { caixa_sessao_id: sessao.id },
+        {
+          caixa_sessao_id: null,
+          conta_bancaria_id: sessao.conta_bancaria_id,
+          data_movimento: { [Op.gte]: sessao.data_abertura }
+        }
+      ]
+    },
+    order: [['data_movimento', 'DESC'], ['id', 'DESC']],
+    transaction
+  });
+
+  const ultimaTransferencia = await TransferenciaFinanceira.findOne({
+    attributes: ['data_transferencia'],
+    where: {
+      status: 'ATIVA',
+      data_transferencia: { [Op.gte]: sessao.data_abertura },
+      [Op.or]: [
+        { caixa_sessao_origem_id: sessao.id },
+        { caixa_sessao_destino_id: sessao.id },
+        {
+          caixa_sessao_origem_id: null,
+          conta_origem_id: sessao.conta_bancaria_id
+        },
+        {
+          caixa_sessao_destino_id: null,
+          conta_destino_id: sessao.conta_bancaria_id
+        }
+      ]
+    },
+    order: [['data_transferencia', 'DESC'], ['id', 'DESC']],
+    transaction
+  });
+
+  const datasValidas = [
+    today(),
+    String(sessao.data_abertura || ''),
+    String(ultimoMovimento?.data_movimento || ''),
+    String(ultimaTransferencia?.data_transferencia || '')
+  ]
+    .filter((data) => /^\d{4}-\d{2}-\d{2}$/.test(data))
+    .sort();
+
+  return datasValidas[datasValidas.length - 1] || today();
+}
+
 async function calcularResumoSessao(sessao, { transaction = null } = {}) {
   const movimentos = await carregarMovimentosSessao(sessao, { transaction });
 
@@ -500,6 +552,13 @@ async function fecharSessaoCaixa(req, sessaoId, payload = {}) {
     const dataFechamento = parseDate(payload.data_fechamento, 'Data de fechamento', today());
     if (dataFechamento < sessao.data_abertura) {
       throw createHttpError(400, 'Data de fechamento nao pode ser anterior a data de abertura.');
+    }
+    const dataMinimaFechamento = await obterDataMinimaFechamento(sessao, { transaction });
+    if (dataFechamento < dataMinimaFechamento) {
+      throw createHttpError(
+        400,
+        `Data de fechamento nao pode ser retroativa nem anterior ao ultimo movimento do caixa (${dataMinimaFechamento}).`
+      );
     }
 
     sessao.data_fechamento = dataFechamento;

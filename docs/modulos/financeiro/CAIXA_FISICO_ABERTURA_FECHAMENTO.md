@@ -73,6 +73,7 @@ Baixas, transferencias e movimentos originados em outros modulos devem ser corri
 O usuario conta o dinheiro e informa o saldo encontrado.
 
 - sem divergencia, o fechamento pode ser confirmado normalmente;
+- a data de fechamento nao pode ser retroativa, anterior a abertura nem anterior ao movimento mais recente da sessao;
 - com divergencia entre saldo contado e saldo calculado, a justificativa com pelo menos 10 caracteres e obrigatoria;
 - saldo calculado, saldo contado, diferenca, responsavel e horario ficam preservados;
 - depois do fechamento, a sessao nao aceita novos movimentos;
@@ -105,6 +106,7 @@ O endpoint legado `POST /financeiro/caixas/confirmar-conciliacao-dia` permanece 
 | Estornar o mesmo movimento novamente | Operacao bloqueada |
 | Estornar movimento originado em outro fluxo | Operacao bloqueada |
 | Fechar com saldo igual | Sessao fechada sem divergencia |
+| Fechar com data retroativa ou anterior ao ultimo movimento | Operacao bloqueada |
 | Fechar com divergencia sem justificativa valida | Operacao bloqueada |
 | Fechar com divergencia justificada | Sessao fechada e diferenca auditada |
 | Registrar movimento depois do fechamento | Operacao bloqueada |
