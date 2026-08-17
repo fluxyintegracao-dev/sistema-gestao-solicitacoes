@@ -3291,6 +3291,43 @@ a:hover {
 
 .solicitacoes-massa-modal {
   backdrop-filter: blur(6px);
+  max-width: calc(100vw - 1rem);
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-width: none;
+}
+
+.solicitacoes-massa-modal::-webkit-scrollbar {
+  display: none;
+}
+
+.solicitacoes-massa-contador {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.layout-shell .solicitacoes-massa-acao {
+  width: 2.5rem;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  min-height: 2.5rem;
+  flex: 0 0 2.5rem;
+  gap: 0;
+  padding: 0;
+  border-radius: 0.75rem;
+}
+
+.layout-shell .solicitacoes-massa-acao svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.layout-shell .solicitacoes-massa-acao--perigo {
+  color: #dc2626;
+}
+
+.dark .layout-shell .solicitacoes-massa-acao--perigo {
+  color: #fca5a5;
 }
 
 @media (max-width: 767px) {
@@ -3299,6 +3336,14 @@ a:hover {
     justify-content: space-between;
     padding: 0.5rem;
     border-radius: 14px;
+  }
+
+  .layout-shell .solicitacoes-massa-acao {
+    width: 2.75rem;
+    min-width: 2.75rem;
+    height: 2.75rem;
+    min-height: 2.75rem;
+    flex-basis: 2.75rem;
   }
 }
 

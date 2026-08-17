@@ -5,7 +5,9 @@ import {
   HiDocumentArrowDown,
   HiViewColumns,
   HiOutlineEye,
+  HiOutlineHandRaised,
   HiOutlineUserPlus,
+  HiOutlineUserGroup,
   HiOutlineFolderOpen,
   HiOutlineArrowRightOnRectangle,
   HiOutlineBanknotes,
@@ -1861,154 +1863,156 @@ export default function Solicitacoes({ arquivadas = false }) {
 
       {selecionadasIds.length > 0 && (
         <div className="solicitacoes-massa-modal fixed left-1/2 -translate-x-1/2 bottom-4 z-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-xl rounded-2xl px-3 py-2 flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
+          <span className="solicitacoes-massa-contador text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
             {selecionadasIds.length} selecionada(s)
           </span>
 
           {selecionadaUnica && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={() => navigate(`/solicitacoes/${selecionadaUnica.id}`)}
               title="Ver solicitação"
+              aria-label="Ver solicitação"
             >
               <HiOutlineEye className="w-4 h-4" />
-              <span className="hidden sm:inline">Ver</span>
             </button>
           )}
 
           {!arquivadas && selecionadaUnica && podeAssumirUnica && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={assumirSelecionada}
               disabled={processandoMassa}
               title="Assumir solicitação"
+              aria-label="Assumir solicitação"
             >
-              <HiOutlineUserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Assumir</span>
+              <HiOutlineHandRaised className="w-4 h-4" />
             </button>
           )}
 
           {!arquivadas && selecionadaUnica && podeAtribuirUnica && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={() => setModalAtribuir(true)}
               disabled={processandoMassa}
               title="Atribuir responsável"
+              aria-label="Atribuir responsável"
             >
               <HiOutlineUserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Atribuir</span>
             </button>
           )}
 
           <button
             type="button"
-            className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+            className="btn btn-outline solicitacoes-massa-acao"
             onClick={exportarSolicitacoesExcel}
             disabled={processandoMassa || exportando || !filtrosDataValidos}
-            title="Exportar selecionadas"
+            title={exportando ? 'Exportando solicitações' : 'Exportar selecionadas'}
+            aria-label={exportando ? 'Exportando solicitações' : 'Exportar selecionadas'}
+            aria-busy={exportando}
           >
             <HiDocumentArrowDown className="w-4 h-4" />
-            <span className="hidden sm:inline">{exportando ? 'Exportando...' : 'Exportar'}</span>
           </button>
 
           {!arquivadas && podeSolicitarPrioridadeFinanceiro && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={solicitarPrioridadeFinanceiroSelecionadas}
               disabled={processandoMassa}
               title="Solicitar prioridade financeira"
+              aria-label="Solicitar prioridade financeira"
             >
               <HiOutlineBanknotes className="w-4 h-4" />
-              <span className="hidden sm:inline">Prioridade financeiro</span>
             </button>
           )}
 
           {arquivadas ? (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={desarquivarEmMassa}
               disabled={processandoMassa}
               title="Desarquivar selecionadas"
+              aria-label="Desarquivar selecionadas"
             >
               <HiOutlineFolderOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Desarquivar</span>
             </button>
           ) : (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={arquivarEmMassa}
               disabled={processandoMassa}
               title="Arquivar selecionadas"
+              aria-label="Arquivar selecionadas"
             >
               <HiOutlineFolderOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">Arquivar</span>
             </button>
           )}
 
           {!arquivadas && selecionadaUnica && podeEnviarUnica && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={() => setModalEnviarUnitario(true)}
               disabled={processandoMassa}
               title="Enviar para outro setor"
+              aria-label="Enviar para outro setor"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-              <span className="hidden sm:inline">Enviar</span>
             </button>
           )}
 
           {!arquivadas && selecionadasIds.length > 1 && podeEnviarMassa && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={() => setModalEnvioMassa(true)}
               disabled={processandoMassa}
               title="Enviar selecionadas para outro setor"
+              aria-label="Enviar selecionadas para outro setor"
             >
               <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-              <span className="hidden sm:inline">Enviar em massa</span>
             </button>
           )}
 
           {!arquivadas && podeAtribuirMassa && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao"
               onClick={abrirModalAtribuirMassa}
               disabled={processandoMassa}
               title="Atribuir responsável em massa"
+              aria-label="Atribuir responsável em massa"
             >
-              <HiOutlineUserPlus className="w-4 h-4" />
-              <span className="hidden sm:inline">Atribuir em massa</span>
+              <HiOutlineUserGroup className="w-4 h-4" />
             </button>
           )}
 
           {!arquivadas && selecionadaUnica && podeExcluirUnica && (
             <button
               type="button"
-              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              className="btn btn-outline solicitacoes-massa-acao solicitacoes-massa-acao--perigo"
               onClick={excluirSelecionada}
               disabled={processandoMassa}
               title="Excluir solicitação"
+              aria-label="Excluir solicitação"
             >
               <HiOutlineTrash className="w-4 h-4" />
-              <span className="hidden sm:inline">Excluir</span>
             </button>
           )}
 
           <button
             type="button"
-            className="btn btn-outline !min-h-0 h-9 px-2.5 inline-flex items-center gap-1"
+            className="btn btn-outline solicitacoes-massa-acao"
             onClick={() => setSelecionadasIds([])}
             disabled={processandoMassa}
             title="Limpar seleção"
+            aria-label="Limpar seleção"
           >
             <HiOutlineXMark className="w-4 h-4" />
           </button>
