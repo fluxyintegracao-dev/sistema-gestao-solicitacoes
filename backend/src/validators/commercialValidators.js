@@ -230,6 +230,23 @@ function isValidCpfDigits(value) {
   return digit1 === Number(digits[9]) && digit2 === Number(digits[10]);
 }
 
+function isValidCnpjDigits(value) {
+  const digits = onlyDigits(value);
+  if (digits.length !== 14 || /^(\d)\1{13}$/.test(digits)) return false;
+
+  const calculateDigit = (base, weights) => {
+    const sum = base
+      .split('')
+      .reduce((total, digit, index) => total + Number(digit) * weights[index], 0);
+    const rest = sum % 11;
+    return rest < 2 ? 0 : 11 - rest;
+  };
+
+  const digit1 = calculateDigit(digits.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  const digit2 = calculateDigit(digits.slice(0, 13), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]);
+  return digit1 === Number(digits[12]) && digit2 === Number(digits[13]);
+}
+
 function parseCpf(value, fieldName, { required = false } = {}) {
   const normalized = parseOptionalText(value, fieldName, 20, { required });
   if (normalized === undefined) return undefined;
@@ -237,6 +254,16 @@ function parseCpf(value, fieldName, { required = false } = {}) {
     throw new ValidationError(`${fieldName} invalido.`);
   }
   return normalized;
+}
+
+function parseCpfCnpj(value, fieldName, { required = false } = {}) {
+  const normalized = parseOptionalText(value, fieldName, 30, { required });
+  if (normalized === undefined) return undefined;
+  const digits = onlyDigits(normalized);
+  if (!isValidCpfDigits(digits) && !isValidCnpjDigits(digits)) {
+    throw new ValidationError(`${fieldName} invalido.`);
+  }
+  return digits;
 }
 
 function parseEnum(value, fieldName, allowedValues = [], { required = false } = {}) {
@@ -460,25 +487,45 @@ function normalizeParcelas(parcelas) {
 
     ensureAllowedKeys(
       item,
-      ['sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista', 'periodicidade', 'reajuste_tipo', 'data_vencimento', 'competencia_data', 'valor', 'observacoes'],
+      [
+        'sequencia', 'descricao', 'tipo_parcela', 'forma_recebimento_prevista',
+        'periodicidade', 'reajuste_tipo', 'data_vencimento', 'competencia_data',
+        'valor', 'observacoes', 'cheque_numero', 'cheque_titular_nome',
+        'cheque_titular_documento', 'cheque_banco', 'cheque_agencia',
+        'cheque_conta', 'cheque_data_emissao'
+      ],
       `Parcela ${index + 1}`
     );
+
+    const formaRecebimento = parseCommercialOption(
+      item.forma_recebimento_prevista,
+      `Forma de recebimento prevista da parcela ${index + 1}`,
+      { max: 60 }
+    );
+    const isCheque = formaRecebimento === 'CHEQUE';
 
     return {
       sequencia: index + 1,
       descricao: parseOptionalText(item.descricao, `Descricao da parcela ${index + 1}`, 160, { required: true }),
       tipo_parcela: parseCommercialOption(item.tipo_parcela, `Tipo da parcela ${index + 1}`, { fallback: 'PARCELA' }),
-      forma_recebimento_prevista: parseCommercialOption(
-        item.forma_recebimento_prevista,
-        `Forma de recebimento prevista da parcela ${index + 1}`,
-        { max: 60 }
-      ),
+      forma_recebimento_prevista: formaRecebimento,
       periodicidade: parseOptionalText(item.periodicidade, `Periodicidade da parcela ${index + 1}`, 30),
       reajuste_tipo: parseCommercialOption(item.reajuste_tipo, `Tipo de reajuste da parcela ${index + 1}`, { fallback: 'FIXA' }),
       data_vencimento: parseDateOnly(item.data_vencimento, `Vencimento da parcela ${index + 1}`, { required: true }),
       competencia_data: parseDateOnly(item.competencia_data, `Competencia DRE da parcela ${index + 1}`, { required: true }),
       valor: parseDecimal(item.valor, `Valor da parcela ${index + 1}`, { required: true, min: 0.01 }),
-      observacoes: parseOptionalText(item.observacoes, `Observacoes da parcela ${index + 1}`, 1000)
+      observacoes: parseOptionalText(item.observacoes, `Observacoes da parcela ${index + 1}`, 1000),
+      cheque_numero: parseOptionalText(item.cheque_numero, `Numero do cheque da parcela ${index + 1}`, 60, { required: isCheque }),
+      cheque_titular_nome: parseOptionalText(item.cheque_titular_nome, `Titular do cheque da parcela ${index + 1}`, 180, { required: isCheque }),
+      cheque_titular_documento: parseCpfCnpj(
+        item.cheque_titular_documento,
+        `CPF/CNPJ do titular do cheque da parcela ${index + 1}`,
+        { required: isCheque }
+      ),
+      cheque_banco: parseOptionalText(item.cheque_banco, `Banco do cheque da parcela ${index + 1}`, 80, { required: isCheque }),
+      cheque_agencia: parseOptionalText(item.cheque_agencia, `Agencia do cheque da parcela ${index + 1}`, 30),
+      cheque_conta: parseOptionalText(item.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 40),
+      cheque_data_emissao: parseDateOnly(item.cheque_data_emissao, `Data de emissao do cheque da parcela ${index + 1}`, { required: isCheque })
     };
   });
 }
@@ -698,6 +745,14 @@ function validateComercialContratoCreateBody(body = {}) {
   if (Number(data.comissao_percentual || 0) > 0 && !data.competencia_comissao_data) {
     throw new ValidationError('Competencia DRE da comissao e obrigatoria quando houver comissao.');
   }
+
+  const dataAssinatura = data.data_assinatura || data.data_contrato;
+  data.data_assinatura = dataAssinatura;
+  data.data_contrato = dataAssinatura;
+  data.parcelas = data.parcelas.map((parcela) => ({
+    ...parcela,
+    competencia_data: dataAssinatura
+  }));
 
   return data;
 }

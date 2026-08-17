@@ -398,6 +398,10 @@ function isFormaComDetalhe(forma) {
   return ['BENS', 'PERMUTA', 'OUTROS'].includes(String(forma || '').toUpperCase());
 }
 
+function isChequeForma(forma) {
+  return String(forma || '').trim().toUpperCase() === 'CHEQUE';
+}
+
 function buildObservacoesParcela(observacoes, detalheFormaRecebimento) {
   const partes = [
     detalheFormaRecebimento ? `Detalhe da forma: ${String(detalheFormaRecebimento).trim()}` : '',
@@ -442,6 +446,7 @@ function pickEditForm(contrato = {}) {
     Array.isArray(contrato.compradores) ? contrato.compradores : [],
     contrato.parceiro_id ? String(contrato.parceiro_id) : ''
   );
+  const dataAssinatura = contrato.data_assinatura || contrato.data_contrato || today();
 
   return {
     id: contrato.id || null,
@@ -455,7 +460,7 @@ function pickEditForm(contrato = {}) {
     categoria_financeira_comissao_id: contrato.categoria_financeira_comissao_id ? String(contrato.categoria_financeira_comissao_id) : '',
     numero: contrato.numero || '',
     status: contrato.status || 'ATIVO',
-    data_contrato: contrato.data_contrato || today(),
+    data_contrato: dataAssinatura,
     valor_total: formatCurrencyInput(contrato.valor_total),
     valor_entrada: formatCurrencyInput(contrato.valor_entrada),
     desconto_concedido: formatCurrencyInput(contrato.desconto_concedido),
@@ -467,13 +472,28 @@ function pickEditForm(contrato = {}) {
     vagas_garagem_posicao_especifica: Boolean(contrato.vagas_garagem_posicao),
     vagas_garagem_posicao: contrato.vagas_garagem_posicao || '',
     local_assinatura: contrato.local_assinatura || '',
-    data_assinatura: contrato.data_assinatura || contrato.data_contrato || today(),
+    data_assinatura: dataAssinatura,
     testemunha_1_nome: contrato.testemunha_1_nome || '',
     testemunha_1_cpf: contrato.testemunha_1_cpf || '',
     testemunha_2_nome: contrato.testemunha_2_nome || '',
     testemunha_2_cpf: contrato.testemunha_2_cpf || '',
     observacoes: contrato.observacoes || '',
-    parcelas: Array.isArray(contrato.parcelas) ? contrato.parcelas : []
+    parcelas: Array.isArray(contrato.parcelas)
+      ? contrato.parcelas.map((parcela) => {
+        const cheque = parcela.tituloFinanceiro?.chequesTerceiros?.[0] || null;
+        return {
+          ...parcela,
+          competencia_data: dataAssinatura,
+          cheque_numero: parcela.cheque_numero || cheque?.numero_cheque || '',
+          cheque_titular_nome: parcela.cheque_titular_nome || cheque?.titular_nome || '',
+          cheque_titular_documento: parcela.cheque_titular_documento || cheque?.titular_documento || '',
+          cheque_banco: parcela.cheque_banco || cheque?.banco || '',
+          cheque_agencia: parcela.cheque_agencia || cheque?.agencia || '',
+          cheque_conta: parcela.cheque_conta || cheque?.conta || '',
+          cheque_data_emissao: parcela.cheque_data_emissao || cheque?.data_emissao || ''
+        };
+      })
+      : []
   };
 }
 
@@ -524,7 +544,7 @@ function resolveGeneratorByModo(modo, current = {}) {
   return { ...current, modo };
 }
 
-function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODICIDADES) {
+function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODICIDADES, competenciaAssinatura = '') {
   const tipoModo = getModoComposicaoTipo(plano.modo);
   const formaRecebimento = plano.forma_recebimento_prevista || '';
   const tituloBase = String(plano.titulo_bloco || '').trim();
@@ -534,20 +554,32 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     ? ''
     : (tipoModo === 'ENTRADA' ? 'AVISTA' : plano.periodicidade || '');
 
+  if (!competenciaAssinatura) {
+    return { error: 'Informe a data de assinatura do contrato para definir a competencia DRE.' };
+  }
+
   function withPlanoMetadata(parcela, index, intervalMonths = null) {
     return {
       ...parcela,
       plano_pagamento_id: planoId || plano.id || '',
       plano_parcela_index: index,
       plano_periodicidade: planoPeriodicidade,
-      plano_interval_months: intervalMonths
+      plano_interval_months: intervalMonths,
+      competencia_data: competenciaAssinatura,
+      cheque_numero: parcela.cheque_numero || '',
+      cheque_titular_nome: parcela.cheque_titular_nome || '',
+      cheque_titular_documento: parcela.cheque_titular_documento || '',
+      cheque_banco: parcela.cheque_banco || '',
+      cheque_agencia: parcela.cheque_agencia || '',
+      cheque_conta: parcela.cheque_conta || '',
+      cheque_data_emissao: parcela.cheque_data_emissao || ''
     };
   }
 
   if (tipoModo === 'ENTRADA') {
     const valorEntrada = toNumber(plano.valor_parcela);
-    if (valorEntrada <= 0 || !plano.primeiro_vencimento || !plano.competencia_data) {
-      return { error: 'Informe valor, vencimento e competencia DRE da entrada.' };
+    if (valorEntrada <= 0 || !plano.primeiro_vencimento) {
+      return { error: 'Informe valor e vencimento da entrada.' };
     }
 
     const parcela = withPlanoMetadata({
@@ -556,7 +588,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
       forma_recebimento_prevista: formaRecebimento,
       reajuste_tipo: plano.reajuste_tipo || 'FIXA',
       data_vencimento: plano.primeiro_vencimento,
-      competencia_data: plano.competencia_data,
+      competencia_data: competenciaAssinatura,
       valor: valorEntrada.toFixed(2),
       observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
     }, 0, 0);
@@ -575,14 +607,14 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
         forma_recebimento_prevista: formaRecebimento,
         reajuste_tipo: item.reajuste_tipo || plano.reajuste_tipo || 'FIXA',
         data_vencimento: item.data_vencimento,
-        competencia_data: item.competencia_data,
+        competencia_data: competenciaAssinatura,
         valor: toNumber(item.valor).toFixed(2),
         observacoes: buildObservacoesParcela(item.observacoes, plano.detalhe_forma_recebimento)
       }))
-      .filter((item) => item.data_vencimento && item.competencia_data && toNumber(item.valor) > 0);
+      .filter((item) => item.data_vencimento && toNumber(item.valor) > 0);
 
     if (!parcelas.length) {
-      return { error: 'Informe ao menos um lancamento manual com vencimento, competencia DRE e valor.' };
+      return { error: 'Informe ao menos um lancamento manual com vencimento e valor.' };
     }
 
     return {
@@ -598,8 +630,8 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     : Math.max(0, Number(plano.quantidade_parcelas || 0));
   const valorParcela = toNumber(plano.valor_parcela);
 
-  if (!quantidade || valorParcela <= 0 || !plano.competencia_data) {
-    return { error: 'Informe quantidade, valor e primeira competencia DRE validos para a composicao periodica.' };
+  if (!quantidade || valorParcela <= 0) {
+    return { error: 'Informe quantidade e valor validos para a composicao periodica.' };
   }
 
   const parcelas = Array.from({ length: quantidade }).map((_, index) => withPlanoMetadata({
@@ -608,7 +640,7 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
     forma_recebimento_prevista: formaRecebimento,
     reajuste_tipo: plano.reajuste_tipo || 'FIXA',
     data_vencimento: addMonths(plano.primeiro_vencimento || today(), index * intervalMonths),
-    competencia_data: addMonths(plano.competencia_data, index * intervalMonths),
+    competencia_data: competenciaAssinatura,
     valor: valorParcela.toFixed(2),
     observacoes: buildObservacoesParcela('', plano.detalhe_forma_recebimento)
   }, index, intervalMonths));
@@ -928,8 +960,39 @@ export default function ComercialContratos() {
     setParcelaEditandoIndex(null);
     setForm((current) => ({
       ...current,
-      parcelas,
+      parcelas: parcelas.map((item) => ({
+        ...item,
+        competencia_data: current.data_assinatura
+      })),
       valor_total: current.valor_total ? current.valor_total : (total > 0 ? formatCurrencyInput(total) : '')
+    }));
+  }
+
+  function handleDataAssinaturaChange(value) {
+    setForm((current) => ({
+      ...current,
+      data_assinatura: value,
+      data_contrato: value,
+      parcelas: (current.parcelas || []).map((item) => ({
+        ...item,
+        competencia_data: value
+      }))
+    }));
+    setPaymentPlans((current) => current.map((plano) => ({
+      ...plano,
+      competencia_data: value,
+      parcelas_geradas: (plano.parcelas_geradas || []).map((item) => ({
+        ...item,
+        competencia_data: value
+      }))
+    })));
+    setGenerator((current) => ({
+      ...current,
+      competencia_data: value,
+      parcelas_personalizadas: (current.parcelas_personalizadas || []).map((item) => ({
+        ...item,
+        competencia_data: value
+      }))
     }));
   }
 
@@ -951,7 +1014,7 @@ export default function ComercialContratos() {
     }
 
     const planoId = `${Date.now()}-${Math.random()}`;
-    const resultado = gerarParcelasDoBloco(generator, planoId, periodicidades);
+    const resultado = gerarParcelasDoBloco(generator, planoId, periodicidades, form.data_assinatura);
     if (resultado.error) {
       setError(resultado.error);
       return;
@@ -1445,7 +1508,6 @@ export default function ComercialContratos() {
     if (!hasText(form.parceiro_id)) camposFaltando.push('Cliente');
     if (!hasText(form.obra_id) || !empreendimentoSelecionado?.obra_id) camposFaltando.push('Obra vinculada ao empreendimento');
     if (!hasText(form.numero)) camposFaltando.push('Contrato');
-    if (!hasText(form.data_contrato)) camposFaltando.push('Data');
     if (!hasText(form.status)) camposFaltando.push('Status');
     if (!hasText(form.categoria_financeira_id)) camposFaltando.push('Categoria financeira');
     if (!hasText(form.corretor_parceiro_id)) camposFaltando.push('Corretor parceiro');
@@ -1472,10 +1534,20 @@ export default function ComercialContratos() {
         || !hasText(item.forma_recebimento_prevista)
         || !hasText(item.reajuste_tipo)
         || !hasText(item.data_vencimento)
-        || !hasText(item.competencia_data)
         || roundCurrency(item.valor || item.valor_original) <= 0
       );
       if (parcelaIncompleta) camposFaltando.push('Dados das parcelas');
+
+      const chequeIncompleto = form.parcelas.some((item) => {
+        if (String(item.forma_recebimento_prevista || '').toUpperCase() !== 'CHEQUE') return false;
+        return !hasText(item.cheque_numero)
+          || !hasText(item.cheque_titular_nome)
+          || !hasText(item.cheque_titular_documento)
+          || !isValidCpfCnpj(item.cheque_titular_documento)
+          || !hasText(item.cheque_banco)
+          || !hasText(item.cheque_data_emissao);
+      });
+      if (chequeIncompleto) camposFaltando.push('Dados dos cheques');
     }
 
     if (camposFaltando.length) {
@@ -1544,7 +1616,7 @@ export default function ComercialContratos() {
           categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
           numero: form.numero,
           status: form.status,
-          data_contrato: form.data_contrato,
+          data_contrato: form.data_assinatura,
           valor_total: form.valor_total || undefined,
           valor_entrada: valorEntradaComposicao || undefined,
           desconto_concedido: form.desconto_concedido || undefined,
@@ -1555,7 +1627,7 @@ export default function ComercialContratos() {
           quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
           local_assinatura: form.local_assinatura || undefined,
-          data_assinatura: form.data_assinatura || form.data_contrato || undefined,
+          data_assinatura: form.data_assinatura || undefined,
           testemunha_1_nome: form.testemunha_1_nome || undefined,
           testemunha_1_cpf: form.testemunha_1_cpf || undefined,
           testemunha_2_nome: form.testemunha_2_nome || undefined,
@@ -1569,9 +1641,16 @@ export default function ComercialContratos() {
             periodicidade: item.plano_periodicidade || item.periodicidade || undefined,
             reajuste_tipo: item.reajuste_tipo || 'FIXA',
             data_vencimento: item.data_vencimento,
-            competencia_data: item.competencia_data,
+            competencia_data: form.data_assinatura,
             valor: item.valor || item.valor_original,
-            observacoes: item.observacoes || undefined
+            observacoes: item.observacoes || undefined,
+            cheque_numero: item.cheque_numero || undefined,
+            cheque_titular_nome: item.cheque_titular_nome || undefined,
+            cheque_titular_documento: item.cheque_titular_documento || undefined,
+            cheque_banco: item.cheque_banco || undefined,
+            cheque_agencia: item.cheque_agencia || undefined,
+            cheque_conta: item.cheque_conta || undefined,
+            cheque_data_emissao: item.cheque_data_emissao || undefined
           }))
         });
       }
@@ -1614,7 +1693,7 @@ export default function ComercialContratos() {
           </div>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Empreendimento</span>
               <select className="input w-full" value={form.empreendimento_id} onChange={(e) => selecionarEmpreendimentoContrato(e.target.value)} required disabled={Boolean(form.id)}>
@@ -1750,10 +1829,6 @@ export default function ComercialContratos() {
               <input className="input w-full" value={form.numero} onChange={(e) => setForm((c) => ({ ...c, numero: e.target.value }))} required disabled={Boolean(form.id)} />
             </label>
             <label className="sol-filter-field">
-              <span className="sol-filter-label">Data</span>
-              <input className="input w-full" type="date" value={form.data_contrato} onChange={(e) => setForm((c) => ({ ...c, data_contrato: e.target.value }))} required disabled={Boolean(form.id)} />
-            </label>
-            <label className="sol-filter-field">
               <span className="sol-filter-label">Status</span>
               <select className="input w-full" value={form.status} onChange={(e) => setForm((c) => ({ ...c, status: e.target.value }))}>
                 {STATUS_CONTRATO.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -1868,7 +1943,7 @@ export default function ComercialContratos() {
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Data de assinatura</span>
-              <input className="input w-full" type="date" value={form.data_assinatura} onChange={(e) => setForm((c) => ({ ...c, data_assinatura: e.target.value }))} />
+              <input className="input w-full" type="date" value={form.data_assinatura} onChange={(e) => handleDataAssinaturaChange(e.target.value)} />
             </label>
           </div>
           <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
@@ -1985,7 +2060,12 @@ export default function ComercialContratos() {
                 </div>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-6">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                <strong>Competencia DRE:</strong> {form.data_assinatura ? formatDate(form.data_assinatura) : 'informe a data de assinatura'}.
+                Todas as formas de pagamento usam automaticamente a assinatura do contrato como competencia.
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Modo</span>
                   <select className="input w-full" value={generator.modo} onChange={(e) => setGenerator((c) => resolveGeneratorByModo(e.target.value, c))}>
@@ -2033,7 +2113,7 @@ export default function ComercialContratos() {
               )}
 
               {getModoComposicaoTipo(generator.modo) === 'ENTRADA' ? (
-                <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Valor da entrada</span>
                     <input className="input w-full" inputMode="decimal" value={generator.valor_parcela} onChange={(e) => setGenerator((c) => ({ ...c, valor_parcela: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setGenerator((c) => ({ ...c, valor_parcela: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" />
@@ -2042,13 +2122,9 @@ export default function ComercialContratos() {
                     <span className="sol-filter-label">Vencimento da entrada</span>
                     <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
-                  <label className="sol-filter-field">
-                    <span className="sol-filter-label">Competencia DRE</span>
-                    <input className="input w-full" type="date" value={generator.competencia_data} onChange={(e) => setGenerator((c) => ({ ...c, competencia_data: e.target.value }))} />
-                  </label>
                 </div>
               ) : getModoComposicaoTipo(generator.modo) === 'PERIODICO' ? (
-                <div className="grid gap-3 md:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   <label className="sol-filter-field">
                     <span className="sol-filter-label">Periodicidade</span>
                   <select className="input w-full" value={generator.periodicidade} onChange={(e) => setGenerator((c) => ({ ...c, periodicidade: e.target.value, quantidade_parcelas: e.target.value === 'AVISTA' ? '1' : c.quantidade_parcelas }))}>
@@ -2067,10 +2143,6 @@ export default function ComercialContratos() {
                     <span className="sol-filter-label">Primeiro vencimento</span>
                     <input className="input w-full" type="date" value={generator.primeiro_vencimento} onChange={(e) => setGenerator((c) => ({ ...c, primeiro_vencimento: e.target.value }))} />
                   </label>
-                  <label className="sol-filter-field">
-                    <span className="sol-filter-label">Primeira competencia DRE</span>
-                    <input className="input w-full" type="date" value={generator.competencia_data} onChange={(e) => setGenerator((c) => ({ ...c, competencia_data: e.target.value }))} />
-                  </label>
                 </div>
               ) : (
                 <div className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
@@ -2088,7 +2160,7 @@ export default function ComercialContratos() {
 
                   <div className="space-y-3">
                     {(generator.parcelas_personalizadas || []).map((item, index) => (
-                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 md:grid-cols-[minmax(0,1.4fr)_150px_150px_160px_160px_150px_auto]">
+                      <div key={`custom-${index}`} className="grid gap-3 rounded-2xl border border-[var(--c-border)] p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1.4fr)_150px_150px_160px_150px_auto]">
                         <label className="sol-filter-field">
                           <span className="sol-filter-label">Descricao</span>
                           <input className="input w-full" value={item.descricao} onChange={(e) => updateParcelaCustomizada(index, 'descricao', e.target.value)} />
@@ -2110,10 +2182,6 @@ export default function ComercialContratos() {
                           <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcelaCustomizada(index, 'data_vencimento', e.target.value)} />
                         </label>
                         <label className="sol-filter-field">
-                          <span className="sol-filter-label">Competencia DRE</span>
-                          <input className="input w-full" type="date" value={item.competencia_data || ''} onChange={(e) => updateParcelaCustomizada(index, 'competencia_data', e.target.value)} />
-                        </label>
-                        <label className="sol-filter-field">
                           <span className="sol-filter-label">Valor</span>
                           <input className="input w-full" inputMode="decimal" value={item.valor} onChange={(e) => updateParcelaCustomizada(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcelaCustomizada(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
                         </label>
@@ -2133,7 +2201,7 @@ export default function ComercialContratos() {
                   Adicionar forma de pagamento
                 </button>
                 <span className="inline-flex items-center rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)]">
-                  Rascunho do bloco: <strong className="ml-1">{formatCurrency(gerarParcelasDoBloco(generator, '', periodicidades).total || 0)}</strong>
+                  Rascunho do bloco: <strong className="ml-1">{formatCurrency(gerarParcelasDoBloco(generator, '', periodicidades, form.data_assinatura).total || 0)}</strong>
                 </span>
               </div>
 
@@ -2186,8 +2254,103 @@ export default function ComercialContratos() {
               )}
 
               {form.parcelas.length > 0 && (
-                <div className="overflow-x-auto rounded-2xl border border-[var(--c-border)]">
-                  <table className="min-w-full text-sm">
+                <div className="space-y-3 xl:hidden">
+                  {form.parcelas.map((item, index) => {
+                    const isEditing = parcelaEditandoIndex === index;
+                    const reajusteLabel = getOptionLabel(parcelaReajusteTipos.find((tipo) => getOptionValue(tipo) === (item.reajuste_tipo || 'FIXA'))) || item.reajuste_tipo || 'Fixa';
+                    const canAdjust = Math.abs(diferencaComposicao) > 0.009;
+
+                    return (
+                      <article key={`mobile-${item.descricao}-${index}`} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3">
+                        <div className="mb-3 flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Parcela {index + 1}</div>
+                            <div className="mt-1 font-semibold text-[var(--c-text)]">{item.descricao || 'Sem descricao'}</div>
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm inline-flex shrink-0 items-center gap-1.5"
+                            onClick={() => setParcelaEditandoIndex(isEditing ? null : index)}
+                            title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
+                          >
+                            <HiOutlinePencilSquare className="h-4 w-4" />
+                            {isEditing ? 'Concluir' : 'Editar'}
+                          </button>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)] sm:col-span-2">
+                            Descricao
+                            {isEditing ? (
+                              <input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} />
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.descricao || '-'}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Tipo
+                            {isEditing ? (
+                              <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
+                                {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
+                              </select>
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.tipo_parcela || '-'}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Forma
+                            {isEditing ? (
+                              <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
+                                <option value="">Nao informar</option>
+                                {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
+                              </select>
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.forma_recebimento_prevista || '-'}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Reajuste
+                            {isEditing ? (
+                              <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
+                                {parcelaReajusteTipos.map((tipo) => {
+                                  const resumo = getOptionResumo(tipo);
+                                  return <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}{resumo ? ` (${resumo})` : ''}</option>;
+                                })}
+                              </select>
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{reajusteLabel}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Vencimento
+                            {isEditing ? (
+                              <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{formatDate(item.data_vencimento)}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Competencia DRE
+                            <span className="block text-sm font-medium text-[var(--c-text)]">{formatDate(form.data_assinatura)}</span>
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)]">
+                            Valor
+                            {isEditing ? (
+                              <input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
+                            ) : <span className="block text-sm font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>}
+                          </label>
+                          <label className="space-y-1 text-xs font-semibold text-[var(--c-muted)] sm:col-span-2">
+                            Detalhe
+                            {isEditing ? (
+                              <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(index, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
+                            ) : <span className="block text-sm font-medium text-[var(--c-text)]">{item.observacoes || '-'}</span>}
+                          </label>
+                        </div>
+
+                        {isEditing && canAdjust && (
+                          <button type="button" className="btn btn-primary btn-sm mt-3 w-full" onClick={() => ajustarParcelaParaFechamento(index)}>
+                            Fechar diferenca
+                          </button>
+                        )}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+
+              {form.parcelas.length > 0 && (
+                <div className="hidden overflow-x-auto rounded-2xl border border-[var(--c-border)] xl:block">
+                  <table className="min-w-[1180px] text-sm">
                     <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
                       <tr>
                         <th className="px-3 py-3 text-left">Descricao</th>
@@ -2263,11 +2426,7 @@ export default function ComercialContratos() {
                                 )}
                               </td>
                               <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <input className="input w-full" type="date" value={item.competencia_data || ''} onChange={(e) => updateParcela(index, 'competencia_data', e.target.value)} />
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{formatDate(item.competencia_data)}</span>
-                                )}
+                                <span className="text-[var(--c-muted)]">{formatDate(form.data_assinatura)}</span>
                               </td>
                               <td className="px-3 py-3 text-right">
                                 {isEditing ? (
@@ -2306,6 +2465,49 @@ export default function ComercialContratos() {
                     </tbody>
                   </table>
                 </div>
+              )}
+
+              {form.parcelas.some((item) => isChequeForma(item.forma_recebimento_prevista)) && (
+                <section className="space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 md:p-4">
+                  <div>
+                    <h4 className="font-semibold text-[var(--c-text)]">Dados dos cheques</h4>
+                    <p className="mt-1 text-sm text-[var(--c-muted)]">Informe os dados de cada cheque. Ao criar o contrato, os documentos serao registrados automaticamente na Carteira de Cheques.</p>
+                  </div>
+                  {form.parcelas.map((item, index) => {
+                    if (!isChequeForma(item.forma_recebimento_prevista)) return null;
+                    return (
+                      <article key={`cheque-${index}`} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-[var(--c-text)]">{item.descricao || `Cheque ${index + 1}`}</span>
+                          <span className="text-sm font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Numero do cheque *
+                            <input className="input w-full" value={item.cheque_numero || ''} onChange={(e) => updateParcela(index, 'cheque_numero', e.target.value)} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Titular *
+                            <input className="input w-full" value={item.cheque_titular_nome || ''} onChange={(e) => updateParcela(index, 'cheque_titular_nome', e.target.value)} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">CPF/CNPJ do titular *
+                            <input className="input w-full" inputMode="numeric" value={item.cheque_titular_documento || ''} onChange={(e) => updateParcela(index, 'cheque_titular_documento', maskCpfCnpj(e.target.value))} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Banco *
+                            <input className="input w-full" value={item.cheque_banco || ''} onChange={(e) => updateParcela(index, 'cheque_banco', e.target.value)} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Agencia
+                            <input className="input w-full" value={item.cheque_agencia || ''} onChange={(e) => updateParcela(index, 'cheque_agencia', e.target.value)} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Conta
+                            <input className="input w-full" value={item.cheque_conta || ''} onChange={(e) => updateParcela(index, 'cheque_conta', e.target.value)} />
+                          </label>
+                          <label className="space-y-1 text-sm text-[var(--c-text)]">Data de emissao *
+                            <input className="input w-full" type="date" value={item.cheque_data_emissao || ''} onChange={(e) => updateParcela(index, 'cheque_data_emissao', e.target.value)} />
+                          </label>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </section>
               )}
             </div>
           )}
@@ -2377,7 +2579,6 @@ export default function ComercialContratos() {
                       <span>Empreendimento: {item.empreendimento?.nome || '-'}</span>
                       <span>Unidade: {item.unidadeComercial?.codigo || '-'}</span>
                       <span>Valor total: {formatCurrency(item.valor_total)}</span>
-                      <span>Data contrato: {formatDate(item.data_contrato)}</span>
                       <span>Obra: {item.obra?.nome || '-'}</span>
                       <span>Em aberto: {formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</span>
                       <span>Vencido: {formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</span>
@@ -2650,7 +2851,7 @@ export default function ComercialContratos() {
           </div>
 
           <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--c-border)]">
-            <table className="min-w-full text-sm">
+            <table className="min-w-[1180px] text-sm">
               <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
                 <tr>
                   <th className="px-4 py-3 text-left">Seq.</th>
@@ -2666,11 +2867,20 @@ export default function ComercialContratos() {
                 </tr>
               </thead>
               <tbody>
-                {(contratoSelecionado.parcelas || []).map((parcela) => (
+                {(contratoSelecionado.parcelas || []).map((parcela) => {
+                  const cheque = parcela.tituloFinanceiro?.chequesTerceiros?.[0];
+                  return (
                   <tr key={parcela.id} className="border-t border-[var(--c-border)]">
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.sequencia}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.descricao}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.forma_recebimento_prevista || '-'}</td>
+                    <td className="px-4 py-3 text-[var(--c-text)]">
+                      <div>{parcela.forma_recebimento_prevista || '-'}</div>
+                      {cheque && (
+                        <div className="mt-1 max-w-[280px] text-xs leading-relaxed text-[var(--c-muted)]">
+                          Cheque {cheque.numero_cheque} · {cheque.banco || 'Banco nao informado'} · {cheque.titular_nome || 'Titular nao informado'} · {cheque.titular_documento ? maskCpfCnpj(cheque.titular_documento) : 'Documento nao informado'}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{String(parcela.reajuste_tipo || 'FIXA') === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{parcela.observacoes || '-'}</td>
                     <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.data_vencimento)}</td>
@@ -2691,7 +2901,8 @@ export default function ComercialContratos() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -1,7 +1,10 @@
+const crypto = require('crypto');
 const { Op } = require('sequelize');
 const {
   sequelize,
   CategoriaFinanceira,
+  ChequeTerceiro,
+  ChequeTerceiroMovimento,
   ConfiguracaoSistema,
   ContratoComercial,
   ContratoComercialComprador,
@@ -308,6 +311,26 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
             'considera_dre',
             'data_vencimento',
             'data_quitacao'
+          ],
+          include: [
+            {
+              model: ChequeTerceiro,
+              as: 'chequesTerceiros',
+              attributes: [
+                'id',
+                'codigo',
+                'numero_cheque',
+                'titular_nome',
+                'titular_documento',
+                'banco',
+                'agencia',
+                'conta',
+                'valor',
+                'data_emissao',
+                'data_vencimento',
+                'status'
+              ]
+            }
           ]
         }
       ]
@@ -1572,7 +1595,11 @@ async function criarContratoComercial(req, payload = {}) {
   await ensureUniqueContratoNumero(payload.numero);
   await ensureUnidadeDisponivelParaContrato(unidade, cliente.id);
 
-  const parcelasContrato = normalizarParcelasContrato(payload.parcelas);
+  const dataAssinatura = payload.data_assinatura || payload.data_contrato;
+  const parcelasContrato = normalizarParcelasContrato(payload.parcelas).map((parcela) => ({
+    ...parcela,
+    competencia_data: dataAssinatura
+  }));
   const totalCalculado = totalParcelas(parcelasContrato);
   const valorTotalInformado = payload.valor_total != null ? roundCurrency(payload.valor_total) : totalCalculado;
 
@@ -1592,7 +1619,7 @@ async function criarContratoComercial(req, payload = {}) {
       categoria_financeira_comissao_id: payload.categoria_financeira_comissao_id || null,
       numero: payload.numero,
       status: payload.status || 'ATIVO',
-      data_contrato: payload.data_contrato,
+      data_contrato: dataAssinatura,
       valor_total: valorTotalInformado,
       valor_entrada: roundCurrency(payload.valor_entrada || 0),
       desconto_concedido: roundCurrency(payload.desconto_concedido || 0),
@@ -1604,7 +1631,7 @@ async function criarContratoComercial(req, payload = {}) {
       quantidade_vagas_garagem: payload.possui_vaga_garagem ? (payload.quantidade_vagas_garagem || null) : null,
       vagas_garagem_posicao: payload.possui_vaga_garagem ? (payload.vagas_garagem_posicao || null) : null,
       local_assinatura: payload.local_assinatura || null,
-      data_assinatura: payload.data_assinatura || payload.data_contrato || null,
+      data_assinatura: dataAssinatura,
       testemunha_1_nome: payload.testemunha_1_nome || null,
       testemunha_1_cpf: payload.testemunha_1_cpf || null,
       testemunha_2_nome: payload.testemunha_2_nome || null,
@@ -1646,6 +1673,53 @@ async function criarContratoComercial(req, payload = {}) {
         valor_original: roundCurrency(parcela.valor),
         observacoes: parcela.observacoes || null
       }, { transaction });
+
+      if (String(parcela.forma_recebimento_prevista || '').trim().toUpperCase() === 'CHEQUE') {
+        const cheque = await ChequeTerceiro.create({
+          codigo: `CHQ-${crypto.randomUUID().replace(/-/g, '').slice(0, 10).toUpperCase()}`,
+          titulo_financeiro_id: titulo.id,
+          parceiro_entregou_id: cliente.id,
+          titular_parceiro_id: null,
+          empresa_id: empresaContratoId,
+          obra_origem_id: obra.id,
+          origem_tipo: 'CONTRATO_COMERCIAL',
+          motivo_origem: `Contrato ${contrato.numero} - ${parcela.descricao}`.slice(0, 255),
+          data_entrada: dataAssinatura,
+          cliente_nome: cliente.nome,
+          titular_nome: parcela.cheque_titular_nome,
+          titular_documento: parcela.cheque_titular_documento,
+          banco: parcela.cheque_banco,
+          agencia: parcela.cheque_agencia || null,
+          conta: parcela.cheque_conta || null,
+          numero_cheque: parcela.cheque_numero,
+          valor: roundCurrency(parcela.valor),
+          data_emissao: parcela.cheque_data_emissao,
+          data_vencimento: parcela.data_vencimento,
+          status: 'EM_CARTEIRA',
+          observacoes: parcela.observacoes || `Cheque recebido no contrato ${contrato.numero}.`,
+          criado_por: req.user?.id || null,
+          atualizado_por: req.user?.id || null
+        }, { transaction });
+
+        await ChequeTerceiroMovimento.create({
+          cheque_terceiro_id: cheque.id,
+          tipo_evento: 'ENTRADA',
+          status_anterior: null,
+          status_novo: 'EM_CARTEIRA',
+          empresa_origem_id: null,
+          empresa_destino_id: empresaContratoId,
+          titulo_financeiro_id: titulo.id,
+          valor: roundCurrency(parcela.valor),
+          data_evento: dataAssinatura,
+          observacoes: `Cheque recebido no contrato ${contrato.numero}.`,
+          metadata_json: {
+            origem: 'CONTRATO_COMERCIAL',
+            contrato_id: contrato.id,
+            parcela_sequencia: parcela.sequencia
+          },
+          criado_por: req.user?.id || null
+        }, { transaction });
+      }
     }
 
     const tituloComissao = await sincronizarTituloComissao({
@@ -1730,6 +1804,18 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     };
     delete updateData.compradores;
 
+    const atualizarDataAssinatura =
+      Object.prototype.hasOwnProperty.call(payload, 'data_assinatura') ||
+      Object.prototype.hasOwnProperty.call(payload, 'data_contrato');
+    const dataAssinaturaAtualizada = atualizarDataAssinatura
+      ? (payload.data_assinatura || payload.data_contrato || null)
+      : null;
+
+    if (atualizarDataAssinatura) {
+      updateData.data_assinatura = dataAssinaturaAtualizada;
+      updateData.data_contrato = dataAssinaturaAtualizada;
+    }
+
     if (payload.status) {
       updateData.status = normalizeContractStatus(payload.status);
     }
@@ -1792,6 +1878,50 @@ async function atualizarContratoComercial(req, id, payload = {}) {
             where: {
               id: tituloIds,
               valor_baixado: 0
+            },
+            transaction
+          }
+        );
+      }
+    }
+
+    if (atualizarDataAssinatura) {
+      const tituloIds = (contrato.parcelas || [])
+        .map((parcela) => Number(parcela.titulo_financeiro_id || parcela.tituloFinanceiro?.id || 0))
+        .filter((value) => value > 0);
+
+      await ContratoComercialParcela.update(
+        { competencia_data: dataAssinaturaAtualizada },
+        {
+          where: { contrato_comercial_id: contrato.id },
+          transaction
+        }
+      );
+
+      if (tituloIds.length) {
+        await TituloFinanceiro.update(
+          {
+            competencia_data: dataAssinaturaAtualizada,
+            atualizado_por: req.user?.id || null
+          },
+          {
+            where: {
+              id: { [Op.in]: tituloIds },
+              valor_baixado: 0
+            },
+            transaction
+          }
+        );
+
+        await ChequeTerceiro.update(
+          {
+            data_entrada: dataAssinaturaAtualizada,
+            atualizado_por: req.user?.id || null
+          },
+          {
+            where: {
+              titulo_financeiro_id: { [Op.in]: tituloIds },
+              status: 'EM_CARTEIRA'
             },
             transaction
           }
