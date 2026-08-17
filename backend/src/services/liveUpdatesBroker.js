@@ -55,6 +55,17 @@ class LiveUpdatesBroker {
     return `live-${Date.now()}-${connectionSequence}`;
   }
 
+  closeConnection(connection) {
+    if (!connection || connection.closed) return;
+
+    connection.closed = true;
+    this.connections.delete(connection.id);
+
+    if (this.connections.size === 0) {
+      this.stopKeepAliveTimer();
+    }
+  }
+
   connect({ req, res, topics } = {}) {
     const connection = {
       id: this.createConnectionId(),
@@ -78,20 +89,17 @@ class LiveUpdatesBroker {
       connected_at: new Date().toISOString()
     });
 
-    const cleanup = () => {
-      if (connection.closed) return;
-      connection.closed = true;
-      this.connections.delete(connection.id);
-      if (this.connections.size === 0) {
-        this.stopKeepAliveTimer();
-      }
-    };
+    const cleanup = () => this.closeConnection(connection);
 
-    req?.on?.('close', cleanup);
-    req?.on?.('end', cleanup);
-    req?.on?.('error', cleanup);
-    res?.on?.('close', cleanup);
-    res?.on?.('error', cleanup);
+    // Em uma requisicao GET o evento `end` indica apenas que o request nao
+    // possui mais corpo. Ele nao encerra o response SSE. Usar esse evento (ou
+    // o `close` do IncomingMessage) removia a conexao logo apos a abertura e
+    // interrompia os keep-alives, deixando o proxy finalizar o chunked stream.
+    req?.once?.('aborted', cleanup);
+    req?.once?.('error', cleanup);
+    res?.once?.('close', cleanup);
+    res?.once?.('finish', cleanup);
+    res?.once?.('error', cleanup);
 
     return cleanup;
   }
@@ -99,12 +107,19 @@ class LiveUpdatesBroker {
   writeRaw(connection, chunk) {
     if (!connection || connection.closed) return false;
 
+    if (connection.res?.destroyed || connection.res?.writableEnded) {
+      this.closeConnection(connection);
+      return false;
+    }
+
     try {
       connection.res.write(chunk);
+      if (typeof connection.res.flush === 'function') {
+        connection.res.flush();
+      }
       return true;
     } catch {
-      connection.closed = true;
-      this.connections.delete(connection.id);
+      this.closeConnection(connection);
       return false;
     }
   }

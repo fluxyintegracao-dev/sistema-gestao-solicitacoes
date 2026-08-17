@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import { buscarParceiros } from '../services/parceiros';
 import {
   atualizarUnidadeComercial,
@@ -96,7 +97,7 @@ export default function ComercialUnidades() {
       setError('');
       const [empreendimentosData, clientesData, unidadesData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
-        buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
+        buscarParceiros({ cliente: 1, ativo: 1, limit: 'all' }),
         getUnidadesComerciais()
       ]);
       setEmpreendimentos(Array.isArray(empreendimentosData) ? empreendimentosData : []);
@@ -302,21 +303,21 @@ export default function ComercialUnidades() {
                 </label>
               </div>
 
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Cliente da reserva</span>
-                <select
-                  className="input w-full"
+              <div className="sol-filter-field">
+                <ParceiroAutocomplete
+                  label="Cliente da reserva"
                   value={form.parceiro_reserva_id}
-                  onChange={(event) => setForm((current) => ({ ...current, parceiro_reserva_id: event.target.value }))}
-                >
-                  <option value="">Sem reserva vinculada</option>
-                  {clientes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  options={clientes}
+                  onChange={(parceiroId) => setForm((current) => ({ ...current, parceiro_reserva_id: parceiroId }))}
+                  placeholder="Digite nome, CPF/CNPJ ou e-mail"
+                  emptyLabel="Nenhum cliente encontrado"
+                  showOptionsOnFocus
+                  resultLimit={8}
+                />
+                <span className="mt-1 text-xs text-[var(--c-muted)]">
+                  Campo opcional. Apague a busca para deixar a unidade sem reserva vinculada.
+                </span>
+              </div>
 
               <label className="sol-filter-field">
                 <span className="sol-filter-label">Observacoes</span>
