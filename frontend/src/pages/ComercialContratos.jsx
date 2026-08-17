@@ -700,7 +700,7 @@ export default function ComercialContratos() {
       const [empreData, unidData, clientesData, corretoresData, testemunhasData, obrasData, categoriasData, contratosData, modelosData] = await Promise.all([
         getEmpreendimentosComerciais({ ativo: 1 }),
         getUnidadesComerciais({ ativo: 1 }),
-        buscarParceiros({ cliente: 1, ativo: 1, limit: 300 }),
+        buscarParceiros({ cliente: 1, ativo: 1, limit: 'all' }),
         buscarParceiros({ corretor: 1, ativo: 1, limit: 300 }),
         buscarParceiros({ testemunha: 1, ativo: 1, limit: 300 }),
         getObrasComerciais(),
@@ -1754,6 +1754,8 @@ export default function ComercialContratos() {
                 disabled={Boolean(form.id)}
                 placeholder="Digite nome, CPF/CNPJ ou e-mail"
                 emptyLabel="Nenhum cliente encontrado"
+                showOptionsOnFocus
+                resultLimit={8}
               />
               {!form.id && (
                 <button type="button" className="btn btn-outline btn-sm mt-2" onClick={() => abrirCadastroRapidoPessoa('cliente')}>
@@ -1789,6 +1791,8 @@ export default function ComercialContratos() {
                   onChange={setCompradorSelecionarId}
                   placeholder="Digite nome, CPF/CNPJ ou e-mail"
                   emptyLabel="Nenhum cliente disponível"
+                  showOptionsOnFocus
+                  resultLimit={8}
                 />
                 <div className="mt-2 flex flex-wrap gap-2">
                   <button type="button" className="btn btn-primary btn-sm" onClick={() => adicionarComprador()} disabled={!compradorSelecionarId}>

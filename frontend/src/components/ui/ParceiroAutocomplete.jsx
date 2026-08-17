@@ -15,6 +15,8 @@ export default function ParceiroAutocomplete({
   disabled = false,
   placeholder = 'Digite para buscar',
   emptyLabel = 'Nenhuma opcao encontrada',
+  showOptionsOnFocus = false,
+  resultLimit = 5,
   className = '',
   inputClassName = 'input w-full'
 }) {
@@ -42,12 +44,13 @@ export default function ParceiroAutocomplete({
     const normalizedQuery = normalizeText(query.trim());
     const source = Array.isArray(options) ? options : [];
 
-    if (!normalizedQuery) {
+    if (!normalizedQuery && !showOptionsOnFocus) {
       return [];
     }
 
     return source
       .filter((item) => {
+        if (!normalizedQuery) return true;
         const searchable = [
           item?.nome,
           item?.razao_social,
@@ -56,8 +59,8 @@ export default function ParceiroAutocomplete({
         ].filter(Boolean).join(' ');
         return normalizeText(searchable).includes(normalizedQuery);
       })
-      .slice(0, 5);
-  }, [options, query]);
+      .slice(0, Math.max(Number(resultLimit) || 5, 1));
+  }, [options, query, resultLimit, showOptionsOnFocus]);
 
   useEffect(() => {
     setActiveIndex(0);
