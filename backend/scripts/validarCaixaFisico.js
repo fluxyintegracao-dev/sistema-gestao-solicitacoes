@@ -66,6 +66,10 @@ function validateBackendContracts() {
   ].forEach((contract) => assert(service.includes(contract), `Regra do caixa fisico ausente: ${contract}`));
 
   assert(service.includes('if (!contaEhCaixaFisico(conta))'), 'Caixa fisico deve ignorar a trava de conciliacao OFX na abertura.');
+  assert(service.includes('movimentoConfirmado'), 'Movimento manual deve ser confirmado no livro antes da resposta de sucesso.');
+  assert(service.includes("Nenhum lancamento foi mantido"), 'Falha de confirmacao deve provocar rollback explicito.');
+  assert(service.includes("...sessao.get({ plain: true })"), 'Detalhe do caixa deve ser serializado explicitamente para o frontend.');
+  assert(service.includes('total_entradas: detalheAtualizado.resumo_atual.total_entradas'), 'Resumo persistido deve acompanhar o movimento confirmado.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos'"), 'Rota de movimento manual ausente.');
   assert(routes.includes("'/financeiro/caixas/:id/movimentos/:movimentoId/estornar'"), 'Rota de estorno manual ausente.');
   assert(routes.includes('criticalRateLimit'), 'Rotas criticas do caixa devem manter rate limit.');

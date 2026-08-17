@@ -235,12 +235,12 @@ function obterNaturezaMovimento(movimento) {
 
 function movimentoWhereSessao(sessao) {
   return {
-    conta_bancaria_id: sessao.conta_bancaria_id,
     status: 'ATIVO',
     [Op.or]: [
       { caixa_sessao_id: sessao.id },
       {
         caixa_sessao_id: null,
+        conta_bancaria_id: sessao.conta_bancaria_id,
         data_movimento: {
           [Op.gte]: sessao.data_abertura,
           [Op.lte]: sessao.data_fechamento || today()
@@ -570,6 +570,7 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
   }
   let movimentoId = null;
   let sessaoAudit = null;
+  let detalheAtualizado = null;
 
   await sequelize.transaction(async (transaction) => {
     const sessao = await carregarSessaoParaMovimento(sessaoId, transaction);
@@ -595,6 +596,23 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
     }, { transaction });
     movimentoId = movimento.id;
     sessaoAudit = sessao;
+
+    detalheAtualizado = await montarDetalheSessaoCaixa(sessao.id, { transaction });
+    const movimentoConfirmado = detalheAtualizado.movimentos_detalhados.some((item) => (
+      item.origem === 'MOVIMENTO' && Number(item.id) === Number(movimento.id)
+    ));
+    if (!movimentoConfirmado) {
+      throw createHttpError(500, 'Nao foi possivel confirmar o movimento no livro do caixa. Nenhum lancamento foi mantido.');
+    }
+
+    await sessao.update({
+      total_entradas: detalheAtualizado.resumo_atual.total_entradas,
+      total_saidas: detalheAtualizado.resumo_atual.total_saidas,
+      saldo_sistema: detalheAtualizado.resumo_atual.saldo_sistema
+    }, { transaction });
+    detalheAtualizado.total_entradas = detalheAtualizado.resumo_atual.total_entradas;
+    detalheAtualizado.total_saidas = detalheAtualizado.resumo_atual.total_saidas;
+    detalheAtualizado.saldo_sistema = detalheAtualizado.resumo_atual.saldo_sistema;
   });
 
   await registrarEventoSeguranca({
@@ -616,7 +634,7 @@ async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
     }
   });
 
-  return obterResumoSessaoCaixa(req, sessaoAudit.id);
+  return detalheAtualizado;
 }
 
 async function estornarMovimentoCaixa(req, sessaoId, movimentoId, payload = {}) {
@@ -707,28 +725,36 @@ function serializarTransferenciaSessao(transferencia, sessao) {
   };
 }
 
-async function obterResumoSessaoCaixa(req, sessaoId) {
-  await assertFinanceAccess(req);
+async function montarDetalheSessaoCaixa(sessaoId, { transaction = null } = {}) {
   const sessao = await CaixaFinanceiroSessao.findByPk(parsePositiveInteger(sessaoId, 'Caixa'), {
-    include: includeSessao()
+    include: includeSessao(),
+    transaction
   });
   if (!sessao) {
     throw createHttpError(404, 'Caixa nao encontrado.');
   }
-  const resumo = await calcularResumoSessao(sessao);
-  const [movimentos, transferencias] = await Promise.all([
-    carregarMovimentosSessao(sessao),
-    carregarTransferenciasSessao(sessao)
-  ]);
+  const resumo = await calcularResumoSessao(sessao, { transaction });
+  // Dentro de uma transacao do Sequelize, as consultas compartilham a mesma
+  // conexao. Mantelas sequenciais evita concorrencia na conexao e garante que
+  // o movimento recem-criado seja lido antes de confirmar o sucesso ao cliente.
+  const movimentos = await carregarMovimentosSessao(sessao, { transaction });
+  const transferencias = await carregarTransferenciasSessao(sessao, { transaction });
   const movimentosDetalhados = [
     ...movimentos.map((movimento) => serializarMovimentoSessao(movimento, sessao)),
     ...transferencias.map((transferencia) => serializarTransferenciaSessao(transferencia, sessao))
   ]
     .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')) || Number(b.id) - Number(a.id))
     .slice(0, 300);
-  sessao.setDataValue('resumo_atual', resumo);
-  sessao.setDataValue('movimentos_detalhados', movimentosDetalhados);
-  return sessao;
+  return {
+    ...sessao.get({ plain: true }),
+    resumo_atual: resumo,
+    movimentos_detalhados: movimentosDetalhados
+  };
+}
+
+async function obterResumoSessaoCaixa(req, sessaoId) {
+  await assertFinanceAccess(req);
+  return montarDetalheSessaoCaixa(sessaoId);
 }
 
 module.exports = {
