@@ -567,6 +567,26 @@ export async function fecharCaixaFinanceiro(id, data) {
   return parseJson(response, 'Erro ao fechar caixa financeiro');
 }
 
+export async function registrarMovimentoCaixaFinanceiro(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/${id}/movimentos`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao registrar movimento de caixa');
+}
+
+export async function estornarMovimentoCaixaFinanceiro(id, movimentoId, data) {
+  const response = await fetch(`${API_URL}/financeiro/caixas/${id}/movimentos/${movimentoId}/estornar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao estornar movimento de caixa');
+}
+
 export async function getTransferenciasFinanceiras(params = {}) {
   const query = new URLSearchParams(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && value !== '')
