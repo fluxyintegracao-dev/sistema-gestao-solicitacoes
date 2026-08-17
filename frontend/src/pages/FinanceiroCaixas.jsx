@@ -203,6 +203,32 @@ export default function FinanceiroCaixas() {
     }
   }, [contaSelecionadaId]);
 
+  const aplicarSessaoAtualizada = useCallback((detalhe) => {
+    if (!detalhe?.id) return false;
+
+    setSessaoDetalhe(detalhe.status === 'ABERTO' ? detalhe : null);
+    setSessoes((atuais) => {
+      const existe = atuais.some((sessao) => Number(sessao.id) === Number(detalhe.id));
+      if (!existe) return [detalhe, ...atuais];
+      return atuais.map((sessao) => (
+        Number(sessao.id) === Number(detalhe.id) ? detalhe : sessao
+      ));
+    });
+
+    if (detalhe.status === 'ABERTO') {
+      setFecharForm((current) => ({
+        ...current,
+        data_fechamento: today(),
+        saldo_informado: formatCurrencyInput(
+          detalhe?.resumo_atual?.saldo_sistema ?? detalhe?.saldo_sistema ?? '',
+          { emptyZero: false }
+        )
+      }));
+    }
+
+    return true;
+  }, []);
+
   useEffect(() => {
     setError('');
     carregarControleCaixa().catch((err) => {
@@ -228,8 +254,8 @@ export default function FinanceiroCaixas() {
       setSaving(true);
       setError('');
       setMessage('');
-      await acao();
-      await carregarControleCaixa();
+      const resultado = await acao();
+      if (!resultado?.estadoAplicado) await carregarControleCaixa();
     } catch (err) {
       setError(err?.message || mensagemErro);
     } finally {
@@ -263,12 +289,14 @@ export default function FinanceiroCaixas() {
       return;
     }
     await executar(async () => {
-      await registrarMovimentoCaixaFinanceiro(sessaoAberta.id, {
+      const detalhe = await registrarMovimentoCaixaFinanceiro(sessaoAberta.id, {
         ...movimentoForm,
         valor: valorMovimento
       });
+      const estadoAplicado = aplicarSessaoAtualizada(detalhe);
       setMessage(`${movimentoForm.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso.`);
       setMovimentoForm({ natureza: movimentoForm.natureza, data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
+      return { estadoAplicado };
     }, 'Erro ao registrar o movimento.');
   }
 
@@ -288,9 +316,11 @@ export default function FinanceiroCaixas() {
     event.preventDefault();
     if (!sessaoAberta || !estorno.movimento) return;
     await executar(async () => {
-      await estornarMovimentoCaixaFinanceiro(sessaoAberta.id, estorno.movimento.id, { motivo: estorno.motivo });
+      const detalhe = await estornarMovimentoCaixaFinanceiro(sessaoAberta.id, estorno.movimento.id, { motivo: estorno.motivo });
+      const estadoAplicado = aplicarSessaoAtualizada(detalhe);
       setMessage('Movimento estornado com trilha de auditoria.');
       setEstorno({ movimento: null, motivo: '' });
+      return { estadoAplicado };
     }, 'Erro ao estornar o movimento.');
   }
 
