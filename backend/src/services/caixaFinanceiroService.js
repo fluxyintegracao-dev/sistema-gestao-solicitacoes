@@ -8,7 +8,8 @@ const {
   MovimentoFinanceiro,
   TituloFinanceiro,
   TransferenciaFinanceira,
-  User
+  User,
+  sequelize
 } = require('../models');
 const { canAccessFinanceiro } = require('./authorizationService');
 const { registrarEventoSeguranca } = require('./securityLogService');
@@ -91,7 +92,7 @@ function includeSessao() {
     {
       model: ContaBancaria,
       as: 'contaBancaria',
-      attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'tipo_operacional', 'empresa_id']
+      attributes: ['id', 'nome', 'banco', 'agencia', 'conta', 'tipo_operacional', 'empresa_id', 'exige_abertura_fechamento']
     },
     {
       model: EmpresaGrupo,
@@ -111,16 +112,29 @@ function includeSessao() {
   ];
 }
 
-async function carregarConta(contaBancariaId) {
+function contaExigeSessao(conta) {
+  return Boolean(conta?.exige_abertura_fechamento)
+    || String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
+}
+
+function contaEhCaixaFisico(conta) {
+  return String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
+}
+
+async function carregarConta(contaBancariaId, { transaction = null, lock = null } = {}) {
   const id = parsePositiveInteger(contaBancariaId, 'Conta financeira');
   const conta = await ContaBancaria.findByPk(id, {
-    include: [{ model: EmpresaGrupo, as: 'empresa', attributes: ['id', 'codigo', 'nome'] }]
+    transaction,
+    ...(lock ? { lock } : {})
   });
   if (!conta || conta.ativo === false) {
     throw createHttpError(400, 'Conta financeira invalida ou inativa.');
   }
   if (!conta.empresa_id) {
     throw createHttpError(400, 'A conta financeira precisa estar vinculada a uma empresa do grupo antes de abrir caixa.');
+  }
+  if (!contaExigeSessao(conta)) {
+    throw createHttpError(400, 'Esta conta nao esta configurada para abertura e fechamento de caixa.');
   }
   return conta;
 }
@@ -211,38 +225,80 @@ async function confirmarConciliacaoDiaCaixa(req, payload = {}) {
   return confirmacao;
 }
 
-async function calcularResumoSessao(sessao) {
-  const movimentos = await MovimentoFinanceiro.findAll({
-    where: {
-      conta_bancaria_id: sessao.conta_bancaria_id,
-      status: 'ATIVO',
-      data_movimento: {
-        [Op.gte]: sessao.data_abertura,
-        [Op.lte]: sessao.data_fechamento || today()
-      }
+function obterNaturezaMovimento(movimento) {
+  const tipoMovimento = String(movimento?.tipo_movimento || '').toUpperCase();
+  if (tipoMovimento === 'CAIXA_ENTRADA_MANUAL') return 'ENTRADA';
+  if (tipoMovimento === 'CAIXA_SAIDA_MANUAL') return 'SAIDA';
+  if (String(movimento?.titulo?.tipo || '').toUpperCase() === 'RECEBER') return 'ENTRADA';
+  return 'SAIDA';
+}
+
+function movimentoWhereVinculadoSessao(sessao) {
+  return {
+    status: 'ATIVO',
+    caixa_sessao_id: sessao.id
+  };
+}
+
+function movimentoWhereLegadoSessao(sessao) {
+  return {
+    status: 'ATIVO',
+    caixa_sessao_id: null,
+    conta_bancaria_id: sessao.conta_bancaria_id,
+    data_movimento: {
+      [Op.gte]: sessao.data_abertura,
+      [Op.lte]: sessao.data_fechamento || today()
+    }
+  };
+}
+
+async function carregarMovimentosSessao(sessao, { transaction = null } = {}) {
+  const include = [
+    {
+      // Movimentos manuais de caixa nao possuem titulo financeiro. O escopo
+      // padrao de TituloFinanceiro adiciona `deleted_at IS NULL` e, sem tornar
+      // a associacao explicitamente opcional, o Sequelize pode gerar INNER
+      // JOIN e ocultar justamente esses movimentos do livro do caixa.
+      model: TituloFinanceiro.unscoped(),
+      as: 'titulo',
+      attributes: ['id', 'codigo', 'descricao', 'tipo'],
+      required: false
     },
-    include: [
-      {
-        model: TituloFinanceiro,
-        as: 'titulo',
-        attributes: ['id', 'tipo']
-      }
-    ]
+    {
+      model: User,
+      as: 'criadoPor',
+      attributes: ['id', 'nome', 'email'],
+      required: false
+    }
+  ];
+  const queryOptions = {
+    include,
+    order: [['data_movimento', 'DESC'], ['id', 'DESC']],
+    transaction
+  };
+
+  // O vinculo explicito com a sessao e a fonte canonica dos movimentos novos.
+  // A busca por conta/data existe apenas para movimentos antigos, anteriores ao
+  // campo caixa_sessao_id. Consultas separadas evitam que a compatibilidade
+  // legada esconda um movimento recem-criado na mesma transacao.
+  const movimentosVinculados = await MovimentoFinanceiro.findAll({
+    ...queryOptions,
+    where: movimentoWhereVinculadoSessao(sessao)
+  });
+  const movimentosLegados = await MovimentoFinanceiro.findAll({
+    ...queryOptions,
+    where: movimentoWhereLegadoSessao(sessao)
   });
 
-  let totalEntradas = 0;
-  let totalSaidas = 0;
+  return [...movimentosVinculados, ...movimentosLegados]
+    .sort((a, b) => (
+      String(b.data_movimento || '').localeCompare(String(a.data_movimento || ''))
+      || Number(b.id) - Number(a.id)
+    ));
+}
 
-  for (const movimento of movimentos) {
-    const valor = roundCurrency(movimento.valor_quitacao || movimento.valor || 0);
-    if (String(movimento.titulo?.tipo || '').toUpperCase() === 'RECEBER') {
-      totalEntradas = roundCurrency(totalEntradas + valor);
-    } else {
-      totalSaidas = roundCurrency(totalSaidas + valor);
-    }
-  }
-
-  const transferencias = await TransferenciaFinanceira.findAll({
+async function carregarTransferenciasSessao(sessao, { transaction = null } = {}) {
+  return TransferenciaFinanceira.findAll({
     where: {
       status: 'ATIVA',
       data_transferencia: {
@@ -250,11 +306,96 @@ async function calcularResumoSessao(sessao) {
         [Op.lte]: sessao.data_fechamento || today()
       },
       [Op.or]: [
-        { conta_origem_id: sessao.conta_bancaria_id },
-        { conta_destino_id: sessao.conta_bancaria_id }
+        { caixa_sessao_origem_id: sessao.id },
+        { caixa_sessao_destino_id: sessao.id },
+        {
+          caixa_sessao_origem_id: null,
+          conta_origem_id: sessao.conta_bancaria_id
+        },
+        {
+          caixa_sessao_destino_id: null,
+          conta_destino_id: sessao.conta_bancaria_id
+        }
       ]
-    }
+    },
+    include: [
+      { model: ContaBancaria, as: 'contaOrigem', attributes: ['id', 'nome'] },
+      { model: ContaBancaria, as: 'contaDestino', attributes: ['id', 'nome'] },
+      { model: User, as: 'criadoPor', attributes: ['id', 'nome', 'email'] }
+    ],
+    order: [['data_transferencia', 'DESC'], ['id', 'DESC']],
+    transaction
   });
+}
+
+async function obterDataMinimaFechamento(sessao, { transaction = null } = {}) {
+  const ultimoMovimento = await MovimentoFinanceiro.findOne({
+    attributes: ['data_movimento'],
+    where: {
+      status: 'ATIVO',
+      [Op.or]: [
+        { caixa_sessao_id: sessao.id },
+        {
+          caixa_sessao_id: null,
+          conta_bancaria_id: sessao.conta_bancaria_id,
+          data_movimento: { [Op.gte]: sessao.data_abertura }
+        }
+      ]
+    },
+    order: [['data_movimento', 'DESC'], ['id', 'DESC']],
+    transaction
+  });
+
+  const ultimaTransferencia = await TransferenciaFinanceira.findOne({
+    attributes: ['data_transferencia'],
+    where: {
+      status: 'ATIVA',
+      data_transferencia: { [Op.gte]: sessao.data_abertura },
+      [Op.or]: [
+        { caixa_sessao_origem_id: sessao.id },
+        { caixa_sessao_destino_id: sessao.id },
+        {
+          caixa_sessao_origem_id: null,
+          conta_origem_id: sessao.conta_bancaria_id
+        },
+        {
+          caixa_sessao_destino_id: null,
+          conta_destino_id: sessao.conta_bancaria_id
+        }
+      ]
+    },
+    order: [['data_transferencia', 'DESC'], ['id', 'DESC']],
+    transaction
+  });
+
+  const datasValidas = [
+    today(),
+    String(sessao.data_abertura || ''),
+    String(ultimoMovimento?.data_movimento || ''),
+    String(ultimaTransferencia?.data_transferencia || '')
+  ]
+    .filter((data) => /^\d{4}-\d{2}-\d{2}$/.test(data))
+    .sort();
+
+  return datasValidas[datasValidas.length - 1] || today();
+}
+
+async function calcularResumoSessao(sessao, { transaction = null } = {}) {
+  const movimentos = await carregarMovimentosSessao(sessao, { transaction });
+
+  let totalEntradas = 0;
+  let totalSaidas = 0;
+
+  for (const movimento of movimentos) {
+    const valor = Math.abs(roundCurrency(movimento.valor_quitacao || movimento.valor || 0));
+    if (obterNaturezaMovimento(movimento) === 'ENTRADA') {
+      totalEntradas = roundCurrency(totalEntradas + valor);
+    } else {
+      totalSaidas = roundCurrency(totalSaidas + valor);
+    }
+  }
+
+  const transferencias = await carregarTransferenciasSessao(sessao, { transaction });
 
   for (const transferencia of transferencias) {
     const valor = roundCurrency(transferencia.valor || 0);
@@ -314,57 +455,64 @@ async function listarSessoesCaixa(req, filters = {}) {
 
 async function abrirSessaoCaixa(req, payload = {}) {
   await assertFinanceAccess(req);
-  const conta = await carregarConta(payload.conta_bancaria_id);
   const dataAbertura = parseDate(payload.data_abertura, 'Data de abertura', today());
   const dataConciliacaoObrigatoria = addDays(dataAbertura, -1);
+  let contaAudit = null;
+  let saldoAberturaAudit = 0;
 
-  const aberto = await CaixaFinanceiroSessao.findOne({
-    where: {
-      conta_bancaria_id: conta.id,
-      status: 'ABERTO'
+  const sessaoId = await sequelize.transaction(async (transaction) => {
+    const conta = await carregarConta(payload.conta_bancaria_id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    contaAudit = conta;
+
+    const aberto = await CaixaFinanceiroSessao.findOne({
+      where: { conta_bancaria_id: conta.id, status: 'ABERTO' },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (aberto) {
+      throw createHttpError(409, 'Ja existe um caixa aberto para esta conta.');
     }
-  });
 
-  if (aberto) {
-    throw createHttpError(409, 'Ja existe um caixa aberto para esta conta.');
-  }
+    const ultimaFechada = await CaixaFinanceiroSessao.findOne({
+      where: { conta_bancaria_id: conta.id, status: 'FECHADO' },
+      order: [['data_fechamento', 'DESC'], ['id', 'DESC']],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    const saldoPadrao = ultimaFechada
+      ? roundCurrency(ultimaFechada.saldo_informado ?? ultimaFechada.saldo_sistema)
+      : roundCurrency(conta.saldo_inicial || 0);
+    const saldoAbertura = parseMoney(payload.saldo_abertura, 'Saldo de abertura') ?? saldoPadrao;
+    saldoAberturaAudit = saldoAbertura;
 
-  const ultimaFechada = await CaixaFinanceiroSessao.findOne({
-    where: {
-      conta_bancaria_id: conta.id,
-      status: 'FECHADO'
-    },
-    order: [['data_fechamento', 'DESC'], ['id', 'DESC']]
-  });
-
-  const saldoPadrao = ultimaFechada
-    ? roundCurrency(ultimaFechada.saldo_informado ?? ultimaFechada.saldo_sistema)
-    : roundCurrency(conta.saldo_inicial || 0);
-  const saldoAbertura = parseMoney(payload.saldo_abertura, 'Saldo de abertura') ?? saldoPadrao;
-
-  const confirmacaoConciliacao = await CaixaConciliacaoConfirmacao.findOne({
-    where: {
-      conta_bancaria_id: conta.id,
-      data_referencia: dataConciliacaoObrigatoria
+    // Caixa fisico tem conferencia propria no fechamento e nao depende de arquivo OFX.
+    if (!contaEhCaixaFisico(conta)) {
+      const confirmacaoConciliacao = await CaixaConciliacaoConfirmacao.findOne({
+        where: { conta_bancaria_id: conta.id, data_referencia: dataConciliacaoObrigatoria },
+        transaction
+      });
+      if (!confirmacaoConciliacao) {
+        throw createHttpError(
+          400,
+          `Confirme que todos os OFX de ${dataConciliacaoObrigatoria} desta conta foram conciliados antes de abrir o caixa.`
+        );
+      }
     }
-  });
 
-  if (!confirmacaoConciliacao) {
-    throw createHttpError(
-      400,
-      `Confirme que todos os OFX de ${dataConciliacaoObrigatoria} desta conta foram conciliados antes de abrir o caixa.`
-    );
-  }
-
-  const sessao = await CaixaFinanceiroSessao.create({
-    empresa_id: Number(conta.empresa_id),
-    conta_bancaria_id: conta.id,
-    data_abertura: dataAbertura,
-    status: 'ABERTO',
-    saldo_abertura: saldoAbertura,
-    saldo_sistema: saldoAbertura,
-    observacoes_abertura: payload.observacoes || null,
-    aberto_por: req.user?.id || null
+    const sessao = await CaixaFinanceiroSessao.create({
+      empresa_id: Number(conta.empresa_id),
+      conta_bancaria_id: conta.id,
+      data_abertura: dataAbertura,
+      status: 'ABERTO',
+      saldo_abertura: saldoAbertura,
+      saldo_sistema: saldoAbertura,
+      observacoes_abertura: payload.observacoes || null,
+      aberto_por: req.user?.id || null
+    }, { transaction });
+    return sessao.id;
   });
 
   await registrarEventoSeguranca({
@@ -372,59 +520,75 @@ async function abrirSessaoCaixa(req, payload = {}) {
     usuarioId: req.user?.id || null,
     tipoEvento: 'FINANCIAL_CASH_SESSION_OPENED',
     recursoTipo: 'CAIXA_FINANCEIRO',
-    recursoId: sessao.id,
+    recursoId: sessaoId,
     status: 'SUCCESS',
     descricao: 'Sessao de caixa aberta',
     metadata: {
-      conta_bancaria_id: conta.id,
-      empresa_id: Number(conta.empresa_id),
-      saldo_abertura: saldoAbertura
+      conta_bancaria_id: contaAudit.id,
+      empresa_id: Number(contaAudit.empresa_id),
+      saldo_abertura: saldoAberturaAudit,
+      tipo_operacional: contaAudit.tipo_operacional
     }
   });
 
-  return CaixaFinanceiroSessao.findByPk(sessao.id, { include: includeSessao() });
+  return CaixaFinanceiroSessao.findByPk(sessaoId, { include: includeSessao() });
 }
 
 async function fecharSessaoCaixa(req, sessaoId, payload = {}) {
   await assertFinanceAccess(req);
-  const sessao = await CaixaFinanceiroSessao.findByPk(parsePositiveInteger(sessaoId, 'Caixa'), {
-    include: includeSessao()
-  });
+  const id = parsePositiveInteger(sessaoId, 'Caixa');
+  let fechamentoAudit = null;
 
-  if (!sessao) {
-    throw createHttpError(404, 'Caixa nao encontrado.');
-  }
-  if (sessao.status !== 'ABERTO') {
-    throw createHttpError(400, 'Apenas caixas abertos podem ser fechados.');
-  }
+  await sequelize.transaction(async (transaction) => {
+    const sessao = await CaixaFinanceiroSessao.findByPk(id, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!sessao) throw createHttpError(404, 'Caixa nao encontrado.');
+    if (sessao.status !== 'ABERTO') {
+      throw createHttpError(400, 'Apenas caixas abertos podem ser fechados.');
+    }
 
-  const dataFechamento = parseDate(payload.data_fechamento, 'Data de fechamento', today());
-  if (dataFechamento < sessao.data_abertura) {
-    throw createHttpError(400, 'Data de fechamento nao pode ser anterior a data de abertura.');
-  }
+    const dataFechamento = parseDate(payload.data_fechamento, 'Data de fechamento', today());
+    if (dataFechamento < sessao.data_abertura) {
+      throw createHttpError(400, 'Data de fechamento nao pode ser anterior a data de abertura.');
+    }
+    const dataMinimaFechamento = await obterDataMinimaFechamento(sessao, { transaction });
+    if (dataFechamento < dataMinimaFechamento) {
+      throw createHttpError(
+        400,
+        `Data de fechamento nao pode ser retroativa nem anterior ao ultimo movimento do caixa (${dataMinimaFechamento}).`
+      );
+    }
 
-  sessao.data_fechamento = dataFechamento;
-  const resumo = await calcularResumoSessao(sessao);
-  const saldoInformado = parseMoney(payload.saldo_informado, 'Saldo informado', { required: true });
-  const diferenca = roundCurrency(saldoInformado - resumo.saldo_sistema);
-  if (Math.abs(diferenca) > 0.009) {
-    throw createHttpError(
-      400,
-      `O caixa nao pode ser fechado com saldo divergente. Saldo do sistema: R$ ${resumo.saldo_sistema.toFixed(2)}; saldo informado: R$ ${saldoInformado.toFixed(2)}.`
-    );
-  }
+    sessao.data_fechamento = dataFechamento;
+    const resumo = await calcularResumoSessao(sessao, { transaction });
+    const saldoInformado = parseMoney(payload.saldo_informado, 'Saldo informado', { required: true });
+    const diferenca = roundCurrency(saldoInformado - resumo.saldo_sistema);
+    const observacoes = String(payload.observacoes || '').trim();
+    if (Math.abs(diferenca) > 0.009 && observacoes.length < 10) {
+      throw createHttpError(400, 'Informe uma justificativa com pelo menos 10 caracteres para fechar o caixa com divergencia.');
+    }
 
-  await sessao.update({
-    data_fechamento: dataFechamento,
-    status: 'FECHADO',
-    total_entradas: resumo.total_entradas,
-    total_saidas: resumo.total_saidas,
-    saldo_sistema: resumo.saldo_sistema,
-    saldo_informado: saldoInformado,
-    diferenca,
-    observacoes_fechamento: payload.observacoes || null,
-    fechado_por: req.user?.id || null,
-    fechado_em: new Date()
+    await sessao.update({
+      data_fechamento: dataFechamento,
+      status: 'FECHADO',
+      total_entradas: resumo.total_entradas,
+      total_saidas: resumo.total_saidas,
+      saldo_sistema: resumo.saldo_sistema,
+      saldo_informado: saldoInformado,
+      diferenca,
+      observacoes_fechamento: observacoes || null,
+      fechado_por: req.user?.id || null,
+      fechado_em: new Date()
+    }, { transaction });
+    fechamentoAudit = {
+      conta_bancaria_id: sessao.conta_bancaria_id,
+      empresa_id: sessao.empresa_id || null,
+      saldo_sistema: resumo.saldo_sistema,
+      saldo_informado: saldoInformado,
+      diferenca
+    };
   });
 
   await registrarEventoSeguranca({
@@ -432,38 +596,262 @@ async function fecharSessaoCaixa(req, sessaoId, payload = {}) {
     usuarioId: req.user?.id || null,
     tipoEvento: 'FINANCIAL_CASH_SESSION_CLOSED',
     recursoTipo: 'CAIXA_FINANCEIRO',
-    recursoId: sessao.id,
+    recursoId: id,
     status: 'SUCCESS',
     descricao: 'Sessao de caixa fechada',
     metadata: {
-      conta_bancaria_id: sessao.conta_bancaria_id,
-      empresa_id: sessao.empresa_id || null,
-      saldo_sistema: resumo.saldo_sistema,
-      saldo_informado: saldoInformado,
-      diferenca
+      ...fechamentoAudit
     }
   });
 
-  return CaixaFinanceiroSessao.findByPk(sessao.id, { include: includeSessao() });
+  return CaixaFinanceiroSessao.findByPk(id, { include: includeSessao() });
 }
 
-async function obterResumoSessaoCaixa(req, sessaoId) {
+async function carregarSessaoParaMovimento(sessaoId, transaction) {
+  const id = parsePositiveInteger(sessaoId, 'Caixa');
+  const sessao = await CaixaFinanceiroSessao.findByPk(id, {
+    transaction,
+    lock: transaction.LOCK.UPDATE
+  });
+  if (!sessao) throw createHttpError(404, 'Caixa nao encontrado.');
+  if (sessao.status !== 'ABERTO') {
+    throw createHttpError(400, 'O caixa precisa estar aberto para registrar ou estornar movimentos.');
+  }
+  const conta = await ContaBancaria.findByPk(sessao.conta_bancaria_id, {
+    attributes: ['id', 'nome', 'tipo_operacional', 'empresa_id', 'exige_abertura_fechamento'],
+    transaction
+  });
+  if (!conta || !contaEhCaixaFisico(conta)) {
+    throw createHttpError(400, 'Lancamentos manuais sao permitidos somente em contas de caixa fisico.');
+  }
+  sessao.setDataValue('contaBancaria', conta);
+  return sessao;
+}
+
+async function registrarMovimentoCaixa(req, sessaoId, payload = {}) {
   await assertFinanceAccess(req);
+  const natureza = String(payload.natureza || '').trim().toUpperCase();
+  if (!['ENTRADA', 'SAIDA'].includes(natureza)) {
+    throw createHttpError(400, 'Natureza do movimento invalida.');
+  }
+  const descricao = String(payload.descricao || '').trim();
+  if (descricao.length < 3) {
+    throw createHttpError(400, 'Informe uma descricao com pelo menos 3 caracteres.');
+  }
+  const valor = parseMoney(payload.valor, 'Valor', { required: true });
+  if (valor <= 0) throw createHttpError(400, 'O valor deve ser maior que zero.');
+  const dataMovimento = parseDate(payload.data_movimento, 'Data do movimento', today());
+  if (dataMovimento > today()) {
+    throw createHttpError(400, 'A data do movimento nao pode ser futura.');
+  }
+  let movimentoId = null;
+  let sessaoAudit = null;
+  let detalheAtualizado = null;
+
+  await sequelize.transaction(async (transaction) => {
+    const sessao = await carregarSessaoParaMovimento(sessaoId, transaction);
+    if (dataMovimento < sessao.data_abertura) {
+      throw createHttpError(400, 'A data do movimento nao pode ser anterior a abertura do caixa.');
+    }
+    // Calcula a base antes do INSERT. A sessao esta bloqueada para UPDATE, entao
+    // dois lancamentos manuais no mesmo caixa nao atualizam os totais em paralelo.
+    // A recarga completa do livro e feita somente depois do commit: em alguns
+    // ambientes MySQL a releitura ORM dentro desta transacao nao enxergava a
+    // linha recem-criada e provocava um rollback indevido.
+    const resumoAnterior = await calcularResumoSessao(sessao, { transaction });
+    const movimento = await MovimentoFinanceiro.create({
+      titulo_financeiro_id: null,
+      conta_bancaria_id: sessao.conta_bancaria_id,
+      empresa_id: sessao.empresa_id || sessao.contaBancaria?.empresa_id || null,
+      caixa_sessao_id: sessao.id,
+      tipo_movimento: natureza === 'ENTRADA' ? 'CAIXA_ENTRADA_MANUAL' : 'CAIXA_SAIDA_MANUAL',
+      status: 'ATIVO',
+      valor,
+      juros: 0,
+      multa: 0,
+      desconto: 0,
+      valor_quitacao: valor,
+      data_movimento: dataMovimento,
+      documento_referencia: String(payload.documento_referencia || '').trim().slice(0, 120) || null,
+      observacoes: descricao,
+      criado_por: req.user?.id || null
+    }, { transaction });
+    movimentoId = movimento.id;
+    sessaoAudit = sessao;
+
+    const totalEntradas = roundCurrency(
+      resumoAnterior.total_entradas + (natureza === 'ENTRADA' ? valor : 0)
+    );
+    const totalSaidas = roundCurrency(
+      resumoAnterior.total_saidas + (natureza === 'SAIDA' ? valor : 0)
+    );
+    const saldoSistema = roundCurrency(
+      Number(sessao.saldo_abertura || 0) + totalEntradas - totalSaidas
+    );
+
+    await sessao.update({
+      total_entradas: totalEntradas,
+      total_saidas: totalSaidas,
+      saldo_sistema: saldoSistema
+    }, { transaction });
+  });
+
+  // Fora da transacao, a listagem consulta apenas dados efetivamente commitados.
+  // O INSERT e a atualizacao dos totais continuam atomicos: qualquer erro dentro
+  // do bloco acima reverte ambos antes de chegar a esta recarga.
+  detalheAtualizado = await montarDetalheSessaoCaixa(sessaoAudit.id);
+  detalheAtualizado.total_entradas = detalheAtualizado.resumo_atual.total_entradas;
+  detalheAtualizado.total_saidas = detalheAtualizado.resumo_atual.total_saidas;
+  detalheAtualizado.saldo_sistema = detalheAtualizado.resumo_atual.saldo_sistema;
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_CASH_MOVEMENT_CREATED',
+    recursoTipo: 'MOVIMENTO_FINANCEIRO',
+    recursoId: movimentoId,
+    status: 'SUCCESS',
+    descricao: `${natureza === 'ENTRADA' ? 'Entrada' : 'Saida'} manual registrada no caixa fisico`,
+    metadata: {
+      caixa_sessao_id: Number(sessaoAudit.id),
+      conta_bancaria_id: Number(sessaoAudit.conta_bancaria_id),
+      empresa_id: sessaoAudit.empresa_id ? Number(sessaoAudit.empresa_id) : null,
+      natureza,
+      valor,
+      data_movimento: dataMovimento,
+      documento_referencia: payload.documento_referencia || null
+    }
+  });
+
+  return detalheAtualizado;
+}
+
+async function estornarMovimentoCaixa(req, sessaoId, movimentoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const idMovimento = parsePositiveInteger(movimentoId, 'Movimento');
+  const motivo = String(payload.motivo || '').trim();
+  if (motivo.length < 10) {
+    throw createHttpError(400, 'Informe um motivo com pelo menos 10 caracteres para o estorno.');
+  }
+  let movimentoAudit = null;
+
+  await sequelize.transaction(async (transaction) => {
+    const sessao = await carregarSessaoParaMovimento(sessaoId, transaction);
+    const movimento = await MovimentoFinanceiro.findOne({
+      where: {
+        id: idMovimento,
+        caixa_sessao_id: sessao.id
+      },
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!movimento) throw createHttpError(404, 'Movimento do caixa nao encontrado.');
+    if (movimento.status !== 'ATIVO') throw createHttpError(400, 'Este movimento ja foi estornado.');
+    if (!['CAIXA_ENTRADA_MANUAL', 'CAIXA_SAIDA_MANUAL'].includes(String(movimento.tipo_movimento || '').toUpperCase())) {
+      throw createHttpError(400, 'Somente lancamentos manuais podem ser estornados por este fluxo.');
+    }
+    await movimento.update({
+      status: 'ESTORNADO',
+      estornado_por: req.user?.id || null,
+      estornado_em: new Date(),
+      observacoes: `${movimento.observacoes || ''}\n[ESTORNO] ${motivo}`.trim()
+    }, { transaction });
+    movimentoAudit = {
+      caixa_sessao_id: sessao.id,
+      conta_bancaria_id: sessao.conta_bancaria_id,
+      empresa_id: sessao.empresa_id || null,
+      tipo_movimento: movimento.tipo_movimento,
+      valor: Number(movimento.valor_quitacao || movimento.valor || 0)
+    };
+  });
+
+  await registrarEventoSeguranca({
+    req,
+    usuarioId: req.user?.id || null,
+    tipoEvento: 'FINANCIAL_CASH_MOVEMENT_REVERSED',
+    recursoTipo: 'MOVIMENTO_FINANCEIRO',
+    recursoId: idMovimento,
+    status: 'SUCCESS',
+    descricao: 'Movimento manual de caixa estornado',
+    metadata: { ...movimentoAudit, motivo }
+  });
+
+  return obterResumoSessaoCaixa(req, movimentoAudit.caixa_sessao_id);
+}
+
+function serializarMovimentoSessao(movimento, sessao) {
+  const natureza = obterNaturezaMovimento(movimento);
+  const manual = ['CAIXA_ENTRADA_MANUAL', 'CAIXA_SAIDA_MANUAL'].includes(String(movimento.tipo_movimento || '').toUpperCase());
+  return {
+    id: movimento.id,
+    origem: 'MOVIMENTO',
+    natureza,
+    tipo: movimento.tipo_movimento,
+    data: movimento.data_movimento,
+    valor: Math.abs(Number(movimento.valor_quitacao || movimento.valor || 0)),
+    descricao: movimento.observacoes || movimento.titulo?.descricao || movimento.titulo?.codigo || 'Movimento financeiro',
+    documento: movimento.documento_referencia || movimento.titulo?.codigo || null,
+    titulo: movimento.titulo || null,
+    usuario: movimento.criadoPor || null,
+    estornavel: sessao.status === 'ABERTO' && manual && movimento.status === 'ATIVO'
+  };
+}
+
+function serializarTransferenciaSessao(transferencia, sessao) {
+  const entrada = Number(transferencia.conta_destino_id) === Number(sessao.conta_bancaria_id);
+  return {
+    id: transferencia.id,
+    origem: 'TRANSFERENCIA',
+    natureza: entrada ? 'ENTRADA' : 'SAIDA',
+    tipo: 'TRANSFERENCIA',
+    data: transferencia.data_transferencia,
+    valor: Math.abs(Number(transferencia.valor || 0)),
+    descricao: transferencia.descricao || `Transferencia ${entrada ? 'recebida' : 'enviada'}`,
+    documento: null,
+    conta_contraparte: entrada ? transferencia.contaOrigem?.nome : transferencia.contaDestino?.nome,
+    usuario: transferencia.criadoPor || null,
+    estornavel: false
+  };
+}
+
+async function montarDetalheSessaoCaixa(sessaoId, { transaction = null } = {}) {
   const sessao = await CaixaFinanceiroSessao.findByPk(parsePositiveInteger(sessaoId, 'Caixa'), {
-    include: includeSessao()
+    include: includeSessao(),
+    transaction
   });
   if (!sessao) {
     throw createHttpError(404, 'Caixa nao encontrado.');
   }
-  const resumo = await calcularResumoSessao(sessao);
-  sessao.setDataValue('resumo_atual', resumo);
-  return sessao;
+  const resumo = await calcularResumoSessao(sessao, { transaction });
+  // Dentro de uma transacao do Sequelize, as consultas compartilham a mesma
+  // conexao. Mantelas sequenciais evita concorrencia na conexao e garante que
+  // o movimento recem-criado seja lido antes de confirmar o sucesso ao cliente.
+  const movimentos = await carregarMovimentosSessao(sessao, { transaction });
+  const transferencias = await carregarTransferenciasSessao(sessao, { transaction });
+  const movimentosDetalhados = [
+    ...movimentos.map((movimento) => serializarMovimentoSessao(movimento, sessao)),
+    ...transferencias.map((transferencia) => serializarTransferenciaSessao(transferencia, sessao))
+  ]
+    .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')) || Number(b.id) - Number(a.id))
+    .slice(0, 300);
+  return {
+    ...sessao.get({ plain: true }),
+    resumo_atual: resumo,
+    movimentos_detalhados: movimentosDetalhados
+  };
+}
+
+async function obterResumoSessaoCaixa(req, sessaoId) {
+  await assertFinanceAccess(req);
+  return montarDetalheSessaoCaixa(sessaoId);
 }
 
 module.exports = {
   abrirSessaoCaixa,
   confirmarConciliacaoDiaCaixa,
+  estornarMovimentoCaixa,
   fecharSessaoCaixa,
   listarSessoesCaixa,
-  obterResumoSessaoCaixa
+  obterResumoSessaoCaixa,
+  registrarMovimentoCaixa
 };

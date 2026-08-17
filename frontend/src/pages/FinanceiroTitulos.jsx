@@ -646,7 +646,17 @@ function today() {
 }
 
 function contaBancariaObrigatoria(formaRecebimento) {
-  return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+  return !['CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+}
+
+function contaExigeControleDiario(conta) {
+  const valorConfigurado = conta?.exige_abertura_fechamento;
+  const exigeAberturaFechamento = valorConfigurado === true
+    || Number(valorConfigurado) === 1
+    || String(valorConfigurado || '').trim().toLowerCase() === 'true';
+
+  return exigeAberturaFechamento
+    || String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
 }
 
 function isCartaoForma(formaRecebimento) {
@@ -1197,6 +1207,19 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     if (!baixaMassaForm.empresa_id) return [];
     return contasBancarias.filter((conta) => String(conta.empresa_id || '') === String(baixaMassaForm.empresa_id));
   }, [baixaMassaForm.empresa_id, contasBancarias]);
+  const baixaMassaUsaDinheiro = String(baixaMassaForm.forma_recebimento || '').toUpperCase() === 'DINHEIRO';
+  const contasFinanceirasCompativeisBaixaMassa = useMemo(
+    () => baixaMassaUsaDinheiro
+      ? contasBancariasBaixaMassa.filter((conta) => contaExigeControleDiario(conta))
+      : contasBancariasBaixaMassa,
+    [baixaMassaUsaDinheiro, contasBancariasBaixaMassa]
+  );
+  const contaSelecionadaBaixaMassa = useMemo(
+    () => contasBancariasBaixaMassa.find(
+      (conta) => String(conta.id) === String(baixaMassaForm.conta_bancaria_id)
+    ) || null,
+    [baixaMassaForm.conta_bancaria_id, contasBancariasBaixaMassa]
+  );
   const selectedCartaoBaixaMassa = useMemo(
     () => cartoes.find((cartao) => String(cartao.id) === String(baixaMassaForm.cartao_id)) || null,
     [cartoes, baixaMassaForm.cartao_id]
@@ -1682,6 +1705,17 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     if (baixaMassaUsaCartao && !baixaMassaForm.cartao_id) {
       setError('Informe o cartao utilizado na baixa em massa.');
       return;
+    }
+
+    if (!baixaMassaParcelada && baixaMassaUsaDinheiro) {
+      if (!baixaMassaForm.conta_bancaria_id) {
+        setError('Selecione o caixa fisico usado na baixa em dinheiro.');
+        return;
+      }
+      if (!contaExigeControleDiario(contaSelecionadaBaixaMassa)) {
+        setError('A baixa em dinheiro deve usar uma conta de caixa fisico com controle de abertura e fechamento.');
+        return;
+      }
     }
 
     if (baixaMassaTemEmpresaDiferente && !baixaMassaForm.natureza_intercompany_baixa) {
@@ -3059,7 +3093,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         forma_pagamento_id: formaPagamentoId,
                         forma_recebimento: formaOperacional,
                         cartao_id: '',
-                        conta_bancaria_id: isCartaoForma(formaOperacional) ? '' : current.conta_bancaria_id,
+                        conta_bancaria_id: '',
                         parcelado: false,
                         desconto: '',
                         usar_cheque_terceiro: false,
@@ -3156,7 +3190,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ) : null}
 
                 <label className="app-filter-field md:col-span-2">
-                  <span className="app-filter-label">Conta bancaria</span>
+                  <span className="app-filter-label">{baixaMassaUsaDinheiro ? 'Caixa fisico *' : 'Conta bancaria'}</span>
                   <select
                     className="input w-full input-sm"
                     value={baixaMassaForm.conta_bancaria_id}
@@ -3172,15 +3206,25 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                         ? 'Selecione a conta para conciliacao das parcelas'
                         : baixaMassaUsaCartao
                         ? (baixaMassaCartaoDebito ? 'Conta vinculada ao cartao' : 'Cartao de credito sem baixa bancaria imediata')
+                        : baixaMassaUsaDinheiro
+                        ? 'Selecione o caixa fisico'
                         : (baixaMassaForm.empresa_id ? 'Sem conta bancaria' : 'Selecione a empresa pagadora')}
                     </option>
-                    {contasBancariasBaixaMassa.map((conta) => (
+                    {contasFinanceirasCompativeisBaixaMassa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
                         {conta.banco ? ` - ${conta.banco}` : ''}
                       </option>
                     ))}
                   </select>
+                  {baixaMassaUsaDinheiro ? (
+                    <span className="mt-1 block text-xs text-[var(--c-muted)]">
+                      O caixa deve estar aberto e abranger a data informada para o pagamento.
+                      {baixaMassaForm.empresa_id && contasFinanceirasCompativeisBaixaMassa.length === 0
+                        ? ' Nenhum caixa fisico ativo foi encontrado para esta empresa.'
+                        : ''}
+                    </span>
+                  ) : null}
                 </label>
 
                 <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">

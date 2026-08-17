@@ -1,861 +1,502 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  HiOutlineArrowDownCircle,
+  HiOutlineArrowUpCircle,
+  HiOutlineBanknotes,
+  HiOutlineCheckCircle,
+  HiOutlineClock,
+  HiOutlineLockClosed,
+  HiOutlineLockOpen,
+  HiOutlinePlus,
+  HiOutlineScale,
+  HiOutlineXMark
+} from 'react-icons/hi2';
 import {
   abrirCaixaFinanceiro,
-  cancelarTransferenciaFinanceira,
   confirmarConciliacaoDiaCaixa,
+  estornarMovimentoCaixaFinanceiro,
   fecharCaixaFinanceiro,
+  getCaixaFinanceiro,
   getCaixasFinanceiros,
   getContasBancarias,
-  criarTransferenciaFinanceira,
-  getTransferenciasFinanceiras
+  registrarMovimentoCaixaFinanceiro
 } from '../services/financeiro';
-import { getEmpresasGrupo } from '../services/empresasGrupo';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 
-const TIPOS_INTERCOMPANY = [
-  { value: 'APORTE', label: 'Aporte' },
-  { value: 'EMPRESTIMO', label: 'Emprestimo' },
-  { value: 'REEMBOLSO', label: 'Reembolso' },
-  { value: 'RATEIO', label: 'Rateio' },
-  { value: 'COBERTURA_CAIXA', label: 'Cobertura de caixa' },
-  { value: 'FOLHA', label: 'Folha' },
-  { value: 'ADMINISTRATIVO', label: 'Administrativo' },
-  { value: 'IMPOSTO', label: 'Imposto' },
-  { value: 'TRANSFERENCIA_OPERACIONAL', label: 'Transferencia operacional' }
+const MOVIMENTO_COLUMNS = [
+  { key: 'data', width: 112, minWidth: 96 },
+  { key: 'natureza', width: 118, minWidth: 104 },
+  { key: 'descricao', width: 320, minWidth: 220 },
+  { key: 'documento', width: 170, minWidth: 130 },
+  { key: 'origem', width: 160, minWidth: 130 },
+  { key: 'valor', width: 150, minWidth: 125 },
+  { key: 'acao', width: 112, minWidth: 96 }
 ];
 
-const DEFAULT_FILTERS = {
-  status: 'ABERTO',
-  empresa_id: '',
-  conta_bancaria_id: '',
-  limit: '100'
-};
+const FECHAMENTO_COLUMNS = [
+  { key: 'abertura', width: 120, minWidth: 104 },
+  { key: 'fechamento', width: 120, minWidth: 104 },
+  { key: 'saldo_inicial', width: 150, minWidth: 126 },
+  { key: 'entradas', width: 140, minWidth: 116 },
+  { key: 'saidas', width: 140, minWidth: 116 },
+  { key: 'saldo_contado', width: 158, minWidth: 132 },
+  { key: 'diferenca', width: 156, minWidth: 132 },
+  { key: 'responsavel', width: 220, minWidth: 180 }
+];
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function addDays(dateString, days) {
-  const date = new Date(`${dateString || today()}T12:00:00.000`);
+  const date = new Date(`${dateString || today()}T12:00:00`);
   if (Number.isNaN(date.getTime())) return today();
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
 }
 
 function formatCurrency(value) {
-  return Number(value || 0).toLocaleString('pt-BR', {
-    style: 'currency',
-    currency: 'BRL'
-  });
+  return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
 function formatDate(value) {
   if (!value) return '-';
-  const [year, month, day] = String(value).split('-');
-  if (!year || !month || !day) return '-';
-  return `${day}/${month}/${year}`;
+  const [year, month, day] = String(value).slice(0, 10).split('-');
+  return year && month && day ? `${day}/${month}/${year}` : '-';
 }
 
-function compact(params = {}) {
-  return Object.fromEntries(
-    Object.entries(params).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
-  );
+function contaEhCaixaFisico(conta) {
+  return String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
 }
 
-function statusClass(status) {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'ABERTO') return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (normalized === 'FECHADO') return 'app-status-pill bg-slate-100 text-slate-700';
-  return 'app-status-pill bg-blue-100 text-blue-700';
+function contaParticipaDoControle(conta) {
+  return conta?.ativo !== false && (contaEhCaixaFisico(conta) || conta?.exige_abertura_fechamento === true);
 }
 
 function contaLabel(conta) {
-  if (!conta) return 'Conta nao informada';
-  const sufixo = conta.tipo_operacional === 'CAIXA_INTERNO' ? 'Caixa interno' : (conta.banco || 'Conta bancaria');
-  return `${conta.nome || `Conta ${conta.id}`} - ${sufixo}`;
+  if (!conta) return 'Conta não informada';
+  const tipo = contaEhCaixaFisico(conta) ? 'Caixa físico' : (conta.banco || 'Conta financeira');
+  return `${conta.nome || `Conta ${conta.id}`} · ${tipo}`;
 }
 
-function getContaEmpresaId(conta) {
-  return String(conta?.empresa_id || conta?.empresa?.id || '');
+function empresaLabel(conta) {
+  return conta?.empresa?.nome || conta?.empresa?.razao_social || 'Empresa não informada';
 }
 
-function getContaEmpresaNome(conta) {
-  return conta?.empresa?.nome || conta?.empresa?.razao_social || (conta?.empresa_id ? `Empresa #${conta.empresa_id}` : 'Sem empresa vinculada');
+function statusClass(status) {
+  return String(status || '').toUpperCase() === 'ABERTO'
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
+    : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
 }
 
-function empresaLabel(empresa) {
-  return empresa?.nome || empresa?.razao_social || `Empresa ${empresa?.id}`;
+function Metric({ label, value, icon: Icon, tone = 'default', hint }) {
+  const toneClass = {
+    default: 'text-[var(--c-text)]',
+    positive: 'text-emerald-600 dark:text-emerald-400',
+    negative: 'text-rose-600 dark:text-rose-400'
+  }[tone];
+  return (
+    <div className="min-w-0 rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-3.5 py-3">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">
+        {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}<span>{label}</span>
+      </div>
+      <strong className={`mt-1 block break-words text-base leading-tight sm:text-lg ${toneClass}`} title={String(value)}>{value}</strong>
+      {hint ? <span className="mt-0.5 block text-xs text-[var(--c-muted)]">{hint}</span> : null}
+    </div>
+  );
 }
 
 export default function FinanceiroCaixas() {
-  const [filters, setFilters] = useState(DEFAULT_FILTERS);
-  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [contas, setContas] = useState([]);
-  const [empresas, setEmpresas] = useState([]);
+  const [contaSelecionadaId, setContaSelecionadaId] = useState('');
+  const [empresaFiltro, setEmpresaFiltro] = useState('');
   const [sessoes, setSessoes] = useState([]);
-  const [transferencias, setTransferencias] = useState([]);
-  const [abrirForm, setAbrirForm] = useState({
-    conta_bancaria_id: '',
-    data_abertura: today(),
-    saldo_abertura: '',
-    observacoes: ''
-  });
-  const [fecharForm, setFecharForm] = useState({});
-  const [transferenciaForm, setTransferenciaForm] = useState({
-    tipo_transferencia: 'MESMA_TITULARIDADE',
-    empresa_origem_id: '',
-    empresa_destino_id: '',
-    conta_origem_id: '',
-    conta_destino_id: '',
-    data_transferencia: today(),
-    valor: '',
-    descricao: '',
-    tipo_intercompany: '',
-    motivo_intercompany: '',
-    elimina_consolidado: true
-  });
+  const [sessaoDetalhe, setSessaoDetalhe] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [loadingOptions, setLoadingOptions] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-
-  const contaOrigemTransferencia = useMemo(
-    () => contas.find((conta) => String(conta.id) === String(transferenciaForm.conta_origem_id)),
-    [contas, transferenciaForm.conta_origem_id]
-  );
-  const contaDestinoTransferencia = useMemo(
-    () => contas.find((conta) => String(conta.id) === String(transferenciaForm.conta_destino_id)),
-    [contas, transferenciaForm.conta_destino_id]
-  );
-  const transferenciaEntreEmpresas = transferenciaForm.tipo_transferencia === 'ENTRE_EMPRESAS';
-  const transferenciaMesmaTitularidade = transferenciaForm.tipo_transferencia === 'MESMA_TITULARIDADE';
-  const contasOrigemDisponiveis = useMemo(
-    () => contas.filter((conta) => !transferenciaForm.empresa_origem_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_origem_id)),
-    [contas, transferenciaForm.empresa_origem_id]
-  );
-  const contasDestinoDisponiveis = useMemo(() => contas.filter((conta) => {
-    if (String(conta.id) === String(transferenciaForm.conta_origem_id)) return false;
-    if (transferenciaMesmaTitularidade) {
-      return !transferenciaForm.empresa_origem_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_origem_id);
-    }
-    if (transferenciaEntreEmpresas) {
-      return !transferenciaForm.empresa_destino_id || getContaEmpresaId(conta) === String(transferenciaForm.empresa_destino_id);
-    }
-    return true;
-  }), [contas, transferenciaEntreEmpresas, transferenciaForm.conta_origem_id, transferenciaForm.empresa_destino_id, transferenciaForm.empresa_origem_id, transferenciaMesmaTitularidade]);
+  const carregamentoIdRef = useRef(0);
+  const [abrirForm, setAbrirForm] = useState({ data_abertura: today(), saldo_abertura: '', observacoes: '' });
+  const [movimentoForm, setMovimentoForm] = useState({ natureza: 'SAIDA', data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
+  const [fecharForm, setFecharForm] = useState({ data_fechamento: today(), saldo_informado: '', observacoes: '' });
+  const [estorno, setEstorno] = useState({ movimento: null, motivo: '' });
 
   useEffect(() => {
     let active = true;
-    setLoadingOptions(true);
-
-    Promise.all([
-      getContasBancarias().catch(() => []),
-      getEmpresasGrupo({ ativo: true }).catch(() => [])
-    ])
-      .then(([contasData, empresasData]) => {
+    getContasBancarias()
+      .then((data) => {
         if (!active) return;
-        setContas(Array.isArray(contasData) ? contasData : []);
-        setEmpresas(Array.isArray(empresasData) ? empresasData : []);
+        const elegiveis = (Array.isArray(data) ? data : [])
+          .filter(contaParticipaDoControle)
+          .sort((a, b) => Number(contaEhCaixaFisico(b)) - Number(contaEhCaixaFisico(a)) || String(a.nome || '').localeCompare(String(b.nome || '')));
+        setContas(elegiveis);
+        setContaSelecionadaId((current) => current || String(elegiveis[0]?.id || ''));
       })
-      .finally(() => {
-        if (active) setLoadingOptions(false);
-      });
+      .catch((err) => setError(err?.message || 'Erro ao carregar as contas configuradas para caixa.'));
+    return () => { active = false; };
+  }, []);
 
-    return () => {
-      active = false;
-    };
+  const empresas = useMemo(() => {
+    const map = new Map();
+    contas.forEach((conta) => {
+      if (conta.empresa_id && conta.empresa) map.set(String(conta.empresa_id), conta.empresa);
+    });
+    return [...map.values()].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
+  }, [contas]);
+
+  const contasFiltradas = useMemo(() => contas.filter((conta) => (
+    !empresaFiltro || String(conta.empresa_id || '') === String(empresaFiltro)
+  )), [contas, empresaFiltro]);
+
+  const contaSelecionada = useMemo(
+    () => contas.find((conta) => String(conta.id) === String(contaSelecionadaId)) || null,
+    [contas, contaSelecionadaId]
+  );
+
+  useEffect(() => {
+    if (!contasFiltradas.some((conta) => String(conta.id) === String(contaSelecionadaId))) {
+      setContaSelecionadaId(String(contasFiltradas[0]?.id || ''));
+    }
+  }, [contasFiltradas, contaSelecionadaId]);
+
+  const carregarControleCaixa = useCallback(async () => {
+    if (!contaSelecionadaId) {
+      setSessoes([]);
+      setSessaoDetalhe(null);
+      setLoading(false);
+      return null;
+    }
+
+    const carregamentoId = carregamentoIdRef.current + 1;
+    carregamentoIdRef.current = carregamentoId;
+    setLoading(true);
+
+    try {
+      const data = await getCaixasFinanceiros({ conta_bancaria_id: contaSelecionadaId, status: 'TODOS', limit: 100 });
+      if (carregamentoId !== carregamentoIdRef.current) return null;
+
+      const lista = Array.isArray(data) ? data : [];
+      setSessoes(lista);
+      const aberta = lista.find((sessao) => sessao.status === 'ABERTO');
+      if (!aberta) {
+        setSessaoDetalhe(null);
+        return null;
+      }
+
+      const detalhe = await getCaixaFinanceiro(aberta.id);
+      if (carregamentoId !== carregamentoIdRef.current) return null;
+
+      setSessaoDetalhe(detalhe);
+      setFecharForm((current) => ({
+        ...current,
+        data_fechamento: today(),
+        saldo_informado: formatCurrencyInput(
+          detalhe?.resumo_atual?.saldo_sistema ?? detalhe?.saldo_sistema ?? '',
+          { emptyZero: false }
+        )
+      }));
+      return detalhe;
+    } finally {
+      if (carregamentoId === carregamentoIdRef.current) setLoading(false);
+    }
+  }, [contaSelecionadaId]);
+
+  const aplicarSessaoAtualizada = useCallback((detalhe) => {
+    if (!detalhe?.id) return false;
+
+    setSessaoDetalhe(detalhe.status === 'ABERTO' ? detalhe : null);
+    setSessoes((atuais) => {
+      const existe = atuais.some((sessao) => Number(sessao.id) === Number(detalhe.id));
+      if (!existe) return [detalhe, ...atuais];
+      return atuais.map((sessao) => (
+        Number(sessao.id) === Number(detalhe.id) ? detalhe : sessao
+      ));
+    });
+
+    if (detalhe.status === 'ABERTO') {
+      setFecharForm((current) => ({
+        ...current,
+        data_fechamento: today(),
+        saldo_informado: formatCurrencyInput(
+          detalhe?.resumo_atual?.saldo_sistema ?? detalhe?.saldo_sistema ?? '',
+          { emptyZero: false }
+        )
+      }));
+    }
+
+    return true;
   }, []);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
     setError('');
+    carregarControleCaixa().catch((err) => {
+      if (!contaSelecionadaId) return;
+      setError(err?.message || 'Erro ao carregar o controle do caixa.');
+      setSessoes([]);
+      setSessaoDetalhe(null);
+    });
+    return () => { carregamentoIdRef.current += 1; };
+  }, [carregarControleCaixa, contaSelecionadaId]);
 
-    Promise.all([
-      getCaixasFinanceiros(compact(appliedFilters)),
-      getTransferenciasFinanceiras(compact({
-        empresa_id: appliedFilters.empresa_id,
-        conta_bancaria_id: appliedFilters.conta_bancaria_id,
-        status: 'TODOS',
-        limit: appliedFilters.limit
-      }))
-    ])
-      .then(([data, transferenciasData]) => {
-        if (!active) return;
-        const list = Array.isArray(data) ? data : [];
-        setSessoes(list);
-        setTransferencias(Array.isArray(transferenciasData) ? transferenciasData : []);
-        setFecharForm((current) => {
-          const next = { ...current };
-          for (const sessao of list) {
-            if (sessao.status === 'ABERTO' && !next[sessao.id]) {
-              next[sessao.id] = {
-                data_fechamento: today(),
-                saldo_informado: sessao.resumo_atual?.saldo_sistema ?? sessao.saldo_sistema ?? '',
-                observacoes: ''
-              };
-            }
-          }
-          return next;
-        });
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err?.message || 'Erro ao carregar caixas financeiros');
-        setSessoes([]);
-        setTransferencias([]);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+  const sessaoAberta = useMemo(() => sessoes.find((sessao) => sessao.status === 'ABERTO') || null, [sessoes]);
+  const sessoesFechadas = useMemo(() => sessoes.filter((sessao) => sessao.status === 'FECHADO'), [sessoes]);
+  const resumo = sessaoDetalhe?.resumo_atual || sessaoAberta?.resumo_atual || {};
+  const movimentos = Array.isArray(sessaoDetalhe?.movimentos_detalhados) ? sessaoDetalhe.movimentos_detalhados : [];
+  const dataMinimaFechamento = useMemo(() => {
+    const datasValidas = [
+      today(),
+      String(sessaoAberta?.data_abertura || ''),
+      ...movimentos.map((movimento) => String(movimento?.data || ''))
+    ]
+      .filter((data) => /^\d{4}-\d{2}-\d{2}$/.test(data))
+      .sort();
 
-    return () => {
-      active = false;
-    };
-  }, [appliedFilters]);
+    return datasValidas[datasValidas.length - 1] || today();
+  }, [movimentos, sessaoAberta?.data_abertura]);
+  const saldoSistema = Number(resumo.saldo_sistema ?? sessaoAberta?.saldo_sistema ?? 0);
+  const saldoInformado = parseCurrencyInput(fecharForm.saldo_informado);
+  const diferencaFechamento = Number.isFinite(saldoInformado) ? saldoInformado - saldoSistema : 0;
+  const caixaFisico = contaEhCaixaFisico(contaSelecionada);
 
-  const contasFiltradas = useMemo(() => {
-    if (!filters.empresa_id) return contas;
-    return contas.filter((conta) => String(conta.empresa_id || '') === String(filters.empresa_id));
-  }, [contas, filters.empresa_id]);
+  useEffect(() => {
+    setFecharForm((current) => (
+      current.data_fechamento >= dataMinimaFechamento
+        ? current
+        : { ...current, data_fechamento: dataMinimaFechamento }
+    ));
+  }, [dataMinimaFechamento]);
 
-  const resumo = useMemo(() => sessoes.reduce((acc, sessao) => {
-    acc.quantidade += 1;
-    if (sessao.status === 'ABERTO') acc.abertos += 1;
-    if (sessao.status === 'FECHADO') acc.fechados += 1;
-    const saldoAtual = sessao.resumo_atual?.saldo_sistema ?? sessao.saldo_sistema ?? 0;
-    acc.saldo += Number(saldoAtual || 0);
-    return acc;
-  }, { quantidade: 0, abertos: 0, fechados: 0, saldo: 0 }), [sessoes]);
-
-  function setFilter(name, value) {
-    setFilters((current) => ({
-      ...current,
-      [name]: value,
-      ...(name === 'empresa_id' ? { conta_bancaria_id: '' } : {})
-    }));
+  async function executar(acao, mensagemErro) {
+    try {
+      setSaving(true);
+      setError('');
+      setMessage('');
+      const resultado = await acao();
+      if (!resultado?.estadoAplicado) await carregarControleCaixa();
+    } catch (err) {
+      setError(err?.message || mensagemErro);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAbrir(event) {
     event.preventDefault();
-    try {
-      setSaving(true);
-      setError('');
-      setMessage('');
-      await abrirCaixaFinanceiro({
-        ...abrirForm,
-        saldo_abertura: abrirForm.saldo_abertura === '' ? undefined : abrirForm.saldo_abertura
-      });
+    await executar(async () => {
+      await abrirCaixaFinanceiro({ conta_bancaria_id: contaSelecionadaId, data_abertura: abrirForm.data_abertura, saldo_abertura: abrirForm.saldo_abertura === '' ? undefined : abrirForm.saldo_abertura, observacoes: abrirForm.observacoes });
       setMessage('Caixa aberto com sucesso.');
-      setAbrirForm({
-        conta_bancaria_id: '',
-        data_abertura: today(),
-        saldo_abertura: '',
-        observacoes: ''
-      });
-      setAppliedFilters((current) => ({ ...current }));
-    } catch (err) {
-      setError(err?.message || 'Erro ao abrir caixa financeiro');
-    } finally {
-      setSaving(false);
-    }
+      setAbrirForm({ data_abertura: today(), saldo_abertura: '', observacoes: '' });
+    }, 'Erro ao abrir o caixa.');
   }
 
-  async function handleConfirmarConciliacaoDia() {
-    if (!abrirForm.conta_bancaria_id) {
-      setError('Selecione a conta antes de confirmar a conciliacao do dia anterior.');
-      return;
-    }
-    const dataReferencia = addDays(abrirForm.data_abertura || today(), -1);
-    try {
-      setSaving(true);
-      setError('');
-      setMessage('');
-      await confirmarConciliacaoDiaCaixa({
-        conta_bancaria_id: abrirForm.conta_bancaria_id,
-        data_referencia: dataReferencia,
-        observacoes: abrirForm.observacoes
-      });
-      setMessage(`Conciliacao OFX de ${formatDate(dataReferencia)} confirmada para esta conta.`);
-    } catch (err) {
-      setError(err?.message || 'Erro ao confirmar conciliacao OFX do dia anterior');
-    } finally {
-      setSaving(false);
-    }
+  async function handleConfirmarOfx() {
+    await executar(async () => {
+      const dataReferencia = addDays(abrirForm.data_abertura, -1);
+      await confirmarConciliacaoDiaCaixa({ conta_bancaria_id: contaSelecionadaId, data_referencia: dataReferencia, observacoes: abrirForm.observacoes });
+      setMessage(`Conferência OFX de ${formatDate(dataReferencia)} confirmada.`);
+    }, 'Erro ao confirmar a conferência OFX.');
   }
 
-  async function handleFechar(sessaoId) {
-    const payload = fecharForm[sessaoId] || {};
-    try {
-      setSaving(true);
-      setError('');
-      setMessage('');
-      await fecharCaixaFinanceiro(sessaoId, payload);
-      setMessage('Caixa fechado com sucesso.');
-      setAppliedFilters((current) => ({ ...current }));
-    } catch (err) {
-      setError(err?.message || 'Erro ao fechar caixa financeiro');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleTransferencia(event) {
+  async function handleMovimento(event) {
     event.preventDefault();
-    if (transferenciaMesmaTitularidade && !transferenciaForm.empresa_origem_id) {
-      setError('Selecione a empresa da transferencia de mesma titularidade.');
+    if (!sessaoAberta) return;
+    const valorMovimento = parseCurrencyInput(movimentoForm.valor);
+    if (valorMovimento <= 0) {
+      setError('Informe um valor maior que zero para registrar o movimento.');
       return;
     }
-    if (transferenciaEntreEmpresas && (!transferenciaForm.empresa_origem_id || !transferenciaForm.empresa_destino_id)) {
-      setError('Selecione empresa origem e empresa destino.');
-      return;
-    }
-    if (transferenciaEntreEmpresas && String(transferenciaForm.empresa_origem_id) === String(transferenciaForm.empresa_destino_id)) {
-      setError('Empresa origem e destino devem ser diferentes.');
-      return;
-    }
-    if (transferenciaForm.conta_origem_id && String(transferenciaForm.conta_origem_id) === String(transferenciaForm.conta_destino_id)) {
-      setError('Conta origem e destino devem ser diferentes.');
-      return;
-    }
-    if (transferenciaEntreEmpresas && !transferenciaForm.tipo_intercompany) {
-      setError('Transferencia entre empresas exige tipo.');
-      return;
-    }
-    if (transferenciaEntreEmpresas && !String(transferenciaForm.motivo_intercompany || '').trim()) {
-      setError('Transferencia entre empresas exige motivo.');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError('');
-      setMessage('');
-      await criarTransferenciaFinanceira({
-        ...transferenciaForm,
-        tipo_transferencia: transferenciaForm.tipo_transferencia,
-        tipo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.tipo_intercompany : undefined,
-        motivo_intercompany: transferenciaEntreEmpresas ? transferenciaForm.motivo_intercompany : undefined,
-        elimina_consolidado: transferenciaEntreEmpresas ? transferenciaForm.elimina_consolidado : true
+    await executar(async () => {
+      const detalhe = await registrarMovimentoCaixaFinanceiro(sessaoAberta.id, {
+        ...movimentoForm,
+        valor: valorMovimento
       });
-      setMessage('Transferencia registrada com sucesso.');
-      setTransferenciaForm({
-        tipo_transferencia: 'MESMA_TITULARIDADE',
-        empresa_origem_id: '',
-        empresa_destino_id: '',
-        conta_origem_id: '',
-        conta_destino_id: '',
-        data_transferencia: today(),
-        valor: '',
-        descricao: '',
-        tipo_intercompany: '',
-        motivo_intercompany: '',
-        elimina_consolidado: true
-      });
-      setAppliedFilters((current) => ({ ...current }));
-    } catch (err) {
-      setError(err?.message || 'Erro ao registrar transferencia financeira');
-    } finally {
-      setSaving(false);
-    }
+      const estadoAplicado = aplicarSessaoAtualizada(detalhe);
+      setMessage(`${movimentoForm.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso.`);
+      setMovimentoForm({ natureza: movimentoForm.natureza, data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
+      return { estadoAplicado };
+    }, 'Erro ao registrar o movimento.');
   }
 
-  async function handleCancelarTransferencia(transferenciaId) {
-    try {
-      setSaving(true);
-      setError('');
-      setMessage('');
-      await cancelarTransferenciaFinanceira(transferenciaId, {});
-      setMessage('Transferencia cancelada com sucesso.');
-      setAppliedFilters((current) => ({ ...current }));
-    } catch (err) {
-      setError(err?.message || 'Erro ao cancelar transferencia financeira');
-    } finally {
-      setSaving(false);
+  async function handleFechar(event) {
+    event.preventDefault();
+    if (!sessaoAberta) return;
+    if (fecharForm.data_fechamento < dataMinimaFechamento) {
+      setError(`A data de fechamento nao pode ser anterior a ${formatDate(dataMinimaFechamento)}.`);
+      return;
     }
+    await executar(async () => {
+      await fecharCaixaFinanceiro(sessaoAberta.id, {
+        ...fecharForm,
+        saldo_informado: parseCurrencyInput(fecharForm.saldo_informado)
+      });
+      setMessage('Caixa fechado e conferência registrada com sucesso.');
+    }, 'Erro ao fechar o caixa.');
+  }
+
+  async function handleEstornar(event) {
+    event.preventDefault();
+    if (!sessaoAberta || !estorno.movimento) return;
+    await executar(async () => {
+      const detalhe = await estornarMovimentoCaixaFinanceiro(sessaoAberta.id, estorno.movimento.id, { motivo: estorno.motivo });
+      const estadoAplicado = aplicarSessaoAtualizada(detalhe);
+      setMessage('Movimento estornado com trilha de auditoria.');
+      setEstorno({ movimento: null, motivo: '' });
+      return { estadoAplicado };
+    }, 'Erro ao estornar o movimento.');
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header">
-        <h1 className="text-xl font-semibold md:text-2xl">Abertura e Fechamento de Caixa</h1>
-        <p className="page-subtitle">
-          Controle operacional por empresa e conta, incluindo contas bancarias e caixa interno em especie.
-        </p>
-      </div>
-
-      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
-      {message ? <div className="app-alert">{message}</div> : null}
-
-      <div className="grid gap-4 md:grid-cols-4">
-        <div className="app-summary-card">
-          <span className="app-summary-label">Sessoes filtradas</span>
-          <strong className="app-summary-value">{resumo.quantidade}</strong>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Abertas</span>
-          <strong className="app-summary-value">{resumo.abertos}</strong>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Fechadas</span>
-          <strong className="app-summary-value">{resumo.fechados}</strong>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Saldo apurado</span>
-          <strong className="app-summary-value">{formatCurrency(resumo.saldo)}</strong>
+    <div className="page solicitacoes-page mx-auto w-full max-w-[1600px]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-primary)]">Financeiro · tesouraria</span>
+          <h1 className="mt-1 text-xl font-semibold text-[var(--c-text)] md:text-2xl">Caixas e Contas</h1>
+          <p className="mt-1 max-w-3xl text-sm text-[var(--c-muted)]">Abertura, movimentação e conferência do dinheiro físico em um único fluxo operacional.</p>
         </div>
       </div>
 
-      <div className="card sol-surface-card">
-        <div className="solicitacoes-toolbar rounded-xl p-0">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Filtros</h2>
-            <p className="text-sm text-[var(--c-muted)]">Use os filtros para acompanhar uma empresa, conta ou status.</p>
-          </div>
-          <button type="button" className="btn btn-primary" onClick={() => setAppliedFilters(filters)} disabled={loading}>
-            Consultar
-          </button>
-        </div>
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
-          <label className="sol-filter-field">
+      {error ? <div className="app-alert app-alert-error mt-3">{error}</div> : null}
+      {message ? <div className="app-alert app-alert-success mt-3">{message}</div> : null}
+
+      <section className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] p-3 shadow-sm sm:p-4">
+        <div className="grid gap-3 md:grid-cols-12 md:items-end">
+          <label className="sol-filter-field md:col-span-4">
             <span className="sol-filter-label">Empresa</span>
-            <select className="input w-full" value={filters.empresa_id} onChange={(e) => setFilter('empresa_id', e.target.value)} disabled={loadingOptions}>
-              <option value="">Todas</option>
-              {empresas.map((empresa) => (
-                <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>
-              ))}
+            <select className="input w-full" value={empresaFiltro} onChange={(event) => setEmpresaFiltro(event.target.value)}>
+              <option value="">Todas as empresas</option>
+              {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
             </select>
           </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Conta</span>
-            <select className="input w-full" value={filters.conta_bancaria_id} onChange={(e) => setFilter('conta_bancaria_id', e.target.value)} disabled={loadingOptions}>
-              <option value="">Todas</option>
-              {contasFiltradas.map((conta) => (
-                <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
-              ))}
+          <label className="sol-filter-field md:col-span-6">
+            <span className="sol-filter-label">Caixa / conta com controle diário</span>
+            <select className="input w-full" value={contaSelecionadaId} onChange={(event) => setContaSelecionadaId(event.target.value)}>
+              {contasFiltradas.length === 0 ? <option value="">Nenhuma conta configurada</option> : null}
+              {contasFiltradas.map((conta) => <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>)}
             </select>
           </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Status</span>
-            <select className="input w-full" value={filters.status} onChange={(e) => setFilter('status', e.target.value)}>
-              <option value="ABERTO">Abertos</option>
-              <option value="FECHADO">Fechados</option>
-              <option value="TODOS">Todos</option>
-            </select>
-          </label>
-          <label className="sol-filter-field">
-            <span className="sol-filter-label">Limite</span>
-            <select className="input w-full" value={filters.limit} onChange={(e) => setFilter('limit', e.target.value)}>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="200">200</option>
-            </select>
-          </label>
+          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-3 py-2 text-sm md:col-span-2">
+            {sessaoAberta ? <HiOutlineLockOpen className="h-5 w-5 shrink-0 text-emerald-600" /> : <HiOutlineLockClosed className="h-5 w-5 shrink-0 text-[var(--c-muted)]" />}
+            <div className="min-w-0">
+              <strong className="block truncate text-[var(--c-text)]">{sessaoAberta ? 'Caixa aberto' : 'Caixa fechado'}</strong>
+              <span className="block truncate text-xs text-[var(--c-muted)]">{contaSelecionada ? empresaLabel(contaSelecionada) : 'Selecione uma conta'}</span>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(300px,360px)_minmax(320px,400px)_1fr]">
-        <div className="card sol-surface-card">
-          <h2 className="text-lg font-semibold text-[var(--c-text)]">Abrir caixa</h2>
-          <form className="mt-4 space-y-3" onSubmit={handleAbrir}>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Conta</span>
-              <select
-                className="input w-full"
-                value={abrirForm.conta_bancaria_id}
-                onChange={(e) => setAbrirForm((current) => ({ ...current, conta_bancaria_id: e.target.value }))}
-                required
-                disabled={loadingOptions}
-              >
-                <option value="">Selecione</option>
-                {contas.map((conta) => (
-                  <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Data de abertura</span>
-              <input
-                className="input w-full"
-                type="date"
-                value={abrirForm.data_abertura}
-                onChange={(e) => setAbrirForm((current) => ({ ...current, data_abertura: e.target.value }))}
-              />
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Saldo de abertura</span>
-              <input
-                className="input w-full"
-                inputMode="decimal"
-                placeholder="Saldo calculado pelo fechamento anterior"
-                value={abrirForm.saldo_abertura}
-                onChange={(e) => setAbrirForm((current) => ({ ...current, saldo_abertura: e.target.value }))}
-              />
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Observacoes</span>
-              <textarea
-                className="input min-h-[88px] w-full"
-                value={abrirForm.observacoes}
-                onChange={(e) => setAbrirForm((current) => ({ ...current, observacoes: e.target.value }))}
-              />
-            </label>
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-800">
-              <strong className="block text-amber-900">Conferencia OFX obrigatoria</strong>
-              <span>
-                Antes de abrir, confirme que os OFX de {formatDate(addDays(abrirForm.data_abertura || today(), -1))} desta conta foram conciliados ou ignorados.
-              </span>
-              <button
-                type="button"
-                className="btn btn-outline mt-3 w-full"
-                onClick={handleConfirmarConciliacaoDia}
-                disabled={saving || !abrirForm.conta_bancaria_id}
-              >
-                Confirmar OFX do dia anterior
+      {!contaSelecionada && !loading ? (
+        <div className="mt-4 rounded-2xl border border-dashed border-[var(--c-border)] bg-[var(--c-card)] px-5 py-8 text-center text-sm text-[var(--c-muted)]">
+          Cadastre uma conta como <strong className="text-[var(--c-text)]">Caixa interno</strong> e habilite abertura e fechamento nos Cadastros Financeiros.
+        </div>
+      ) : null}
+
+      {contaSelecionada && !sessaoAberta && !loading ? (
+        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineLockOpen className="h-5 w-5 text-[var(--c-primary)]" /> Abrir caixa</h2>
+              <p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Informe o saldo inicial. O caixa físico não depende de conciliação OFX.' : 'Esta conta mantém a conferência OFX anterior.'}</p>
+            </div>
+            <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusClass('FECHADO')}`}>FECHADO</span>
+          </div>
+          <form className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleAbrir}>
+            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data de abertura *</span><input className="input w-full" type="date" value={abrirForm.data_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, data_abertura: event.target.value }))} required /></label>
+            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Saldo inicial</span><input className="input w-full" inputMode="decimal" placeholder="Ex.: 500,00" value={abrirForm.saldo_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, saldo_abertura: event.target.value }))} /></label>
+            <label className="sol-filter-field sm:col-span-2 xl:col-span-6"><span className="sol-filter-label">Observação de abertura</span><input className="input w-full" maxLength={4000} placeholder="Opcional" value={abrirForm.observacoes} onChange={(event) => setAbrirForm((current) => ({ ...current, observacoes: event.target.value }))} /></label>
+            <div className="flex flex-wrap justify-end gap-2 sm:col-span-2 xl:col-span-2">{!caixaFisico ? <button type="button" className="btn btn-secondary" onClick={handleConfirmarOfx} disabled={saving}>Confirmar OFX</button> : null}<button type="submit" className="btn btn-primary" disabled={saving}>Abrir caixa</button></div>
+          </form>
+        </section>
+      ) : null}
+
+      {sessaoAberta ? <>
+        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0"><h2 className="text-base font-semibold text-[var(--c-text)]">Movimento do caixa · {formatDate(sessaoAberta.data_abertura)}</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Resumo financeiro da sessão aberta.</p></div>
+            <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusClass('ABERTO')}`}>ABERTO</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 sm:p-4">
+            <Metric icon={HiOutlineBanknotes} label="Saldo de abertura" value={formatCurrency(sessaoAberta.saldo_abertura)} />
+            <Metric icon={HiOutlineArrowDownCircle} label="Entradas" value={formatCurrency(resumo.total_entradas)} tone="positive" />
+            <Metric icon={HiOutlineArrowUpCircle} label="Saídas" value={formatCurrency(resumo.total_saidas)} tone="negative" />
+            <Metric icon={HiOutlineScale} label="Saldo no sistema" value={formatCurrency(saldoSistema)} tone={saldoSistema < 0 ? 'negative' : 'default'} hint={`${resumo.quantidade_movimentos || 0} movimento(s)`} />
+          </div>
+        </section>
+
+        {caixaFisico ? (
+          <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+            <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="text-base font-semibold text-[var(--c-text)]">Registrar entrada ou saída</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Use para dinheiro físico ainda não registrado por outro fluxo financeiro.</p></div>
+            <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input mt-auto w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input mt-auto w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
+              <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input mt-auto w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input mt-auto w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
+              <div className="flex items-center justify-end sm:col-span-2 xl:col-span-1">
+                <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Registrar entrada ou saída" title="Registrar entrada ou saída">
+                  <HiOutlinePlus className="h-5 w-5" />
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
+
+        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="text-base font-semibold text-[var(--c-text)]">Livro do caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Entradas, saídas e transferências da sessão.</p></div><span className="shrink-0 rounded-full bg-[var(--c-soft)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">{movimentos.length} registro(s)</span></div>
+          {movimentos.length === 0 ? (
+            <div className="m-4 rounded-xl border border-dashed border-[var(--c-border)] bg-[var(--c-soft)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum movimento registrado nesta sessão.</div>
+          ) : <>
+            <div className="hidden overflow-x-auto md:block">
+              <ResizableTable columns={MOVIMENTO_COLUMNS} storageKey="fluxy.financeiro.caixas.movimentos.columns" className="app-table" scrollLabel="Livro do caixa com colunas redimensionáveis">
+                <thead><tr><ResizableTh columnKey="data">Data</ResizableTh><ResizableTh columnKey="natureza">Natureza</ResizableTh><ResizableTh columnKey="descricao">Descrição</ResizableTh><ResizableTh columnKey="documento">Documento</ResizableTh><ResizableTh columnKey="origem">Origem</ResizableTh><ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh><ResizableTh columnKey="acao">Ação</ResizableTh></tr></thead>
+                <tbody>{movimentos.map((movimento) => <tr key={`${movimento.origem}-${movimento.id}`}><td>{formatDate(movimento.data)}</td><td><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movimento.natureza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300'}`}>{movimento.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'}</span></td><td className="whitespace-normal"><strong className="block text-[var(--c-text)]">{movimento.descricao}</strong>{movimento.conta_contraparte ? <span className="text-xs text-[var(--c-muted)]">Contraparte: {movimento.conta_contraparte}</span> : null}</td><td>{movimento.documento || '-'}</td><td>{movimento.origem === 'TRANSFERENCIA' ? 'Transferência' : (movimento.tipo?.includes('MANUAL') ? 'Lançamento manual' : 'Financeiro')}</td><td className={`text-right font-semibold ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>{movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}</td><td>{movimento.estornavel ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button> : '-'}</td></tr>)}</tbody>
+              </ResizableTable>
+            </div>
+            <div className="grid gap-3 p-3 md:hidden">
+              {movimentos.map((movimento) => <article key={`${movimento.origem}-${movimento.id}`} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="text-xs text-[var(--c-muted)]">{formatDate(movimento.data)} · {movimento.origem === 'TRANSFERENCIA' ? 'Transferência' : (movimento.tipo?.includes('MANUAL') ? 'Manual' : 'Financeiro')}</span><strong className="mt-1 block text-sm text-[var(--c-text)]">{movimento.descricao}</strong></div><strong className={`shrink-0 text-sm ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>{movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}</strong></div>{movimento.documento ? <p className="mt-2 text-xs text-[var(--c-muted)]">Documento: {movimento.documento}</p> : null}{movimento.estornavel ? <button type="button" className="btn btn-secondary btn-sm mt-3" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button> : null}</article>)}
+            </div>
+          </>}
+        </section>
+
+        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+          <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineCheckCircle className="h-5 w-5 text-[var(--c-primary)]" /> Conferir e fechar caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.</p></div>
+          <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" min={dataMinimaFechamento} value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
+            <div className={`flex h-full min-h-[88px] flex-col justify-center rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
+            <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input mt-auto w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
+            <div className="flex items-center justify-end sm:col-span-2 xl:col-span-2">
+              <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Fechar caixa" title="Fechar caixa">
+                <HiOutlineLockClosed className="h-5 w-5" />
               </button>
             </div>
-            <button type="submit" className="btn btn-primary w-full" disabled={saving}>
-              {saving ? 'Salvando...' : 'Abrir caixa'}
-            </button>
           </form>
-        </div>
+        </section>
+      </> : null}
 
-        <div className="hidden">
-          <h2 className="text-lg font-semibold text-[var(--c-text)]">Transferir entre contas</h2>
-          <form className="mt-4 space-y-3" onSubmit={handleTransferencia}>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Tipo de transferencia</span>
-              <select
-                className="input w-full"
-                value={transferenciaForm.tipo_transferencia}
-                onChange={(e) => setTransferenciaForm((current) => ({
-                  ...current,
-                  tipo_transferencia: e.target.value,
-                  empresa_origem_id: '',
-                  empresa_destino_id: '',
-                  conta_origem_id: '',
-                  conta_destino_id: '',
-                  tipo_intercompany: '',
-                  motivo_intercompany: ''
-                }))}
-              >
-                <option value="MESMA_TITULARIDADE">Mesma titularidade</option>
-                <option value="ENTRE_EMPRESAS">Entre empresas</option>
-              </select>
-            </label>
-            {transferenciaMesmaTitularidade ? (
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Empresa</span>
-                <select
-                  className="input w-full"
-                  value={transferenciaForm.empresa_origem_id}
-                  onChange={(e) => setTransferenciaForm((current) => ({
-                    ...current,
-                    empresa_origem_id: e.target.value,
-                    empresa_destino_id: e.target.value,
-                    conta_origem_id: '',
-                    conta_destino_id: ''
-                  }))}
-                  required
-                  disabled={loadingOptions}
-                >
-                  <option value="">Selecione</option>
-                  {empresas.map((empresa) => (
-                    <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="sol-filter-field">
-                  <span className="sol-filter-label">Empresa origem</span>
-                  <select
-                    className="input w-full"
-                    value={transferenciaForm.empresa_origem_id}
-                    onChange={(e) => setTransferenciaForm((current) => ({
-                      ...current,
-                      empresa_origem_id: e.target.value,
-                      conta_origem_id: '',
-                      empresa_destino_id: String(current.empresa_destino_id) === String(e.target.value) ? '' : current.empresa_destino_id
-                    }))}
-                    required
-                    disabled={loadingOptions}
-                  >
-                    <option value="">Selecione</option>
-                    {empresas.map((empresa) => (
-                      <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="sol-filter-field">
-                  <span className="sol-filter-label">Empresa destino</span>
-                  <select
-                    className="input w-full"
-                    value={transferenciaForm.empresa_destino_id}
-                    onChange={(e) => setTransferenciaForm((current) => ({
-                      ...current,
-                      empresa_destino_id: e.target.value,
-                      conta_destino_id: ''
-                    }))}
-                    required
-                    disabled={loadingOptions}
-                  >
-                    <option value="">Selecione</option>
-                    {empresas
-                      .filter((empresa) => String(empresa.id) !== String(transferenciaForm.empresa_origem_id))
-                      .map((empresa) => (
-                        <option key={empresa.id} value={empresa.id}>{empresaLabel(empresa)}</option>
-                      ))}
-                  </select>
-                </label>
-              </div>
-            )}
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Conta de origem</span>
-              <select
-                className="input w-full"
-                value={transferenciaForm.conta_origem_id}
-                onChange={(e) => setTransferenciaForm((current) => ({
-                  ...current,
-                  conta_origem_id: e.target.value,
-                  conta_destino_id: String(current.conta_destino_id) === String(e.target.value) ? '' : current.conta_destino_id
-                }))}
-                required
-                disabled={loadingOptions || !transferenciaForm.empresa_origem_id}
-              >
-                <option value="">Selecione</option>
-                {contasOrigemDisponiveis.map((conta) => (
-                  <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
-                ))}
-              </select>
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Conta de destino</span>
-              <select
-                className="input w-full"
-                value={transferenciaForm.conta_destino_id}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, conta_destino_id: e.target.value }))}
-                required
-                disabled={loadingOptions || !transferenciaForm.empresa_destino_id || !transferenciaForm.conta_origem_id}
-              >
-                <option value="">Selecione</option>
-                {contasDestinoDisponiveis.map((conta) => (
-                  <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>
-                ))}
-              </select>
-            </label>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Data</span>
-                <input
-                  className="input w-full"
-                  type="date"
-                  value={transferenciaForm.data_transferencia}
-                  onChange={(e) => setTransferenciaForm((current) => ({ ...current, data_transferencia: e.target.value }))}
-                />
-              </label>
-              <label className="sol-filter-field">
-                <span className="sol-filter-label">Valor</span>
-                <input
-                  className="input w-full"
-                  inputMode="decimal"
-                  value={transferenciaForm.valor}
-                  onChange={(e) => setTransferenciaForm((current) => ({ ...current, valor: e.target.value }))}
-                  required
-                />
-              </label>
+      {contaSelecionada ? (
+        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineClock className="h-5 w-5" /> Histórico de fechamentos</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Conferências anteriores da conta selecionada.</p></div><span className="shrink-0 text-xs text-[var(--c-muted)]">{sessoesFechadas.length} fechamento(s)</span></div>
+          {sessoesFechadas.length === 0 ? (
+            <div className="m-4 rounded-xl border border-dashed border-[var(--c-border)] bg-[var(--c-soft)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum fechamento registrado para esta conta.</div>
+          ) : <>
+            <div className="hidden overflow-x-auto md:block">
+              <ResizableTable columns={FECHAMENTO_COLUMNS} storageKey="fluxy.financeiro.caixas.fechamentos.columns" className="app-table" scrollLabel="Histórico de fechamentos com colunas redimensionáveis">
+                <thead><tr><ResizableTh columnKey="abertura">Abertura</ResizableTh><ResizableTh columnKey="fechamento">Fechamento</ResizableTh><ResizableTh columnKey="saldo_inicial" className="text-right">Saldo inicial</ResizableTh><ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh><ResizableTh columnKey="saidas" className="text-right">Saídas</ResizableTh><ResizableTh columnKey="saldo_contado" className="text-right">Saldo contado</ResizableTh><ResizableTh columnKey="diferenca" className="pr-4 text-right">Diferença</ResizableTh><ResizableTh columnKey="responsavel" className="border-l border-[var(--c-border)] pl-4">Responsável</ResizableTh></tr></thead>
+                <tbody>{sessoesFechadas.map((sessao) => <tr key={sessao.id}><td>{formatDate(sessao.data_abertura)}</td><td>{formatDate(sessao.data_fechamento)}</td><td className="text-right">{formatCurrency(sessao.saldo_abertura)}</td><td className="text-right text-emerald-600">{formatCurrency(sessao.total_entradas)}</td><td className="text-right text-rose-600">{formatCurrency(sessao.total_saidas)}</td><td className="text-right font-semibold">{formatCurrency(sessao.saldo_informado)}</td><td className={`pr-4 text-right font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</td><td className="border-l border-[var(--c-border)] pl-4 whitespace-normal">{sessao.fechadoPor?.nome || '-'}</td></tr>)}</tbody>
+              </ResizableTable>
             </div>
-            {contaOrigemTransferencia && contaDestinoTransferencia ? (
-              <div className={`rounded-xl border px-3 py-2 text-sm ${transferenciaEntreEmpresas ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-emerald-200 bg-emerald-50 text-emerald-800'}`}>
-                <strong>{transferenciaEntreEmpresas ? 'Transferencia Entre Empresas' : 'Transferencia interna da mesma empresa'}</strong>
-                <div className="mt-1">
-                  {getContaEmpresaNome(contaOrigemTransferencia)} para {getContaEmpresaNome(contaDestinoTransferencia)}.
-                </div>
-              </div>
-            ) : null}
-            {transferenciaEntreEmpresas ? (
-              <>
-                <label className="sol-filter-field">
-                  <span className="sol-filter-label">Tipo</span>
-                  <select
-                    className="input w-full"
-                    value={transferenciaForm.tipo_intercompany}
-                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, tipo_intercompany: e.target.value }))}
-                    required
-                  >
-                    <option value="">Selecione</option>
-                    {TIPOS_INTERCOMPANY.map((tipo) => (
-                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="sol-filter-field">
-                  <span className="sol-filter-label">Motivo</span>
-                  <input
-                    className="input w-full"
-                    value={transferenciaForm.motivo_intercompany}
-                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, motivo_intercompany: e.target.value }))}
-                    placeholder="Ex.: cobertura de caixa para folha"
-                    required
-                  />
-                </label>
-                <label className="flex items-center gap-2 rounded-xl border border-[var(--c-border)] px-3 py-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={transferenciaForm.elimina_consolidado}
-                    onChange={(e) => setTransferenciaForm((current) => ({ ...current, elimina_consolidado: e.target.checked }))}
-                  />
-                  <span>Eliminar do consolidado do grupo</span>
-                </label>
-              </>
-            ) : null}
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Descricao</span>
-              <input
-                className="input w-full"
-                value={transferenciaForm.descricao}
-                onChange={(e) => setTransferenciaForm((current) => ({ ...current, descricao: e.target.value }))}
-                placeholder="Ex.: transferencia para suprimento de caixa"
-              />
-            </label>
-            <button type="submit" className="btn btn-primary w-full" disabled={saving}>
-              {saving ? 'Salvando...' : 'Registrar transferencia'}
-            </button>
-          </form>
-        </div>
-
-        <div className="card sol-surface-card">
-          <h2 className="text-lg font-semibold text-[var(--c-text)]">Sessoes de caixa</h2>
-          {loading ? (
-            <div className="app-empty-card mt-4">Carregando caixas...</div>
-          ) : sessoes.length === 0 ? (
-            <div className="app-empty-card mt-4">Nenhum caixa encontrado.</div>
-          ) : (
-            <div className="mt-4 app-list-stack">
-              {sessoes.map((sessao) => {
-                const resumoAtual = sessao.resumo_atual || {};
-                const saldoSistema = resumoAtual.saldo_sistema ?? sessao.saldo_sistema ?? 0;
-                return (
-                  <div key={sessao.id} className="app-list-card">
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                      <div className="min-w-0 text-sm">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <strong className="text-[var(--c-text)]">{contaLabel(sessao.contaBancaria)}</strong>
-                          <span className={statusClass(sessao.status)}>{sessao.status}</span>
-                        </div>
-                        <div className="mt-1 text-[var(--c-muted)]">
-                          {sessao.empresa?.nome || 'Sem empresa'} - Aberto em {formatDate(sessao.data_abertura)}
-                          {sessao.data_fechamento ? ` - Fechado em ${formatDate(sessao.data_fechamento)}` : ''}
-                        </div>
-                        <div className="mt-3 grid gap-2 sm:grid-cols-4">
-                          <div>
-                            <span className="app-summary-label">Abertura</span>
-                            <strong className="block text-[var(--c-text)]">{formatCurrency(sessao.saldo_abertura)}</strong>
-                          </div>
-                          <div>
-                            <span className="app-summary-label">Entradas</span>
-                            <strong className="block text-emerald-700">{formatCurrency(resumoAtual.total_entradas ?? sessao.total_entradas)}</strong>
-                          </div>
-                          <div>
-                            <span className="app-summary-label">Saidas</span>
-                            <strong className="block text-rose-700">{formatCurrency(resumoAtual.total_saidas ?? sessao.total_saidas)}</strong>
-                          </div>
-                          <div>
-                            <span className="app-summary-label">Saldo sistema</span>
-                            <strong className="block text-[var(--c-text)]">{formatCurrency(saldoSistema)}</strong>
-                          </div>
-                        </div>
-                        {sessao.status === 'FECHADO' ? (
-                          <div className="mt-2 text-[var(--c-muted)]">
-                            Saldo informado {formatCurrency(sessao.saldo_informado)} - Diferenca {formatCurrency(sessao.diferenca)}
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {sessao.status === 'ABERTO' ? (
-                        <div className="w-full rounded-xl border border-[var(--c-border)] p-3 lg:max-w-xs">
-                          <div className="grid gap-2">
-                            <label className="sol-filter-field">
-                              <span className="sol-filter-label">Data fechamento</span>
-                              <input
-                                className="input w-full"
-                                type="date"
-                                value={fecharForm[sessao.id]?.data_fechamento || today()}
-                                onChange={(e) => setFecharForm((current) => ({
-                                  ...current,
-                                  [sessao.id]: { ...(current[sessao.id] || {}), data_fechamento: e.target.value }
-                                }))}
-                              />
-                            </label>
-                            <label className="sol-filter-field">
-                              <span className="sol-filter-label">Saldo informado</span>
-                              <input
-                                className="input w-full"
-                                inputMode="decimal"
-                                value={fecharForm[sessao.id]?.saldo_informado ?? saldoSistema}
-                                onChange={(e) => setFecharForm((current) => ({
-                                  ...current,
-                                  [sessao.id]: { ...(current[sessao.id] || {}), saldo_informado: e.target.value }
-                                }))}
-                              />
-                            </label>
-                            <button type="button" className="btn btn-primary" onClick={() => handleFechar(sessao.id)} disabled={saving}>
-                              Fechar caixa
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="grid gap-3 p-3 md:hidden">
+              {sessoesFechadas.map((sessao) => <article key={sessao.id} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3"><div className="flex items-start justify-between gap-3"><div><span className="text-xs text-[var(--c-muted)]">{formatDate(sessao.data_abertura)} → {formatDate(sessao.data_fechamento)}</span><strong className="mt-1 block text-sm text-[var(--c-text)]">{sessao.fechadoPor?.nome || 'Responsável não informado'}</strong></div><strong className={`text-sm ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</strong></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-[var(--c-muted)]">Saldo inicial</dt><dd className="font-semibold text-[var(--c-text)]">{formatCurrency(sessao.saldo_abertura)}</dd></div><div><dt className="text-[var(--c-muted)]">Saldo contado</dt><dd className="font-semibold text-[var(--c-text)]">{formatCurrency(sessao.saldo_informado)}</dd></div><div><dt className="text-[var(--c-muted)]">Entradas</dt><dd className="font-semibold text-emerald-600">{formatCurrency(sessao.total_entradas)}</dd></div><div><dt className="text-[var(--c-muted)]">Saídas</dt><dd className="font-semibold text-rose-600">{formatCurrency(sessao.total_saidas)}</dd></div></dl></article>)}
             </div>
-          )}
+          </>}
+        </section>
+      ) : null}
 
-          <div className="hidden">
-            <h3 className="text-base font-semibold text-[var(--c-text)]">Transferencias recentes</h3>
-            {transferencias.length === 0 ? (
-              <div className="app-empty-card mt-3">Nenhuma transferencia encontrada nos filtros atuais.</div>
-            ) : (
-              <div className="mt-3 space-y-3">
-                {transferencias.map((transferencia) => (
-                  <div key={transferencia.id} className="rounded-xl border border-[var(--c-border)] px-4 py-3 text-sm">
-                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                      <div>
-                        <strong className="text-[var(--c-text)]">{formatCurrency(transferencia.valor)}</strong>
-                        <span className="ml-2 text-[var(--c-muted)]">{formatDate(transferencia.data_transferencia)}</span>
-                        <span className={`ml-2 ${statusClass(transferencia.status)}`}>{transferencia.status}</span>
-                        <div className="mt-1 text-[var(--c-muted)]">
-                          {contaLabel(transferencia.contaOrigem)} para {contaLabel(transferencia.contaDestino)}
-                        </div>
-                        {transferencia.tipo_intercompany ? (
-                          <div className="mt-1 text-amber-700">
-                            Entre Empresas: {transferencia.tipo_intercompany}
-                            {transferencia.motivo_intercompany ? ` - ${transferencia.motivo_intercompany}` : ''}
-                          </div>
-                        ) : null}
-                        {transferencia.descricao ? (
-                          <div className="mt-1 text-[var(--c-muted)]">{transferencia.descricao}</div>
-                        ) : null}
-                      </div>
-                      {transferencia.status === 'ATIVA' && !transferencia.conciliacao_origem_id && !transferencia.conciliacao_destino_id ? (
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => handleCancelarTransferencia(transferencia.id)}
-                          disabled={saving}
-                        >
-                          Cancelar
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      {loading ? <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando controle de caixa...</div> : null}
+
+      {estorno.movimento ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="estorno-caixa-title"><form className="isolate w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--modal-bg)] text-[var(--c-text)] shadow-2xl" onSubmit={handleEstornar}><div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4"><div><h2 id="estorno-caixa-title" className="text-base font-semibold text-[var(--c-text)]">Estornar movimento</h2><p className="mt-1 text-sm text-[var(--c-muted)]">O registro será preservado e marcado como estornado na auditoria.</p></div><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento: null, motivo: '' })} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button></div><div className="space-y-3 p-4"><div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3 text-sm"><strong className="block text-[var(--c-text)]">{estorno.movimento.descricao}</strong><span className="text-[var(--c-muted)]">{formatDate(estorno.movimento.data)} · {formatCurrency(estorno.movimento.valor)}</span></div><label className="sol-filter-field"><span className="sol-filter-label">Motivo do estorno *</span><textarea className="input min-h-24 w-full" minLength={10} maxLength={4000} value={estorno.motivo} onChange={(event) => setEstorno((current) => ({ ...current, motivo: event.target.value }))} placeholder="Explique o motivo com pelo menos 10 caracteres" required /></label></div><div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4"><button type="button" className="btn btn-secondary" onClick={() => setEstorno({ movimento: null, motivo: '' })}>Cancelar</button><button type="submit" className="btn btn-primary" disabled={saving}>Confirmar estorno</button></div></form></div> : null}
     </div>
   );
 }

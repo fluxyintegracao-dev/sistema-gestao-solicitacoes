@@ -185,6 +185,9 @@ const {
   validateFinanceConciliacaoEstornoTransferenciaBody,
   validateFinanceCaixaAberturaBody,
   validateFinanceCaixaFechamentoBody,
+  validateFinanceCaixaMovimentoBody,
+  validateFinanceCaixaMovimentoEstornoBody,
+  validateFinanceCaixaMovimentoParams,
   validateFinanceCaixaQuery,
   validateFinanceBoletoTituloQuery,
   validateFinanceBaixasQuery,
@@ -226,6 +229,12 @@ const {
   validatePaymentRejectBody,
   validatePaymentMfaBody
 } = require('./validators/paymentValidators');
+const {
+  validateDdaIgnoreBody,
+  validateDdaLinkBody,
+  validateDdaListQuery,
+  validateDdaSyncBody
+} = require('./validators/ddaValidators');
 const { env } = require('./config/env');
 const {
   canAccessBoletos,
@@ -403,6 +412,7 @@ const BoletoController = require('./controllers/BoletoController');
 const BoletoCaixaCnabController = require('./controllers/BoletoCaixaCnabController');
 const PaymentBeneficiaryController = require('./controllers/PaymentBeneficiaryController');
 const PaymentController = require('./controllers/PaymentController');
+const FinanceiroDdaController = require('./controllers/FinanceiroDdaController');
 const CrmLeadsController = require('./controllers/CrmLeadsController');
 const CrmPipelineController = require('./controllers/CrmPipelineController');
 const CrmTasksController = require('./controllers/CrmTasksController');
@@ -687,6 +697,26 @@ const allowConciliacaoCorrigirConta = allowFinanceiroArea(
 const allowConciliacaoEstornar = allowFinanceiroArea(
   'FINANCEIRO_CONCILIACAO_ESTORNAR',
   ['financeiro.conciliacao.estornar']
+);
+const allowDdaVisualizar = allowFinanceiroArea(
+  'FINANCEIRO_DDA_VISUALIZAR',
+  ['financeiro.dda.visualizar']
+);
+const allowDdaSincronizar = allowFinanceiroArea(
+  'FINANCEIRO_DDA_SINCRONIZAR',
+  ['financeiro.dda.sincronizar']
+);
+const allowDdaVincular = allowFinanceiroArea(
+  'FINANCEIRO_DDA_VINCULAR',
+  ['financeiro.dda.vincular']
+);
+const allowDdaIgnorar = allowFinanceiroArea(
+  'FINANCEIRO_DDA_IGNORAR',
+  ['financeiro.dda.ignorar']
+);
+const allowDdaAuditar = allowFinanceiroArea(
+  'FINANCEIRO_DDA_AUDITAR',
+  ['financeiro.dda.auditar']
 );
 
 function allowFinanceiroRelatorio(permissionKeys = []) {
@@ -1717,6 +1747,16 @@ router.get('/financeiro/pagamentos/providers', allowPagamentosRead, PaymentContr
 router.get('/financeiro/pagamentos/accounts', allowPagamentosRead, PaymentController.accounts);
 router.post('/financeiro/pagamentos/accounts', allowPagamentosConfig, criticalRateLimit, validateRequest({ body: validatePaymentAccountBody }), PaymentController.criarAccount);
 router.put('/financeiro/pagamentos/accounts/:id', allowPagamentosConfig, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conta pagadora'), body: validatePaymentAccountBody }), PaymentController.atualizarAccount);
+router.get('/financeiro/dda/resumo', allowDdaVisualizar, validateRequest({ query: validateDdaListQuery }), FinanceiroDdaController.resumo);
+router.get('/financeiro/dda/boletos', allowDdaVisualizar, validateRequest({ query: validateDdaListQuery }), FinanceiroDdaController.index);
+router.get('/financeiro/dda/boletos/:id', allowDdaVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA') }), FinanceiroDdaController.show);
+router.get('/financeiro/dda/boletos/:id/candidatos', allowDdaVisualizar, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA') }), FinanceiroDdaController.candidatos);
+router.get('/financeiro/dda/sincronizacoes', allowDdaAuditar, validateRequest({ query: validateDdaListQuery }), FinanceiroDdaController.sincronizacoes);
+router.post('/financeiro/dda/sincronizar', allowDdaSincronizar, criticalRateLimit, validateRequest({ body: validateDdaSyncBody }), FinanceiroDdaController.sincronizar);
+router.post('/financeiro/dda/boletos/:id/reprocessar-match', allowDdaVincular, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA') }), FinanceiroDdaController.reprocessarMatch);
+router.post('/financeiro/dda/boletos/:id/vincular', allowDdaVincular, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA'), body: validateDdaLinkBody }), FinanceiroDdaController.vincular);
+router.post('/financeiro/dda/boletos/:id/confirmar-sugestao', allowDdaVincular, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA') }), FinanceiroDdaController.confirmarSugestao);
+router.post('/financeiro/dda/boletos/:id/ignorar', allowDdaIgnorar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Boleto DDA'), body: validateDdaIgnoreBody }), FinanceiroDdaController.ignorar);
 router.use('/financeiro/bancos', allowFinanceiro, require('./modules/banking/routes'));
 router.get('/financeiro/conciliacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoQuery }), ConciliacaoBancariaController.index);
 router.get('/financeiro/conciliacoes/importacoes', allowFinanceiro, validateRequest({ query: validateFinanceConciliacaoImportacoesQuery }), ConciliacaoBancariaController.importacoes);
@@ -1741,6 +1781,8 @@ router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: valid
 router.post('/financeiro/caixas/confirmar-conciliacao-dia', allowFinanceiro, criticalRateLimit, CaixaFinanceiroController.confirmarConciliacaoDia);
 router.post('/financeiro/caixas/abrir', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceCaixaAberturaBody }), CaixaFinanceiroController.abrir);
 router.get('/financeiro/caixas/:id', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro') }), CaixaFinanceiroController.show);
+router.post('/financeiro/caixas/:id/movimentos', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro'), body: validateFinanceCaixaMovimentoBody }), CaixaFinanceiroController.registrarMovimento);
+router.post('/financeiro/caixas/:id/movimentos/:movimentoId/estornar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateFinanceCaixaMovimentoParams, body: validateFinanceCaixaMovimentoEstornoBody }), CaixaFinanceiroController.estornarMovimento);
 router.post('/financeiro/caixas/:id/fechar', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Caixa financeiro'), body: validateFinanceCaixaFechamentoBody }), CaixaFinanceiroController.fechar);
 router.get('/financeiro/transferencias', allowFinanceiro, validateRequest({ query: validateFinanceTransferenciaQuery }), TransferenciaFinanceiraController.index);
 router.post('/financeiro/transferencias', allowFinanceiro, criticalRateLimit, validateRequest({ body: validateFinanceTransferenciaBody }), TransferenciaFinanceiraController.create);

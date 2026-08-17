@@ -133,6 +133,9 @@ db.PaymentTransaction = require('./PaymentTransaction')(sequelize, Sequelize);
 db.PaymentEvent = require('./PaymentEvent')(sequelize, Sequelize);
 db.PaymentReconciliation = require('./PaymentReconciliation')(sequelize, Sequelize);
 db.PaymentJob = require('./PaymentJob')(sequelize, Sequelize);
+db.FinanceiroDdaSincronizacao = require('./FinanceiroDdaSincronizacao')(sequelize, Sequelize);
+db.FinanceiroDdaBoleto = require('./FinanceiroDdaBoleto')(sequelize, Sequelize);
+db.FinanceiroDdaEvento = require('./FinanceiroDdaEvento')(sequelize, Sequelize);
 db.Unidade = require('./Unidade')(sequelize, Sequelize);
 db.Categoria = require('./Categoria')(sequelize, Sequelize);
 db.Insumo = require('./Insumo')(sequelize, Sequelize);
@@ -3674,6 +3677,24 @@ db.ConciliacaoBancariaImportacao.belongsTo(db.User, {
 // =====================
 // MOTOR DE PAGAMENTOS
 // =====================
+db.EmpresaGrupo.hasMany(db.FinanceiroDdaBoleto, { foreignKey: 'empresa_id', as: 'ddaBoletos' });
+db.FinanceiroDdaBoleto.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.EmpresaGrupo.hasMany(db.FinanceiroDdaSincronizacao, { foreignKey: 'empresa_id', as: 'ddaSincronizacoes' });
+db.FinanceiroDdaSincronizacao.belongsTo(db.EmpresaGrupo, { foreignKey: 'empresa_id', as: 'empresa' });
+db.User.hasMany(db.FinanceiroDdaSincronizacao, { foreignKey: 'criado_por', as: 'ddaSincronizacoesCriadas' });
+db.FinanceiroDdaSincronizacao.belongsTo(db.User, { foreignKey: 'criado_por', as: 'criadoPor' });
+db.PaymentAccount.hasMany(db.FinanceiroDdaBoleto, { foreignKey: 'payment_account_id', as: 'ddaBoletos' });
+db.FinanceiroDdaBoleto.belongsTo(db.PaymentAccount, { foreignKey: 'payment_account_id', as: 'paymentAccount' });
+db.FinanceiroDdaSincronizacao.hasMany(db.FinanceiroDdaBoleto, { foreignKey: 'sincronizacao_id', as: 'boletos' });
+db.FinanceiroDdaBoleto.belongsTo(db.FinanceiroDdaSincronizacao, { foreignKey: 'sincronizacao_id', as: 'sincronizacao' });
+db.TituloFinanceiro.hasMany(db.FinanceiroDdaBoleto, { foreignKey: 'titulo_financeiro_id', as: 'ddaBoletosVinculados' });
+db.FinanceiroDdaBoleto.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'titulo' });
+db.FinanceiroDdaBoleto.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_sugerido_id', as: 'tituloSugerido' });
+db.FinanceiroDdaBoleto.hasMany(db.FinanceiroDdaEvento, { foreignKey: 'boleto_id', as: 'eventos' });
+db.FinanceiroDdaEvento.belongsTo(db.FinanceiroDdaBoleto, { foreignKey: 'boleto_id', as: 'boleto' });
+db.FinanceiroDdaSincronizacao.hasMany(db.FinanceiroDdaEvento, { foreignKey: 'sincronizacao_id', as: 'eventos' });
+db.FinanceiroDdaEvento.belongsTo(db.FinanceiroDdaSincronizacao, { foreignKey: 'sincronizacao_id', as: 'sincronizacao' });
+
 db.PaymentProvider.hasMany(db.PaymentAccount, {
   foreignKey: 'provider_id',
   as: 'accounts'

@@ -1525,8 +1525,11 @@ function validateFinanceTituloBaixaBody(body = {}) {
   const usarChequeTerceiro = parseBoolean(body.usar_cheque_terceiro, 'Usar cheque de terceiro');
   const chequeTerceiroId = parseInteger(body.cheque_terceiro_id, 'Cheque de terceiro');
   const empresaId = parseInteger(body.empresa_id, 'Empresa pagadora', { required: true });
+  if (formaRecebimento === 'DINHEIRO' && !contaBancariaId) {
+    throw new ValidationError('Selecione o caixa fisico usado na baixa em dinheiro.');
+  }
   const exigeContaBancaria = (
-    (!formaRecebimento || !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento))
+    (!formaRecebimento || !['CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(formaRecebimento))
     && !(formaRecebimento === 'CHEQUE' && usarChequeTerceiro)
   );
 
@@ -1915,6 +1918,37 @@ function validateFinanceCaixaFechamentoBody(body = {}) {
   };
 }
 
+function validateFinanceCaixaMovimentoBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['natureza', 'data_movimento', 'valor', 'descricao', 'documento_referencia'],
+    'Movimento de caixa fisico'
+  );
+
+  return {
+    natureza: parseEnum(body.natureza, 'Natureza', ['ENTRADA', 'SAIDA'], { required: true }),
+    data_movimento: parseDateOnly(body.data_movimento, 'Data do movimento'),
+    valor: parseDecimal(body.valor, 'Valor', { required: true }),
+    descricao: parseOptionalText(body.descricao, 'Descricao', 4000),
+    documento_referencia: parseOptionalText(body.documento_referencia, 'Documento', 120)
+  };
+}
+
+function validateFinanceCaixaMovimentoEstornoBody(body = {}) {
+  ensureAllowedKeys(body, ['motivo'], 'Estorno de movimento de caixa fisico');
+  return {
+    motivo: parseOptionalText(body.motivo, 'Motivo', 1000)
+  };
+}
+
+function validateFinanceCaixaMovimentoParams(params = {}) {
+  ensureAllowedKeys(params, ['id', 'movimentoId'], 'Movimento de caixa fisico');
+  return {
+    id: parseInteger(params.id, 'Caixa financeiro', { required: true }),
+    movimentoId: parseInteger(params.movimentoId, 'Movimento financeiro', { required: true })
+  };
+}
+
 function validateFinanceTransferenciaQuery(query = {}) {
   ensureAllowedKeys(
     query,
@@ -2022,6 +2056,9 @@ module.exports = {
   validateFinanceConciliacaoQuery,
   validateFinanceCaixaAberturaBody,
   validateFinanceCaixaFechamentoBody,
+  validateFinanceCaixaMovimentoBody,
+  validateFinanceCaixaMovimentoEstornoBody,
+  validateFinanceCaixaMovimentoParams,
   validateFinanceCaixaQuery,
   validateFinanceTransferenciaBody,
   validateFinanceTransferenciaCancelBody,

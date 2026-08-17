@@ -1687,8 +1687,11 @@ export default function FinanceiroCard({
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="card max-h-[92vh] w-full max-w-2xl space-y-4 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
+          <div
+            className="max-h-[92vh] w-full space-y-4 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--modal-bg)] p-4 text-[var(--c-text)] shadow-2xl sm:p-5"
+            style={{ maxWidth: '820px' }}
+          >
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>

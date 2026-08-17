@@ -67,7 +67,13 @@ const FINANCEIRO_PERMISSION_KEYS = [
   'financeiro.pagamentos.configurar',
   'financeiro.favorecidos.visualizar',
   'financeiro.favorecidos.gerenciar',
-  'financeiro.favorecidos.auditar'
+  'financeiro.favorecidos.auditar',
+  'financeiro.dda.visualizar',
+  'financeiro.dda.sincronizar',
+  'financeiro.dda.vincular',
+  'financeiro.dda.ignorar',
+  'financeiro.dda.auditar',
+  'financeiro.dda.configurar'
 ];
 
 const FINANCEIRO_PAGAMENTOS_PERMISSION_KEYS = [

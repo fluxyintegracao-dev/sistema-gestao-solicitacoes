@@ -123,7 +123,17 @@ function normalizeCodigoBancoInput(value) {
 }
 
 function contaBancariaObrigatoria(formaRecebimento) {
-  return !['DINHEIRO', 'CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+  return !['CARTAO', 'PERMUTA', 'BENS', 'OUTROS'].includes(String(formaRecebimento || '').toUpperCase());
+}
+
+function contaExigeControleDiario(conta) {
+  const valorConfigurado = conta?.exige_abertura_fechamento;
+  const exigeAberturaFechamento = valorConfigurado === true
+    || Number(valorConfigurado) === 1
+    || String(valorConfigurado || '').trim().toLowerCase() === 'true';
+
+  return exigeAberturaFechamento
+    || String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
 }
 
 function isCartaoForma(formaRecebimento) {
@@ -323,6 +333,7 @@ export default function FinanceiroTituloDetalhe() {
   const [contasBancarias, setContasBancarias] = useState([]);
   const [cartoes, setCartoes] = useState([]);
   const [chequesTerceiros, setChequesTerceiros] = useState([]);
+  const [loadingChequesTerceiros, setLoadingChequesTerceiros] = useState(false);
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -342,18 +353,16 @@ export default function FinanceiroTituloDetalhe() {
     try {
       setLoading(true);
       setError('');
-      const [tituloData, contasData, cartoesData, chequesData, empresasData, auditoriaData] = await Promise.all([
+      const [tituloData, contasData, cartoesData, empresasData, auditoriaData] = await Promise.all([
         getTituloFinanceiroById(id),
         getContasBancarias(),
         getCartoesFinanceiros(),
-        getChequesTerceirosDisponiveis().catch(() => []),
         getEmpresasGrupo({ ativo: true }),
         podeVerAuditoriaFinanceira ? getTituloFinanceiroAuditoria(id) : Promise.resolve([])
       ]);
       setTitulo(tituloData);
       setContasBancarias(Array.isArray(contasData) ? contasData : []);
       setCartoes(Array.isArray(cartoesData) ? cartoesData : []);
-      setChequesTerceiros(Array.isArray(chequesData) ? chequesData : []);
       setEmpresasGrupo(Array.isArray(empresasData) ? empresasData : []);
       setAuditoria(Array.isArray(auditoriaData) ? auditoriaData : []);
       setCobrancaForm(buildCobrancaForm(tituloData));
@@ -459,6 +468,7 @@ export default function FinanceiroTituloDetalhe() {
   const baixaUsaCartao = isCartaoForma(baixaForm.forma_recebimento);
   const baixaCartaoDebito = baixaUsaCartao && isCartaoDebito(selectedCartaoBaixa);
   const baixaUsaCheque = isChequeForma(baixaForm.forma_recebimento);
+  const baixaUsaDinheiro = String(baixaForm.forma_recebimento || '').toUpperCase() === 'DINHEIRO';
   const tituloTipo = String(titulo?.tipo || '').toUpperCase();
   const baixaFormaLabel = tituloTipo === 'PAGAR' ? 'Forma de pagamento' : 'Forma de recebimento';
   const baixaRecebeChequeTerceiro = baixaUsaCheque && tituloTipo === 'RECEBER';
@@ -467,6 +477,46 @@ export default function FinanceiroTituloDetalhe() {
     () => chequesTerceiros.filter((cheque) => String(cheque?.status || '').toUpperCase() === 'EM_CARTEIRA'),
     [chequesTerceiros]
   );
+  const contasFinanceirasCompativeisBaixa = useMemo(
+    () => baixaUsaDinheiro
+      ? contasBancariasBaixa.filter((conta) => contaExigeControleDiario(conta))
+      : contasBancariasBaixa,
+    [baixaUsaDinheiro, contasBancariasBaixa]
+  );
+  const contaSelecionadaBaixa = useMemo(
+    () => contasBancarias.find((conta) => String(conta.id) === String(baixaForm.conta_bancaria_id)) || null,
+    [baixaForm.conta_bancaria_id, contasBancarias]
+  );
+
+  useEffect(() => {
+    let ativo = true;
+
+    if (!baixaPagaComChequeTerceiro) {
+      setChequesTerceiros([]);
+      setLoadingChequesTerceiros(false);
+      return () => {
+        ativo = false;
+      };
+    }
+
+    setLoadingChequesTerceiros(true);
+    getChequesTerceirosDisponiveis()
+      .then((data) => {
+        if (ativo) setChequesTerceiros(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (!ativo) return;
+        setChequesTerceiros([]);
+        setError(err?.message || 'Erro ao consultar cheques de terceiros disponiveis.');
+      })
+      .finally(() => {
+        if (ativo) setLoadingChequesTerceiros(false);
+      });
+
+    return () => {
+      ativo = false;
+    };
+  }, [baixaPagaComChequeTerceiro]);
 
   const empresaTituloId = String(titulo?.empresa_id || '');
   const baixaEmpresaDiferente = Boolean(
@@ -517,6 +567,14 @@ export default function FinanceiroTituloDetalhe() {
     }
     if (baixaCartaoDebito && !baixaForm.conta_bancaria_id) {
       setError('Cartao de debito precisa ter conta bancaria vinculada.');
+      return;
+    }
+    if (baixaUsaDinheiro && !baixaForm.conta_bancaria_id) {
+      setError('Selecione o caixa fisico usado na baixa em dinheiro.');
+      return;
+    }
+    if (baixaUsaDinheiro && !contaExigeControleDiario(contaSelecionadaBaixa)) {
+      setError('A baixa em dinheiro deve usar uma conta de caixa fisico com controle de abertura e fechamento.');
       return;
     }
     if (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) {
@@ -1344,7 +1402,7 @@ export default function FinanceiroTituloDetalhe() {
                       titular_documento: '',
                       data_emissao: '',
                       data_vencimento: '',
-                      conta_bancaria_id: isCartaoForma(event.target.value) ? '' : current.conta_bancaria_id
+                      conta_bancaria_id: ''
                     }))}
                   >
                     <option value="">Nao informar</option>
@@ -1459,7 +1517,11 @@ export default function FinanceiroTituloDetalhe() {
                             </option>
                           ))}
                         </select>
-                        {!chequesTerceirosDisponiveis.length ? (
+                        {loadingChequesTerceiros ? (
+                          <span className="mt-1 block text-xs text-amber-700">
+                            Consultando cheques em carteira...
+                          </span>
+                        ) : !chequesTerceirosDisponiveis.length ? (
                           <span className="mt-1 block text-xs text-amber-700">
                             Nenhum cheque de terceiro em carteira foi encontrado.
                           </span>
@@ -1550,7 +1612,9 @@ export default function FinanceiroTituloDetalhe() {
                 ) : null}
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Conta bancaria</span>
+                  <span className="mb-1 block text-slate-500">
+                    {baixaUsaDinheiro ? 'Caixa fisico *' : 'Conta bancaria'}
+                  </span>
                   <select
                     className="input w-full"
                     value={baixaForm.conta_bancaria_id}
@@ -1563,12 +1627,19 @@ export default function FinanceiroTituloDetalhe() {
                         ? (baixaCartaoDebito ? 'Conta vinculada ao cartao' : 'Cartao de credito sem baixa bancaria imediata')
                         : (baixaForm.empresa_id ? 'Selecione' : 'Selecione a empresa da baixa')}
                     </option>
-                    {contasBancariasBaixa.map((conta) => (
+                    {contasFinanceirasCompativeisBaixa.map((conta) => (
                       <option key={conta.id} value={conta.id}>
                         {conta.nome}
                       </option>
                     ))}
                   </select>
+                  {baixaUsaDinheiro ? (
+                    <span className="mt-1 block text-xs text-slate-500">
+                      {contasFinanceirasCompativeisBaixa.length
+                        ? 'O caixa precisa estar aberto e incluir a data deste movimento.'
+                        : 'Nenhuma conta de caixa fisico com controle diario foi encontrada para esta empresa.'}
+                    </span>
+                  ) : null}
                 </label>
 
                 <label className="text-sm">
@@ -1788,6 +1859,7 @@ export default function FinanceiroTituloDetalhe() {
                     !baixaForm.forma_recebimento ||
                     (baixaUsaCartao && !baixaForm.cartao_id) ||
                     (baixaCartaoDebito && !baixaForm.conta_bancaria_id) ||
+                    (baixaUsaDinheiro && !contaExigeControleDiario(contaSelecionadaBaixa)) ||
                     (contaBancariaObrigatoria(baixaForm.forma_recebimento) && !baixaPagaComChequeTerceiro && !baixaForm.conta_bancaria_id) ||
                     (baixaPagaComChequeTerceiro && !baixaForm.cheque_terceiro_id) ||
                     (baixaUsaCheque && !baixaPagaComChequeTerceiro && (!baixaForm.cheque_numero || !baixaForm.cheque_emitente)) ||

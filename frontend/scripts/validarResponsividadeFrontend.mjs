@@ -43,6 +43,8 @@ const main = read('src/main.jsx');
 const indexCss = read('src/index.css');
 const responsiveCss = read('src/styles/responsive-system.css');
 const resizableTable = read('src/components/ResizableTable.jsx');
+const modalPortal = read('src/components/ui/ModalPortal.jsx');
+const gerenciarCotacao = read('src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx');
 const html = read('index.html');
 
 const routeCount = (app.match(/<Route\b/g) || []).length;
@@ -85,6 +87,25 @@ if (!resizableTable.includes('className="resizable-table-scroll"')
   fail('tabelas redimensionaveis precisam de rolagem local.');
 }
 
+if (/\.layout-shell\.fluxy-app-shell\s*>\s*\.layout-main\s*\{[^}]*z-index\s*:/s.test(indexCss)
+  || /\.layout-shell\.fluxy-app-shell\s*>\s*\.layout-main\s*\{[^}]*z-index\s*:/s.test(responsiveCss)) {
+  fail('o conteudo principal nao pode criar um contexto de empilhamento abaixo dos modais.');
+}
+if (!modalPortal.includes("createPortal(")
+  || !modalPortal.includes("document.body")
+  || !modalPortal.includes("document.body.style.overflow = 'hidden'")) {
+  fail('ModalPortal precisa renderizar no body e bloquear a rolagem de fundo.');
+}
+if (!indexCss.includes('.app-modal-overlay')
+  || !indexCss.includes('.app-modal-surface--form')
+  || !indexCss.includes('.layout-main :where(.modal-overlay, .fixed.inset-0)')) {
+  fail('faltam o contrato global de modal ou a protecao dos overlays legados.');
+}
+const modaisCompraNoPortal = (gerenciarCotacao.match(/<ModalPortal\b/g) || []).length;
+if (modaisCompraNoPortal < 4) {
+  fail('os quatro overlays criticos da gestao de cotacao precisam usar ModalPortal.');
+}
+
 const sourceFiles = listFiles(srcRoot, ['.jsx', '.js']);
 const routeFiles = sourceFiles.filter((filePath) => {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -101,6 +122,8 @@ console.log(JSON.stringify({
   paginas_lazy_verificadas: lazyImports.length,
   arquivos_com_tabela: routeFiles.length,
   arquivos_com_wrapper_nomeado: namedScrollFiles.length,
+  modais_criticos_com_portal: modaisCompraNoPortal,
+  protecao_global_de_overlays: true,
   garantia_para_tabelas_historicas: responsiveCss.includes(':has(> table:not(.solicitacoes-table--mobile))'),
   breakpoints: ['smartphone <= 767px', 'tablet <= 1023px', 'desktop >= 1024px']
 }, null, 2));

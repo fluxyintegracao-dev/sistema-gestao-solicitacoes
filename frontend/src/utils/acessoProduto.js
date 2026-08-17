@@ -674,6 +674,12 @@ export function canAccessFinanceiro(user) {
       'financeiro.pagamentos.confirmar_baixa',
       'financeiro.pagamentos.auditar',
       'financeiro.pagamentos.configurar',
+      'financeiro.dda.visualizar',
+      'financeiro.dda.sincronizar',
+      'financeiro.dda.vincular',
+      'financeiro.dda.ignorar',
+      'financeiro.dda.auditar',
+      'financeiro.dda.configurar',
       'financeiro.favorecidos.visualizar',
       'financeiro.favorecidos.gerenciar',
       'financeiro.favorecidos.auditar'
@@ -772,6 +778,22 @@ export function canAccessPagamentos(user) {
   }
 
   return canAccessFinanceiro(user) || userHasPaymentApprovalDirectorate(user);
+}
+
+export function canAccessFinanceiroDda(user) {
+  if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasAnyPermissao(user, [
+      'financeiro.dda.visualizar',
+      'financeiro.dda.sincronizar',
+      'financeiro.dda.vincular',
+      'financeiro.dda.ignorar',
+      'financeiro.dda.auditar',
+      'financeiro.dda.configurar'
+    ]);
+  }
+  return canAccessFinanceiro(user);
 }
 
 export function canPreparePagamentos(user) {

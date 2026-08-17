@@ -14,6 +14,7 @@ import {
   canAccessDashboard,
   canAccessContratos,
   canAccessFinanceiro,
+  canAccessFinanceiroDda,
   canAccessFiscal,
   canAccessConfiguracoes,
   canAccessPagamentos,
@@ -95,6 +96,7 @@ const FinanceiroTituloEditar = lazy(() => import('./pages/FinanceiroTituloEditar
 const FinanceiroChequesTerceiros = lazy(() => import('./pages/FinanceiroChequesTerceiros'));
 const FinanceiroBaixasCompostas = lazy(() => import('./pages/FinanceiroBaixasCompostas'));
 const FinanceiroPagamentos = lazy(() => import('./pages/FinanceiroPagamentos'));
+const FinanceiroDda = lazy(() => import('./pages/FinanceiroDda'));
 const FinanceiroBoletos = lazy(() => import('./pages/FinanceiroBoletos'));
 const FinanceiroFaturasCartao = lazy(() => import('./pages/FinanceiroFaturasCartao'));
 const FinanceiroFaturaCartaoDetalhe = lazy(() => import('./pages/FinanceiroFaturaCartaoDetalhe'));
@@ -449,6 +451,14 @@ function FinanceiroRoute({ children }) {
 function FinanceiroPagamentosRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessPagamentos(user)) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function FinanceiroDdaRoute({ children }) {
+  const { user } = useAuth();
+  if (!canAccessFinanceiroDda(user)) {
     return <Navigate to="/" replace />;
   }
   return children;
@@ -994,6 +1004,7 @@ export default function App() {
         <Route path="financeiro/cheques-terceiros" element={<FinanceiroRoute><FinanceiroChequesTerceiros /></FinanceiroRoute>} />
         <Route path="financeiro/baixas-compostas" element={<FinanceiroRoute><FinanceiroBaixasCompostas /></FinanceiroRoute>} />
         <Route path="financeiro/pagamentos" element={<FinanceiroPagamentosRoute><FinanceiroPagamentos /></FinanceiroPagamentosRoute>} />
+        <Route path="financeiro/dda" element={<FinanceiroDdaRoute><FinanceiroDda /></FinanceiroDdaRoute>} />
         <Route path="financeiro/boletos" element={<BoletosRoute><FinanceiroBoletos /></BoletosRoute>} />
         <Route path="financeiro/faturas-cartao" element={<FinanceiroRoute><FinanceiroFaturasCartao /></FinanceiroRoute>} />
         <Route path="financeiro/faturas-cartao/:id" element={<FinanceiroRoute><FinanceiroFaturaCartaoDetalhe /></FinanceiroRoute>} />

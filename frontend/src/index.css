@@ -85,8 +85,8 @@
   --z-dropdown: 25;
   --z-sticky: 20;
   --z-sidebar: 30;
-  --z-modal: 50;
-  --z-toast: 60;
+  --z-modal: 100;
+  --z-toast: 120;
   /* Modal tokens */
   --modal-overlay: rgba(15, 23, 42, 0.48);
   --modal-bg: #ffffff;
@@ -7205,7 +7205,6 @@ body {
 
 .layout-shell.fluxy-app-shell > .layout-main {
   position: relative;
-  z-index: 1;
 }
 
 .sidebar {
@@ -11099,6 +11098,53 @@ body {
   -webkit-backdrop-filter: blur(4px);
 }
 
+/* Contrato global de overlays. O portal vive diretamente no body e, por isso,
+   nunca fica preso ao contexto de empilhamento do conteudo ou abaixo do menu. */
+.app-modal-portal {
+  position: relative;
+  z-index: var(--z-modal);
+}
+
+.app-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+  background: var(--modal-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.app-modal-surface {
+  position: relative;
+  display: flex;
+  width: min(100%, var(--modal-max-w-md));
+  max-height: min(92dvh, 900px);
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--c-text);
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: var(--modal-radius);
+  box-shadow: var(--modal-shadow);
+}
+
+.app-modal-surface--compact { width: min(100%, var(--modal-max-w-sm)); }
+.app-modal-surface--standard { width: min(100%, 720px); }
+.app-modal-surface--form { width: min(100%, 960px); }
+.app-modal-surface--wide { width: min(100%, var(--modal-max-w-xl)); }
+.app-modal-surface--workspace { width: min(100%, 1280px); }
+
+/* Protecao para overlays legados enquanto cada fluxo e migrado para o portal.
+   Todo overlay de tela inteira originado por uma pagina deve ficar acima do
+   shell, inclusive quando ainda nao recebeu role="dialog". */
+.layout-main :where(.modal-overlay, .fixed.inset-0) {
+  z-index: var(--z-modal) !important;
+}
+
 .modal-dialog {
   position: relative;
   display: grid;
@@ -11307,14 +11353,16 @@ body {
 }
 
 @media (max-width: 639px) {
-  .modal-overlay {
+  .modal-overlay,
+  .app-modal-overlay {
     align-items: flex-end;
     padding: 0;
   }
 
-  .modal-dialog {
+  .modal-dialog,
+  .app-modal-surface {
     max-width: 100%;
-    max-height: 92vh;
+    max-height: calc(100dvh - env(safe-area-inset-top));
     border-radius: var(--modal-radius) var(--modal-radius) 0 0;
   }
 

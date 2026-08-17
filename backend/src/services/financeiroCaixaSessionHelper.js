@@ -11,7 +11,12 @@ function today() {
 }
 
 function contaExigeSessao(conta) {
-  return Boolean(conta?.exige_abertura_fechamento) ||
+  const valorConfigurado = conta?.exige_abertura_fechamento;
+  const exigeAberturaFechamento = valorConfigurado === true ||
+    Number(valorConfigurado) === 1 ||
+    String(valorConfigurado || '').trim().toLowerCase() === 'true';
+
+  return exigeAberturaFechamento ||
     String(conta?.tipo_operacional || '').toUpperCase() === 'CAIXA_INTERNO';
 }
 

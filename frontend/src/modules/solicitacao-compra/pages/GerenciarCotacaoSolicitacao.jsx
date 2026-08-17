@@ -30,6 +30,7 @@ import {
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
+import ModalPortal from '../../../components/ui/ModalPortal';
 import {
   canEncerrarComprasCotacoes,
   canEncerrarSemPedidoComprasCotacoes,
@@ -325,11 +326,12 @@ function ModalRespostaInternaCotacao({
   }
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-3" role="dialog" aria-modal="true">
-      <div className="flex max-h-[92vh] w-full max-w-[1120px] flex-col overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
+    <ModalPortal onClose={onFechar} closeOnEscape={!salvando && !enviandoArquivos}>
+      <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="editar-resposta-cotacao-titulo">
+        <div className="app-modal-surface app-modal-surface--form">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Editar resposta da cotacao</h2>
+            <h2 id="editar-resposta-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">Editar resposta da cotacao</h2>
             <p className="text-sm text-[var(--c-muted)]">
               {cotacao.fornecedor?.nome || 'Fornecedor'} - a alteracao sera registrada na auditoria como resposta interna.
             </p>
@@ -573,8 +575,9 @@ function ModalRespostaInternaCotacao({
           ) : null}
           <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -595,8 +598,9 @@ function ModalEncerrarSemPedido({
   const justificativaValida = String(justificativa || '').trim().length >= 10;
 
   return (
-    <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/60 p-3 sm:p-5" role="dialog" aria-modal="true" aria-labelledby="encerrar-sem-pedido-titulo">
-      <div className="flex max-h-[92vh] w-full max-w-[720px] flex-col overflow-hidden rounded-xl border border-red-200 bg-[var(--c-surface)] shadow-2xl dark:border-red-900/70">
+    <ModalPortal onClose={onFechar} closeOnEscape={!processando}>
+      <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="encerrar-sem-pedido-titulo">
+        <div className="app-modal-surface app-modal-surface--standard border-red-200 dark:border-red-900/70">
         <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
           <div className="min-w-0">
             <h2 id="encerrar-sem-pedido-titulo" className="text-lg font-semibold text-[var(--c-text)]">Encerrar cotacao sem gerar pedido?</h2>
@@ -682,8 +686,9 @@ function ModalEncerrarSemPedido({
             {processando ? 'Encerrando...' : 'Encerrar sem gerar pedido'}
           </button>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -869,10 +874,11 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
   }, [fornecedor, totalGanho, solicitacaoId]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 py-8 overflow-y-auto">
-      <div className="w-full max-w-2xl rounded-2xl bg-[var(--c-surface)] shadow-xl mx-4">
+    <ModalPortal onClose={onFechar}>
+      <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pedido-final-titulo">
+        <div className="app-modal-surface app-modal-surface--standard">
         <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--c-border)]">
-          <h2 className="font-semibold text-[var(--c-text)]">
+          <h2 id="pedido-final-titulo" className="font-semibold text-[var(--c-text)]">
             Pedido: {fornecedor.nome}
           </h2>
           <button type="button" onClick={onFechar} className="text-[var(--c-muted)] hover:text-[var(--c-text)]">Fechar</button>
@@ -1042,8 +1048,9 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
         <div className="flex justify-end px-6 py-4 border-t border-[var(--c-border)]">
           <button type="button" className="btn btn-outline" onClick={onFechar}>Fechar</button>
         </div>
+        </div>
       </div>
-    </div>
+    </ModalPortal>
   );
 }
 
@@ -3428,9 +3435,10 @@ export default function GerenciarCotacaoSolicitacao() {
         }}
       />
       {modalCancelamentoCotacao && (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-[560px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl">
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Cancelar cotacao</h2>
+        <ModalPortal onClose={() => setModalCancelamentoCotacao(false)} closeOnEscape={!cancelandoCotacao}>
+          <div className="app-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="cancelar-cotacao-titulo">
+            <div className="app-modal-surface app-modal-surface--compact p-5">
+            <h2 id="cancelar-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">Cancelar cotacao</h2>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               Os links serao bloqueados, as respostas deixarao de participar do comparativo e a solicitacao voltara para liberada para compra. O historico sera preservado.
             </p>
@@ -3449,8 +3457,9 @@ export default function GerenciarCotacaoSolicitacao() {
                 {cancelandoCotacao ? 'Cancelando...' : 'Confirmar cancelamento'}
               </button>
             </div>
+            </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

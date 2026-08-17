@@ -26,6 +26,7 @@ const {
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
+const { contaExigeSessao, obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 
 const STATUS_CHEQUE = ['EM_CARTEIRA', 'RESERVADO', 'UTILIZADO', 'DEPOSITADO', 'DEVOLVIDO', 'CANCELADO'];
 const EVENTOS_MANUAIS = {
@@ -536,9 +537,21 @@ async function validarBaixaComposta(payload, transaction, { lock = false } = {})
     const tipo = resolverTipoOperacionalFormaPagamento(forma);
     if (!tipo) throw httpError(400, `Forma de pagamento sem tipo operacional na operacao ${item.ordem}.`);
     const chequeTerceiro = Boolean(item.cheque_terceiro_id);
-    const exigeConta = !['DINHEIRO', 'PERMUTA', 'BENS', 'OUTROS'].includes(tipo) && !(tipo === 'CHEQUE' && chequeTerceiro);
+    const exigeConta = !['PERMUTA', 'BENS', 'OUTROS'].includes(tipo) && !(tipo === 'CHEQUE' && chequeTerceiro);
     const conta = item.conta_bancaria_id ? contaMap.get(item.conta_bancaria_id) : null;
     if (exigeConta && !conta) throw httpError(400, `Informe a conta financeira na operacao ${item.ordem}.`);
+    if (tipo === 'DINHEIRO') {
+      if (!contaExigeSessao(conta)) {
+        throw httpError(
+          400,
+          `A operacao ${item.ordem} em dinheiro deve usar um caixa fisico com controle de abertura e fechamento.`
+        );
+      }
+      await obterSessaoAbertaParaConta(conta, dataMovimento, {
+        transaction,
+        exigir: true
+      });
+    }
     const cartao = item.cartao_id ? cartaoMap.get(item.cartao_id) : null;
     if (tipo === 'CARTAO' && !cartao) throw httpError(400, `Informe um cartao ativo na operacao ${item.ordem}.`);
     if (tipo === 'CHEQUE' && !chequeTerceiro && (!item.cheque_numero || !item.cheque_emitente)) {
