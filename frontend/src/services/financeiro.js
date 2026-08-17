@@ -28,7 +28,8 @@ export async function getTitulosFinanceiros(params = {}) {
   const url = query ? `${API_URL}/financeiro/titulos?${query}` : `${API_URL}/financeiro/titulos`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    cache: 'no-store'
   });
 
   return parseJson(response, 'Erro ao buscar titulos financeiros');
@@ -524,7 +525,8 @@ export async function getCaixasFinanceiros(params = {}) {
   const url = query ? `${API_URL}/financeiro/caixas?${query}` : `${API_URL}/financeiro/caixas`;
 
   const response = await fetch(url, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    cache: 'no-store'
   });
 
   return parseJson(response, 'Erro ao buscar caixas financeiros');
@@ -532,7 +534,8 @@ export async function getCaixasFinanceiros(params = {}) {
 
 export async function getCaixaFinanceiro(id) {
   const response = await fetch(`${API_URL}/financeiro/caixas/${id}`, {
-    headers: authHeaders()
+    headers: authHeaders(),
+    cache: 'no-store'
   });
 
   return parseJson(response, 'Erro ao buscar caixa financeiro');

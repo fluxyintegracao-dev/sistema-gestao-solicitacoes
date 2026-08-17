@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   HiOutlineArrowDownCircle,
-  HiOutlineArrowPath,
   HiOutlineArrowUpCircle,
   HiOutlineBanknotes,
   HiOutlineCheckCircle,
@@ -23,6 +22,7 @@ import {
   registrarMovimentoCaixaFinanceiro
 } from '../services/financeiro';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 
 const MOVIMENTO_COLUMNS = [
   { key: 'data', width: 112, minWidth: 96 },
@@ -117,7 +117,7 @@ export default function FinanceiroCaixas() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
+  const carregamentoIdRef = useRef(0);
   const [abrirForm, setAbrirForm] = useState({ data_abertura: today(), saldo_abertura: '', observacoes: '' });
   const [movimentoForm, setMovimentoForm] = useState({ natureza: 'SAIDA', data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
   const [fecharForm, setFecharForm] = useState({ data_fechamento: today(), saldo_informado: '', observacoes: '' });
@@ -161,46 +161,75 @@ export default function FinanceiroCaixas() {
     }
   }, [contasFiltradas, contaSelecionadaId]);
 
-  useEffect(() => {
+  const carregarControleCaixa = useCallback(async () => {
     if (!contaSelecionadaId) {
-      setSessoes([]); setSessaoDetalhe(null); setLoading(false); return undefined;
+      setSessoes([]);
+      setSessaoDetalhe(null);
+      setLoading(false);
+      return null;
     }
-    let active = true;
-    setLoading(true); setError('');
-    getCaixasFinanceiros({ conta_bancaria_id: contaSelecionadaId, status: 'TODOS', limit: 100 })
-      .then(async (data) => {
-        if (!active) return;
-        const lista = Array.isArray(data) ? data : [];
-        setSessoes(lista);
-        const aberta = lista.find((sessao) => sessao.status === 'ABERTO');
-        if (!aberta) { setSessaoDetalhe(null); return; }
-        const detalhe = await getCaixaFinanceiro(aberta.id);
-        if (!active) return;
-        setSessaoDetalhe(detalhe);
-        setFecharForm({ data_fechamento: today(), saldo_informado: String(detalhe?.resumo_atual?.saldo_sistema ?? detalhe?.saldo_sistema ?? ''), observacoes: '' });
-      })
-      .catch((err) => {
-        if (!active) return;
-        setError(err?.message || 'Erro ao carregar o controle do caixa.'); setSessoes([]); setSessaoDetalhe(null);
-      })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  }, [contaSelecionadaId, refreshKey]);
+
+    const carregamentoId = carregamentoIdRef.current + 1;
+    carregamentoIdRef.current = carregamentoId;
+    setLoading(true);
+
+    try {
+      const data = await getCaixasFinanceiros({ conta_bancaria_id: contaSelecionadaId, status: 'TODOS', limit: 100 });
+      if (carregamentoId !== carregamentoIdRef.current) return null;
+
+      const lista = Array.isArray(data) ? data : [];
+      setSessoes(lista);
+      const aberta = lista.find((sessao) => sessao.status === 'ABERTO');
+      if (!aberta) {
+        setSessaoDetalhe(null);
+        return null;
+      }
+
+      const detalhe = await getCaixaFinanceiro(aberta.id);
+      if (carregamentoId !== carregamentoIdRef.current) return null;
+
+      setSessaoDetalhe(detalhe);
+      setFecharForm((current) => ({
+        ...current,
+        data_fechamento: today(),
+        saldo_informado: formatCurrencyInput(
+          detalhe?.resumo_atual?.saldo_sistema ?? detalhe?.saldo_sistema ?? '',
+          { emptyZero: false }
+        )
+      }));
+      return detalhe;
+    } finally {
+      if (carregamentoId === carregamentoIdRef.current) setLoading(false);
+    }
+  }, [contaSelecionadaId]);
+
+  useEffect(() => {
+    setError('');
+    carregarControleCaixa().catch((err) => {
+      if (!contaSelecionadaId) return;
+      setError(err?.message || 'Erro ao carregar o controle do caixa.');
+      setSessoes([]);
+      setSessaoDetalhe(null);
+    });
+    return () => { carregamentoIdRef.current += 1; };
+  }, [carregarControleCaixa, contaSelecionadaId]);
 
   const sessaoAberta = useMemo(() => sessoes.find((sessao) => sessao.status === 'ABERTO') || null, [sessoes]);
   const sessoesFechadas = useMemo(() => sessoes.filter((sessao) => sessao.status === 'FECHADO'), [sessoes]);
   const resumo = sessaoDetalhe?.resumo_atual || sessaoAberta?.resumo_atual || {};
   const movimentos = Array.isArray(sessaoDetalhe?.movimentos_detalhados) ? sessaoDetalhe.movimentos_detalhados : [];
   const saldoSistema = Number(resumo.saldo_sistema ?? sessaoAberta?.saldo_sistema ?? 0);
-  const saldoInformado = Number(String(fecharForm.saldo_informado || '0').replace(',', '.'));
+  const saldoInformado = parseCurrencyInput(fecharForm.saldo_informado);
   const diferencaFechamento = Number.isFinite(saldoInformado) ? saldoInformado - saldoSistema : 0;
   const caixaFisico = contaEhCaixaFisico(contaSelecionada);
 
-  function refresh() { setRefreshKey((current) => current + 1); }
-
   async function executar(acao, mensagemErro) {
     try {
-      setSaving(true); setError(''); setMessage(''); await acao(); refresh();
+      setSaving(true);
+      setError('');
+      setMessage('');
+      await acao();
+      await carregarControleCaixa();
     } catch (err) {
       setError(err?.message || mensagemErro);
     } finally {
@@ -228,8 +257,16 @@ export default function FinanceiroCaixas() {
   async function handleMovimento(event) {
     event.preventDefault();
     if (!sessaoAberta) return;
+    const valorMovimento = parseCurrencyInput(movimentoForm.valor);
+    if (valorMovimento <= 0) {
+      setError('Informe um valor maior que zero para registrar o movimento.');
+      return;
+    }
     await executar(async () => {
-      await registrarMovimentoCaixaFinanceiro(sessaoAberta.id, movimentoForm);
+      await registrarMovimentoCaixaFinanceiro(sessaoAberta.id, {
+        ...movimentoForm,
+        valor: valorMovimento
+      });
       setMessage(`${movimentoForm.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso.`);
       setMovimentoForm({ natureza: movimentoForm.natureza, data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
     }, 'Erro ao registrar o movimento.');
@@ -239,7 +276,10 @@ export default function FinanceiroCaixas() {
     event.preventDefault();
     if (!sessaoAberta) return;
     await executar(async () => {
-      await fecharCaixaFinanceiro(sessaoAberta.id, fecharForm);
+      await fecharCaixaFinanceiro(sessaoAberta.id, {
+        ...fecharForm,
+        saldo_informado: parseCurrencyInput(fecharForm.saldo_informado)
+      });
       setMessage('Caixa fechado e conferência registrada com sucesso.');
     }, 'Erro ao fechar o caixa.');
   }
@@ -262,10 +302,6 @@ export default function FinanceiroCaixas() {
           <h1 className="mt-1 text-xl font-semibold text-[var(--c-text)] md:text-2xl">Caixas e Contas</h1>
           <p className="mt-1 max-w-3xl text-sm text-[var(--c-muted)]">Abertura, movimentação e conferência do dinheiro físico em um único fluxo operacional.</p>
         </div>
-        <button type="button" className="btn btn-secondary w-fit shrink-0" onClick={refresh} disabled={loading || saving} title="Atualizar dados">
-          <HiOutlineArrowPath className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Atualizar</span>
-        </button>
       </div>
 
       {error ? <div className="app-alert app-alert-error mt-3">{error}</div> : null}
@@ -341,7 +377,7 @@ export default function FinanceiroCaixas() {
             <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input mt-auto w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input mt-auto w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
-              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input mt-auto w-full" type="number" min="0.01" step="0.01" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: event.target.value }))} required /></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input mt-auto w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input mt-auto w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
               <div className="flex items-center justify-end sm:col-span-2 xl:col-span-1">
@@ -374,7 +410,7 @@ export default function FinanceiroCaixas() {
           <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineCheckCircle className="h-5 w-5 text-[var(--c-primary)]" /> Conferir e fechar caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.</p></div>
           <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
             <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
-            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="number" step="0.01" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: event.target.value }))} required /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
             <div className={`flex h-full min-h-[88px] flex-col justify-center rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
             <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input mt-auto w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
             <div className="flex items-center justify-end sm:col-span-2 xl:col-span-2">
