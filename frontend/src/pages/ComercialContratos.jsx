@@ -447,6 +447,8 @@ function pickEditForm(contrato = {}) {
     contrato.parceiro_id ? String(contrato.parceiro_id) : ''
   );
   const dataAssinatura = contrato.data_assinatura || contrato.data_contrato || today();
+  const possuiCorretor = Boolean(contrato.corretor_parceiro_id);
+  const categoriaFinanceiraId = contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '';
 
   return {
     id: contrato.id || null,
@@ -456,17 +458,17 @@ function pickEditForm(contrato = {}) {
     compradores,
     corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
     obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
-    categoria_financeira_id: contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '',
-    categoria_financeira_comissao_id: contrato.categoria_financeira_comissao_id ? String(contrato.categoria_financeira_comissao_id) : '',
+    categoria_financeira_id: categoriaFinanceiraId,
+    categoria_financeira_comissao_id: possuiCorretor ? categoriaFinanceiraId : '',
     numero: contrato.numero || '',
     status: contrato.status || 'ATIVO',
     data_contrato: dataAssinatura,
     valor_total: formatCurrencyInput(contrato.valor_total),
     valor_entrada: formatCurrencyInput(contrato.valor_entrada),
     desconto_concedido: formatCurrencyInput(contrato.desconto_concedido),
-    corretor_nome: contrato.corretor_nome || '',
-    comissao_percentual: contrato.comissao_percentual || '',
-    competencia_comissao_data: contrato.competencia_comissao_data || '',
+    corretor_nome: possuiCorretor ? (contrato.corretorParceiro?.nome || contrato.corretor_nome || '') : '',
+    comissao_percentual: possuiCorretor ? (contrato.comissao_percentual || '') : '',
+    competencia_comissao_data: possuiCorretor ? dataAssinatura : '',
     possui_vaga_garagem: Boolean(contrato.possui_vaga_garagem),
     quantidade_vagas_garagem: contrato.quantidade_vagas_garagem ? String(contrato.quantidade_vagas_garagem) : '',
     vagas_garagem_posicao_especifica: Boolean(contrato.vagas_garagem_posicao),
@@ -785,18 +787,6 @@ export default function ComercialContratos() {
     [categorias, categoriaConfig.contrato_venda_categoria_ids, categoriaConfigLoaded]
   );
 
-  const categoriasCompativeisPagar = useMemo(
-    () => {
-      const permitidas = new Set((categoriaConfig.comissao_categoria_ids || []).map(Number));
-      return categorias.filter((item) => {
-        const compativel = ['PAGAR', 'AMBOS'].includes(String(item.tipo || '').toUpperCase());
-        const classificadaDre = item?.considera_dre !== false && String(item?.dre_grupo || '').trim();
-        return compativel && classificadaDre && (!categoriaConfigLoaded || permitidas.has(Number(item.id)));
-      });
-    },
-    [categorias, categoriaConfig.comissao_categoria_ids, categoriaConfigLoaded]
-  );
-
   const compradoresContrato = useMemo(() => {
     const mapaClientes = new Map(clientes.map((cliente) => [String(cliente.id), cliente]));
     return normalizeCompradoresForm(form.compradores, form.parceiro_id).map((item) => ({
@@ -973,6 +963,7 @@ export default function ComercialContratos() {
       ...current,
       data_assinatura: value,
       data_contrato: value,
+      competencia_comissao_data: current.corretor_parceiro_id ? value : '',
       parcelas: (current.parcelas || []).map((item) => ({
         ...item,
         competencia_data: value
@@ -1488,7 +1479,9 @@ export default function ComercialContratos() {
         setForm((current) => ({
           ...current,
           corretor_parceiro_id: String(pessoa.id),
-          corretor_nome: pessoa.nome || ''
+          corretor_nome: pessoa.nome || '',
+          categoria_financeira_comissao_id: current.categoria_financeira_id || '',
+          competencia_comissao_data: current.data_assinatura || ''
         }));
       }
 
@@ -1510,18 +1503,14 @@ export default function ComercialContratos() {
     if (!hasText(form.numero)) camposFaltando.push('Contrato');
     if (!hasText(form.status)) camposFaltando.push('Status');
     if (!hasText(form.categoria_financeira_id)) camposFaltando.push('Categoria financeira');
-    if (!hasText(form.corretor_parceiro_id)) camposFaltando.push('Corretor parceiro');
-    if (!hasText(form.corretor_nome)) camposFaltando.push('Corretor no contrato');
-    if (!hasText(form.categoria_financeira_comissao_id)) camposFaltando.push('Categoria comissao');
-    if (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0) camposFaltando.push('Comissao %');
-    if (!hasText(form.competencia_comissao_data)) camposFaltando.push('Competencia DRE da comissao');
+    if (hasText(form.corretor_parceiro_id) && (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0)) camposFaltando.push('Comissao %');
     if (!hasText(form.valor_total) || roundCurrency(form.valor_total) <= 0) camposFaltando.push('Valor total');
     if (form.possui_vaga_garagem && (!hasText(form.quantidade_vagas_garagem) || Number(form.quantidade_vagas_garagem) <= 0)) camposFaltando.push('Quantidade de vagas');
     if (form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica && !hasText(form.vagas_garagem_posicao)) camposFaltando.push('Posicao das vagas');
     if (!hasText(form.local_assinatura)) camposFaltando.push('Local de assinatura');
     if (!hasText(form.data_assinatura)) camposFaltando.push('Data de assinatura');
-    if (!hasText(form.testemunha_1_nome) || !hasText(form.testemunha_1_cpf)) camposFaltando.push('Testemunha 1 cadastrada');
-    if (!hasText(form.testemunha_2_nome) || !hasText(form.testemunha_2_cpf)) camposFaltando.push('Testemunha 2 cadastrada');
+    if (hasText(form.testemunha_1_nome) !== hasText(form.testemunha_1_cpf)) camposFaltando.push('Nome e CPF da testemunha 1');
+    if (hasText(form.testemunha_2_nome) !== hasText(form.testemunha_2_cpf)) camposFaltando.push('Nome e CPF da testemunha 2');
     if (hasText(form.testemunha_1_cpf) && (onlyDigits(form.testemunha_1_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_1_cpf))) camposFaltando.push('CPF valido da testemunha 1');
     if (hasText(form.testemunha_2_cpf) && (onlyDigits(form.testemunha_2_cpf).length !== 11 || !isValidCpfCnpj(form.testemunha_2_cpf))) camposFaltando.push('CPF valido da testemunha 2');
 
@@ -1574,6 +1563,23 @@ export default function ComercialContratos() {
     try {
       setSaving(true);
       setError('');
+      const corretorSelecionado = corretores.find((item) => String(item.id) === String(form.corretor_parceiro_id));
+      const possuiCorretor = Boolean(form.corretor_parceiro_id);
+      const dadosComissao = possuiCorretor
+        ? {
+          corretor_parceiro_id: Number(form.corretor_parceiro_id),
+          corretor_nome: corretorSelecionado?.nome || form.corretor_nome || null,
+          comissao_percentual: form.comissao_percentual,
+          categoria_financeira_comissao_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : null,
+          competencia_comissao_data: form.data_assinatura || null
+        }
+        : {
+          corretor_parceiro_id: null,
+          corretor_nome: null,
+          comissao_percentual: null,
+          categoria_financeira_comissao_id: null,
+          competencia_comissao_data: null
+        };
       if (form.id) {
         await atualizarContratoComercial(form.id, {
           status: form.status,
@@ -1583,21 +1589,17 @@ export default function ComercialContratos() {
             ordem: item.ordem
           })),
           categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
-          corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
-          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
+          ...dadosComissao,
           desconto_concedido: form.desconto_concedido || undefined,
-          corretor_nome: form.corretor_nome || undefined,
-          comissao_percentual: form.comissao_percentual || undefined,
-          competencia_comissao_data: form.competencia_comissao_data || undefined,
           possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
           quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
           local_assinatura: form.local_assinatura || undefined,
           data_assinatura: form.data_assinatura || undefined,
-          testemunha_1_nome: form.testemunha_1_nome || undefined,
-          testemunha_1_cpf: form.testemunha_1_cpf || undefined,
-          testemunha_2_nome: form.testemunha_2_nome || undefined,
-          testemunha_2_cpf: form.testemunha_2_cpf || undefined,
+          testemunha_1_nome: form.testemunha_1_nome || null,
+          testemunha_1_cpf: form.testemunha_1_cpf || null,
+          testemunha_2_nome: form.testemunha_2_nome || null,
+          testemunha_2_cpf: form.testemunha_2_cpf || null,
           observacoes: form.observacoes || undefined
         });
       } else {
@@ -1610,28 +1612,24 @@ export default function ComercialContratos() {
             principal: Boolean(item.principal),
             ordem: item.ordem
           })),
-          corretor_parceiro_id: form.corretor_parceiro_id ? Number(form.corretor_parceiro_id) : null,
+          ...dadosComissao,
           obra_id: Number(form.obra_id),
           categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
-          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id ? Number(form.categoria_financeira_comissao_id) : null,
           numero: form.numero,
           status: form.status,
           data_contrato: form.data_assinatura,
           valor_total: form.valor_total || undefined,
           valor_entrada: valorEntradaComposicao || undefined,
           desconto_concedido: form.desconto_concedido || undefined,
-          corretor_nome: form.corretor_nome || undefined,
-          comissao_percentual: form.comissao_percentual || undefined,
-          competencia_comissao_data: form.competencia_comissao_data || undefined,
           possui_vaga_garagem: Boolean(form.possui_vaga_garagem),
           quantidade_vagas_garagem: form.possui_vaga_garagem ? Number(form.quantidade_vagas_garagem || 0) : null,
           vagas_garagem_posicao: form.possui_vaga_garagem && form.vagas_garagem_posicao_especifica ? form.vagas_garagem_posicao || null : null,
           local_assinatura: form.local_assinatura || undefined,
           data_assinatura: form.data_assinatura || undefined,
-          testemunha_1_nome: form.testemunha_1_nome || undefined,
-          testemunha_1_cpf: form.testemunha_1_cpf || undefined,
-          testemunha_2_nome: form.testemunha_2_nome || undefined,
-          testemunha_2_cpf: form.testemunha_2_cpf || undefined,
+          testemunha_1_nome: form.testemunha_1_nome || null,
+          testemunha_1_cpf: form.testemunha_1_cpf || null,
+          testemunha_2_nome: form.testemunha_2_nome || null,
+          testemunha_2_cpf: form.testemunha_2_cpf || null,
           observacoes: form.observacoes || undefined,
           parcelas: form.parcelas.map((item, index) => ({
             sequencia: item.sequencia || index + 1,
@@ -1840,7 +1838,15 @@ export default function ComercialContratos() {
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Categoria financeira</span>
-              <select className="input w-full" value={form.categoria_financeira_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_id: e.target.value }))}>
+              <select
+                className="input w-full"
+                value={form.categoria_financeira_id}
+                onChange={(e) => setForm((current) => ({
+                  ...current,
+                  categoria_financeira_id: e.target.value,
+                  categoria_financeira_comissao_id: current.corretor_parceiro_id ? e.target.value : ''
+                }))}
+              >
                 <option value="">Selecione uma categoria de receita DRE</option>
                 {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
               </select>
@@ -1849,9 +1855,8 @@ export default function ComercialContratos() {
               ) : null}
             </label>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-3">
             <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
-            <label className="sol-filter-field"><span className="sol-filter-label">Comissao %</span><input className="input w-full" type="number" step="0.01" value={form.comissao_percentual} onChange={(e) => setForm((c) => ({ ...c, comissao_percentual: e.target.value }))} /></label>
             <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
           </div>
           <div className="grid gap-3 md:grid-cols-4">
@@ -1903,7 +1908,7 @@ export default function ComercialContratos() {
             )}
           </div>
           <div className="grid gap-3 md:grid-cols-4">
-            <label className="sol-filter-field">
+            <label className="sol-filter-field md:col-span-2">
               <span className="sol-filter-label">Corretor parceiro</span>
               <ParceiroAutocomplete
                 label=""
@@ -1914,7 +1919,10 @@ export default function ComercialContratos() {
                   setForm((c) => ({
                     ...c,
                     corretor_parceiro_id: corretorId,
-                    corretor_nome: corretor?.nome || (corretorId ? c.corretor_nome : '')
+                    corretor_nome: corretor?.nome || '',
+                    comissao_percentual: corretorId ? c.comissao_percentual : '',
+                    categoria_financeira_comissao_id: corretorId ? c.categoria_financeira_id : '',
+                    competencia_comissao_data: corretorId ? c.data_assinatura : ''
                   }));
                 }}
                 placeholder="Digite nome, CPF/CNPJ ou e-mail"
@@ -1924,21 +1932,31 @@ export default function ComercialContratos() {
                 Cadastro rapido
               </button>
             </label>
-            <label className="sol-filter-field"><span className="sol-filter-label">Corretor no contrato</span><input className="input w-full" value={form.corretor_nome} onChange={(e) => setForm((c) => ({ ...c, corretor_nome: e.target.value }))} placeholder="Nome livre, se precisar ajustar" /></label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Categoria comissao</span>
-              <select className="input w-full" value={form.categoria_financeira_comissao_id} onChange={(e) => setForm((c) => ({ ...c, categoria_financeira_comissao_id: e.target.value }))}>
-                <option value="">Selecione uma categoria de comissao DRE</option>
-                {categoriasCompativeisPagar.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
-              </select>
-              {!categoriasCompativeisPagar.length ? (
-                <span className="mt-1 text-xs text-amber-600">Cadastre/libere uma categoria PAGAR/AMBOS marcada para DRE e com grupo DRE.</span>
-              ) : null}
-            </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Competencia DRE comissao</span>
-              <input className="input w-full" type="date" value={form.competencia_comissao_data} onChange={(e) => setForm((c) => ({ ...c, competencia_comissao_data: e.target.value }))} />
-            </label>
+            {form.corretor_parceiro_id && (
+              <>
+                <label className="sol-filter-field">
+                  <span className="sol-filter-label">Comissao %</span>
+                  <input
+                    className="input w-full"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={form.comissao_percentual}
+                    onChange={(e) => setForm((c) => ({ ...c, comissao_percentual: e.target.value }))}
+                    required
+                  />
+                </label>
+                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Dados da comissao</p>
+                  <p className="mt-1 text-sm text-[var(--c-text)]">
+                    Categoria: <strong>{categoriasCompativeis.find((item) => String(item.id) === String(form.categoria_financeira_id))?.nome || 'Selecione a categoria do contrato'}</strong>
+                  </p>
+                  <p className="mt-1 text-sm text-[var(--c-text)]">
+                    Competencia DRE: <strong>{form.data_assinatura ? formatDate(form.data_assinatura) : 'Informe a data de assinatura'}</strong>
+                  </p>
+                </div>
+              </>
+            )}
           </div>
           <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field md:col-span-2">

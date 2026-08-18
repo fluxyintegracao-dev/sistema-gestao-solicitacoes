@@ -1546,10 +1546,6 @@ function assertDadosObrigatoriosDocumentoContrato(dados = {}) {
 
   if (!safeString(dados?.contrato?.local_assinatura).trim()) faltando.push('local de assinatura');
   if (!safeString(dados?.contrato?.data_assinatura_iso).trim()) faltando.push('data de assinatura');
-  if (!safeString(dados?.testemunha_1?.nome).trim()) faltando.push('nome da testemunha 1');
-  if (!safeString(dados?.testemunha_1?.cpf).trim()) faltando.push('CPF da testemunha 1');
-  if (!safeString(dados?.testemunha_2?.nome).trim()) faltando.push('nome da testemunha 2');
-  if (!safeString(dados?.testemunha_2?.cpf).trim()) faltando.push('CPF da testemunha 2');
 
   if (faltando.length) {
     throw createHttpError(

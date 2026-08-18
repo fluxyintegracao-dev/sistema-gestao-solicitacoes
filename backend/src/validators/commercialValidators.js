@@ -256,6 +256,14 @@ function parseCpf(value, fieldName, { required = false } = {}) {
   return normalized;
 }
 
+function validateWitnessPair(nome, cpf, label) {
+  const hasNome = Boolean(String(nome || '').trim());
+  const hasCpf = Boolean(String(cpf || '').trim());
+  if (hasNome !== hasCpf) {
+    throw new ValidationError(`${label}: informe nome e CPF juntos.`);
+  }
+}
+
 function parseCpfCnpj(value, fieldName, { required = false } = {}) {
   const normalized = parseOptionalText(value, fieldName, 30, { required });
   if (normalized === undefined) return undefined;
@@ -725,10 +733,10 @@ function validateComercialContratoCreateBody(body = {}) {
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
     local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
     data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
-    testemunha_1_nome: parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160, { required: true }),
-    testemunha_1_cpf: parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1', { required: true }),
-    testemunha_2_nome: parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160, { required: true }),
-    testemunha_2_cpf: parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2', { required: true }),
+    testemunha_1_nome: parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160),
+    testemunha_1_cpf: parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1'),
+    testemunha_2_nome: parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160),
+    testemunha_2_cpf: parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2'),
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000),
     parcelas: normalizeParcelas(body.parcelas)
   };
@@ -742,13 +750,28 @@ function validateComercialContratoCreateBody(body = {}) {
     data.vagas_garagem_posicao = null;
   }
 
-  if (Number(data.comissao_percentual || 0) > 0 && !data.competencia_comissao_data) {
-    throw new ValidationError('Competencia DRE da comissao e obrigatoria quando houver comissao.');
-  }
-
   const dataAssinatura = data.data_assinatura || data.data_contrato;
   data.data_assinatura = dataAssinatura;
   data.data_contrato = dataAssinatura;
+
+  const temCorretor = Boolean(data.corretor_parceiro_id);
+  if (temCorretor && Number(data.comissao_percentual || 0) <= 0) {
+    throw new ValidationError('Comissao percentual e obrigatoria quando houver corretor.');
+  }
+
+  if (temCorretor) {
+    data.categoria_financeira_comissao_id = data.categoria_financeira_id || null;
+    data.competencia_comissao_data = dataAssinatura;
+  } else {
+    data.corretor_nome = null;
+    data.comissao_percentual = null;
+    data.categoria_financeira_comissao_id = null;
+    data.competencia_comissao_data = null;
+  }
+
+  validateWitnessPair(data.testemunha_1_nome, data.testemunha_1_cpf, 'Testemunha 1');
+  validateWitnessPair(data.testemunha_2_nome, data.testemunha_2_cpf, 'Testemunha 2');
+
   data.parcelas = data.parcelas.map((parcela) => ({
     ...parcela,
     competencia_data: dataAssinatura
@@ -799,18 +822,30 @@ function validateComercialContratoUpdateBody(body = {}) {
       : undefined,
     desconto_concedido: parseDecimal(body.desconto_concedido, 'Desconto concedido', { min: 0 }),
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),
-    corretor_nome: parseOptionalText(body.corretor_nome, 'Corretor', 160),
+    corretor_nome: Object.prototype.hasOwnProperty.call(body, 'corretor_nome')
+      ? (parseOptionalText(body.corretor_nome, 'Corretor', 160) ?? null)
+      : undefined,
     comissao_percentual: parseDecimal(body.comissao_percentual, 'Comissao percentual', { min: 0 }),
-    competencia_comissao_data: parseDateOnly(body.competencia_comissao_data, 'Competencia DRE da comissao'),
+    competencia_comissao_data: Object.prototype.hasOwnProperty.call(body, 'competencia_comissao_data')
+      ? (parseDateOnly(body.competencia_comissao_data, 'Competencia DRE da comissao') ?? null)
+      : undefined,
     possui_vaga_garagem: parseBoolean(body.possui_vaga_garagem, 'Possui vaga de garagem'),
     quantidade_vagas_garagem: parseInteger(body.quantidade_vagas_garagem, 'Quantidade de vagas de garagem'),
     vagas_garagem_posicao: parseOptionalText(body.vagas_garagem_posicao, 'Posicao das vagas de garagem', 255),
     local_assinatura: parseOptionalText(body.local_assinatura, 'Local de assinatura', 160),
     data_assinatura: parseDateOnly(body.data_assinatura, 'Data de assinatura'),
-    testemunha_1_nome: parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160),
-    testemunha_1_cpf: parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1'),
-    testemunha_2_nome: parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160),
-    testemunha_2_cpf: parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2'),
+    testemunha_1_nome: Object.prototype.hasOwnProperty.call(body, 'testemunha_1_nome')
+      ? (parseOptionalText(body.testemunha_1_nome, 'Nome da testemunha 1', 160) ?? null)
+      : undefined,
+    testemunha_1_cpf: Object.prototype.hasOwnProperty.call(body, 'testemunha_1_cpf')
+      ? (parseCpf(body.testemunha_1_cpf, 'CPF da testemunha 1') ?? null)
+      : undefined,
+    testemunha_2_nome: Object.prototype.hasOwnProperty.call(body, 'testemunha_2_nome')
+      ? (parseOptionalText(body.testemunha_2_nome, 'Nome da testemunha 2', 160) ?? null)
+      : undefined,
+    testemunha_2_cpf: Object.prototype.hasOwnProperty.call(body, 'testemunha_2_cpf')
+      ? (parseCpf(body.testemunha_2_cpf, 'CPF da testemunha 2') ?? null)
+      : undefined,
     observacoes: parseOptionalText(body.observacoes, 'Observacoes', 4000)
   };
 
