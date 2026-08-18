@@ -18,6 +18,9 @@ const {
 const {
   resolverCondicaoPagamentoPedido
 } = require('../src/services/pedidoCompraDocumentoUtils');
+const {
+  calcularRateiosMonetarios
+} = require('../src/services/pedidoCompraService');
 
 function itemSelecionado() {
   return {
@@ -181,6 +184,24 @@ function validarFretePorItemRespostaInterna() {
   assert.strictEqual(resultado.frete_valor, 0);
   assert.strictEqual(resultado.itens[0].frete_valor, 18.9);
   assert.strictEqual(resultado.itens[1].frete_valor, 0);
+}
+
+function validarFreteGlobalAcimaDoValorDasMercadorias() {
+  const bases = [632.76, 112.72, 159.5, 198.56];
+  const freteCotado = 2370;
+  const rateios = calcularRateiosMonetarios(freteCotado, bases, {
+    limitarAoTotalBase: false
+  });
+
+  assert.deepStrictEqual(rateios, [1358.94, 242.08, 342.55, 426.43]);
+  assert.strictEqual(Number(rateios.reduce((total, valor) => total + valor, 0).toFixed(2)), freteCotado);
+
+  const descontoLimitado = calcularRateiosMonetarios(freteCotado, bases);
+  assert.strictEqual(
+    Number(descontoLimitado.reduce((total, valor) => total + valor, 0).toFixed(2)),
+    1103.54,
+    'Descontos continuam limitados ao total das mercadorias.'
+  );
 }
 
 function validarContratoFretePorItemETotais() {
@@ -481,6 +502,7 @@ validarEncerramentoSemPedido();
 validarPermissaoEncerramentoSemPedido();
 validarPrazoGeralRespostaInterna();
 validarFretePorItemRespostaInterna();
+validarFreteGlobalAcimaDoValorDasMercadorias();
 validarContratoFretePorItemETotais();
 validarCompatibilidadeDataChegadaLegada();
 validarDisponibilidadeHistoricaPorFornecedorItem();

@@ -1,5 +1,5 @@
 # Ownership Ativo
 
-Nao ha ownership multirrepositorio ativo.
+Nao ha ownership ativo.
 
-Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e horario de inicio. Remover a reserva ao concluir o handoff.
+Ultima liberacao: `/root` concluiu a correcao de rateio de frete global em compras (18/08/2026). Arquivos liberados: `backend/src/services/pedidoCompraService.js`, `backend/scripts/validarCompraCotacaoEnvio.js` e `backend/scripts/corrigirFreteGlobalPedido.js`.
