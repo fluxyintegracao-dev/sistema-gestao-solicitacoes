@@ -78,10 +78,13 @@ function roundPedidoQty(value) {
   return Number(asNumber(value).toFixed(3));
 }
 
-function calcularRateiosMonetarios(valorTotal, bases = []) {
+function calcularRateiosMonetarios(valorTotal, bases = [], { limitarAoTotalBase = true } = {}) {
   const valoresBase = bases.map((base) => Math.max(0, roundMoney(base)));
   const totalBase = roundMoney(valoresBase.reduce((sum, base) => sum + base, 0));
-  const totalRatear = Math.min(Math.max(0, roundMoney(valorTotal)), totalBase);
+  const valorNormalizado = Math.max(0, roundMoney(valorTotal));
+  const totalRatear = limitarAoTotalBase
+    ? Math.min(valorNormalizado, totalBase)
+    : valorNormalizado;
 
   if (!valoresBase.length || totalRatear <= 0 || totalBase <= 0) {
     return valoresBase.map(() => 0);
@@ -1420,7 +1423,9 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       const freteRodada = baseCotada > 0
         ? roundMoney(Math.min(freteRestante, freteCotacao * (baseRodada / baseCotada)))
         : 0;
-      const fretesRateados = calcularRateiosMonetarios(freteRodada, basesFrete);
+      const fretesRateados = calcularRateiosMonetarios(freteRodada, basesFrete, {
+        limitarAoTotalBase: false
+      });
       grupo.forEach((alocacao, index) => {
         alocacao.frete_rateado = fretesRateados[index] || 0;
       });
@@ -4069,5 +4074,6 @@ module.exports = {
   registrarComentarioPedido,
   remanejarPedidoItem,
   removerPedidoItem,
-  adicionarRespostaAoPedido
+  adicionarRespostaAoPedido,
+  calcularRateiosMonetarios
 };
