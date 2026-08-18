@@ -449,6 +449,7 @@ function pickEditForm(contrato = {}) {
   const dataAssinatura = contrato.data_assinatura || contrato.data_contrato || today();
   const possuiCorretor = Boolean(contrato.corretor_parceiro_id);
   const categoriaFinanceiraId = contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '';
+  const categoriaComissaoId = contrato.categoria_financeira_comissao_id ? String(contrato.categoria_financeira_comissao_id) : '';
 
   return {
     id: contrato.id || null,
@@ -459,7 +460,7 @@ function pickEditForm(contrato = {}) {
     corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
     obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
     categoria_financeira_id: categoriaFinanceiraId,
-    categoria_financeira_comissao_id: possuiCorretor ? categoriaFinanceiraId : '',
+    categoria_financeira_comissao_id: possuiCorretor ? categoriaComissaoId : '',
     numero: contrato.numero || '',
     status: contrato.status || 'ATIVO',
     data_contrato: dataAssinatura,
@@ -1480,7 +1481,7 @@ export default function ComercialContratos() {
           ...current,
           corretor_parceiro_id: String(pessoa.id),
           corretor_nome: pessoa.nome || '',
-          categoria_financeira_comissao_id: current.categoria_financeira_id || '',
+          categoria_financeira_comissao_id: current.categoria_financeira_comissao_id || '',
           competencia_comissao_data: current.data_assinatura || ''
         }));
       }
@@ -1570,7 +1571,9 @@ export default function ComercialContratos() {
           corretor_parceiro_id: Number(form.corretor_parceiro_id),
           corretor_nome: corretorSelecionado?.nome || form.corretor_nome || null,
           comissao_percentual: form.comissao_percentual,
-          categoria_financeira_comissao_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : null,
+          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id
+            ? Number(form.categoria_financeira_comissao_id)
+            : null,
           competencia_comissao_data: form.data_assinatura || null
         }
         : {
@@ -1844,7 +1847,7 @@ export default function ComercialContratos() {
                 onChange={(e) => setForm((current) => ({
                   ...current,
                   categoria_financeira_id: e.target.value,
-                  categoria_financeira_comissao_id: current.corretor_parceiro_id ? e.target.value : ''
+                  categoria_financeira_comissao_id: current.corretor_parceiro_id ? current.categoria_financeira_comissao_id || '' : ''
                 }))}
               >
                 <option value="">Selecione uma categoria de receita DRE</option>
@@ -1921,7 +1924,7 @@ export default function ComercialContratos() {
                     corretor_parceiro_id: corretorId,
                     corretor_nome: corretor?.nome || '',
                     comissao_percentual: corretorId ? c.comissao_percentual : '',
-                    categoria_financeira_comissao_id: corretorId ? c.categoria_financeira_id : '',
+                    categoria_financeira_comissao_id: corretorId ? c.categoria_financeira_comissao_id || '' : '',
                     competencia_comissao_data: corretorId ? c.data_assinatura : ''
                   }));
                 }}
@@ -1948,9 +1951,6 @@ export default function ComercialContratos() {
                 </label>
                 <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Dados da comissao</p>
-                  <p className="mt-1 text-sm text-[var(--c-text)]">
-                    Categoria: <strong>{categoriasCompativeis.find((item) => String(item.id) === String(form.categoria_financeira_id))?.nome || 'Selecione a categoria do contrato'}</strong>
-                  </p>
                   <p className="mt-1 text-sm text-[var(--c-text)]">
                     Competencia DRE: <strong>{form.data_assinatura ? formatDate(form.data_assinatura) : 'Informe a data de assinatura'}</strong>
                   </p>
@@ -2646,10 +2646,6 @@ export default function ComercialContratos() {
               <div className="mt-1 text-xs text-[var(--c-muted)]">
                 Competencia DRE: {formatDate(contratoSelecionado.competencia_comissao_data)}
               </div>
-            </div>
-            <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-              <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Categoria comissao</div>
-              <div className="mt-2 text-sm font-semibold text-[var(--c-text)]">{contratoSelecionado.categoriaFinanceiraComissao?.nome || '-'}</div>
             </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulo comissao</div>

@@ -760,7 +760,6 @@ function validateComercialContratoCreateBody(body = {}) {
   }
 
   if (temCorretor) {
-    data.categoria_financeira_comissao_id = data.categoria_financeira_id || null;
     data.competencia_comissao_data = dataAssinatura;
   } else {
     data.corretor_nome = null;

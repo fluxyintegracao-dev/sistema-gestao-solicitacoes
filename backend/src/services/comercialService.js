@@ -1522,9 +1522,13 @@ async function sincronizarTituloComissao({
     return tituloExistente;
   }
 
-  // A comissao usa a mesma categoria do contrato, conforme a regra comercial.
-  await ensureCategoriaFinanceiraReceber(categoriaFinanceiraComissaoId);
-  await ensureCategoriaPermitidaNoComercial(categoriaFinanceiraComissaoId, 'contrato');
+  if (!categoriaFinanceiraComissaoId) {
+    return tituloExistente;
+  }
+
+  // A comissao deve usar categoria de pagamentos (PAGAR), independente do contrato.
+  await ensureCategoriaFinanceiraPagar(categoriaFinanceiraComissaoId);
+  await ensureCategoriaPermitidaNoComercial(categoriaFinanceiraComissaoId, 'comissao');
 
   const payload = buildTituloComissaoPayload({
     contrato,
@@ -1602,7 +1606,7 @@ async function criarContratoComercial(req, payload = {}) {
 
   const dataAssinatura = payload.data_assinatura || payload.data_contrato;
   const categoriaFinanceiraComissaoId = corretorParceiro
-    ? (payload.categoria_financeira_id || null)
+    ? (payload.categoria_financeira_comissao_id ?? null)
     : null;
   const comissaoPercentual = corretorParceiro ? payload.comissao_percentual : null;
 
@@ -1809,9 +1813,6 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     : (contrato.obra || await ensureObraExists(contrato.obra_id));
   const empresaContratoId = getEmpresaObraParaTitulo(obraContrato, 'obra do contrato comercial');
 
-  const categoriaFinanceiraContratoId = Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_id')
-    ? payload.categoria_financeira_id
-    : contrato.categoria_financeira_id;
   const atualizarDataAssinatura =
     Object.prototype.hasOwnProperty.call(payload, 'data_assinatura') ||
     Object.prototype.hasOwnProperty.call(payload, 'data_contrato');
@@ -1866,9 +1867,11 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     updateData.corretor_parceiro_id = corretorParceiro?.id || null;
     updateData.corretor_nome = corretorParceiro?.nome || null;
     updateData.comissao_percentual = corretorParceiro ? comissaoPercentualEfetiva : null;
-    updateData.categoria_financeira_comissao_id = corretorParceiro
-      ? (categoriaFinanceiraContratoId || null)
-      : null;
+    const categoriaFinanceiraComissaoAtual = Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_comissao_id')
+      ? payload.categoria_financeira_comissao_id
+      : contrato.categoria_financeira_comissao_id;
+
+    updateData.categoria_financeira_comissao_id = corretorParceiro ? categoriaFinanceiraComissaoAtual : null;
     updateData.competencia_comissao_data = corretorParceiro ? dataAssinaturaEfetiva : null;
 
     if (Object.prototype.hasOwnProperty.call(payload, 'possui_vaga_garagem') && !payload.possui_vaga_garagem) {
@@ -1992,7 +1995,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       transaction,
       contrato: contratoAtualizado,
       corretorParceiro,
-      categoriaFinanceiraComissaoId: updateData.categoria_financeira_comissao_id,
+      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id,
       empresaId: empresaContratoId
     });
 
