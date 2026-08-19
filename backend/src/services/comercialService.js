@@ -633,14 +633,17 @@ async function ensureUniqueContratoNumero(numero, contratoId = null) {
 
   const existing = await ContratoComercial.findOne({ where });
   if (existing) {
-    throw createHttpError(400, 'Ja existe um contrato comercial com este numero.');
+    throw createHttpError(
+      400,
+      `Ja existe o contrato #${existing.id} com o codigo ${numero}, vinculado a unidade ${existing.unidade_comercial_id}.`
+    );
   }
 }
 
-function buildContratoNumeroPadrao(empreendimento, unidade, incluirTorre = true) {
+function buildContratoNumeroPadrao(empreendimento, unidade) {
   return [
     empreendimento?.codigo,
-    incluirTorre ? unidade?.torre : null,
+    unidade?.torre,
     unidade?.codigo
   ]
     .map((value) => normalizeOptionalText(value))
@@ -649,17 +652,11 @@ function buildContratoNumeroPadrao(empreendimento, unidade, incluirTorre = true)
 }
 
 function resolveContratoNumeroCadastro(numeroInformado, empreendimento, unidade) {
-  const numero = normalizeOptionalText(numeroInformado);
-  const numeroLegadoAutomatico = buildContratoNumeroPadrao(empreendimento, unidade, false);
-  const numeroComTorre = buildContratoNumeroPadrao(empreendimento, unidade, true);
+  const numeroCalculado = buildContratoNumeroPadrao(empreendimento, unidade);
 
-  // Mantem numeros personalizados, mas atualiza o antigo padrao automatico para
-  // distinguir unidades de mesmo codigo em torres diferentes.
-  if (!numero || (unidade?.torre && numero === numeroLegadoAutomatico)) {
-    return numeroComTorre;
-  }
-
-  return numero;
+  // O backend e a fonte de verdade para impedir que rascunhos locais antigos ou
+  // clientes desatualizados enviem o codigo de outra unidade.
+  return numeroCalculado || normalizeOptionalText(numeroInformado);
 }
 
 function buildUnidadeTorreWhere(torre) {

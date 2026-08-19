@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -699,6 +699,7 @@ export default function ComercialContratos() {
   const [contratoSelecionado, setContratoSelecionado] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const submitInFlightRef = useRef(false);
   const [processingAction, setProcessingAction] = useState('');
   const [parcelaEditandoIndex, setParcelaEditandoIndex] = useState(null);
   const [showDistrato, setShowDistrato] = useState(false);
@@ -786,6 +787,21 @@ export default function ComercialContratos() {
     () => empreendimentos.find((item) => String(item.id) === String(form.empreendimento_id)),
     [empreendimentos, form.empreendimento_id]
   );
+
+  const unidadeSelecionada = useMemo(
+    () => unidades.find((item) => String(item.id) === String(form.unidade_comercial_id)),
+    [form.unidade_comercial_id, unidades]
+  );
+
+  const numeroContratoCalculado = useMemo(
+    () => buildContratoNumero(empreendimentoSelecionado, unidadeSelecionada),
+    [empreendimentoSelecionado, unidadeSelecionada]
+  );
+
+  useEffect(() => {
+    if (form.id || !numeroContratoCalculado || form.numero === numeroContratoCalculado) return;
+    setForm((current) => ({ ...current, numero: numeroContratoCalculado }));
+  }, [form.id, form.numero, numeroContratoCalculado]);
 
   const obraSelecionada = useMemo(
     () => obras.find((item) => String(item.id) === String(form.obra_id)),
@@ -1516,7 +1532,7 @@ export default function ComercialContratos() {
     if (!hasText(form.unidade_comercial_id)) camposFaltando.push('Unidade');
     if (!hasText(form.parceiro_id)) camposFaltando.push('Cliente');
     if (!hasText(form.obra_id) || !empreendimentoSelecionado?.obra_id) camposFaltando.push('Obra vinculada ao empreendimento');
-    if (!hasText(form.numero)) camposFaltando.push('Contrato');
+    if (!hasText(numeroContratoCalculado)) camposFaltando.push('Contrato');
     if (!hasText(form.status)) camposFaltando.push('Status');
     if (!hasText(form.categoria_financeira_id)) camposFaltando.push('Categoria financeira');
     if (hasText(form.corretor_parceiro_id) && (!hasText(form.comissao_percentual) || toNumber(form.comissao_percentual) <= 0)) camposFaltando.push('Comissao %');
@@ -1568,6 +1584,7 @@ export default function ComercialContratos() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (submitInFlightRef.current) return;
     if (!form.id) {
       const validationMessage = validarCriacaoContrato();
       if (validationMessage) {
@@ -1576,6 +1593,7 @@ export default function ComercialContratos() {
         return;
       }
     }
+    submitInFlightRef.current = true;
     try {
       setSaving(true);
       setError('');
@@ -1629,7 +1647,7 @@ export default function ComercialContratos() {
           ...dadosComissao,
           obra_id: Number(form.obra_id),
           categoria_financeira_id: form.categoria_financeira_id ? Number(form.categoria_financeira_id) : undefined,
-          numero: form.numero,
+          numero: numeroContratoCalculado,
           status: form.status,
           data_contrato: form.data_assinatura,
           valor_total: form.valor_total || undefined,
@@ -1672,6 +1690,7 @@ export default function ComercialContratos() {
     } catch (err) {
       setError(err?.message || 'Erro ao salvar contrato comercial');
     } finally {
+      submitInFlightRef.current = false;
       setSaving(false);
     }
   }
@@ -1836,8 +1855,19 @@ export default function ComercialContratos() {
               )}
             </label>
             <label className="sol-filter-field">
-              <span className="sol-filter-label">Contrato</span>
-              <input className="input w-full" value={form.numero} onChange={(e) => setForm((c) => ({ ...c, numero: e.target.value }))} required disabled={Boolean(form.id)} />
+              <span className="sol-filter-label">Codigo do contrato</span>
+              <input
+                className="input w-full"
+                value={form.id ? form.numero : numeroContratoCalculado}
+                readOnly
+                aria-readonly="true"
+                required
+              />
+              {!form.id && (
+                <span className="mt-1 text-xs text-[var(--c-muted)]">
+                  Gerado automaticamente por empreendimento, torre e unidade.
+                </span>
+              )}
             </label>
             <label className="sol-filter-field">
               <span className="sol-filter-label">Status</span>
