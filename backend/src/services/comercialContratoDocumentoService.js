@@ -27,8 +27,8 @@ const { normalizeOriginalName, sanitizeFileNameForStorage } = require('../utils/
 const TIPOS_DOCUMENTO = new Set(['CONTRATO', 'QUADRO_RESUMO']);
 
 const VARIAVEIS_CONTRATO_COMERCIAL = [
-  { chave: 'contrato.numero', descricao: 'Numero do contrato' },
-  { chave: 'contrato.numero_identificador', descricao: 'Identificador do contrato calculado pelo empreendimento/unidade' },
+  { chave: 'contrato.numero', descricao: 'Numero exibido no contrato: empreendimento/unidade' },
+  { chave: 'contrato.numero_identificador', descricao: 'Identificador exibido no contrato: empreendimento/unidade' },
   { chave: 'contrato.data', descricao: 'Data do contrato em formato brasileiro' },
   { chave: 'contrato.valor_total', descricao: 'Valor total em numero' },
   { chave: 'contrato.valor_total_formatado', descricao: 'Valor total formatado em reais' },
@@ -1243,14 +1243,14 @@ function buildAssinaturaPessoa(nome, documento) {
 }
 
 function buildNumeroContrato(raw = {}, empreendimento = {}, unidade = {}) {
-  const numeroSalvo = safeString(raw.numero).trim();
-  if (numeroSalvo) return numeroSalvo;
-
-  return [
+  const numeroDocumento = [
     safeString(empreendimento.codigo).trim(),
-    safeString(unidade.torre || unidade.bloco).trim(),
     safeString(unidade.codigo).trim()
   ].filter(Boolean).join(' - ');
+
+  // O numero salvo pode conter a torre para garantir unicidade interna, mas o
+  // contrato entregue ao cliente preserva o identificador empreendimento/unidade.
+  return numeroDocumento || safeString(raw.numero).trim();
 }
 
 function buildItemIIITexto(contrato = {}, empreendimento = {}, unidade = {}) {
@@ -1546,10 +1546,6 @@ function assertDadosObrigatoriosDocumentoContrato(dados = {}) {
 
   if (!safeString(dados?.contrato?.local_assinatura).trim()) faltando.push('local de assinatura');
   if (!safeString(dados?.contrato?.data_assinatura_iso).trim()) faltando.push('data de assinatura');
-  if (!safeString(dados?.testemunha_1?.nome).trim()) faltando.push('nome da testemunha 1');
-  if (!safeString(dados?.testemunha_1?.cpf).trim()) faltando.push('CPF da testemunha 1');
-  if (!safeString(dados?.testemunha_2?.nome).trim()) faltando.push('nome da testemunha 2');
-  if (!safeString(dados?.testemunha_2?.cpf).trim()) faltando.push('CPF da testemunha 2');
 
   if (faltando.length) {
     throw createHttpError(

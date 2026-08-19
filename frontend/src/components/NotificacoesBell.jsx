@@ -166,7 +166,7 @@ export default function NotificacoesBell() {
             aria-label="Fechar notificacoes"
           />
 
-          <section
+          <div
             ref={painelRef}
             className="notification-panel"
             role="dialog"
@@ -264,7 +264,7 @@ export default function NotificacoesBell() {
                 </div>
               )}
             </div>
-          </section>
+          </div>
         </>
       )}
     </div>

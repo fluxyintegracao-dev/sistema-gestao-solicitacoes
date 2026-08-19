@@ -43,6 +43,14 @@ function normalizeOptionalText(value) {
   return text || null;
 }
 
+function assertTestemunhaCompleta(nome, cpf, label) {
+  const hasNome = Boolean(normalizeOptionalText(nome));
+  const hasCpf = Boolean(normalizeOptionalText(cpf));
+  if (hasNome !== hasCpf) {
+    throw createHttpError(400, `${label}: informe nome e CPF juntos.`);
+  }
+}
+
 function normalizeContractStatus(value) {
   const normalized = String(value || '').trim().toUpperCase();
   if (!normalized) {
@@ -104,13 +112,20 @@ async function ensureCategoriaPermitidaNoComercial(categoriaId, campo) {
   }
 
   const config = await getComercialCategoriasContratoConfig();
-  const chave = campo === 'comissao' ? 'comissao_categoria_ids' : 'contrato_venda_categoria_ids';
+  const chave = campo === 'comissao' ? 'comissao_categoria_id' : 'contrato_venda_categoria_ids';
+  const permitidas = new Set(normalizarIdList(config?.[chave]));
 
-  if (!Array.isArray(config?.[chave])) {
+  if (campo === 'comissao' && !permitidas.size) {
+    const compatibilidade = getComissaoCategoriaFinanceiraFromConfig(config);
+    if (Number.isInteger(compatibilidade) && compatibilidade > 0) {
+      permitidas.add(compatibilidade);
+    }
+  }
+
+  if (campo === 'comissao' && !permitidas.size && !config?.[chave]) {
     return;
   }
 
-  const permitidas = new Set(normalizarIdList(config[chave]));
   if (!permitidas.has(Number(categoriaId))) {
     throw createHttpError(
       400,
@@ -125,7 +140,7 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
   const config = await getComercialCategoriasContratoConfig();
   const permitidas = new Set([
     ...normalizarIdList(config?.contrato_venda_categoria_ids),
-    ...normalizarIdList(config?.comissao_categoria_ids)
+    ...normalizarIdList(config?.comissao_categoria_id)
   ]);
   const term = normalizeSearch(filters.q || filters.busca);
   const where = {
@@ -155,11 +170,21 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
     config: config
       ? {
           contrato_venda_categoria_ids: normalizarIdList(config.contrato_venda_categoria_ids),
-          comissao_categoria_ids: normalizarIdList(config.comissao_categoria_ids),
+          comissao_categoria_id: Number(config.comissao_categoria_id) || null,
           opcoes_pagamento: config.opcoes_pagamento || {}
         }
       : null
   };
+}
+
+function getComissaoCategoriaFinanceiraFromConfig(config) {
+  const categoriaFromSingle = Number(config?.comissao_categoria_id);
+  if (Number.isInteger(categoriaFromSingle) && categoriaFromSingle > 0) {
+    return categoriaFromSingle;
+  }
+
+  const lista = normalizarIdList(config?.comissao_categoria_ids);
+  return lista[0] || null;
 }
 
 function mergeObservacoes(...values) {
@@ -608,8 +633,30 @@ async function ensureUniqueContratoNumero(numero, contratoId = null) {
 
   const existing = await ContratoComercial.findOne({ where });
   if (existing) {
-    throw createHttpError(400, 'Ja existe um contrato comercial com este numero.');
+    throw createHttpError(
+      400,
+      `Ja existe o contrato #${existing.id} com o codigo ${numero}, vinculado a unidade ${existing.unidade_comercial_id}.`
+    );
   }
+}
+
+function buildContratoNumeroPadrao(empreendimento, unidade) {
+  return [
+    empreendimento?.codigo,
+    unidade?.torre,
+    unidade?.codigo
+  ]
+    .map((value) => normalizeOptionalText(value))
+    .filter(Boolean)
+    .join(' - ');
+}
+
+function resolveContratoNumeroCadastro(numeroInformado, empreendimento, unidade) {
+  const numeroCalculado = buildContratoNumeroPadrao(empreendimento, unidade);
+
+  // O backend e a fonte de verdade para impedir que rascunhos locais antigos ou
+  // clientes desatualizados enviem o codigo de outra unidade.
+  return numeroCalculado || normalizeOptionalText(numeroInformado);
 }
 
 function buildUnidadeTorreWhere(torre) {
@@ -1514,6 +1561,11 @@ async function sincronizarTituloComissao({
     return tituloExistente;
   }
 
+  if (!categoriaFinanceiraComissaoId) {
+    return tituloExistente;
+  }
+
+  // A comissao deve usar categoria de pagamentos (PAGAR), independente do contrato.
   await ensureCategoriaFinanceiraPagar(categoriaFinanceiraComissaoId);
   await ensureCategoriaPermitidaNoComercial(categoriaFinanceiraComissaoId, 'comissao');
 
@@ -1578,10 +1630,6 @@ async function criarContratoComercial(req, payload = {}) {
   await ensureCategoriaFinanceiraReceber(payload.categoria_financeira_id);
   await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_id, 'contrato');
 
-  if (payload.categoria_financeira_comissao_id) {
-    await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
-    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
-  }
   const empresaContratoId = getEmpresaObraParaTitulo(obra, 'obra do contrato comercial');
 
   if (Number(unidade.empreendimento_id) !== Number(empreendimento.id)) {
@@ -1592,10 +1640,24 @@ async function criarContratoComercial(req, payload = {}) {
     throw createHttpError(400, 'O empreendimento esta vinculado a outra obra.');
   }
 
-  await ensureUniqueContratoNumero(payload.numero);
+  const numeroContrato = resolveContratoNumeroCadastro(payload.numero, empreendimento, unidade);
+  await ensureUniqueContratoNumero(numeroContrato);
   await ensureUnidadeDisponivelParaContrato(unidade, cliente.id);
 
   const dataAssinatura = payload.data_assinatura || payload.data_contrato;
+  const configCategoriasComerciais = await getComercialCategoriasContratoConfig();
+  const categoriaFinanceiraComissaoId = corretorParceiro
+    ? getComissaoCategoriaFinanceiraFromConfig(configCategoriasComerciais)
+    : null;
+  const comissaoPercentual = corretorParceiro ? payload.comissao_percentual : null;
+
+  if (corretorParceiro && Number(comissaoPercentual || 0) <= 0) {
+    throw createHttpError(400, 'Comissao percentual e obrigatoria quando houver corretor.');
+  }
+
+  assertTestemunhaCompleta(payload.testemunha_1_nome, payload.testemunha_1_cpf, 'Testemunha 1');
+  assertTestemunhaCompleta(payload.testemunha_2_nome, payload.testemunha_2_cpf, 'Testemunha 2');
+
   const parcelasContrato = normalizarParcelasContrato(payload.parcelas).map((parcela) => ({
     ...parcela,
     competencia_data: dataAssinatura
@@ -1616,17 +1678,17 @@ async function criarContratoComercial(req, payload = {}) {
       corretor_parceiro_id: corretorParceiro?.id || null,
       obra_id: obra.id,
       categoria_financeira_id: payload.categoria_financeira_id || null,
-      categoria_financeira_comissao_id: payload.categoria_financeira_comissao_id || null,
-      numero: payload.numero,
+      categoria_financeira_comissao_id: categoriaFinanceiraComissaoId,
+      numero: numeroContrato,
       status: payload.status || 'ATIVO',
       data_contrato: dataAssinatura,
       valor_total: valorTotalInformado,
       valor_entrada: roundCurrency(payload.valor_entrada || 0),
       desconto_concedido: roundCurrency(payload.desconto_concedido || 0),
       indice_reajuste: payload.indice_reajuste || null,
-      corretor_nome: payload.corretor_nome || corretorParceiro?.nome || null,
-      comissao_percentual: payload.comissao_percentual ?? null,
-      competencia_comissao_data: payload.competencia_comissao_data || null,
+      corretor_nome: corretorParceiro?.nome || null,
+      comissao_percentual: comissaoPercentual ?? null,
+      competencia_comissao_data: corretorParceiro ? dataAssinatura : null,
       possui_vaga_garagem: Boolean(payload.possui_vaga_garagem),
       quantidade_vagas_garagem: payload.possui_vaga_garagem ? (payload.quantidade_vagas_garagem || null) : null,
       vagas_garagem_posicao: payload.possui_vaga_garagem ? (payload.vagas_garagem_posicao || null) : null,
@@ -1727,14 +1789,14 @@ async function criarContratoComercial(req, payload = {}) {
       transaction,
       contrato,
       corretorParceiro,
-      categoriaFinanceiraComissaoId: payload.categoria_financeira_comissao_id || null,
+      categoriaFinanceiraComissaoId,
       empresaId: empresaContratoId
     });
 
     if (tituloComissao && Number(contrato.titulo_financeiro_comissao_id || 0) !== Number(tituloComissao.id || 0)) {
       await contrato.update({
         titulo_financeiro_comissao_id: tituloComissao.id,
-        corretor_nome: payload.corretor_nome || corretorParceiro?.nome || contrato.corretor_nome || null,
+        corretor_nome: corretorParceiro?.nome || contrato.corretor_nome || null,
         atualizado_por: req.user?.id || null
       }, { transaction });
     }
@@ -1787,14 +1849,40 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     corretorParceiro = await ensureCorretorParceiro(payload.corretor_parceiro_id);
   }
 
-  if (Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_comissao_id') && payload.categoria_financeira_comissao_id) {
-    await ensureCategoriaFinanceiraPagar(payload.categoria_financeira_comissao_id);
-    await ensureCategoriaPermitidaNoComercial(payload.categoria_financeira_comissao_id, 'comissao');
-  }
   const obraContrato = Object.prototype.hasOwnProperty.call(payload, 'obra_id')
     ? await ensureObraExists(payload.obra_id)
     : (contrato.obra || await ensureObraExists(contrato.obra_id));
   const empresaContratoId = getEmpresaObraParaTitulo(obraContrato, 'obra do contrato comercial');
+
+  const atualizarDataAssinatura =
+    Object.prototype.hasOwnProperty.call(payload, 'data_assinatura') ||
+    Object.prototype.hasOwnProperty.call(payload, 'data_contrato');
+  const dataAssinaturaEfetiva = atualizarDataAssinatura
+    ? (payload.data_assinatura || payload.data_contrato || null)
+    : (contrato.data_assinatura || contrato.data_contrato || null);
+  const comissaoPercentualEfetiva = Object.prototype.hasOwnProperty.call(payload, 'comissao_percentual')
+    ? payload.comissao_percentual
+    : contrato.comissao_percentual;
+
+  if (corretorParceiro && Number(comissaoPercentualEfetiva || 0) <= 0) {
+    throw createHttpError(400, 'Comissao percentual e obrigatoria quando houver corretor.');
+  }
+
+  const testemunha1Nome = Object.prototype.hasOwnProperty.call(payload, 'testemunha_1_nome')
+    ? payload.testemunha_1_nome
+    : contrato.testemunha_1_nome;
+  const testemunha1Cpf = Object.prototype.hasOwnProperty.call(payload, 'testemunha_1_cpf')
+    ? payload.testemunha_1_cpf
+    : contrato.testemunha_1_cpf;
+  const testemunha2Nome = Object.prototype.hasOwnProperty.call(payload, 'testemunha_2_nome')
+    ? payload.testemunha_2_nome
+    : contrato.testemunha_2_nome;
+  const testemunha2Cpf = Object.prototype.hasOwnProperty.call(payload, 'testemunha_2_cpf')
+    ? payload.testemunha_2_cpf
+    : contrato.testemunha_2_cpf;
+
+  assertTestemunhaCompleta(testemunha1Nome, testemunha1Cpf, 'Testemunha 1');
+  assertTestemunhaCompleta(testemunha2Nome, testemunha2Cpf, 'Testemunha 2');
 
   const transaction = await sequelize.transaction();
   try {
@@ -1804,9 +1892,6 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     };
     delete updateData.compradores;
 
-    const atualizarDataAssinatura =
-      Object.prototype.hasOwnProperty.call(payload, 'data_assinatura') ||
-      Object.prototype.hasOwnProperty.call(payload, 'data_contrato');
     const dataAssinaturaAtualizada = atualizarDataAssinatura
       ? (payload.data_assinatura || payload.data_contrato || null)
       : null;
@@ -1820,12 +1905,14 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       updateData.status = normalizeContractStatus(payload.status);
     }
 
-    if (Object.prototype.hasOwnProperty.call(payload, 'corretor_parceiro_id')) {
-      updateData.corretor_parceiro_id = payload.corretor_parceiro_id || null;
-      if (!Object.prototype.hasOwnProperty.call(payload, 'corretor_nome')) {
-        updateData.corretor_nome = corretorParceiro?.nome || null;
-      }
-    }
+    updateData.corretor_parceiro_id = corretorParceiro?.id || null;
+    updateData.corretor_nome = corretorParceiro?.nome || null;
+    updateData.comissao_percentual = corretorParceiro ? comissaoPercentualEfetiva : null;
+    const configCategoriasComerciais = await getComercialCategoriasContratoConfig();
+    const categoriaFinanceiraComissaoAtual = getComissaoCategoriaFinanceiraFromConfig(configCategoriasComerciais);
+
+    updateData.categoria_financeira_comissao_id = corretorParceiro ? categoriaFinanceiraComissaoAtual : null;
+    updateData.competencia_comissao_data = corretorParceiro ? dataAssinaturaEfetiva : null;
 
     if (Object.prototype.hasOwnProperty.call(payload, 'possui_vaga_garagem') && !payload.possui_vaga_garagem) {
       updateData.quantidade_vagas_garagem = null;
@@ -1948,10 +2035,7 @@ async function atualizarContratoComercial(req, id, payload = {}) {
       transaction,
       contrato: contratoAtualizado,
       corretorParceiro,
-      categoriaFinanceiraComissaoId:
-        Object.prototype.hasOwnProperty.call(updateData, 'categoria_financeira_comissao_id')
-          ? updateData.categoria_financeira_comissao_id
-          : contratoAtualizado.categoria_financeira_comissao_id,
+      categoriaFinanceiraComissaoId: contratoAtualizado.categoria_financeira_comissao_id,
       empresaId: empresaContratoId
     });
 
