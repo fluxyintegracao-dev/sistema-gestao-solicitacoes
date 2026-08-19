@@ -7,6 +7,10 @@ function normalizeText(value) {
     .toLowerCase();
 }
 
+function onlyDigits(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
 export default function ParceiroAutocomplete({
   label,
   value,
@@ -42,6 +46,7 @@ export default function ParceiroAutocomplete({
 
   const filteredOptions = useMemo(() => {
     const normalizedQuery = normalizeText(query.trim());
+    const digitsQuery = onlyDigits(query);
     const source = Array.isArray(options) ? options : [];
 
     if (!normalizedQuery && !showOptionsOnFocus) {
@@ -51,6 +56,11 @@ export default function ParceiroAutocomplete({
     return source
       .filter((item) => {
         if (!normalizedQuery) return true;
+
+        if (digitsQuery && onlyDigits(item?.cpf_cnpj).includes(digitsQuery)) {
+          return true;
+        }
+
         const searchable = [
           item?.nome,
           item?.razao_social,
