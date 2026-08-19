@@ -291,6 +291,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
     {
       model: TituloFinanceiro,
       as: 'tituloFinanceiroComissao',
+      required: false,
       attributes: [
         'id',
         'status',
@@ -324,6 +325,7 @@ function buildContratoInclude({ includeParcelas = false } = {}) {
         {
           model: TituloFinanceiro,
           as: 'tituloFinanceiro',
+          required: false,
           attributes: [
             'id',
             'status',
@@ -1334,6 +1336,7 @@ async function anexarIndicadoresContratos(contratos = [], { manterParcelas = fal
       {
         model: TituloFinanceiro,
         as: 'tituloFinanceiro',
+        required: false,
         attributes: ['id', 'status', 'valor_original', 'valor_saldo', 'valor_baixado', 'data_vencimento', 'data_quitacao']
       }
     ],

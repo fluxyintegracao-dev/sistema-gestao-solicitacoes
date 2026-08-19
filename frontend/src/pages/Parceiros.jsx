@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   atualizarParceiro,
   baixarModeloParceiros,
+  buscarParceiroPorId,
   buscarParceiros,
   criarParceiro,
   exportarParceiros,
@@ -114,6 +115,7 @@ export default function Parceiros() {
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const [error, setError] = useState('');
+  const [parceiroCarregandoId, setParceiroCarregandoId] = useState(null);
   const [pageSize, setPageSize] = useState('25');
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -265,6 +267,21 @@ export default function Parceiros() {
       setError(err?.message || 'Erro ao salvar parceiro');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleEditarParceiro(parceiro) {
+    if (!parceiro?.id) return;
+
+    try {
+      setError('');
+      setParceiroCarregandoId(parceiro.id);
+      const parceiroCompleto = await buscarParceiroPorId(parceiro.id);
+      setParceiroForm(pickParceiroFormData(parceiroCompleto));
+    } catch (err) {
+      setError(err?.message || 'Erro ao carregar os dados completos da pessoa');
+    } finally {
+      setParceiroCarregandoId(null);
     }
   }
 
@@ -786,9 +803,10 @@ export default function Parceiros() {
                                   <button
                                     type="button"
                                     className="btn btn-outline px-3 py-1.5 text-xs"
-                                    onClick={() => setParceiroForm(pickParceiroFormData(parceiro))}
+                                    onClick={() => handleEditarParceiro(parceiro)}
+                                    disabled={parceiroCarregandoId === parceiro.id}
                                   >
-                                    Editar
+                                    {parceiroCarregandoId === parceiro.id ? 'Carregando...' : 'Editar'}
                                   </button>
                                 </td>
                               </tr>
@@ -854,9 +872,10 @@ export default function Parceiros() {
                       <button
                         type="button"
                         className="btn btn-outline"
-                        onClick={() => setParceiroForm(pickParceiroFormData(parceiro))}
+                        onClick={() => handleEditarParceiro(parceiro)}
+                        disabled={parceiroCarregandoId === parceiro.id}
                       >
-                        Editar
+                        {parceiroCarregandoId === parceiro.id ? 'Carregando...' : 'Editar'}
                       </button>
                     </div>
                   </div>

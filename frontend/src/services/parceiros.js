@@ -43,6 +43,15 @@ export async function buscarParceiros(params = {}, { signal } = {}) {
   return parseJson(response, 'Erro ao buscar parceiros');
 }
 
+export async function buscarParceiroPorId(id, { signal } = {}) {
+  const response = await fetch(`${API_URL}/parceiros/${id}`, {
+    headers: authHeaders(),
+    signal
+  });
+
+  return parseJson(response, 'Erro ao buscar os dados completos da pessoa');
+}
+
 export async function baixarModeloParceiros() {
   const response = await fetch(`${API_URL}/parceiros/modelo-xlsx`, {
     headers: authHeaders()
