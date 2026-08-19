@@ -679,7 +679,6 @@ function validateComercialContratoCreateBody(body = {}) {
       'corretor_parceiro_id',
       'obra_id',
       'categoria_financeira_id',
-      'categoria_financeira_comissao_id',
       'numero',
       'status',
       'data_contrato',
@@ -715,9 +714,6 @@ function validateComercialContratoCreateBody(body = {}) {
       : undefined,
     obra_id: parseInteger(body.obra_id, 'Obra', { required: true }),
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
-    categoria_financeira_comissao_id: Object.prototype.hasOwnProperty.call(body, 'categoria_financeira_comissao_id')
-      ? (parseInteger(body.categoria_financeira_comissao_id, 'Categoria financeira da comissao') ?? null)
-      : undefined,
     numero: parseOptionalText(body.numero, 'Numero do contrato', 120, { required: true }),
     status: parseEnum(body.status, 'Status', CONTRATO_STATUS) || 'ATIVO',
     data_contrato: parseDateOnly(body.data_contrato, 'Data do contrato', { required: true }),
@@ -764,7 +760,6 @@ function validateComercialContratoCreateBody(body = {}) {
   } else {
     data.corretor_nome = null;
     data.comissao_percentual = null;
-    data.categoria_financeira_comissao_id = null;
     data.competencia_comissao_data = null;
   }
 
@@ -787,7 +782,6 @@ function validateComercialContratoUpdateBody(body = {}) {
       'compradores',
       'categoria_financeira_id',
       'corretor_parceiro_id',
-      'categoria_financeira_comissao_id',
       'desconto_concedido',
       'indice_reajuste',
       'corretor_nome',
@@ -815,9 +809,6 @@ function validateComercialContratoUpdateBody(body = {}) {
     categoria_financeira_id: parseInteger(body.categoria_financeira_id, 'Categoria financeira'),
     corretor_parceiro_id: Object.prototype.hasOwnProperty.call(body, 'corretor_parceiro_id')
       ? (parseInteger(body.corretor_parceiro_id, 'Corretor') ?? null)
-      : undefined,
-    categoria_financeira_comissao_id: Object.prototype.hasOwnProperty.call(body, 'categoria_financeira_comissao_id')
-      ? (parseInteger(body.categoria_financeira_comissao_id, 'Categoria financeira da comissao') ?? null)
       : undefined,
     desconto_concedido: parseDecimal(body.desconto_concedido, 'Desconto concedido', { min: 0 }),
     indice_reajuste: parseOptionalText(body.indice_reajuste, 'Indice de reajuste', 60),

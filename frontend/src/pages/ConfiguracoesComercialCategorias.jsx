@@ -100,6 +100,43 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
   );
 }
 
+function CategoriaSelect({ title, description, categorias, value, onChange }) {
+  const selected = Number(value || 0);
+
+  return (
+    <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+      <div className="sol-filtros-head">
+        <div>
+          <p className="sol-filtros-title">{title}</p>
+          <p className="sol-filtros-subtitle">{description}</p>
+        </div>
+      </div>
+
+      <div className="mt-4">
+        <label className="sol-filter-field">
+          <span className="sol-filter-label">Categoria financeira</span>
+          <select
+            className="input w-full"
+            value={selected ? String(selected) : ''}
+            onChange={(event) => onChange(event.target.value ? Number(event.target.value) : '')}
+          >
+            <option value="">Selecione uma categoria para comissão</option>
+            {(categorias || []).map((categoria) => (
+              <option key={categoria.id} value={Number(categoria.id)}>
+                {categoria.nome}{categoria.tipo ? ` - ${categoria.tipo}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {(categorias || []).length === 0 && (
+        <div className="app-empty-card mt-4">Nenhuma categoria financeira compatível encontrada.</div>
+      )}
+    </section>
+  );
+}
+
 function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
   const showResumo = groupKey === 'reajustes';
   const showInterval = groupKey === 'periodicidades';
@@ -233,7 +270,7 @@ export default function ConfiguracoesComercialCategorias() {
   const [error, setError] = useState('');
   const [config, setConfig] = useState({
     contrato_venda_categoria_ids: [],
-    comissao_categoria_ids: [],
+    comissao_categoria_id: '',
     categorias_contrato: [],
     categorias_comissao: [],
     opcoes_pagamento: {}
@@ -245,7 +282,17 @@ export default function ConfiguracoesComercialCategorias() {
     (async () => {
       try {
         const data = await getComercialCategoriasContrato();
-        if (active) setConfig(data || {});
+        if (!active) return;
+        const nextConfig = data || {};
+        setConfig({
+          contrato_venda_categoria_ids: Array.isArray(nextConfig.contrato_venda_categoria_ids)
+            ? nextConfig.contrato_venda_categoria_ids
+            : [],
+          comissao_categoria_id: nextConfig.comissao_categoria_id || '',
+          categorias_contrato: nextConfig.categorias_contrato || [],
+          categorias_comissao: nextConfig.categorias_comissao || [],
+          opcoes_pagamento: nextConfig.opcoes_pagamento || {}
+        });
       } catch (err) {
         if (active) setError(err?.message || 'Erro ao carregar configuracao comercial');
       } finally {
@@ -264,10 +311,18 @@ export default function ConfiguracoesComercialCategorias() {
       setError('');
       const data = await salvarComercialCategoriasContrato({
         contrato_venda_categoria_ids: config.contrato_venda_categoria_ids,
-        comissao_categoria_ids: config.comissao_categoria_ids,
+        comissao_categoria_id: config.comissao_categoria_id,
         opcoes_pagamento: getOptionPayload(config)
       });
-      setConfig(data || config);
+      if (data) {
+        setConfig((current) => ({
+          ...current,
+          contrato_venda_categoria_ids: Array.isArray(data.contrato_venda_categoria_ids)
+            ? data.contrato_venda_categoria_ids
+            : current.contrato_venda_categoria_ids,
+          comissao_categoria_id: data.comissao_categoria_id || ''
+        }));
+      }
       alert('Categorias comerciais atualizadas com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao salvar configuracao comercial');
@@ -326,12 +381,12 @@ export default function ConfiguracoesComercialCategorias() {
         onChange={(ids) => setConfig((current) => ({ ...current, contrato_venda_categoria_ids: ids }))}
       />
 
-      <CategoriaChecklist
-        title="Comissao"
-        description="Categorias de contas a pagar exibidas no campo Categoria comissao."
+      <CategoriaSelect
+        title="Comissao (global)"
+        description="Categoria única usada em todos os contratos com corretor. Não é exibida na tela de contratos."
         categorias={config.categorias_comissao || []}
-        selectedIds={config.comissao_categoria_ids || []}
-        onChange={(ids) => setConfig((current) => ({ ...current, comissao_categoria_ids: ids }))}
+        value={config.comissao_categoria_id || ''}
+        onChange={(value) => setConfig((current) => ({ ...current, comissao_categoria_id: value }))}
       />
 
       <section className="grid gap-4 xl:grid-cols-2">

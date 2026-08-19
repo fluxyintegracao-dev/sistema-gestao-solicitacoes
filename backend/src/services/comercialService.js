@@ -112,13 +112,20 @@ async function ensureCategoriaPermitidaNoComercial(categoriaId, campo) {
   }
 
   const config = await getComercialCategoriasContratoConfig();
-  const chave = campo === 'comissao' ? 'comissao_categoria_ids' : 'contrato_venda_categoria_ids';
+  const chave = campo === 'comissao' ? 'comissao_categoria_id' : 'contrato_venda_categoria_ids';
+  const permitidas = new Set(normalizarIdList(config?.[chave]));
 
-  if (!Array.isArray(config?.[chave])) {
+  if (campo === 'comissao' && !permitidas.size) {
+    const compatibilidade = getComissaoCategoriaFinanceiraFromConfig(config);
+    if (Number.isInteger(compatibilidade) && compatibilidade > 0) {
+      permitidas.add(compatibilidade);
+    }
+  }
+
+  if (campo === 'comissao' && !permitidas.size && !config?.[chave]) {
     return;
   }
 
-  const permitidas = new Set(normalizarIdList(config[chave]));
   if (!permitidas.has(Number(categoriaId))) {
     throw createHttpError(
       400,
@@ -133,7 +140,7 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
   const config = await getComercialCategoriasContratoConfig();
   const permitidas = new Set([
     ...normalizarIdList(config?.contrato_venda_categoria_ids),
-    ...normalizarIdList(config?.comissao_categoria_ids)
+    ...normalizarIdList(config?.comissao_categoria_id)
   ]);
   const term = normalizeSearch(filters.q || filters.busca);
   const where = {
@@ -163,11 +170,21 @@ async function listarCategoriasFinanceirasComercial(filters = {}) {
     config: config
       ? {
           contrato_venda_categoria_ids: normalizarIdList(config.contrato_venda_categoria_ids),
-          comissao_categoria_ids: normalizarIdList(config.comissao_categoria_ids),
+          comissao_categoria_id: Number(config.comissao_categoria_id) || null,
           opcoes_pagamento: config.opcoes_pagamento || {}
         }
       : null
   };
+}
+
+function getComissaoCategoriaFinanceiraFromConfig(config) {
+  const categoriaFromSingle = Number(config?.comissao_categoria_id);
+  if (Number.isInteger(categoriaFromSingle) && categoriaFromSingle > 0) {
+    return categoriaFromSingle;
+  }
+
+  const lista = normalizarIdList(config?.comissao_categoria_ids);
+  return lista[0] || null;
 }
 
 function mergeObservacoes(...values) {
@@ -1605,8 +1622,9 @@ async function criarContratoComercial(req, payload = {}) {
   await ensureUnidadeDisponivelParaContrato(unidade, cliente.id);
 
   const dataAssinatura = payload.data_assinatura || payload.data_contrato;
+  const configCategoriasComerciais = await getComercialCategoriasContratoConfig();
   const categoriaFinanceiraComissaoId = corretorParceiro
-    ? (payload.categoria_financeira_comissao_id ?? null)
+    ? getComissaoCategoriaFinanceiraFromConfig(configCategoriasComerciais)
     : null;
   const comissaoPercentual = corretorParceiro ? payload.comissao_percentual : null;
 
@@ -1867,9 +1885,8 @@ async function atualizarContratoComercial(req, id, payload = {}) {
     updateData.corretor_parceiro_id = corretorParceiro?.id || null;
     updateData.corretor_nome = corretorParceiro?.nome || null;
     updateData.comissao_percentual = corretorParceiro ? comissaoPercentualEfetiva : null;
-    const categoriaFinanceiraComissaoAtual = Object.prototype.hasOwnProperty.call(payload, 'categoria_financeira_comissao_id')
-      ? payload.categoria_financeira_comissao_id
-      : contrato.categoria_financeira_comissao_id;
+    const configCategoriasComerciais = await getComercialCategoriasContratoConfig();
+    const categoriaFinanceiraComissaoAtual = getComissaoCategoriaFinanceiraFromConfig(configCategoriasComerciais);
 
     updateData.categoria_financeira_comissao_id = corretorParceiro ? categoriaFinanceiraComissaoAtual : null;
     updateData.competencia_comissao_data = corretorParceiro ? dataAssinaturaEfetiva : null;

@@ -409,14 +409,17 @@ async function getComercialCategoriasContratoConfig() {
   const categoriasComissao = categorias.filter((categoria) =>
     ['PAGAR', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase())
   );
+  const comissaoCategoriaFromConfig = normalizarIdList(
+    Array.isArray(config?.comissao_categoria_ids) && config.comissao_categoria_ids.length
+      ? config.comissao_categoria_ids
+      : config?.comissao_categoria_id
+  )[0] || null;
 
   return {
     contrato_venda_categoria_ids: Array.isArray(config?.contrato_venda_categoria_ids)
       ? normalizarIdList(config.contrato_venda_categoria_ids)
       : categoriasContrato.map((categoria) => categoria.id),
-    comissao_categoria_ids: Array.isArray(config?.comissao_categoria_ids)
-      ? normalizarIdList(config.comissao_categoria_ids)
-      : categoriasComissao.map((categoria) => categoria.id),
+    comissao_categoria_id: comissaoCategoriaFromConfig,
     categorias_contrato: categoriasContrato,
     categorias_comissao: categoriasComissao,
     opcoes_pagamento: serializarComercialOpcoesPagamento(config?.opcoes_pagamento)
@@ -1443,7 +1446,10 @@ module.exports = {
   async setComercialCategoriasContrato(req, res) {
     try {
       const contratoIds = normalizarIdList(req.body?.contrato_venda_categoria_ids);
-      const comissaoIds = normalizarIdList(req.body?.comissao_categoria_ids);
+      const comissaoIds = normalizarIdList(
+        req.body?.comissao_categoria_id ?? req.body?.comissao_categoria_ids
+      );
+      const comissaoCategoriaId = comissaoIds[0] || null;
       const existente = await ConfiguracaoSistema.findOne({
         where: { chave: CHAVE_COMERCIAL_CATEGORIAS_CONTRATO },
         order: [['id', 'DESC']]
@@ -1477,7 +1483,7 @@ module.exports = {
 
       const valor = JSON.stringify({
         contrato_venda_categoria_ids: contratoIds,
-        comissao_categoria_ids: comissaoIds,
+        comissao_categoria_id: comissaoCategoriaId,
         opcoes_pagamento: opcoesPagamento
       });
 

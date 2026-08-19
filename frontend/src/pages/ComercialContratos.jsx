@@ -98,7 +98,6 @@ function defaultForm() {
     corretor_parceiro_id: '',
     obra_id: '',
     categoria_financeira_id: '',
-    categoria_financeira_comissao_id: '',
     numero: '',
     status: 'ATIVO',
     data_contrato: today(),
@@ -449,7 +448,6 @@ function pickEditForm(contrato = {}) {
   const dataAssinatura = contrato.data_assinatura || contrato.data_contrato || today();
   const possuiCorretor = Boolean(contrato.corretor_parceiro_id);
   const categoriaFinanceiraId = contrato.categoria_financeira_id ? String(contrato.categoria_financeira_id) : '';
-  const categoriaComissaoId = contrato.categoria_financeira_comissao_id ? String(contrato.categoria_financeira_comissao_id) : '';
 
   return {
     id: contrato.id || null,
@@ -460,7 +458,6 @@ function pickEditForm(contrato = {}) {
     corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
     obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
     categoria_financeira_id: categoriaFinanceiraId,
-    categoria_financeira_comissao_id: possuiCorretor ? categoriaComissaoId : '',
     numero: contrato.numero || '',
     status: contrato.status || 'ATIVO',
     data_contrato: dataAssinatura,
@@ -673,7 +670,7 @@ export default function ComercialContratos() {
   const [categorias, setCategorias] = useState([]);
   const [categoriaConfig, setCategoriaConfig] = useState({
     contrato_venda_categoria_ids: [],
-    comissao_categoria_ids: [],
+    comissao_categoria_id: null,
     opcoes_pagamento: {}
   });
   const [categoriaConfigLoaded, setCategoriaConfigLoaded] = useState(false);
@@ -727,9 +724,9 @@ export default function ComercialContratos() {
           contrato_venda_categoria_ids: Array.isArray(categoriaConfigData.contrato_venda_categoria_ids)
             ? categoriaConfigData.contrato_venda_categoria_ids.map(Number)
             : [],
-          comissao_categoria_ids: Array.isArray(categoriaConfigData.comissao_categoria_ids)
-            ? categoriaConfigData.comissao_categoria_ids.map(Number)
-            : [],
+          comissao_categoria_id: categoriaConfigData.comissao_categoria_id
+            ? Number(categoriaConfigData.comissao_categoria_id)
+            : null,
           opcoes_pagamento: categoriaConfigData.opcoes_pagamento || {}
         });
         setCategoriaConfigLoaded(true);
@@ -1481,7 +1478,6 @@ export default function ComercialContratos() {
           ...current,
           corretor_parceiro_id: String(pessoa.id),
           corretor_nome: pessoa.nome || '',
-          categoria_financeira_comissao_id: current.categoria_financeira_comissao_id || '',
           competencia_comissao_data: current.data_assinatura || ''
         }));
       }
@@ -1571,16 +1567,12 @@ export default function ComercialContratos() {
           corretor_parceiro_id: Number(form.corretor_parceiro_id),
           corretor_nome: corretorSelecionado?.nome || form.corretor_nome || null,
           comissao_percentual: form.comissao_percentual,
-          categoria_financeira_comissao_id: form.categoria_financeira_comissao_id
-            ? Number(form.categoria_financeira_comissao_id)
-            : null,
           competencia_comissao_data: form.data_assinatura || null
         }
         : {
           corretor_parceiro_id: null,
           corretor_nome: null,
           comissao_percentual: null,
-          categoria_financeira_comissao_id: null,
           competencia_comissao_data: null
         };
       if (form.id) {
@@ -1844,11 +1836,7 @@ export default function ComercialContratos() {
               <select
                 className="input w-full"
                 value={form.categoria_financeira_id}
-                onChange={(e) => setForm((current) => ({
-                  ...current,
-                  categoria_financeira_id: e.target.value,
-                  categoria_financeira_comissao_id: current.corretor_parceiro_id ? current.categoria_financeira_comissao_id || '' : ''
-                }))}
+                onChange={(e) => setForm((current) => ({ ...current, categoria_financeira_id: e.target.value }))}
               >
                 <option value="">Selecione uma categoria de receita DRE</option>
                 {categoriasCompativeis.map((item) => <option key={item.id} value={item.id}>{item.nome}{item.dre_grupo ? ` - ${item.dre_grupo}` : ''}</option>)}
@@ -1924,7 +1912,6 @@ export default function ComercialContratos() {
                     corretor_parceiro_id: corretorId,
                     corretor_nome: corretor?.nome || '',
                     comissao_percentual: corretorId ? c.comissao_percentual : '',
-                    categoria_financeira_comissao_id: corretorId ? c.categoria_financeira_comissao_id || '' : '',
                     competencia_comissao_data: corretorId ? c.data_assinatura : ''
                   }));
                 }}
