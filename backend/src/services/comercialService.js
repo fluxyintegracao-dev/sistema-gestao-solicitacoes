@@ -637,6 +637,31 @@ async function ensureUniqueContratoNumero(numero, contratoId = null) {
   }
 }
 
+function buildContratoNumeroPadrao(empreendimento, unidade, incluirTorre = true) {
+  return [
+    empreendimento?.codigo,
+    incluirTorre ? unidade?.torre : null,
+    unidade?.codigo
+  ]
+    .map((value) => normalizeOptionalText(value))
+    .filter(Boolean)
+    .join(' - ');
+}
+
+function resolveContratoNumeroCadastro(numeroInformado, empreendimento, unidade) {
+  const numero = normalizeOptionalText(numeroInformado);
+  const numeroLegadoAutomatico = buildContratoNumeroPadrao(empreendimento, unidade, false);
+  const numeroComTorre = buildContratoNumeroPadrao(empreendimento, unidade, true);
+
+  // Mantem numeros personalizados, mas atualiza o antigo padrao automatico para
+  // distinguir unidades de mesmo codigo em torres diferentes.
+  if (!numero || (unidade?.torre && numero === numeroLegadoAutomatico)) {
+    return numeroComTorre;
+  }
+
+  return numero;
+}
+
 function buildUnidadeTorreWhere(torre) {
   const normalized = normalizeOptionalText(torre);
   if (normalized) {
@@ -1618,7 +1643,8 @@ async function criarContratoComercial(req, payload = {}) {
     throw createHttpError(400, 'O empreendimento esta vinculado a outra obra.');
   }
 
-  await ensureUniqueContratoNumero(payload.numero);
+  const numeroContrato = resolveContratoNumeroCadastro(payload.numero, empreendimento, unidade);
+  await ensureUniqueContratoNumero(numeroContrato);
   await ensureUnidadeDisponivelParaContrato(unidade, cliente.id);
 
   const dataAssinatura = payload.data_assinatura || payload.data_contrato;
@@ -1656,7 +1682,7 @@ async function criarContratoComercial(req, payload = {}) {
       obra_id: obra.id,
       categoria_financeira_id: payload.categoria_financeira_id || null,
       categoria_financeira_comissao_id: categoriaFinanceiraComissaoId,
-      numero: payload.numero,
+      numero: numeroContrato,
       status: payload.status || 'ATIVO',
       data_contrato: dataAssinatura,
       valor_total: valorTotalInformado,

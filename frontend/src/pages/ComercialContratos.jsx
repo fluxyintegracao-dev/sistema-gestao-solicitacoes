@@ -88,6 +88,25 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function buildContratoNumero(empreendimento, unidade) {
+  if (!unidade) return '';
+
+  return [empreendimento?.codigo, unidade?.torre, unidade?.codigo]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' - ');
+}
+
+function buildUnidadeOptionLabel(unidade) {
+  const identificacao = [unidade?.torre, unidade?.codigo]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' - ');
+  const vendida = String(unidade?.situacao || '').trim().toUpperCase() === 'VENDIDA';
+
+  return `${identificacao || unidade?.nome || 'Unidade'}${vendida ? ' - vendida' : ''}`;
+}
+
 function defaultForm() {
   return {
     id: null,
@@ -1686,7 +1705,7 @@ export default function ComercialContratos() {
           </div>
         </div>
         <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Empreendimento</span>
               <select className="input w-full" value={form.empreendimento_id} onChange={(e) => selecionarEmpreendimentoContrato(e.target.value)} required disabled={Boolean(form.id)}>
@@ -1703,9 +1722,7 @@ export default function ComercialContratos() {
                   const unidadeId = e.target.value;
                   const unidade = unidades.find((u) => String(u.id) === String(unidadeId));
                   const emp = empreendimentos.find((em) => String(em.id) === String(form.empreendimento_id));
-                  const autoNumero = unidade && emp?.codigo
-                    ? `${emp.codigo} - ${unidade.codigo}`
-                    : (unidade?.codigo ?? '');
+                  const autoNumero = buildContratoNumero(emp, unidade);
                   setForm((c) => ({ ...c, unidade_comercial_id: unidadeId, numero: autoNumero }));
                 }}
                 required
@@ -1713,10 +1730,7 @@ export default function ComercialContratos() {
               >
                 <option value="">Selecione</option>
                 {unidadesDoEmpreendimento.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.codigo}
-                    {String(item.situacao || '').trim().toUpperCase() === 'VENDIDA' ? ' - vendida' : ''}
-                  </option>
+                  <option key={item.id} value={item.id}>{buildUnidadeOptionLabel(item)}</option>
                 ))}
               </select>
               {!form.id && form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
@@ -1761,8 +1775,9 @@ export default function ComercialContratos() {
                 </p>
               )}
             </div>
-            {!form.id && mostrarCompradorAdicional && (
-              <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
+          </div>
+          {!form.id && mostrarCompradorAdicional && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-3">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <span className="sol-filter-label">Comprador adicional</span>
                   <button
@@ -1798,8 +1813,9 @@ export default function ComercialContratos() {
                 <p className="mt-2 text-xs text-[var(--c-muted)]">
                   O comprador adicional entra no contrato e nas assinaturas. O principal continua vinculado aos titulos financeiros.
                 </p>
-              </div>
-            )}
+            </div>
+          )}
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Obra</span>
               <input
@@ -1819,8 +1835,6 @@ export default function ComercialContratos() {
                 </span>
               )}
             </label>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Contrato</span>
               <input className="input w-full" value={form.numero} onChange={(e) => setForm((c) => ({ ...c, numero: e.target.value }))} required disabled={Boolean(form.id)} />
@@ -1831,6 +1845,8 @@ export default function ComercialContratos() {
                 {STATUS_CONTRATO.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </label>
+          </div>
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Categoria financeira</span>
               <select
@@ -1845,12 +1861,10 @@ export default function ComercialContratos() {
                 <span className="mt-1 text-xs text-amber-600">Cadastre/libere uma categoria RECEBER/AMBOS marcada para DRE e com grupo DRE.</span>
               ) : null}
             </label>
-          </div>
-          <div className="grid gap-3 md:grid-cols-3">
             <label className="sol-filter-field"><span className="sol-filter-label">Desconto</span><input className="input w-full" inputMode="decimal" value={form.desconto_concedido} onChange={(e) => setForm((c) => ({ ...c, desconto_concedido: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, desconto_concedido: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
             <label className="sol-filter-field"><span className="sol-filter-label">Valor total</span><input className="input w-full" inputMode="decimal" value={form.valor_total} onChange={(e) => setForm((c) => ({ ...c, valor_total: normalizeCurrencyTyping(e.target.value) }))} onBlur={(e) => setForm((c) => ({ ...c, valor_total: formatCurrencyInput(e.target.value) }))} placeholder="R$ 0,00" /></label>
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <label className="sol-filter-field">
               <span className="sol-filter-label">Vaga de garagem</span>
               <select
@@ -1898,8 +1912,8 @@ export default function ComercialContratos() {
               </>
             )}
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <label className="sol-filter-field md:col-span-2">
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="sol-filter-field">
               <span className="sol-filter-label">Corretor parceiro</span>
               <ParceiroAutocomplete
                 label=""
@@ -1945,8 +1959,8 @@ export default function ComercialContratos() {
               </>
             )}
           </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <label className="sol-filter-field md:col-span-2">
+          <div className="grid items-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <label className="sol-filter-field xl:col-span-2">
               <span className="sol-filter-label">Local de assinatura</span>
               <input className="input w-full" value={form.local_assinatura} onChange={(e) => setForm((c) => ({ ...c, local_assinatura: e.target.value }))} placeholder="Ex.: Balneario de Iriri, Anchieta-ES" />
             </label>
