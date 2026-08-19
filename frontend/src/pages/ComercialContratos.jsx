@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
+import { HiOutlineEye, HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
+import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
@@ -49,6 +50,20 @@ const PERIODICIDADES = [
   { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
 ];
 const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
+const CONTRATOS_CARTEIRA_COLUMNS = [
+  { key: 'contrato', width: 190, minWidth: 140 },
+  { key: 'status', width: 200, minWidth: 140 },
+  { key: 'cliente', width: 250, minWidth: 170 },
+  { key: 'empreendimento', width: 210, minWidth: 150 },
+  { key: 'unidade', width: 160, minWidth: 120 },
+  { key: 'corretor', width: 190, minWidth: 140 },
+  { key: 'comissao', width: 100, minWidth: 84 },
+  { key: 'obra', width: 220, minWidth: 160 },
+  { key: 'valor_total', width: 145, minWidth: 120 },
+  { key: 'em_aberto', width: 145, minWidth: 120 },
+  { key: 'vencido', width: 140, minWidth: 115 },
+  { key: 'acoes', width: 104, minWidth: 96 }
+];
 
 function getOptionValue(option) {
   return String(option?.value || option || '').trim();
@@ -2608,47 +2623,85 @@ export default function ComercialContratos() {
           </label>
         </div>
 
-        <div className="mt-4 space-y-3">
+        <div className="app-table-shell mt-4 overflow-hidden rounded-xl border border-[var(--c-border)]">
           {contratosFiltrados.length === 0 ? (
             <div className="app-empty-card">Nenhum contrato comercial encontrado.</div>
           ) : (
-            contratosFiltrados.map((item) => (
-              <article key={item.id} className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm">
-                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-semibold text-[var(--c-text)]">{item.numero}</h3>
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+            <ResizableTable
+              columns={CONTRATOS_CARTEIRA_COLUMNS}
+              storageKey="fluxy.comercial.contratos.carteira.columns"
+              className="table"
+              scrollLabel="Carteira de contratos comerciais com colunas redimensionaveis"
+            >
+              <thead>
+                <tr>
+                  <ResizableTh columnKey="contrato">Contrato</ResizableTh>
+                  <ResizableTh columnKey="status">Status</ResizableTh>
+                  <ResizableTh columnKey="cliente">Cliente</ResizableTh>
+                  <ResizableTh columnKey="empreendimento">Empreendimento</ResizableTh>
+                  <ResizableTh columnKey="unidade">Torre / unidade</ResizableTh>
+                  <ResizableTh columnKey="corretor">Corretor</ResizableTh>
+                  <ResizableTh columnKey="comissao" className="text-right">Comissao</ResizableTh>
+                  <ResizableTh columnKey="obra">Obra</ResizableTh>
+                  <ResizableTh columnKey="valor_total" className="text-right">Valor total</ResizableTh>
+                  <ResizableTh columnKey="em_aberto" className="text-right">Em aberto</ResizableTh>
+                  <ResizableTh columnKey="vencido" className="text-right">Vencido</ResizableTh>
+                  <ResizableTh columnKey="acoes" className="text-center">Acoes</ResizableTh>
+                </tr>
+              </thead>
+              <tbody>
+                {contratosFiltrados.map((item) => (
+                  <tr key={item.id}>
+                    <td className="font-semibold text-[var(--c-text)]" title={item.numero || ''}>{item.numero || '-'}</td>
+                    <td>
+                      <div className="flex flex-col items-start gap-1.5">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
                       {item.indicadoresFinanceiros?.status_sugerido && item.indicadoresFinanceiros.status_sugerido !== item.status && (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-700">
-                          Financeiro sugere {item.indicadoresFinanceiros.status_sugerido}
-                        </span>
-                      )}
-                    </div>
-                    <div className="grid gap-2 text-sm text-[var(--c-muted)] md:grid-cols-2">
-                      <span>Cliente: {item.cliente?.nome || '-'}</span>
-                      <span>Corretor: {item.corretor_nome || '-'}</span>
-                      <span>Comissao: {Number(item.comissao_percentual || 0) > 0 ? `${Number(item.comissao_percentual).toLocaleString('pt-BR')}%` : '-'}</span>
-                      <span>Empreendimento: {item.empreendimento?.nome || '-'}</span>
-                      <span>Unidade: {item.unidadeComercial?.codigo || '-'}</span>
-                      <span>Valor total: {formatCurrency(item.valor_total)}</span>
-                      <span>Obra: {item.obra?.nome || '-'}</span>
-                      <span>Em aberto: {formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</span>
-                      <span>Vencido: {formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" className="btn btn-outline" onClick={() => selecionarContrato(item.id)}>
-                      Detalhes
-                    </button>
-                    <button type="button" className="btn btn-outline" onClick={() => editarContrato(item.id)}>
-                      Editar resumo
-                    </button>
-                  </div>
-                </div>
-              </article>
-            ))
+                          <span className="inline-flex max-w-full rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700" title={`Financeiro sugere ${item.indicadoresFinanceiros.status_sugerido}`}>
+                            Sugere {item.indicadoresFinanceiros.status_sugerido}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td title={item.cliente?.nome || ''}>{item.cliente?.nome || '-'}</td>
+                    <td title={item.empreendimento?.nome || ''}>{item.empreendimento?.nome || '-'}</td>
+                    <td title={[item.unidadeComercial?.torre, item.unidadeComercial?.codigo].filter(Boolean).join(' - ')}>
+                      {[item.unidadeComercial?.torre, item.unidadeComercial?.codigo].filter(Boolean).join(' - ') || '-'}
+                    </td>
+                    <td title={item.corretor_nome || ''}>{item.corretor_nome || '-'}</td>
+                    <td className="text-right">
+                      {Number(item.comissao_percentual || 0) > 0 ? `${Number(item.comissao_percentual).toLocaleString('pt-BR')}%` : '-'}
+                    </td>
+                    <td title={item.obra?.nome || ''}>{item.obra?.nome || '-'}</td>
+                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.valor_total)}</td>
+                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</td>
+                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</td>
+                    <td>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                          onClick={() => selecionarContrato(item.id)}
+                          title="Abrir detalhes"
+                          aria-label={`Abrir detalhes do contrato ${item.numero}`}
+                        >
+                          <HiOutlineEye className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                          onClick={() => editarContrato(item.id)}
+                          title="Editar resumo"
+                          aria-label={`Editar resumo do contrato ${item.numero}`}
+                        >
+                          <HiOutlinePencilSquare className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </ResizableTable>
           )}
         </div>
       </section>
