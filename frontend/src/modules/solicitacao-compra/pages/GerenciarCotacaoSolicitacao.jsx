@@ -2711,7 +2711,7 @@ export default function GerenciarCotacaoSolicitacao() {
       : formatNumeroCompra(quantidade);
     const quantidadeNumero = typeof quantidade === 'string'
       ? parseNumeroCompraDigitado(quantidadeInput)
-      : parseNumeroCompra(quantidadeInput);
+      : parseNumeroCompra(quantidade);
 
     setVencedoresSelecionados((prev) => {
       const next = { ...prev };
