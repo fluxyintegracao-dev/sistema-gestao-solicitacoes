@@ -1,5 +1,6 @@
 const path = require('path');
 const ExcelJS = require('exceljs');
+const { createSpreadsheetNumber } = require('./valorMonetario');
 
 function normalizeWorksheetName(name) {
   const value = String(name || 'Planilha').trim() || 'Planilha';
@@ -125,7 +126,7 @@ function csvToJsonRows(buffer, { defval = '' } = {}) {
   }, []);
 }
 
-function normalizeCellValue(cell, { raw = false } = {}) {
+function normalizeCellValue(cell, { raw = false, preserveNumbers = false } = {}) {
   if (!cell) return '';
 
   const { value } = cell;
@@ -134,6 +135,9 @@ function normalizeCellValue(cell, { raw = false } = {}) {
 
   if (typeof value === 'object') {
     if (value.result !== undefined && value.result !== null) {
+      if (preserveNumbers && typeof value.result === 'number') {
+        return createSpreadsheetNumber(value.result, cell.text);
+      }
       return value.result instanceof Date ? value.result : String(value.result);
     }
     if (Array.isArray(value.richText)) {
@@ -152,6 +156,9 @@ function normalizeCellValue(cell, { raw = false } = {}) {
   }
 
   if (typeof value === 'number') {
+    if (preserveNumbers) {
+      return createSpreadsheetNumber(value, cell.text);
+    }
     return cell.text ? String(cell.text) : value;
   }
 
@@ -251,7 +258,8 @@ async function sheetToArrayRows(buffer, {
 async function allSheetsToArrayRows(buffer, {
   filename = '',
   defval = '',
-  raw = false
+  raw = false,
+  preserveNumbers = false
 } = {}) {
   if (isCsvFile(filename)) {
     return [{ name: 'CSV', rows: await sheetToArrayRows(buffer, { filename, defval, raw }) }];
@@ -266,7 +274,7 @@ async function allSheetsToArrayRows(buffer, {
       const values = [];
       let hasValue = false;
       for (let column = 1; column <= columnCount; column += 1) {
-        const value = normalizeCellValue(row.getCell(column), { raw });
+        const value = normalizeCellValue(row.getCell(column), { raw, preserveNumbers });
         const finalValue = value === '' || value === null || value === undefined ? defval : value;
         values.push(finalValue);
         if (String(finalValue ?? '').trim() !== '') {

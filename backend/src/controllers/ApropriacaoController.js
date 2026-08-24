@@ -2,8 +2,11 @@ const { Op } = require('sequelize');
 const { Apropriacao, Obra, sequelize } = require('../models');
 const { isObraCentroCusto } = require('../constants/centroCusto');
 const { allSheetsToArrayRows, createWorkbookBuffer } = require('../utils/excelWorkbook');
+const { parseValorMonetario, spreadsheetDisplayValue } = require('../utils/valorMonetario');
 
 function parseBoolean(value, fallback = false) {
+  value = spreadsheetDisplayValue(value);
+
   if (typeof value === 'boolean') {
     return value;
   }
@@ -13,7 +16,7 @@ function parseBoolean(value, fallback = false) {
   }
 
   if (typeof value === 'string') {
-    const normalized = value.trim().toLowerCase();
+    const normalized = String(value || '').trim().toLowerCase();
     if (['true', 'sim', 's', '1', 'yes', 'y'].includes(normalized)) return true;
     if (['false', 'nao', 'não', 'n', '0', 'no'].includes(normalized)) return false;
   }
@@ -22,24 +25,11 @@ function parseBoolean(value, fallback = false) {
 }
 
 function parseValorOrcado(value, fallback = 0) {
-  if (value === undefined) {
-    return fallback;
-  }
-
-  if (value === null || value === '') {
-    return 0;
-  }
-
-  const raw = String(value).trim();
-  const normalized = raw.includes(',')
-    ? raw.replace(/\./g, '').replace(',', '.')
-    : raw;
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  return parseValorMonetario(value, fallback);
 }
 
 function normalizarCodigoApropriacao(value) {
-  return String(value || '').trim().replace(/\s+/g, '');
+  return String(spreadsheetDisplayValue(value) || '').trim().replace(/\s+/g, '');
 }
 
 function codigoEhPaiDe(codigoPai, codigoFilho) {
@@ -53,7 +43,7 @@ function inferirSomadora(codigo, codigosComparacao = []) {
 }
 
 function normalizeHeader(value) {
-  return String(value || '')
+  return String(spreadsheetDisplayValue(value) || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
@@ -98,8 +88,8 @@ function parseLinhasModelo(rows, headerIndex) {
 
   for (const row of rows.slice(headerIndex + 1)) {
     const codigo = normalizarCodigoApropriacao(pick(row, headers, ['codigo']));
-    const descricao = String(pick(row, headers, ['descricao']) || '').trim();
-    const codigoObra = String(pick(row, headers, ['codigo_obra', 'obra_codigo']) || '').trim();
+    const descricao = String(spreadsheetDisplayValue(pick(row, headers, ['descricao'])) || '').trim();
+    const codigoObra = String(spreadsheetDisplayValue(pick(row, headers, ['codigo_obra', 'obra_codigo'])) || '').trim();
     const codigoPai = normalizarCodigoApropriacao(pick(row, headers, ['codigo_apropriacao_pai', 'codigo_pai', 'apropriacao_pai']));
 
     if (!codigo || !codigoPareceApropriacao(codigo)) {
@@ -128,7 +118,7 @@ function parseLinhasSienge(rows) {
       continue;
     }
 
-    const descricao = String(row[3] || row[1] || row[2] || '').trim();
+    const descricao = String(spreadsheetDisplayValue(row[3] || row[1] || row[2]) || '').trim();
     if (!descricao) {
       continue;
     }
@@ -149,7 +139,8 @@ async function extrairLinhasXlsx(file) {
   const sheets = await allSheetsToArrayRows(file.buffer, {
     filename: file.originalname,
     raw: false,
-    defval: ''
+    defval: '',
+    preserveNumbers: true
   });
   const linhas = [];
 
