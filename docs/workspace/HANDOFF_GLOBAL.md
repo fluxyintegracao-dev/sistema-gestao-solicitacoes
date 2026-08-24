@@ -52,3 +52,35 @@
     - O arquivo `32-Aprop_Ed Pedra Menina.xlsx` declara internamente o codigo de obra `33`; esse foi o codigo mantido na conversao.
   ownership liberado:
     - backend/scripts/corrigirOrcamentoApropriacoesObra4.js
+
+## Handoff
+
+- data: 2026-08-24
+  sessao: root-2026-08-24-gestao-obras-rateio-apropriacoes
+  status: finalizado_com_auditoria_pendente
+  escopo concluido:
+    - Gestao de obras passa a distribuir valores pagos, saldos em aberto e pedidos por uma unica fonte de apropriacao.
+    - Prioridade definida: rateio do titulo, rateio da solicitacao, apropriacao simples do titulo, apropriacao simples da solicitacao e sem apropriacao.
+    - O mesmo titulo nunca soma simultaneamente o vinculo do titulo e o vinculo da solicitacao.
+    - Rateios por valor, percentual ou quantidade sao convertidos em centavos com fechamento exato; o residuo de arredondamento e distribuido deterministicamente.
+    - Resposta da gestao identifica a fonte e detalha as apropriacoes usadas para cada custo/pedido.
+  arquivos alterados:
+    - backend/src/services/obraGestaoService.js
+    - backend/src/services/obraGestaoApropriacaoService.js
+    - backend/scripts/validarObraGestaoApropriacoes.js
+    - backend/package.json
+  validacao executada:
+    - node --check nos tres arquivos JavaScript alterados/criados
+    - npm run test:obra-gestao-apropriacoes
+    - npm run test:importacao-apropriacoes
+    - git diff --check
+  pendencias:
+    - Extrair os dados atuais do banco na EC2 para gerar o comparativo Excel pre-importacao; a copia local nao possui credenciais de banco.
+  riscos conhecidos:
+    - Titulos com rateio entre obras continuam limitados pela selecao principal `titulos_financeiros.obra_id` da tela; este ajuste trata multiplas apropriacoes dentro da obra carregada.
+    - Custos historicos legados continuam sem apropriacao por nao possuirem esse vinculo na tabela de origem.
+  ownership liberado:
+    - backend/src/services/obraGestaoService.js
+    - backend/src/services/obraGestaoApropriacaoService.js
+    - backend/scripts/validarObraGestaoApropriacoes.js
+    - backend/package.json

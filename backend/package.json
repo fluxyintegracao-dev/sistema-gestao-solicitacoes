@@ -31,6 +31,7 @@
     "test:solicitacao-vencimento": "node scripts/validarSolicitacaoDataVencimento.js",
     "test:live-updates": "node scripts/validarLiveUpdates.js",
     "test:importacao-apropriacoes": "node scripts/validarImportacaoApropriacoes.js",
+    "test:obra-gestao-apropriacoes": "node scripts/validarObraGestaoApropriacoes.js",
     "test:caixa-fisico": "node scripts/validarCaixaFisico.js",
     "auditoria-operacional:retencao:simular": "node scripts/limparAuditoriaOperacional.js",
     "auditoria-operacional:retencao:aplicar": "node scripts/limparAuditoriaOperacional.js --confirm",
