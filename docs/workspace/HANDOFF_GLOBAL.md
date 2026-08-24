@@ -84,3 +84,28 @@
     - backend/src/services/obraGestaoApropriacaoService.js
     - backend/scripts/validarObraGestaoApropriacoes.js
     - backend/package.json
+
+## Handoff
+
+- data: 2026-08-24
+  sessao: root-2026-08-24-exportacao-auditoria-apropriacoes
+  status: finalizado
+  escopo concluido:
+    - Criado extrator somente leitura para gerar a base agregada do comparativo entre banco e planilhas de apropriacao.
+    - Exportacao contem obra, codigo, descricao, valor orcado, hierarquia, atividade, valor pago apropriado e contagens de vinculos.
+    - Nao exporta credores, documentos, contas bancarias, solicitacoes individuais ou titulos individuais.
+    - Codigos padrao correspondem as 22 planilhas convertidas; podem ser sobrescritos por argumento CLI.
+  arquivos alterados:
+    - backend/scripts/exportarAuditoriaApropriacoes.js
+    - backend/package.json
+  validacao executada:
+    - node --check backend/scripts/exportarAuditoriaApropriacoes.js
+    - npm run test:obra-gestao-apropriacoes
+    - git diff --check
+  pendencias:
+    - Executar na EC2 principal e trazer o JSON para a estacao local, onde sera cruzado com o XLSX e convertido no relatorio final.
+  riscos conhecidos:
+    - O extrator considera titulos associados pela obra principal; rateios de um mesmo titulo entre obras permanecem fora do escopo desta entrega.
+  ownership liberado:
+    - backend/scripts/exportarAuditoriaApropriacoes.js
+    - backend/package.json

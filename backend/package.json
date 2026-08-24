@@ -38,6 +38,7 @@
     "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",
     "audit:fluxos-obra": "node scripts/auditarFluxosSolicitacoesObra.js",
     "audit:cadastros-solicitacoes": "node scripts/auditarCadastrosSolicitacoes.js",
+    "audit:apropriacoes-base": "node scripts/exportarAuditoriaApropriacoes.js",
     "test:custos-recebiveis-fase2": "node src/modules/custosRecebiveis/tests/validarFase2.js",
     "test:custos-recebiveis-fase3": "node src/modules/custosRecebiveis/tests/validarFase3.js",
     "test:custos-recebiveis-fase4": "node src/modules/custosRecebiveis/tests/validarFase4.js",
