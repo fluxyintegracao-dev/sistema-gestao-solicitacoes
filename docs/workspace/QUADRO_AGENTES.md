@@ -1,5 +1,5 @@
 # Quadro de Agentes
 
-Nao ha agentes paralelos registrados neste repositorio.
+## Trabalho em andamento
 
-O quadro deve refletir apenas trabalho atual. Entregas finalizadas pertencem ao changelog ou ao historico do Git.
+Nenhum trabalho em andamento.

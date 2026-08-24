@@ -4,8 +4,10 @@ const {
   Obra,
   Apropriacao,
   Solicitacao,
+  SolicitacaoApropriacao,
   SolicitacaoCompra,
   TituloFinanceiro,
+  TituloFinanceiroRateio,
   MovimentoFinanceiro,
   ObraCustoHistorico,
   Parceiro,
@@ -15,6 +17,7 @@ const {
   Contrato,
   ContratoAnexo
 } = require('../models');
+const { distribuirPorApropriacao } = require('./obraGestaoApropriacaoService');
 
 const STATUS_TITULO_ABERTO = new Set(['ABERTO', 'PARCIAL']);
 const STATUS_MOVIMENTO_ATIVO = 'ATIVO';
@@ -122,28 +125,72 @@ function sumMovimentosAtivos(titulo) {
   );
 }
 
-function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
+function aplicarDistribuicoesNoBucket({ distribuicoes, bucketMap, campo, obraId }) {
+  return distribuicoes
+    .filter((item) => !item.obra_id || Number(item.obra_id) === Number(obraId))
+    .map((item) => {
+      const bucket = ensureBucket(bucketMap, item.apropriacao_id, bucketMap);
+      bucket[campo] += item.valor;
+      return {
+        ...item,
+        apropriacao_codigo: bucket.codigo,
+        apropriacao_descricao: bucket.descricao
+      };
+    });
+}
+
+function resumirApropriacoesDistribuidas(distribuicoes = []) {
+  if (distribuicoes.length === 1) {
+    return {
+      apropriacao_codigo: distribuicoes[0].apropriacao_codigo,
+      apropriacao_descricao: distribuicoes[0].apropriacao_descricao
+    };
+  }
+
+  if (distribuicoes.length > 1) {
+    return {
+      apropriacao_codigo: 'RATEIO_MULTIPLO',
+      apropriacao_descricao: `${distribuicoes.length} apropriacoes`
+    };
+  }
+
+  return {
+    apropriacao_codigo: 'SEM_APROPRIACAO',
+    apropriacao_descricao: 'Sem apropriacao vinculada'
+  };
+}
+
+function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap, obraId }) {
   const custosExecutados = [];
   const receitas = [];
 
   titulos.forEach((titulo) => {
     const solicitacao = titulo.solicitacao_id ? solicitacoesMap.get(Number(titulo.solicitacao_id)) : null;
-    const bucket = ensureBucket(bucketMap, solicitacao?.apropriacao_id, bucketMap);
     const pagoAtivo = sumMovimentosAtivos(titulo);
     const saldo = roundCurrency(titulo.valor_saldo);
     const status = String(titulo.status || '').toUpperCase();
     const parceiroNome = titulo.parceiro?.nome || 'Parceiro nao informado';
 
     if (String(titulo.tipo || '').toUpperCase() === TIPO_TITULO_PAGAR) {
-      if (pagoAtivo > 0) {
-        bucket.pago += pagoAtivo;
-      }
+      const distribuicoesPago = aplicarDistribuicoesNoBucket({
+        distribuicoes: distribuirPorApropriacao({ valor: pagoAtivo, titulo, solicitacao }),
+        bucketMap,
+        campo: 'pago',
+        obraId
+      });
+      const pagoNaObra = roundCurrency(distribuicoesPago.reduce((total, item) => total + item.valor, 0));
 
       if (STATUS_TITULO_ABERTO.has(status) && saldo > 0) {
-        bucket.a_pagar += saldo;
+        aplicarDistribuicoesNoBucket({
+          distribuicoes: distribuirPorApropriacao({ valor: saldo, titulo, solicitacao }),
+          bucketMap,
+          campo: 'a_pagar',
+          obraId
+        });
       }
 
-      if (pagoAtivo > 0) {
+      if (pagoNaObra > 0) {
+        const resumoApropriacao = resumirApropriacoesDistribuidas(distribuicoesPago);
         custosExecutados.push({
           id: titulo.id,
           titulo_id: titulo.id,
@@ -153,9 +200,15 @@ function summarizeTitulosByBuckets({ titulos, solicitacoesMap, bucketMap }) {
           origem: titulo.solicitacao_id ? 'TITULO DA SOLICITACAO' : 'TITULO MANUAL',
           codigo_referencia: titulo.numero_documento || solicitacao?.codigo || `TIT-${titulo.id}`,
           descricao: titulo.descricao || '-',
-          total: pagoAtivo,
-          apropriacao_codigo: bucket.codigo,
-          apropriacao_descricao: bucket.descricao
+          total: pagoNaObra,
+          ...resumoApropriacao,
+          rateio_fonte: distribuicoesPago[0]?.fonte || null,
+          apropriacoes: distribuicoesPago.map((item) => ({
+            apropriacao_id: item.apropriacao_id,
+            codigo: item.apropriacao_codigo,
+            descricao: item.apropriacao_descricao,
+            valor: item.valor
+          }))
         });
       }
 
@@ -230,7 +283,7 @@ function summarizeCustosHistoricosByBuckets({ custosHistoricos, bucketMap }) {
   };
 }
 
-function summarizePedidos({ solicitacoes, titulosBySolicitacaoId, bucketMap }) {
+function summarizePedidos({ solicitacoes, titulosBySolicitacaoId, bucketMap, obraId }) {
   const pedidos = [];
 
   solicitacoes.forEach((solicitacao) => {
@@ -243,8 +296,14 @@ function summarizePedidos({ solicitacoes, titulosBySolicitacaoId, bucketMap }) {
       return;
     }
 
-    const bucket = ensureBucket(bucketMap, solicitacao.apropriacao_id, bucketMap);
-    bucket.pedidos += valor;
+    const distribuicoes = aplicarDistribuicoesNoBucket({
+      distribuicoes: distribuirPorApropriacao({ valor, solicitacao }),
+      bucketMap,
+      campo: 'pedidos',
+      obraId
+    });
+    const valorNaObra = roundCurrency(distribuicoes.reduce((total, item) => total + item.valor, 0));
+    const resumoApropriacao = resumirApropriacoesDistribuidas(distribuicoes);
 
     pedidos.push({
       id: solicitacao.id,
@@ -252,10 +311,16 @@ function summarizePedidos({ solicitacoes, titulosBySolicitacaoId, bucketMap }) {
       numero_pedido: solicitacao.numero_pedido,
       status: solicitacao.status_global,
       descricao: solicitacao.descricao,
-      valor,
+      valor: valorNaObra,
       createdAt: solicitacao.createdAt,
-      apropriacao_codigo: bucket.codigo,
-      apropriacao_descricao: bucket.descricao,
+      ...resumoApropriacao,
+      rateio_fonte: distribuicoes[0]?.fonte || null,
+      apropriacoes: distribuicoes.map((item) => ({
+        apropriacao_id: item.apropriacao_id,
+        codigo: item.apropriacao_codigo,
+        descricao: item.apropriacao_descricao,
+        valor: item.valor
+      })),
       tipo: solicitacao.tipo?.nome || 'Solicitacao'
     });
   });
@@ -407,7 +472,15 @@ async function carregarDadosObra(obraId) {
     }),
     Solicitacao.findAll({
       where: { obra_id: obraId },
-      include: [{ model: TipoSolicitacao, as: 'tipo', attributes: ['id', 'nome'] }],
+      include: [
+        { model: TipoSolicitacao, as: 'tipo', attributes: ['id', 'nome'] },
+        {
+          model: SolicitacaoApropriacao,
+          as: 'apropriacoes',
+          required: false,
+          attributes: ['id', 'apropriacao_id', 'percentual', 'quantidade', 'valor_rateio']
+        }
+      ],
       order: [['createdAt', 'DESC']]
     }),
     SolicitacaoCompra.findAll({
@@ -424,6 +497,12 @@ async function carregarDadosObra(obraId) {
           required: false,
           where: { status: STATUS_MOVIMENTO_ATIVO },
           attributes: ['id', 'status', 'valor', 'valor_quitacao', 'data_movimento']
+        },
+        {
+          model: TituloFinanceiroRateio,
+          as: 'rateios',
+          required: false,
+          attributes: ['id', 'obra_id', 'apropriacao_id', 'tipo_rateio', 'percentual', 'valor_rateio']
         }
       ],
       order: [['data_vencimento', 'ASC'], ['createdAt', 'DESC']]
@@ -501,7 +580,8 @@ async function obterGestaoObra(obraId) {
   const { custosExecutados: custosTitulos, receitas } = summarizeTitulosByBuckets({
     titulos,
     solicitacoesMap,
-    bucketMap
+    bucketMap,
+    obraId
   });
   const {
     custosExecutados: custosHistoricosExecutados,
@@ -515,7 +595,8 @@ async function obterGestaoObra(obraId) {
   const pedidos = summarizePedidos({
     solicitacoes,
     titulosBySolicitacaoId,
-    bucketMap
+    bucketMap,
+    obraId
   });
   const buckets = finalizeBuckets(bucketMap);
   const kpis = buildKpis({ buckets, custosExecutados, pedidos });

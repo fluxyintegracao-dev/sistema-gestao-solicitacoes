@@ -5,14 +5,14 @@ const CODIGO_OBRA = '8';
 const CORRECOES = [
   { id: 202, codigo: '00.005', anterior: 155.84, corrigido: 155838.32 },
   { id: 204, codigo: '00.007', anterior: 375.19, corrigido: 375193.00 },
-  { id: 205, codigo: '00.008', anterior: 297.53, corrigido: 297543.83 },
+  { id: 205, codigo: '00.008', anterior: 297.53, corrigido: 297534.83, valores_intermediarios: [297543.83] },
   { id: 207, codigo: '00.010', anterior: 103.72, corrigido: 103718.49 },
   { id: 208, codigo: '00.011', anterior: 798.69, corrigido: 798688.00 },
   { id: 210, codigo: '00.013', anterior: 352.50, corrigido: 352502.00 },
   { id: 211, codigo: '00.014', anterior: 104.74, corrigido: 104739.18 },
   { id: 215, codigo: '00.018', anterior: 408.13, corrigido: 408125.93 },
   { id: 216, codigo: '00.019', anterior: 277.66, corrigido: 277657.23 },
-  { id: 218, codigo: '00.021', anterior: 142.11, corrigido: 142112.11 },
+  { id: 218, codigo: '00.021', anterior: 142.11, corrigido: 142112.31, valores_intermediarios: [142112.11] },
   { id: 219, codigo: '00.022', anterior: 297.34, corrigido: 297336.00 },
   { id: 220, codigo: '00.023', anterior: 6.85, corrigido: 6847.42 },
   { id: 221, codigo: '00.024', anterior: 282.27, corrigido: 282268.48 },
@@ -46,12 +46,20 @@ async function carregarCorrecao(transaction) {
   const porId = new Map(registros.map((item) => [Number(item.id), item]));
   return CORRECOES.map((correcao) => {
     const registro = porId.get(correcao.id);
+    const valorAtual = roundMoney(registro?.valor_orcado);
+    const valoresAceitos = [correcao.anterior, ...(correcao.valores_intermediarios || []), correcao.corrigido];
     if (!registro
       || registro.codigo !== correcao.codigo
-      || roundMoney(registro.valor_orcado) !== correcao.anterior) {
+      || !valoresAceitos.includes(valorAtual)) {
       throw new Error(`Apropriacao ${correcao.id}/${correcao.codigo} diverge do valor auditado; nenhuma alteracao foi aplicada.`);
     }
-    return { ...correcao, descricao: registro.descricao, registro };
+    return {
+      ...correcao,
+      descricao: registro.descricao,
+      valor_atual: valorAtual,
+      necessita_correcao: valorAtual !== correcao.corrigido,
+      registro
+    };
   });
 }
 
@@ -65,15 +73,16 @@ async function executar() {
         obra_id: OBRA_ID,
         codigo_obra: CODIGO_OBRA,
         aplicado: aplicar,
-        quantidade: correcoes.length,
-        total_anterior: total(correcoes, 'anterior'),
+        quantidade_auditada: correcoes.length,
+        quantidade_a_corrigir: correcoes.filter((item) => item.necessita_correcao).length,
+        total_atual: total(correcoes, 'valor_atual'),
         total_corrigido: total(correcoes, 'corrigido'),
-        diferenca: roundMoney(total(correcoes, 'corrigido') - total(correcoes, 'anterior')),
+        diferenca: roundMoney(total(correcoes, 'corrigido') - total(correcoes, 'valor_atual')),
         correcoes: correcoes.map(({ registro, ...item }) => item)
       };
 
       if (aplicar) {
-        for (const item of correcoes) {
+        for (const item of correcoes.filter((item) => item.necessita_correcao)) {
           await item.registro.update({ valor_orcado: item.corrigido }, { transaction });
         }
       }

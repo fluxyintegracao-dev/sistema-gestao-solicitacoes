@@ -1,3 +1,3 @@
 # Sessoes Ativas
 
-Nao ha sessao multirrepositorio ativa.
+Nenhuma sessao ativa.
