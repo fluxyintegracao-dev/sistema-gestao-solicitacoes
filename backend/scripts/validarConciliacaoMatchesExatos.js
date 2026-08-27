@@ -10,8 +10,15 @@ const {
   isExactConciliacaoMatch
 } = require('../src/utils/conciliacaoMatch');
 const {
+  classifyBankReversal,
+  datesWithinReversalWindow,
+  hasOppositeExactAmount,
+  scoreReversalCandidate
+} = require('../src/services/conciliacaoEstornoBancarioService');
+const {
   validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoCreditoRotativoBody,
+  validateFinanceConciliacaoEstornoBancarioBody,
   validateFinanceConciliacaoEstornoTarifaBody,
   validateFinanceConciliacaoEstornoTransferenciaBody,
   validateFinanceRelatorioConciliacaoQuery
@@ -40,6 +47,34 @@ assert.strictEqual(isExactConciliacaoMatch({
   movementDate: '2026-07-06',
   movementValue: 1436.16
 }), false);
+
+assert.deepStrictEqual(
+  classifyBankReversal({
+    descricao_banco: 'PIX - REJEITADO - 10/08 11:06 CONTA DO RECEBEDOR INEXIST',
+    valor: 850
+  }),
+  { tipo: 'PIX_REJEITADO', janela_dias: 2 }
+);
+assert.deepStrictEqual(
+  classifyBankReversal({ descricao_banco: 'CHEQUE DEVOLVIDO', valor: 1250 }),
+  { tipo: 'CHEQUE_DEVOLVIDO', janela_dias: 30 }
+);
+assert.strictEqual(
+  classifyBankReversal({ descricao_banco: 'ESTORNO DE TARIFA BANCARIA', valor: 12.5 }),
+  null,
+  'Estorno de tarifa deve continuar no fluxo especializado existente.'
+);
+assert.strictEqual(hasOppositeExactAmount(850, -850), true);
+assert.strictEqual(hasOppositeExactAmount(850, -849.99), false);
+assert.strictEqual(datesWithinReversalWindow({ reversalDate: '2026-08-10', originalDate: '2026-08-10', windowDays: 2 }), true);
+assert.strictEqual(datesWithinReversalWindow({ reversalDate: '2026-08-10', originalDate: '2026-08-07', windowDays: 2 }), false);
+assert.strictEqual(
+  scoreReversalCandidate(
+    { data_movimento: '2026-08-10', documento: 'ABC', descricao_banco: 'PIX REJEITADO' },
+    { data_movimento: '2026-08-10', documento: 'ABC', descricao_banco: 'PIX ENVIADO' }
+  ).score,
+  125
+);
 
 assert.strictEqual(isExactOppositeBankTransfer({
   currentDate: '2026-08-04',
@@ -272,6 +307,27 @@ assert(
 assert.deepStrictEqual(
   validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }),
   { movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }
+);
+assert.deepStrictEqual(
+  validateFinanceConciliacaoEstornoBancarioBody({
+    conciliacao_origem_id: 81,
+    motivo: 'PIX rejeitado pelo banco.'
+  }),
+  {
+    conciliacao_origem_id: 81,
+    motivo: 'PIX rejeitado pelo banco.'
+  }
+);
+assert.throws(
+  () => validateFinanceConciliacaoEstornoBancarioBody({ conciliacao_origem_id: 81 }),
+  /Justificativa.*obrigat/i
+);
+assert(
+  routesSource.includes("router.post('/financeiro/conciliacoes/:id/confirmar-estorno-bancario'")
+    && serviceSource.includes("tipo_movimento: 'ESTORNO_BANCARIO'")
+    && serviceSource.includes("match_inicial_tipo: 'ESTORNO_ALERTA'")
+    && reconciliationPageSource.includes('Confirmar devolucao'),
+  'Estornos bancarios devem ser alertados, bloqueados no lote e confirmados por fluxo dedicado.'
 );
 assert.throws(
   () => validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, valor: 100 }),

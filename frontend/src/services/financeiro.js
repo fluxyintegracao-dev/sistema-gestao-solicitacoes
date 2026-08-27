@@ -468,6 +468,16 @@ export async function confirmarConciliacaoEstornoTarifa(id, data) {
   return parseJson(response, 'Erro ao conciliar estorno de tarifa bancaria');
 }
 
+export async function confirmarConciliacaoEstornoBancario(id, data) {
+  const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-estorno-bancario`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao confirmar estorno bancario');
+}
+
 export async function confirmarConciliacaoCreditoRotativo(id, data = {}) {
   const response = await fetch(`${API_URL}/financeiro/conciliacoes/${id}/confirmar-credito-rotativo`, {
     method: 'POST',
