@@ -23,8 +23,17 @@ const { registrarEventoSeguranca } = require('./securityLogService');
 const { baixarFaturaCartao } = require('./faturaCartaoFinanceiroService');
 const { obterSessaoAbertaParaConta } = require('./financeiroCaixaSessionHelper');
 const { listarTarifasBancariasConfig } = require('./financeiroCadastroService');
-const { criarTituloManualComBaixaAtomica } = require('./tituloFinanceiroService');
+const {
+  criarTituloManualComBaixaAtomica,
+  estornarMovimentoTitulo
+} = require('./tituloFinanceiroService');
 const { criarTransferenciaFinanceira } = require('./transferenciaFinanceiraService');
+const {
+  classifyBankReversal,
+  datesWithinReversalWindow,
+  hasOppositeExactAmount,
+  scoreReversalCandidate
+} = require('./conciliacaoEstornoBancarioService');
 const {
   hasSameConciliacaoDate,
   hasSameConciliacaoValue,
@@ -705,9 +714,21 @@ async function importSingleOfxFile(req, file, payload = {}) {
     throw createHttpError(409, 'Todos os lancamentos deste arquivo ja foram importados anteriormente.');
   }
 
+  const alertasEstorno = [];
   for (const conciliacao of imported) {
     try {
-      await registrarClassificacaoInicialMatch(req, conciliacao);
+      const estorno = await registrarClassificacaoEstornoBancario(conciliacao);
+      if (!estorno) {
+        await registrarClassificacaoInicialMatch(req, conciliacao);
+      } else {
+        alertasEstorno.push({
+          conciliacao_id: conciliacao.id,
+          tipo: estorno.tipo,
+          valor: Number(conciliacao.valor || 0),
+          data_movimento: conciliacao.data_movimento,
+          total_candidatos: estorno.total_candidatos
+        });
+      }
     } catch (error) {
       // A classificacao e analitica e nao pode invalidar uma importacao OFX valida.
       console.error(`Falha ao classificar match inicial da conciliacao #${conciliacao.id}:`, error.message);
@@ -739,7 +760,8 @@ async function importSingleOfxFile(req, file, payload = {}) {
       arquivo_hash: arquivoHash,
       arquivo: file.originalname,
       importados: imported.length,
-      ignorados: skipped.length
+      ignorados: skipped.length,
+      alertas_estorno: alertasEstorno.length
     }
   });
 
@@ -751,6 +773,8 @@ async function importSingleOfxFile(req, file, payload = {}) {
     arquivo_hash: arquivoHash,
     importados: imported.length,
     ignorados: skipped.length,
+    alertas_estorno: alertasEstorno.length,
+    estornos_detectados: alertasEstorno,
     total_lidos: transacoes.length,
     itens_importados: imported.map((item) => ({
       id: item.id,
@@ -804,6 +828,7 @@ async function importOfx(req, payload = {}) {
       acc.importados += Number(item.importados || 0);
       acc.ignorados += Number(item.ignorados || 0);
       acc.total_lidos += Number(item.total_lidos || 0);
+      acc.alertas_estorno += Number(item.alertas_estorno || 0);
     } else {
       acc.arquivos_nao_importados += 1;
     }
@@ -813,6 +838,7 @@ async function importOfx(req, payload = {}) {
     arquivos_importados: 0,
     arquivos_nao_importados: 0,
     total_lidos: 0,
+    alertas_estorno: 0,
     importados: 0,
     ignorados: 0
   });
@@ -1164,6 +1190,139 @@ async function registrarClassificacaoInicialMatch(req, conciliacao) {
   return tipo;
 }
 
+async function analisarPossivelEstornoBancario(conciliacao, { transaction = null, lock = false } = {}) {
+  const classificacao = classifyBankReversal(conciliacao);
+  if (!classificacao) return null;
+
+  const dataInicial = subtractDays(conciliacao.data_movimento, classificacao.janela_dias);
+  const query = {
+    where: {
+      id: { [Op.ne]: conciliacao.id },
+      conta_bancaria_id: conciliacao.conta_bancaria_id,
+      valor: roundCurrency(-Number(conciliacao.valor || 0)),
+      data_movimento: { [Op.between]: [dataInicial, conciliacao.data_movimento] },
+      status: { [Op.in]: ['PENDENTE', 'CONCILIADO'] },
+      deleted_at: null
+    },
+    order: [['data_movimento', 'DESC'], ['id', 'DESC']],
+    transaction
+  };
+  if (lock && transaction) query.lock = transaction.LOCK.UPDATE;
+
+  const candidatasEncontradas = await ConciliacaoBancaria.findAll(query);
+  const candidatas = candidatasEncontradas.filter((candidata) => (
+    !classifyBankReversal(candidata)
+    && hasOppositeExactAmount(conciliacao.valor, candidata.valor)
+    && datesWithinReversalWindow({
+      reversalDate: conciliacao.data_movimento,
+      originalDate: candidata.data_movimento,
+      windowDays: classificacao.janela_dias
+    })
+  ));
+
+  const movimentoIds = [...new Set(candidatas.map((item) => Number(item.movimento_financeiro_id || 0)).filter(Boolean))];
+  const tituloIds = [...new Set(candidatas.map((item) => Number(item.titulo_financeiro_id || 0)).filter(Boolean))];
+  const [movimentos, titulos] = await Promise.all([
+    movimentoIds.length
+      ? MovimentoFinanceiro.findAll({
+          where: { id: { [Op.in]: movimentoIds } },
+          attributes: ['id', 'titulo_financeiro_id', 'tipo_movimento', 'status', 'valor', 'valor_quitacao', 'data_movimento'],
+          transaction
+        })
+      : [],
+    tituloIds.length
+      ? TituloFinanceiro.findAll({
+          where: { id: { [Op.in]: tituloIds } },
+          attributes: ['id', 'codigo', 'tipo', 'descricao', 'numero_documento', 'status', 'valor_original', 'valor_saldo', 'parceiro_id'],
+          include: [{ model: Parceiro, as: 'parceiro', attributes: ['id', 'nome', 'cpf_cnpj'] }],
+          transaction
+        })
+      : []
+  ]);
+  const movimentoMap = new Map(movimentos.map((item) => [Number(item.id), item.toJSON()]));
+  const tituloMap = new Map(titulos.map((item) => [Number(item.id), item.toJSON()]));
+
+  const candidatos = candidatas.map((candidata) => {
+    const json = candidata.toJSON();
+    const ranking = scoreReversalCandidate(conciliacao, candidata);
+    const movimento = movimentoMap.get(Number(json.movimento_financeiro_id || 0)) || null;
+    const titulo = tituloMap.get(Number(json.titulo_financeiro_id || movimento?.titulo_financeiro_id || 0)) || null;
+    return {
+      conciliacao_id: json.id,
+      data_movimento: json.data_movimento,
+      valor: Number(json.valor || 0),
+      documento: json.documento || null,
+      descricao_banco: json.descricao_banco || null,
+      status: json.status,
+      score: ranking.score,
+      motivos: ranking.motivos,
+      movimento: movimento
+        ? {
+            id: movimento.id,
+            tipo_movimento: movimento.tipo_movimento,
+            status: movimento.status,
+            valor_quitacao: Number(movimento.valor_quitacao || 0)
+          }
+        : null,
+      titulo: titulo
+        ? {
+            id: titulo.id,
+            codigo: titulo.codigo,
+            tipo: titulo.tipo,
+            descricao: titulo.descricao,
+            numero_documento: titulo.numero_documento,
+            status: titulo.status,
+            valor_original: Number(titulo.valor_original || 0),
+            valor_saldo: Number(titulo.valor_saldo || 0),
+            parceiro_nome: titulo.parceiro?.nome || null,
+            parceiro_documento: titulo.parceiro?.cpf_cnpj || null
+          }
+        : null
+    };
+  }).sort((a, b) => b.score - a.score || Number(b.conciliacao_id) - Number(a.conciliacao_id));
+
+  const selectedOriginId = Number(conciliacao.estorno_conciliacao_origem_id || 0);
+  return {
+    detectado: true,
+    tipo: classificacao.tipo,
+    status: conciliacao.estorno_status || 'ALERTA',
+    janela_dias: classificacao.janela_dias,
+    total_candidatos: candidatos.length,
+    exige_confirmacao_manual: String(conciliacao.estorno_status || '').toUpperCase() !== 'CONFIRMADO',
+    ambiguo: candidatos.length !== 1,
+    conciliacao_origem_id: selectedOriginId || null,
+    candidatos
+  };
+}
+
+async function registrarClassificacaoEstornoBancario(conciliacao) {
+  const analise = await analisarPossivelEstornoBancario(conciliacao);
+  if (!analise) return null;
+  await conciliacao.update({
+    evento_bancario_tipo: analise.tipo,
+    estorno_status: conciliacao.estorno_status || 'ALERTA',
+    estorno_candidatos: analise.total_candidatos,
+    estorno_avaliado_em: new Date(),
+    match_inicial_tipo: 'ESTORNO_ALERTA',
+    match_inicial_candidatos: analise.total_candidatos,
+    match_inicial_movimento_id: null,
+    match_inicial_avaliado_em: new Date()
+  });
+  return analise;
+}
+
+function assertSemAlertaEstornoBancario(conciliacao) {
+  if (
+    classifyBankReversal(conciliacao)
+    && String(conciliacao.estorno_status || '').toUpperCase() !== 'CONFIRMADO'
+  ) {
+    throw createHttpError(
+      409,
+      'Este lancamento possui alerta de estorno bancario. Confirme a devolucao ou selecione o lancamento original antes de outra conciliacao.'
+    );
+  }
+}
+
 function inferirResolucaoConciliacao(conciliacao, movimentoId, { batch = false } = {}) {
   if (batch) return 'AUTO_LOTE';
   if (
@@ -1390,7 +1549,8 @@ async function listarConciliacoes(req, filters = {}) {
     const contraparteTransferenciaAutomatica = contrapartesTransferencia.length === 1
       ? contrapartesTransferencia[0]
       : null;
-    const analise = String(item.status || '').toUpperCase() === 'PENDENTE'
+    const estornoBancario = await analisarPossivelEstornoBancario(item);
+    const analise = String(item.status || '').toUpperCase() === 'PENDENTE' && !estornoBancario
       ? await analyzeSuggestions(req, item)
       : {
           sugestoes: [],
@@ -1475,7 +1635,8 @@ async function listarConciliacoes(req, filters = {}) {
           }
         : null,
       transferencia_contrapartes_exatas: contrapartesTransferencia.length,
-      transferencia_contraparte_ambigua: contrapartesTransferencia.length > 1
+      transferencia_contraparte_ambigua: contrapartesTransferencia.length > 1,
+      estorno_bancario: estornoBancario
     };
   }));
 
@@ -1811,6 +1972,7 @@ async function confirmarConciliacaoFatura(req, conciliacaoId, payload = {}) {
       lock: transaction.LOCK.UPDATE
     });
     if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    assertSemAlertaEstornoBancario(conciliacao);
     if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
       throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
     }
@@ -1880,6 +2042,7 @@ async function confirmarConciliacaoTransferencia(req, conciliacaoId, payload = {
       lock: transaction.LOCK.UPDATE
     });
     if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    assertSemAlertaEstornoBancario(conciliacao);
     if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
       throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
     }
@@ -2091,6 +2254,9 @@ async function estornarConciliacao(req, conciliacaoId, payload = {}) {
   if (!motivo) throw createHttpError(400, 'Informe o motivo do estorno da conciliacao.');
 
   const referencia = await loadConciliacaoById(req, conciliacaoId);
+  if (String(referencia.resolucao_tipo || '').toUpperCase() === 'ESTORNO_BANCARIO') {
+    throw createHttpError(409, 'O desfazimento de um estorno bancario confirmado exige fluxo operacional especifico e nao pode ser feito pelo estorno generico.');
+  }
   if (referencia.transferencia_financeira_id) {
     return estornarConciliacaoTransferencia(req, conciliacaoId, payload);
   }
@@ -2264,6 +2430,7 @@ async function confirmarConciliacaoTarifa(req, conciliacaoId, payload = {}) {
       lock: transaction.LOCK.UPDATE
     });
     if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    assertSemAlertaEstornoBancario(conciliacao);
 
     const statusConciliacao = String(conciliacao.status || '').toUpperCase();
     if (statusConciliacao !== 'PENDENTE') {
@@ -2602,6 +2769,204 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
   }
 }
 
+async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload = {}) {
+  await assertFinanceAccess(req);
+  const origemId = parseInteger(payload.conciliacao_origem_id, 'Lancamento bancario original');
+  const motivo = String(payload.motivo || '').trim();
+  if (!motivo) throw createHttpError(400, 'Informe a justificativa para confirmar o estorno bancario.');
+
+  let estorno = await ConciliacaoBancaria.findByPk(conciliacaoId);
+  if (!estorno) throw createHttpError(404, 'Lancamento de estorno nao encontrado.');
+  if (
+    String(estorno.estorno_status || '').toUpperCase() === 'CONFIRMADO'
+    && Number(estorno.estorno_conciliacao_origem_id) === origemId
+  ) {
+    return loadConciliacaoById(req, estorno.id);
+  }
+  if (String(estorno.status || '').toUpperCase() !== 'PENDENTE') {
+    throw createHttpError(409, 'Somente um alerta pendente pode ser confirmado como estorno bancario.');
+  }
+
+  const analise = await analisarPossivelEstornoBancario(estorno);
+  if (!analise) throw createHttpError(409, 'O lancamento nao possui indicios de estorno bancario.');
+  const candidato = analise.candidatos.find((item) => Number(item.conciliacao_id) === origemId);
+  if (!candidato) {
+    throw createHttpError(409, 'O lancamento original selecionado nao e compativel com este estorno.');
+  }
+
+  let origem = await ConciliacaoBancaria.findByPk(origemId);
+  if (!origem || origem.deleted_at) throw createHttpError(404, 'Lancamento bancario original nao encontrado.');
+  let movimentoOriginalId = Number(origem.movimento_financeiro_id || 0) || null;
+  let tituloOriginalId = Number(origem.titulo_financeiro_id || 0) || null;
+  const movimentosOrigem = await MovimentoFinanceiro.findAll({
+    where: {
+      conciliacao_bancaria_id: origem.id,
+      tipo_movimento: 'BAIXA',
+      status: { [Op.in]: ['ATIVO', 'ESTORNADO'] }
+    },
+    order: [['id', 'ASC']]
+  });
+  if (movimentosOrigem.length > 1) {
+    throw createHttpError(
+      409,
+      'A saida original esta conciliada com multiplas baixas. Estorne os titulos individualmente antes de concluir a devolucao bancaria.'
+    );
+  }
+  if (!movimentoOriginalId && movimentosOrigem.length === 1) {
+    movimentoOriginalId = Number(movimentosOrigem[0].id);
+    tituloOriginalId = Number(movimentosOrigem[0].titulo_financeiro_id || 0) || null;
+  }
+
+  if (movimentoOriginalId) {
+    const movimentoOriginal = await MovimentoFinanceiro.findByPk(movimentoOriginalId);
+    if (!movimentoOriginal) throw createHttpError(409, 'Movimento financeiro original nao encontrado.');
+    if (String(movimentoOriginal.tipo_movimento || '').toUpperCase() !== 'BAIXA') {
+      throw createHttpError(409, 'O lancamento original nao corresponde a uma baixa de titulo estornavel.');
+    }
+    if (!tituloOriginalId || Number(movimentoOriginal.titulo_financeiro_id) !== tituloOriginalId) {
+      throw createHttpError(409, 'O vinculo entre o titulo e a baixa original esta inconsistente.');
+    }
+    if (!movimentoOriginal.conciliacao_bancaria_id) {
+      await movimentoOriginal.update({ conciliacao_bancaria_id: origem.id });
+    } else if (Number(movimentoOriginal.conciliacao_bancaria_id) !== Number(origem.id)) {
+      throw createHttpError(409, 'A baixa original esta vinculada a outro lancamento bancario.');
+    }
+    if (String(movimentoOriginal.status || '').toUpperCase() === 'ATIVO') {
+      await estornarMovimentoTitulo(req, tituloOriginalId, movimentoOriginalId, {
+        observacoes: `Estorno bancario confirmado pelo OFX #${estorno.id}: ${motivo}`
+      });
+    } else if (String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
+      throw createHttpError(409, 'A baixa original nao esta ativa nem estornada para concluir esta devolucao.');
+    }
+  } else {
+    throw createHttpError(
+      409,
+      'Concilie primeiro o lancamento bancario original com a baixa do titulo correto. Depois confirme a devolucao.'
+    );
+  }
+
+  const transaction = await sequelize.transaction();
+  try {
+    estorno = await ConciliacaoBancaria.findByPk(conciliacaoId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    origem = await ConciliacaoBancaria.findByPk(origemId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!estorno || !origem) throw createHttpError(404, 'Um dos lancamentos bancarios nao foi encontrado.');
+
+    if (
+      String(estorno.estorno_status || '').toUpperCase() === 'CONFIRMADO'
+      && Number(estorno.estorno_conciliacao_origem_id) === origemId
+    ) {
+      await transaction.commit();
+      return loadConciliacaoById(req, estorno.id);
+    }
+    if (!hasOppositeExactAmount(estorno.valor, origem.valor)) {
+      throw createHttpError(409, 'Os valores bancarios deixaram de ser compativeis para estorno.');
+    }
+    const classificacao = classifyBankReversal(estorno);
+    if (!classificacao || !datesWithinReversalWindow({
+      reversalDate: estorno.data_movimento,
+      originalDate: origem.data_movimento,
+      windowDays: classificacao.janela_dias
+    })) {
+      throw createHttpError(409, 'O lancamento original esta fora da janela permitida para o estorno.');
+    }
+
+    let movimentoEstorno = null;
+    const movimentoOriginal = await MovimentoFinanceiro.findByPk(movimentoOriginalId, {
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+    if (!movimentoOriginal || String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
+      throw createHttpError(409, 'A baixa original precisa estar estornada antes de vincular a devolucao bancaria.');
+    }
+    movimentoEstorno = await MovimentoFinanceiro.findOne({
+        where: {
+          movimento_origem_id: movimentoOriginal.id,
+          tipo_movimento: 'ESTORNO_BANCARIO',
+          status: 'ATIVO'
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+      });
+    if (!movimentoEstorno) {
+      movimentoEstorno = await MovimentoFinanceiro.create({
+          titulo_financeiro_id: tituloOriginalId,
+          conta_bancaria_id: estorno.conta_bancaria_id,
+          empresa_id: estorno.empresa_id,
+          conciliacao_bancaria_id: estorno.id,
+          movimento_origem_id: movimentoOriginal.id,
+          forma_pagamento_id: movimentoOriginal.forma_pagamento_id || null,
+          forma_recebimento: movimentoOriginal.forma_recebimento || null,
+          documento_referencia: estorno.documento || movimentoOriginal.documento_referencia || null,
+          tipo_movimento: 'ESTORNO_BANCARIO',
+          status: 'ATIVO',
+          valor: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+          juros: 0,
+          multa: 0,
+          desconto: 0,
+          valor_quitacao: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+          data_movimento: estorno.data_movimento,
+          observacoes: `[ESTORNO_BANCARIO:${movimentoOriginal.id}] ${motivo}`,
+          criado_por: req.user?.id || null
+      }, { transaction });
+    }
+
+    const confirmadoEm = new Date();
+    await origem.update({
+      status: 'CONCILIADO',
+      movimento_financeiro_id: movimentoOriginalId,
+      titulo_financeiro_id: tituloOriginalId,
+      resolucao_tipo: 'ESTORNADO_POR_OFX',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: confirmadoEm
+    }, { transaction });
+    await estorno.update({
+      evento_bancario_tipo: classificacao.tipo,
+      estorno_status: 'CONFIRMADO',
+      estorno_conciliacao_origem_id: origem.id,
+      estorno_candidatos: analise.total_candidatos,
+      estorno_avaliado_em: confirmadoEm,
+      movimento_financeiro_id: movimentoEstorno?.id || null,
+      titulo_financeiro_id: tituloOriginalId,
+      resolucao_tipo: 'ESTORNO_BANCARIO',
+      status: 'CONCILIADO',
+      confirmado_por: req.user?.id || null,
+      confirmado_em: confirmadoEm
+    }, { transaction });
+
+    await transaction.commit();
+
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'FINANCIAL_BANK_REVERSAL_CONFIRMED',
+      recursoTipo: 'CONCILIACAO_BANCARIA',
+      recursoId: estorno.id,
+      status: 'SUCCESS',
+      descricao: 'Estorno bancario confirmado e vinculado ao lancamento original',
+      metadata: {
+        conciliacao_origem_id: origem.id,
+        titulo_financeiro_id: tituloOriginalId,
+        movimento_origem_id: movimentoOriginalId,
+        movimento_estorno_id: movimentoEstorno?.id || null,
+        evento_bancario_tipo: classificacao.tipo,
+        valor: Math.abs(Number(estorno.valor || 0)),
+        motivo
+      }
+    });
+
+    return loadConciliacaoById(req, estorno.id);
+  } catch (error) {
+    if (!transaction.finished) await transaction.rollback();
+    throw error;
+  }
+}
+
 async function confirmarConciliacaoCreditoRotativo(req, conciliacaoId, payload = {}) {
   await assertFinanceAccess(req);
 
@@ -2612,6 +2977,7 @@ async function confirmarConciliacaoCreditoRotativo(req, conciliacaoId, payload =
       lock: transaction.LOCK.UPDATE
     });
     if (!conciliacao) throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
+    assertSemAlertaEstornoBancario(conciliacao);
 
     const valorBanco = Number(conciliacao.valor || 0);
     if (!Number.isFinite(valorBanco) || valorBanco === 0) {
@@ -2750,6 +3116,7 @@ async function finalizarConciliacao(req, conciliacao, movimento, { batch = false
 
 async function confirmarConciliacao(req, conciliacaoId, payload = {}) {
   const conciliacao = await loadConciliacaoById(req, conciliacaoId);
+  assertSemAlertaEstornoBancario(conciliacao);
   if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
     throw createHttpError(400, 'Somente conciliacoes pendentes podem ser confirmadas.');
   }
@@ -2837,6 +3204,7 @@ async function criarTituloEConciliar(req, conciliacaoId, payload = {}) {
     if (!conciliacao) {
       throw createHttpError(404, 'Lancamento de conciliacao nao encontrado.');
     }
+    assertSemAlertaEstornoBancario(conciliacao);
 
     if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
       throw createHttpError(400, 'Somente conciliacoes pendentes podem receber criacao rapida de titulo.');
@@ -2930,6 +3298,11 @@ async function conciliarSugeridos(req, filters = {}) {
   const erros = [];
 
   for (const conciliacao of conciliacoes) {
+    const estornoBancario = await analisarPossivelEstornoBancario(conciliacao);
+    if (estornoBancario) {
+      resumo.associacao_manual += 1;
+      continue;
+    }
     const analise = await analyzeSuggestions(req, conciliacao, { maxSuggestions: 5 });
 
     if (!analise.sugestoes.length) {
@@ -3025,6 +3398,7 @@ async function listarMovimentosAssociacao(req, conciliacaoId, filters = {}) {
 
 async function ignorarConciliacao(req, conciliacaoId) {
   const conciliacao = await loadConciliacaoById(req, conciliacaoId);
+  assertSemAlertaEstornoBancario(conciliacao);
   if (String(conciliacao.status || '').toUpperCase() !== 'PENDENTE') {
     throw createHttpError(400, 'Somente conciliacoes pendentes podem ser ignoradas.');
   }
@@ -3159,6 +3533,7 @@ async function corrigirContaConciliacao(req, conciliacaoId, payload = {}) {
 
 async function removerConciliacao(req, conciliacaoId, payload = {}) {
   const conciliacao = await loadConciliacaoById(req, conciliacaoId);
+  assertSemAlertaEstornoBancario(conciliacao);
   const status = String(conciliacao.status || '').toUpperCase();
   if (status !== 'PENDENTE' && status !== 'IGNORADO') {
     throw createHttpError(400, 'Somente lancamentos pendentes ou ignorados podem ser removidos do extrato.');
@@ -3201,6 +3576,7 @@ module.exports = {
   corrigirContaConciliacao,
   confirmarConciliacao,
   confirmarConciliacaoCreditoRotativo,
+  confirmarConciliacaoEstornoBancario,
   confirmarConciliacaoFatura,
   confirmarConciliacaoEstornoTarifa,
   confirmarConciliacaoTarifa,

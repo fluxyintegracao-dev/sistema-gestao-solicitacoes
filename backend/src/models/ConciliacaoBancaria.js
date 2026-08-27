@@ -79,6 +79,26 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(40),
       allowNull: true
     },
+    evento_bancario_tipo: {
+      type: DataTypes.STRING(40),
+      allowNull: true
+    },
+    estorno_status: {
+      type: DataTypes.STRING(30),
+      allowNull: true
+    },
+    estorno_conciliacao_origem_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    estorno_candidatos: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    estorno_avaliado_em: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
     confirmado_por: {
       type: DataTypes.INTEGER,
       allowNull: true

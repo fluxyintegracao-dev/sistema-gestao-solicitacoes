@@ -175,6 +175,7 @@ const {
   validateFinanceConciliacaoConfirmBody,
   validateFinanceConciliacaoCorrigirContaBody,
   validateFinanceConciliacaoCreditoRotativoBody,
+  validateFinanceConciliacaoEstornoBancarioBody,
   validateFinanceConciliacaoEstornoTarifaBody,
   validateFinanceConciliacaoImportBody,
   validateFinanceConciliacaoImportacoesQuery,
@@ -1776,6 +1777,7 @@ router.post('/financeiro/conciliacoes/:id/estornar', allowConciliacaoEstornar, c
 router.post('/financeiro/conciliacoes/:id/confirmar-tarifa', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoTarifaBody }), ConciliacaoBancariaController.confirmarTarifa);
 router.get('/financeiro/conciliacoes/:id/tarifas-estorno', allowFinanceiro, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria') }), ConciliacaoBancariaController.tarifasEstorno);
 router.post('/financeiro/conciliacoes/:id/confirmar-estorno-tarifa', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoEstornoTarifaBody }), ConciliacaoBancariaController.confirmarEstornoTarifa);
+router.post('/financeiro/conciliacoes/:id/confirmar-estorno-bancario', allowConciliacaoEstornar, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoEstornoBancarioBody }), ConciliacaoBancariaController.confirmarEstornoBancario);
 router.post('/financeiro/conciliacoes/:id/confirmar-credito-rotativo', allowFinanceiro, criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Conciliacao bancaria'), body: validateFinanceConciliacaoCreditoRotativoBody }), ConciliacaoBancariaController.confirmarCreditoRotativo);
 router.get('/financeiro/caixas', allowFinanceiro, validateRequest({ query: validateFinanceCaixaQuery }), CaixaFinanceiroController.index);
 router.post('/financeiro/caixas/confirmar-conciliacao-dia', allowFinanceiro, criticalRateLimit, CaixaFinanceiroController.confirmarConciliacaoDia);

@@ -4784,6 +4784,9 @@ function classifyMovimentoBancario(movimento, titulo) {
   if (tipoMovimento === 'ESTORNO_TARIFA_BANCARIA') {
     return 'ENTRADA';
   }
+  if (tipoMovimento === 'ESTORNO_BANCARIO') {
+    return String(titulo?.tipo || '').toUpperCase() === 'RECEBER' ? 'SAIDA' : 'ENTRADA';
+  }
   if (tipoMovimento === 'LIBERACAO_CREDITO_ROTATIVO') {
     return 'ENTRADA';
   }
@@ -5076,6 +5079,8 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
       ? 'TRANSFERENCIA'
       : conciliacao.fatura_cartao_id
         ? 'FATURA_CARTAO'
+        : movimento && tipoMovimento === 'ESTORNO_BANCARIO'
+          ? 'ESTORNO_BANCARIO'
         : titulo
           ? 'TITULO'
           : movimento && tipoMovimento === 'TARIFA_BANCARIA'
@@ -5112,6 +5117,7 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
       conta_destino: transferencia ? buildContaLabel(contaDestino) : null,
       tipo_conciliacao: tipoConciliacao,
       tipo_movimento: movimento?.tipo_movimento || null,
+      estorno_conciliacao_origem_id: conciliacao.estorno_conciliacao_origem_id || null,
       parceiro: parceiro?.nome || null,
       obra: obra?.nome || null,
       confirmado_em: conciliacao.confirmado_em || null,

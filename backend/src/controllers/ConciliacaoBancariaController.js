@@ -4,6 +4,7 @@ const {
   confirmarConciliacao,
   confirmarConciliacaoFatura,
   confirmarConciliacaoCreditoRotativo,
+  confirmarConciliacaoEstornoBancario,
   confirmarConciliacaoEstornoTarifa,
   confirmarConciliacaoTarifa,
   confirmarConciliacaoTransferencia,
@@ -183,6 +184,16 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return responderErro(res, error, 'Erro ao conciliar estorno de tarifa bancaria');
+    }
+  },
+
+  async confirmarEstornoBancario(req, res) {
+    try {
+      const data = await confirmarConciliacaoEstornoBancario(req, req.params.id, req.body || {});
+      return res.json(data);
+    } catch (error) {
+      console.error(error);
+      return responderErro(res, error, 'Erro ao confirmar estorno bancario');
     }
   },
 

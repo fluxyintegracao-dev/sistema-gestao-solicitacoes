@@ -6,6 +6,7 @@ import {
   confirmarConciliacaoBancaria,
   confirmarConciliacaoFaturaCartao,
   confirmarConciliacaoCreditoRotativo,
+  confirmarConciliacaoEstornoBancario,
   confirmarConciliacaoEstornoTarifa,
   confirmarConciliacaoTarifaBancaria,
   confirmarConciliacaoTransferencia,
@@ -851,10 +852,19 @@ function ContextoObraTitulo({ registro }) {
   );
 }
 
-function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onIgnorar, onRemover, onAssociarManual, onPrepararSugestao, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
+function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onConfirmarEstorno, onIgnorar, onRemover, onAssociarManual, onPrepararSugestao, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
+  const [estornoExpandido, setEstornoExpandido] = useState(false);
+  const [estornoOrigemId, setEstornoOrigemId] = useState(() => {
+    const candidatos = item?.estorno_bancario?.candidatos || [];
+    return candidatos.length === 1 ? Number(candidatos[0].conciliacao_id) : null;
+  });
+  const [estornoMotivo, setEstornoMotivo] = useState('Pagamento devolvido pelo banco conforme lancamento OFX.');
 
   const isPendente = item.status === 'PENDENTE';
+  const alertaEstorno = isPendente && item.estorno_bancario?.detectado
+    ? item.estorno_bancario
+    : null;
   const movimentosPreparados = Array.isArray(associacaoPreparada?.movimentos)
     ? associacaoPreparada.movimentos
     : [];
@@ -887,15 +897,90 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
   const isConfirmando = processingId === pidConfirmar;
   const isIgnorando = processingId === `ignorar-${item.id}`;
   const isRemovendo = processingId === `remover-${item.id}`;
+  const isConfirmandoEstorno = processingId === `estorno-bancario-${item.id}`;
   const podeConfirmar = isPendente && movimentoIdsConfirmacao.length > 0 && !isConfirmando;
+  const candidatoEstornoSelecionado = alertaEstorno?.candidatos?.find((candidato) => Number(candidato.conciliacao_id) === Number(estornoOrigemId));
+  const podeConfirmarEstorno = Boolean(
+    alertaEstorno
+    && canEstornarTransferencia
+    && estornoOrigemId
+    && candidatoEstornoSelecionado?.titulo
+    && candidatoEstornoSelecionado?.movimento?.id
+    && String(estornoMotivo || '').trim()
+    && !isConfirmandoEstorno
+  );
 
   return (
     <div className="sol-surface-card card overflow-hidden rounded-lg border border-[var(--c-border)]">
+      {alertaEstorno && (
+        <div className="border-b border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded bg-amber-700 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-amber-50">
+                  Estorno bancario
+                </span>
+                <strong className="text-xs">
+                  {alertaEstorno.tipo === 'PIX_REJEITADO' ? 'PIX rejeitado/devolvido' : alertaEstorno.tipo === 'CHEQUE_DEVOLVIDO' ? 'Cheque devolvido' : 'Possivel devolucao'}
+                </strong>
+                <span className="text-[10px] text-amber-800">
+                  {alertaEstorno.total_candidatos} lancamento(s) original(is) compativel(is)
+                </span>
+              </div>
+              <p className="mt-0.5 text-[10px] text-amber-800">
+                Bloqueado para conciliacao automatica. Confirme qual saida foi devolvida para reabrir o titulo correto.
+              </p>
+            </div>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setEstornoExpandido((value) => !value)}>
+              {estornoExpandido ? 'Fechar revisao' : 'Revisar estorno'}
+            </button>
+          </div>
+
+          {estornoExpandido && (
+            <div className="mt-2 border-t border-amber-200 pt-2">
+              {alertaEstorno.candidatos.length === 0 ? (
+                <p className="text-xs font-medium text-rose-700">Nenhuma saida de mesmo valor foi localizada na janela de conferencia.</p>
+              ) : (
+                <div className="grid gap-1.5 lg:grid-cols-2">
+                  {alertaEstorno.candidatos.map((candidato) => (
+                    <label key={candidato.conciliacao_id} className={`flex gap-2 rounded border px-2 py-1.5 ${candidato.titulo && candidato.movimento?.id ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} ${Number(estornoOrigemId) === Number(candidato.conciliacao_id) ? 'border-amber-600 bg-amber-100' : 'border-amber-200 bg-[var(--c-surface)]'}`}>
+                      <input type="radio" name={`estorno-${item.id}`} disabled={!candidato.titulo || !candidato.movimento?.id} checked={Number(estornoOrigemId) === Number(candidato.conciliacao_id)} onChange={() => setEstornoOrigemId(Number(candidato.conciliacao_id))} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-[11px] font-semibold">{candidato.descricao_banco || `Lancamento #${candidato.conciliacao_id}`}</span>
+                        <span className="block text-[10px] text-amber-800">{formatDate(candidato.data_movimento)} · {formatCurrency(Math.abs(Number(candidato.valor || 0)))} · {candidato.status}</span>
+                        {candidato.titulo && (
+                          <span className="block truncate text-[10px] text-[var(--c-muted)]">Titulo #{candidato.titulo.id} · {candidato.titulo.parceiro_nome || candidato.titulo.descricao}</span>
+                        )}
+                        {(!candidato.titulo || !candidato.movimento?.id) && (
+                          <span className="block text-[10px] font-medium text-rose-700">Concilie esta saida com o titulo correto antes de confirmar a devolucao.</span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end">
+                <label className="flex-1 text-[10px] font-semibold text-amber-900">
+                  Justificativa
+                  <input className="input input-sm mt-1 w-full" value={estornoMotivo} maxLength={255} onChange={(event) => setEstornoMotivo(event.target.value)} />
+                </label>
+                {canEstornarTransferencia ? (
+                  <button type="button" className="btn btn-danger btn-sm" disabled={!podeConfirmarEstorno} onClick={() => onConfirmarEstorno(item, estornoOrigemId, estornoMotivo)}>
+                    {isConfirmandoEstorno ? 'Confirmando...' : 'Confirmar devolucao'}
+                  </button>
+                ) : (
+                  <span className="text-[10px] text-amber-800">Seu usuario pode visualizar o alerta, mas nao possui permissao para estornar conciliacoes.</span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="grid items-stretch" style={{ gridTemplateColumns: 'minmax(0,1fr) auto minmax(0,1fr)' }}>
 
         {/* ── Coluna esquerda: lançamento OFX ── */}
         <div className="flex flex-col gap-1 p-2">
-          {isPendente && (
+          {isPendente && !alertaEstorno && (
             <label className="mb-1 flex items-center gap-2 text-[10px] font-semibold text-[var(--c-muted)]">
               <input
                 type="checkbox"
@@ -932,7 +1017,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
             </p>
           )}
           {/* ignorar */}
-          {isPendente && (
+          {isPendente && !alertaEstorno && (
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
@@ -956,7 +1041,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
 
         {/* ── Centro: botão conciliar ── */}
         <div className="flex items-center justify-center px-2">
-          {isPendente && (
+          {isPendente && !alertaEstorno && (
             <button
               type="button"
               disabled={!podeConfirmar}
@@ -977,7 +1062,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
         {/* ── Coluna direita: sugestão / vazio ── */}
         <div className="flex flex-col gap-1 p-2">
           {/* header */}
-          {isPendente && (
+          {isPendente && !alertaEstorno && (
             <div className="flex items-center justify-between gap-1">
               <p className="text-[9px] uppercase tracking-wide font-semibold text-[var(--c-muted)]">Lançamento Fluxy</p>
               <div className="flex items-center gap-0.5">
@@ -1045,6 +1130,12 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
           ) : !isPendente ? (
             <div className="flex flex-1 items-center justify-center py-1">
               <p className="text-[10px] text-[var(--c-muted)]">{statusLabel(item.status)}</p>
+            </div>
+          ) : alertaEstorno ? (
+            <div className="flex flex-1 items-center rounded border border-amber-200 bg-amber-50 px-2 py-2">
+              <p className="text-[10px] font-medium leading-tight text-amber-800">
+                Aguardando a escolha do lancamento original. Nenhum titulo sera associado automaticamente.
+              </p>
             </div>
           ) : temAssociacaoPreparada ? (
             <div className="flex flex-col gap-1 flex-1">
@@ -1493,6 +1584,11 @@ function ToolbarConciliacao({ meta, filters, setFilters, setAppliedFilters, resu
               {resumoSugestoes.manuais} manual
             </span>
           )}
+          {resumoSugestoes.estornos > 0 && (
+            <span className="inline-flex items-center gap-1 font-semibold text-amber-800">
+              ↩ {resumoSugestoes.estornos} estorno(s) para revisar
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs text-[var(--c-muted)]">
@@ -1778,8 +1874,8 @@ export default function FinanceiroConciliacao() {
   ]), [dados.meta.total_disponivel, dados.meta.total_listado, dados.resumo]);
 
   const resumoSugestoesPagina = useMemo(() => dados.itens.reduce(
-    (acc, item) => { if (item.conciliacao_em_lote_disponivel) acc.prontos += 1; if (item.associacao_manual_recomendada) acc.manuais += 1; return acc; },
-    { prontos: 0, manuais: 0 }
+    (acc, item) => { if (item.conciliacao_em_lote_disponivel) acc.prontos += 1; if (item.associacao_manual_recomendada) acc.manuais += 1; if (item.status === 'PENDENTE' && item.estorno_bancario?.detectado) acc.estornos += 1; return acc; },
+    { prontos: 0, manuais: 0, estornos: 0 }
   ), [dados.itens]);
   const bancosDashboard = useMemo(() => {
     const bancos = new Set(contas.map((conta) => getContaBanco(conta)).filter(Boolean));
@@ -1795,7 +1891,7 @@ export default function FinanceiroConciliacao() {
   }, { contas: 0, pendentes: 0, conciliados: 0, ignorados: 0, valor_absoluto_total: 0 }), [contasResumo]);
   const conciliacoesSelecionadasItens = useMemo(() => {
     const ids = new Set(conciliacoesSelecionadas.map((id) => Number(id)));
-    return dados.itens.filter((item) => ids.has(Number(item.id)) && item.status === 'PENDENTE');
+    return dados.itens.filter((item) => ids.has(Number(item.id)) && item.status === 'PENDENTE' && !item.estorno_bancario?.detectado);
   }, [conciliacoesSelecionadas, dados.itens]);
 
   async function handleImportar(event) {
@@ -1815,7 +1911,8 @@ export default function FinanceiroConciliacao() {
       const arquivosImportados = Number(response.arquivos_importados || 0);
       const arquivosNaoImportados = Number(response.arquivos_nao_importados || 0);
       const importados = Number(response.importados || 0);
-      setFeedback(`${arquivosImportados} arquivo(s) importado(s), ${arquivosNaoImportados} nao importado(s) e ${importados} lancamento(s) novo(s) gravado(s).`);
+      const alertasEstorno = Number(response.alertas_estorno || 0);
+      setFeedback(`${arquivosImportados} arquivo(s) importado(s), ${arquivosNaoImportados} nao importado(s) e ${importados} lancamento(s) novo(s) gravado(s).${alertasEstorno ? ` Atenção: ${alertasEstorno} possível(is) estorno(s) bancário(s) precisa(m) de revisão.` : ''}`);
       if (arquivosNaoImportados > 0 && arquivosImportados === 0) {
         setError('Nenhum arquivo foi importado. Confira o resumo abaixo e ajuste as contas bancarias antes de tentar novamente.');
       }
@@ -1828,7 +1925,7 @@ export default function FinanceiroConciliacao() {
   }
 
   function toggleConciliacaoSelecionada(item) {
-    if (!item || item.status !== 'PENDENTE') return;
+    if (!item || item.status !== 'PENDENTE' || item.estorno_bancario?.detectado) return;
     setConciliacoesSelecionadas((current) => {
       const id = Number(item.id);
       return current.includes(id)
@@ -1883,6 +1980,32 @@ export default function FinanceiroConciliacao() {
     } finally {
       setProcessingId(null);
       if (fecharModal) setAssociacaoModal((c) => ({ ...c, processing: false }));
+    }
+  }
+
+  async function handleConfirmarEstornoBancario(item, conciliacaoOrigemId, motivo) {
+    if (!item?.id || !conciliacaoOrigemId) return;
+    const candidato = item.estorno_bancario?.candidatos?.find((value) => Number(value.conciliacao_id) === Number(conciliacaoOrigemId));
+    if (!candidato?.titulo || !candidato?.movimento?.id) {
+      setError('Concilie primeiro a saida original com a baixa do titulo correto.');
+      return;
+    }
+    const tituloInfo = ` O titulo #${candidato.titulo.id} sera reaberto.`;
+    if (!window.confirm(`Confirmar que este credito devolveu o lancamento #${conciliacaoOrigemId}?${tituloInfo}`)) return;
+    try {
+      setProcessingId(`estorno-bancario-${item.id}`);
+      setError(''); setFeedback('');
+      await confirmarConciliacaoEstornoBancario(item.id, {
+        conciliacao_origem_id: conciliacaoOrigemId,
+        motivo
+      });
+      setConciliacoesSelecionadas((current) => current.filter((id) => Number(id) !== Number(item.id)));
+      setFeedback(`Estorno confirmado. O titulo #${candidato.titulo.id} foi reaberto e os dois lancamentos OFX permaneceram auditados.`);
+      await carregarConciliacoes();
+    } catch (err) {
+      setError(err?.message || 'Erro ao confirmar estorno bancario');
+    } finally {
+      setProcessingId(null);
     }
   }
 
@@ -2734,6 +2857,7 @@ export default function FinanceiroConciliacao() {
                     selected={conciliacoesSelecionadas.includes(Number(item.id))}
                     onToggleSelecao={toggleConciliacaoSelecionada}
                     onConfirmar={handleConfirmar} onIgnorar={handleIgnorar}
+                    onConfirmarEstorno={handleConfirmarEstornoBancario}
                     onRemover={handleRemover}
                     onAssociarManual={abrirAssociacaoManual}
                     onPrepararSugestao={prepararSugestaoCompativel}

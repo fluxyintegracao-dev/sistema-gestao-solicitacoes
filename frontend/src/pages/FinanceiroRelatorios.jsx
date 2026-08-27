@@ -809,6 +809,7 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
                 <option value="FATURA_CARTAO">Faturas de cartao</option>
                 <option value="TARIFA">Tarifas bancarias</option>
                 <option value="ESTORNO_TARIFA">Estornos de tarifa</option>
+                <option value="ESTORNO_BANCARIO">Estornos bancarios</option>
                 <option value="CREDITO_ROTATIVO">Credito rotativo</option>
                 <option value="MOVIMENTO">Outros movimentos</option>
                 <option value="SEM_VINCULO">Sem vinculo</option>
@@ -1123,6 +1124,8 @@ function ContaReportShell({ title, subtitle, type }) {
                                   ? `Tarifa · mov. #${item.movimento_financeiro_id}`
                                   : item.tipo_conciliacao === 'ESTORNO_TARIFA'
                                     ? `Estorno de tarifa - mov. #${item.movimento_financeiro_id}`
+                                  : item.tipo_conciliacao === 'ESTORNO_BANCARIO'
+                                    ? `Estorno bancario - mov. #${item.movimento_financeiro_id}`
                                   : item.tipo_conciliacao === 'CREDITO_ROTATIVO'
                                     ? `${item.natureza === 'SAIDA' ? 'Amortizacao' : 'Liberacao'} · mov. #${item.movimento_financeiro_id}`
                                   : item.titulo_codigo || (item.movimento_financeiro_id ? `Mov. #${item.movimento_financeiro_id}` : '-')}
@@ -1146,6 +1149,7 @@ function ContaReportShell({ title, subtitle, type }) {
                           {type === 'conciliacao' && canEstornarConciliacao ? (
                             <td>
                               {item.status === 'CONCILIADO'
+                                && item.tipo_conciliacao !== 'ESTORNO_BANCARIO'
                                 && (item.tipo_conciliacao !== 'TRANSFERENCIA' || item.transferencia_status === 'ATIVA') ? (
                                 <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
                                   Estornar
