@@ -375,7 +375,7 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
                 <CardMetrica
                   titulo="Total da solicitação"
                   valor={formatarMoeda(valorTotalCompraDireta)}
-                  detalhe={freteTipoCompraDireta === 'TERCEIRO'
+                  detalhe={freteTipoCompraDireta !== 'SEM_FRETE'
                     ? `Itens ${formatarMoeda(valorLiquidoItensCompraDireta)} + frete ${formatarMoeda(freteValorCompraDireta)}`
                     : temDescontoCompraDireta
                       ? `Bruto ${formatarMoeda(valorBrutoCompraDireta)} - desconto ${formatarMoeda(descontoCompraDireta)}`

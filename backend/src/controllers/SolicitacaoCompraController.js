@@ -1047,7 +1047,7 @@ function limitarTextoPdf(texto, limite = 160) {
 
 function obterDadosCabecalhoCompraDireta(solicitacao) {
   const descricaoPrincipal = solicitacao?.solicitacaoPrincipal?.descricao || '';
-  const valor = Number(solicitacao?.valor_fechado || solicitacao?.solicitacaoPrincipal?.valor || 0);
+  const valor = Number(solicitacao?.solicitacaoPrincipal?.valor || solicitacao?.valor_fechado || 0);
 
   return {
     valorTotal: `R$ ${formatCurrencyPdf(valor)}`,
@@ -3624,7 +3624,10 @@ module.exports = {
       }
 
       const valorTotalSolicitacaoCompraDireta = compraDireta
-        ? arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta === 'TERCEIRO' ? freteValorCompraDireta : 0))
+        ? arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta !== 'SEM_FRETE' ? freteValorCompraDireta : 0))
+        : 0;
+      const valorTotalFornecedorCompraDireta = compraDireta
+        ? arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta === 'EMBUTIDO' ? freteValorCompraDireta : 0))
         : 0;
 
       let formasPagamentoCompraDireta = [];
@@ -3702,7 +3705,7 @@ module.exports = {
           observacoes: observacoes || null,
           necessario_para: necessario_para || null,
           link_geral: link_geral || null,
-          valor_fechado: compraDireta ? valorTotalCompraDireta : 0,
+          valor_fechado: compraDireta ? valorTotalFornecedorCompraDireta : 0,
           desconto_total: compraDireta ? descontoTotalCompraDireta : 0,
           frete_tipo: freteTipoCompraDireta,
           frete_valor: freteValorCompraDireta,
@@ -3792,7 +3795,7 @@ module.exports = {
         compraDireta && descontoTotalCompraDireta > 0 ? `Desconto concedido: R$ ${formatCurrencyPdf(descontoTotalCompraDireta)}` : null,
         compraDireta ? `Valor liquido dos itens: R$ ${formatCurrencyPdf(valorTotalCompraDireta)}` : null,
         compraDireta && freteTipoCompraDireta === 'EMBUTIDO'
-          ? `Frete embutido nos itens${freteValorCompraDireta > 0 ? `: R$ ${formatCurrencyPdf(freteValorCompraDireta)}` : ''}`
+          ? `Frete embutido devido ao credor principal${freteValorCompraDireta > 0 ? `: R$ ${formatCurrencyPdf(freteValorCompraDireta)}` : ''}`
           : null,
         compraDireta && freteTipoCompraDireta === 'TERCEIRO'
           ? `Frete pago a terceiro: R$ ${formatCurrencyPdf(freteValorCompraDireta)} - Credor: ${freteCredorCompraDireta.nome || freteCredorCompraDireta.cpf_cnpj || freteCredorCompraDireta.id} - Vencimento: ${frete_data_vencimento} - Dados: ${String(frete_dados_pagamento || '').trim()}`

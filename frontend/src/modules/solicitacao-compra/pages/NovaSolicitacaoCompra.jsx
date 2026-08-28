@@ -592,7 +592,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
 
   const valorTotalSolicitacaoCompraDireta = useMemo(
     () => arredondarMoeda(
-      valorTotalCompraDireta + (freteTipo === 'TERCEIRO' ? freteValorNumero : 0)
+      valorTotalCompraDireta + (freteTipo !== 'SEM_FRETE' ? freteValorNumero : 0)
     ),
     [freteTipo, freteValorNumero, valorTotalCompraDireta]
   );
@@ -1605,7 +1605,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--c-text)]">Frete</h3>
                   <p className="mt-1 text-xs text-[var(--c-muted)]">
-                    Informe se o frete já compõe os itens ou se será pago separadamente a outro credor.
+                    Informe se o frete será pago ao credor principal ou separadamente a outro credor.
                   </p>
                 </div>
                 {freteTipo === 'TERCEIRO' && (
@@ -1659,7 +1659,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                     />
                     <span className="text-xs text-[var(--c-muted)]">
                       {freteTipo === 'EMBUTIDO'
-                        ? 'Valor informativo: não será somado novamente nem gerará título.'
+                        ? 'Será somado à compra e pago ao credor principal no mesmo título.'
                         : 'Será somado à solicitação e separado do credor principal.'}
                     </span>
                   </div>

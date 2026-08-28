@@ -44,7 +44,9 @@ function run() {
 
   includesAll(controller, [
     "['SEM_FRETE', 'EMBUTIDO', 'TERCEIRO']",
-    "freteTipoCompraDireta === 'TERCEIRO' ? freteValorCompraDireta : 0",
+    "freteTipoCompraDireta !== 'SEM_FRETE' ? freteValorCompraDireta : 0",
+    "freteTipoCompraDireta === 'EMBUTIDO' ? freteValorCompraDireta : 0",
+    'valorTotalFornecedorCompraDireta',
     "freteTipoCompraDireta !== 'SEM_FRETE' && freteValorCompraDireta <= 0",
     'Selecione um credor ativo para o frete pago a terceiro.',
     'Informe os dados para pagamento do frete.',
@@ -52,6 +54,18 @@ function run() {
     'isFormaPagamentoFopag',
     'FOPAG nao esta disponivel para solicitacoes de compra.'
   ], 'regras backend');
+  assert(
+    controller.includes("arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta !== 'SEM_FRETE' ? freteValorCompraDireta : 0))"),
+    'Backend deve somar qualquer frete informado ao total da compra direta.'
+  );
+  assert(
+    controller.includes("arredondarMoeda(valorTotalCompraDireta + (freteTipoCompraDireta === 'EMBUTIDO' ? freteValorCompraDireta : 0))"),
+    'Backend deve somar somente o frete embutido ao valor devido ao credor principal.'
+  );
+  assert(
+    controller.includes('valor_fechado: compraDireta ? valorTotalFornecedorCompraDireta : 0'),
+    'Compra direta deve persistir em valor_fechado o total devido ao credor principal.'
+  );
 
   includesAll(novaCompra, [
     'Condições comerciais e comprovantes',
@@ -65,6 +79,10 @@ function run() {
     'Informe um valor maior que zero para o frete embutido.',
     'Informe a data de vencimento.'
   ], 'formulario');
+  assert(
+    novaCompra.includes("valorTotalCompraDireta + (freteTipo !== 'SEM_FRETE' ? freteValorNumero : 0)"),
+    'Formulario deve somar frete embutido ou de terceiro ao total da compra direta.'
+  );
   includesAll(revisao, ['Credor do frete', 'Valor total da solicitação'], 'revisao');
   includesAll(financeiro, [
     'getFreteTerceiroCompraDireta',
