@@ -45,7 +45,9 @@ const {
 const {
   buildCompraFornecedorItemKey,
   calcularDisponibilidadeFornecedorItem,
-  montarMapaAlocacoesAtivasPorFornecedorItem
+  isOfertaSaldo,
+  montarMapaAlocacoesAtivasPorFornecedorItem,
+  montarMapaAlocacoesAtivasPorResposta
 } = require('./comprasDisponibilidadeService');
 
 function normalizeText(value) {
@@ -372,6 +374,7 @@ async function carregarSolicitacaoPedidos(id, transaction, { incluirPedidos = tr
             'observacao',
             'quantidade_minima_item',
             'quantidade_disponivel',
+            'escopo_disponibilidade',
             'ipi_valor',
             'icms_valor',
             'st_valor',
@@ -1229,8 +1232,11 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
   const alocadoAnteriorPorFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(
     solicitacao?.alocacoes || []
   );
+  const alocadoAnteriorPorResposta = montarMapaAlocacoesAtivasPorResposta(solicitacao?.alocacoes || []);
   const tributosAnterioresPorFornecedorItem = new Map();
   const fretesAnterioresPorFornecedorItem = new Map();
+  const tributosAnterioresPorResposta = new Map();
+  const fretesAnterioresPorResposta = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
     const fornecedorItemKey = buildCompraFornecedorItemKey(alocacao.fornecedor_compra_id, alocacao);
@@ -1244,8 +1250,22 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       fornecedorItemKey,
       roundMoney((fretesAnterioresPorFornecedorItem.get(fornecedorItemKey) || 0) + asNumber(alocacao.frete_rateado))
     );
+    const respostaItemId = Number(alocacao.resposta_item_id || 0);
+    if (respostaItemId) {
+      const tributosResposta = tributosAnterioresPorResposta.get(respostaItemId) || { ipi: 0, icms: 0, st: 0 };
+      tributosAnterioresPorResposta.set(respostaItemId, {
+        ipi: roundMoney(tributosResposta.ipi + asNumber(alocacao.ipi_rateado)),
+        icms: roundMoney(tributosResposta.icms + asNumber(alocacao.icms_rateado)),
+        st: roundMoney(tributosResposta.st + asNumber(alocacao.st_rateado))
+      });
+      fretesAnterioresPorResposta.set(
+        respostaItemId,
+        roundMoney((fretesAnterioresPorResposta.get(respostaItemId) || 0) + asNumber(alocacao.frete_rateado))
+      );
+    }
   }
   const alocadoRodadaPorFornecedorItem = new Map();
+  const alocadoRodadaPorResposta = new Map();
   const tributosRodadaPorFornecedorItem = new Map();
   const fretesRodadaPorFornecedorItem = new Map();
 
@@ -1291,9 +1311,13 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const quantidadeDisponivel = roundQty(
       resposta.quantidade_disponivel ?? (resposta.disponivel ? quantidadeBase : 0)
     );
+    const ofertaSaldo = isOfertaSaldo(resposta);
     const quantidadeJaAlocadaFornecedorItem = roundQty(
-      (alocadoAnteriorPorFornecedorItem.get(fornecedorItemKey) || 0)
-      + (alocadoRodadaPorFornecedorItem.get(fornecedorItemKey) || 0)
+      ofertaSaldo
+        ? (alocadoAnteriorPorResposta.get(Number(resposta.id)) || 0)
+          + (alocadoRodadaPorResposta.get(Number(resposta.id)) || 0)
+        : (alocadoAnteriorPorFornecedorItem.get(fornecedorItemKey) || 0)
+          + (alocadoRodadaPorFornecedorItem.get(fornecedorItemKey) || 0)
     );
     const disponibilidadeRestante = roundQty(Math.max(0, quantidadeDisponivel - quantidadeJaAlocadaFornecedorItem));
     if (quantidadeAlocada > disponibilidadeRestante) {
@@ -1314,7 +1338,13 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       fornecedorItemKey,
       roundQty((alocadoRodadaPorFornecedorItem.get(fornecedorItemKey) || 0) + quantidadeAlocada)
     );
-    const tributosAnteriores = tributosAnterioresPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
+    alocadoRodadaPorResposta.set(
+      Number(resposta.id),
+      roundQty((alocadoRodadaPorResposta.get(Number(resposta.id)) || 0) + quantidadeAlocada)
+    );
+    const tributosAnteriores = ofertaSaldo
+      ? tributosAnterioresPorResposta.get(Number(resposta.id)) || { ipi: 0, icms: 0, st: 0 }
+      : tributosAnterioresPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
     const tributosRodada = tributosRodadaPorFornecedorItem.get(fornecedorItemKey) || { ipi: 0, icms: 0, st: 0 };
     const percentualQuantidade = quantidadeDisponivel > 0 ? quantidadeAlocada / quantidadeDisponivel : 0;
     const ratearTributo = (total, anterior, rodada) => roundMoney(Math.min(
@@ -1327,7 +1357,9 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     const freteItemRateado = normalizeText(vinculacaoFornecedor.frete_modo) === 'POR_ITEM'
       ? ratearTributo(
           resposta.frete_valor,
-          fretesAnterioresPorFornecedorItem.get(fornecedorItemKey) || 0,
+          ofertaSaldo
+            ? fretesAnterioresPorResposta.get(Number(resposta.id)) || 0
+            : fretesAnterioresPorFornecedorItem.get(fornecedorItemKey) || 0,
           fretesRodadaPorFornecedorItem.get(fornecedorItemKey) || 0
         )
       : 0;
@@ -1371,6 +1403,9 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
   const descontosAtivosPorFornecedor = new Map();
   const difalAtivoPorFornecedor = new Map();
   const freteAtivoPorFornecedor = new Map();
+  const descontosAtivosPorResposta = new Map();
+  const difalAtivoPorResposta = new Map();
+  const freteAtivoPorResposta = new Map();
   for (const alocacao of solicitacao?.alocacoes || []) {
     if (normalizeText(alocacao.status) !== 'ATIVA') continue;
     const fornecedorId = Number(alocacao.fornecedor_compra_id || 0);
@@ -1386,12 +1421,31 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
       fornecedorId,
       roundMoney((freteAtivoPorFornecedor.get(fornecedorId) || 0) + asNumber(alocacao.frete_rateado))
     );
+    const respostaItemId = Number(alocacao.resposta_item_id || 0);
+    if (respostaItemId) {
+      descontosAtivosPorResposta.set(respostaItemId, roundMoney(
+        (descontosAtivosPorResposta.get(respostaItemId) || 0) + asNumber(alocacao.desconto_rateado)
+      ));
+      difalAtivoPorResposta.set(respostaItemId, roundMoney(
+        (difalAtivoPorResposta.get(respostaItemId) || 0) + asNumber(alocacao.difal_rateado)
+      ));
+      freteAtivoPorResposta.set(respostaItemId, roundMoney(
+        (freteAtivoPorResposta.get(respostaItemId) || 0) + asNumber(alocacao.frete_rateado)
+      ));
+    }
   }
 
   for (const [fornecedorId, grupo] of porFornecedor.entries()) {
     const vinculacaoFornecedor = grupo[0]?.vinculacaoFornecedor;
+    const respostaIdsGrupo = grupo.map((item) => Number(item.resposta?.id || 0)).filter(Boolean);
+    const ofertaSaldoGrupo = grupo.every((item) => isOfertaSaldo(item.resposta));
+    const somarPorRespostas = (mapa) => roundMoney(
+      respostaIdsGrupo.reduce((total, respostaId) => total + asNumber(mapa.get(respostaId)), 0)
+    );
     const difalCotacao = roundMoney(vinculacaoFornecedor?.difal_valor);
-    const difalAnterior = roundMoney(difalAtivoPorFornecedor.get(fornecedorId) || 0);
+    const difalAnterior = ofertaSaldoGrupo
+      ? somarPorRespostas(difalAtivoPorResposta)
+      : roundMoney(difalAtivoPorFornecedor.get(fornecedorId) || 0);
     const difalRestante = roundMoney(Math.max(0, difalCotacao - difalAnterior));
     const baseCotada = roundMoney((vinculacaoFornecedor?.respostas || []).reduce((sum, resposta) => {
       if (!resposta.disponivel || asNumber(resposta.preco) <= 0) return sum;
@@ -1416,7 +1470,9 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
 
     if (normalizeText(vinculacaoFornecedor?.frete_modo) !== 'POR_ITEM') {
       const freteCotacao = roundMoney(vinculacaoFornecedor?.frete_valor);
-      const freteAnterior = roundMoney(freteAtivoPorFornecedor.get(fornecedorId) || 0);
+      const freteAnterior = ofertaSaldoGrupo
+        ? somarPorRespostas(freteAtivoPorResposta)
+        : roundMoney(freteAtivoPorFornecedor.get(fornecedorId) || 0);
       const freteRestante = roundMoney(Math.max(0, freteCotacao - freteAnterior));
       const basesFrete = grupo.map((alocacao) => alocacao.valor_mercadoria);
       const baseRodada = basesFrete.reduce((sum, valor) => sum + asNumber(valor), 0);
@@ -1432,7 +1488,10 @@ function montarAlocacoesNormalizadas(solicitacao, vencedores = [], saldosAtuais 
     }
 
     const descontoCotacao = roundMoney(grupo[0]?.vinculacaoFornecedor?.desconto_total);
-    const descontoTotal = roundMoney(Math.max(0, descontoCotacao - (descontosAtivosPorFornecedor.get(fornecedorId) || 0)));
+    const descontoAnterior = ofertaSaldoGrupo
+      ? somarPorRespostas(descontosAtivosPorResposta)
+      : roundMoney(descontosAtivosPorFornecedor.get(fornecedorId) || 0);
+    const descontoTotal = roundMoney(Math.max(0, descontoCotacao - descontoAnterior));
     const bases = grupo.map((alocacao) => alocacao.valor_total);
     const descontos = calcularRateiosMonetarios(descontoTotal, bases);
     grupo.forEach((alocacao, index) => {
@@ -1809,7 +1868,7 @@ async function gerarPedidosDosVencedores({
           observacoes: `Frete informado na cotacao do fornecedor ${grupo.vinculacaoFornecedor.fornecedor?.nome || grupo.vinculacaoFornecedor.fornecedor_compra_id}`
         },
         usuarioId,
-        idempotencyKey: `COTACAO:${grupo.vinculacaoFornecedor.id}:FRETE`,
+        idempotencyKey: `COTACAO:${grupo.vinculacaoFornecedor.id}:FECHAMENTO:${fechamento.id}:FRETE`,
         permitirSemCredor: true,
         transaction
       });
@@ -2647,6 +2706,7 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
   const mapaAlocacoesFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(
     solicitacao?.alocacoes || []
   );
+  const mapaAlocacoesResposta = montarMapaAlocacoesAtivasPorResposta(solicitacao?.alocacoes || []);
 
   const candidatos = edicaoBloqueada
     ? []
@@ -2683,7 +2743,8 @@ async function obterPedidoDetalhe(id, { obraIdsHistoricoPreco = null } = {}) {
           fornecedorCompraId: fornecedor.fornecedor_compra_id,
           item: resposta,
           quantidadeDisponivel: resposta.quantidade_disponivel ?? baseItem?.quantidade_solicitada,
-          mapaAlocacoesFornecedorItem
+          mapaAlocacoesFornecedorItem,
+          mapaAlocacoesResposta
         });
         return {
           resposta_item_id: resposta.id,

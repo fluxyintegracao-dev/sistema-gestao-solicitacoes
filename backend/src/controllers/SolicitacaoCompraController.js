@@ -58,6 +58,7 @@ const {
   buildCompraItemKey,
   calcularDisponibilidadeFornecedorItem,
   montarMapaAlocacoesAtivasPorFornecedorItem,
+  montarMapaAlocacoesAtivasPorResposta,
   montarMapaAlocacoesAtivasPorItem
 } = require('../services/comprasDisponibilidadeService');
 const { isPedidoCompraStatusLocked } = require('../services/pedidoCompraStatusConfig');
@@ -655,6 +656,7 @@ async function carregarSolicitacaoCompra(id) {
               'observacao',
               'quantidade_minima_item',
               'quantidade_disponivel',
+              'escopo_disponibilidade',
               'ipi_valor',
               'icms_valor',
               'st_valor',
@@ -689,6 +691,7 @@ async function carregarSolicitacaoCompra(id) {
         attributes: [
           'id',
           'fornecedor_compra_id',
+          'resposta_item_id',
           'item_tipo',
           'solicitacao_compra_item_id',
           'solicitacao_compra_item_manual_id',
@@ -1272,6 +1275,7 @@ function montarComparativoSolicitacao(solicitacao) {
   const itens = obterItensCotaveis(solicitacao);
   const mapaAlocacoesPorItem = montarMapaAlocacoesAtivasPorItem(solicitacao.alocacoes || []);
   const mapaAlocacoesPorFornecedorItem = montarMapaAlocacoesAtivasPorFornecedorItem(solicitacao.alocacoes || []);
+  const mapaAlocacoesPorResposta = montarMapaAlocacoesAtivasPorResposta(solicitacao.alocacoes || []);
   const fornecedoresAtivos = (solicitacao.fornecedores || []).filter(
     (cotacaoFornecedor) => !['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(cotacaoFornecedor.status))
   );
@@ -1326,9 +1330,10 @@ function montarComparativoSolicitacao(solicitacao) {
       );
       const disponibilidadeFornecedor = calcularDisponibilidadeFornecedorItem({
         fornecedorCompraId: cotacaoFornecedor.fornecedor_compra_id,
-        item,
+        item: resposta || item,
         quantidadeDisponivel,
-        mapaAlocacoesFornecedorItem: mapaAlocacoesPorFornecedorItem
+        mapaAlocacoesFornecedorItem: mapaAlocacoesPorFornecedorItem,
+        mapaAlocacoesResposta: mapaAlocacoesPorResposta
       });
 
       return {
@@ -1359,6 +1364,7 @@ function montarComparativoSolicitacao(solicitacao) {
         observacao: resposta?.observacao || '',
         quantidade_minima_item: resposta?.quantidade_minima_item ?? null,
         quantidade_disponivel: quantidadeDisponivel,
+        escopo_disponibilidade: resposta?.escopo_disponibilidade || 'ACUMULADA',
         saldo_disponivel_fornecedor: disponibilidadeFornecedor.saldo_disponivel,
         ipi_valor: Number(resposta?.ipi_valor || 0),
         icms_valor: Number(resposta?.icms_valor || 0),

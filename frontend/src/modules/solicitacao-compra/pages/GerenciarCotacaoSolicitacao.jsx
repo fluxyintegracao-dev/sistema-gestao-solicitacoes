@@ -7,6 +7,7 @@ import {
   HiOutlineClipboardDocument,
   HiOutlinePaperClip,
   HiOutlineArrowPath,
+  HiOutlinePlusCircle,
   HiOutlinePencilSquare,
   HiOutlineXMark
 } from 'react-icons/hi2';
@@ -161,7 +162,7 @@ const FORNECEDOR_LINK_COLUMNS = [
   { key: 'email', width: 250, minWidth: 160 },
   { key: 'status', width: 130, minWidth: 105 },
   { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 230, minWidth: 220 }
+  { key: 'acoes', width: 260, minWidth: 245 }
 ];
 
 const CONDICOES_PAGAMENTO_COTACAO = [
@@ -195,7 +196,12 @@ function decimalApiParaInput(value, limite = 10) {
   return decimalLimpo ? `${inteiro},${decimalLimpo}` : inteiro;
 }
 
-function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
+function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados, options = {}) {
+  const novaOfertaSaldo = options.novaOfertaSaldo === true;
+  const itensComparativo = new Map(
+    (options.comparativo?.itens || []).map((item) => [buildItemKey(item), item])
+  );
+  const fornecedorCompraId = Number(cotacaoFornecedor?.fornecedor_compra_id || 0);
   const selecoes = new Set(
     (cotacaoFornecedor?.itensSelecionados || []).map((item) => buildItemKey({
       item_tipo: item.item_tipo,
@@ -214,8 +220,12 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
       resposta
     ])
   );
+  const modoOfertaSaldo = novaOfertaSaldo || [...respostas.values()].some(
+    (resposta) => String(resposta?.escopo_disponibilidade || '').toUpperCase() === 'OFERTA_SALDO'
+  );
 
   return {
+    nova_oferta_saldo: modoOfertaSaldo,
     valor_minimo_pedido: decimalApiParaInput(cotacaoFornecedor?.valor_minimo_pedido, 2),
     desconto_total: decimalApiParaInput(cotacaoFornecedor?.desconto_total, 2),
     condicao_pagamento: cotacaoFornecedor?.condicao_pagamento || '',
@@ -232,6 +242,24 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
     observacao_resposta: cotacaoFornecedor?.observacao_resposta || '',
     itens: itensCotacao.map((item) => {
       const resposta = respostas.get(buildItemKey(item));
+      const comparativoItem = itensComparativo.get(buildItemKey(item));
+      const saldoSolicitacao = parseNumeroCompra(comparativoItem?.saldo_disponivel ?? item.quantidade);
+      const quantidadeJaCompradaFornecedor = (options.alocacoes || []).reduce((total, alocacao) => {
+        const referenciaId = Number(
+          alocacao?.solicitacao_compra_item_id || alocacao?.solicitacao_compra_item_manual_id || 0
+        );
+        const mesmoItem = buildItemKey({
+          item_tipo: alocacao?.item_tipo,
+          item_referencia_id: referenciaId
+        }) === buildItemKey(item);
+        const ativa = String(alocacao?.status || '').toUpperCase() === 'ATIVA';
+        return ativa && mesmoItem && Number(alocacao?.fornecedor_compra_id) === fornecedorCompraId
+          ? total + parseNumeroCompra(alocacao?.quantidade_alocada)
+          : total;
+      }, 0);
+      const quantidadeOferta = modoOfertaSaldo
+        ? Math.max(0, saldoSolicitacao)
+        : resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : '');
       return {
         ...item,
         status_disponibilidade: resposta?.status_disponibilidade
@@ -240,8 +268,10 @@ function montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados) {
         quantidade_original: decimalApiParaInput(item.quantidade, 6),
         quantidade_solicitada: decimalApiParaInput(item.quantidade, 6),
         quantidade_minima_item: decimalApiParaInput(resposta?.quantidade_minima_item, 3),
+        saldo_solicitacao: saldoSolicitacao,
+        quantidade_ja_comprada_fornecedor: quantidadeJaCompradaFornecedor,
         quantidade_disponivel: decimalApiParaInput(
-          resposta?.quantidade_disponivel ?? (resposta?.disponivel ? item.quantidade : ''),
+          quantidadeOferta,
           3
         ),
         ipi_valor: formatarMoedaCotacaoInput(decimalApiParaInput(resposta?.ipi_valor, 2), 2),
@@ -331,9 +361,13 @@ function ModalRespostaInternaCotacao({
         <div className="app-modal-surface app-modal-surface--form">
         <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
           <div>
-            <h2 id="editar-resposta-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">Editar resposta da cotacao</h2>
+            <h2 id="editar-resposta-cotacao-titulo" className="text-lg font-semibold text-[var(--c-text)]">
+              {form.nova_oferta_saldo ? 'Nova oferta para o saldo' : 'Editar resposta da cotacao'}
+            </h2>
             <p className="text-sm text-[var(--c-muted)]">
-              {cotacao.fornecedor?.nome || 'Fornecedor'} - a alteracao sera registrada na auditoria como resposta interna.
+              {cotacao.fornecedor?.nome || 'Fornecedor'} - {form.nova_oferta_saldo
+                ? 'os valores informados valem somente para esta nova oferta.'
+                : 'a alteracao sera registrada na auditoria como resposta interna.'}
             </p>
           </div>
           <button
@@ -352,6 +386,11 @@ function ModalRespostaInternaCotacao({
           {solicitacaoEncerrada ? (
             <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
+            </div>
+          ) : null}
+          {form.nova_oferta_saldo ? (
+            <div className="mb-3 border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+              O pedido anterior e seu preco permanecem inalterados. Informe abaixo a quantidade, o preco e o prazo oferecidos agora para o saldo restante.
             </div>
           ) : null}
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-6">
@@ -513,7 +552,7 @@ function ModalRespostaInternaCotacao({
                   <th>Item</th>
                   <th>Qtd. solic.</th>
                   <th>Preco unit.</th>
-                  <th>Qtd. disponivel</th>
+                  <th>{form.nova_oferta_saldo ? 'Qtd. desta oferta' : 'Qtd. disponivel'}</th>
                   <th>Valor total</th>
                   <th>IPI</th>
                   <th>ICMS</th>
@@ -529,6 +568,11 @@ function ModalRespostaInternaCotacao({
                     <td className="min-w-[210px]">
                       <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
                       <div className="text-[var(--c-muted)]">{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
+                      {form.nova_oferta_saldo ? (
+                        <div className="mt-0.5 text-[10px] text-blue-700">
+                          Ja comprado deste fornecedor: {formatNumeroCompra(item.quantidade_ja_comprada_fornecedor)} · Saldo da solicitacao: {formatNumeroCompra(item.saldo_solicitacao)}
+                        </div>
+                      ) : null}
                     </td>
                     <td>
                       <input
@@ -570,7 +614,7 @@ function ModalRespostaInternaCotacao({
 
         <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--c-border)] px-5 py-4">
           <button type="button" className="btn btn-outline" onClick={onFechar} disabled={salvando || enviandoArquivos}>Cancelar</button>
-          {!solicitacaoEncerrada ? (
+          {!solicitacaoEncerrada && !form.nova_oferta_saldo ? (
             <button type="button" className="btn btn-outline" onClick={() => onSalvar(false)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar rascunho'}</button>
           ) : null}
           <button type="button" className="btn btn-primary" onClick={() => onSalvar(true)} disabled={salvando || enviandoArquivos}>{salvando ? 'Salvando...' : 'Salvar resposta'}</button>
@@ -2508,7 +2552,19 @@ export default function GerenciarCotacaoSolicitacao() {
 
   function abrirRespostaInterna(cotacaoFornecedor) {
     setCotacaoRespostaInterna(cotacaoFornecedor);
-    setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados));
+    setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados, {
+      comparativo,
+      alocacoes: solicitacao?.alocacoes || []
+    }));
+  }
+
+  function abrirNovaOfertaSaldo(cotacaoFornecedor) {
+    setCotacaoRespostaInterna(cotacaoFornecedor);
+    setFormRespostaInterna(montarFormularioRespostaInterna(cotacaoFornecedor, itensCombinados, {
+      novaOfertaSaldo: true,
+      comparativo,
+      alocacoes: solicitacao?.alocacoes || []
+    }));
   }
 
   function abrirRespostaInternaPorId(cotacaoFornecedorId) {
@@ -2643,6 +2699,7 @@ export default function GerenciarCotacaoSolicitacao() {
         frete_transportador_nome: formRespostaInterna.frete_transportador_nome,
         frete_transportador_cpf_cnpj: formRespostaInterna.frete_transportador_cpf_cnpj,
         observacao_resposta: formRespostaInterna.observacao_resposta,
+        nova_oferta_saldo: formRespostaInterna.nova_oferta_saldo === true,
         finalizar,
         itens: formRespostaInterna.itens.map((item) => ({
           item_tipo: item.item_tipo,
@@ -3260,6 +3317,16 @@ export default function GerenciarCotacaoSolicitacao() {
                         const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
                         const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
                         const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
+                        const possuiSaldoParaNovaOferta = (comparativo?.itens || []).some((item) => (
+                          parseNumeroCompra(item?.saldo_disponivel) > 0.0001
+                          && (item?.respostas || []).some(
+                            (resposta) => Number(resposta?.cotacao_fornecedor_id) === Number(cotacaoFornecedor.id)
+                          )
+                        ));
+                        const podeRegistrarNovaOferta = podeEditarResposta
+                          && statusSolicitacao === 'fechamento_parcial'
+                          && Boolean(pedidoFornecedor?.id)
+                          && possuiSaldoParaNovaOferta;
                         const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
                           && !fluxoTerminal;
                         const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
@@ -3362,6 +3429,18 @@ export default function GerenciarCotacaoSolicitacao() {
                                 aria-label="Editar resposta internamente"
                               >
                                 <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                              </CotacaoActionButton>
+                              <CotacaoActionButton
+                                type="button"
+                                onClick={() => abrirNovaOfertaSaldo(cotacaoFornecedor)}
+                                disabled={!podeRegistrarNovaOferta}
+                                title={podeRegistrarNovaOferta
+                                  ? 'Registrar novo preco e prazo deste fornecedor para o saldo'
+                                  : 'Nova oferta disponivel apos um fechamento parcial com este fornecedor'}
+                                aria-label="Registrar nova oferta para o saldo"
+                                className={podeRegistrarNovaOferta ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}
+                              >
+                                <HiOutlinePlusCircle className="h-4 w-4" />
                               </CotacaoActionButton>
                               <CotacaoActionButton
                                 type="button"

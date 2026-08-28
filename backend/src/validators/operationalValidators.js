@@ -602,6 +602,7 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
       'frete_transportador_nome',
       'frete_transportador_cpf_cnpj',
       'observacao_resposta',
+      'nova_oferta_saldo',
       'finalizar'
     ],
     'Resposta interna da cotacao'
@@ -706,6 +707,7 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
 
   return {
     itens,
+    nova_oferta_saldo: parseBoolean(body.nova_oferta_saldo, 'Nova oferta para o saldo'),
     valor_minimo_pedido: parseDecimal(body.valor_minimo_pedido, 'Valor minimo do pedido', {
       min: 0,
       scale: 2,
