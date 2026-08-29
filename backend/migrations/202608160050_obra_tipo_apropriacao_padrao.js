@@ -1,6 +1,6 @@
 'use strict';
 
-const { tableExists } = require('../src/database/schemaUtils');
+const { resolveTableName, tableExists } = require('../src/database/schemaUtils');
 
 /**
  * Vinculo entre tipo de solicitacao e apropriacao padrao, por obra.
@@ -17,12 +17,14 @@ module.exports = {
   async up({ DataTypes, queryInterface, sequelize }) {
     if (await tableExists(sequelize, 'obra_tipo_apropriacao_padrao')) return;
 
+    const obrasTableName = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+
     await queryInterface.createTable('obra_tipo_apropriacao_padrao', {
       id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true, allowNull: false },
       obra_id: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: { model: 'obras', key: 'id' },
+        references: { model: obrasTableName, key: 'id' },
         onUpdate: 'CASCADE',
         onDelete: 'CASCADE'
       },

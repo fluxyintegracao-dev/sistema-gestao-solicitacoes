@@ -94,13 +94,27 @@ Validacoes desta revisao: documentacao aprovada, build do frontend aprovado com 
 responsividade aprovada, zero referencias aos scripts removidos e zero padroes de mutacao de
 dados no auditor de duplicados.
 
+## Correcao durante o deploy da dev-v2
+
+- o snapshot `0a0f6e51` foi publicado em `dev-v2`, preservando o `.env` do servidor byte a byte;
+- o preflight encontrou 38 migrations estruturais pendentes e a auditoria encontrou zero contratos
+  duplicados;
+- antes das migrations foi criado um dump `--no-data` privado da estrutura do banco de
+  desenvolvimento;
+- a primeira migration parou sem ser registrada porque o MySQL Linux possui a tabela fisica
+  `Obras`, enquanto a migration referenciava `obras`;
+- `202608160050_obra_tipo_apropriacao_padrao.js` e
+  `202608270055_recarga_cartao_fluxo.js` passaram a resolver `Obras`/`obras` dinamicamente pelo
+  `information_schema`, como as migrations historicas do projeto;
+- o processo `backend-dev` permanece parado ate a publicacao da correcao, nova auditoria e conclusao
+  das migrations; `backend-solicitacoes` nao foi interrompido.
+
 ## Proximo passo exato
 
-1. preservar fora da troca o `.env`, PM2, certificados e arquivos de cada ambiente;
-2. colocar o snapshot de codigo em `dev-v2` sem iniciar o processo;
-3. instalar dependencias e compilar;
-4. executar `npm run preflight:schema` com o `.env` original da `dev-v2`;
-5. aplicar somente as pendencias estruturais com `ALLOW_SCHEMA_MIGRATIONS=true npm run migrate`;
-6. repetir o preflight e exigir zero pendencias;
-7. iniciar apenas `backend-dev`, configurar `PED. ADITIVO` e `Despesa Eventual` pela interface e homologar;
-8. repetir em `main` preservando o `.env` de producao e reiniciando apenas `backend-solicitacoes`.
+1. publicar em `dev-v2` a correcao de capitalizacao das duas migrations;
+2. atualizar o clone da EC2 sem iniciar o processo;
+3. repetir a auditoria estatica das 38 migrations;
+4. aplicar somente as pendencias estruturais com `ALLOW_SCHEMA_MIGRATIONS=true npm run migrate`;
+5. repetir o preflight e exigir zero pendencias;
+6. iniciar apenas `backend-dev`, configurar `PED. ADITIVO` e `Despesa Eventual` pela interface e homologar;
+7. repetir em `main` preservando o `.env` de producao e reiniciando apenas `backend-solicitacoes`.

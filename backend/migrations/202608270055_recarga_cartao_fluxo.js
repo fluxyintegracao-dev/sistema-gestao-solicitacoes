@@ -3,6 +3,7 @@
 const {
   foreignKeyExists,
   indexExists,
+  resolveTableName,
   tableExists
 } = require('../src/database/schemaUtils');
 
@@ -33,6 +34,8 @@ async function adicionarIndice(queryInterface, sequelize, tabela, nome, fields, 
 
 module.exports = {
   async up({ DataTypes, queryInterface, sequelize }) {
+    const obrasTableName = await resolveTableName(sequelize, ['Obras', 'obras'], 'Obras');
+
     if (!(await tableExists(sequelize, TABELAS.cartoes))) {
       await queryInterface.createTable(TABELAS.cartoes, {
         id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true, allowNull: false },
@@ -128,7 +131,7 @@ module.exports = {
     await adicionarFk(queryInterface, sequelize, TABELAS.prestacoes, 'cr_prest_validado_fk', ['validado_por'], { table: 'users', field: 'id' }, 'SET NULL');
 
     await adicionarFk(queryInterface, sequelize, TABELAS.rateios, 'cr_rateio_prest_fk', ['prestacao_id'], { table: TABELAS.prestacoes, field: 'id' }, 'CASCADE');
-    await adicionarFk(queryInterface, sequelize, TABELAS.rateios, 'cr_rateio_obra_fk', ['obra_id'], { table: 'obras', field: 'id' });
+    await adicionarFk(queryInterface, sequelize, TABELAS.rateios, 'cr_rateio_obra_fk', ['obra_id'], { table: obrasTableName, field: 'id' });
     await adicionarFk(queryInterface, sequelize, TABELAS.rateios, 'cr_rateio_aprop_fk', ['apropriacao_id'], { table: 'apropriacoes', field: 'id' });
     await adicionarFk(queryInterface, sequelize, TABELAS.rateios, 'cr_rateio_criado_fk', ['criado_por'], { table: 'users', field: 'id' }, 'SET NULL');
 
