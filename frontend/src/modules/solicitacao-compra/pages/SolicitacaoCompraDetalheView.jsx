@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import { listarApropriacoes } from '../../../services/apropriacoes';
@@ -13,6 +12,7 @@ import {
 } from '../../../services/compras';
 import {
   canAlterarQuantidadeSolicitacaoCompra,
+  canCatalogarItensManuaisCompras,
   canDeleteCompraSolicitacoes,
   canEditarApropriacoesItemCompraDireta,
   canEditarApropriacoesItemSolicitacaoCompra
@@ -28,6 +28,7 @@ import {
   sincronizarItemComRateios,
   validarRateiosItem
 } from '../utils/apropriacoes';
+import ItemCompraExpansivel from '../components/ItemCompraExpansivel';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -59,18 +60,6 @@ function statusCotacaoClass(status) {
   return 'app-status-pill bg-blue-100 text-blue-700';
 }
 
-const itemTableColumns = [
-  { key: 'indice', width: 64, minWidth: 56 },
-  { key: 'tipo', width: 112, minWidth: 92 },
-  { key: 'insumo', width: 220, minWidth: 160 },
-  { key: 'unidade', width: 96, minWidth: 78 },
-  { key: 'quantidade', width: 118, minWidth: 98 },
-  { key: 'especificacao', width: 260, minWidth: 180 },
-  { key: 'apropriacao', width: 140, minWidth: 110 },
-  { key: 'necessario_para', width: 132, minWidth: 112 },
-  { key: 'link', width: 280, minWidth: 140 }
-];
-
 function combinarItensSolicitacaoCompra(solicitacao, apropriacoes = []) {
   const itens = (solicitacao?.itens || []).map((item) => ({
     id: item.id,
@@ -85,24 +74,44 @@ function combinarItensSolicitacaoCompra(solicitacao, apropriacoes = []) {
     apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
     apropriacao_linhas: item.apropriacao_linhas || [],
     necessario_para: item.necessario_para,
-    link_produto: item.link_produto || ''
+    necessario_para_formatado: formatarData(item.necessario_para),
+    link_produto: item.link_produto || '',
+    arquivo_url: item.arquivo_url || '',
+    arquivo_nome_original: item.arquivo_nome_original || ''
   }));
 
-  const manuais = (solicitacao?.itensManuais || []).map((item) => ({
-    id: item.id,
-    item_tipo: 'MANUAL',
-    tipo: 'MANUAL',
-    nome: item.nome_manual || '-',
-    unidade: item.unidade_sigla_manual || '-',
-    quantidade: item.quantidade,
-    especificacao: item.especificacao || '-',
-    apropriacao_id: item.apropriacao_id || '',
-    apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
-    apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
-    apropriacao_linhas: item.apropriacao_linhas || [],
-    necessario_para: item.necessario_para,
-    link_produto: item.link_produto || ''
-  }));
+  const manuais = (solicitacao?.itensManuais || []).map((item) => {
+    const insumoOficial = item.insumoCatalogado || null;
+    return {
+      id: item.id,
+      item_tipo: 'MANUAL',
+      tipo: 'MANUAL',
+      nome: insumoOficial?.nome || item.nome_manual || '-',
+      unidade: insumoOficial?.unidade?.sigla
+        || insumoOficial?.unidade?.nome
+        || insumoOficial?.unidade_manual
+        || item.unidade_sigla_manual
+        || '-',
+      quantidade: item.quantidade,
+      especificacao: insumoOficial?.descricao || item.especificacao || '-',
+      nome_original: item.nome_manual || '-',
+      especificacao_original: item.especificacao || '-',
+      apropriacao_id: item.apropriacao_id || '',
+      apropriacao: montarLinhasResumoApropriacao(item, apropriacoes).join(' | ') || item.apropriacao?.codigo || '-',
+      apropriacoes: Array.isArray(item.apropriacoes) ? item.apropriacoes : [],
+      apropriacao_linhas: item.apropriacao_linhas || [],
+      necessario_para: item.necessario_para,
+      necessario_para_formatado: formatarData(item.necessario_para),
+      link_produto: item.link_produto || '',
+      arquivo_url: item.arquivo_url || '',
+      arquivo_nome_original: item.arquivo_nome_original || '',
+      insumo_catalogado_id: item.insumo_catalogado_id || null,
+      insumoCatalogado: insumoOficial,
+      catalogador: item.catalogador || null,
+      catalogado_em: item.catalogado_em || null,
+      catalogacao_tipo: item.catalogacao_tipo || null
+    };
+  });
 
   return [...itens, ...manuais];
 }
@@ -185,6 +194,7 @@ export default function SolicitacaoCompraDetalheView() {
   const podeEditarQuantidadeItem = canAlterarQuantidadeSolicitacaoCompra(user);
   const podeEditarApropriacoesItem =
     canEditarApropriacoesItemSolicitacaoCompra(user) || canEditarApropriacoesItemCompraDireta(user);
+  const podeCatalogarItensManuais = canCatalogarItensManuaisCompras(user);
 
   const resumoRateiosModal = modalApropriacaoItem
     ? calcularResumoRateios({ ...modalApropriacaoItem, apropriacoes: rateiosModal })
@@ -482,92 +492,48 @@ export default function SolicitacaoCompraDetalheView() {
             <h2 className="font-semibold">Itens</h2>
             <span className="text-sm text-[var(--c-muted)]">{itensCombinados.length} item(ns)</span>
           </div>
-          <div className="app-table-shell compra-detalhe-itens-shell overflow-x-auto">
-            <ResizableTable
-              columns={itemTableColumns}
-              storageKey="fluxy.solicitacao-compra-detalhe.itens.columns.v1"
-              className="table compra-detalhe-itens-table"
-            >
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="indice">#</ResizableTh>
-                  <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                  <ResizableTh columnKey="insumo">Insumo</ResizableTh>
-                  <ResizableTh columnKey="unidade">Unidade</ResizableTh>
-                  <ResizableTh columnKey="quantidade">Quantidade</ResizableTh>
-                  <ResizableTh columnKey="especificacao">Especificacao</ResizableTh>
-                  <ResizableTh columnKey="apropriacao">Apropriacao</ResizableTh>
-                  <ResizableTh columnKey="necessario_para">Necessario para</ResizableTh>
-                  <ResizableTh columnKey="link">Link</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {itensCombinados.map((item, index) => {
-                  const loadingKey = `${item.item_tipo}-${item.id}`;
-
-                  return (
-                  <tr key={loadingKey}>
-                    <td>{index + 1}</td>
-                    <td>
-                      <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${item.tipo === 'MANUAL' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
-                        {item.tipo}
-                      </span>
-                    </td>
-                    <td className={item.tipo === 'MANUAL' ? 'font-semibold text-red-700' : ''}>{item.nome}</td>
-                    <td>{item.unidade}</td>
-                    <td>
-                      <div className="flex items-center gap-2">
-                        <span>{item.quantidade}</span>
-                        {podeEditarQuantidadeItem && !solicitacaoCompraCancelada && (
-                          <button
-                            type="button"
-                            className="rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
-                            onClick={() => handleEditarQuantidade(item)}
-                            disabled={salvandoQuantidadeId === loadingKey}
-                          >
-                            {salvandoQuantidadeId === loadingKey ? 'Salvando...' : 'Editar'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td>{item.especificacao}</td>
-                    <td>
-                      <div className="flex flex-col gap-2">
-                        <span>{item.apropriacao}</span>
-                        {podeEditarApropriacoesItem && !solicitacaoCompraCancelada && (
-                          <button
-                            type="button"
-                            className="w-fit rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold text-[var(--c-text)] hover:bg-[var(--c-surface-muted)]"
-                            onClick={() => abrirModalApropriacao(item)}
-                            disabled={salvandoApropriacaoId === loadingKey}
-                          >
-                            {salvandoApropriacaoId === loadingKey ? 'Salvando...' : 'Editar apropr.'}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td>{formatarData(item.necessario_para)}</td>
-                    <td>
-                      {item.link_produto ? (
-                        <a
-                          className="compra-detalhe-link-cell"
-                          href={item.link_produto}
-                          target="_blank"
-                          rel="noreferrer"
-                          title={item.link_produto}
-                        >
-                          {item.link_produto}
-                        </a>
-                      ) : (
-                        '-'
-                      )}
-                    </td>
+          {itensCombinados.length > 0 ? (
+            <div className="compra-itens-tabela-shell" role="region" aria-label="Itens da solicitacao de compra" tabIndex={0}>
+              <table className="compra-itens-tabela">
+                <thead>
+                  <tr>
+                    <th scope="col" className="compra-item-column-index">#</th>
+                    <th scope="col">Origem</th>
+                    <th scope="col">Item</th>
+                    <th scope="col">Quantidade</th>
+                    <th scope="col">Apropriacao</th>
+                    <th scope="col">Necessario para</th>
+                    <th scope="col">Cadastro</th>
+                    <th scope="col" className="compra-item-column-action"><span className="sr-only">Detalhes</span></th>
                   </tr>
-                  );
-                })}
-              </tbody>
-            </ResizableTable>
-          </div>
+                </thead>
+                <tbody>
+                  {itensCombinados.map((item, index) => {
+                    const loadingKey = `${item.item_tipo}-${item.id}`;
+                    return (
+                      <ItemCompraExpansivel
+                        key={loadingKey}
+                        item={item}
+                        index={index}
+                        solicitacaoId={id}
+                        podeEditarQuantidade={podeEditarQuantidadeItem}
+                        podeEditarApropriacao={podeEditarApropriacoesItem}
+                        podeCatalogar={podeCatalogarItensManuais}
+                        bloqueado={solicitacaoCompraCancelada}
+                        salvandoQuantidade={salvandoQuantidadeId === loadingKey}
+                        salvandoApropriacao={salvandoApropriacaoId === loadingKey}
+                        onEditarQuantidade={handleEditarQuantidade}
+                        onEditarApropriacao={abrirModalApropriacao}
+                        onCatalogado={carregar}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="compra-itens-empty">Nenhum item informado nesta solicitacao.</div>
+          )}
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">

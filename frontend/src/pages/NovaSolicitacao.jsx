@@ -3,17 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
-import { createSolicitacao } from '../services/solicitacoes';
+import { createSolicitacao, getApropriacaoPadraoSolicitacao, getSaldoDespesaEventual } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
-import { getContratos } from '../services/contratos';
+import { getContratos, criarContratoFluxoNovo, getFormasPagamentoFluxos, getLimiteJuridico, uploadContratoAnexos, uploadNegociacaoContrato, uploadDocumentacaoJuridicaContrato } from '../services/contratos';
+import BlocoContratoFluxoNovo, { LIMITE_DETALHES_CONTRATO, MAXIMO_PARCELAS_CONTRATO } from '../components/contratos/BlocoContratoFluxoNovo';
+import ModalConferenciaCredores from '../components/contratos/ModalConferenciaCredores';
+import BlocoMedicaoContrato from '../components/contratos/BlocoMedicaoContrato';
+import ModalAditivoContrato from '../components/contratos/ModalAditivoContrato';
 import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceiros';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
 import { HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
+import ParceiroBuscaRemota from '../components/solicitacoes/ParceiroBuscaRemota';
+import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
+import RecargaCartaoFields from '../components/recarga-cartao/RecargaCartaoFields';
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
@@ -24,11 +31,20 @@ import {
 } from '../utils/novaSolicitacaoAutomacaoDestino';
 import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 import {
+  UPLOAD_DOCUMENT_ACCEPT,
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
+  arquivoDocumentoPermitido,
   concatenarAnexosPendentes,
   extrairFilesAnexosPendentes,
-  montarMensagemArquivosAcimaDoLimite
+  montarMensagemArquivosAcimaDoLimite,
+  montarMensagemTiposArquivoNaoPermitidos
 } from '../utils/pendingAttachments';
+import {
+  chavePixPreferencial,
+  formaPagamentoEhBoleto,
+  formaPagamentoEhPix,
+  formaPagamentoPermitidaDespesaEventual
+} from '../utils/formaPagamento';
 
 function normalizarBusca(valor) {
   return String(valor || '')
@@ -41,6 +57,19 @@ function normalizarBusca(valor) {
 function isTipoCompraDireta(tipo) {
   const token = normalizarBusca(tipo?.codigo_interno || tipo?.nome).replace(/[^A-Z0-9]+/g, '_');
   return token === 'COMPRA_DIRETA';
+}
+
+function isTipoRecargaCartao(tipo, comportamento = {}) {
+  if (comportamento?.usa_fluxo_recarga_cartao === true) return true;
+  const token = normalizarBusca(tipo?.codigo_interno || tipo?.nome).replace(/[^A-Z0-9]+/g, '_');
+  return token === 'RECARGA_DE_CARTAO';
+}
+
+function isSetorGerenciaProcessos(setor) {
+  const tokens = [setor?.codigo, setor?.nome]
+    .map((valor) => normalizarBusca(valor).replace(/[^A-Z0-9]+/g, '_'))
+    .filter(Boolean);
+  return tokens.some((token) => token === 'GEO' || (token.includes('GERENCIA') && token.includes('PROCESSO')));
 }
 
 function formatarLocalidadeObra(obra) {
@@ -88,6 +117,7 @@ function criarNovoParceiroPadrao() {
     email: '',
     endereco: '',
     numero: '',
+    complemento: '',
     bairro: '',
     cep: '',
     municipio: '',
@@ -131,12 +161,21 @@ export default function NovaSolicitacao() {
   const [contratos, setContratos] = useState([]);
   const [contratosRef, setContratosRef] = useState([]);
   const [apropriacoes, setApropriacoes] = useState([]);
+  const [apropriacaoAutomatica, setApropriacaoAutomatica] = useState({
+    status: 'idle',
+    apropriacao: null,
+    erro: ''
+  });
   const [apropriacoesContratoRateio, setApropriacoesContratoRateio] = useState([]);
   const [refContratoBusca, setRefContratoBusca] = useState('');
   const [refResultados, setRefResultados] = useState([]);
   const [parceiroBusca, setParceiroBusca] = useState('');
   const [parceiroResultados, setParceiroResultados] = useState([]);
   const [parceiroSelecionado, setParceiroSelecionado] = useState(null);
+  const [favorecidoSelecionado, setFavorecidoSelecionado] = useState(null);
+  const [usarCredorComoFavorecido, setUsarCredorComoFavorecido] = useState(false);
+  const [formasPagamentoSolicitacao, setFormasPagamentoSolicitacao] = useState([]);
+  const [erroFormasPagamento, setErroFormasPagamento] = useState('');
   const [parceiroBuscando, setParceiroBuscando] = useState(false);
   const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
   const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
@@ -146,9 +185,27 @@ export default function NovaSolicitacao() {
   const [categoriasParceiro, setCategoriasParceiro] = useState([]);
   const [novoParceiro, setNovoParceiro] = useState(criarNovoParceiroPadrao);
   const [arquivos, setArquivos] = useState([]);
+  const [boletoArquivos, setBoletoArquivos] = useState([]);
+  const [despesaEventualSaldo, setDespesaEventualSaldo] = useState({ status: 'idle', dados: null, erro: '' });
+  const [despesaEventualDeclaracoes, setDespesaEventualDeclaracoes] = useState({
+    despesa_pontual_nao_recorrente: false,
+    sem_vinculo_contratual: false,
+    nao_fracionada: false
+  });
+  const [cartaoRecargaId, setCartaoRecargaId] = useState('');
+  const [recargaCartaoContexto, setRecargaCartaoContexto] = useState(null);
   const [criandoSolicitacao, setCriandoSolicitacao] = useState(false);
   const [valorTexto, setValorTexto] = useState('');
+  const [contratoNovoDados, setContratoNovoDados] = useState(null);
+  // Rateio da apropriacao do CONTRATO (19/08): varias apropriacoes, por % ou por R$.
+  // Comeca com uma linha vazia — o caso de uma apropriacao so continua sendo o normal.
+  const [rateioContrato, setRateioContrato] = useState([{ apropriacao_id: '', percentual: '100', valor: '' }]);
+  const [medicaoContratoDados, setMedicaoContratoDados] = useState(null);
+  // PI-15: o aditivo virou uma ACAO sobre o contrato, pedida por um modal na tela de medicao.
+  // Nao e mais um subtipo da Nova Solicitacao, e nao participa do envio deste formulario.
+  const [modalAditivoAberto, setModalAditivoAberto] = useState(false);
   const anexosRef = useRef(null);
+  const boletoRef = useRef(null);
   const obraBuscaBlurTimeoutRef = useRef(null);
   const automacaoDestinoExecutadaRef = useRef('');
   const criandoSolicitacaoRef = useRef(false);
@@ -163,6 +220,10 @@ export default function NovaSolicitacao() {
     codigo_contrato: '',
     area_responsavel: '',
     descricao: '',
+    justificativa: '',
+    favorecido_id: '',
+    forma_pagamento_id: '',
+    favorecido_chave_pix: '',
     itens_apropriacao: '',
     ref_contrato_abertura: '',
     valor: '',
@@ -306,7 +367,8 @@ export default function NovaSolicitacao() {
   }, [form.obra_id, obraSelecionadaEhObra, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setForm((atual) => ({ ...atual, [name]: value }));
   }
 
   function normalizarDocumento(valor) {
@@ -324,37 +386,61 @@ export default function NovaSolicitacao() {
   }
 
   function limparParceiroSelecionado() {
+    if (usarCredorComoFavorecido) {
+      setUsarCredorComoFavorecido(false);
+      setFavorecidoSelecionado(null);
+      setForm(prev => ({ ...prev, parceiro_id: '', favorecido_id: '', favorecido_chave_pix: '' }));
+    } else {
+      setForm(prev => ({ ...prev, parceiro_id: '' }));
+    }
     setParceiroSelecionado(null);
     setParceiroBusca('');
     setParceiroResultados([]);
     setParceiroBuscaExecutada(false);
     setCredorContratoSugestoesAbertas(false);
-    setForm(prev => ({ ...prev, parceiro_id: '' }));
   }
 
-  async function buscarParceirosRelacionados() {
+  async function buscarParceirosRelacionados({ automatico = false } = {}) {
     try {
       const termo = parceiroBusca.trim();
       if (!termo) return;
       setParceiroBuscando(true);
       setParceiroBuscaExecutada(true);
-      const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 8 });
+      const data = await buscarParceiros({ q: termo, fornecedor: 1, ativo: 1, limit: 20 });
       const lista = Array.isArray(data) ? data : [];
       setParceiroResultados(lista);
 
-      if (lista.length === 1) {
+      // So auto-seleciona no clique do botao. Na busca AO DIGITAR isso seria hostil: a pessoa
+      // digita "JOAO", cai em um resultado unico e o campo se fecha sozinho antes de ela terminar
+      // de escrever o nome inteiro.
+      if (!automatico && lista.length === 1) {
         selecionarParceiro(lista[0]);
       }
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao buscar credores');
+      // Busca automatica nao interrompe a digitacao com alerta: quem esta escrevendo nao pediu
+      // esta busca, e um popup a cada tecla seria pior que o erro.
+      if (!automatico) alert(error.message || 'Erro ao buscar credores');
     } finally {
       setParceiroBuscando(false);
     }
   }
 
+
   async function salvarNovoParceiro() {
     try {
+      // O backend recusa igual (PI-20). Barrar aqui evita a viagem so para receber o 400, e a
+      // mensagem lista o que falta em vez de dizer apenas "cadastro incompleto".
+      const faltando = [
+        ['nome', 'Nome'], ['cpf_cnpj', 'CPF/CNPJ'], ['endereco', 'Logradouro'], ['numero', 'Numero'],
+        ['bairro', 'Bairro'], ['cep', 'CEP'], ['municipio', 'Municipio'], ['estado', 'UF']
+      ].filter(([campo]) => !String(novoParceiro[campo] || '').trim()).map(([, rotulo]) => rotulo);
+
+      if (faltando.length > 0) {
+        alert(`Complete o cadastro do credor. Falta: ${faltando.join(', ')}.`);
+        return;
+      }
+
       const payload = {
         ...novoParceiro,
         cpf_cnpj: normalizarDocumento(novoParceiro.cpf_cnpj),
@@ -387,7 +473,11 @@ export default function NovaSolicitacao() {
       tipo_sub_id: '',
       contrato_id: '',
       codigo_contrato: '',
-      parceiro_id: ''
+      parceiro_id: '',
+      favorecido_id: '',
+      forma_pagamento_id: '',
+      favorecido_chave_pix: '',
+      justificativa: ''
     }));
     setContratos([]);
     setApropriacoes([]);
@@ -396,6 +486,10 @@ export default function NovaSolicitacao() {
     setRefResultados([]);
     setApropriacoesContratoRateio([]);
     limparParceiroSelecionado();
+    setFavorecidoSelecionado(null);
+    setUsarCredorComoFavorecido(false);
+    setBoletoArquivos([]);
+    if (boletoRef.current) boletoRef.current.value = '';
   }
 
   function limparBuscaObra() {
@@ -412,6 +506,11 @@ export default function NovaSolicitacao() {
       apropriacoes: moduloApropriacoesHabilitado
     });
   }, [tipoSelecionado, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
+  // Derivado do comportamento, nao do nome/id: qualquer tipo configurado como medicao recebe as
+  // mesmas exigencias de documento e pagamento condicional.
+  const tipoEhDeMedicao = Boolean(
+    comportamentoTipo.mostrar_periodo_medicao || comportamentoTipo.exige_periodo_medicao
+  );
   const camposNovaSolicitacao = useMemo(() => (
     resolverCamposNovaSolicitacaoFrontend(
       comportamentoTipo,
@@ -419,12 +518,39 @@ export default function NovaSolicitacao() {
       form.tipo_solicitacao_id,
       {
         apropriacoesDisponiveis: moduloApropriacoesHabilitado,
-        areaResponsavel: form.area_responsavel
+        areaResponsavel: form.area_responsavel,
+        // Regra do subtipo tem precedencia sobre a do tipo (escopo de contratos 3.1-3.3).
+        tipoSubId: form.tipo_sub_id
       }
     )
-  ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel, moduloApropriacoesHabilitado]);
-  const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
-  const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+    // `form.tipo_sub_id` entra aqui porque e lido dentro do memo: sem ele, trocar o subtipo nao
+    // re-resolve os campos e a regra `tipo:subtipo` inteira nao tem efeito na tela (o motor, a
+    // tela de configuracao e o backend ja resolviam certo — so esta lista estava incompleta).
+  ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel, form.tipo_sub_id, moduloApropriacoesHabilitado]);
+  const tipoConfiguradoComoDespesaEventual = Boolean(comportamentoTipo.usa_fluxo_despesa_eventual);
+  const tipoConfiguradoComoRecargaCartao = isTipoRecargaCartao(tipoSelecionado, comportamentoTipo);
+  const camposFixosDespesaEventual = new Set([
+    'valor',
+    'credor',
+    'favorecido',
+    'forma_pagamento',
+    'apropriacao_principal',
+    'subtipo',
+    'justificativa',
+    'anexos',
+    'data_vencimento'
+  ]);
+  const camposFixosRecargaCartao = new Set(['valor', 'data_vencimento']);
+  const campoVisivel = (campo) => {
+    if (tipoConfiguradoComoRecargaCartao) return camposFixosRecargaCartao.has(campo);
+    return (tipoConfiguradoComoDespesaEventual && camposFixosDespesaEventual.has(campo))
+      || camposNovaSolicitacao?.[campo]?.visivel !== false;
+  };
+  const campoObrigatorio = (campo) => {
+    if (tipoConfiguradoComoRecargaCartao) return camposFixosRecargaCartao.has(campo);
+    return (tipoConfiguradoComoDespesaEventual && camposFixosDespesaEventual.has(campo))
+      || Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+  };
   const opcoesNovaSolicitacao = useMemo(() => (
     obterOpcoesNovaSolicitacaoFrontend(
       camposNovaSolicitacaoConfig,
@@ -432,9 +558,116 @@ export default function NovaSolicitacao() {
       form.area_responsavel
     )
   ), [camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel]);
+  // Campo que nao aparece nao pode ser exigido — a guarda usa `exibirCampoSubtipo`, definido logo
+  // abaixo, e por isso a exigencia e resolvida junto dele.
   const subtipoObrigatorio = campoObrigatorio('subtipo');
   const medicaoObrigatoria = campoObrigatorio('periodo_medicao');
   const solicitacaoCompra = !comportamentoTipo.mostrar_apropriacao_principal && !comportamentoTipo.mostrar_valor;
+  // Fluxo novo de contratos (D38): a flag vem do JSON comportamento do tipo, mesmo estilo
+  // da derivacao acima — nunca por nome de tipo.
+  const usaFluxoContratoNovo = Boolean(comportamentoTipo.usa_fluxo_contrato_novo);
+  const usaFluxoDespesaEventual = tipoConfiguradoComoDespesaEventual;
+  const usaFluxoRecargaCartao = tipoConfiguradoComoRecargaCartao;
+  const usaApropriacaoAutomaticaObra = Boolean(comportamentoTipo.usa_apropriacao_automatica_obra);
+
+  useEffect(() => {
+    if (!usaApropriacaoAutomaticaObra || !form.obra_id || !form.tipo_solicitacao_id) {
+      setApropriacaoAutomatica({ status: 'idle', apropriacao: null, erro: '' });
+      return undefined;
+    }
+
+    let cancelado = false;
+    setApropriacaoAutomatica({ status: 'loading', apropriacao: null, erro: '' });
+    getApropriacaoPadraoSolicitacao({
+      obra_id: form.obra_id,
+      tipo_solicitacao_id: form.tipo_solicitacao_id
+    })
+      .then((data) => {
+        if (cancelado) return;
+        setApropriacaoAutomatica({
+          status: data?.apropriacao ? 'success' : 'error',
+          apropriacao: data?.apropriacao || null,
+          erro: data?.apropriacao ? '' : 'A apropriacao automatica nao esta configurada para esta obra.'
+        });
+      })
+      .catch((error) => {
+        if (cancelado) return;
+        setApropriacaoAutomatica({
+          status: 'error',
+          apropriacao: null,
+          erro: error?.message || 'Nao foi possivel conferir a apropriacao automatica.'
+        });
+      });
+
+    return () => {
+      cancelado = true;
+    };
+  }, [usaApropriacaoAutomaticaObra, form.obra_id, form.tipo_solicitacao_id]);
+
+  useEffect(() => {
+    if (!usaFluxoDespesaEventual || !form.obra_id) {
+      setDespesaEventualSaldo({ status: 'idle', dados: null, erro: '' });
+      return undefined;
+    }
+
+    let cancelado = false;
+    setDespesaEventualSaldo({ status: 'loading', dados: null, erro: '' });
+    getSaldoDespesaEventual(form.obra_id)
+      .then((dados) => {
+        if (!cancelado) setDespesaEventualSaldo({ status: 'success', dados, erro: '' });
+      })
+      .catch((error) => {
+        if (!cancelado) {
+          setDespesaEventualSaldo({
+            status: 'error',
+            dados: null,
+            erro: error?.message || 'Nao foi possivel calcular o saldo da obra.'
+          });
+        }
+      });
+
+    return () => { cancelado = true; };
+  }, [usaFluxoDespesaEventual, form.obra_id]);
+
+  useEffect(() => {
+    if (usaFluxoDespesaEventual) return;
+    setDespesaEventualDeclaracoes({
+      despesa_pontual_nao_recorrente: false,
+      sem_vinculo_contratual: false,
+      nao_fracionada: false
+    });
+  }, [usaFluxoDespesaEventual]);
+
+  useEffect(() => {
+    if (usaFluxoRecargaCartao) return;
+    setCartaoRecargaId('');
+    setRecargaCartaoContexto(null);
+  }, [usaFluxoRecargaCartao]);
+
+  useEffect(() => {
+    if (!usaFluxoRecargaCartao) return;
+    const gerencia = setores.find(isSetorGerenciaProcessos);
+    if (!gerencia?.codigo || String(form.area_responsavel) === String(gerencia.codigo)) return;
+    setForm((atual) => ({ ...atual, area_responsavel: gerencia.codigo }));
+  }, [usaFluxoRecargaCartao, setores, form.area_responsavel]);
+
+  // O limite vem da configuracao (`CONTRATO_LIMITE_JURIDICO`). A constante da tela ficou apenas
+  // como fallback: com o numero fixo aqui, mudar o limite pela tela de configuracao fazia a tela
+  // cobrar num corte e o backend rotear noutro.
+  const [limiteJuridico, setLimiteJuridico] = useState(LIMITE_DETALHES_CONTRATO);
+  // Conferencia do cadastro dos contratados, exigida acima do limite (20/08).
+  const [modalCredoresAberto, setModalCredoresAberto] = useState(false);
+  const [credoresParaConferir, setCredoresParaConferir] = useState([]);
+
+  useEffect(() => {
+    if (!usaFluxoContratoNovo) return undefined;
+    let cancelado = false;
+    getLimiteJuridico()
+      .then((r) => { if (!cancelado && Number(r?.limite) > 0) setLimiteJuridico(Number(r.limite)); })
+      // Falha aqui mantem o fallback: e melhor cobrar no corte antigo do que nao cobrar.
+      .catch(() => {});
+    return () => { cancelado = true; };
+  }, [usaFluxoContratoNovo]);
   const exigeApropriacaoPrincipal =
     Boolean(form.tipo_solicitacao_id) &&
     obraSelecionadaEhObra &&
@@ -443,14 +676,38 @@ export default function NovaSolicitacao() {
   const exibirCamposContrato = obraSelecionadaEhObra && campoVisivel('contrato');
   const exibirCampoApropriacao = obraSelecionadaEhObra && moduloApropriacoesHabilitado && campoVisivel('apropriacao_principal');
   const camposContratoObrigatorios = campoObrigatorio('contrato');
-  const exibirCampoSubtipo = campoVisivel('subtipo');
+  // O SUBTIPO SAI DO CONTRATO (item 1 do lote de 23/08). Pelo tipo CONTRATO so existe a abertura,
+  // entao o subtipo nao separava nada — e o gatilho do fluxo novo sempre foi do TIPO
+  // (`usa_fluxo_contrato_novo`), nunca do subtipo. Nos demais tipos ele continua como sempre.
+  //
+  // Consequencia registrada no plano: a configuracao de "campos por subtipo" (PI-13) deixa de valer
+  // para CONTRATO — passa a valer a do tipo. As solicitacoes antigas guardam o subtipo e seguem
+  // legiveis; nada e apagado.
+  const exibirCampoSubtipo = campoVisivel('subtipo') && !usaFluxoContratoNovo;
   const exibirCampoCredor = campoVisivel('credor');
+
+  // Busca do credor AO DIGITAR (pedido do cliente, 19/08), sem minimo de caracteres: procura desde
+  // a primeira letra. O atraso existe para nao disparar uma consulta por tecla — e cancelado a
+  // cada digito novo, entao so a ultima palavra digitada vira consulta.
+  useEffect(() => {
+    if (!exibirCampoCredor) return undefined;
+    const termo = parceiroBusca.trim();
+    if (!termo || parceiroSelecionado) return undefined;
+    const id = window.setTimeout(() => { void buscarParceirosRelacionados({ automatico: true }); }, 350);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parceiroBusca, parceiroSelecionado, exibirCampoCredor]);
+
   const exibirCadastroCredor = campoVisivel('cadastro_credor');
   const permitirVinculoCredor = exibirCampoCredor || exibirCadastroCredor;
   const permitirCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
   const restringirCredorAoContrato = exibirCamposContrato && !permitirCredorAvulsoComContrato;
-  const exibirDataVencimento = campoVisivel('data_vencimento');
-  const dataVencimentoObrigatoria = campoObrigatorio('data_vencimento');
+  // No fluxo novo de contratos o vencimento que vale e o 1o vencimento do bloco (as parcelas
+  // derivam dele); manter o campo do formulario exigiria um dado que nao vai no payload (M1).
+  const exibirDataVencimento = campoVisivel('data_vencimento') && !usaFluxoContratoNovo;
+  // Campo invisivel nao pode ser exigido: sem esta guarda o submit ficaria travado por um
+  // campo que o usuario nao tem como preencher (a validacao roda antes do fluxo do contrato).
+  const dataVencimentoObrigatoria = exibirDataVencimento && campoObrigatorio('data_vencimento');
   const exibirDataDemissao = campoVisivel('data_demissao');
   const dataDemissaoObrigatoria = campoObrigatorio('data_demissao');
   const exibirPeriodoMedicao = campoVisivel('periodo_medicao');
@@ -466,7 +723,99 @@ export default function NovaSolicitacao() {
     (Boolean(comportamentoTipo.exige_apropriacoes_contrato) || campoObrigatorio('apropriacoes_contrato'));
   const exibirDescricao = campoVisivel('descricao');
   const descricaoObrigatoria = campoObrigatorio('descricao');
-  const exibirAnexos = campoVisivel('anexos');
+  const exibirJustificativa = campoVisivel('justificativa') && !usaFluxoContratoNovo;
+  const justificativaObrigatoria = exibirJustificativa && campoObrigatorio('justificativa');
+  const exibirFormaPagamento = campoVisivel('forma_pagamento') && !usaFluxoContratoNovo;
+  // A forma vem primeiro. Depois de selecionada, o favorecido aparece para qualquer pagamento;
+  // PIX acrescenta a chave e Boleto acrescenta o anexo especifico.
+  const exibirFavorecido = (campoVisivel('favorecido') || exibirFormaPagamento) && !usaFluxoContratoNovo;
+  const formaPagamentoObrigatoria = exibirFormaPagamento && campoObrigatorio('forma_pagamento');
+  // Em medicao o anexo e regra do fluxo, mesmo que a configuracao visual antiga tenha ocultado o
+  // campo: campo invisivel e obrigatorio seria uma tela impossivel de concluir.
+  const exibirAnexos = campoVisivel('anexos') || tipoEhDeMedicao;
+  const anexosObrigatorios = tipoEhDeMedicao || campoObrigatorio('anexos');
+  const formasPagamentoDisponiveis = useMemo(
+    () => usaFluxoDespesaEventual
+      ? formasPagamentoSolicitacao.filter(formaPagamentoPermitidaDespesaEventual)
+      : formasPagamentoSolicitacao,
+    [formasPagamentoSolicitacao, usaFluxoDespesaEventual]
+  );
+  const formaPagamentoSelecionada = useMemo(
+    () => formasPagamentoDisponiveis.find((forma) => String(forma.id) === String(form.forma_pagamento_id)) || null,
+    [formasPagamentoDisponiveis, form.forma_pagamento_id]
+  );
+  const pagamentoViaPix = formaPagamentoEhPix(formaPagamentoSelecionada);
+  const pagamentoViaBoleto = formaPagamentoEhBoleto(formaPagamentoSelecionada);
+  const exibirFavorecidoPagamento = exibirFavorecido && Boolean(formaPagamentoSelecionada);
+  // Se existe uma forma de pagamento escolhida, precisa existir quem recebera. A configuracao
+  // pode controlar a presenca do bloco, mas nao pode tornar anonima uma solicitacao de pagamento.
+  const favorecidoObrigatorio = exibirFavorecidoPagamento;
+
+  useEffect(() => {
+    if (!form.forma_pagamento_id || formasPagamentoSolicitacao.length === 0) return;
+    const formaContinuaDisponivel = formasPagamentoDisponiveis.some(
+      (forma) => String(forma.id) === String(form.forma_pagamento_id)
+    );
+    if (formaContinuaDisponivel) return;
+    setForm((prev) => ({
+      ...prev,
+      forma_pagamento_id: '',
+      favorecido_chave_pix: ''
+    }));
+    setBoletoArquivos([]);
+  }, [form.forma_pagamento_id, formasPagamentoDisponiveis, formasPagamentoSolicitacao.length]);
+
+  useEffect(() => {
+    if (!exibirFormaPagamento) {
+      setForm((prev) => ({ ...prev, forma_pagamento_id: '', favorecido_chave_pix: '' }));
+      setFormasPagamentoSolicitacao([]);
+      setErroFormasPagamento('');
+      setBoletoArquivos([]);
+      return undefined;
+    }
+
+    let cancelado = false;
+    setErroFormasPagamento('');
+    getFormasPagamentoFluxos()
+      .then((resposta) => {
+        if (cancelado) return;
+        setFormasPagamentoSolicitacao(Array.isArray(resposta?.formas) ? resposta.formas : []);
+      })
+      .catch((error) => {
+        if (cancelado) return;
+        setFormasPagamentoSolicitacao([]);
+        setErroFormasPagamento(error?.message || 'Nao foi possivel carregar as formas de pagamento.');
+      });
+
+    return () => { cancelado = true; };
+  }, [exibirFormaPagamento]);
+
+  useEffect(() => {
+    if (!exibirFavorecidoPagamento) {
+      setFavorecidoSelecionado(null);
+      setUsarCredorComoFavorecido(false);
+      setForm((prev) => ({ ...prev, favorecido_id: '', favorecido_chave_pix: '' }));
+    }
+    if (!exibirJustificativa) {
+      setForm((prev) => ({ ...prev, justificativa: '' }));
+    }
+  }, [exibirFavorecidoPagamento, exibirJustificativa]);
+
+  useEffect(() => {
+    if (!exibirFavorecidoPagamento || !usarCredorComoFavorecido) return;
+    setFavorecidoSelecionado(parceiroSelecionado || null);
+    setForm((prev) => ({
+      ...prev,
+      favorecido_id: parceiroSelecionado?.id ? String(parceiroSelecionado.id) : '',
+      favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiroSelecionado) : ''
+    }));
+  }, [exibirFavorecidoPagamento, pagamentoViaPix, parceiroSelecionado, usarCredorComoFavorecido]);
+
+  useEffect(() => {
+    if (pagamentoViaBoleto) return;
+    setBoletoArquivos([]);
+    if (boletoRef.current) boletoRef.current.value = '';
+  }, [pagamentoViaBoleto]);
 
   useEffect(() => {
     if (!exibirCamposContrato) {
@@ -603,7 +952,10 @@ export default function NovaSolicitacao() {
       codigo_contrato: contrato.codigo || '',
       parceiro_id: permitirCredorAvulsoComContrato ? prev.parceiro_id : (credores.length === 1 ? String(credores[0].id) : '')
     }));
-    setRefContratoBusca(contrato.ref_contrato || '');
+    // Contrato do fluxo novo nasce sem `ref_contrato` — a referencia dele e o proprio codigo
+    // (CT-0001). Sem este fallback o campo obrigatorio ficava vazio e travava o submit da
+    // medicao, mesmo com o contrato escolhido na lista.
+    setRefContratoBusca(contrato.ref_contrato || contrato.codigo || '');
     setRefResultados([]);
     setApropriacoesContratoRateio(normalizarApropriacoesContratoParaRateio(contrato));
     if (permitirCredorAvulsoComContrato) {
@@ -698,10 +1050,30 @@ export default function NovaSolicitacao() {
   }
 
   function adicionarArquivos(files) {
-    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, files, {
+    const lista = Array.from(files || []).filter(Boolean);
+    const tiposInvalidos = lista.filter((file) => !arquivoDocumentoPermitido(file));
+    const tiposValidos = lista.filter((file) => arquivoDocumentoPermitido(file));
+    const { arquivos: proximoEstado, rejeitados } = concatenarAnexosPendentes(arquivos, tiposValidos, {
       maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
     });
     setArquivos(proximoEstado);
+    if (tiposInvalidos.length > 0) {
+      alert(montarMensagemTiposArquivoNaoPermitidos(tiposInvalidos));
+    }
+    if (rejeitados.length > 0) {
+      alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
+    }
+  }
+
+  function selecionarArquivoBoleto(files) {
+    const lista = Array.from(files || []).filter(Boolean);
+    const { arquivos: aceitos, rejeitados } = concatenarAnexosPendentes([], lista.slice(0, 1), {
+      maxFileSizeMb: UPLOAD_MAX_FILE_SIZE_MB_PADRAO
+    });
+    setBoletoArquivos(aceitos);
+    if (lista.length > 1) {
+      alert('Selecione somente um arquivo de boleto.');
+    }
     if (rejeitados.length > 0) {
       alert(montarMensagemArquivosAcimaDoLimite(rejeitados, UPLOAD_MAX_FILE_SIZE_MB_PADRAO));
     }
@@ -775,24 +1147,55 @@ export default function NovaSolicitacao() {
     selecionarObra(obrasFiltradas[0]);
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
+  /**
+   * `confirmadoNaConferencia` fecha o ciclo do modal de credores: o mesmo submit roda duas vezes
+   * acima do limite — a primeira abre a conferencia e para, a segunda (disparada pelo botao do
+   * modal) cria. Sem o parametro, seria preciso duplicar toda a validacao num segundo caminho.
+   */
+  async function handleSubmit(e, { confirmadoNaConferencia = false } = {}) {
+    e?.preventDefault?.();
 
     if (!form.obra_id) {
       alert('Selecione uma obra/centro de custo');
       return;
     }
 
-    if (exigeApropriacaoPrincipal && !form.apropriacao_id) {
-      alert('Selecione a apropriação principal da solicitação.');
+    if (usaFluxoRecargaCartao && !cartaoRecargaId) {
+      alert('Selecione o cartão que receberá a recarga.');
+      return;
+    }
+    if (usaFluxoRecargaCartao && recargaCartaoContexto?.bloqueado) {
+      alert(recargaCartaoContexto.motivo_bloqueio || 'Conclua a recarga anterior antes de solicitar uma nova.');
       return;
     }
 
-    if (subtipoObrigatorio && !form.tipo_sub_id) {
+    if (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') {
+      alert('Aguarde a conferencia da apropriacao automatica da obra.');
+      return;
+    }
+    if (usaApropriacaoAutomaticaObra && !apropriacaoAutomatica.apropriacao) {
+      alert(apropriacaoAutomatica.erro || 'Configure a apropriacao padrao desta obra antes de criar a solicitacao.');
+      return;
+    }
+
+    // No fluxo novo de contrato a apropriacao virou RATEIO (19/08): quem cumpre a exigencia sao as
+    // linhas do rateio, nao o campo unico — que nem e exibido nesse caminho. Validar o campo unico
+    // aqui barrava o contrato mesmo com o rateio preenchido.
+    const temApropriacao = usaFluxoContratoNovo
+      ? rateioContrato.some((l) => l.apropriacao_id)
+      : Boolean(form.apropriacao_id);
+    if (exigeApropriacaoPrincipal && !temApropriacao) {
+      alert(usaFluxoContratoNovo
+        ? 'Informe ao menos uma apropriacao no rateio do contrato.'
+        : 'Selecione a apropriação principal da solicitação.');
+      return;
+    }
+
+    if (subtipoObrigatorio && exibirCampoSubtipo && !form.tipo_sub_id) {
       alert('Para continuar, selecione o subtipo.');
       return;
     }
-    if (!tipoSemValor && (form.valor === '' || form.valor === null || form.valor === undefined)) {
+    if (valorObrigatorio && (form.valor === '' || form.valor === null || form.valor === undefined)) {
       alert('Informe o valor da solicitação.');
       return;
     }
@@ -800,8 +1203,8 @@ export default function NovaSolicitacao() {
       alert('Para Medicao, informe data inicial e data final.');
       return;
     }
-    if (dataVencimentoObrigatoria && !form.data_vencimento) {
-      alert('Informe a data de vencimento.');
+    if (dataVencimentoExigida && !form.data_vencimento) {
+      alert(usaFluxoRecargaCartao ? 'Informe a data prevista para recarga.' : 'Informe a data de vencimento.');
       return;
     }
     if (dataDemissaoObrigatoria && !form.data_demissao) {
@@ -820,7 +1223,7 @@ export default function NovaSolicitacao() {
       alert('Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.');
       return;
     }
-    if (apropriacoesContratoObrigatorias && apropriacoesRateioSelecionadas.length === 0) {
+    if (apropriacoesContratoExigidas && apropriacoesRateioSelecionadas.length === 0) {
       alert('Selecione ao menos uma apropriacao do contrato para esta solicitacao.');
       return;
     }
@@ -832,18 +1235,102 @@ export default function NovaSolicitacao() {
       alert('Selecione o credor da solicitação.');
       return;
     }
+    if (formaPagamentoObrigatoria && !form.forma_pagamento_id) {
+      alert('Selecione a forma de pagamento.');
+      return;
+    }
+    if (favorecidoObrigatorio && !form.favorecido_id) {
+      alert('Selecione o favorecido do pagamento.');
+      return;
+    }
+    if (pagamentoViaPix && !String(form.favorecido_chave_pix || '').trim()) {
+      alert('Informe a chave PIX do favorecido.');
+      return;
+    }
+    if (pagamentoViaBoleto && boletoArquivos.length === 0) {
+      alert('Anexe o boleto para usar esta forma de pagamento.');
+      return;
+    }
+    if (justificativaObrigatoria && !form.justificativa.trim()) {
+      alert('Informe a justificativa da solicitação.');
+      return;
+    }
 
-    if (exibirDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
+    if (exibirCampoDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
       alert('Data de vencimento não pode ser menor que a data atual.');
       return;
     }
 
-    if (descricaoObrigatoria && !form.descricao.trim()) {
-      alert('Informe a descrição da solicitação.');
+    // Medicao de contrato do fluxo novo: sem parcela marcada nao ha o que medir, e o saldo
+    // e conferido aqui so para avisar antes de enviar — quem decide e o backend.
+    if (usaMedicaoFluxoNovo) {
+      if (!(medicaoContratoDados?.itens || []).length) {
+        alert('Selecione ao menos uma parcela do contrato para medir.');
+        return;
+      }
+      if (medicaoContratoDados?.excedeSaldo) {
+        alert('O total selecionado passa do saldo do contrato.');
+        return;
+      }
+      // Os dados de pagamento sao cobrados aqui tambem para a pessoa nao descobrir depois de montar
+      // a medicao inteira. Quem recusa de verdade e o servidor.
+      const pgto = medicaoContratoDados?.pagamento || {};
+      if (!pgto.forma_pagamento_id) { alert('Informe a forma de pagamento da medicao.'); return; }
+      if (!pgto.favorecido_id) { alert('Informe o favorecido desta medicao.'); return; }
+      if (pgto.via_pix && !String(pgto.favorecido_chave_pix || '').trim()) {
+        alert('Informe a chave PIX do favorecido.'); return;
+      }
+      if (pgto.via_boleto && !String(pgto.boleto_anexo_nome || '').trim()) {
+        alert('Anexe o boleto desta medicao.'); return;
+      }
+      if (!pgto.via_pix && !pgto.via_boleto && !String(pgto.favorecido_contato || '').trim()) {
+        alert('Informe os dados para pagamento desta medicao.'); return;
+      }
+      if (!pgto.dados_confirmados) {
+        alert('Confirme que os dados de pagamento estao corretos antes de enviar a medicao.'); return;
+      }
+    }
+
+    // Vale para medicao nova e legada. No fluxo novo o boleto pode ser o proprio documento
+    // obrigatorio; nas demais formas, ao menos um arquivo deve estar no campo unico de anexos.
+    const anexosPendentesMedicao = [...arquivos, ...boletoArquivos];
+    if (tipoEhDeMedicao && anexosPendentesMedicao.length === 0) {
+      alert('Anexe ao menos um arquivo para enviar a solicitacao de medicao.');
+      return;
+    }
+    if (!tipoEhDeMedicao && anexosObrigatorios && arquivos.length === 0) {
+      alert('Anexe ao menos um comprovante da despesa.');
       return;
     }
 
-    if (apropriacoesRateioSelecionadas.length > 0) {
+    if (usaFluxoDespesaEventual) {
+      if (despesaEventualSaldo.status !== 'success' || !despesaEventualSaldo.dados) {
+        alert(despesaEventualSaldo.erro || 'Aguarde o cálculo do saldo de Despesa Eventual da obra.');
+        return;
+      }
+      const valorDespesa = Number(form.valor || 0);
+      if (valorDespesa > Number(despesaEventualSaldo.dados.limite_solicitacao || 0)) {
+        alert('O valor informado ultrapassa o limite por solicitação.');
+        return;
+      }
+      if (valorDespesa > Number(despesaEventualSaldo.dados.saldo_obra || 0)) {
+        alert('O valor informado ultrapassa o saldo de Despesa Eventual desta obra.');
+        return;
+      }
+      if (Object.values(despesaEventualDeclaracoes).some((confirmado) => confirmado !== true)) {
+        alert('Confirme todas as declarações obrigatórias da Despesa Eventual.');
+        return;
+      }
+    }
+
+    if (descricaoExigida && !form.descricao.trim()) {
+      alert('Informe o título da solicitação.');
+      return;
+    }
+
+    // Na medicao do fluxo novo o bloco de rateio nem aparece; a guarda existe para o caso de uma
+    // selecao ter ficado no estado de antes da troca de contrato.
+    if (!usaMedicaoFluxoNovo && apropriacoesRateioSelecionadas.length > 0) {
       const valorTotalSolicitacao = arredondarCentavos(parseDecimalRateio(form.valor));
       if (!valorTotalSolicitacao || valorTotalSolicitacao <= 0) {
         alert('Informe o valor total da solicitacao para validar o rateio das apropriacoes.');
@@ -883,6 +1370,257 @@ export default function NovaSolicitacao() {
     if (criandoSolicitacaoRef.current) {
       return;
     }
+    // Fluxo novo de contratos (D38): cria o CONTRATO pelo endpoint auditado em vez da
+    // solicitacao padrao. Obra, credor, valor, descricao e apropriacao principal vem do
+    // formulario; o bloco fornece categoria, condicao, parcelas e detalhes.
+    if (usaFluxoContratoNovo) {
+      const d = contratoNovoDados || {};
+      if (!form.parceiro_id) { alert('Selecione o credor do contrato.'); return; }
+      const camposObrigatoriosContrato = [
+        ['contrato_objeto', d.objeto, 'Informe o objeto do contrato.'],
+        ['contrato_justificativa', d.justificativa, 'Informe a justificativa da contratacao.'],
+        ['contrato_responsavel', d.responsavel_id, 'Selecione o responsavel pela contratacao.'],
+        ['contrato_vigencia_inicio', d.vigencia_inicio, 'Informe a vigencia inicial do contrato.'],
+        ['contrato_vigencia_fim', d.vigencia_fim, 'Informe a vigencia final do contrato.']
+      ];
+      const campoContratoPendente = camposObrigatoriosContrato.find(
+        ([campoId, valor]) => campoObrigatorio(campoId) && !String(valor || '').trim()
+      );
+      if (campoContratoPendente) { alert(campoContratoPendente[2]); return; }
+      // O rateio precisa fechar ANTES de enviar: o backend recusaria, mas a pessoa perderia o
+      // formulario inteiro para descobrir um erro de digitacao.
+      const linhasRateio = rateioContrato.filter((l) => l.apropriacao_id);
+      if (linhasRateio.length === 0) { alert('Informe ao menos uma apropriacao para o contrato.'); return; }
+      // As duas colunas (% e R$) ficam em sincronia na tela, entao basta conferir uma. O
+      // percentual e a que vale, porque e ele que vai gravado.
+      const somaPercentual = linhasRateio.reduce((acc, l) => acc + (numeroDoCampo(l.percentual) || 0), 0);
+      if (Math.abs(somaPercentual - 100) >= 0.001) {
+        alert('O rateio da apropriacao deve fechar 100% (ou o valor total do contrato).');
+        return;
+      }
+      if (!d.forma_pagamento_id) { alert('Selecione a condicao de pagamento.'); return; }
+      if (!d.favorecido_id) { alert('Selecione o favorecido do pagamento.'); return; }
+      if (d.pagamento_via_pix && !String(d.favorecido_chave_pix || '').trim()) {
+        alert('Informe a chave PIX do favorecido.'); return;
+      }
+      if (d.pagamento_via_pix && !String(d.favorecido_contato || '').trim()) {
+        alert('Informe o contato do favorecido para o pagamento PIX.'); return;
+      }
+      if (d.pagamento_via_boleto && !d.boleto_arquivo) {
+        alert('Anexe o boleto desta contratacao.'); return;
+      }
+      if (!d.pagamento_via_pix && !d.pagamento_via_boleto && !String(d.dados_pagamento || '').trim()) {
+        alert('Informe os dados para pagamento desta contratacao.'); return;
+      }
+      if (!d.qtde_parcelas || !d.primeiro_vencimento) { alert('Informe a quantidade de parcelas e o 1o vencimento.'); return; }
+      const qtde = Number(d.qtde_parcelas);
+      if (!Number.isInteger(qtde) || qtde < 1 || qtde > MAXIMO_PARCELAS_CONTRATO) {
+        alert(`A quantidade de parcelas deve ser um numero inteiro de 1 a ${MAXIMO_PARCELAS_CONTRATO}.`); return;
+      }
+      // Continua valendo para a CONFERENCIA de cadastro logo abaixo, que so acontece acima do
+      // limite — a negociacao e que deixou de olhar o valor.
+      const acimaDoLimite = Number(form.valor) > limiteJuridico;
+
+      // A negociacao detalhada agora e documento e vale para TODO contrato (item 7, 23/08). O
+      // backend cobra de novo na aprovacao — este aviso existe para a pessoa nao descobrir depois
+      // de o contrato ja estar criado.
+      if (!d.negociacao_arquivo) {
+        alert('Anexe o documento da negociacao detalhada: ele e obrigatorio em todo contrato.'); return;
+      }
+      if (acimaDoLimite) {
+        const documentosObrigatorios = [
+          ['Cartao CNPJ', d.cartao_cnpj_arquivo],
+          ['Ato constitutivo', d.ato_constitutivo_arquivo],
+          ['Documentos do representante legal', d.documentos_representante_legal_arquivo]
+        ];
+        const documentosFaltantes = documentosObrigatorios.filter(([, arquivo]) => !arquivo).map(([nome]) => nome);
+        if (documentosFaltantes.length > 0) {
+          alert(`Anexe a documentacao juridica obrigatoria: ${documentosFaltantes.join(', ')}.`); return;
+        }
+
+        const qualificacao = d.representante_legal_qualificacao || {};
+        const camposQualificacao = [
+          ['nome completo', qualificacao.nome],
+          ['CPF', qualificacao.cpf],
+          ['RG', qualificacao.rg],
+          ['cargo ou funcao', qualificacao.cargo],
+          ['nacionalidade', qualificacao.nacionalidade],
+          ['estado civil', qualificacao.estado_civil],
+          ['profissao', qualificacao.profissao]
+        ];
+        const qualificacaoFaltante = camposQualificacao
+          .filter(([, valor]) => !String(valor || '').trim())
+          .map(([nome]) => nome);
+        if (qualificacaoFaltante.length > 0) {
+          alert(`Complete a qualificacao do representante legal: ${qualificacaoFaltante.join(', ')}.`); return;
+        }
+        if (qualificacao.estado_civil === 'CASADO') {
+          const conjuge = qualificacao.conjuge || {};
+          const camposConjuge = [
+            ['nome completo', conjuge.nome],
+            ['CPF', conjuge.cpf],
+            ['RG', conjuge.rg],
+            ['nacionalidade', conjuge.nacionalidade],
+            ['profissao', conjuge.profissao],
+            ['regime de bens', conjuge.regime_bens]
+          ];
+          const dadosConjugeFaltantes = camposConjuge
+            .filter(([, valor]) => !String(valor || '').trim())
+            .map(([nome]) => nome);
+          if (dadosConjugeFaltantes.length > 0) {
+            alert(`Complete os dados do conjuge: ${dadosConjugeFaltantes.join(', ')}.`); return;
+          }
+        }
+      }
+      // Portao do valor minimo por parcela: a previa deixa digitar livremente (senao nao da
+      // para escrever "0,50"), entao a cobranca acontece aqui, antes de enviar.
+      const parcelaInvalida = (d.parcelas || []).find((pc) => !(Number(pc.valor) > 0));
+      if (parcelaInvalida) {
+        alert(`A parcela ${parcelaInvalida.numero} deve ser de no minimo R$ 0,01.`); return;
+      }
+
+      // Acima do limite o contrato vai ao Juridico, que monta a minuta a partir do cadastro do
+      // contratado — e 98% dos fornecedores estao sem endereco completo. A conferencia acontece
+      // aqui, com a chance de corrigir, e nao la na frente com a minuta parada.
+      if (acimaDoLimite && !confirmadoNaConferencia) {
+        // `d.parceiros` e a lista de ids dos contratados que o bloco emite (PI-12), e o
+        // `favorecido_id` entra tambem: se o pagamento vai para um terceiro, e o cadastro DELE
+        // que precisa estar completo para a minuta.
+        const ids = [Number(form.parceiro_id), ...(d.parceiros || []).map(Number), Number(d.favorecido_id)]
+          .filter((n) => Number.isInteger(n) && n > 0);
+        setCredoresParaConferir([...new Set(ids)]);
+        setModalCredoresAberto(true);
+        return;
+      }
+
+      criandoSolicitacaoRef.current = true;
+      setCriandoSolicitacao(true);
+      // A mesma chave do fluxo padrao: o ref acima so protege o duplo clique nesta aba;
+      // retry de rede sem chave duplicaria o contrato (M3 da auditoria).
+      const idempotencyKeyContrato = criarChaveIdempotenciaSolicitacao();
+      try {
+        const apropriacoesDoContrato = rateioContrato
+          .filter((l) => l.apropriacao_id)
+          .map((l) => ({
+            apropriacao_id: Number(l.apropriacao_id),
+            percentual: Number((numeroDoCampo(l.percentual) || 0).toFixed(4))
+          }));
+
+        const r = await criarContratoFluxoNovo({
+          obra_id: Number(form.obra_id),
+          parceiro_id: Number(form.parceiro_id),
+          // PI-12: contratados (o do formulario + os do bloco) e quem recebe.
+          parceiros: (d.parceiros || []).map(Number).filter(Boolean),
+          favorecido_id: d.favorecido_id ? Number(d.favorecido_id) : null,
+          favorecido_chave_pix: d.pagamento_via_pix ? String(d.favorecido_chave_pix || '').trim() : null,
+          favorecido_contato: d.pagamento_via_pix ? String(d.favorecido_contato || '').trim() : null,
+          dados_pagamento: !d.pagamento_via_pix && !d.pagamento_via_boleto
+            ? String(d.dados_pagamento || '').trim()
+            : null,
+          boleto_anexo_nome: d.pagamento_via_boleto ? (d.boleto_arquivo?.name || null) : null,
+          descricao: exibirDescricao ? form.descricao : null,
+          // O titulo e a referencia do contrato: e o texto que a Medicao pesquisa depois.
+          ref_contrato: exibirDescricao ? form.descricao : null,
+          valor_total: form.valor,
+          qtde_parcelas: Number(d.qtde_parcelas),
+          primeiro_vencimento: d.primeiro_vencimento,
+          // PI-16: a categoria financeira NAO vai mais daqui. Quem abre o contrato e o usuario da
+          // obra, que nao conhece o plano financeiro da empresa — ela passou a ser informada por
+          // quem APROVA, no detalhe da solicitacao, e a aprovacao e barrada sem ela.
+          forma_pagamento_id: Number(d.forma_pagamento_id),
+          // O setor que recebe a solicitacao do contrato. Codigo do setor, nao nome.
+          area_responsavel: form.area_responsavel,
+          detalhes_contratacao: d.detalhes_contratacao,
+          representante_legal_qualificacao: acimaDoLimite ? d.representante_legal_qualificacao : null,
+          // Campos do escopo 3.1/3.2 — as colunas ja existiam; faltava o caminho da tela.
+          objeto: campoVisivel('contrato_objeto') ? (d.objeto || null) : null,
+          justificativa: campoVisivel('contrato_justificativa') ? (d.justificativa || null) : null,
+          responsavel_id: campoVisivel('contrato_responsavel') && d.responsavel_id ? Number(d.responsavel_id) : null,
+          vigencia_inicio: campoVisivel('contrato_vigencia_inicio') ? (d.vigencia_inicio || null) : null,
+          vigencia_fim: campoVisivel('contrato_vigencia_fim') ? (d.vigencia_fim || null) : null,
+          // D38-a: o fluxo deriva do subtipo por id vinculado — persiste o vinculo
+          tipo_macro_id: Number(form.tipo_solicitacao_id),
+          tipo_sub_id: form.tipo_sub_id ? Number(form.tipo_sub_id) : null,
+          // Rateio da apropriacao (19/08): N apropriacoes, por % ou por R$.
+          //
+          // Vai como PERCENTUAL mesmo quando a pessoa digita R$: um rateio em reais e uma
+          // proporcao do total, e e proporcionalmente que cada PARCELA precisa ser dividida.
+          // A aritmetica fina fica no backend (`montarRateios`), que divide em centavos com a
+          // sobra na ultima — aqui nao se recalcula nada disso.
+          apropriacoes: apropriacoesDoContrato,
+          parcelas: (d.parcelas || []).map((pc) => ({ numero: pc.numero, valor: pc.valor, vencimento: pc.vencimento }))
+        }, { idempotencyKey: idempotencyKeyContrato });
+
+        // Anexos vao para o CONTRATO criado (endpoint auditado), espelhando o fluxo
+        // padrao: se o upload falhar, o usuario e avisado — nunca descartado em silencio
+        // (A1 da auditoria: o arquivo sumia sem requisicao, sem registro e sem aviso).
+        const idContrato = r?.contrato?.id;
+
+        // A negociacao detalhada sobe ANTES dos anexos avulsos: sem ela o contrato nao pode ser
+        // aprovado, entao falhar aqui e um problema maior do que falhar num anexo qualquer.
+        if (d.negociacao_arquivo && idContrato) {
+          try {
+            await uploadNegociacaoContrato(idContrato, d.negociacao_arquivo);
+          } catch (erroNegociacao) {
+            console.error(erroNegociacao);
+            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a negociacao detalhada NAO foi enviada (${erroNegociacao.message}). Sem ela o contrato nao pode ser aprovado: abra o contrato e envie o documento.`);
+            navigate('/gestao-contratos', { replace: true });
+            return;
+          }
+        }
+
+        // Boleto do contrato tem papel proprio: e obrigatorio para esta forma e a aprovacao
+        // confere o registro tipado. Nao entra junto dos anexos gerais para nao depender do nome.
+        if (d.pagamento_via_boleto && d.boleto_arquivo && idContrato) {
+          try {
+            await uploadContratoAnexos(idContrato, [d.boleto_arquivo], { tipo: 'BOLETO' });
+          } catch (erroBoleto) {
+            console.error(erroBoleto);
+            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas o boleto nao foi enviado. Abra o contrato e anexe novamente o arquivo informado antes da aprovacao.`);
+            navigate('/gestao-contratos', { replace: true });
+            return;
+          }
+        }
+
+        if (acimaDoLimite && idContrato) {
+          try {
+            await Promise.all([
+              uploadDocumentacaoJuridicaContrato(idContrato, 'cartao-cnpj', d.cartao_cnpj_arquivo),
+              uploadDocumentacaoJuridicaContrato(idContrato, 'ato-constitutivo', d.ato_constitutivo_arquivo),
+              uploadDocumentacaoJuridicaContrato(idContrato, 'representante-legal', d.documentos_representante_legal_arquivo)
+            ]);
+          } catch (erroDocumentacao) {
+            console.error(erroDocumentacao);
+            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a documentacao juridica nao foi enviada por completo (${erroDocumentacao.message}). O contrato permanecera bloqueado para aprovacao ate o dossie ser completado.`);
+            navigate('/gestao-contratos', { replace: true });
+            return;
+          }
+        }
+
+        if (exibirAnexos && arquivos.length > 0 && idContrato) {
+          try {
+            await uploadContratoAnexos(idContrato, extrairFilesAnexosPendentes(arquivos));
+          } catch (uploadError) {
+            console.error(uploadError);
+            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas os anexos nao foram enviados. Abra o contrato em Gestao de Contratos e envie os anexos novamente.`);
+            navigate('/gestao-contratos', { replace: true });
+            return;
+          }
+        }
+
+        alert(`Contrato ${r?.contrato?.codigo || ''} criado — aguardando aprovacao.`);
+        // O contrato do fluxo novo nao aparece na lista de solicitacoes: mandar para la
+        // deixava a instrucao de "abra o contrato" sem alvo (N5).
+        navigate('/gestao-contratos', { replace: true });
+      } catch (error) {
+        alert(error?.message || 'Erro ao criar contrato.');
+      } finally {
+        criandoSolicitacaoRef.current = false;
+        setCriandoSolicitacao(false);
+      }
+      return;
+    }
+
     criandoSolicitacaoRef.current = true;
     setCriandoSolicitacao(true);
     const idempotencyKey = criarChaveIdempotenciaSolicitacao();
@@ -890,6 +1628,15 @@ export default function NovaSolicitacao() {
     const payload = {
       ...form,
       parceiro_id: permitirVinculoCredor ? (form.parceiro_id || null) : null,
+      favorecido_id: exibirFavorecidoPagamento ? (form.favorecido_id || null) : null,
+      forma_pagamento_id: exibirFormaPagamento ? (form.forma_pagamento_id || null) : null,
+      favorecido_chave_pix: pagamentoViaPix
+        ? String(form.favorecido_chave_pix || '').trim()
+        : null,
+      boleto_anexo_nome: pagamentoViaBoleto ? (boletoArquivos[0]?.nome || null) : null,
+      despesa_eventual_declaracoes: usaFluxoDespesaEventual ? despesaEventualDeclaracoes : undefined,
+      cartao_recarga_id: usaFluxoRecargaCartao ? Number(cartaoRecargaId) : undefined,
+      justificativa: exibirJustificativa ? form.justificativa : null,
       apropriacao_id: exibirCampoApropriacao ? (form.apropriacao_id || null) : null,
       contrato_id: exibirCamposContrato ? (form.contrato_id || null) : null,
       tipo_sub_id: exibirCampoSubtipo ? (form.tipo_sub_id || null) : null,
@@ -901,6 +1648,17 @@ export default function NovaSolicitacao() {
       itens_apropriacao: exibirItensApropriacao ? (form.itens_apropriacao || null) : null,
       ref_contrato_abertura: exibirRefContratoAbertura ? (form.ref_contrato_abertura || null) : null,
       descricao: exibirDescricao ? form.descricao : '',
+      // Parcelas consumidas pela medicao (wireframe 2). O backend valida antes de gravar a
+      // solicitacao e aplica na sequencia.
+      medicao_parcelas: usaMedicaoFluxoNovo ? (medicaoContratoDados?.itens || []) : undefined,
+      // Dados de pagamento DA MEDICAO (itens 5 e 9, 23/08): favorecido, chave PIX, forma, contato e
+      // o aceite. O backend recusa a medicao sem eles.
+      medicao_pagamento: usaMedicaoFluxoNovo ? (medicaoContratoDados?.pagamento || {}) : undefined,
+      // O endpoint historico recebe JSON e o upload ocorre logo depois. A API valida que havia
+      // arquivo selecionado; na aprovacao, o backend confere o anexo efetivamente gravado.
+      anexos_pendentes_nomes: tipoEhDeMedicao
+        ? anexosPendentesMedicao.map((arquivo) => arquivo.nome).filter(Boolean)
+        : (arquivos.length > 0 ? arquivos.map((arquivo) => arquivo.nome).filter(Boolean) : undefined),
       apropriacoes_rateio: exibirCamposContrato
         ? apropriacoesRateioSelecionadas.map(item => ({
             apropriacao_id: item.apropriacao_id,
@@ -917,13 +1675,33 @@ export default function NovaSolicitacao() {
       if (!solicitacao?.id) {
         throw new Error('Solicitacao criada, mas a API nao retornou o identificador para abrir o detalhe.');
       }
+      const medicaoIdCriada = Number(solicitacao?.medicao?.id || 0) || null;
+
+      if (pagamentoViaBoleto && boletoArquivos.length > 0) {
+        try {
+          await uploadArquivos({
+            files: extrairFilesAnexosPendentes(boletoArquivos),
+            solicitacao_id: solicitacao.id,
+            medicao_id: medicaoIdCriada,
+            tipo: 'BOLETO',
+            criacao_upload_token: solicitacao.criacao_upload_token || null
+          });
+        } catch (uploadError) {
+          console.error(uploadError);
+          alert(`A solicitacao ${solicitacao.codigo || solicitacao.id} foi criada, mas o boleto nao foi enviado. Abra a solicitacao e anexe o boleto novamente.`);
+          navigate(`/solicitacoes/${solicitacao.id}`, { replace: true });
+          return;
+        }
+      }
 
       if (exibirAnexos && arquivos.length > 0) {
         try {
           await uploadArquivos({
             files: extrairFilesAnexosPendentes(arquivos),
             solicitacao_id: solicitacao.id,
-            tipo: 'SOLICITACAO'
+            medicao_id: medicaoIdCriada,
+            tipo: 'SOLICITACAO',
+            criacao_upload_token: solicitacao.criacao_upload_token || null
           });
         } catch (uploadError) {
           console.error(uploadError);
@@ -982,6 +1760,41 @@ export default function NovaSolicitacao() {
     return [...contratosDisponiveis, ...contratos, ...contratosRef]
       .find(item => String(item.id) === String(form.contrato_id)) || null;
   }, [form.contrato_id, contratosDisponiveis, contratos, contratosRef]);
+
+  // MD-2/MD-3: a bifurcacao da medicao le o marcador do CONTRATO escolhido. Contrato sem
+  // marcador (os 335 existentes) cai na trilha antiga, que nao muda em nada.
+  const contratoSelecionadoEhFluxoNovo = Boolean(contratoSelecionado?.fluxo_novo);
+  const usaMedicaoFluxoNovo = exibirCamposContrato && Boolean(form.contrato_id) && contratoSelecionadoEhFluxoNovo;
+
+  // MEDICAO DO FLUXO NOVO NAO TEM VALOR, TITULO NEM VENCIMENTO PROPRIOS (pedido do cliente, 20/08).
+  //
+  // Ela nao cria solicitacao: o backend intercepta e a transforma num evento da solicitacao unica
+  // do contrato (PI-16). O valor vem da soma das parcelas marcadas e o vencimento vem de cada
+  // parcela — os tres campos eram preenchidos, validados e descartados.
+  //
+  // O periodo (data inicial/final) CONTINUA valendo, mas sobe para o topo do card da medicao, ao
+  // lado da tabela que ele data. O estado segue sendo o mesmo (`form.data_inicio_medicao` /
+  // `data_fim_medicao`): dar estado proprio ao card faria a validacao conferir um valor e o envio
+  // mandar outro.
+  //
+  // Contrato LEGADO nao entra em nada disto — a medicao dele cria solicitacao propria.
+  const exibirValor = !tipoSemValor && !usaMedicaoFluxoNovo;
+  const valorObrigatorio = exibirValor && !tipoSemValor;
+  const exibirCampoDescricao = exibirDescricao && !usaMedicaoFluxoNovo;
+  const descricaoExigida = descricaoObrigatoria && !usaMedicaoFluxoNovo;
+  const exibirCampoDataVencimento = exibirDataVencimento && !usaMedicaoFluxoNovo;
+  const dataVencimentoExigida = dataVencimentoObrigatoria && !usaMedicaoFluxoNovo;
+  // Fora do fluxo novo o par continua onde sempre esteve: o card nao existe para recebe-lo.
+  const exibirPeriodoMedicaoSolto = exibirPeriodoMedicao && !usaMedicaoFluxoNovo;
+  // Campo que nao aparece nao pode ser exigido: o bloco de rateio some na medicao do fluxo novo, e
+  // sem esta linha o envio ficaria travado por uma selecao que a pessoa nao tem como fazer.
+  const apropriacoesContratoExigidas = apropriacoesContratoObrigatorias && !usaMedicaoFluxoNovo;
+  // PI-15: o termo aditivo e pedido por um botao AQUI, na tela de medicao, e vale para contrato
+  // do fluxo ANTIGO e do NOVO — por isso a condicao NAO olha `fluxo_novo`.
+  //
+  // "Estar na medicao" foi derivado acima do COMPORTAMENTO do tipo (mostra/exige periodo),
+  // nunca do nome nem do id: a mesma regra tambem forca o campo unico de anexos a aparecer.
+  const podeSolicitarAditivo = tipoEhDeMedicao && exibirCamposContrato && Boolean(form.contrato_id);
   const credoresContratoSelecionado = useMemo(
     () => getCredoresContrato(contratoSelecionado),
     [contratoSelecionado]
@@ -1122,7 +1935,7 @@ export default function NovaSolicitacao() {
                     ))
                   ) : (
                     <div className="px-3 py-2 text-xs text-[var(--c-muted)]">
-                      Nenhum credor vinculado ao contrato corresponde a busca.
+                      Nenhum Contratado vinculado ao contrato corresponde a busca.
                     </div>
                   )}
                 </div>
@@ -1163,7 +1976,7 @@ export default function NovaSolicitacao() {
               <button
                 type="button"
                 className="btn btn-outline btn-sm"
-                onClick={buscarParceirosRelacionados}
+                onClick={() => buscarParceirosRelacionados()}
                 disabled={parceiroBuscando}
               >
                 {parceiroBuscando ? 'Buscando...' : 'Buscar'}
@@ -1234,12 +2047,34 @@ export default function NovaSolicitacao() {
   }
   const hoje = new Date();
   const hojeInput = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, '0')}-${String(hoje.getDate()).padStart(2, '0')}`;
+  const saldoDespesaDados = despesaEventualSaldo.dados;
+  const valorDespesaAtual = Number(form.valor || 0);
+  const saldoDespesaAposSolicitacao = saldoDespesaDados
+    ? Math.max(0, Number(saldoDespesaDados.saldo_obra || 0) - valorDespesaAtual)
+    : 0;
+  const despesaExcedeLimite = Boolean(
+    saldoDespesaDados && (
+      valorDespesaAtual > Number(saldoDespesaDados.limite_solicitacao || 0) ||
+      valorDespesaAtual > Number(saldoDespesaDados.saldo_obra || 0)
+    )
+  );
   const tiposFiltradosPorSetor = useMemo(() => {
     const setorKey = String(form.area_responsavel || '').trim().toUpperCase();
     if (!setorKey) return [];
 
+    // PI-16: tipo de USO DO SISTEMA nunca aparece aqui. O filtro e por TIPO, antes da lista por
+    // setor, de proposito: a lista por setor e permissiva (setor sem lista mostra tudo, e 9 dos 19
+    // setores ativos nao tem lista), entao esconder por la vazaria — e voltaria a vazar a cada
+    // setor novo. Aqui nao tem como vazar.
+    const setorSelecionado = setores.find(
+      (setor) => String(setor.codigo || '').toUpperCase() === setorKey
+    ) || null;
     const tiposAtivos = Array.isArray(tipos)
-      ? tipos.filter(tipo => tipo?.ativo !== false)
+      ? tipos.filter((tipo) => {
+          if (tipo?.ativo === false || tipo?.comportamento?.somente_sistema === true) return false;
+          const behavior = getTipoSolicitacaoBehavior(tipo);
+          return behavior.somente_gerencia_processos !== true || isSetorGerenciaProcessos(setorSelecionado);
+        })
       : [];
 
     const regra = tiposPorSetorConfig?.[setorKey];
@@ -1253,7 +2088,7 @@ export default function NovaSolicitacao() {
 
     const idsPermitidos = new Set(tiposPermitidos);
     return tiposAtivos.filter(tipo => idsPermitidos.has(Number(tipo.id)));
-  }, [tipos, tiposPorSetorConfig, form.area_responsavel]);
+  }, [tipos, tiposPorSetorConfig, form.area_responsavel, setores]);
 
   useEffect(() => {
     if (!form.area_responsavel) return;
@@ -1459,7 +2294,7 @@ export default function NovaSolicitacao() {
           )}
 
           <label className="grid gap-1 text-sm lg:col-span-6">
-            Área Responsável
+            Para qual setor deseja enviar?
             <select
               name="area_responsavel"
               onChange={handleChange}
@@ -1500,6 +2335,13 @@ export default function NovaSolicitacao() {
               ))}
             </select>
           </label>
+
+          <RecargaCartaoFields
+            ativo={usaFluxoRecargaCartao}
+            value={cartaoRecargaId}
+            onChange={setCartaoRecargaId}
+            onContextChange={setRecargaCartaoContexto}
+          />
 
           {false && exibirCampoCredor && (
             <label className="grid gap-1 text-sm lg:col-span-6">
@@ -1557,7 +2399,7 @@ export default function NovaSolicitacao() {
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={buscarParceirosRelacionados}
+                      onClick={() => buscarParceirosRelacionados()}
                       disabled={parceiroBuscando}
                     >
                       {parceiroBuscando ? 'Buscando...' : 'Buscar'}
@@ -1598,34 +2440,6 @@ export default function NovaSolicitacao() {
             </label>
           )}
 
-          {exibirCampoApropriacao && (
-            <label className="grid gap-1 text-sm lg:col-span-6">
-              Apropriacao da Solicitacao na Obra
-              <ApropriacaoAutocomplete
-                value={form.apropriacao_id}
-                options={apropriacoes}
-                onChange={(id) => setForm({ ...form, apropriacao_id: id })}
-                disabled={!form.obra_id}
-                required={exigeApropriacaoPrincipal}
-                inputClassName="input input-sm w-full"
-                disabledPlaceholder="Selecione a obra primeiro"
-              />
-              {exigeApropriacaoPrincipal ? (
-                <span className="text-xs text-gray-500">
-                  Campo obrigatorio conforme configuracao da nova solicitacao.
-                </span>
-              ) : (
-                <span className="text-xs text-gray-500">
-                  Campo opcional. Use quando a solicitacao precisar nascer vinculada a uma apropriacao da obra.
-                </span>
-              )}
-              {form.obra_id && apropriacoes.length === 0 && (
-                <span className="text-xs text-gray-500">
-                  Nenhuma apropriacao ativa encontrada para esta obra.
-                </span>
-              )}
-            </label>
-          )}
 
           {exibirCamposContrato && (
             <label className="grid gap-1 text-sm lg:col-span-12">
@@ -1667,11 +2481,11 @@ export default function NovaSolicitacao() {
               )}
             </label>
           )}
-        </div>
 
-        {exibirCampoSubtipo && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
-            <label className="grid gap-1 text-sm">
+          {/* Ordem pedida pelo cliente (19/08): Subtipo e Credor lado a lado; a Apropriacao
+              desce para a faixa inteira, porque agora ela rateia o contrato entre varias. */}
+          {exibirCampoSubtipo && (
+            <label className="grid gap-1 text-sm lg:col-span-6">
               Subtipo
               <select
                 name="tipo_sub_id"
@@ -1692,8 +2506,142 @@ export default function NovaSolicitacao() {
                 </span>
               )}
             </label>
-          </div>
-        )}
+          )}
+
+          {exibirCampoCredor && renderCampoCredor('grid gap-1 text-sm lg:col-span-6')}
+
+          {/* Padrao dos fluxos de pagamento: primeiro a forma; somente depois aparecem os dados
+              que ela realmente exige. Assim boleto nunca pede PIX e PIX nunca pede boleto. */}
+          {exibirFormaPagamento && (
+            <label className="grid gap-1 text-sm lg:col-span-6">
+              Forma de pagamento{formaPagamentoObrigatoria ? ' *' : ''}
+              <select
+                className="input input-sm"
+                name="forma_pagamento_id"
+                value={form.forma_pagamento_id}
+                required={formaPagamentoObrigatoria}
+                onChange={(event) => {
+                  const formaId = event.target.value;
+                  const forma = formasPagamentoDisponiveis
+                    .find((item) => String(item.id) === String(formaId)) || null;
+                  setForm((prev) => ({
+                    ...prev,
+                    forma_pagamento_id: formaId,
+                    favorecido_chave_pix: formaPagamentoEhPix(forma)
+                      ? chavePixPreferencial(favorecidoSelecionado)
+                      : ''
+                  }));
+                }}
+              >
+                <option value="">Selecione</option>
+                {formasPagamentoDisponiveis.map((forma) => (
+                  <option key={forma.id} value={forma.id}>{forma.nome}</option>
+                ))}
+              </select>
+              {erroFormasPagamento && <span className="text-xs text-red-700">{erroFormasPagamento}</span>}
+              {!erroFormasPagamento && formasPagamentoDisponiveis.length === 0 && (
+                <span className="text-xs text-[var(--c-muted)]">
+                  Nenhuma forma de pagamento compatível está ativa e liberada.
+                </span>
+              )}
+            </label>
+          )}
+
+          {exibirFavorecidoPagamento && exibirCampoCredor && (
+            <label className="flex items-center gap-2 text-sm lg:col-span-12">
+              <input
+                type="checkbox"
+                checked={usarCredorComoFavorecido}
+                disabled={!parceiroSelecionado}
+                onChange={(event) => {
+                  const marcado = event.target.checked;
+                  setUsarCredorComoFavorecido(marcado);
+                  if (marcado) {
+                    setFavorecidoSelecionado(parceiroSelecionado);
+                    setForm((prev) => ({
+                      ...prev,
+                      favorecido_id: parceiroSelecionado?.id ? String(parceiroSelecionado.id) : '',
+                      favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiroSelecionado) : ''
+                    }));
+                  } else {
+                    setFavorecidoSelecionado(null);
+                    setForm((prev) => ({ ...prev, favorecido_id: '', favorecido_chave_pix: '' }));
+                  }
+                }}
+              />
+              <span>Usar o credor como favorecido do pagamento</span>
+            </label>
+          )}
+
+          {exibirFavorecidoPagamento && !usarCredorComoFavorecido && (
+            <ParceiroBuscaRemota
+              className="lg:col-span-6"
+              label="Favorecido do pagamento"
+              selecionado={favorecidoSelecionado}
+              obrigatorio={favorecidoObrigatorio}
+              placeholder="Buscar favorecido por nome ou CPF/CNPJ"
+              onSelecionar={(parceiro) => {
+                setFavorecidoSelecionado(parceiro);
+                setForm((prev) => ({
+                  ...prev,
+                  favorecido_id: parceiro ? String(parceiro.id) : '',
+                  favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
+                }));
+              }}
+            />
+          )}
+
+          {exibirFormaPagamento && pagamentoViaPix && (
+            <label className="grid gap-1 text-sm lg:col-span-6">
+              Chave PIX do favorecido *
+              <input
+                className="input input-sm"
+                name="favorecido_chave_pix"
+                value={form.favorecido_chave_pix}
+                required
+                onChange={handleChange}
+                placeholder="Informe ou altere a chave PIX"
+              />
+              <span className="text-xs text-[var(--c-muted)]">
+                Sugerida pelas chaves 1, 2 e 3 do cadastro, nesta ordem. O valor pode ser alterado.
+              </span>
+            </label>
+          )}
+
+          {exibirFormaPagamento && pagamentoViaBoleto && (
+            <div className="grid gap-1 text-sm lg:col-span-6">
+              <span>Boleto *</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
+                  <HiPaperClip className="h-4 w-4" />
+                  <span>Selecionar boleto</span>
+                  <input
+                    ref={boletoRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                    onChange={(event) => {
+                      selecionarArquivoBoleto(event.target.files);
+                      event.target.value = '';
+                    }}
+                  />
+                </label>
+                <span className="text-xs text-[var(--c-muted)]">
+                  {boletoArquivos[0]?.nome || 'Nenhum boleto selecionado'}
+                </span>
+                {boletoArquivos.length > 0 && (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setBoletoArquivos([])}
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {exibirCamposContrato && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-secundaria">
@@ -1723,7 +2671,13 @@ export default function NovaSolicitacao() {
               </select>
             </label>
 
-            {form.contrato_id && (
+            {/* O rateio de apropriacao tambem nao e da MEDICAO do fluxo novo.
+                Ela nao cria solicitacao (PI-16): o que o backend recebe aqui e descartado junto com
+                valor, descricao e vencimento. E os titulos ja nasceram com o rateio do CONTRATO, na
+                aprovacao — este bloco pediria de novo, com base num Valor que nao existe mais, uma
+                divisao que ja esta feita. Ele so ficou de pe ate agora porque o campo Valor
+                existia. */}
+            {form.contrato_id && !usaMedicaoFluxoNovo && (
               <div className="md:col-span-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -1792,30 +2746,207 @@ export default function NovaSolicitacao() {
           </div>
         )}
 
-        {exibirCampoCredor && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
-            {renderCampoCredor('grid gap-1 text-sm md:col-span-2')}
+        {usaMedicaoFluxoNovo && (
+          <BlocoMedicaoContrato
+            contratoId={Number(form.contrato_id)}
+            onChange={setMedicaoContratoDados}
+            periodo={{ inicio: form.data_inicio_medicao, fim: form.data_fim_medicao }}
+            periodoObrigatorio={medicaoObrigatoria}
+            onPeriodoChange={handleChange}
+            boletoArquivo={boletoArquivos[0] || null}
+            onSelecionarBoleto={selecionarArquivoBoleto}
+            onRemoverBoleto={() => setBoletoArquivos([])}
+          />
+        )}
+
+        {/* PI-15: acao separada da medicao. Nao envia nem valida o formulario em curso — o modal
+            fecha e a medicao continua exatamente como estava. Serve contrato legado e do fluxo
+            novo, por isso nao ha condicao de `fluxo_novo` aqui. */}
+        {podeSolicitarAditivo && (
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              data-testid="botao-solicitar-aditivo"
+              onClick={() => setModalAditivoAberto(true)}
+            >
+              Solicitar termo aditivo
+            </button>
+            <span className="text-xs text-[var(--c-muted)]">
+              Acrescenta valor ao contrato selecionado, com limite de 25% do valor original.
+              Entra como pendente e nao interfere nesta medicao.
+            </span>
           </div>
         )}
 
+
+        {/* O VALOR VEM ANTES DA APROPRIACAO (item 2 do lote de 23/08). E o valor que a apropriacao
+            reparte: pedir o rateio antes do numero a repartir obrigava a pessoa a voltar. */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
-          {!tipoSemValor && (
+          {exibirValor && (
             <label className="grid gap-1 text-sm">
               Valor
               <input
+                name="valor"
                 type="text"
                 className="input input-sm"
                 value={valorTexto}
                 onChange={e => atualizarValor(e.target.value)}
                 placeholder="R$ 0,00"
-                required={campoObrigatorio('valor')}
+                required={valorObrigatorio && campoObrigatorio('valor')}
               />
             </label>
           )}
 
-          {exibirDataVencimento && (
+          {usaFluxoDespesaEventual && (
+            <div
+              className={`md:col-span-2 rounded-lg border px-3 py-2 text-sm ${
+                despesaExcedeLimite
+                  ? 'border-red-300 bg-red-50 text-red-800'
+                  : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
+              }`}
+              aria-live="polite"
+            >
+              {despesaEventualSaldo.status === 'loading' && 'Calculando o saldo da obra...'}
+              {despesaEventualSaldo.status === 'error' && despesaEventualSaldo.erro}
+              {despesaEventualSaldo.status === 'success' && saldoDespesaDados && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1">
+                  <span><strong>Limite por solicitação:</strong> {formatarMoeda(Number(saldoDespesaDados.limite_solicitacao || 0))}</span>
+                  <span><strong>Comprometido na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.comprometido_obra || 0))}</span>
+                  <span><strong>Saldo disponível na obra:</strong> {formatarMoeda(Number(saldoDespesaDados.saldo_obra || 0))}</span>
+                  <span><strong>Saldo após esta solicitação:</strong> {formatarMoeda(saldoDespesaAposSolicitacao)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+        </div>
+
+        {exibirCampoApropriacao && (
+          <div className="grid gap-1 text-sm w-full">
+            Apropriacao da Solicitacao na Obra
+            {/* No fluxo novo de contrato a apropriacao deixou de ser UMA: o cliente pediu ratear o
+                valor do contrato entre varias, por % ou por R$ (19/08). No fluxo padrao continua
+                sendo uma so — nada muda para as 665 solicitacoes historicas. */}
+            {usaFluxoContratoNovo ? (
+              <RateioApropriacoesContrato
+                linhas={rateioContrato}
+                apropriacoes={apropriacoes}
+                valorTotal={form.valor}
+                onChange={setRateioContrato}
+                desabilitado={!form.obra_id}
+              />
+            ) : (
+              <ApropriacaoAutocomplete
+                value={form.apropriacao_id}
+                options={apropriacoes}
+                onChange={(id) => setForm({ ...form, apropriacao_id: id })}
+                disabled={!form.obra_id}
+                required={exigeApropriacaoPrincipal}
+                inputClassName="input input-sm w-full"
+                disabledPlaceholder="Selecione a obra primeiro"
+              />
+            )}
+            {exigeApropriacaoPrincipal ? (
+              <span className="text-xs text-gray-500">
+                Campo obrigatorio conforme configuracao da nova solicitacao.
+              </span>
+            ) : (
+              <span className="text-xs text-gray-500">
+                Campo opcional. Use quando a solicitacao precisar nascer vinculada a uma apropriacao da obra.
+              </span>
+            )}
+            {form.obra_id && apropriacoes.length === 0 && (
+              <span className="text-xs text-gray-500">
+                Nenhuma apropriacao ativa encontrada para esta obra.
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
+          {/* Titulo do contrato ABAIXO do Valor (ordem pedida em 19/08), e nao ao lado: ocupa a
+              faixa inteira para cair na linha de baixo. Antes ele ficava depois do bloco do
+              contrato, longe do valor que ele identifica. */}
+          {exibirCampoDescricao && (
+            <label className="grid gap-1 text-sm md:col-span-2">
+              {usaFluxoContratoNovo ? 'Título do contrato' : 'Título da solicitação'}
+              <textarea
+                name="descricao"
+                onChange={e =>
+                  setForm(prev => ({
+                    ...prev,
+                    descricao: e.target.value.slice(0, 50)
+                  }))
+                }
+                maxLength={50}
+                className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+                required={descricaoExigida}
+                value={form.descricao}
+              />
+            </label>
+          )}
+
+          {exibirJustificativa && (
+            <label className="grid gap-1 text-sm md:col-span-2">
+              Justificativa{justificativaObrigatoria ? ' *' : ''}
+              <textarea
+                name="justificativa"
+                onChange={handleChange}
+                className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
+                required={justificativaObrigatoria}
+                value={form.justificativa}
+                rows={3}
+                placeholder="Explique a necessidade desta solicitação"
+              />
+            </label>
+          )}
+
+          {usaFluxoDespesaEventual && (
+            <fieldset className="md:col-span-2 grid gap-2 rounded-lg border border-[var(--c-border)] p-3">
+              <legend className="px-1 text-sm font-semibold text-[var(--c-text)]">Declarações obrigatórias</legend>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={despesaEventualDeclaracoes.despesa_pontual_nao_recorrente}
+                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
+                    ...atual,
+                    despesa_pontual_nao_recorrente: event.target.checked
+                  }))}
+                />
+                <span>Confirmo que esta e uma despesa pontual, esporadica e nao recorrente.</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={despesaEventualDeclaracoes.sem_vinculo_contratual}
+                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
+                    ...atual,
+                    sem_vinculo_contratual: event.target.checked
+                  }))}
+                />
+                <span>Confirmo que a despesa nao caracteriza vinculo ou necessidade de contrato.</span>
+              </label>
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-1"
+                  checked={despesaEventualDeclaracoes.nao_fracionada}
+                  onChange={(event) => setDespesaEventualDeclaracoes((atual) => ({
+                    ...atual,
+                    nao_fracionada: event.target.checked
+                  }))}
+                />
+                <span>Confirmo que a despesa nao foi fracionada para se enquadrar no limite.</span>
+              </label>
+            </fieldset>
+          )}
+
+          {exibirCampoDataVencimento && (
           <label className="grid gap-1 text-sm">
-            Data de vencimento
+            {usaFluxoRecargaCartao ? 'Data prevista para recarga' : 'Data de vencimento'}
             <input
               name="data_vencimento"
               type="date"
@@ -1823,7 +2954,7 @@ export default function NovaSolicitacao() {
               className="input input-sm"
               value={form.data_vencimento}
               min={hojeInput}
-              required={dataVencimentoObrigatoria}
+              required={dataVencimentoExigida}
             />
           </label>
           )}
@@ -1843,7 +2974,19 @@ export default function NovaSolicitacao() {
           )}
         </div>
 
-        {exibirPeriodoMedicao && (
+        {/* Blocos de contrato ficam FORA do grid de duas colunas: dentro dele o bloco ocupava
+            uma coluna so, espremido, com metade da tela vazia ao lado. */}
+        {usaFluxoContratoNovo && (
+          <BlocoContratoFluxoNovo
+            valorTotal={form.valor}
+            contratadoPrincipal={parceiroSelecionado}
+            limiteJuridico={limiteJuridico}
+            camposConfigurados={camposNovaSolicitacao}
+            onChange={setContratoNovoDados}
+          />
+        )}
+
+        {exibirPeriodoMedicaoSolto && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 nova-solicitacao-grid-curta">
             <label className="grid gap-1 text-sm">
               Data inicial (Medição)
@@ -1898,32 +3041,13 @@ export default function NovaSolicitacao() {
           </label>
         )}
 
-        {exibirDescricao && (
-        <label className="grid gap-1 text-sm">
-          Descrição
-          <textarea
-            name="descricao"
-            onChange={e =>
-              setForm(prev => ({
-                ...prev,
-                descricao: e.target.value.slice(0, 50)
-              }))
-            }
-            maxLength={50}
-            className="input input-sm nova-solicitacao-textarea text-[var(--c-text)] placeholder:text-[var(--c-muted)]"
-            required={descricaoObrigatoria}
-            value={form.descricao}
-          />
-          <span className="text-xs text-gray-500">
-            Descrição breve, com no máximo 50 caracteres.
-          </span>
-          </label>
-        )}
 
         <div className="nova-solicitacao-actions-bar">
-          {exibirAnexos && (
+          {exibirAnexos && !(tipoEhDeMedicao && (pagamentoViaBoleto || medicaoContratoDados?.pagamento?.via_boleto)) && (
           <label className="grid gap-1 text-sm nova-solicitacao-anexos">
-          Anexos
+          {tipoEhDeMedicao
+            ? 'Anexo da medição *'
+            : (usaFluxoDespesaEventual ? 'Comprovante da despesa *' : `Anexos${anexosObrigatorios ? ' *' : ''}`)}
           <div className="flex items-center gap-2 flex-wrap nova-solicitacao-inline-actions nova-solicitacao-anexos-head">
             <label className="btn btn-outline btn-sm inline-flex items-center gap-2 cursor-pointer">
               <HiPaperClip className="w-4 h-4" />
@@ -1931,6 +3055,7 @@ export default function NovaSolicitacao() {
               <input
                 type="file"
                 multiple
+                accept={UPLOAD_DOCUMENT_ACCEPT}
                 ref={anexosRef}
                 className="hidden"
                 onChange={e => {
@@ -1959,7 +3084,12 @@ export default function NovaSolicitacao() {
           <button
             type="submit"
             className="btn btn-primary btn-sm"
-            disabled={criandoSolicitacao}
+            disabled={
+              criandoSolicitacao ||
+              (usaFluxoRecargaCartao && (!cartaoRecargaId || recargaCartaoContexto?.bloqueado)) ||
+              (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') ||
+              (usaFluxoDespesaEventual && despesaEventualSaldo.status === 'loading')
+            }
           >
             {criandoSolicitacao ? 'Criando...' : 'Criar Solicitação'}
           </button>
@@ -2077,6 +3207,68 @@ export default function NovaSolicitacao() {
                   onChange={e => setNovoParceiro(prev => ({ ...prev, email: e.target.value }))}
                 />
               </label>
+
+              {/* Endereco obrigatorio no cadastro (PI-20).
+                  Estes campos ja existiam no estado do formulario, mas nao eram renderizados — e e
+                  por isso que 2.428 dos 2.454 fornecedores ativos estao sem endereco. Exigir aqui
+                  evita que o contrato acima do limite pare na conferencia depois. */}
+              <div className="md:col-span-2 rounded-lg border border-[var(--c-border)] p-3 space-y-3">
+                <div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                    Endereco do credor *
+                  </div>
+                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    Obrigatorio: contrato acima do limite vai ao Juridico, e a minuta precisa
+                    identificar e localizar a parte.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-6">
+                  <label className="grid gap-1 text-sm md:col-span-4">
+                    Logradouro *
+                    <input className="input input-sm" name="novo_credor_endereco"
+                      value={novoParceiro.endereco}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, endereco: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-2">
+                    Numero *
+                    <input className="input input-sm" name="novo_credor_numero"
+                      value={novoParceiro.numero}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, numero: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-2">
+                    Complemento
+                    <input className="input input-sm" name="novo_credor_complemento"
+                      value={novoParceiro.complemento || ''}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, complemento: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-4">
+                    Bairro *
+                    <input className="input input-sm" name="novo_credor_bairro"
+                      value={novoParceiro.bairro}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, bairro: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-2">
+                    CEP *
+                    <input className="input input-sm" name="novo_credor_cep"
+                      value={novoParceiro.cep}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, cep: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-3">
+                    Municipio *
+                    <input className="input input-sm" name="novo_credor_municipio"
+                      value={novoParceiro.municipio}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, municipio: e.target.value }))} />
+                  </label>
+                  <label className="grid gap-1 text-sm md:col-span-1">
+                    UF *
+                    <input className="input input-sm" name="novo_credor_estado" maxLength={2}
+                      value={novoParceiro.estado}
+                      onChange={e => setNovoParceiro(prev => ({ ...prev, estado: e.target.value }))} />
+                  </label>
+                </div>
+              </div>
+
               <div className="md:col-span-2 rounded-lg border border-[var(--c-border)] p-3 space-y-3">
                 <div>
                   <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>
@@ -2254,6 +3446,32 @@ export default function NovaSolicitacao() {
           </div>
         </div>
       )}
+
+      {/* Modal do termo aditivo (PI-15). Fica fora do <form> de proposito: o envio dele e proprio
+          e nao pode disparar o submit da medicao. */}
+      <ModalAditivoContrato
+        aberto={modalAditivoAberto}
+        contratoId={form.contrato_id ? Number(form.contrato_id) : null}
+        areaResponsavel={form.area_responsavel}
+        contratoRotulo={contratoSelecionado
+          ? `${contratoSelecionado.codigo || ''} ${contratoSelecionado.ref_contrato || contratoSelecionado.descricao || ''}`.trim()
+          : ''}
+        onFechar={() => setModalAditivoAberto(false)}
+        onSolicitado={(r) => {
+          alert(`Termo aditivo de R$ ${Number(r?.aditivo?.valor || 0).toFixed(2)} solicitado — aguardando aprovacao.`);
+        }}
+      />
+
+      <ModalConferenciaCredores
+        aberto={modalCredoresAberto}
+        parceiroIds={credoresParaConferir}
+        criando={criandoSolicitacao}
+        onFechar={() => setModalCredoresAberto(false)}
+        onConfirmar={() => {
+          setModalCredoresAberto(false);
+          void handleSubmit(null, { confirmadoNaConferencia: true });
+        }}
+      />
 
     </div>
   );

@@ -572,6 +572,28 @@ export default function Layout() {
       addGroup('RH/DP', [
         rhDpDashboardAccess ? item('/rh-dp', 'Visao do Modulo', HiOutlineUsers) : null,
         rhDpDashboardAccess ? item('/rh-dp/relatorios', 'Relatórios', HiOutlineDocumentText) : null,
+        /**
+         * Pessoal vem ANTES de Colaboradores, e Jornada logo depois (26/08).
+         *
+         * Pessoal e a tela de trabalho — a obra pede e o DP decide, e e onde as solicitacoes em
+         * aberto aparecem. Colaboradores e o cadastro, consulta. Quem abre o modulo abre para
+         * resolver o que esta parado, e o menu deve refletir isso.
+         *
+         * As duas usam o mesmo acesso de Colaboradores porque e o que a rota exige
+         * (`RhDpColaboradoresRoute`). Os BOTOES dentro delas e que seguem as permissoes finas de
+         * `rh_dp.solicitacoes.*` — sem elas a pessoa ve a lista e nao ve os botoes, que e o
+         * comportamento certo.
+         */
+        /**
+         * Jornada saiu do menu em 26/08: virou ABA dentro de Pessoal.
+         *
+         * Manter os dois caminhos daria duas portas para a mesma tela, e a do menu levaria a uma
+         * versao sem as abas irmas ao lado — quem entrasse por ali perderia a sequencia do trabalho
+         * (pedir, informar jornada, apurar), que e justamente o motivo de terem sido unidas.
+         *
+         * A ROTA `/rh-dp/jornada` continua existindo: quem tiver o link salvo nao quebra.
+         */
+        rhDpColaboradoresAccess ? item('/rh-dp/pessoal', 'Pessoal', HiOutlineUsers) : null,
         rhDpColaboradoresAccess ? item('/rh-dp/colaboradores', 'Colaboradores', HiOutlineUsers) : null,
         rhDpDocumentosAccess ? item('/rh-dp/documentos', 'Documentos', HiOutlineFolderOpen) : null,
         rhDpImportacoesAccess ? item('/rh-dp/importacoes', 'Importacoes', HiOutlineCloudArrowUp) : null,
@@ -669,6 +691,7 @@ export default function Layout() {
         configuracoesGeralAccess && comercialAccess ? item('/configuracoes-comercial-categorias', 'Categorias Comerciais', HiOutlineArchiveBox) : null,
         configuracoesModulosAccess ? item('/configuracoes-modulos', 'Modulos e Planos', HiOutlineCog6Tooth) : null,
         configuracoesAparenciaAccess ? item('/configuracoes-notificacoes-sistema', 'Notificacoes Sistema', HiOutlineBell) : null,
+        configuracoesGeralAccess ? item('/configuracoes-formas-pagamento-solicitacao', 'Formas da Nova Solicitacao', HiOutlineAdjustmentsHorizontal) : null,
         superadmin && moduloBibliotecaHabilitado ? item('/arquivos-modelos-config', 'Arquivos Modelos', HiOutlineFolderOpen) : null
       ]);
     }

@@ -14,6 +14,14 @@ function getDefaultTipoSolicitacaoBehavior() {
     exige_valor: true,
     mostrar_descricao: true,
     exige_descricao: true,
+    mostrar_credor: true,
+    exige_credor: false,
+    mostrar_justificativa: false,
+    exige_justificativa: false,
+    mostrar_favorecido: false,
+    exige_favorecido: false,
+    mostrar_forma_pagamento: false,
+    exige_forma_pagamento: false,
     mostrar_apropriacao_principal: true,
     exige_apropriacao_principal: false,
     mostrar_contrato: false,
@@ -26,7 +34,27 @@ function getDefaultTipoSolicitacaoBehavior() {
     exige_ref_contrato_abertura: false,
     mostrar_itens_apropriacao: false,
     exige_itens_apropriacao: false,
-    exige_apropriacoes_contrato: false
+    exige_apropriacoes_contrato: false,
+    // ADM Local e Locacao recebem a apropriacao pelo vinculo obra + tipo. A flag permite que
+    // frontend e backend escondam os campos manuais sem depender do nome exibido na tela.
+    usa_apropriacao_automatica_obra: false,
+    // Fluxo novo de contratos (D38): chave de comportamento de primeira classe — o
+    // normalizador so preserva chaves do default, e sem esta linha a flag era descartada
+    // na serializacao do tipo (descoberto por sonda no DOM: endpoint devolvia 17 chaves).
+    usa_fluxo_contrato_novo: false,
+    // Fluxo simplificado para pequenas despesas. A flag concentra limites, documentos,
+    // declaracoes e formas de pagamento sem depender do nome exibido do tipo.
+    usa_fluxo_despesa_eventual: false,
+    somente_gerencia_processos: false,
+    mostrar_anexos: true,
+    exige_anexos: false,
+    // PI-16: tipo de USO DO SISTEMA — criado por acao do sistema (hoje, o aditivo de contrato
+    // legado), nunca escolhido por alguem na Nova Solicitacao.
+    //
+    // A marca vive no TIPO, e nao na lista por setor, porque `TIPOS_SOLICITACAO_POR_SETOR` e
+    // lista de permissao e setor SEM lista mostra tudo: 9 dos 19 setores ativos nao tem lista, e
+    // esconder por omissao vazaria para eles — e para todo setor novo criado depois.
+    somente_sistema: false
   };
 }
 
@@ -89,11 +117,19 @@ function inferLegacyTipoBehavior(tipo) {
     behavior.exige_contrato = true;
     behavior.mostrar_subtipo = true;
     behavior.exige_subtipo = true;
+    behavior.usa_apropriacao_automatica_obra = true;
+    behavior.mostrar_justificativa = true;
+    behavior.exige_justificativa = true;
+    behavior.mostrar_favorecido = true;
+    behavior.exige_favorecido = true;
+    behavior.mostrar_forma_pagamento = true;
+    behavior.exige_forma_pagamento = true;
   }
 
   if (codigoInterno === 'LOCACAO_DE_MAQ_EQ') {
     behavior.mostrar_contrato = true;
     behavior.exige_contrato = true;
+    behavior.usa_apropriacao_automatica_obra = true;
   }
 
   if (codigoInterno === 'ABERTURA_DE_CONTRATO') {

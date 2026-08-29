@@ -4,8 +4,10 @@ const { Op, fn, col } = require('sequelize');
 const {
   Anexo,
   Apropriacao,
+  Categoria,
   Historico,
   Insumo,
+  InsumoAlias,
   Obra,
   Parceiro,
   FornecedorCompra,
@@ -618,6 +620,16 @@ async function carregarSolicitacaoCompra(id) {
         separate: true,
         include: [
           { model: Apropriacao, as: 'apropriacao', attributes: APROPRIACAO_ATTRIBUTES },
+          {
+            model: Insumo,
+            as: 'insumoCatalogado',
+            attributes: ['id', 'nome', 'codigo', 'descricao', 'unidade_id', 'unidade_manual', 'categoria_id', 'ativo'],
+            include: [
+              { model: Unidade, as: 'unidade', attributes: ['id', 'nome', 'sigla'] },
+              { model: Categoria, as: 'categoria', attributes: ['id', 'nome'] }
+            ]
+          },
+          { model: User, as: 'catalogador', attributes: ['id', 'nome', 'email'] },
           buildIncludeRateiosItemManual()
         ]
       },
@@ -2231,7 +2243,10 @@ module.exports = {
       const [insumos, unidades, apropriacoes] = await Promise.all([
         Insumo.findAll({
           where: { ativo: true },
-          include: [{ model: Unidade, as: 'unidade' }]
+          include: [
+            { model: Unidade, as: 'unidade' },
+            { model: InsumoAlias, as: 'aliases', where: { ativo: true }, required: false }
+          ]
         }),
         Unidade.findAll(),
         Apropriacao.findAll({
@@ -2330,7 +2345,13 @@ module.exports = {
       }
 
       const [insumos, unidades, apropriacoes] = await Promise.all([
-        Insumo.findAll({ include: [{ model: Unidade, as: 'unidade' }] }),
+        Insumo.findAll({
+          where: { ativo: true },
+          include: [
+            { model: Unidade, as: 'unidade' },
+            { model: InsumoAlias, as: 'aliases', where: { ativo: true }, required: false }
+          ]
+        }),
         Unidade.findAll(),
         Apropriacao.findAll({
           where: { obra_id: obraId },
@@ -2341,7 +2362,8 @@ module.exports = {
       const insumosMap = buildCompraDiretaImportMap(insumos, (insumo) => [
         insumo.nome,
         insumo.codigo,
-        insumo.id ? String(insumo.id) : ''
+        insumo.id ? String(insumo.id) : '',
+        ...(insumo.aliases || []).map((entry) => entry.alias)
       ]);
       const unidadesMap = buildCompraDiretaImportMap(unidades, (unidade) => [
         unidade.sigla,

@@ -31,6 +31,7 @@ const BEHAVIOR_FIELDS = [
   { key: 'exige_ref_contrato_abertura', label: 'Exigir ref. contrato abertura' },
   { key: 'mostrar_itens_apropriacao', label: 'Mostrar itens de apropriacao' },
   { key: 'exige_itens_apropriacao', label: 'Exigir itens de apropriacao' },
+  { key: 'usa_fluxo_contrato_novo', label: 'Usar fluxo novo de contratos' },
   { key: 'exige_apropriacoes_contrato', label: 'Exigir apropriacoes do contrato' }
 ];
 

@@ -107,7 +107,22 @@ function sanitizePositiveInteger(value, fieldName) {
   return parsed;
 }
 
-function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
+/**
+ * Campos do REPRESENTANTE LEGAL. Sao do representante, nao do parceiro: numa PJ quem assina o
+ * contrato e outra pessoa. A qualificacao repete o vocabulario que o Comercial ja usa no parceiro
+ * pessoa fisica (nacionalidade, estado civil, profissao).
+ */
+const CAMPOS_REPRESENTANTE = [
+  'representante_nome',
+  'representante_cpf',
+  'representante_rg',
+  'representante_cargo',
+  'representante_nacionalidade',
+  'representante_estado_civil',
+  'representante_profissao'
+];
+
+function normalizeParceiroPayload(payload = {}, { partial = false, exigirCadastroCompleto = false } = {}) {
   const cpfCnpj = normalizarCpfCnpj(payload.cpf_cnpj);
   const nome = String(payload.nome || '').trim();
   const telefone = String(payload.telefone || '').trim();
@@ -143,6 +158,28 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     }
     if (!tipoPessoa) {
       throw new Error('Nao foi possivel identificar o tipo de pessoa.');
+    }
+
+    // PJ EXIGE NOME FANTASIA E REPRESENTANTE LEGAL (itens 12, 27 e 28 do lote de 23/08).
+    //
+    // Em pessoa FISICA nao se aplica: nome fantasia de pessoa nao existe, e quem assina e ela
+    // mesma. Exigir dos dois levaria a repetir o nome no campo, que e pior do que nao ter.
+    //
+    // A regra e da CRIACAO, e so onde `exigirCadastroCompleto` for pedido — ver o comentario em
+    // `criarParceiro`. Parceiro que ja existe nao vira invalido por uma regra nova.
+    // `inferirTipoPessoa` devolve 'J' e 'F', e nao 'PJ'/'PF' — conferido na propria funcao. Comparar
+    // com 'PJ' deixava a regra sempre falsa e a exigencia nunca disparava.
+    if (exigirCadastroCompleto && tipoPessoa === 'J') {
+      if (!sanitizeText(payload.nome_fantasia)) {
+        throw new Error('Informe o nome fantasia da empresa.');
+      }
+      if (!sanitizeText(payload.representante_nome)) {
+        throw new Error('Informe o nome do representante legal da empresa.');
+      }
+      const cpfRepresentante = normalizarCpfCnpj(payload.representante_cpf);
+      if (!cpfRepresentante || !isValidCpfCnpj(cpfRepresentante)) {
+        throw new Error('Informe um CPF valido para o representante legal.');
+      }
     }
   }
 
@@ -194,6 +231,19 @@ function normalizeParceiroPayload(payload = {}, { partial = false } = {}) {
     fornecedor,
     corretor,
     testemunha,
+    nome_fantasia: partial
+      ? (payload.nome_fantasia !== undefined ? sanitizeText(payload.nome_fantasia) : undefined)
+      : sanitizeText(payload.nome_fantasia),
+    // O CPF do representante e guardado so com digitos, como o do parceiro — comparar documento
+    // com pontuacao ja gerou duplicata neste sistema.
+    representante_cpf: partial
+      ? (payload.representante_cpf !== undefined ? (normalizarCpfCnpj(payload.representante_cpf) || null) : undefined)
+      : (normalizarCpfCnpj(payload.representante_cpf) || null),
+    ...Object.fromEntries(CAMPOS_REPRESENTANTE
+      .filter((campo) => campo !== 'representante_cpf')
+      .map((campo) => [campo, partial
+        ? (payload[campo] !== undefined ? sanitizeText(payload[campo]) : undefined)
+        : sanitizeText(payload[campo])])),
     conjuge_nome: partial
       ? (payload.conjuge_nome !== undefined ? sanitizeText(payload.conjuge_nome) : undefined)
       : sanitizeText(payload.conjuge_nome),
@@ -387,9 +437,23 @@ async function buscarParceiros({
   return Parceiro.findAll(options);
 }
 
+/**
+ * `exigirCadastroCompleto` liga a regra PF/PJ de 23/08 (nome fantasia e representante legal na PJ).
+ *
+ * Vem LIGADA por padrao — e o cadastro de credor que o cliente pediu para fechar. Fica desligada
+ * apenas no cadastro rapido de fornecedor de COMPRA DIRETA, que e do modulo de Compras: ligar la
+ * sem o campo existir no formulario derrubaria o cadastro do outro agente, e derrubar o modulo
+ * alheio para cumprir regra do meu e o que o PROTOCOLO-AGENTES-PARALELOS proibe. Anotado la para
+ * ele completar.
+ *
+ * A importacao por XLSX nao passa por aqui (grava pelo model), entao planilha antiga continua
+ * importando — exigir nome fantasia em 5.000 linhas historicas travaria a carga inteira.
+ */
 async function criarParceiro(payload, options = {}) {
   const categoriaIds = parseCategoriaIds(payload?.categoria_ids);
-  const data = normalizeParceiroPayload(payload);
+  const data = normalizeParceiroPayload(payload, {
+    exigirCadastroCompleto: options.exigirCadastroCompleto !== false
+  });
   await ensureParceiroUnico(data.cpf_cnpj, null, options);
   await validarCategorias(categoriaIds, options);
   const parceiro = await Parceiro.create(data, { transaction: options.transaction });

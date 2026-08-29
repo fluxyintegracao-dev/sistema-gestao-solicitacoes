@@ -1,6 +1,6 @@
 const { env, validateRequiredEnv } = require('./src/config/env');
 const sequelize = require('./src/database');
-const { runMigrations } = require('./src/database/runMigrations');
+const { assertMigrationsUpToDate } = require('./src/database/runMigrations');
 const { iniciarOpsSync } = require('./src/services/opsService');
 const { loadRuntimeConfig } = require('./src/services/runtimeConfig');
 const { ensureRateLimitStoreReady } = require('./src/services/rateLimitStore');
@@ -13,7 +13,7 @@ async function start() {
   validateRequiredEnv();
   await ensureRateLimitStoreReady();
   await ensureClamavReady();
-  await runMigrations();
+  await assertMigrationsUpToDate();
   await loadRuntimeConfig();
 
   const app = require('./src/app');

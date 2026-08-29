@@ -18,7 +18,7 @@ import {
 } from '../services/obras';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
-import { canAccessGestaoObras, isBusinessAdmin } from '../utils/acessoProduto';
+import { canAccessGestaoObras, canManageCadastroObras } from '../utils/acessoProduto';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -169,7 +169,7 @@ export default function Obras() {
   const [modalAberto, setModalAberto] = useState(false);
   const [form, setForm] = useState(initialFormState());
 
-  const podeGerenciarCadastro = isBusinessAdmin(user);
+  const podeGerenciarCadastro = canManageCadastroObras(user);
   const gestaoObrasHabilitada = canAccessGestaoObras(user);
 
   useEffect(() => {

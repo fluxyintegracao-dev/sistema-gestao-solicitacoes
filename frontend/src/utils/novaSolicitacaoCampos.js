@@ -3,6 +3,8 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'area_responsavel', label: 'Area responsavel', descricao: 'Define o setor que recebe a solicitacao.', fixo: true },
   { id: 'credor', label: 'Credor', descricao: 'Pessoa ou empresa vinculada como credor.' },
   { id: 'cadastro_credor', label: 'Cadastro de credor', descricao: 'Permite cadastrar um novo credor durante a abertura da solicitacao.', permiteObrigatorio: false },
+  { id: 'favorecido', label: 'Favorecido', descricao: 'Pessoa ou empresa que recebera o pagamento.', excetoFluxoContratoNovo: true },
+  { id: 'forma_pagamento', label: 'Forma de pagamento', descricao: 'Forma prevista para o pagamento da solicitacao.', excetoFluxoContratoNovo: true },
   { id: 'apropriacao_principal', label: 'Apropriacao principal', descricao: 'Apropriacao da solicitacao na obra.' },
   { id: 'subtipo', label: 'Subtipo', descricao: 'Subtipo de contrato ou classificacao complementar.' },
   { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
@@ -13,8 +15,14 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'periodo_medicao', label: 'Periodo de medicao', descricao: 'Data inicial e final da medicao.' },
   { id: 'ref_contrato_abertura', label: 'Ref. contrato abertura', descricao: 'Referencia usada para abertura de contrato.' },
   { id: 'itens_apropriacao', label: 'Itens de apropriacao', descricao: 'Itens de apropriacao usados na abertura de contrato.' },
-  { id: 'descricao', label: 'Descricao', descricao: 'Descricao textual da solicitacao.' },
-  { id: 'anexos', label: 'Anexos', descricao: 'Arquivos anexados na abertura da solicitacao.', permiteObrigatorio: false }
+  { id: 'contrato_objeto', label: 'Objeto do contrato', descricao: 'Define o que esta sendo contratado no novo fluxo.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_justificativa', label: 'Justificativa da contratacao', descricao: 'Registra por que a contratacao e necessaria.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_responsavel', label: 'Responsavel pela contratacao', descricao: 'Usuario responsavel pelo acompanhamento da contratacao.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_vigencia_inicio', label: 'Vigencia inicial do contrato', descricao: 'Data de inicio da vigencia contratual.', somenteFluxoContratoNovo: true },
+  { id: 'contrato_vigencia_fim', label: 'Vigencia final do contrato', descricao: 'Data final da vigencia contratual.', somenteFluxoContratoNovo: true },
+  { id: 'descricao', label: 'Titulo', descricao: 'Titulo curto usado para identificar a solicitacao.' },
+  { id: 'justificativa', label: 'Justificativa', descricao: 'Motivo e necessidade da solicitacao.', excetoFluxoContratoNovo: true },
+  { id: 'anexos', label: 'Anexos', descricao: 'Arquivos anexados na abertura da solicitacao.' }
 ];
 
 export const OPCOES_NOVA_SOLICITACAO = [
@@ -44,13 +52,26 @@ function normalizarTipoKey(value) {
   return String(value || '').trim();
 }
 
-function obterRegraCampos(config, tipoId, areaResponsavel) {
+// Espelha a cascata do backend: a regra do SUBTIPO (`tipo:subtipo`) tem precedencia sobre a do
+// tipo, e o tipo continua valendo quando nao ha regra de subtipo. As duas pontas precisam
+// resolver igual, senao a tela mostra um campo que o servidor recusa (ou o contrario).
+function chaveTipoSubtipo(tipoId, subtipoId) {
+  const tipo = normalizarTipoKey(tipoId);
+  const sub = normalizarTipoKey(subtipoId);
+  return tipo && sub ? `${tipo}:${sub}` : null;
+}
+
+function obterRegraCampos(config, tipoId, areaResponsavel, subtipoId) {
+  const subKey = chaveTipoSubtipo(tipoId, subtipoId);
   const tipoKey = normalizarTipoKey(tipoId);
   const areaKey = normalizarAreaNovaSolicitacao(areaResponsavel);
 
   return (
+    (subKey && config?.regras?.[areaKey]?.tipos?.[subKey]?.campos) ||
     config?.regras?.[areaKey]?.tipos?.[tipoKey]?.campos ||
+    (subKey && config?.regras?.__GLOBAL__?.tipos?.[subKey]?.campos) ||
     config?.regras?.__GLOBAL__?.tipos?.[tipoKey]?.campos ||
+    (subKey && config?.regras?.[subKey]?.campos) ||
     config?.regras?.[tipoKey]?.campos ||
     {}
   );
@@ -93,9 +114,13 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
     case 'area_responsavel':
       return { visivel: true, obrigatorio: true };
     case 'credor':
-      return { visivel: true, obrigatorio: false };
+      return { visivel: behavior.mostrar_credor !== false, obrigatorio: Boolean(behavior.exige_credor) };
     case 'cadastro_credor':
       return { visivel: false, obrigatorio: false };
+    case 'favorecido':
+      return { visivel: Boolean(behavior.mostrar_favorecido), obrigatorio: Boolean(behavior.exige_favorecido) };
+    case 'forma_pagamento':
+      return { visivel: Boolean(behavior.mostrar_forma_pagamento), obrigatorio: Boolean(behavior.exige_forma_pagamento) };
     case 'apropriacao_principal':
       return {
         visivel: Boolean(apropriacoesDisponiveis && behavior.mostrar_apropriacao_principal),
@@ -141,18 +166,26 @@ function padraoCampo(id, behavior = {}, contexto = {}) {
         ),
         obrigatorio: Boolean(behavior.exige_itens_apropriacao)
       };
+    case 'contrato_objeto':
+    case 'contrato_justificativa':
+    case 'contrato_responsavel':
+    case 'contrato_vigencia_inicio':
+    case 'contrato_vigencia_fim':
+      return { visivel: Boolean(behavior.usa_fluxo_contrato_novo), obrigatorio: false };
     case 'descricao':
       return { visivel: behavior.mostrar_descricao !== false, obrigatorio: Boolean(behavior.exige_descricao) };
+    case 'justificativa':
+      return { visivel: Boolean(behavior.mostrar_justificativa), obrigatorio: Boolean(behavior.exige_justificativa) };
     case 'anexos':
-      return { visivel: true, obrigatorio: false };
+      return { visivel: behavior.mostrar_anexos !== false, obrigatorio: Boolean(behavior.exige_anexos) };
     default:
       return { visivel: true, obrigatorio: false };
   }
 }
 
 export function resolverCamposNovaSolicitacaoFrontend(behavior, config, tipoId, contexto = {}) {
-  const regrasTipo = obterRegraCampos(config, tipoId, contexto.areaResponsavel);
-  return CAMPOS_NOVA_SOLICITACAO.reduce((acc, campo) => {
+  const regrasTipo = obterRegraCampos(config, tipoId, contexto.areaResponsavel, contexto.tipoSubId);
+  const campos = CAMPOS_NOVA_SOLICITACAO.reduce((acc, campo) => {
     const padrao = padraoCampo(campo.id, behavior, contexto);
     const regra = regrasTipo[campo.id];
     const visivel = campo.fixo ? true : boolOrDefault(regra?.visivel, padrao.visivel);
@@ -168,6 +201,18 @@ export function resolverCamposNovaSolicitacaoFrontend(behavior, config, tipoId, 
     };
     return acc;
   }, {});
+
+  if (behavior?.usa_apropriacao_automatica_obra === true) {
+    ['contrato', 'apropriacoes_contrato', 'apropriacao_principal'].forEach((campoId) => {
+      campos[campoId] = {
+        ...campos[campoId],
+        visivel: false,
+        obrigatorio: false
+      };
+    });
+  }
+
+  return campos;
 }
 
 export function normalizarConfigCamposNovaSolicitacao(config) {

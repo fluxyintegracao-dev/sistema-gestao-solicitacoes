@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 function normalize(v) {
   return String(v || '')
@@ -26,6 +27,33 @@ export default function ApropriacaoAutocomplete({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  // A lista vai em PORTAL, e a posicao dela e medida a partir do input.
+  //
+  // Ela era `absolute` dentro do proprio campo, e por isso sumia quando o autocomplete ficava
+  // dentro de um container com `overflow` — foi o que aconteceu na tabela de rateio: com UMA
+  // linha a tabela e baixa, a lista cai inteira fora da area visivel e some; com mais linhas ha
+  // altura sobrando e ela aparece. Dava a impressao de "so funciona com mais de uma apropriacao".
+  //
+  // Em portal no body, nenhum ancestral consegue recortar — vale para este uso e para qualquer
+  // outro lugar que ponha o campo dentro de uma area com rolagem.
+  const campoRef = useRef(null);
+  const [caixa, setCaixa] = useState(null);
+
+  useEffect(() => {
+    if (!open || !campoRef.current) return undefined;
+    const medir = () => {
+      const r = campoRef.current?.getBoundingClientRect();
+      if (r) setCaixa({ left: r.left, top: r.bottom + 4, width: r.width });
+    };
+    medir();
+    window.addEventListener('resize', medir);
+    // `true` para capturar rolagem de QUALQUER ancestral, nao so da janela.
+    window.addEventListener('scroll', medir, true);
+    return () => {
+      window.removeEventListener('resize', medir);
+      window.removeEventListener('scroll', medir, true);
+    };
+  }, [open]);
 
   const selectedOption = useMemo(
     () => options.find((item) => String(item.id) === String(value || '')),
@@ -86,7 +114,7 @@ export default function ApropriacaoAutocomplete({
   }
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={campoRef} className={`relative ${className}`}>
       <input
         className={inputClassName}
         value={query}
@@ -103,8 +131,11 @@ export default function ApropriacaoAutocomplete({
         aria-autocomplete="list"
       />
 
-      {open && !disabled && (
-        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-[80] max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
+      {open && !disabled && caixa && typeof document !== 'undefined' && createPortal((
+        <div
+          className="fixed max-h-60 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl"
+          style={{ left: caixa.left, top: caixa.top, width: caixa.width, zIndex: 'var(--z-dropdown-portal, 90)' }}
+        >
           {filteredOptions.length ? (
             filteredOptions.map((option, i) => (
               <button
@@ -141,7 +172,7 @@ export default function ApropriacaoAutocomplete({
             </div>
           )}
         </div>
-      )}
+      ), document.body)}
     </div>
   );
 }

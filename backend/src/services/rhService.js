@@ -12,6 +12,18 @@ const {
   sequelize
 } = require('../models');
 const { ValidationError } = require('../middlewares/validation');
+const rhVinculoObraService = require('./rhVinculoObraService');
+
+/**
+ * Importado por funcao, e nao no topo: `rhSolicitacaoService` requer `rhVinculoObraService`, que
+ * requer os models — e este arquivo e requerido pelo controller que tambem chega la. Trazer o
+ * modulo inteiro aqui em cima fecha um ciclo de require, e o sintoma de ciclo em CommonJS e um
+ * objeto vazio em tempo de execucao, nao um erro no boot: falha longe da causa.
+ */
+function pedidosAbertosPorColaborador(obraIds) {
+  // eslint-disable-next-line global-require
+  return require('./rhSolicitacaoService').pedidosAbertosPorColaborador(obraIds);
+}
 const { uploadToS3, getPresignedUrl } = require('./s3');
 const { normalizeOriginalName } = require('../utils/fileName');
 const {
@@ -948,11 +960,54 @@ async function listarColaboradoresRh(filters = {}) {
     where.status = filters.status;
   }
 
-  return RhColaborador.findAll({
+  const colaboradores = await RhColaborador.findAll({
     where,
     include: COLABORADOR_INCLUDE,
     order: [['nome', 'ASC']]
   });
+
+  /**
+   * PEDIDOS EM ABERTO EMBUTIDOS, E QUEM TEM PEDIDO VEM PRIMEIRO (Fase 2, 25/08).
+   *
+   * Requisito do cliente para a tela consolidada: "uma lista de colaboradores que, quando tiver
+   * alguma solicitacao para aquele colaborador, ele seja posicionado primeiro na lista e ganhe
+   * destaque visual e de status".
+   *
+   * UMA consulta para todos os pedidos abertos, e nao uma por linha. A alternativa obvia — perguntar
+   * "tem pedido?" para cada colaborador — faria 137 consultas para montar a tela, e a tela que
+   * existe para dar AGILIDADE seria a mais lenta do modulo. O indice
+   * `(colaborador_id, situacao)` nasceu na migration por causa disto.
+   *
+   * `filters.obra_ids` e a visibilidade: quem nao tem `rh_dp.solicitacoes.ver_todas` recebe aqui a
+   * lista das obras dele. Nulo significa "todas" — e quem decide isso e o chamador, para que a
+   * regra de visibilidade fique em um lugar so.
+   *
+   * A ordenacao por nome CONTINUA valendo dentro de cada grupo: quem tem pedido em ordem
+   * alfabetica, depois quem nao tem em ordem alfabetica. Sem isso a lista mudaria de ordem a cada
+   * pedido novo e ninguem acharia mais ninguem.
+   */
+  const abertosPorColaborador = await pedidosAbertosPorColaborador(filters.obra_ids || null);
+
+  const comPedido = [];
+  const semPedido = [];
+
+  for (const colaborador of colaboradores) {
+    const pedidos = abertosPorColaborador.get(colaborador.id) || [];
+    const plano = colaborador.get({ plain: true });
+
+    plano.solicitacoes_abertas = pedidos.map((pedido) => ({
+      id: pedido.id,
+      tipo: pedido.tipo,
+      situacao: pedido.situacao,
+      obra_id: pedido.obra_id,
+      criada_em: pedido.createdAt
+    }));
+    plano.tem_solicitacao_aberta = pedidos.length > 0;
+
+    (pedidos.length ? comPedido : semPedido).push(plano);
+  }
+
+  return [...comPedido, ...semPedido];
 }
 
 async function detalharColaboradorRh(id) {
@@ -990,6 +1045,20 @@ async function criarColaboradorRh(data, user) {
 
     await upsertPagamentoColaborador(created.id, data.pagamento, transaction);
 
+    // Abre o vinculo de lotacao. `obra_id` no colaborador continua sendo a obra corrente; esta
+    // linha e o comeco do historico, que responde "onde ele estava naquele dia" (Fase 1, 25/08).
+    await rhVinculoObraService.registrarVinculo(
+      {
+        colaboradorId: created.id,
+        obraId: created.obra_id,
+        setorId: created.setor_id,
+        vigenciaInicio: created.data_admissao || created.data_inicio,
+        motivo: 'ADMISSAO',
+        criadoPor: user?.id || null
+      },
+      transaction
+    );
+
     return RhColaborador.findByPk(created.id, {
       include: COLABORADOR_INCLUDE,
       transaction
@@ -1015,6 +1084,59 @@ async function atualizarColaboradorRh(id, data, user) {
     }
 
     await assertUniqueColaborador(data, colaborador.id, transaction);
+
+    /**
+     * A PORTA DOS FUNDOS FECHA AQUI (Fase 2 do modulo DP, 25/08).
+     *
+     * Decisao do cliente: trocar a obra de um colaborador passa a exigir solicitacao formal — a
+     * Obra pede, o DP decide. Enquanto a edicao direta continuasse existindo ao lado do fluxo, o
+     * processo seria OPCIONAL, e opcional e o mesmo que inexistente: bastaria abrir o cadastro
+     * para contornar a aprovacao, e o historico de lotacao nasceria com buracos.
+     *
+     * Fecha SEM periodo de convivencia porque o modulo RH/DP nao e operado pela empresa hoje —
+     * nao ha usuario para quebrar. Em modulo vivo isto exigiria transicao.
+     *
+     * A via nova e `rhSolicitacaoService`, tipo TROCA_OBRA, provada pela suite 50.
+     *
+     * `salario_base` NAO e fechado aqui, de proposito: a alteracao salarial so ganha fluxo na
+     * Fase 5, e fechar antes deixaria o salario impossivel de corrigir por qualquer caminho.
+     */
+    if (Object.prototype.hasOwnProperty.call(data, 'obra_id')) {
+      const obraPedida = data.obra_id === null || data.obra_id === '' ? null : Number(data.obra_id);
+      const obraAtual = colaborador.obra_id === null ? null : Number(colaborador.obra_id);
+      if (obraPedida !== obraAtual) {
+        throw new ValidationError(
+          'A obra do colaborador nao e alterada pelo cadastro. Abra uma solicitacao de troca de '
+          + 'obra para que o Departamento Pessoal decida.'
+        );
+      }
+    }
+
+    /**
+     * O SALARIO FECHA NA FASE 5, agora que existe o que o substitua.
+     *
+     * Na Fase 2 deixei esta porta aberta de proposito: a alteracao salarial ainda nao tinha fluxo, e
+     * fechar antes teria deixado o salario impossivel de corrigir por qualquer caminho. Agora o
+     * pedido ALTERACAO_SALARIAL existe, exige a permissao de Diretoria e grava historico com
+     * vigencia — entao a edicao direta deixa de ter justificativa.
+     *
+     * O que muda em relacao a obra: aqui a mensagem cita a DIRETORIA, porque quem decide nao e o DP.
+     */
+    if (Object.prototype.hasOwnProperty.call(data, 'salario_base')) {
+      const pedido = data.salario_base === null || data.salario_base === '' ? null : Number(data.salario_base);
+      const atual = colaborador.salario_base === null ? null : Number(colaborador.salario_base);
+      if (pedido !== atual) {
+        throw new ValidationError(
+          'O salario nao e alterado pelo cadastro. Abra uma solicitacao de alteracao salarial: '
+          + 'a decisao e da Diretoria.'
+        );
+      }
+    }
+
+    // Lidos ANTES do update: depois dele o valor antigo desaparece, e e a comparacao com o antigo
+    // que diz se houve troca de obra ou desligamento (Fase 1, 25/08).
+    const obraAnterior = colaborador.obra_id === null ? null : Number(colaborador.obra_id);
+    const demissaoAnterior = colaborador.data_demissao || null;
 
     const collaboratorPayload = Object.fromEntries(
       Object.entries({
@@ -1042,6 +1164,39 @@ async function atualizarColaboradorRh(id, data, user) {
     );
 
     await colaborador.update(collaboratorPayload, { transaction });
+
+    // REDE DE SEGURANCA (Fase 1, mantida na Fase 2).
+    //
+    // Depois da trava acima, a obra nao muda mais por este caminho — este bloco deixou de ser a via
+    // normal. Fica porque e barato e porque a alternativa seria confiar que a trava nunca sera
+    // contornada por um caminho novo. Se algum dia a obra mudar por aqui, o vinculo e gravado em
+    // vez de o historico perder a transferencia em silencio.
+    const obraNova = colaborador.obra_id === null ? null : Number(colaborador.obra_id);
+    if (obraNova !== obraAnterior) {
+      await rhVinculoObraService.registrarVinculo(
+        {
+          colaboradorId: colaborador.id,
+          obraId: colaborador.obra_id,
+          setorId: colaborador.setor_id,
+          motivo: 'TROCA_OBRA',
+          criadoPor: user?.id || null
+        },
+        transaction
+      );
+    }
+
+    // Desligamento fecha o vinculo aberto — no PROPRIO dia da demissao, que ainda e trabalhado.
+    if (colaborador.data_demissao && !demissaoAnterior) {
+      await rhVinculoObraService.encerrarVinculo(
+        {
+          colaboradorId: colaborador.id,
+          dataFim: colaborador.data_demissao,
+          motivo: 'DEMISSAO'
+        },
+        transaction
+      );
+    }
+
     const pagamento = await upsertPagamentoColaborador(colaborador.id, data.pagamento, transaction);
     const parceiro = await sincronizarParceiroColaborador(
       {

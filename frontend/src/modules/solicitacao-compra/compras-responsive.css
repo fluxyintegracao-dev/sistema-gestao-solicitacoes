@@ -725,3 +725,641 @@
     animation-duration: 0.001ms !important;
   }
 }
+
+/* Itens de compra: catalogacao e controles compartilhados pela tabela expansivel. */
+.compras-responsive-scope .compra-item-index {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--c-muted);
+}
+
+.compras-responsive-scope .compra-item-origin,
+.compras-responsive-scope .compra-item-catalog-status {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  min-height: 1.55rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope .compra-item-origin {
+  background: var(--c-surface-muted);
+  color: var(--c-muted);
+}
+
+.compras-responsive-scope .compra-item-origin.is-manual,
+.compras-responsive-scope .compra-item-catalog-status.is-pending {
+  background: #fff1e6;
+  color: #9a4312;
+}
+
+.dark .compras-responsive-scope .compra-item-origin.is-manual,
+.dark .compras-responsive-scope .compra-item-catalog-status.is-pending {
+  background: rgba(180, 83, 9, 0.22);
+  color: #fdba74;
+}
+
+.compras-responsive-scope .compra-item-catalog-status.is-cataloged {
+  background: #e7f7ed;
+  color: #17633b;
+}
+
+.compras-responsive-scope .compra-item-catalog-status.is-official {
+  background: #edf3fb;
+  color: #315c8d;
+}
+
+.compras-responsive-scope .compra-item-chevron {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--c-muted);
+  transition: transform 180ms ease-out;
+}
+
+.compras-responsive-scope .compra-item-field > span,
+.compras-responsive-scope .compra-item-field > label > span,
+.compras-responsive-scope .compra-item-code-preview > span,
+.compras-responsive-scope .compra-item-cataloged-banner > span,
+.compras-responsive-scope .compra-item-eyebrow {
+  color: var(--c-muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope .compra-item-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.85rem;
+}
+
+.compras-responsive-scope .compra-item-inline-actions .btn {
+  min-height: 2.2rem;
+}
+
+.compras-responsive-scope .compra-item-cataloged-banner,
+.compras-responsive-scope .compra-item-permission-note {
+  display: grid;
+  gap: 0.2rem;
+  margin-top: 0.85rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--c-surface-muted);
+  color: var(--c-text);
+  font-size: 0.8rem;
+}
+
+.compras-responsive-scope .compra-item-cataloged-banner {
+  border-left: 3px solid #2c8b57;
+}
+
+.compras-responsive-scope .compra-item-cataloged-banner small {
+  color: var(--c-muted);
+}
+
+.compras-responsive-scope .compra-item-tratamento {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 0.9rem;
+  padding-top: 0.9rem;
+  border-top: 1px dashed var(--c-border);
+}
+
+.compras-responsive-scope .compra-item-tratamento-loading {
+  margin-top: 0.9rem;
+  padding: 0.8rem;
+  color: var(--c-muted);
+  font-size: 0.8rem;
+}
+
+.compras-responsive-scope .compra-item-tratamento-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.compras-responsive-scope .compra-item-tratamento-head h4 {
+  margin: 0.12rem 0;
+  font-size: 0.98rem;
+}
+
+.compras-responsive-scope .compra-item-tratamento-head p {
+  margin: 0;
+  color: var(--c-muted);
+  font-size: 0.76rem;
+}
+
+.compras-responsive-scope .compra-item-tratamento-choice {
+  display: inline-flex;
+  padding: 0.2rem;
+  border: 1px solid var(--c-border);
+  border-radius: 0.55rem;
+  background: var(--c-surface-muted);
+}
+
+.compras-responsive-scope .compra-item-tratamento-choice button {
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+  border: 0;
+  border-radius: 0.38rem;
+  background: transparent;
+  color: var(--c-muted);
+  font-size: 0.74rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.compras-responsive-scope .compra-item-tratamento-choice button.is-active {
+  background: var(--c-surface);
+  color: var(--c-text);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.12);
+}
+
+.compras-responsive-scope .compra-item-tratamento-choice button:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.compras-responsive-scope .compra-item-tratamento-grid,
+.compras-responsive-scope .compra-item-tratamento-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.compras-responsive-scope .compra-item-field {
+  display: grid;
+  align-content: start;
+  gap: 0.32rem;
+}
+
+.compras-responsive-scope .compra-item-field-wide,
+.compras-responsive-scope .compra-item-autocomplete-selection {
+  grid-column: 1 / -1;
+}
+
+.compras-responsive-scope .compra-item-tratamento-footer {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  gap: 0.55rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input {
+  display: grid;
+  min-height: 2.55rem;
+  grid-template-columns: 1.2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0 0.45rem 0 0.7rem;
+  border: 1px solid var(--c-border);
+  border-radius: 0.5rem;
+  background: var(--c-surface);
+  transition: border-color 150ms ease-out, box-shadow 150ms ease-out;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input:focus-within {
+  border-color: var(--c-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c-primary) 18%, transparent);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input.is-selected {
+  border-color: #3b8b62;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input > svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--c-muted);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input.is-selected > svg {
+  color: #28714e;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-input .input {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.45rem;
+  padding: 0;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+  outline: 0;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-loading {
+  padding-right: 0.25rem;
+  color: var(--c-muted);
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-clear {
+  display: inline-grid;
+  width: 2.1rem;
+  height: 2.1rem;
+  place-items: center;
+  border: 0;
+  border-radius: 0.35rem;
+  background: transparent;
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-clear:hover {
+  background: var(--c-surface-muted);
+  color: var(--c-text);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-clear:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-clear svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options {
+  max-height: 13.5rem;
+  overflow-y: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 0.5rem;
+  background: var(--c-surface);
+  box-shadow: 0 0.45rem 1rem rgba(15, 23, 42, 0.1);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button {
+  display: grid;
+  width: 100%;
+  min-height: 3.15rem;
+  grid-template-columns: minmax(0, 1fr) 1.2rem;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.52rem 0.7rem;
+  border: 0;
+  background: transparent;
+  color: var(--c-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button + button {
+  border-top: 1px solid var(--c-border);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button:is(:hover, .is-active) {
+  background: var(--c-surface-muted);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button.is-selected {
+  color: #17633b;
+  background: #edf8f1;
+}
+
+.dark .compras-responsive-scope .compra-item-autocomplete-options > button.is-selected {
+  color: #86efac;
+  background: rgba(22, 101, 52, 0.2);
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--c-primary);
+  outline-offset: -2px;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options > button > span {
+  display: grid;
+  min-width: 0;
+  gap: 0.12rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options strong,
+.compras-responsive-scope .compra-item-autocomplete-options small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options strong {
+  font-size: 0.78rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-options small,
+.compras-responsive-scope .compra-item-autocomplete-help {
+  color: var(--c-muted);
+  font-size: 0.7rem;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-empty {
+  padding: 0.85rem;
+  color: var(--c-muted);
+  font-size: 0.76rem;
+  text-align: center;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-selection {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #17633b;
+  font-size: 0.72rem;
+  font-weight: 650;
+}
+
+.compras-responsive-scope .compra-item-autocomplete-selection svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex: 0 0 auto;
+}
+
+.compras-responsive-scope .compra-item-code-preview small {
+  color: var(--c-muted);
+  font-size: 0.74rem;
+}
+
+.compras-responsive-scope .compra-item-code-preview {
+  display: grid;
+  gap: 0.28rem;
+  padding: 0.55rem 0;
+}
+
+.compras-responsive-scope .compra-item-feedback {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.compras-responsive-scope .compra-item-feedback.is-error {
+  background: #fff0ef;
+  color: #9d2821;
+}
+
+.compras-responsive-scope .compra-item-feedback.is-success {
+  background: #e7f7ed;
+  color: #17633b;
+}
+
+@media (max-width: 640px) {
+  .compras-responsive-scope .compra-item-tratamento-grid,
+  .compras-responsive-scope .compra-item-tratamento-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .compras-responsive-scope .compra-item-tratamento-head,
+  .compras-responsive-scope .compra-item-tratamento-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .compras-responsive-scope .compra-item-tratamento-choice {
+    width: 100%;
+  }
+
+  .compras-responsive-scope .compra-item-tratamento-choice button {
+    flex: 1 1 50%;
+    min-height: 2.75rem;
+  }
+
+  .compras-responsive-scope .compra-item-autocomplete-clear {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .compras-responsive-scope .compra-item-inline-actions .btn,
+  .compras-responsive-scope .compra-item-tratamento-footer .btn {
+    width: 100%;
+    min-height: 2.75rem;
+    justify-content: center;
+  }
+}
+
+/* Itens de compra: tabela operacional com detalhe progressivo por linha. */
+.compras-responsive-scope .compra-itens-tabela-shell {
+  overflow-x: auto;
+  border: 1px solid var(--c-border);
+  border-radius: 0.65rem;
+  background: var(--c-surface);
+}
+
+.compras-responsive-scope .compra-itens-tabela-shell:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.compras-responsive-scope .compra-itens-tabela {
+  width: 100%;
+  min-width: 58rem;
+  border-spacing: 0;
+  border-collapse: separate;
+  table-layout: fixed;
+  color: var(--c-text);
+  font-size: 0.78rem;
+}
+
+.compras-responsive-scope .compra-itens-tabela th {
+  padding: 0.55rem 0.65rem;
+  background: var(--c-surface-muted);
+  color: var(--c-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .compra-itens-tabela th:nth-child(1) { width: 3rem; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(2) { width: 6.6rem; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(3) { width: 26%; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(4) { width: 7rem; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(5) { width: 18%; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(6) { width: 8rem; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(7) { width: 10rem; }
+.compras-responsive-scope .compra-itens-tabela th:nth-child(8) { width: 3rem; }
+
+.compras-responsive-scope .compra-item-table-row > td {
+  height: 3.65rem;
+  padding: 0.56rem 0.65rem;
+  border-top: 1px solid var(--c-border);
+  background: var(--c-surface);
+  vertical-align: middle;
+  transition: background-color 150ms ease-out;
+}
+
+.compras-responsive-scope .compra-item-table-row:hover > td,
+.compras-responsive-scope .compra-item-table-row.is-open > td {
+  background: var(--c-surface-muted);
+}
+
+.compras-responsive-scope .compra-item-cell-index,
+.compras-responsive-scope .compra-item-cell-toggle {
+  text-align: center;
+}
+
+.compras-responsive-scope .compra-item-cell-main,
+.compras-responsive-scope .compra-item-cell-quantity {
+  min-width: 0;
+}
+
+.compras-responsive-scope .compra-item-cell-main > strong,
+.compras-responsive-scope .compra-item-cell-main > small,
+.compras-responsive-scope .compra-item-cell-quantity > strong,
+.compras-responsive-scope .compra-item-cell-quantity > small {
+  display: block;
+}
+
+.compras-responsive-scope .compra-item-cell-main > small,
+.compras-responsive-scope .compra-item-cell-quantity > small {
+  margin-top: 0.16rem;
+}
+
+.compras-responsive-scope .compra-item-cell-main strong,
+.compras-responsive-scope .compra-item-cell-main small,
+.compras-responsive-scope .compra-item-cell-apropriacao {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compras-responsive-scope .compra-item-cell-main strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.compras-responsive-scope .compra-item-cell-main small,
+.compras-responsive-scope .compra-item-cell-quantity small {
+  color: var(--c-muted);
+  font-size: 0.7rem;
+}
+
+.compras-responsive-scope .compra-item-cell-quantity strong,
+.compras-responsive-scope .compra-item-cell-date {
+  font-variant-numeric: tabular-nums;
+}
+
+.compras-responsive-scope .compra-item-cell-apropriacao {
+  color: var(--c-muted);
+}
+
+.compras-responsive-scope .compra-item-toggle {
+  display: inline-grid;
+  width: 2rem;
+  height: 2rem;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.compras-responsive-scope .compra-item-toggle:hover {
+  border-color: var(--c-border);
+  background: var(--c-surface);
+  color: var(--c-text);
+}
+
+.compras-responsive-scope .compra-item-toggle:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}
+
+.compras-responsive-scope .compra-item-table-row.is-open .compra-item-chevron {
+  transform: rotate(180deg);
+}
+
+.compras-responsive-scope .compra-item-table-detail-row > td {
+  padding: 0;
+  border-top: 1px solid var(--c-border);
+  border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface-muted);
+  background: color-mix(in srgb, var(--c-surface-muted) 72%, var(--c-surface));
+}
+
+.compras-responsive-scope .compra-item-table-detail {
+  padding: 0.85rem 1rem 1rem 3.65rem;
+}
+
+.compras-responsive-scope .compra-item-expanded-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.compras-responsive-scope .compra-item-expanded-spec {
+  display: grid;
+  min-width: 0;
+  gap: 0.2rem;
+}
+
+.compras-responsive-scope .compra-item-expanded-spec > span {
+  color: var(--c-muted);
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compras-responsive-scope .compra-item-expanded-spec > strong {
+  font-size: 0.8rem;
+  font-weight: 650;
+}
+
+.compras-responsive-scope .compra-item-expanded-head .compra-item-inline-actions {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  margin-top: 0;
+}
+
+.compras-responsive-scope .compra-item-table-detail .compra-item-tratamento {
+  margin-top: 0.8rem;
+  padding-top: 0.8rem;
+}
+
+.compras-responsive-scope .compra-itens-empty {
+  padding: 1rem;
+  border: 1px dashed var(--c-border);
+  color: var(--c-muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .compras-responsive-scope .compra-itens-tabela {
+    min-width: 52rem;
+  }
+
+  .compras-responsive-scope .compra-item-table-detail {
+    padding-left: 1rem;
+  }
+
+  .compras-responsive-scope .compra-item-expanded-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .compras-responsive-scope .compra-item-expanded-head .compra-item-inline-actions {
+    justify-content: flex-start;
+  }
+}

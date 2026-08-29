@@ -53,6 +53,13 @@ const SECOES_CONFIG = [
         description: 'Cadastro e manutencao de contratos.',
         to: '/gestao-contratos',
         requireModule: 'CONTRATOS'
+      },
+      {
+        title: 'Cartões de Recarga',
+        description: 'Cadastre os cartões Flash e vincule os usuários autorizados a solicitar recarga.',
+        to: '/configuracoes-cartoes-recarga',
+        requireSuperadmin: true,
+        strictSuperadmin: true
       }
     ]
   },
@@ -165,6 +172,19 @@ const SECOES_CONFIG = [
         to: '/areas-obra'
       },
       {
+        title: 'Apropriacao Padrao por Obra',
+        description: 'Defina a apropriacao preenchida automaticamente por obra e tipo de solicitacao.',
+        to: '/obra-tipo-apropriacao'
+      },
+      {
+        title: 'Categorias do Contrato de Obra',
+        description: 'Selecione quais categorias financeiras aparecem ao criar um contrato de obra.',
+        to: '/contrato-obra-categorias',
+        // Mesma area do endpoint e da rota: o card nao pode exigir permissao diferente
+        // da tela que ele abre.
+        permissionArea: 'geral'
+      },
+      {
         title: 'Areas por Setor de Origem',
         description: 'Defina quais setores cada setor pode selecionar na nova solicitacao.',
         to: '/areas-por-setor-origem'
@@ -194,6 +214,12 @@ const SECOES_CONFIG = [
         description: 'Defina campos visiveis e obrigatorios por tipo de solicitacao.',
         to: '/nova-solicitacao-campos',
         permissionArea: 'solicitacoes'
+      },
+      {
+        title: 'Formas de Pagamento da Nova Solicitacao',
+        description: 'Escolha as formas exibidas em contratos e nos demais tipos de solicitacao.',
+        to: '/configuracoes-formas-pagamento-solicitacao',
+        permissionArea: 'geral'
       },
       {
         title: 'Automacao da Nova Solicitacao',

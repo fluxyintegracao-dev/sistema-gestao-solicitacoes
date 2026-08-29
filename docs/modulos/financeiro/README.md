@@ -51,12 +51,6 @@ Detalhes tecnicos e cenarios de aceite estao em [`PLANO_IMPORTACAO_TITULOS_PAGAR
 - nova baixa depois do estorno e uma nova operacao auditada;
 - comprovantes e conciliacoes vinculados precisam ser revistos.
 
-## Caixa fisico
-
-O controle de dinheiro fisico usa contas do tipo `CAIXA_INTERNO`, com abertura, livro de entradas e saidas, estorno auditado de lancamentos manuais e fechamento por saldo contado. Esse fluxo e independente do OFX; contas bancarias que utilizam controle diario preservam a exigencia anterior de conferencia bancaria.
-
-Regras operacionais, endpoints e matriz de smoke test: [`CAIXA_FISICO_ABERTURA_FECHAMENTO.md`](./CAIXA_FISICO_ABERTURA_FECHAMENTO.md).
-
 ## Cheques de terceiros e baixa com multiplas fontes
 
 Cheques recebidos de terceiros sao controlados em carteira de custodia, sem simular uma conta bancaria. O financeiro pode registrar/importar saldo legado, transferir a custodia entre empresas, depositar em conta da mesma empresa ou utilizar o cheque integralmente como um componente de uma baixa composta.

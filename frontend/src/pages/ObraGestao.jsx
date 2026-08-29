@@ -13,6 +13,7 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { canManageGestaoObrasApropriacoes } from '../utils/acessoProduto';
 import { getObraGestao, obterUrlArquivoObra } from '../services/obras';
 import {
   atualizarApropriacao,
@@ -103,7 +104,7 @@ export default function ObraGestao() {
   const [novoItemModal, setNovoItemModal] = useState(false);
   const [novoItem, setNovoItem] = useState({ codigo: '', descricao: '', valor_orcado: '' });
 
-  const isSuperadmin = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
+  const podeEditarApropriacoes = canManageGestaoObrasApropriacoes(user);
   const requestedTab = searchParams.get('aba') || 'dashboard';
   const activeTab = TAB_DEFINITIONS.some((tab) => tab.id === requestedTab)
     ? requestedTab
@@ -382,7 +383,7 @@ export default function ObraGestao() {
               </p>
             </div>
 
-            {isSuperadmin && (
+            {podeEditarApropriacoes && (
               <div className="flex flex-wrap gap-2">
                 <button type="button" className="btn btn-outline !rounded-xl" onClick={limparOrcamento}>
                   Limpar orcamento
@@ -407,7 +408,7 @@ export default function ObraGestao() {
                     <tr className="text-left text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>
                       <th className="px-4 py-3">Descricao do item macro</th>
                       <th className="px-4 py-3 text-right">Valor orcado (R$)</th>
-                      {isSuperadmin ? <th className="px-4 py-3 text-right">Acoes</th> : null}
+                      {podeEditarApropriacoes ? <th className="px-4 py-3 text-right">Acoes</th> : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -415,7 +416,7 @@ export default function ObraGestao() {
                       <tr key={item.id} className="border-t" style={{ borderColor: 'var(--ui-border)' }}>
                         <td className="px-4 py-3">
                           <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>{item.codigo}</div>
-                          {isSuperadmin ? (
+                          {podeEditarApropriacoes ? (
                             <input
                               className="input mt-1.5 !rounded-xl"
                               style={{ borderColor: 'var(--ui-border)' }}
@@ -429,7 +430,7 @@ export default function ObraGestao() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {isSuperadmin ? (
+                          {podeEditarApropriacoes ? (
                             <input
                               className="input ml-auto max-w-[220px] !rounded-xl text-right"
                               style={{ borderColor: 'var(--ui-border)' }}
@@ -442,7 +443,7 @@ export default function ObraGestao() {
                             <div className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(normalizeMoneyInput(item.valor_orcado))}</div>
                           )}
                         </td>
-                        {isSuperadmin ? (
+                        {podeEditarApropriacoes ? (
                           <td className="px-4 py-3.5 text-right">
                             <button
                               type="button"
@@ -466,13 +467,13 @@ export default function ObraGestao() {
                           orcamentoDraft.reduce((total, item) => total + normalizeMoneyInput(item.valor_orcado), 0)
                         )}
                       </td>
-                      {isSuperadmin ? <td className="px-4 py-3" /> : null}
+                      {podeEditarApropriacoes ? <td className="px-4 py-3" /> : null}
                     </tr>
                   </tfoot>
                 </table>
               </div>
 
-              {isSuperadmin && (
+              {podeEditarApropriacoes && (
                 <div className="mt-4 flex justify-end">
                   <button type="button" className="btn btn-primary !rounded-xl" onClick={salvarOrcamento} disabled={savingBudget}>
                     {savingBudget ? 'Salvando...' : 'Confirmar e salvar orcamento'}

@@ -578,3 +578,62 @@ export async function salvarModulosSistema(data) {
   }
   return res.json();
 }
+
+export async function getObraTipoApropriacao() {
+  const res = await fetch(`${API_URL}/configuracoes/obra-tipo-apropriacao`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar apropriacoes padrao por obra');
+  return res.json();
+}
+
+export async function getApropriacoesDaObra(obraId, busca = '') {
+  const query = busca ? `?busca=${encodeURIComponent(busca)}` : '';
+  const res = await fetch(
+    `${API_URL}/configuracoes/obra-tipo-apropriacao/obras/${obraId}/apropriacoes${query}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error('Erro ao buscar apropriacoes da obra');
+  return res.json();
+}
+
+export async function salvarObraTipoApropriacao(data) {
+  const res = await fetch(`${API_URL}/configuracoes/obra-tipo-apropriacao`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    let message = txt;
+    try {
+      const dataErro = JSON.parse(txt);
+      message = dataErro?.error || dataErro?.message || txt;
+    } catch (_) {
+      // Resposta textual continua sendo exibida integralmente.
+    }
+    throw new Error(message || 'Erro ao salvar apropriacao padrao');
+  }
+  return res.json();
+}
+
+export async function getContratoObraCategorias() {
+  const res = await fetch(`${API_URL}/configuracoes/contrato-obra-categorias`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao buscar categorias do contrato de obra');
+  return res.json();
+}
+
+export async function salvarContratoObraCategorias(categoriaIds) {
+  const res = await fetch(`${API_URL}/configuracoes/contrato-obra-categorias`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ categoria_ids: categoriaIds })
+  });
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(txt || 'Erro ao salvar categorias do contrato de obra');
+  }
+  return res.json();
+}

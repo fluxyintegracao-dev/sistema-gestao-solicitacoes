@@ -26,6 +26,10 @@ mobile/dist/
 mobile/android/build/
 frontend/android/build/
 
+# Evidencias de QA: PNGs sao provas em disco, nao codigo.
+# Os scripts e relatorios (.md) continuam versionados.
+qa/evidencias/
+
 # Uploads, temporarios e relatorios
 backend/uploads/
 tmp/
@@ -46,6 +50,7 @@ yarn-error.log*
 *.pem
 *.key
 *.p12
+*.pfx
 *.crt
 *.sql
 *.sqlite
@@ -60,6 +65,7 @@ yarn-error.log*
 .idea/
 .DS_Store
 Thumbs.db
+~$*.docx
 
 # Artefatos locais antigos
 image.png
@@ -73,3 +79,6 @@ teste/
 sistema-gestao/
 sistema-gestao-solicitacoes/
 _tmp_brandkit_blue_complete/
+
+# As paginas publicas pertencem ao snapshot, mas nunca transportar metadados Git aninhados.
+legal-pages/.git/

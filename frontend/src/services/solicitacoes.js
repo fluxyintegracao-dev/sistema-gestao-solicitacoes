@@ -48,6 +48,43 @@ export async function getObrasVisiveisSolicitacoes(params = {}) {
   return res.json();
 }
 
+export async function getApropriacaoPadraoSolicitacao({ obra_id, tipo_solicitacao_id }) {
+  const query = new URLSearchParams({
+    obra_id: String(obra_id || ''),
+    tipo_solicitacao_id: String(tipo_solicitacao_id || '')
+  });
+  const res = await fetch(`${API_URL}/solicitacoes/apropriacao-padrao?${query.toString()}`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(
+      res.status,
+      'Nao foi possivel resolver a apropriacao automatica da solicitacao.',
+      await parseJsonSafe(res)
+    );
+  }
+
+  return res.json();
+}
+
+export async function getSaldoDespesaEventual(obraId) {
+  const query = new URLSearchParams({ obra_id: String(obraId || '') });
+  const res = await fetch(`${API_URL}/solicitacoes/despesa-eventual/saldo?${query.toString()}`, {
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(
+      res.status,
+      'Nao foi possivel calcular o saldo de Despesa Eventual da obra.',
+      await parseJsonSafe(res)
+    );
+  }
+
+  return res.json();
+}
+
 export async function getStatusVisiveisSolicitacoes(params = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query
@@ -115,6 +152,47 @@ export async function getSolicitacaoById(id) {
 
   if (!res.ok) {
     throw buildResponseError(res.status, 'Erro ao buscar solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
+export async function solicitarRetornoSolicitacao(id, motivo) {
+  const res = await fetch(`${API_URL}/solicitacoes/${id}/retorno`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ motivo })
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao solicitar retorno da solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
+export async function decidirRetornoSolicitacao(pedidoId, { aprovar, motivo_decisao = '' }) {
+  const res = await fetch(`${API_URL}/solicitacoes/retornos/${pedidoId}/decisao`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ aprovar: Boolean(aprovar), motivo_decisao })
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao decidir o retorno da solicitacao', await parseJsonSafe(res));
+  }
+
+  return res.json();
+}
+
+export async function cancelarRetornoSolicitacao(pedidoId) {
+  const res = await fetch(`${API_URL}/solicitacoes/retornos/${pedidoId}/cancelar`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+
+  if (!res.ok) {
+    throw buildResponseError(res.status, 'Erro ao cancelar o pedido de retorno', await parseJsonSafe(res));
   }
 
   return res.json();

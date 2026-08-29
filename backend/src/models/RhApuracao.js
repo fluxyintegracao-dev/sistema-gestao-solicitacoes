@@ -32,6 +32,13 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       allowNull: false,
       defaultValue: 30
     },
+    // Fase 12: o periodo e a data prevista moram na APURACAO, e nao so no `dados_json` do pedido.
+    // Quem e consultado depois — relatorio, conferencia, fechamento — e a apuracao; deixar a data
+    // so no pedido faria todo relatorio abrir o pedido para saber quando aquilo seria pago.
+    periodo_inicio: { type: DataTypes.DATEONLY, allowNull: true },
+    periodo_fim: { type: DataTypes.DATEONLY, allowNull: true },
+    data_prevista_pagamento: { type: DataTypes.DATEONLY, allowNull: true },
+    solicitacao_id: { type: DataTypes.INTEGER, allowNull: true },
     total_colaboradores: {
       type: DataTypes.INTEGER,
       allowNull: false,

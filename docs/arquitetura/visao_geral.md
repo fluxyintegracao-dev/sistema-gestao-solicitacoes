@@ -18,7 +18,7 @@ O banco persiste o estado oficial. Relatorios e dashboards devem derivar de dado
 
 ## Inicializacao
 
-`backend/server.js` valida o ambiente, executa `runMigrations()`, carrega configuracoes e inicia a API. O bootstrap legado com `sequelize.sync()` so pode ocorrer mediante flag excepcional e nao faz parte do runtime normal.
+`backend/server.js` valida o ambiente, confere em modo somente leitura se o schema ja contem todas as migrations, carrega configuracoes e inicia a API. O processo nao aplica migrations nem usa `sequelize.sync()` no runtime normal. Se houver incompatibilidade, a inicializacao falha sem alterar o banco.
 
 ## Modularidade
 

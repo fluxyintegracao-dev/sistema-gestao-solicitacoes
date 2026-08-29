@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { corrigirTextoCorrompido } from '../../utils/texto';
+import { hasAnyExplicitPermissao } from '../../utils/acessoProduto';
 
 function normalizarTextoSolicitacaoCompra(valor) {
   return String(valor || '')
@@ -84,17 +85,14 @@ export default function LinhaSolicitacao({
     String(user?.perfil || '').toUpperCase().startsWith('ADMIN') &&
     setorTokens.some(isGeoSetor);
   const isSuperadmin = String(user?.perfil || '').toUpperCase() === 'SUPERADMIN';
-  const permissoesArea = Array.isArray(user?.areas_permissoes)
-    ? user.areas_permissoes.map(item => String(item || '').trim().toLowerCase())
-    : [];
   const podeEditarValor =
     isAdminGEO ||
     isSuperadmin ||
-    permissoesArea.includes('solicitacoes.acoes.alterar_valor');
+    hasAnyExplicitPermissao(user, ['solicitacoes.acoes.alterar_valor']);
   const podeEditarDataVencimento =
     isAdminGEO ||
     isSuperadmin ||
-    permissoesArea.includes('solicitacoes.acoes.alterar_data_vencimento');
+    hasAnyExplicitPermissao(user, ['solicitacoes.acoes.alterar_data_vencimento']);
   const setorSolicitacao = setoresMap?.[solicitacao.area_responsavel] || null;
   const setorNomeSolicitacao =
     (setorSolicitacao?.nome || setorSolicitacao || solicitacao.area_responsavel || '');

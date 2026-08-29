@@ -94,7 +94,8 @@ function toEditState(item) {
   };
 }
 
-export default function RhDpApuracao() {
+/** Serve de PAGINA e de ABA — ver o comentario equivalente em `RhDpJornada`. */
+export default function RhDpApuracao({ comoAba = false }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const podeEditar = canEditRhDpApuracao(user);
@@ -375,25 +376,23 @@ export default function RhDpApuracao() {
   }, [apuracoes]);
 
   return (
-    <div className="page solicitacoes-page rhdp-page rhdp-apuracao-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">RH/DP - Apuracao</h1>
-            <p className="page-subtitle">
-              Gere a pre-folha por competencia a partir das obras informadas nas importacoes confirmadas, revise por colaborador e registre ajustes auditados.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/rh-dp" className="btn btn-outline">
-              Voltar ao RH/DP
-            </Link>
-            <Link to="/rh-dp/importacoes" className="btn btn-outline">
-              Importacoes
-            </Link>
+    <div className={comoAba ? 'rhdp-apuracao-page space-y-4' : 'page solicitacoes-page rhdp-page rhdp-apuracao-page space-y-6'}>
+      {comoAba ? null : (
+        <div className="app-page-header">
+          <div className="app-page-header-row">
+            <div>
+              <h1 className="text-xl font-semibold md:text-2xl">RH/DP - Apuracao</h1>
+              <p className="page-subtitle">
+                Gere a pre-folha por competencia a partir das obras informadas nas importacoes confirmadas, revise por colaborador e registre ajustes auditados.
+              </p>
+            </div>
+            <div className="app-page-actions">
+              <Link to="/rh-dp" className="btn btn-outline">Voltar ao RH/DP</Link>
+              <Link to="/rh-dp/importacoes" className="btn btn-outline">Importacoes</Link>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <form className="sol-surface-card rhdp-apuracao-create-card rounded-xl p-4 space-y-4" onSubmit={onGerarApuracao}>
         <div className="rhdp-apuracao-form-grid">

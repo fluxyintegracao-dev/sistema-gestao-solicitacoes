@@ -72,6 +72,26 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.TEXT,
         allowNull: false
       },
+      justificativa: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
+      favorecido_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      forma_pagamento_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+      },
+      favorecido_chave_pix: {
+        type: DataTypes.STRING(255),
+        allowNull: true
+      },
+      despesa_eventual_declaracoes: {
+        type: DataTypes.TEXT,
+        allowNull: true
+      },
       valor: {
         type: DataTypes.DECIMAL(12, 2),
         allowNull: true

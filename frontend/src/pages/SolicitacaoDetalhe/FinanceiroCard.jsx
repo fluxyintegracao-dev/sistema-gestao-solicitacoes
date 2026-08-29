@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import OverlayModal from '../../components/ui/OverlayModal';
+import PrevisoesContrato from './PrevisoesContrato';
+import ModalMedicao from './ModalMedicao';
 import { Link } from 'react-router-dom';
 import { buscarParceiroPorId, buscarParceiros } from '../../services/parceiros';
 import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../services/solicitacoes';
@@ -311,7 +314,7 @@ function createPagamento(solicitacao, valor = '', categoriaFinanceiraId = '', op
     data_vencimento: options.data_vencimento || solicitacao?.data_vencimento || today(),
     observacoes: options.observacoes || '',
     competencia_data: '',
-    forma_pagamento_id: '',
+    forma_pagamento_id: options.forma_pagamento_id || (solicitacao?.forma_pagamento_id ? String(solicitacao.forma_pagamento_id) : ''),
     cartao_id: '',
     quantidade_parcelas: '1',
     data_compra: today(),
@@ -382,7 +385,13 @@ function criarCredorFormPadrao() {
     nome: '',
     cpf_cnpj: '',
     telefone: '',
-    email: ''
+    email: '',
+    // PJ exige nome fantasia e representante legal (23/08). Em pessoa fisica nao se aplica: nome
+    // fantasia de pessoa nao existe, e quem assina e ela mesma.
+    nome_fantasia: '',
+    representante_nome: '',
+    representante_cpf: '',
+    representante_cargo: ''
   };
 }
 
@@ -393,10 +402,24 @@ function onlyDigits(value) {
 function statusClass(status) {
   const normalized = String(status || '').toUpperCase();
   if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
+  if (normalized === 'LIBERADA') return 'bg-emerald-100 text-emerald-700';
   if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
   if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
   if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
   return 'bg-slate-100 text-slate-700';
+}
+
+function rotuloSituacao(status) {
+  const normalized = String(status || '').toUpperCase();
+  return {
+    PREVISAO: 'Previsão',
+    ABERTO: 'Aberto',
+    LIBERADA: 'Liberada',
+    PARCIAL: 'Parcial',
+    QUITADO: 'Quitado',
+    CANCELADO: 'Cancelado',
+    ESTORNADO: 'Estornado'
+  }[normalized] || status || '-';
 }
 
 function SearchIcon() {
@@ -593,11 +616,22 @@ export default function FinanceiroCard({
   solicitacao,
   onTituloCriado,
   onSolicitacaoAtualizada,
-  podeAcessarModuloFinanceiro = false
+  podeAcessarModuloFinanceiro = false,
+  podeVisualizarTitulos = false,
+  somenteLeitura = false
 }) {
   const { user } = useAuth();
+  const podeExecutarAcoesFinanceiras = podeAcessarModuloFinanceiro && !somenteLeitura;
   const podeGerenciarDadosPagamento = canManagePaymentBeneficiaries(user);
   const freteTerceiroObrigatorio = Boolean(getFreteTerceiroCompraDireta(solicitacao));
+  // Medicao escolhida pelo botao da linha do titulo — abre os anexos, os comentarios e a edicao
+  // de valor/vencimento dela (PI-16 e pedido do cliente, 20/08).
+  const [medicaoAberta, setMedicaoAberta] = useState(null);
+  // As parcelas que a tabela de previsoes carregou. O modal usa as MESMAS, em vez de buscar de
+  // novo: duas leituras da mesma coisa acabam discordando logo depois de uma edicao.
+  const [dadosContrato, setDadosContrato] = useState(null);
+  // Recarrega a tabela depois que a medicao e alterada — o valor mudou nela E nas ultimas parcelas.
+  const [recarregarParcelas, setRecarregarParcelas] = useState(0);
   const [titulos, setTitulos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -636,6 +670,36 @@ export default function FinanceiroCard({
     () => Boolean(getFreteTerceiroCompraDireta(solicitacao))
   );
   const parceiroPagamentoId = selectedPartner?.id || form.parceiro_id || null;
+  // A tabela de parcelas e a fonte unica do fluxo novo. Solicitacoes comuns e contratos legados
+  // continuam usando a relacao generica de titulos abaixo.
+  const situacaoPorTitulo = useMemo(() => new Map(
+    (dadosContrato?.parcelas || [])
+      .filter((parcela) => parcela.titulo_financeiro_id)
+      .map((parcela) => [String(parcela.titulo_financeiro_id), parcela.situacao || parcela.status])
+  ), [dadosContrato?.parcelas]);
+  const usaTabelaParcelasFluxoNovo = Boolean(
+    dadosContrato?.contrato?.fluxo_novo
+      && String(dadosContrato.contrato.solicitacao_id) === String(solicitacao?.id)
+  );
+  // Enquanto a rota identifica se o contrato e novo ou legado, nao renderiza a lista generica:
+  // isso evita o piscar das mesmas parcelas em dois formatos antes da resposta chegar.
+  const classificandoContrato = Boolean(solicitacao?.contrato_id) && dadosContrato === null;
+  const exibirTitulosDetalhados = podeVisualizarTitulos
+    && !usaTabelaParcelasFluxoNovo
+    && !classificandoContrato;
+  const tipoSolicitacao = normalizeSearchText(
+    solicitacao?.tipo?.nome
+      || solicitacao?.tipo_nome
+      || solicitacao?.tipo_solicitacao
+      || solicitacao?.descricao_tipo
+  );
+  const usaTituloAutomaticoRecarga = tipoSolicitacao.includes('recarga de cartao');
+  const geracaoManualDesabilitada = usaTabelaParcelasFluxoNovo
+    || usaTituloAutomaticoRecarga
+    || classificandoContrato;
+  const motivoGeracaoManualDesabilitada = usaTituloAutomaticoRecarga
+    ? 'A conta da Recarga de Cartao e criada automaticamente pela solicitacao.'
+    : 'Os titulos do contrato do fluxo novo sao criados automaticamente pelo cronograma.';
 
   function resetModalState(baseSolicitacao = solicitacao) {
     setForm(buildDefaultForm(baseSolicitacao));
@@ -665,6 +729,12 @@ export default function FinanceiroCard({
       setParceiroFinanceiro(null);
       return undefined;
     }
+    // A leitura da Obra usa somente o parceiro ja entregue pela solicitacao. A busca financeira
+    // completa inclui chaves PIX e outros dados operacionais que nao fazem parte deste resumo.
+    if (somenteLeitura) {
+      setParceiroFinanceiro(solicitacao?.parceiro || null);
+      return undefined;
+    }
 
     let active = true;
     buscarParceiroPorId(parceiroId)
@@ -678,9 +748,15 @@ export default function FinanceiroCard({
     return () => {
       active = false;
     };
-  }, [solicitacao?.parceiro?.id]);
+  }, [solicitacao?.parceiro?.id, somenteLeitura]);
 
   async function carregarTitulos() {
+    if (!podeVisualizarTitulos) {
+      setTitulos([]);
+      setErro('');
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setErro('');
@@ -695,7 +771,7 @@ export default function FinanceiroCard({
 
   useEffect(() => {
     carregarTitulos();
-  }, [solicitacao.id]);
+  }, [solicitacao.id, podeVisualizarTitulos]);
 
   useEffect(() => {
     if (!modalOpen) return undefined;
@@ -1534,7 +1610,12 @@ export default function FinanceiroCard({
         nome: cadastroCredorForm.nome,
         cpf_cnpj: onlyDigits(cadastroCredorForm.cpf_cnpj),
         telefone: onlyDigits(cadastroCredorForm.telefone),
-        email: cadastroCredorForm.email
+        email: cadastroCredorForm.email,
+        // Vao vazios quando o documento e de pessoa fisica — o backend so os exige na PJ.
+        nome_fantasia: cadastroCredorForm.nome_fantasia,
+        representante_nome: cadastroCredorForm.representante_nome,
+        representante_cpf: onlyDigits(cadastroCredorForm.representante_cpf),
+        representante_cargo: cadastroCredorForm.representante_cargo
       });
       fecharCadastroCredorModal();
       if (typeof onSolicitacaoAtualizada === 'function') {
@@ -1550,21 +1631,32 @@ export default function FinanceiroCard({
 
   return (
     <>
+      <ModalMedicao
+        medicao={medicaoAberta}
+        historicos={solicitacao?.historicos || []}
+        parcelas={dadosContrato?.parcelas || []}
+        podeEditar={!somenteLeitura && dadosContrato?.contrato?.permissoes?.editar_medicao === true}
+        podeAprovar={!somenteLeitura && dadosContrato?.contrato?.permissoes?.aprovar === true}
+        onFechar={() => setMedicaoAberta(null)}
+        onSalvo={() => setRecarregarParcelas((n) => n + 1)}
+      />
       <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 shadow-sm space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Financeiro</h2>
             <p className="text-sm text-[var(--c-muted)]">
-              Gere contas a pagar ou receber sem sair do fluxo da solicitacao.
+              {podeExecutarAcoesFinanceiras
+                ? 'Gere contas a pagar ou receber sem sair do fluxo da solicitacao.'
+                : 'Acompanhe titulos, parcelas, medicoes e pagamentos desta solicitacao.'}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {podeAcessarModuloFinanceiro && (
+            {podeExecutarAcoesFinanceiras && (
               <Link to="/financeiro/titulos" className="btn btn-outline">
                 Ver titulos
               </Link>
             )}
-            {podeAcessarModuloFinanceiro && (
+            {podeExecutarAcoesFinanceiras && (
               <button
                 type="button"
                 className="btn btn-outline"
@@ -1577,7 +1669,7 @@ export default function FinanceiroCard({
                 Cadastrar credor
               </button>
             )}
-            {podeAcessarModuloFinanceiro && (
+            {podeExecutarAcoesFinanceiras && (
               <button
                 type="button"
                 className="btn btn-outline"
@@ -1592,20 +1684,43 @@ export default function FinanceiroCard({
                 Editar credor
               </button>
             )}
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setErro('');
-                resetModalState(solicitacao);
-                setModalOpen(true);
-              }}
-            >
-              Gerar conta
-            </button>
+            {podeExecutarAcoesFinanceiras && (
+              <span title={geracaoManualDesabilitada ? motivoGeracaoManualDesabilitada : undefined}>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={geracaoManualDesabilitada}
+                  aria-label={geracaoManualDesabilitada
+                    ? `Gerar conta desabilitado. ${motivoGeracaoManualDesabilitada}`
+                    : 'Gerar conta'}
+                  onClick={() => {
+                    setErro('');
+                    resetModalState(solicitacao);
+                    setModalOpen(true);
+                  }}
+                >
+                  Gerar conta
+                </button>
+              </span>
+            )}
           </div>
         </div>
 
+        {/* PI-16: as previsoes de parcela do contrato, aqui no card do Financeiro — pedido do
+            cliente. Antes da aprovacao nao existe titulo nenhum, entao esta e a unica leitura do
+            que esta por vir; depois dela, a mesma tabela mostra o titulo e a medicao de cada
+            parcela. O componente se esconde sozinho quando a solicitacao nao e a dona do
+            contrato. */}
+        <PrevisoesContrato
+          contratoId={solicitacao?.contrato_id || null}
+          solicitacaoId={solicitacao?.id}
+          atualizarEm={recarregarParcelas}
+          onDados={setDadosContrato}
+          onAbrirMedicao={setMedicaoAberta}
+          somenteLeitura={somenteLeitura}
+        />
+
+        {exibirTitulosDetalhados && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
             <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Titulos</div>
@@ -1618,12 +1733,14 @@ export default function FinanceiroCard({
           <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
             <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Parceiro</div>
             <div className="mt-1 text-sm font-medium text-[var(--c-text)]">{parceiroFinanceiro?.nome || 'Nao vinculado'}</div>
-            <div className="mt-1 flex min-w-0 items-baseline gap-1 text-xs text-[var(--c-muted)]">
-              <span className="shrink-0 font-medium">PIX:</span>
-              <span className="truncate" title={parceiroFinanceiroPix?.chave || ''}>
-                {parceiroFinanceiroPix ? `${parceiroFinanceiroPix.tipo} - ${parceiroFinanceiroPix.chave}` : ''}
-              </span>
-            </div>
+            {podeExecutarAcoesFinanceiras && (
+              <div className="mt-1 flex min-w-0 items-baseline gap-1 text-xs text-[var(--c-muted)]">
+                <span className="shrink-0 font-medium">PIX:</span>
+                <span className="truncate" title={parceiroFinanceiroPix?.chave || ''}>
+                  {parceiroFinanceiroPix ? `${parceiroFinanceiroPix.tipo} - ${parceiroFinanceiroPix.chave}` : ''}
+                </span>
+              </div>
+            )}
           </div>
           <div className="rounded-xl bg-[var(--c-bg)] px-3 py-2">
             <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor sugerido</div>
@@ -1632,14 +1749,15 @@ export default function FinanceiroCard({
             </div>
           </div>
         </div>
+        )}
 
-        {erro && !modalOpen && (
+        {exibirTitulosDetalhados && erro && !modalOpen && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
             {erro}
           </div>
         )}
 
-        {loading ? (
+        {exibirTitulosDetalhados && (loading ? (
           <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
             Carregando titulos financeiros...
           </div>
@@ -1649,33 +1767,45 @@ export default function FinanceiroCard({
           </div>
         ) : (
           <div className="space-y-2">
-            {titulos.map((titulo) => (
-              <div
-                key={titulo.id}
-                className="rounded-xl border border-[var(--c-border)] px-3 py-3 text-sm"
-              >
+            {titulos.map((titulo) => {
+              const situacao = situacaoPorTitulo.get(String(titulo.id)) || titulo.status;
+              return (
+                <div
+                  key={titulo.id}
+                  className="rounded-xl border border-[var(--c-border)] px-3 py-3 text-sm"
+                >
                 <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <Link className="font-medium text-blue-600 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
-                      {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
-                    </Link>
+                    {podeExecutarAcoesFinanceiras ? (
+                      <Link className="font-medium text-blue-600 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
+                        {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-[var(--c-text)]">
+                        {limparDescricaoTituloCompra(titulo.descricao) || `${titulo.tipo} #${titulo.id}`}
+                      </span>
+                    )}
                     <div className="text-[var(--c-muted)]">
                       {titulo.parceiro?.nome || '-'} - vencimento {formatDate(titulo.data_vencimento)}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(titulo.status)}`}>
-                      {titulo.status}
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(situacao)}`}
+                      data-testid={`situacao-titulo-${titulo.id}`}
+                    >
+                      {rotuloSituacao(situacao)}
                     </span>
                     <span className="text-sm font-semibold text-[var(--c-text)]">
                       {formatCurrency(titulo.valor_saldo)}
                     </span>
                   </div>
                 </div>
-              </div>
-            ))}
+                </div>
+              );
+            })}
           </div>
-        )}
+        ))}
       </div>
 
       {cadastroCredorModalOpen && (
@@ -1753,6 +1883,61 @@ export default function FinanceiroCard({
                   disabled={cadastroCredorSaving}
                 />
               </label>
+
+              {/* Aparecem e somem conforme o DOCUMENTO digitado: 14 digitos e CNPJ. Mostrar sempre
+                  faria o formulario pedir nome fantasia de pessoa fisica, que nao existe. */}
+              {onlyDigits(cadastroCredorForm.cpf_cnpj).length === 14 && (
+                <>
+                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                    Nome fantasia *
+                    <input
+                      className="input"
+                      name="nome_fantasia"
+                      value={cadastroCredorForm.nome_fantasia}
+                      onChange={handleCadastroCredorChange}
+                      placeholder="Como a empresa e conhecida"
+                      disabled={cadastroCredorSaving}
+                    />
+                  </label>
+
+                  <div className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--c-muted)]">
+                    Representante legal
+                  </div>
+                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                    Nome *
+                    <input
+                      className="input"
+                      name="representante_nome"
+                      value={cadastroCredorForm.representante_nome}
+                      onChange={handleCadastroCredorChange}
+                      placeholder="Quem assina pela empresa"
+                      disabled={cadastroCredorSaving}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                    CPF *
+                    <input
+                      className="input"
+                      name="representante_cpf"
+                      value={cadastroCredorForm.representante_cpf}
+                      onChange={handleCadastroCredorChange}
+                      placeholder="Somente numeros"
+                      disabled={cadastroCredorSaving}
+                    />
+                  </label>
+                  <label className="grid gap-1 text-sm text-[var(--c-muted)]">
+                    Cargo
+                    <input
+                      className="input"
+                      name="representante_cargo"
+                      value={cadastroCredorForm.representante_cargo}
+                      onChange={handleCadastroCredorChange}
+                      placeholder="Socio, diretor, procurador"
+                      disabled={cadastroCredorSaving}
+                    />
+                  </label>
+                </>
+              )}
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-[var(--c-border)] pt-3 sm:flex-row sm:justify-end">
@@ -1881,11 +2066,8 @@ export default function FinanceiroCard({
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-3 sm:p-4">
-          <div
-            className="max-h-[92vh] w-full space-y-4 overflow-y-auto rounded-2xl border border-[var(--c-border)] bg-[var(--modal-bg)] p-4 text-[var(--c-text)] shadow-2xl sm:p-5"
-            style={{ maxWidth: '820px' }}
-          >
+        <OverlayModal rotulo="Gerar conta" largura="var(--modal-max-w-lg, 860px)">
+          <div className="space-y-4 overflow-y-auto p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-[var(--c-text)]">Gerar conta</h3>
@@ -2758,7 +2940,7 @@ export default function FinanceiroCard({
               </div>
             </form>
           </div>
-        </div>
+        </OverlayModal>
       )}
 
       {modalOpen && categoriaModalOpen && (

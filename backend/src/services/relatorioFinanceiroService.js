@@ -1357,6 +1357,10 @@ function getCreditoDebitoFromTitulo(titulo, valor) {
 function buildFinanceiroObrasLinhaBase(titulo, analise) {
   return {
     titulo_id: titulo.id,
+    // ITEM 22 (23/08): a linha precisa dizer QUAL solicitacao, porque e por ela que se chega aos
+    // arquivos — nem `anexos` nem `comprovantes` apontam para o titulo. Nulo aqui significa titulo
+    // sem solicitacao (importado do historico, lancado a mao), e a tela avisa em vez de abrir vazio.
+    solicitacao_id: titulo.solicitacao_id || null,
     titulo_codigo: titulo.codigo,
     titulo_parcela: getTituloParcelaLabel(titulo),
     tipo: titulo.tipo,

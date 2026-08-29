@@ -11,7 +11,7 @@ import {
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
-import { canAccessContratos, canManageContratos } from '../utils/acessoProduto';
+import { canAccessContratos, canManageContratos, hasPermissao } from '../utils/acessoProduto';
 import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
   concatenarAnexosPendentes,
@@ -23,13 +23,16 @@ import { getMinhasObras, getObras } from '../services/obras';
 import {
   atualizarContrato,
   criarContrato,
+  encerrarContratoFluxoNovo,
   excluirContrato,
   exportarContratosCsv,
   getContratoAnexos,
   getContratos,
   getContratosResumo,
   importarApropriacoesContratos,
-  uploadContratoAnexos
+  uploadContratoAnexos,
+  uploadNegociacaoContrato,
+  uploadDocumentacaoJuridicaContrato
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
@@ -83,6 +86,12 @@ export default function GestaoContratos() {
   const [salvando, setSalvando] = useState(false);
   const [editandoId, setEditandoId] = useState(null);
   const [salvandoEdicaoId, setSalvandoEdicaoId] = useState(null);
+  const [negociacaoEdicaoArquivo, setNegociacaoEdicaoArquivo] = useState(null);
+  const [documentacaoJuridicaEdicao, setDocumentacaoJuridicaEdicao] = useState({
+    'cartao-cnpj': null,
+    'ato-constitutivo': null,
+    'representante-legal': null
+  });
   const [contratoSelecionadoId, setContratoSelecionadoId] = useState(null);
   const [formEdicao, setFormEdicao] = useState({
     obra_id: '',
@@ -121,6 +130,7 @@ export default function GestaoContratos() {
   const isSetorObra = setorTokens.includes('OBRA');
   const podeAcessar = canAccessContratos(user);
   const podeGerenciarContratos = canManageContratos(user);
+  const podeEncerrarContratos = hasPermissao(user, 'contratos.geral.encerrar');
   const contratoSelecionado = contratos.find(item => String(item.id) === String(contratoSelecionadoId)) || null;
   const contratoEmEdicao = contratos.find(item => String(item.id) === String(editandoId)) || null;
   const contratosTableColumns = useMemo(() => CONTRATOS_TABLE_COLUMNS, []);
@@ -314,6 +324,37 @@ export default function GestaoContratos() {
         vistos.add(item.parceiro_id);
         return true;
       });
+  }
+
+  function contratoPossuiAlteracoesCadastrais(contrato, payload) {
+    const ordenarPorId = (lista, campo) => [...lista].sort((a, b) => Number(a[campo]) - Number(b[campo]));
+    const atual = {
+      obra_id: contrato?.obra_id ? Number(contrato.obra_id) : null,
+      codigo: String(contrato?.codigo || '').trim(),
+      ref_contrato: String(contrato?.ref_contrato || '').trim(),
+      descricao: String(contrato?.descricao || '').trim() || null,
+      itens_apropriacao: String(contrato?.itens_apropriacao || '').trim() || null,
+      valor_total: contrato?.valor_total === null || contrato?.valor_total === undefined
+        ? null
+        : Number(contrato.valor_total),
+      ajuste_solicitado: Number(contrato?.ajuste_solicitado || 0),
+      ajuste_pago: Number(contrato?.ajuste_pago || 0),
+      apropriacoes: ordenarPorId(
+        montarApropriacoesPayload(normalizarApropriacoesContrato(contrato)),
+        'apropriacao_id'
+      ),
+      credores: ordenarPorId(
+        montarCredoresPayload(normalizarCredoresContrato(contrato)),
+        'parceiro_id'
+      )
+    };
+    const informado = {
+      ...payload,
+      apropriacoes: ordenarPorId(payload.apropriacoes || [], 'apropriacao_id'),
+      credores: ordenarPorId(payload.credores || [], 'parceiro_id')
+    };
+
+    return JSON.stringify(atual) !== JSON.stringify(informado);
   }
 
   function resumoCredoresContrato(contrato) {
@@ -661,6 +702,12 @@ export default function GestaoContratos() {
 
   function iniciarEdicao(contrato) {
     setEditandoId(contrato.id);
+    setNegociacaoEdicaoArquivo(null);
+    setDocumentacaoJuridicaEdicao({
+      'cartao-cnpj': null,
+      'ato-constitutivo': null,
+      'representante-legal': null
+    });
     setFormEdicao({
       obra_id: contrato.obra_id ? String(contrato.obra_id) : '',
       codigo: String(contrato.codigo || ''),
@@ -686,6 +733,12 @@ export default function GestaoContratos() {
   function cancelarEdicao() {
     setEditandoId(null);
     setSalvandoEdicaoId(null);
+    setNegociacaoEdicaoArquivo(null);
+    setDocumentacaoJuridicaEdicao({
+      'cartao-cnpj': null,
+      'ato-constitutivo': null,
+      'representante-legal': null
+    });
     setFormEdicao({
       obra_id: '',
       codigo: '',
@@ -705,6 +758,31 @@ export default function GestaoContratos() {
   function onChangeEdicao(e) {
     const { name, value } = e.target;
     setFormEdicao(prev => ({ ...prev, [name]: value }));
+  }
+
+  function selecionarNegociacaoEdicao(event) {
+    const arquivo = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!arquivo) return;
+
+    const nome = String(arquivo.name || '').toLowerCase();
+    if (!nome.endsWith('.docx') && !nome.endsWith('.pdf')) {
+      alert('Selecione a negociação detalhada em formato .docx ou .pdf.');
+      return;
+    }
+
+    setNegociacaoEdicaoArquivo(arquivo);
+  }
+
+  function selecionarDocumentoJuridicoEdicao(tipo, event) {
+    const arquivo = event.target.files?.[0] || null;
+    event.target.value = '';
+    if (!arquivo) return;
+    if (!/\.(pdf|docx|png|jpe?g)$/i.test(String(arquivo.name || ''))) {
+      alert('Selecione o documento em PDF, DOCX, JPG ou PNG.');
+      return;
+    }
+    setDocumentacaoJuridicaEdicao((atual) => ({ ...atual, [tipo]: arquivo }));
   }
 
   async function salvarEdicao(contrato) {
@@ -754,18 +832,92 @@ export default function GestaoContratos() {
       return;
     }
 
+    const possuiAlteracoesCadastrais = contratoPossuiAlteracoesCadastrais(contrato, payload);
+    const documentosJuridicosSelecionados = Object.entries(documentacaoJuridicaEdicao)
+      .filter(([, arquivo]) => Boolean(arquivo));
+    if (!possuiAlteracoesCadastrais && !negociacaoEdicaoArquivo && documentosJuridicosSelecionados.length === 0) {
+      alert('Nenhuma alteração para salvar.');
+      return;
+    }
+
+    let negociacaoAtualizada = false;
+    let documentacaoJuridicaAtualizada = false;
+    let dadosContratoAtualizados = false;
     try {
       setSalvandoEdicaoId(contrato.id);
-      await atualizarContrato(contrato.id, payload);
+
+      if (negociacaoEdicaoArquivo) {
+        await uploadNegociacaoContrato(contrato.id, negociacaoEdicaoArquivo);
+        negociacaoAtualizada = true;
+        setNegociacaoEdicaoArquivo(null);
+      }
+
+      if (documentosJuridicosSelecionados.length > 0) {
+        await Promise.all(documentosJuridicosSelecionados.map(([tipo, arquivo]) =>
+          uploadDocumentacaoJuridicaContrato(contrato.id, tipo, arquivo)));
+        documentacaoJuridicaAtualizada = true;
+        setDocumentacaoJuridicaEdicao({
+          'cartao-cnpj': null,
+          'ato-constitutivo': null,
+          'representante-legal': null
+        });
+      }
+
+      if (possuiAlteracoesCadastrais) {
+        await atualizarContrato(contrato.id, payload);
+        dadosContratoAtualizados = true;
+      }
+
       await carregar();
       cancelarEdicao();
       setContratoSelecionadoId(contrato.id);
-      alert('Contrato atualizado com sucesso.');
+      const partesAtualizadas = [
+        dadosContratoAtualizados ? 'dados do contrato' : null,
+        negociacaoAtualizada ? 'negociação detalhada' : null,
+        documentacaoJuridicaAtualizada ? 'documentação jurídica' : null
+      ].filter(Boolean);
+      alert(`${partesAtualizadas.join(', ')} atualizada(s) com sucesso.`);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao atualizar contrato.');
+      if (negociacaoAtualizada && possuiAlteracoesCadastrais && !dadosContratoAtualizados) {
+        alert(`A negociação detalhada foi enviada, mas os outros dados do contrato não foram atualizados: ${error?.message || 'erro ao atualizar contrato'}. O modal permanecerá aberto para tentar novamente.`);
+      } else if (negociacaoAtualizada || documentacaoJuridicaAtualizada || dadosContratoAtualizados) {
+        alert(`As alterações foram salvas, mas não foi possível recarregar a listagem: ${error?.message || 'erro ao recarregar contratos'}.`);
+      } else {
+        alert(error?.message || ((negociacaoEdicaoArquivo || documentosJuridicosSelecionados.length > 0)
+          ? 'Erro ao enviar os documentos do contrato.'
+          : 'Erro ao atualizar contrato.'));
+      }
     } finally {
       setSalvandoEdicaoId(null);
+    }
+  }
+
+  // Quebra de contrato (PI-6): zera o saldo e exclui os titulos em aberto. So aparece para
+  // contrato do fluxo novo ja ativo — nos demais nao ha saldo comprometido para encerrar.
+  async function encerrarContratoItem(contrato) {
+    const motivo = prompt(`Encerrar o contrato ${contrato.codigo}?
+
+Isto zera o saldo restante e exclui os titulos em aberto. Informe o motivo:`);
+    if (motivo === null) return;
+    if (!String(motivo).trim()) { alert('Informe o motivo do encerramento.'); return; }
+    try {
+      const r = await encerrarContratoFluxoNovo(contrato.id, motivo);
+      const ajustados = (r.titulos_ajustados_ao_valor_pago || []).length;
+      alert(
+        `Contrato ${contrato.codigo} encerrado.
+`
+        + `Saldo zerado: R$ ${Number(r.saldo_zerado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+`
+        + `Titulos excluidos: ${(r.titulos_excluidos || []).length}`
+        + (ajustados ? `
+Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
+      );
+      setContratoSelecionadoId(null);
+      await carregar();
+    } catch (error) {
+      console.error(error);
+      alert(error?.message || 'Erro ao encerrar contrato.');
     }
   }
 
@@ -1451,24 +1603,36 @@ export default function GestaoContratos() {
             <span>Anexos</span>
           </button>
           {podeGerenciarContratos && (
-            <>
-              <button
-                type="button"
-                className="btn btn-primary !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-                onClick={() => iniciarEdicao(contratoSelecionado)}
-              >
-                <HiPencilSquare className="w-4 h-4" />
-                <span>Editar</span>
-              </button>
-              <button
-                type="button"
-                className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
-                onClick={() => excluirContratoItem(contratoSelecionado)}
-              >
-                <HiTrash className="w-4 h-4" />
-                <span>Excluir</span>
-              </button>
-            </>
+            <button
+              type="button"
+              className="btn btn-primary !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => iniciarEdicao(contratoSelecionado)}
+            >
+              <HiPencilSquare className="w-4 h-4" />
+              <span>Editar</span>
+            </button>
+          )}
+          {podeEncerrarContratos && contratoSelecionado?.fluxo_novo
+            && contratoSelecionado?.status_contrato === 'ATIVO' && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => encerrarContratoItem(contratoSelecionado)}
+              title="Zera o saldo restante e exclui os titulos em aberto"
+            >
+              <HiXMark className="w-4 h-4" />
+              <span>Encerrar contrato</span>
+            </button>
+          )}
+          {podeGerenciarContratos && (
+            <button
+              type="button"
+              className="btn btn-outline !min-h-0 h-9 px-3 inline-flex items-center gap-2"
+              onClick={() => excluirContratoItem(contratoSelecionado)}
+            >
+              <HiTrash className="w-4 h-4" />
+              <span>Excluir</span>
+            </button>
           )}
           <button
             type="button"
@@ -1597,6 +1761,96 @@ export default function GestaoContratos() {
                     rows="2"
                   />
                 </label>
+
+                <div className="sol-filter-field md:col-span-2 xl:col-span-3">
+                  <span className="sol-filter-label">Negociação detalhada</span>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <label
+                      className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2"
+                      title="Anexar negociação detalhada em .docx ou .pdf"
+                    >
+                      <HiPaperClip className="h-4 w-4" aria-hidden="true" />
+                      <span>{negociacaoEdicaoArquivo ? 'Trocar documento' : 'Anexar documento'}</span>
+                      <input
+                        type="file"
+                        name="negociacao_detalhada_edicao"
+                        accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        className="hidden"
+                        onChange={selecionarNegociacaoEdicao}
+                        disabled={salvandoEdicaoId === contratoEmEdicao.id}
+                      />
+                    </label>
+
+                    {negociacaoEdicaoArquivo ? (
+                      <>
+                        <span className="max-w-full truncate text-xs text-[var(--c-text)]" title={negociacaoEdicaoArquivo.name} data-testid="negociacao-edicao-nome">
+                          {negociacaoEdicaoArquivo.name}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm"
+                          onClick={() => setNegociacaoEdicaoArquivo(null)}
+                          disabled={salvandoEdicaoId === contratoEmEdicao.id}
+                          aria-label="Remover negociação detalhada selecionada"
+                          title="Remover documento selecionado"
+                        >
+                          <HiTrash className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </>
+                    ) : (
+                      <span className="text-xs text-[var(--c-muted)]">Nenhum novo documento selecionado</span>
+                    )}
+                  </div>
+                  <span className="mt-1 text-xs text-[var(--c-muted)]">
+                    Aceita .docx ou .pdf. Se já existir uma negociação, o novo documento substituirá o atual.
+                  </span>
+                </div>
+
+                {contratoEmEdicao.representante_legal_qualificacao && (
+                  <div className="sol-filter-field md:col-span-2 xl:col-span-3">
+                    <span className="sol-filter-label">Documentação jurídica obrigatória</span>
+                    <p className="mt-1 text-xs text-[var(--c-muted)]">
+                      Use estes campos para completar ou substituir os documentos exigidos antes da aprovação.
+                    </p>
+                    <div className="mt-2 overflow-hidden rounded-lg border border-[var(--c-border)]">
+                      {[
+                        ['cartao-cnpj', 'Cartão CNPJ'],
+                        ['ato-constitutivo', 'Ato constitutivo'],
+                        ['representante-legal', 'Documentos do representante legal']
+                      ].map(([tipo, rotulo]) => {
+                        const arquivo = documentacaoJuridicaEdicao[tipo];
+                        return (
+                          <div key={tipo} className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] px-3 py-2 last:border-b-0">
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium">{rotulo}</div>
+                              <div className="max-w-full truncate text-xs text-[var(--c-muted)]" title={arquivo?.name || ''}>
+                                {arquivo?.name || 'Nenhum novo arquivo selecionado'}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
+                                <HiPaperClip className="h-4 w-4" aria-hidden="true" />
+                                <span>{arquivo ? 'Trocar' : 'Selecionar'}</span>
+                                <input type="file" className="hidden"
+                                  accept=".pdf,.docx,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                  onChange={(event) => selecionarDocumentoJuridicoEdicao(tipo, event)}
+                                  disabled={salvandoEdicaoId === contratoEmEdicao.id} />
+                              </label>
+                              {arquivo && (
+                                <button type="button" className="btn btn-outline btn-sm"
+                                  onClick={() => setDocumentacaoJuridicaEdicao((atual) => ({ ...atual, [tipo]: null }))}
+                                  disabled={salvandoEdicaoId === contratoEmEdicao.id}
+                                  aria-label={`Remover ${rotulo} selecionado`}>
+                                  <HiTrash className="h-4 w-4" aria-hidden="true" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {renderApropriacoesEditor({

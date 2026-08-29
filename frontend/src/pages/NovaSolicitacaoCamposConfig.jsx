@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
+import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getSetores } from '../services/setores';
 import { getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor, salvarCamposNovaSolicitacao } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
@@ -23,6 +24,11 @@ export default function NovaSolicitacaoCamposConfig() {
   const [tiposPorSetorConfig, setTiposPorSetorConfig] = useState({});
   const [areaSelecionada, setAreaSelecionada] = useState('');
   const [tipoSelecionadoId, setTipoSelecionadoId] = useState('');
+  // Escopo de contratos 3.1-3.3: os subtipos do mesmo tipo pedem campos diferentes. A regra do
+  // subtipo grava sob `tipo:subtipo` e tem precedencia; sem subtipo escolhido, edita-se o tipo,
+  // que segue valendo como padrao para os subtipos sem regra propria.
+  const [subtipos, setSubtipos] = useState([]);
+  const [subtipoSelecionadoId, setSubtipoSelecionadoId] = useState('');
   const [regras, setRegras] = useState({});
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -100,6 +106,45 @@ export default function NovaSolicitacaoCamposConfig() {
       apropriacoes: moduloApropriacoesHabilitado
     });
   }, [tipoSelecionado, moduloContratosHabilitado, moduloApropriacoesHabilitado]);
+  const camposControladosPelaApropriacaoAutomatica = useMemo(
+    () => new Set(
+      comportamentoTipo.usa_apropriacao_automatica_obra
+        ? ['contrato', 'apropriacao_principal', 'apropriacoes_contrato']
+        : []
+    ),
+    [comportamentoTipo.usa_apropriacao_automatica_obra]
+  );
+  const camposDisponiveis = useMemo(
+    () => CAMPOS_NOVA_SOLICITACAO.filter(
+      (campo) => (
+        (!campo.somenteFluxoContratoNovo || comportamentoTipo.usa_fluxo_contrato_novo) &&
+        (!campo.excetoFluxoContratoNovo || !comportamentoTipo.usa_fluxo_contrato_novo)
+      )
+    ),
+    [comportamentoTipo.usa_fluxo_contrato_novo]
+  );
+
+  // Carrega os subtipos do tipo escolhido; trocar de tipo zera a selecao de subtipo.
+  useEffect(() => {
+    setSubtipoSelecionadoId('');
+    if (!tipoSelecionadoId) { setSubtipos([]); return; }
+    let cancelado = false;
+    getTiposSubContrato({ tipo_macro_id: tipoSelecionadoId })
+      // So subtipo ATIVO, como faz a Nova Solicitacao. O endpoint devolve os inativos tambem, e
+      // sem este filtro daria para configurar campos de um subtipo que ninguem consegue escolher
+      // — configuracao que nunca teria efeito, e que o proximo leitor acharia que tem.
+      .then((lista) => {
+        if (cancelado) return;
+        setSubtipos(Array.isArray(lista) ? lista.filter((item) => item?.ativo !== false) : []);
+      })
+      .catch(() => { if (!cancelado) setSubtipos([]); });
+    return () => { cancelado = true; };
+  }, [tipoSelecionadoId]);
+
+  // A chave que esta sendo editada: o subtipo quando escolhido, senao o tipo.
+  const chaveRegraSelecionada = subtipoSelecionadoId
+    ? `${tipoSelecionadoId}:${subtipoSelecionadoId}`
+    : String(tipoSelecionadoId || '');
 
   const camposResolvidos = useMemo(() => (
     resolverCamposNovaSolicitacaoFrontend(
@@ -108,22 +153,23 @@ export default function NovaSolicitacaoCamposConfig() {
       tipoSelecionadoId,
       {
         apropriacoesDisponiveis: moduloApropriacoesHabilitado,
-        areaResponsavel: areaSelecionada
+        areaResponsavel: areaSelecionada,
+        tipoSubId: subtipoSelecionadoId
       }
     )
-  ), [comportamentoTipo, regras, tipoSelecionadoId, areaSelecionada, moduloApropriacoesHabilitado]);
+  ), [comportamentoTipo, regras, tipoSelecionadoId, subtipoSelecionadoId, areaSelecionada, moduloApropriacoesHabilitado]);
   const opcoesTipo = useMemo(() => (
     obterOpcoesNovaSolicitacaoFrontend({ regras }, tipoSelecionadoId, areaSelecionada)
   ), [regras, tipoSelecionadoId, areaSelecionada]);
 
   function atualizarCampo(campoId, patch) {
     const definicao = CAMPOS_NOVA_SOLICITACAO.find((campo) => campo.id === campoId);
-    if (definicao?.fixo || !tipoSelecionadoId || !areaSelecionada) return;
+    if (definicao?.fixo || camposControladosPelaApropriacaoAutomatica.has(campoId) || !chaveRegraSelecionada || !areaSelecionada) return;
     const areaKey = normalizarAreaNovaSolicitacao(areaSelecionada);
 
     setRegras((prev) => {
       const atualTiposArea = prev[areaKey]?.tipos || {};
-      const atualRegraTipo = atualTiposArea[String(tipoSelecionadoId)] || {};
+      const atualRegraTipo = atualTiposArea[chaveRegraSelecionada] || {};
       const atualTipo = atualRegraTipo.campos || {};
       const atualCampo = atualTipo[campoId] || {
         visivel: camposResolvidos[campoId]?.visivel_padrao ?? true,
@@ -143,7 +189,7 @@ export default function NovaSolicitacaoCamposConfig() {
         [areaKey]: {
           tipos: {
             ...atualTiposArea,
-            [String(tipoSelecionadoId)]: {
+            [chaveRegraSelecionada]: {
               opcoes: atualRegraTipo.opcoes || {},
               campos: {
                 ...atualTipo,
@@ -157,19 +203,19 @@ export default function NovaSolicitacaoCamposConfig() {
   }
 
   function atualizarOpcao(opcaoId, valor) {
-    if (!tipoSelecionadoId || !areaSelecionada) return;
+    if (!chaveRegraSelecionada || !areaSelecionada) return;
     const areaKey = normalizarAreaNovaSolicitacao(areaSelecionada);
 
     setRegras((prev) => {
       const atualTiposArea = prev[areaKey]?.tipos || {};
-      const atualTipo = atualTiposArea[String(tipoSelecionadoId)] || {};
+      const atualTipo = atualTiposArea[chaveRegraSelecionada] || {};
 
       return {
         ...prev,
         [areaKey]: {
           tipos: {
             ...atualTiposArea,
-            [String(tipoSelecionadoId)]: {
+            [chaveRegraSelecionada]: {
               campos: atualTipo.campos || {},
               opcoes: {
                 ...(atualTipo.opcoes || {}),
@@ -271,6 +317,27 @@ export default function NovaSolicitacaoCamposConfig() {
               ))}
             </select>
           </label>
+          {subtipos.length > 0 && (
+            <label className="grid gap-2 text-sm">
+              Subtipo
+              <select
+                className="input input-sm"
+                value={subtipoSelecionadoId}
+                onChange={(event) => setSubtipoSelecionadoId(event.target.value)}
+              >
+                {/* Vazio = editar o tipo, que vale como padrao para os subtipos sem regra propria. */}
+                <option value="">Todos (regra do tipo)</option>
+                {subtipos.map((sub) => (
+                  <option key={sub.id} value={sub.id}>{sub.nome}</option>
+                ))}
+              </select>
+              <span className="text-xs text-[var(--c-muted)]">
+                {subtipoSelecionadoId
+                  ? 'Editando a regra deste subtipo. Ela tem precedencia sobre a do tipo.'
+                  : 'Editando a regra do tipo. Vale para os subtipos que nao tiverem regra propria.'}
+              </span>
+            </label>
+          )}
           {tiposDaArea.length === 0 && (
             <p className="text-xs text-[var(--c-muted)]">
               Nenhum tipo ativo encontrado para esta area.
@@ -326,16 +393,30 @@ export default function NovaSolicitacaoCamposConfig() {
                 </tr>
               </thead>
               <tbody>
-                {CAMPOS_NOVA_SOLICITACAO.map((campo) => {
+                {camposDisponiveis.map((campo) => {
                   const resolvido = camposResolvidos[campo.id] || {};
+                  const controladoAutomaticamente = camposControladosPelaApropriacaoAutomatica.has(campo.id);
+                  const labelCampo = campo.id === 'descricao' && comportamentoTipo.usa_fluxo_contrato_novo
+                    ? 'Titulo do contrato'
+                    : campo.label;
                   return (
                     <tr key={campo.id} className="border-b border-[var(--c-border)] last:border-0">
                       <td className="px-3 py-3 align-top">
-                        <div className="font-semibold text-[var(--c-text)]">{campo.label}</div>
+                        <div className="font-semibold text-[var(--c-text)]">{labelCampo}</div>
                         <div className="mt-1 text-xs text-[var(--c-muted)]">{campo.descricao}</div>
+                        {campo.somenteFluxoContratoNovo && (
+                          <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                            Campo do novo fluxo de contrato
+                          </span>
+                        )}
                         {campo.fixo && (
                           <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
                             Campo estrutural
+                          </span>
+                        )}
+                        {controladoAutomaticamente && (
+                          <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                            Controlado pela apropriacao automatica
                           </span>
                         )}
                       </td>
@@ -343,7 +424,7 @@ export default function NovaSolicitacaoCamposConfig() {
                         <input
                           type="checkbox"
                           checked={Boolean(resolvido.visivel)}
-                          disabled={campo.fixo}
+                          disabled={campo.fixo || controladoAutomaticamente}
                           onChange={(event) => atualizarCampo(campo.id, { visivel: event.target.checked })}
                         />
                       </td>
@@ -351,7 +432,7 @@ export default function NovaSolicitacaoCamposConfig() {
                         <input
                           type="checkbox"
                           checked={Boolean(resolvido.obrigatorio)}
-                          disabled={campo.fixo || campo.permiteObrigatorio === false || !resolvido.visivel}
+                          disabled={campo.fixo || controladoAutomaticamente || campo.permiteObrigatorio === false || !resolvido.visivel}
                           onChange={(event) => atualizarCampo(campo.id, { obrigatorio: event.target.checked })}
                         />
                       </td>

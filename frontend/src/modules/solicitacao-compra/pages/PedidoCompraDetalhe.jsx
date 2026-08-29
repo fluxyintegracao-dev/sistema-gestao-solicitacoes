@@ -24,9 +24,11 @@ import { buscarParceiros } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canAlterarStatusComprasPedidos,
+  canAnexarEspelhoComprasPedidos,
   canCancelarComprasPedidos,
   canCancelarFreteComprasPedidos,
   canEditarItensComprasPedidos,
+  canManageComprasPedidos,
   canReabrirComprasPedidos,
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,
@@ -393,6 +395,8 @@ export default function PedidoCompraDetalhe() {
   const { user } = useAuth();
   const businessAdmin = isBusinessAdmin(user);
   const podeEditarItensPedido = canEditarItensComprasPedidos(user);
+  const podeComentarPedido = canManageComprasPedidos(user);
+  const podeAnexarEspelhoPedido = canAnexarEspelhoComprasPedidos(user);
   const podeAlterarStatusPedido = canAlterarStatusComprasPedidos(user);
   const podeCancelarPedido = canCancelarComprasPedidos(user);
   const podeReabrirPedido = canReabrirComprasPedidos(user);
@@ -1659,31 +1663,36 @@ export default function PedidoCompraDetalhe() {
             </div>
           </div>
 
-          {podeEditarItensPedido ? (
+          {podeComentarPedido || podeAnexarEspelhoPedido ? (
             <div className="card sol-surface-card">
               <div className="card-header">
                 <h2 className="font-semibold">Historico operacional</h2>
               </div>
               <div className="grid gap-4">
-                <label className="grid gap-2 text-sm font-medium">
-                  Comentario do pedido
-                  <textarea
-                    className="input min-h-[110px]"
-                    value={comentarioPedido}
-                    onChange={(event) => setComentarioPedido(event.target.value)}
-                    placeholder="Registre alinhamentos, pendencias ou informacoes para a obra."
-                  />
-                </label>
-                <button
-                  type="button"
-                  className="btn btn-outline justify-center"
-                  onClick={handleSalvarComentarioPedido}
-                  disabled={salvandoComentario || !comentarioPedido.trim()}
-                >
-                  {salvandoComentario ? 'Registrando...' : 'Registrar comentario'}
-                </button>
+                {podeComentarPedido ? (
+                  <>
+                    <label className="grid gap-2 text-sm font-medium">
+                      Comentario do pedido
+                      <textarea
+                        className="input min-h-[110px]"
+                        value={comentarioPedido}
+                        onChange={(event) => setComentarioPedido(event.target.value)}
+                        placeholder="Registre alinhamentos, pendencias ou informacoes para a obra."
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      className="btn btn-outline justify-center"
+                      onClick={handleSalvarComentarioPedido}
+                      disabled={salvandoComentario || !comentarioPedido.trim()}
+                    >
+                      {salvandoComentario ? 'Registrando...' : 'Registrar comentario'}
+                    </button>
+                  </>
+                ) : null}
 
-                <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
+                {podeAnexarEspelhoPedido ? (
+                  <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm">
                   <div className="font-semibold">Espelho do pedido do fornecedor</div>
                   <p className="mt-1 text-xs text-[var(--c-muted)]">
                     Anexe aqui o comprovante/espelho enviado pelo fornecedor. Ele tambem aparece no historico da solicitacao.
@@ -1697,7 +1706,8 @@ export default function PedidoCompraDetalhe() {
                     {anexandoEspelho ? 'Anexando...' : 'Anexar espelho'}
                     <input type="file" className="hidden" onChange={handleAnexarEspelho} disabled={anexandoEspelho} />
                   </label>
-                </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}

@@ -15,6 +15,7 @@ const {
   Anexo,
   MensagemSetor,
   Parceiro,
+  FormaPagamentoFinanceira,
   SetorPermissao,
   Setor,
   ConfiguracaoSistema,
@@ -79,9 +80,28 @@ const {
 } = require('../services/novaSolicitacaoCamposConfig');
 const { criarParceiro } = require('../services/parceiroService');
 const { isObraCentroCusto } = require('../constants/centroCusto');
+const { resolverApropriacaoPadrao } = require('../services/obraTipoApropriacaoPadraoService');
+const {
+  formaPagamentoEhBoleto,
+  formaPagamentoPermitidaDespesaEventual,
+  formaPagamentoEhPix,
+  listarFormasDosFluxos
+} = require('../services/formasPagamentoMedicaoService');
+const {
+  executarCriacaoComControle: executarCriacaoDespesaEventualComControle,
+  obterSaldoPorObra: obterSaldoDespesaEventualPorObra,
+  tipoEhDespesaEventual,
+  validarDeclaracoes: validarDeclaracoesDespesaEventual
+} = require('../services/despesaEventualService');
+const {
+  executarCriacaoRecargaComControle,
+  sincronizarTituloComStatusSolicitacao,
+  tipoEhRecargaCartao
+} = require('../services/recargaCartaoService');
 const {
   canEditarApropriacoesSolicitacao,
   userHasAreaPermission,
+  userHasAreaPermissionWhenConfigured,
   userHasConfiguredAreaPermissions
 } = require('../services/authorizationService');
 const {
@@ -101,9 +121,23 @@ const SOLICITACAO_RESPONSAVEL_ACTIONS = [
   'RESPONSAVEL_ASSUMIU',
   'RESPONSAVEL_REMOVIDO'
 ];
+const { criarEscopoIdempotencia } = require('../services/idempotenciaCriacaoService');
+const { validarPeriodoMedicao, validarMedicaoParcelas, aplicarMedicaoNasParcelas, registrarMedicaoDoContrato } = require('../services/medicaoContratoService');
+const {
+  assertPodeInteragirSolicitacao,
+  montarContextoInteracao
+} = require('../services/solicitacaoRetornoService');
+const { gerarTokenUploadCriacaoSolicitacao } = require('../services/solicitacaoCriacaoUploadTokenService');
+
 const CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
-const solicitacaoCreatePendingKeys = new Map();
-const solicitacaoCreateCompletedKeys = new Map();
+
+// Mesma mecanica do fluxo novo de contratos, agora em um lugar so: manter duas copias ja
+// tinha feito elas divergirem (TTL diferente e liberacao da chave em queda de conexao so
+// em uma delas). TTL e mensagem preservados como estavam aqui.
+const escopoIdempotenciaSolicitacao = criarEscopoIdempotencia({
+  ttlMs: CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS,
+  mensagemEmAndamento: 'Esta solicitacao ja esta sendo criada. Aguarde a conclusao antes de tentar novamente.'
+});
 
 function parseDecimalOpcionalSolicitacao(valor) {
   if (valor === null || valor === undefined) return null;
@@ -163,67 +197,8 @@ function formatarRateioApropriacoesHistorico(rateios = []) {
     return `${codigo}${descricao}${percentual}${valorRateio}${quantidade}`.trim();
   }).join('; ');
 }
-function limparIdempotenciaCriacaoExpirada() {
-  const agora = Date.now();
-  for (const [key, value] of solicitacaoCreatePendingKeys.entries()) {
-    if (!value || value.expiresAt <= agora) {
-      solicitacaoCreatePendingKeys.delete(key);
-    }
-  }
-  for (const [key, value] of solicitacaoCreateCompletedKeys.entries()) {
-    if (!value || value.expiresAt <= agora) {
-      solicitacaoCreateCompletedKeys.delete(key);
-    }
-  }
-}
-
-function prepararIdempotenciaCriacao(req, res) {
-  limparIdempotenciaCriacaoExpirada();
-
-  const rawKey = String(req.headers?.['idempotency-key'] || '').trim();
-  if (!rawKey) {
-    return { handled: false, scopeKey: null };
-  }
-
-  if (!/^[A-Za-z0-9:_-]{8,160}$/.test(rawKey)) {
-    res.status(400).json({ error: 'Chave de idempotencia invalida.' });
-    return { handled: true, scopeKey: null };
-  }
-
-  const scopeKey = `${req.user?.id || 'anon'}:${rawKey}`;
-  const cached = solicitacaoCreateCompletedKeys.get(scopeKey);
-  if (cached?.body) {
-    res.set('X-Idempotent-Replay', 'true');
-    res.status(200).json(cached.body);
-    return { handled: true, scopeKey: null };
-  }
-
-  if (solicitacaoCreatePendingKeys.has(scopeKey)) {
-    res.status(409).json({
-      error: 'Esta solicitacao ja esta sendo criada. Aguarde a conclusao antes de tentar novamente.'
-    });
-    return { handled: true, scopeKey: null };
-  }
-
-  solicitacaoCreatePendingKeys.set(scopeKey, {
-    expiresAt: Date.now() + CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS
-  });
-
-  res.on('finish', () => {
-    solicitacaoCreatePendingKeys.delete(scopeKey);
-  });
-
-  return { handled: false, scopeKey };
-}
-
-function armazenarIdempotenciaCriacao(scopeKey, body) {
-  if (!scopeKey || !body) return;
-  solicitacaoCreatePendingKeys.delete(scopeKey);
-  solicitacaoCreateCompletedKeys.set(scopeKey, {
-    expiresAt: Date.now() + CREATE_SOLICITACAO_IDEMPOTENCY_TTL_MS,
-    body
-  });
-}
+const prepararIdempotenciaCriacao = (req, res) => escopoIdempotenciaSolicitacao.preparar(req, res);
+const armazenarIdempotenciaCriacao = (scopeKey, body) => escopoIdempotenciaSolicitacao.armazenar(scopeKey, body);
 /* =====================================================
    FUNCAO AUXILIAR - VISIBILIDADE
 ===================================================== */
@@ -422,16 +397,7 @@ async function buscarResumoListaSolicitacaoPorId(id) {
   return Array.isArray(resumo) && resumo.length > 0 ? resumo[0] : null;
 }
 
-async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
-  const acessoObra = await validarAcessoObra(req, solicitacao);
-  if (!acessoObra) {
-    return {
-      allowed: false,
-      status: 403,
-      error: 'Acesso negado. Vincule o usuario a obra para continuar.'
-    };
-  }
-
+async function verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLeituraGlobal = false } = {}) {
   const areaUsuario = await obterAreaUsuario(req);
   const tokensSetorUsuario = expandirTokensComAliasesGeo(
     await obterTokensSetorPrincipalUsuario(req, areaUsuario)
@@ -450,7 +416,26 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
     userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_SETOR]),
     userHasAreaPermission(req.user, [PERMISSAO_SOLICITACOES_VISUALIZAR_TODAS])
   ]);
-  const podeVerTodasSolicitacoes = temPermissoesAreasConfiguradas && permissaoVerTodasSolicitacoes;
+  const podeVerTodasSolicitacoes =
+    permitirLeituraGlobal && temPermissoesAreasConfiguradas && permissaoVerTodasSolicitacoes;
+
+  if (podeVerTodasSolicitacoes) {
+    return {
+      allowed: true,
+      leituraGlobal: true,
+      areaUsuario,
+      tokensSetorUsuario
+    };
+  }
+
+  const acessoObra = await validarAcessoObra(req, solicitacao);
+  if (!acessoObra) {
+    return {
+      allowed: false,
+      status: 403,
+      error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+    };
+  }
 
   if (
     perfil !== 'SUPERADMIN' &&
@@ -668,6 +653,27 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao) {
     allowed: true,
     areaUsuario,
     tokensSetorUsuario
+  };
+}
+
+async function avaliarContextoInteracaoSolicitacao(req, solicitacao, acessoExistente = null) {
+  const acesso = acessoExistente || await verificarAcessoDetalheSolicitacao(req, solicitacao);
+  if (!acesso.allowed) return acesso;
+
+  // Qualquer vinculo adicional serve apenas para VISUALIZAR. Para escrever, anexar, medir ou
+  // pedir aditivo vale exclusivamente o SETOR PRINCIPAL do usuario. Antes, `obterTokensSetorUsuario`
+  // acrescentava `usuario_setores`; assim, Joao (setor principal OBRA) conseguia comentar uma
+  // solicitacao em GEO apenas por possuir um vinculo secundario historico com GEO. Esse mesmo
+  // falso positivo escondia o botao Solicitar retorno.
+  const tokensOperacionais = expandirTokensComAliasesGeo(
+    await obterTokensSetorPrincipalUsuario(req, acesso.areaUsuario)
+  );
+
+  return {
+    ...acesso,
+    estaNoSetorUsuario: setorPertenceAoUsuario(tokensOperacionais, solicitacao.area_responsavel),
+    setorUsuario: acesso.areaUsuario || null,
+    tokensOperacionais
   };
 }
 
@@ -2353,6 +2359,44 @@ module.exports = {
     );
   },
 
+  async saldoDespesaEventual(req, res) {
+    try {
+      const obraId = Number(req.query?.obra_id);
+      if (!Number.isInteger(obraId) || obraId <= 0) {
+        return res.status(400).json({ error: 'Informe uma obra valida.' });
+      }
+
+      const obra = await Obra.findByPk(obraId, { attributes: ['id', 'tipo_centro_custo'] });
+      if (!obra || !isObraCentroCusto(obra.tipo_centro_custo)) {
+        return res.status(404).json({ error: 'Obra nao encontrada.' });
+      }
+
+      const areaUsuario = await obterAreaUsuario(req);
+      const tokensSetorUsuario = await obterTokensSetorUsuario(req, areaUsuario);
+      const setoresCriacaoTodasObras = await obterSetoresCriacaoTodasObras();
+      const perfilUsuario = String(req.user?.perfil || '').trim().toUpperCase();
+      const podeCriarEmTodasObras = tokensSetorUsuario.some((token) => (
+        setoresCriacaoTodasObras.includes(String(token || '').trim().toUpperCase())
+      ));
+
+      if (perfilUsuario !== 'SUPERADMIN' && !podeCriarEmTodasObras) {
+        const { UsuarioObra } = require('../models');
+        const vinculo = await UsuarioObra.findOne({
+          where: { user_id: req.user.id, obra_id: obraId },
+          attributes: ['id']
+        });
+        if (!vinculo) return res.status(403).json({ error: 'Acesso negado para esta obra.' });
+      }
+
+      return res.json(await obterSaldoDespesaEventualPorObra(obraId));
+    } catch (error) {
+      console.error(error);
+      return res.status(Number(error?.statusCode) || 500).json({
+        error: error?.message || 'Erro ao calcular o saldo de Despesa Eventual.'
+      });
+    }
+  },
+
   // =====================================================
   // CRIAR SOLICITACAO
   // =====================================================
@@ -2369,8 +2413,15 @@ module.exports = {
         tipo_macro_id,
         tipo_sub_id,
         descricao,
+        justificativa,
         valor,
         parceiro_id,
+        favorecido_id,
+        forma_pagamento_id,
+        favorecido_chave_pix,
+        boleto_anexo_nome,
+        despesa_eventual_declaracoes,
+        cartao_recarga_id,
         apropriacao_id,
         area_responsavel,
         codigo_contrato,
@@ -2381,7 +2432,15 @@ module.exports = {
         data_fim_medicao,
         itens_apropriacao,
         apropriacoes_rateio,
-        ref_contrato_abertura
+        ref_contrato_abertura,
+        // Wireframe 2: parcelas do contrato do fluxo novo que esta medicao consome.
+        medicao_parcelas: medicaoParcelas,
+        // Dados de pagamento DA MEDICAO (itens 5 e 9, 23/08): favorecido, chave PIX, forma de
+        // pagamento, contato e o aceite. Sairam da abertura do contrato e vieram para ca.
+        medicao_pagamento: medicaoPagamento,
+        // O upload continua no endpoint historico logo depois da criacao; estes nomes provam que
+        // o formulario tinha ao menos um arquivo selecionado antes de registrar a medicao.
+        anexos_pendentes_nomes: anexosPendentesNomes
       } = req.body;
 
       if (!obra_id || !tipo_solicitacao_id || !area_responsavel) {
@@ -2454,6 +2513,15 @@ module.exports = {
           error: 'Tipo de solicitacao nao encontrado.'
         });
       }
+      // PI-16: tipo de USO DO SISTEMA nao pode ser aberto pela Nova Solicitacao — nem pela tela,
+      // nem por chamada direta a esta rota. Esconder so na tela seria um cadeado na porta da
+      // frente com a janela aberta; a solicitacao desse tipo nasce pelo servico que a cria
+      // (hoje, o aditivo de contrato legado).
+      if (normalizeTipoSolicitacaoBehavior(tipoSelecionado)?.somente_sistema === true) {
+        return res.status(400).json({
+          error: 'Este tipo de solicitacao e de uso do sistema e nao pode ser aberto manualmente.'
+        });
+      }
       const tiposPorSetorConfig = await obterTiposSolicitacaoPorSetorConfig();
       const regraTiposSetorDestino = obterRegrasTipoPorTokensSetor(
         tiposPorSetorConfig,
@@ -2468,6 +2536,21 @@ module.exports = {
         }
       }
       const comportamentoBase = normalizeTipoSolicitacaoBehavior(tipoSelecionado);
+      const usaFluxoDespesaEventual = tipoEhDespesaEventual(tipoSelecionado);
+      const usaFluxoRecargaCartao = tipoEhRecargaCartao(tipoSelecionado);
+      if (
+        (comportamentoBase.somente_gerencia_processos === true || usaFluxoRecargaCartao) &&
+        setorDestinoSelecionado.eh_setor_geo !== true &&
+        ![
+          setorDestinoSelecionado.codigo,
+          setorDestinoSelecionado.nome,
+          areaResponsavelPersistida
+        ].some((token) => isGeoSetorToken(token))
+      ) {
+        return res.status(400).json({
+          error: `${usaFluxoRecargaCartao ? 'Recarga de Cartao' : 'Despesa Eventual'} deve ser enviada para o setor GERENCIA DE PROCESSOS.`
+        });
+      }
       const [contratosDisponiveis, apropriacoesDisponiveis] = await Promise.all([
         isModuleEnabled('CONTRATOS'),
         isModuleEnabled('OBRAS')
@@ -2483,11 +2566,67 @@ module.exports = {
         tipo_solicitacao_id,
         {
           apropriacoesDisponiveis,
-          areaResponsavel: areaResponsavelPersistida
+          areaResponsavel: areaResponsavelPersistida,
+          // Regra do subtipo tem precedencia sobre a do tipo (escopo de contratos 3.1-3.3).
+          tipoSubId: tipo_sub_id
         }
       );
-      const campoVisivel = (campo) => camposNovaSolicitacao?.[campo]?.visivel !== false;
-      const campoObrigatorio = (campo) => Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+      const camposFixosDespesaEventual = new Set([
+        'valor',
+        'credor',
+        'favorecido',
+        'forma_pagamento',
+        'apropriacao_principal',
+        'subtipo',
+        'justificativa',
+        'anexos',
+        'data_vencimento'
+      ]);
+      const camposFixosRecargaCartao = new Set(['valor', 'data_vencimento']);
+      const campoVisivel = (campo) => (
+        (usaFluxoRecargaCartao && camposFixosRecargaCartao.has(campo))
+        || (!usaFluxoRecargaCartao && usaFluxoDespesaEventual && camposFixosDespesaEventual.has(campo))
+        || (!usaFluxoRecargaCartao && camposNovaSolicitacao?.[campo]?.visivel !== false)
+      );
+      const usaApropriacaoAutomaticaObra = comportamentoTipo.usa_apropriacao_automatica_obra === true;
+      const tipoEhDeMedicao = Boolean(
+        comportamentoTipo.mostrar_periodo_medicao || comportamentoTipo.exige_periodo_medicao
+      );
+      const nomesAnexosPendentes = Array.isArray(anexosPendentesNomes)
+        ? anexosPendentesNomes.map((nome) => String(nome || '').trim()).filter(Boolean)
+        : [];
+
+      // MEDICAO DE CONTRATO DO FLUXO NOVO NAO TEM VALOR, DESCRICAO NEM VENCIMENTO PROPRIOS (20/08).
+      //
+      // Ela nao cria solicitacao (PI-16): mais abaixo esta requisicao e interceptada e vira um
+      // evento da solicitacao unica do contrato. O valor sai da soma das parcelas marcadas e o
+      // vencimento sai de cada parcela — os tres campos do formulario eram coletados, validados e
+      // **descartados**.
+      //
+      // A dispensa mora AQUI, e nao so na tela, porque estas validacoes rodam ANTES da
+      // interceptacao: com a tela parando de enviar e a checagem no lugar, toda medicao passaria a
+      // responder 400. Foi exatamente assim que a abertura de contrato acima do limite ficou
+      // impossivel por uma rodada — a exigencia mudou de lugar e a checagem antiga ficou.
+      //
+      // Contrato LEGADO nao entra: a medicao dele cria solicitacao propria, e la os tres valem.
+      // Consulta propria, e curta, em vez de subir o carregamento de `contratoAlvo` para ca: ele
+      // vem com uma checagem de contrato inativo/nao aprovado que responde 400 por conta propria, e
+      // adiantar isso trocaria a ORDEM das mensagens de erro que a tela ja mostra hoje. Só roda
+      // quando ha parcelas de medicao no corpo.
+      let ehMedicaoFluxoNovo = false;
+      if (Array.isArray(medicaoParcelas) && medicaoParcelas.length > 0 && contrato_id) {
+        const contratoDaMedicao = await Contrato.findByPk(contrato_id, {
+          attributes: ['id', 'fluxo_novo', 'solicitacao_id']
+        });
+        ehMedicaoFluxoNovo = Boolean(contratoDaMedicao?.fluxo_novo && contratoDaMedicao?.solicitacao_id);
+      }
+
+      const campoObrigatorio = (campo) => {
+        if (ehMedicaoFluxoNovo && ['valor', 'descricao', 'data_vencimento'].includes(campo)) return false;
+        if (usaFluxoRecargaCartao) return camposFixosRecargaCartao.has(campo);
+        if (usaFluxoDespesaEventual && camposFixosDespesaEventual.has(campo)) return true;
+        return Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
+      };
       const rateioApropriacoes = campoVisivel('contrato')
         ? normalizarApropriacoesRateio(apropriacoes_rateio)
         : [];
@@ -2503,8 +2642,32 @@ module.exports = {
           error: 'Campos obrigatorios nao informados'
         });
       }
+      if (campoObrigatorio('justificativa') && !String(justificativa || '').trim()) {
+        return res.status(400).json({ error: 'Informe a justificativa da solicitacao.' });
+      }
+      if (campoObrigatorio('forma_pagamento') && !forma_pagamento_id) {
+        return res.status(400).json({ error: 'Selecione a forma de pagamento.' });
+      }
+      if ((tipoEhDeMedicao || campoObrigatorio('anexos')) && nomesAnexosPendentes.length === 0) {
+        return res.status(400).json({
+          error: tipoEhDeMedicao
+            ? 'Anexe ao menos um arquivo para enviar a solicitacao de medicao.'
+            : 'Anexe ao menos um comprovante da despesa.'
+        });
+      }
 
-      if (campoObrigatorio('subtipo') && !tipo_sub_id) {
+      let declaracoesDespesaEventualNormalizadas = null;
+      if (usaFluxoDespesaEventual) {
+        declaracoesDespesaEventualNormalizadas = validarDeclaracoesDespesaEventual(
+          despesa_eventual_declaracoes
+        );
+      }
+
+      // O SUBTIPO SAI DO CONTRATO DO FLUXO NOVO (item 1, 23/08): pelo tipo CONTRATO so existe a
+      // abertura, entao ele nao separava nada. A tela deixou de mostrar o campo, e exigir aqui
+      // tornaria a criacao impossivel — foi assim que a abertura acima do limite ficou travada por
+      // uma rodada, quando a exigencia mudou de lugar e a checagem antiga ficou.
+      if (campoObrigatorio('subtipo') && !comportamentoTipo.usa_fluxo_contrato_novo && !tipo_sub_id) {
         return res.status(400).json({
           error: 'Para continuar, selecione o subtipo.'
         });
@@ -2532,6 +2695,9 @@ module.exports = {
         return res.status(400).json({
           error: 'Informe a data de vencimento.'
         });
+      }
+      if (usaFluxoRecargaCartao && !cartao_recarga_id) {
+        return res.status(400).json({ error: 'Selecione o cartao que recebera a recarga.' });
       }
       if (campoObrigatorio('data_demissao') && !data_demissao) {
         return res.status(400).json({
@@ -2568,6 +2734,142 @@ module.exports = {
           error: 'Selecione um contrato.'
         });
       }
+
+      // Estado do contrato do fluxo novo (R2): so contrato APROVADO recebe solicitacao.
+      //
+      // O "status Previsao" do MD-6 fala do TITULO — que pode ter sido alterado por quem tem
+      // permissao —, nao de contrato pendente. Contrato nao aprovado nao se mede (decisao do
+      // cliente, 17/08). Contrato abaixo de R$ 50 mil nasce aprovado, e por isso pode ser
+      // criado e medido na sequencia.
+      //
+      // Nao toca no legado de proposito: o filtro e `fluxo_novo = true`, e os 335 contratos
+      // do banco estao em `false`, entao nenhuma solicitacao existente muda de comportamento.
+      let contratoAlvo = null;
+      if (contrato_id) {
+        contratoAlvo = await Contrato.findByPk(contrato_id, {
+          // `solicitacao_id` entra aqui porque a PI-16 decide por ele: com solicitacao-mae, a
+          // medicao vira evento dela em vez de criar solicitacao nova.
+          attributes: ['id', 'codigo', 'fluxo_novo', 'status_contrato', 'ativo', 'solicitacao_id']
+        });
+        if (contratoAlvo && contratoAlvo.fluxo_novo && (!contratoAlvo.ativo || contratoAlvo.status_contrato !== 'ATIVO')) {
+          const motivo = !contratoAlvo.ativo
+            ? 'esta inativo'
+            : contratoAlvo.status_contrato === 'REJEITADO' ? 'foi rejeitado' : 'ainda nao foi aprovado';
+          return res.status(400).json({
+            error: `O contrato ${contratoAlvo.codigo || contrato_id} ${motivo} e nao pode receber solicitacao.`
+          });
+        }
+      }
+
+      // Wireframe 2: as parcelas medidas sao conferidas ANTES de gravar a solicitacao.
+      // A criacao de solicitacao nao roda em transacao; validar aqui evita o unico cenario
+      // ruim de verdade — solicitacao criada e medicao nao aplicada, com o saldo do contrato
+      // dizendo uma coisa e as parcelas outra.
+      const itensMedicao = Array.isArray(medicaoParcelas) ? medicaoParcelas : [];
+      if (itensMedicao.length > 0) {
+        if (!contratoAlvo?.fluxo_novo) {
+          return res.status(400).json({ error: 'Parcelas de medicao so valem para contrato do fluxo novo.' });
+        }
+        try {
+          await assertPodeInteragirSolicitacao(req, contratoAlvo.solicitacao_id);
+          await validarMedicaoParcelas({ contratoId: Number(contrato_id), itens: itensMedicao });
+        } catch (erroMedicao) {
+          return res.status(Number(erroMedicao.statusCode) || 400).json({
+            error: erroMedicao.message,
+            code: erroMedicao.code || undefined
+          });
+        }
+      }
+
+      // MD-8: periodo da medicao. `fim >= inicio` vale para qualquer contrato; a checagem de
+      // sobreposicao so para o fluxo novo — ver a justificativa no servico (o legado tem 375
+      // pares sobrepostos hoje, e bloquear isso quebraria pratica corrente).
+      if (campoVisivel('periodo_medicao') && data_inicio_medicao && data_fim_medicao) {
+        try {
+          await validarPeriodoMedicao({
+            contratoId: contrato_id || null,
+            dataInicio: data_inicio_medicao,
+            dataFim: data_fim_medicao,
+            verificarSobreposicao: Boolean(contratoAlvo?.fluxo_novo)
+          });
+        } catch (erroPeriodo) {
+          return res.status(Number(erroPeriodo.statusCode) || 400).json({ error: erroPeriodo.message });
+        }
+      }
+
+      // PI-16: MEDICAO DE CONTRATO DO FLUXO NOVO NAO CRIA SOLICITACAO.
+      //
+      // Ela passa a ser um EVENTO da solicitacao unica do contrato. Um contrato com 19 medicoes
+      // tinha 19 solicitacoes; agora tem uma, e a unidade de aprovacao e pagamento e o TITULO.
+      //
+      // A interceptacao fica AQUI, depois de toda a validacao e antes de qualquer gravacao, para
+      // nao existir o meio-termo de "solicitacao criada e medicao nao aplicada" — que e
+      // exatamente o cenario que o comentario da validacao acima diz querer evitar.
+      //
+      // O contrato LEGADO nao entra aqui: ele nao tem solicitacao-mae, e sua medicao segue
+      // criando solicitacao propria, como as 665 do historico.
+      if (itensMedicao.length > 0 && contratoAlvo?.fluxo_novo && contratoAlvo?.solicitacao_id) {
+        try {
+          const registro = await registrarMedicaoDoContrato({
+            contratoId: Number(contrato_id),
+            itens: itensMedicao,
+            periodoInicio: data_inicio_medicao || null,
+            periodoFim: data_fim_medicao || null,
+            pagamento: {
+              ...(medicaoPagamento || {}),
+              anexos_pendentes_nomes: nomesAnexosPendentes
+            },
+            usuarioId: Number(req.user.id)
+          });
+
+          // A medicao entra na linha do tempo da solicitacao do contrato. `medicao_id` e o que
+          // permite ao modal do titulo mostrar so os comentarios daquela medicao.
+          await Historico.create({
+            solicitacao_id: contratoAlvo.solicitacao_id,
+            medicao_id: registro.medicao.id,
+            usuario_responsavel_id: Number(req.user.id),
+            // `historicos.setor` e NOT NULL — recuo na area da solicitacao do contrato.
+            setor: area_responsavel || contratoAlvo.area_responsavel || '-',
+            acao: 'MEDICAO_REGISTRADA',
+            // A SOBRA entra no texto quando existe: medindo a ultima parcela livre por menos que o
+            // previsto, a diferenca nao tem para onde ir e vira saldo do contrato (decisao do
+            // cliente, 21/08). Sem escrever aqui, ela apareceria so como um numero a mais no saldo e
+            // ninguem saberia de qual medicao veio.
+            descricao: `Medicao ${registro.medicao.numero} do contrato ${contratoAlvo.codigo}: `
+              + `${registro.parcelas_medidas} parcela(s), total R$ ${Number(registro.total_medido).toFixed(2)}`
+              + (Number(registro.sobra || 0) > 0
+                ? `. O contrato nao usou R$ ${Number(registro.sobra).toFixed(2)}, que ficam como saldo ate o encerramento`
+                : ''),
+            metadata: JSON.stringify({
+              medicao_id: registro.medicao.id,
+              medicao_numero: registro.medicao.numero,
+              contrato_id: Number(contrato_id),
+              periodo_inicio: registro.medicao.periodo_inicio,
+              periodo_fim: registro.medicao.periodo_fim,
+              total_medido: registro.total_medido,
+              sobra: Number(registro.sobra || 0)
+            })
+          });
+
+          // Responde no MESMO formato da criacao normal — a solicitacao achatada — porque a tela
+          // le `solicitacao.id` direto e navega para o detalhe. Aqui ela navega para a solicitacao
+          // DO CONTRATO, que e exatamente onde a medicao acabou de aparecer.
+          const solicitacaoDoContrato = await Solicitacao.findByPk(contratoAlvo.solicitacao_id);
+          return res.status(201).json({
+            ...(solicitacaoDoContrato?.toJSON ? solicitacaoDoContrato.toJSON() : solicitacaoDoContrato),
+            medicao: registro.medicao,
+            parcelas_medidas: registro.parcelas_medidas,
+            total_medido: registro.total_medido,
+            // Quanto o contrato deixou de usar nesta medicao (21/08). Sem devolver aqui, a tela nao
+            // teria como avisar que sobrou — o numero so apareceria no saldo, sem explicacao.
+            sobra: Number(registro.sobra || 0),
+            // Deixa explicito para quem consumir: nao houve solicitacao nova (PI-16).
+            criou_solicitacao: false
+          });
+        } catch (erroMedicao) {
+          return res.status(Number(erroMedicao.statusCode) || 400).json({ error: erroMedicao.message });
+        }
+      }
       if (campoObrigatorio('itens_apropriacao') && !itens_apropriacao && rateioApropriacoes.length === 0) {
         return res.status(400).json({
           error: 'Para Abertura de Contrato, informe os itens de apropriacao ou selecione as apropriacoes do contrato.'
@@ -2601,7 +2903,19 @@ module.exports = {
         });
       }
 
-      if (registroSelecionadoEhObra && campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
+      if (usaApropriacaoAutomaticaObra) {
+        if (!registroSelecionadoEhObra) {
+          return res.status(400).json({
+            error: 'Este tipo de solicitacao exige uma obra; centros de custo nao participam da apropriacao automatica.'
+          });
+        }
+        const resolvido = await resolverApropriacaoPadrao({
+          obraId: obra_id,
+          tipoSolicitacaoId: tipo_solicitacao_id,
+          exigir: true
+        });
+        apropriacao = resolvido.apropriacao;
+      } else if (registroSelecionadoEhObra && campoVisivel('apropriacao_principal') && apropriacao_id !== undefined && apropriacao_id !== null && apropriacao_id !== '') {
         apropriacao = await Apropriacao.findByPk(Number(apropriacao_id), {
           attributes: ['id', 'obra_id', 'codigo', 'descricao', 'somadora']
         });
@@ -2720,6 +3034,9 @@ module.exports = {
       const usuarioId = req.user.id;
       const usuario = await User.findByPk(usuarioId);
       let parceiro = null;
+      let favorecido = null;
+      let formaPagamentoIdPersistida = null;
+      let formaPagamentoSelecionada = null;
 
       const permiteCredorNaSolicitacao = campoVisivel('credor') || campoVisivel('cadastro_credor');
       const opcoesNovaSolicitacao = obterOpcoesNovaSolicitacao(
@@ -2791,6 +3108,48 @@ module.exports = {
         }
       }
 
+      if (campoVisivel('forma_pagamento') && forma_pagamento_id !== undefined && forma_pagamento_id !== null && forma_pagamento_id !== '') {
+        const formaPagamentoId = Number(forma_pagamento_id);
+        const formasConfiguradas = await listarFormasDosFluxos();
+        formaPagamentoSelecionada = formasConfiguradas.formas
+          .find((forma) => Number(forma.id) === formaPagamentoId) || null;
+        if (!Number.isInteger(formaPagamentoId) || !formaPagamentoSelecionada) {
+          return res.status(400).json({ error: 'A forma de pagamento informada nao esta ativa ou liberada para este fluxo.' });
+        }
+        if (usaFluxoDespesaEventual && !formaPagamentoPermitidaDespesaEventual(formaPagamentoSelecionada)) {
+          return res.status(400).json({
+            error: 'Despesa Eventual aceita somente PIX, Transferência Bancária ou Boleto.'
+          });
+        }
+        formaPagamentoIdPersistida = formaPagamentoId;
+      }
+
+      // Toda solicitacao que informa uma forma de pagamento precisa identificar quem recebera.
+      // Antes a obrigatoriedade implicita valia apenas para PIX, permitindo boleto e transferencia
+      // com `favorecido_id` nulo — o erro so aparecia quando o Financeiro tentava pagar.
+      const favorecidoEhObrigatorio = campoObrigatorio('favorecido') || Boolean(formaPagamentoSelecionada);
+      if (favorecidoEhObrigatorio && !favorecido_id) {
+        return res.status(400).json({ error: 'Selecione o favorecido do pagamento.' });
+      }
+      if ((campoVisivel('favorecido') || formaPagamentoSelecionada) && favorecido_id) {
+        favorecido = await Parceiro.findByPk(Number(favorecido_id), {
+          attributes: ['id', 'nome', 'cpf_cnpj', 'ativo']
+        });
+        if (!favorecido || favorecido.ativo === false) {
+          return res.status(400).json({ error: 'Selecione um favorecido ativo.' });
+        }
+      }
+
+      const chavePixPersistida = formaPagamentoEhPix(formaPagamentoSelecionada)
+        ? String(favorecido_chave_pix || '').trim()
+        : null;
+      if (formaPagamentoEhPix(formaPagamentoSelecionada) && !chavePixPersistida) {
+        return res.status(400).json({ error: 'Informe a chave PIX do favorecido.' });
+      }
+      if (formaPagamentoEhBoleto(formaPagamentoSelecionada) && !String(boleto_anexo_nome || '').trim()) {
+        return res.status(400).json({ error: 'Anexe o boleto para usar esta forma de pagamento.' });
+      }
+
       const valorPersistido = !campoVisivel('valor')
         ? null
         : (valor === '' || valor === undefined ? null : valor);
@@ -2841,7 +3200,7 @@ module.exports = {
 
       const codigo = await gerarCodigoSolicitacao();
 
-      const solicitacao = await Solicitacao.create({
+      const dadosSolicitacao = {
         codigo,
         obra_id,
         parceiro_id: parceiro?.id || null,
@@ -2850,6 +3209,13 @@ module.exports = {
         tipo_macro_id: tipo_macro_id || null,
         tipo_sub_id: campoVisivel('subtipo') ? (tipo_sub_id || null) : null,
         descricao: campoVisivel('descricao') ? descricao : '',
+        justificativa: campoVisivel('justificativa') ? (String(justificativa || '').trim() || null) : null,
+        favorecido_id: favorecido?.id || null,
+        forma_pagamento_id: formaPagamentoIdPersistida,
+        favorecido_chave_pix: chavePixPersistida,
+        despesa_eventual_declaracoes: declaracoesDespesaEventualNormalizadas
+          ? JSON.stringify(declaracoesDespesaEventualNormalizadas)
+          : null,
         valor: valorPersistido,
         area_responsavel: areaResponsavelPersistida,
         fluxo_aprovacao_diretoria: false,
@@ -2863,7 +3229,23 @@ module.exports = {
         data_fim_medicao: campoVisivel('periodo_medicao') ? (data_fim_medicao || null) : null,
         criado_por: usuarioId,
         status_global: 'PENDENTE'
-      });
+      };
+
+      const criacao = usaFluxoRecargaCartao
+        ? await executarCriacaoRecargaComControle({
+            cartaoId: cartao_recarga_id,
+            user: req.user,
+            dadosSolicitacao
+          })
+        : usaFluxoDespesaEventual
+          ? await executarCriacaoDespesaEventualComControle({
+            obraId: obra_id,
+            tipoId: tipo_solicitacao_id,
+            valor: valorPersistido,
+            criar: () => Solicitacao.create(dadosSolicitacao)
+          })
+          : { resultado: await Solicitacao.create(dadosSolicitacao), saldo: null };
+      const solicitacao = criacao.resultado;
 
       if (rateioApropriacoesDetalhado.length > 0) {
         await SolicitacaoApropriacao.bulkCreate(
@@ -2894,7 +3276,12 @@ module.exports = {
           setor_destino_pos_aprovacao: null,
           diretoria_fluxo_codigo: null,
           parceiro_id: parceiro?.id || null,
-          apropriacao_id: apropriacao?.id || null
+          favorecido_id: favorecido?.id || null,
+          forma_pagamento_id: formaPagamentoIdPersistida,
+          despesa_eventual_saldo: criacao.saldo,
+          cartao_recarga_id: usaFluxoRecargaCartao ? Number(cartao_recarga_id) : null,
+          apropriacao_id: apropriacao?.id || null,
+          apropriacao_origem: usaApropriacaoAutomaticaObra ? 'PADRAO_OBRA_TIPO' : 'INFORMADA'
         }
       });
 
@@ -2915,6 +3302,8 @@ module.exports = {
       if (apropriacao) {
         metadata.apropriacao_id = apropriacao.id;
         metadata.apropriacao_codigo = apropriacao.codigo;
+        metadata.apropriacao_descricao = apropriacao.descricao || null;
+        metadata.apropriacao_origem = usaApropriacaoAutomaticaObra ? 'PADRAO_OBRA_TIPO' : 'INFORMADA';
       }
       if (rateioApropriacoesDetalhado.length > 0) {
         metadata.apropriacoes_rateio = rateioApropriacoesDetalhado.map(item => ({
@@ -2953,6 +3342,23 @@ module.exports = {
         usarDestinatariosInformados: true
       });
 
+      if (itensMedicao.length > 0) {
+        try {
+          await aplicarMedicaoNasParcelas({
+            contratoId: Number(contrato_id),
+            solicitacaoId: solicitacao.id,
+            itens: itensMedicao,
+            usuarioId
+          });
+        } catch (erroMedicao) {
+          // Ja validado acima; chegar aqui e concorrencia (outra medicao consumiu o saldo no
+          // meio). Desfaz a solicitacao: melhor nao existir do que existir sem consumir o
+          // contrato, que e o que o saldo e o financeiro passariam a contradizer.
+          await solicitacao.destroy().catch(() => null);
+          return res.status(Number(erroMedicao.statusCode) || 400).json({ error: erroMedicao.message });
+        }
+      }
+
       // Criador ja enxerga
       await garantirVisibilidade(solicitacao.id, usuarioId);
 
@@ -2965,14 +3371,28 @@ module.exports = {
         }
       });
 
-      const respostaSolicitacao = solicitacao?.toJSON ? solicitacao.toJSON() : solicitacao;
+      const tiposUploadInicial = [];
+      if (String(boleto_anexo_nome || '').trim()) tiposUploadInicial.push('BOLETO');
+      if (nomesAnexosPendentes.length > 0) tiposUploadInicial.push('SOLICITACAO');
+      const criacaoUploadToken = gerarTokenUploadCriacaoSolicitacao({
+        solicitacaoId: solicitacao.id,
+        usuarioId,
+        tipos: tiposUploadInicial
+      });
+      const respostaSolicitacaoBase = solicitacao?.toJSON ? solicitacao.toJSON() : solicitacao;
+      const respostaSolicitacao = criacaoUploadToken
+        ? { ...respostaSolicitacaoBase, criacao_upload_token: criacaoUploadToken }
+        : respostaSolicitacaoBase;
       armazenarIdempotenciaCriacao(idempotenciaCriacao.scopeKey, respostaSolicitacao);
 
       return res.status(201).json(respostaSolicitacao);
 
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ error: 'Erro ao criar solicitacao' });
+      return res.status(error.statusCode || 500).json({
+        error: error.message || 'Erro ao criar solicitacao',
+        code: error.code || undefined
+      });
     }
   },
 
@@ -2997,7 +3417,7 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLeituraGlobal: true });
       if (!acesso.allowed) {
         return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
       }
@@ -3085,6 +3505,18 @@ module.exports = {
             as: 'parceiro',
             attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email']
           },
+          {
+            model: Parceiro,
+            as: 'favorecido',
+            required: false,
+            attributes: ['id', 'nome', 'cpf_cnpj', 'telefone', 'email']
+          },
+          {
+            model: FormaPagamentoFinanceira,
+            as: 'formaPagamento',
+            required: false,
+            attributes: ['id', 'nome', 'codigo', 'tipo']
+          },
           // HISTORICO
           {
             model: Historico,
@@ -3121,10 +3553,11 @@ module.exports = {
         });
       }
 
-      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao);
+      const acesso = await verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLeituraGlobal: true });
       if (!acesso.allowed) {
         return res.status(acesso.status || 403).json({ error: acesso.error || 'Acesso negado' });
       }
+      const contextoInteracaoBase = await avaliarContextoInteracaoSolicitacao(req, solicitacao, acesso);
       const tokensSetorUsuario = acesso.tokensSetorUsuario || [];
 
       const contextoAprovacaoDiretoria = await obterContextoAprovacaoDiretoria(
@@ -3135,8 +3568,12 @@ module.exports = {
         solicitacao,
         contextoAprovacaoDiretoria
       );
+      const podeAprovarSolicitacaoPorPermissao =
+        !(await userHasConfiguredAreaPermissions(req.user)) ||
+        await userHasAreaPermission(req.user, ['solicitacoes.acoes.aprovar']);
       const podeAprovarDiretoria =
         usaFluxoAprovacaoDiretoria &&
+        podeAprovarSolicitacaoPorPermissao &&
         (
           String(req.user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN' ||
           setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)
@@ -3185,6 +3622,11 @@ module.exports = {
       payload.acao_aprovar_diretoria_disponivel = podeAprovarDiretoria;
       payload.setor_destino_aprovacao = contextoAprovacaoDiretoria.setorDestinoAprovacao || null;
       payload.diretoria_responsavel = contextoAprovacaoDiretoria.diretoriaEsperada || null;
+      payload.contexto_interacao = await montarContextoInteracao(
+        req,
+        solicitacao,
+        contextoInteracaoBase
+      );
 
       return res.json(payload);
 
@@ -3209,21 +3651,22 @@ module.exports = {
       const isSuperadmin = perfil === 'SUPERADMIN';
       const areaUsuario = await obterAreaUsuario(req);
       const isSetorObra = await isSetorObraGeral(req);
-      const permissoesFonte = Array.isArray(req.user?.areas_permissoes)
-        ? req.user.areas_permissoes
-        : (Array.isArray(usuario?.areas_permissoes) ? usuario.areas_permissoes : []);
-      const permissoesArea = permissoesFonte.map((item) => String(item || '').trim().toLowerCase());
-      const podeAlterarStatusQualquerSetor = permissoesArea.includes('solicitacoes.acoes.alterar_status_qualquer_setor');
+      const podeAlterarStatusQualquerSetor = await userHasAreaPermissionWhenConfigured(
+        req.user,
+        ['solicitacoes.acoes.alterar_status_qualquer_setor']
+      );
 
       const solicitacao = await Solicitacao.findByPk(id);
       if (!solicitacao) {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const acessoObra = await validarAcessoObra(req, solicitacao);
-      if (!acessoObra) {
-        return res.status(403).json({
-          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+      try {
+        await assertPodeInteragirSolicitacao(req, solicitacao);
+      } catch (errorAcesso) {
+        return res.status(Number(errorAcesso.statusCode) || 403).json({
+          error: errorAcesso.message,
+          code: errorAcesso.code || undefined
         });
       }
 
@@ -3299,6 +3742,8 @@ module.exports = {
       }
 
       await solicitacao.update({ status_global: status });
+
+      await sincronizarTituloComStatusSolicitacao(solicitacao.id, status, usuarioId);
 
       await Historico.create({
         solicitacao_id: id,
@@ -3469,10 +3914,12 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const acessoObra = await validarAcessoObra(req, solicitacao);
-      if (!acessoObra) {
-        return res.status(403).json({
-          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+      try {
+        await assertPodeInteragirSolicitacao(req, solicitacao);
+      } catch (errorAcesso) {
+        return res.status(Number(errorAcesso.statusCode) || 403).json({
+          error: errorAcesso.message,
+          code: errorAcesso.code || undefined
         });
       }
 
@@ -3898,10 +4345,10 @@ module.exports = {
       const { valor } = req.body;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isGeo = await isSetorGeo(req);
-      const permissoesArea = Array.isArray(req.user?.areas_permissoes)
-        ? req.user.areas_permissoes.map((item) => String(item || '').trim().toLowerCase())
-        : [];
-      const podeEditarPorPermissao = permissoesArea.includes('solicitacoes.acoes.alterar_valor');
+      const podeEditarPorPermissao = await userHasAreaPermissionWhenConfigured(
+        req.user,
+        ['solicitacoes.acoes.alterar_valor']
+      );
       const podeEditar =
         perfil === 'SUPERADMIN' ||
         (perfil.startsWith('ADMIN') && isGeo) ||
@@ -3996,10 +4443,10 @@ module.exports = {
       const { data_vencimento } = req.body;
       const perfil = String(req.user?.perfil || '').trim().toUpperCase();
       const isGeo = await isSetorGeo(req);
-      const permissoesArea = Array.isArray(req.user?.areas_permissoes)
-        ? req.user.areas_permissoes.map((item) => String(item || '').trim().toLowerCase())
-        : [];
-      const podeEditarPorPermissao = permissoesArea.includes('solicitacoes.acoes.alterar_data_vencimento');
+      const podeEditarPorPermissao = await userHasAreaPermissionWhenConfigured(
+        req.user,
+        ['solicitacoes.acoes.alterar_data_vencimento']
+      );
       const podeEditar =
         perfil === 'SUPERADMIN' ||
         (perfil.startsWith('ADMIN') && isGeo) ||
@@ -4330,6 +4777,15 @@ module.exports = {
       if (!podeAprovar) {
         return res.status(403).json({
           error: 'Apenas a diretoria configurada pode aprovar esta solicitacao.'
+        });
+      }
+
+      if (
+        await userHasConfiguredAreaPermissions(req.user) &&
+        !(await userHasAreaPermission(req.user, ['solicitacoes.acoes.aprovar']))
+      ) {
+        return res.status(403).json({
+          error: 'Acesso negado para aprovar ou rejeitar solicitacoes.'
         });
       }
 
@@ -4747,10 +5203,12 @@ module.exports = {
         return res.status(404).json({ error: 'Solicitacao nao encontrada' });
       }
 
-      const acessoObra = await validarAcessoObra(req, solicitacao);
-      if (!acessoObra) {
-        return res.status(403).json({
-          error: 'Acesso negado. Vincule o usuario a obra para continuar.'
+      try {
+        await assertPodeInteragirSolicitacao(req, solicitacao);
+      } catch (errorAcesso) {
+        return res.status(Number(errorAcesso.statusCode) || 403).json({
+          error: errorAcesso.message,
+          code: errorAcesso.code || undefined
         });
       }
 
@@ -4849,6 +5307,15 @@ module.exports = {
       const historicoId = Number(req.params.historicoId);
       if (!Number.isInteger(solicitacaoId) || !Number.isInteger(historicoId)) {
         return res.status(400).json({ error: 'Parametros invalidos.' });
+      }
+
+      try {
+        await assertPodeInteragirSolicitacao(req, solicitacaoId);
+      } catch (errorAcesso) {
+        return res.status(Number(errorAcesso.statusCode) || 403).json({
+          error: errorAcesso.message,
+          code: errorAcesso.code || undefined
+        });
       }
 
       const historico = await Historico.findOne({
@@ -5464,3 +5931,14 @@ module.exports = {
     }
   }
 };
+
+// API interna usada pelos anexos, aditivos e pelo fluxo de retorno. O require e tardio nesses
+// consumidores para nao criar ciclo durante a carga do controller.
+Object.defineProperty(module.exports, '_avaliarContextoInteracaoSolicitacao', {
+  value: avaliarContextoInteracaoSolicitacao,
+  enumerable: false
+});
+Object.defineProperty(module.exports, '_verificarAcessoDetalheSolicitacao', {
+  value: verificarAcessoDetalheSolicitacao,
+  enumerable: false
+});

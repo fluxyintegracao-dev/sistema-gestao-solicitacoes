@@ -1195,6 +1195,54 @@ function validateCompraSolicitacaoItemApropriacoesBody(body = {}) {
   };
 }
 
+function validateCompraCatalogarItemManualBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    [
+      'acao',
+      'insumo_id',
+      'nome',
+      'descricao',
+      'unidade_id',
+      'unidade_manual',
+      'categoria_id',
+      'motivo',
+      'corrigir_vinculo',
+      'confirmar_novo_duplicado'
+    ],
+    'Catalogacao do item manual'
+  );
+
+  const acao = parseOptionalText(body.acao, 'Acao de catalogacao', 30, { required: true }).toUpperCase();
+  if (!['CRIAR_INSUMO', 'VINCULAR_EXISTENTE'].includes(acao)) {
+    throw new ValidationError('Acao de catalogacao invalida.');
+  }
+
+  const payload = {
+    acao,
+    motivo: parseOptionalText(body.motivo, 'Motivo da catalogacao', 1000),
+    corrigir_vinculo: parseBoolean(body.corrigir_vinculo, 'Corrigir vinculo') || false,
+    confirmar_novo_duplicado: parseBoolean(body.confirmar_novo_duplicado, 'Confirmar novo duplicado') || false
+  };
+
+  if (acao === 'VINCULAR_EXISTENTE') {
+    payload.insumo_id = parseInteger(body.insumo_id, 'Insumo existente', { required: true });
+    return payload;
+  }
+
+  payload.nome = parseOptionalText(body.nome, 'Nome do insumo', 255, { required: true });
+  payload.descricao = parseOptionalText(body.descricao, 'Descricao do insumo', 5000);
+  payload.unidade_id = parseInteger(body.unidade_id, 'Unidade', { required: false });
+  payload.unidade_manual = parseOptionalText(body.unidade_manual, 'Unidade manual', 50);
+  payload.categoria_id = parseInteger(body.categoria_id, 'Categoria', { required: false });
+
+  if (!payload.unidade_id && !payload.unidade_manual) {
+    throw new ValidationError('Selecione uma unidade ou informe a unidade manual.');
+  }
+
+  return payload;
+}
+
 function validateCompraSolicitacaoInativarMassaBody(body = {}) {
   ensureAllowedKeys(body, ['solicitacao_ids'], 'Inativacao em massa de solicitacoes de compra');
 
@@ -1476,8 +1524,15 @@ function validateSolicitacaoCreateBody(body = {}) {
       'tipo_macro_id',
       'tipo_sub_id',
       'descricao',
+      'justificativa',
       'valor',
       'parceiro_id',
+      'favorecido_id',
+      'forma_pagamento_id',
+      'favorecido_chave_pix',
+      'boleto_anexo_nome',
+      'despesa_eventual_declaracoes',
+      'cartao_recarga_id',
       'apropriacao_id',
       'area_responsavel',
       'diretoria_fluxo_codigo',
@@ -1489,7 +1544,16 @@ function validateSolicitacaoCreateBody(body = {}) {
       'data_fim_medicao',
       'itens_apropriacao',
       'ref_contrato_abertura',
-      'apropriacoes_rateio'
+      'apropriacoes_rateio',
+      // Wireframe 2: parcelas do contrato do fluxo novo consumidas por esta medicao.
+      'medicao_parcelas',
+      // Dados de pagamento DA MEDICAO (itens 5 e 9, 23/08): favorecido, chave PIX, forma, contato e
+      // o aceite. A lista de campos permitidos e uma allowlist — campo novo que nao entra aqui e
+      // recusado com "contem campos nao permitidos", sem chegar ao controller.
+      'medicao_pagamento',
+      // Nomes dos arquivos selecionados antes da criacao. O upload real continua na rota de
+      // anexos; a aprovacao da medicao confere o registro efetivamente gravado.
+      'anexos_pendentes_nomes'
     ],
     'Solicitacao'
   );
@@ -1500,8 +1564,21 @@ function validateSolicitacaoCreateBody(body = {}) {
     tipo_macro_id: parseInteger(body.tipo_macro_id, 'Tipo macro'),
     tipo_sub_id: parseInteger(body.tipo_sub_id, 'Tipo sub'),
     descricao: body.descricao == null ? undefined : String(body.descricao),
+    justificativa: parseOptionalText(body.justificativa, 'Justificativa', 5000),
     valor: body.valor === '' || body.valor == null ? undefined : parseDecimal(body.valor, 'Valor', { min: 0 }),
     parceiro_id: parseInteger(body.parceiro_id, 'Parceiro'),
+    favorecido_id: parseInteger(body.favorecido_id, 'Favorecido'),
+    forma_pagamento_id: parseInteger(body.forma_pagamento_id, 'Forma de pagamento'),
+    favorecido_chave_pix: parseOptionalText(body.favorecido_chave_pix, 'Chave PIX do favorecido', 255),
+    boleto_anexo_nome: parseOptionalText(body.boleto_anexo_nome, 'Arquivo do boleto', 255),
+    despesa_eventual_declaracoes: body.despesa_eventual_declaracoes && typeof body.despesa_eventual_declaracoes === 'object'
+      ? {
+          despesa_pontual_nao_recorrente: body.despesa_eventual_declaracoes.despesa_pontual_nao_recorrente === true,
+          sem_vinculo_contratual: body.despesa_eventual_declaracoes.sem_vinculo_contratual === true,
+          nao_fracionada: body.despesa_eventual_declaracoes.nao_fracionada === true
+        }
+      : undefined,
+    cartao_recarga_id: parseInteger(body.cartao_recarga_id, 'Cartao de recarga'),
     apropriacao_id: parseInteger(body.apropriacao_id, 'Apropriacao'),
     area_responsavel: parseOptionalText(body.area_responsavel, 'Area responsavel', 120, { required: true }),
     diretoria_fluxo_codigo: parseOptionalText(body.diretoria_fluxo_codigo, 'Diretoria de aprovacao', 120),
@@ -1513,7 +1590,22 @@ function validateSolicitacaoCreateBody(body = {}) {
     data_fim_medicao: parseDateOnly(body.data_fim_medicao, 'Data final da medicao'),
     itens_apropriacao: parseOptionalText(body.itens_apropriacao, 'Itens de apropriacao', 5000),
     ref_contrato_abertura: parseOptionalText(body.ref_contrato_abertura, 'Ref. do contrato', 255),
-    apropriacoes_rateio: Array.isArray(body.apropriacoes_rateio) ? body.apropriacoes_rateio : undefined
+    apropriacoes_rateio: Array.isArray(body.apropriacoes_rateio) ? body.apropriacoes_rateio : undefined,
+    medicao_parcelas: Array.isArray(body.medicao_parcelas) ? body.medicao_parcelas : undefined,
+    // Repassado como veio: quem valida campo a campo e `validarDadosDePagamento`, no servico, junto
+    // da regra de negocio. Duplicar a validacao aqui criaria duas versoes da mesma exigencia.
+    medicao_pagamento: body.medicao_pagamento && typeof body.medicao_pagamento === 'object'
+      ? body.medicao_pagamento
+      : undefined,
+    anexos_pendentes_nomes: (() => {
+      if (!Array.isArray(body.anexos_pendentes_nomes)) return undefined;
+      if (body.anexos_pendentes_nomes.length > 20) {
+        throw new ValidationError('Anexos da medicao excedem o limite permitido.');
+      }
+      return body.anexos_pendentes_nomes
+        .map((nome) => parseOptionalText(nome, 'Nome do anexo da medicao', 255))
+        .filter(Boolean);
+    })()
   };
 }
 
@@ -1678,6 +1770,7 @@ module.exports = {
   validateCompraSolicitacaoItemQuantidadeBody,
   validateCompraSolicitacaoItemQuantidadeParams,
   validateCompraSolicitacaoItemApropriacoesBody,
+  validateCompraCatalogarItemManualBody,
   validateCompraSolicitacaoInativarMassaBody,
   validateCompraSolicitacaoEncaminharComprasMassaBody,
   validateCompraPedidoItemUpdateBody,

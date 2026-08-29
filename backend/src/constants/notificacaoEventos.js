@@ -15,7 +15,11 @@ const NOTIFICACAO_EVENTOS = [
       ['VALOR_ATUALIZADO', 'Valor atualizado', 'Valor da solicitacao foi alterado.'],
       ['DATA_VENCIMENTO_ATUALIZADA', 'Data de vencimento atualizada', 'Data de vencimento da solicitacao foi alterada.'],
       ['ANEXO_ADICIONADO', 'Anexo adicionado', 'Arquivo anexado na solicitacao.'],
-      ['MENCAO_COMENTARIO', 'Mencao em comentario', 'Usuario foi mencionado em comentario.']
+      ['MENCAO_COMENTARIO', 'Mencao em comentario', 'Usuario foi mencionado em comentario.'],
+      ['RETORNO_SOLICITADO', 'Retorno solicitado', 'Outro setor pediu a devolucao da solicitacao para continuar o trabalho.'],
+      ['RETORNO_APROVADO', 'Retorno aprovado', 'O setor atual devolveu a solicitacao ao setor solicitante.'],
+      ['RETORNO_REJEITADO', 'Retorno rejeitado', 'O setor atual rejeitou o pedido de devolucao da solicitacao.'],
+      ['RETORNO_CANCELADO', 'Pedido de retorno cancelado', 'O solicitante cancelou o pedido de devolucao.']
     ]
   },
   {

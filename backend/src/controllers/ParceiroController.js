@@ -1,4 +1,5 @@
 const { Contrato, ContratoCredor, Parceiro, ParceiroCategoria } = require('../models');
+const { pendenciasDoCadastro: pendenciasDoCadastroCredor } = require('../services/credorContratoService');
 const {
   atualizarParceiro,
   buscarParceiros,
@@ -351,6 +352,19 @@ module.exports = {
       );
       const permiteCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
 
+      // Endereco completo e CPF/CNPJ valido sao exigidos JA no cadastro (PI-20).
+      //
+      // Antes, o credor nascia so com nome, documento e telefone — e era exatamente isso que
+      // produzia os 2.428 fornecedores sem endereco. Cadastrar incompleto aqui apenas empurra o
+      // problema para a conferencia do contrato acima do limite, com a pessoa ja no meio do
+      // formulario. A regra e a MESMA da conferencia, importada de la: duas copias divergiriam.
+      const pendencias = pendenciasDoCadastroCredor(req.body || {});
+      if (pendencias.length > 0) {
+        return res.status(400).json({
+          error: `Complete o cadastro do credor antes de salvar. Pendente: ${pendencias.join(', ')}.`
+        });
+      }
+
       const payload = {
         ...req.body,
         fornecedor: true,
@@ -395,6 +409,10 @@ module.exports = {
 
   async createCredorCompraDireta(req, res) {
     try {
+      // COMPRAS, e nao contratos: a exigencia de nome fantasia e representante legal (23/08) fica
+      // DESLIGADA aqui porque o formulario de compra direta e do outro agente e ainda nao tem esses
+      // campos. Ligar sem o campo existir derrubaria o cadastro rapido de fornecedor dele.
+      // Registrado no PROTOCOLO-AGENTES-PARALELOS para ser completado do lado de Compras.
       const parceiro = await criarParceiro({
         ...req.body,
         fornecedor: true,
@@ -402,7 +420,7 @@ module.exports = {
         corretor: false,
         testemunha: false,
         ativo: true
-      });
+      }, { exigirCadastroCompleto: false });
 
       return res.status(201).json(parceiro);
     } catch (error) {

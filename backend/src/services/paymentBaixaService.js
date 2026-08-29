@@ -155,6 +155,7 @@ async function listPaymentsAwaitingBaixaConfirmation(req) {
   });
 }
 
+
 async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
   return sequelize.transaction(async (transaction) => {
     const intent = await PaymentIntent.findByPk(id, {
@@ -193,8 +194,21 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
 
     const valorBaixa = roundCurrency(intent.valor);
     const saldoAtual = roundCurrency(titulo.valor_saldo);
-    if (valorBaixa <= 0 || valorBaixa > saldoAtual) {
+    if (valorBaixa <= 0) {
       throw createHttpError(400, 'Valor do pagamento incompativel com saldo do titulo.');
+    }
+    if (valorBaixa > saldoAtual) {
+      // Mesma liberacao estreita da baixa manual (item 33, 23/08): so parcela de contrato do
+      // fluxo novo, e so ate o que as demais parcelas tem para ceder.
+      const { liberarBaixaAcimaDoSaldo } = require('./medicaoContratoService');
+      const liberado = await liberarBaixaAcimaDoSaldo(
+        titulo.id,
+        roundCurrency(valorBaixa - saldoAtual),
+        transaction
+      );
+      if (!liberado) {
+        throw createHttpError(400, 'Valor do pagamento incompativel com saldo do titulo.');
+      }
     }
 
     const dataMovimento = payload.data_movimento || today();

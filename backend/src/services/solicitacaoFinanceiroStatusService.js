@@ -1,5 +1,6 @@
 const { Op } = require('sequelize');
 const {
+  Contrato,
   Historico,
   Solicitacao,
   TituloFinanceiro
@@ -77,6 +78,41 @@ async function sincronizarStatusSolicitacaoPorBaixaTitulos({
     transaction,
     lock: transaction?.LOCK?.UPDATE
   });
+
+  // DESVIO PARA A SOLICITACAO DE CONTRATO DO FLUXO NOVO (20/08).
+  //
+  // Ela nao segue a regra geral: e uma solicitacao so para o contrato inteiro, e o cliente definiu
+  // NEC. DE MEDICAO / APROVADA / PAGA em vez de PARCIALMENTE PAGO. Ver
+  // `medicaoContratoService.calcularStatusDaSolicitacaoDoContrato`.
+  //
+  // O desvio mora AQUI, e nao numa segunda funcao, porque esta e chamada por CINCO caminhos de
+  // baixa (pagamento, cheque, boleto, fatura de cartao, conciliacao). Uma funcao paralela seria
+  // esquecida em pelo menos um deles, e o status do contrato divergiria conforme a forma de pagar.
+  const contratoDoFluxoNovo = await Contrato.findOne({
+    where: { solicitacao_id: id, fluxo_novo: true },
+    attributes: ['id'],
+    transaction
+  });
+  if (contratoDoFluxoNovo) {
+    const { sincronizarStatusDaSolicitacaoDoContrato } = require('./medicaoContratoService');
+    return sincronizarStatusDaSolicitacaoDoContrato(
+      contratoDoFluxoNovo.id,
+      { usuarioId, setor, motivo: observacao || 'Status atualizado apos baixa de titulo do contrato.' },
+      transaction
+    );
+  }
+
+  // Recarga de cartao encerra pelo valor efetivamente pago. Um titulo PARCIAL nao pode continuar
+  // com saldo em aberto porque o ciclo da recarga terminou; o valor solicitado original permanece
+  // na extensao auditavel do fluxo e a prestacao cobra somente o que efetivamente saiu do caixa.
+  const { sincronizarCicloAposBaixa } = require('./recargaCartaoService');
+  const statusRecarga = await sincronizarCicloAposBaixa({
+    solicitacaoId: id,
+    usuarioId,
+    setor,
+    transaction
+  });
+  if (statusRecarga) return statusRecarga;
 
   const statusAnterior = solicitacao.status_global || null;
   const statusNovo = calcularStatusSolicitacaoPorTitulos(titulos, statusAnterior);

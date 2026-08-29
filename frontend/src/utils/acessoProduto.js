@@ -281,6 +281,15 @@ export function canEditarApropriacoesItemCompraDireta(user) {
   return false;
 }
 
+export function canCatalogarItensManuaisCompras(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.insumos.catalogar_itens_manuais');
+  }
+  return false;
+}
+
 export function canEncaminharCompraSolicitacoes(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (isBusinessAdmin(user)) return true;
@@ -310,6 +319,15 @@ export function canManageComprasPedidos(user) {
       'compras.pedidos.criar',
       'compras.pedidos.aprovar'
     ]);
+  }
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
+export function canAnexarEspelhoComprasPedidos(user) {
+  if (!hasEnabledModule(user, 'COMPRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'compras.pedidos.anexar_espelho');
   }
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
@@ -712,6 +730,10 @@ export function canViewFinanceiroRelatorio(user, permissionKey) {
 }
 
 export function canViewSolicitacaoFinanceiro(user) {
+  // A aba dentro da solicitacao e uma leitura operacional da propria Obra. Isto nao habilita o
+  // modulo Financeiro nem qualquer acao financeira fora da tela de detalhes.
+  if (userHasSetorCapability(user, 'eh_setor_obra')) return true;
+
   if (!hasEnabledModule(user, 'FINANCEIRO')) return false;
   if (canAccessFinanceiro(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
@@ -923,6 +945,13 @@ export function canAccessCadastroObras(user) {
   ]);
 }
 
+export function canManageCadastroObras(user) {
+  if (!hasEnabledModule(user, 'OBRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (canManageConfiguracoesArea(user, 'cadastros')) return true;
+  return hasAnyExplicitPermissao(user, ['obras.cadastro.gerenciar']);
+}
+
 export function canAccessGestaoObras(user) {
   if (!hasEnabledModule(user, 'OBRAS')) return false;
   if (isBusinessAdmin(user)) return true;
@@ -933,6 +962,12 @@ export function canAccessGestaoObras(user) {
     ]);
   }
   return canAccessCadastroObras(user);
+}
+
+export function canManageGestaoObrasApropriacoes(user) {
+  if (!hasEnabledModule(user, 'OBRAS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, ['obras.gestao.apropriacoes']);
 }
 
 export function canAccessContratos(user) {
@@ -1175,6 +1210,12 @@ export function canAccessBiblioteca(user) {
   return true;
 }
 
+export function canManageBiblioteca(user) {
+  if (!hasEnabledModule(user, 'BIBLIOTECA_MODELOS')) return false;
+  if (isBusinessAdmin(user)) return true;
+  return hasAnyExplicitPermissao(user, ['biblioteca.geral.gerenciar']);
+}
+
 export function canAccessTreinamento(user) {
   if (!hasEnabledModule(user, 'TREINAMENTO')) return false;
   if (isBusinessAdmin(user)) return true;
@@ -1218,6 +1259,15 @@ export function canAccessComunicacao(user) {
       'comunicacao.geral.visualizar',
       'comunicacao.geral.enviar'
     ]);
+  }
+  return true;
+}
+
+export function canSendComunicacao(user) {
+  if (!hasEnabledModule(user, 'COMUNICACAO_INTERNA')) return false;
+  if (isBusinessAdmin(user)) return true;
+  if (hasConfiguredAreaPermissions(user)) {
+    return hasPermissao(user, 'comunicacao.geral.enviar');
   }
   return true;
 }
@@ -1680,12 +1730,18 @@ export function canManageCrmConfiguracoes(user) {
 export function hasPermissao(user, permKey) {
   if (isBusinessAdmin(user)) return true;
   const lista = user?.areas_permissoes;
-  // Sem configuração = acesso completo (compatibilidade com instalações existentes)
-  if (!Array.isArray(lista) || lista.length === 0) return true;
+  // O backend informa explicitamente se existe configuracao. Assim uma lista
+  // vazia configurada significa "sem permissoes", enquanto a ausencia de
+  // configuracao continua com o acesso legado por compatibilidade.
+  if (!hasConfiguredAreaPermissions(user)) return true;
+  if (!Array.isArray(lista)) return false;
   return lista.includes(String(permKey).toLowerCase());
 }
 
 export function hasConfiguredAreaPermissions(user) {
+  if (typeof user?.areas_permissoes_configuradas === 'boolean') {
+    return user.areas_permissoes_configuradas;
+  }
   const lista = user?.areas_permissoes;
   return Array.isArray(lista) && lista.length > 0;
 }

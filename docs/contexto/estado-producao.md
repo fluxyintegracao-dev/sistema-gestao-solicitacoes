@@ -20,7 +20,7 @@ Frontend:
 ## Observacoes operacionais
 - `backend/uploads/` contem artefatos antigos preservados e nao deve ser limpo automaticamente.
 - O repositorio nao usa mais `python-service`; o runtime ativo e apenas Node + React.
-- O backend executa migrations pendentes por `runMigrations()` e nao depende de `sequelize.sync({ alter: true })` no runtime normal. Qualquer mudanca de model precisa de migration controlada.
+- O backend apenas confere migrations por `assertMigrationsUpToDate()` em modo somente leitura e nao depende de `sequelize.sync({ alter: true })` no runtime normal. Migrations estruturais sao aplicadas explicitamente antes do restart; o runner bloqueia seed, backfill e DML.
 - O conjunto efetivo de modulos vem de `ConfiguracaoSistema` (`MODULOS_HABILITADOS`), nao apenas dos valores padrao do codigo.
 - Componentes descontinuados ainda presentes no runtime estao inventariados em `../arquitetura/ESTADO_RUNTIME_E_LEGADOS.md` e nao representam funcionalidades vigentes.
 

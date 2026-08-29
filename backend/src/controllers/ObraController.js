@@ -1,10 +1,11 @@
-const { Obra, UsuarioObra, Setor, ConfiguracaoSistema, EmpresaGrupo } = require('../models');
+const { Obra, UsuarioObra, Setor, ConfiguracaoSistema, EmpresaGrupo, sequelize } = require('../models');
 const { Op } = require('sequelize');
 const {
   listarObrasGestao,
   obterGestaoObra
 } = require('../services/obraGestaoService');
 const { canAccessFinanceiro } = require('../services/authorizationService');
+const { garantirApropriacoesPadraoNovaObra } = require('../services/obraTipoApropriacaoPadraoService');
 const {
   TIPO_CENTRO_CUSTO_OBRA,
   TIPOS_CENTRO_CUSTO,
@@ -280,27 +281,44 @@ module.exports = {
       return res.status(error.status || 500).json({ error: error.message || 'Erro ao validar empresa do grupo' });
     }
 
-    const obra = await Obra.create({
-      codigo: String(codigo).toUpperCase(),
-      cidade: cidade || null,
-      nome,
-      cno: cno ? String(cno).trim() : null,
-      endereco_logradouro: endereco_logradouro ? String(endereco_logradouro).trim() : null,
-      endereco_numero: endereco_numero ? String(endereco_numero).trim() : null,
-      endereco_complemento: endereco_complemento ? String(endereco_complemento).trim() : null,
-      endereco_bairro: endereco_bairro ? String(endereco_bairro).trim() : null,
-      endereco_cep: endereco_cep ? String(endereco_cep).trim() : null,
-      endereco_uf: endereco_uf ? String(endereco_uf).trim().toUpperCase().slice(0, 2) : null,
-      empresa_grupo_id: empresa_grupo_id ? Number(empresa_grupo_id) : null,
-      ativo: true,
-      tipo_centro_custo: tipoCentroCustoNorm,
-      classificacao: classificacaoNorm,
-      vgv: vgv != null ? Number(vgv) : null,
-      planilha_geral: planilha_geral != null ? Number(planilha_geral) : null,
-      margem_custo_esperada: margem_custo_esperada != null ? Number(margem_custo_esperada) : null
-    });
+    try {
+      const obra = await sequelize.transaction(async (transaction) => {
+        const criada = await Obra.create({
+          codigo: String(codigo).toUpperCase(),
+          cidade: cidade || null,
+          nome,
+          cno: cno ? String(cno).trim() : null,
+          endereco_logradouro: endereco_logradouro ? String(endereco_logradouro).trim() : null,
+          endereco_numero: endereco_numero ? String(endereco_numero).trim() : null,
+          endereco_complemento: endereco_complemento ? String(endereco_complemento).trim() : null,
+          endereco_bairro: endereco_bairro ? String(endereco_bairro).trim() : null,
+          endereco_cep: endereco_cep ? String(endereco_cep).trim() : null,
+          endereco_uf: endereco_uf ? String(endereco_uf).trim().toUpperCase().slice(0, 2) : null,
+          empresa_grupo_id: empresa_grupo_id ? Number(empresa_grupo_id) : null,
+          ativo: true,
+          tipo_centro_custo: tipoCentroCustoNorm,
+          classificacao: classificacaoNorm,
+          vgv: vgv != null ? Number(vgv) : null,
+          planilha_geral: planilha_geral != null ? Number(planilha_geral) : null,
+          margem_custo_esperada: margem_custo_esperada != null ? Number(margem_custo_esperada) : null
+        }, { transaction });
 
-    res.status(201).json(obra);
+        await garantirApropriacoesPadraoNovaObra({
+          obra: criada,
+          usuarioId: req.user?.id || null,
+          transaction
+        });
+
+        return criada;
+      });
+
+      return res.status(201).json(obra);
+    } catch (error) {
+      console.error('Erro ao criar obra com apropriacoes padrao', error);
+      return res.status(error.statusCode || error.status || 500).json({
+        error: error.message || 'Erro ao criar obra'
+      });
+    }
   },
 
   async update(req, res) {

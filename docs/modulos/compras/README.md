@@ -41,6 +41,24 @@ Compras e dono da solicitacao de compra, origem normal/direta, itens, quantidade
 - o limite permanece em 300 itens considerando o que ja existe no rascunho, e multiplos envios simultaneos ficam bloqueados no frontend;
 - baixar e importar exigem `compras.solicitacoes.criar`, alem do escopo da obra validado no backend.
 
+## Catalogacao de itens manuais
+
+- Solicitacao de Compra e Compra Direta compartilham o tratamento na tela de detalhes;
+- o item manual permanece na tabela e no historico original, mesmo depois da catalogacao;
+- a acao pode vincular um insumo ativo existente ou criar um novo cadastro oficial;
+- novos codigos usam sequencia transacional no formato `INS-000001`, com protecao contra concorrencia;
+- a descricao manual e registrada como alias quando difere do nome oficial, permitindo reconhecimento exato em novas importacoes;
+- nomes e aliases duplicados sugerem o cadastro existente em vez de criar duplicidade silenciosa;
+- o salvamento nao exige justificativa digitada; criacao, vinculo e correcao continuam registrados no log da solicitacao;
+- depois do salvamento, a relacao de itens passa a exibir o nome, a descricao e a unidade do cadastro oficial, preservando os textos manuais no registro de origem e no alias;
+- apenas administradores ou usuarios com `compras.insumos.catalogar_itens_manuais` podem executar a acao;
+- a ausencia de configuracao granular nao libera a escrita no cadastro mestre por compatibilidade legada;
+- o backend revalida permissao, escopo da obra e item pertencente a solicitacao, usa transacao e bloqueio de linha;
+- itens catalogados passam a compor busca por alias, ultimo preco e relatorios agregados pelo insumo oficial;
+- a migration `202608200051_catalogacao_itens_manuais.js` deve ser aplicada antes de publicar o backend e o frontend deste fluxo.
+
+Endpoint protegido: `POST /compras/solicitacoes/:id/itens-manuais/:itemId/catalogar`.
+
 ## Fluxo
 
 1. usuario cria a compra;

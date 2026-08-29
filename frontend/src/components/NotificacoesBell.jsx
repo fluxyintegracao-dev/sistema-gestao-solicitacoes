@@ -52,8 +52,17 @@ export default function NotificacoesBell() {
 
   useEffect(() => {
     carregar();
-    const id = setInterval(() => carregar(), 120000);
-    return () => clearInterval(id);
+    const id = setInterval(() => carregar(), 30000);
+    const aoVoltarParaTela = () => {
+      if (!document.hidden) carregar();
+    };
+    window.addEventListener('focus', aoVoltarParaTela);
+    document.addEventListener('visibilitychange', aoVoltarParaTela);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('focus', aoVoltarParaTela);
+      document.removeEventListener('visibilitychange', aoVoltarParaTela);
+    };
   }, []);
 
   useEffect(() => {
@@ -242,6 +251,11 @@ export default function NotificacoesBell() {
                   </div>
 
                   <div className="notification-item-body">
+                    {item.tipo === 'RETORNO_SOLICITADO' && !item.lida_em && (
+                      <span className="mb-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-800">
+                        Acao necessaria
+                      </span>
+                    )}
                     <p className="notification-item-message">{item.mensagem}</p>
                     {item.createdAt && (
                       <p className="notification-item-date">

@@ -3,7 +3,7 @@ const { env } = require('../config/env');
 const { User, Setor } = require('../models');
 const {
   canAccessFinanceiro,
-  getAreasPermissoesForUser,
+  getAreaPermissionStateForUser,
   getRhDpCapabilitiesForUser
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
@@ -104,11 +104,12 @@ module.exports = async (req, res, next) => {
       return res.status(401).json({ error: 'Sessao revogada. Entre novamente.' });
     }
 
-    const [financeiroLiberado, capacidadesRhDp, areasPermissoes] = await Promise.all([
+    const [financeiroLiberado, capacidadesRhDp, areasPermissionState] = await Promise.all([
       canAccessFinanceiro(user),
       getRhDpCapabilitiesForUser(user),
-      getAreasPermissoesForUser(user)
+      getAreaPermissionStateForUser(user)
     ]);
+    const areasPermissoes = areasPermissionState.bypass ? [] : areasPermissionState.permissions;
 
     req.auth = decoded;
     req.auth_mode = authMode;
@@ -118,7 +119,8 @@ module.exports = async (req, res, next) => {
       financeiro_liberado: Boolean(financeiroLiberado),
       rh_dp_capacidades: capacidadesRhDp.filter((item) => item.startsWith('rh_dp_')),
       integracao_sienge_capacidades: capacidadesRhDp.filter((item) => item.startsWith('integracao_sienge_')),
-      areas_permissoes: areasPermissoes
+      areas_permissoes: areasPermissoes,
+      areas_permissoes_configuradas: Boolean(areasPermissionState.configured)
     };
 
     marcarAtividadeUsuario(user.id).catch(() => {});

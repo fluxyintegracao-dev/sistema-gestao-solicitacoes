@@ -3,10 +3,12 @@ import { Link } from 'react-router-dom';
 import { HiOutlineArrowDownTray, HiOutlineBuildingOffice2, HiOutlineXMark } from 'react-icons/hi2';
 import {
   confirmarImportacaoCustosHistoricosObra,
+  getArquivosDoTitulo,
   getCategoriasFinanceiras,
   getRelatorioFinanceiroObras,
   previewImportacaoCustosHistoricosObra
 } from '../services/financeiro';
+import { fileUrl } from '../services/api';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
@@ -253,6 +255,32 @@ export default function FinanceiroObras() {
     const start = (safePage - 1) * importPreviewPageSize;
     return importPreviewRows.slice(start, start + importPreviewPageSize);
   }, [importPreviewPage, importPreviewPageSize, importPreviewRows, importPreviewTotalPages]);
+
+  /**
+   * ITEM 22 (23/08): clicando na linha, os arquivos daquele pagamento.
+   *
+   * Nem `anexos` nem `comprovantes` apontam para o titulo — as duas apontam para a SOLICITACAO. Por
+   * isso o que se ve aqui sao os arquivos da solicitacao vinculada, e por isso um titulo importado
+   * do historico ou lancado a mao aparece com uma explicacao em vez de uma janela vazia.
+   */
+  const [arquivosModal, setArquivosModal] = useState(null);
+  const [arquivosLoading, setArquivosLoading] = useState(false);
+  const [arquivosErro, setArquivosErro] = useState('');
+
+  async function abrirArquivos(linha) {
+    if (!linha?.titulo_id) return;
+    setArquivosErro('');
+    setArquivosLoading(true);
+    setArquivosModal({ carregando: true, titulo_codigo: linha.titulo_parcela || linha.titulo_id });
+    try {
+      setArquivosModal(await getArquivosDoTitulo(linha.titulo_id));
+    } catch (error) {
+      setArquivosErro(error?.message || 'Erro ao buscar os arquivos.');
+      setArquivosModal(null);
+    } finally {
+      setArquivosLoading(false);
+    }
+  }
 
   function setFilter(name, value) {
     setFilters((current) => ({ ...current, [name]: value }));
@@ -555,7 +583,13 @@ export default function FinanceiroObras() {
                 </tr>
               ) : (
                 relatorio.linhas.map((linha) => (
-                  <tr key={linha.id}>
+                  <tr
+                    key={linha.id}
+                    data-testid={`linha-titulo-${linha.titulo_id || 'sem-titulo'}`}
+                    onClick={() => abrirArquivos(linha)}
+                    style={linha.titulo_id ? { cursor: 'pointer' } : undefined}
+                    title={linha.titulo_id ? 'Ver os arquivos deste pagamento' : undefined}
+                  >
                     <td>{formatDate(linha.data_baixa)}</td>
                     <td>{formatDate(linha.data_vencimento)}</td>
                     <td>
@@ -580,6 +614,68 @@ export default function FinanceiroObras() {
           </ResizableTable>
         </div>
       </section>
+
+      {arquivosModal || arquivosErro ? (
+        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
+          <div className="card sol-surface-card w-full max-w-2xl max-h-[85vh] overflow-y-auto"
+            data-testid="modal-arquivos-titulo">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">Arquivos do pagamento</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  {arquivosModal?.solicitacao_codigo
+                    ? `Titulo ${arquivosModal.titulo_codigo || ''} · solicitacao ${arquivosModal.solicitacao_codigo}`
+                    : `Titulo ${arquivosModal?.titulo_codigo || ''}`}
+                </p>
+              </div>
+              <button type="button" className="btn btn-icon btn-outline" aria-label="Fechar"
+                onClick={() => { setArquivosModal(null); setArquivosErro(''); }}>
+                <HiOutlineXMark className="h-5 w-5" />
+              </button>
+            </div>
+
+            {arquivosErro ? <div className="app-alert app-alert--error">{arquivosErro}</div> : null}
+            {arquivosLoading ? <p className="text-sm text-[var(--c-muted)]">Carregando arquivos...</p> : null}
+
+            {/* Titulo sem solicitacao nao tem arquivo — e isso e dito, em vez de abrir uma lista
+                vazia que a pessoa leria como "os arquivos sumiram". */}
+            {arquivosModal?.motivo ? (
+              <p className="text-sm text-[var(--c-muted)]" data-testid="arquivos-motivo">{arquivosModal.motivo}</p>
+            ) : null}
+
+            {arquivosModal && !arquivosModal.motivo && !arquivosLoading
+              && (arquivosModal.arquivos || []).length === 0 ? (
+                <p className="text-sm text-[var(--c-muted)]" data-testid="arquivos-vazio">
+                  A solicitacao deste pagamento nao tem nenhum arquivo anexado.
+                </p>
+              ) : null}
+
+            <ul className="space-y-2">
+              {(arquivosModal?.arquivos || []).map((arquivo) => (
+                <li key={arquivo.id}
+                  className="flex items-center justify-between gap-3 rounded border border-[var(--c-border)] px-3 py-2"
+                  data-testid={`arquivo-${arquivo.id}`}>
+                  <span className="min-w-0">
+                    <strong className="block truncate text-sm text-[var(--c-text)]">{arquivo.nome}</strong>
+                    <small className="text-[var(--c-muted)]">
+                      {arquivo.origem === 'COMPROVANTE' ? 'Comprovante' : 'Anexo'}
+                      {arquivo.tipo ? ` · ${arquivo.tipo}` : ''}
+                    </small>
+                  </span>
+                  <a
+                    className="btn btn-outline btn-sm shrink-0"
+                    href={String(arquivo.caminho || '').startsWith('http') ? arquivo.caminho : fileUrl(arquivo.caminho)}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Abrir
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      ) : null}
 
       {importModalOpen ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">

@@ -3,7 +3,8 @@ const {
   buildUserScopeTokens,
   canAccessContratosGlobal,
   getUserObraScopeIds,
-  isBusinessAdmin
+  isBusinessAdmin,
+  userHasAreaPermission
 } = require('../services/authorizationService');
 const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
@@ -128,6 +129,7 @@ function createResourceAccessMiddleware({
   resourceType,
   description,
   hasLegacyGlobalAccess,
+  hasReadAccess,
   attachAs
 }) {
   return async (req, res, next) => {
@@ -140,6 +142,14 @@ function createResourceAccessMiddleware({
 
     const obraId = Number(resource.obra_id);
     if (resourceType === 'SOLICITACAO_COMPRA' && isOwnCompraResource(resource, req.user)) {
+      req[attachAs] = resource;
+      return next();
+    }
+
+    // Uma permissao de leitura ampla pode atravessar o escopo da obra somente em GET/HEAD.
+    // Ela nunca serve como atalho para PATCH/POST/DELETE do mesmo recurso.
+    const metodoSomenteLeitura = req.method === 'GET' || req.method === 'HEAD';
+    if (metodoSomenteLeitura && hasReadAccess && await hasReadAccess(resource, req.user)) {
       req[attachAs] = resource;
       return next();
     }
@@ -205,6 +215,13 @@ const requireContratoAccess = createResourceAccessMiddleware({
   resourceType: 'CONTRATO',
   description: 'Usuario tentou acessar contrato fora do seu escopo',
   hasLegacyGlobalAccess: hasLegacyContractGlobalAccess,
+  // `visualizar_todas` abre o detalhe completo da solicitacao em modo leitura. Quando o contrato
+  // pertence a essa solicitacao, suas parcelas/anexos tambem precisam carregar para que o detalhe
+  // nao exiba um falso erro de obra. A guarda acima limita esta excecao a GET/HEAD.
+  hasReadAccess: async (contrato, user) => (
+    Boolean(contrato?.solicitacao_id)
+    && await userHasAreaPermission(user, ['solicitacoes.lista.visualizar_todas'])
+  ),
   attachAs: 'contratoResource'
 });
 

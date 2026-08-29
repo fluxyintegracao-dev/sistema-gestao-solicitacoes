@@ -3637,6 +3637,15 @@ a:hover {
   color: var(--c-text);
 }
 
+.sol-detail-title-text {
+  margin: 0.3rem 0 0;
+  max-width: 72ch;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.4;
+  color: var(--c-text);
+}
+
 .sol-detail-description {
   margin: 0.45rem 0 0;
   font-size: 0.9rem;
@@ -3651,6 +3660,34 @@ a:hover {
   justify-content: flex-end;
   gap: 0.55rem;
   flex-wrap: wrap;
+}
+
+.sol-detail-header-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.6rem;
+}
+
+.sol-detail-header-date {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
+}
+
+.sol-detail-header-date-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.sol-detail-header-date-value {
+  margin-top: 0.16rem;
+  font-size: 0.9rem;
+  color: var(--c-text);
 }
 
 .sol-detail-action-btn {
@@ -3675,6 +3712,10 @@ a:hover {
   border-radius: 12px;
   padding: 0.62rem 0.72rem;
   background: color-mix(in srgb, var(--c-surface) 86%, transparent);
+}
+
+.sol-detail-stat--full {
+  grid-column: 1 / -1;
 }
 
 .sol-detail-stat-label {
@@ -3775,6 +3816,15 @@ a:hover {
   .sol-detail-actions {
     width: 100%;
     justify-content: flex-start;
+  }
+
+  .sol-detail-header-side {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .sol-detail-header-date {
+    align-items: flex-start;
   }
 
   .sol-detail-stats-grid,
@@ -11752,4 +11802,613 @@ body {
 .tooltip-wrap:hover .tooltip-content,
 .tooltip-wrap:focus-within .tooltip-content {
   opacity: 1;
+}
+
+/* ============================================================================
+   RH/DP • Pessoal — a tela consolidada (Fase 6 do modulo DP, 26/08)
+   ---------------------------------------------------------------------------
+   O cliente pediu que quem tem solicitacao em aberto "seja posicionado primeiro
+   na lista e ganhe destaque visual e de status". A ordenacao vem do backend; o
+   destaque e daqui.
+
+   A barra lateral colorida foi escolhida em vez de fundo forte de propósito: a
+   linha continua legivel na leitura normal, e o olho ainda encontra as
+   pendentes de longe. Fundo forte em varias linhas transforma a tabela em
+   semaforo e o destaque deixa de destacar.
+   ========================================================================== */
+
+.rh-pessoal-linha--pendente > td:first-child {
+  box-shadow: inset 3px 0 0 0 #2B5CE6;
+}
+
+.rh-pessoal-linha--pendente {
+  background: rgba(43, 92, 230, 0.05);
+}
+
+.dark .rh-pessoal-linha--pendente {
+  background: rgba(123, 160, 245, 0.08);
+}
+
+.dark .rh-pessoal-linha--pendente > td:first-child {
+  box-shadow: inset 3px 0 0 0 #7BA0F5;
+}
+
+/* --- avisos visuais no topo: o que exige acao, contado por tipo --- */
+.rh-pessoal-alertas {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.rh-pessoal-alerta {
+  border: 1px solid var(--border-color, #DDE1E8);
+  border-left: 3px solid #2B5CE6;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--surface-color, #fff);
+}
+
+.dark .rh-pessoal-alerta {
+  border-color: #2A303A;
+  border-left-color: #7BA0F5;
+  background: #161A21;
+}
+
+.rh-pessoal-alerta-numero {
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.rh-pessoal-alerta-texto {
+  font-size: 0.82rem;
+  opacity: 0.75;
+}
+
+/* --- chips de tipo de solicitacao --- */
+.rh-chip {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 2px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+  background: rgba(120, 130, 148, 0.14);
+  margin-right: 4px;
+}
+
+/* Azul = decisao do DP. Roxo = decisao da DIRETORIA. A cor diz de quem e a vez,
+   e nao so o que e o pedido — que e a duvida real de quem olha a lista. */
+.rh-chip--pedido { background: rgba(43, 92, 230, 0.14); color: #12306E; }
+.rh-chip--evento { background: rgba(21, 128, 61, 0.14); color: #0B4522; }
+.rh-chip--diretoria { background: rgba(107, 47, 191, 0.14); color: #3D1A70; }
+.rh-chip--saindo { background: rgba(180, 83, 9, 0.16); color: #7A3908; }
+
+.dark .rh-chip--pedido { color: #A9C4FF; }
+.dark .rh-chip--evento { color: #8FD9AC; }
+.dark .rh-chip--diretoria { color: #C8AEF2; }
+.dark .rh-chip--saindo { color: #E9A153; }
+
+/* --- lista de solicitacoes do colaborador --- */
+.rh-pessoal-pedidos {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rh-pessoal-pedido {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--border-color, #DDE1E8);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.dark .rh-pessoal-pedido { border-color: #2A303A; }
+
+.rh-pessoal-devolucao {
+  color: #B91C1C;
+  margin-top: 2px;
+}
+
+.dark .rh-pessoal-devolucao { color: #EE7B7B; }
+
+/* --- abas de Pessoal: solicitacoes primeiro, colaboradores depois (26/08) --- */
+.rh-pessoal-abas {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border-color, #DDE1E8);
+}
+
+.dark .rh-pessoal-abas { border-bottom-color: #2A303A; }
+
+.rh-pessoal-aba {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.rh-pessoal-aba:hover { opacity: 0.9; }
+
+.rh-pessoal-aba--ativa {
+  opacity: 1;
+  border-bottom-color: #2B5CE6;
+}
+
+.dark .rh-pessoal-aba--ativa { border-bottom-color: #7BA0F5; }
+
+/* O contador vive no rotulo da aba: e onde o olho ja vai antes de decidir onde clicar. */
+.rh-pessoal-aba-contador {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: #2B5CE6;
+  color: #fff;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.dark .rh-pessoal-aba-contador { background: #7BA0F5; color: #0E1116; }
+
+/* --- conferencia de documentos na solicitacao --- */
+.rh-pessoal-conferencia {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+  border: 1px solid var(--border-color, #DDE1E8);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+
+.dark .rh-pessoal-conferencia { border-color: #2A303A; }
+
+/* Cores diferentes porque as duas pendencias exigem acoes diferentes: o que aguarda conferencia
+   depende do DP; o que nunca chegou depende da obra. */
+.rh-pessoal-conferencia--aguarda { color: #B45309; }
+.rh-pessoal-conferencia--falta { color: #B91C1C; }
+
+.dark .rh-pessoal-conferencia--aguarda { color: #E9A153; }
+.dark .rh-pessoal-conferencia--falta { color: #EE7B7B; }
+
+.rh-chip--aberta { background: rgba(180, 83, 9, 0.16); color: #7A3908; }
+.rh-chip--devolvida { background: rgba(185, 28, 28, 0.14); color: #7F1D1D; }
+
+.dark .rh-chip--aberta { color: #E9A153; }
+.dark .rh-chip--devolvida { color: #EE7B7B; }
+
+.rh-pessoal-historico {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.86rem;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rh-pessoal-historico li {
+  padding-left: 12px;
+  border-left: 2px solid var(--border-color, #DDE1E8);
+}
+
+.dark .rh-pessoal-historico li { border-left-color: #2A303A; }
+
+/* Envio de documento na solicitacao: tipo, arquivo e o botao, na mesma linha em tela larga. */
+.rh-pessoal-envio {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: minmax(200px, 1fr) minmax(200px, 1fr) auto;
+  align-items: center;
+  border: 1px dashed var(--border-color, #C3C9D4);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dark .rh-pessoal-envio { border-color: #3A424F; }
+
+@media (max-width: 720px) {
+  .rh-pessoal-envio { grid-template-columns: 1fr; }
+}
+
+/* Jornada: campos numericos estreitos para caber o mes inteiro na tela sem rolagem lateral. */
+.rh-jornada-numero {
+  max-width: 110px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dias + faltas passando do mes: erro na linha, e nao so na mensagem no rodape. Quem digita precisa
+   ver ONDE errou, nao so QUE errou. */
+.rh-jornada-linha--erro > td:first-child {
+  box-shadow: inset 3px 0 0 0 #B91C1C;
+}
+
+.rh-jornada-linha--erro { background: rgba(185, 28, 28, 0.06); }
+
+.dark .rh-jornada-linha--erro { background: rgba(238, 123, 123, 0.09); }
+.dark .rh-jornada-linha--erro > td:first-child { box-shadow: inset 3px 0 0 0 #EE7B7B; }
+
+/* ============================================================================
+   Responsividade das tabelas do modulo DP (26/08)
+   ---------------------------------------------------------------------------
+   O defeito que isto corrige: os botoes da coluna de acoes quebravam UM
+   CARACTERE POR LINHA ("A c o m p a n h a r"), porque a celula ficava estreita
+   e nada impedia a palavra de quebrar. Largura de coluna sozinha nao resolve —
+   em tela estreita a celula encolhe de novo.
+
+   A regra e: o botao NUNCA quebra por dentro; quem quebra e a lista de botoes,
+   passando para a linha de baixo. E a tabela rola na horizontal quando nem isso
+   basta, em vez de espremer.
+   ========================================================================== */
+
+.rh-pessoal-table .app-page-actions,
+.rh-pessoal-page .app-dense-data-table .app-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.rh-pessoal-page .app-dense-data-table .btn,
+.rh-pessoal-page .rh-pessoal-pedido .btn {
+  white-space: nowrap;
+  word-break: keep-all;
+  flex: 0 0 auto;
+}
+
+/* Botao pequeno dentro de tabela: menos respiro lateral para caber mais por linha. */
+.rh-pessoal-page .app-dense-data-table .btn-sm {
+  padding: 4px 9px;
+  font-size: 0.82rem;
+}
+
+.rh-pessoal-page .rh-chip,
+.rh-pessoal-page .app-dense-data-table td {
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+/* A tabela rola dentro do proprio quadro — a PAGINA nunca rola de lado. */
+.rh-pessoal-page .app-dense-table-wrapper,
+.rhdp-page .app-dense-table-wrapper {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+/* Em tela estreita os filtros viram uma coluna so, em vez de espremer lado a lado. */
+@media (max-width: 900px) {
+  .rh-pessoal-page .rh-colaboradores-filter-grid,
+  .rhdp-page .rh-colaboradores-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rh-pessoal-abas {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}
+
+/* Jornada: os campos numericos nao encolhem abaixo do legivel. */
+.rhdp-page .rh-jornada-numero {
+  min-width: 78px;
+}
+
+/* ============================================================================
+   Botao dentro de TABELA nao estica em tela estreita (26/08)
+   ---------------------------------------------------------------------------
+   Existe uma regra global em `@media (max-width: 767px)` que faz
+   `.app-page-actions .btn { flex: 1 1 auto }`. Ela e correta para os botoes do
+   TOPO da pagina — em celular, um botao largo e mais facil de acertar com o
+   dedo.
+
+   Dentro de uma tabela ela erra: a celula de acoes tem cinco botoes, e cada um
+   passa a ocupar a largura inteira da coluna, um embaixo do outro. A linha fica
+   com 200px de altura e a tabela vira uma escada.
+
+   Aqui o botao volta a ter a largura do texto. A tabela ja rola na horizontal
+   dentro do proprio quadro, entao nao ha o que espremer.
+
+   Vale para o modulo DP inteiro (`.rhdp-page`), nao so para uma tela: as tres
+   tabelas tem coluna de acoes.
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .rhdp-page table .app-page-actions {
+    width: auto;
+  }
+
+  .rhdp-page table .app-page-actions .btn,
+  .rhdp-page table .app-page-actions label.btn {
+    flex: 0 0 auto;
+    width: auto;
+  }
+}
+
+/* ============================================================================
+   Acoes em icone na tabela do modulo DP (26/08)
+   ---------------------------------------------------------------------------
+   Cinco botoes escritos por linha ocupavam 400px de coluna e ainda quebravam em
+   duas fileiras. A tabela virava uma escada, e o nome do colaborador — que e o
+   que se procura — competia com os botoes.
+
+   Alvo de toque de 34px: abaixo disso o dedo erra no celular, e o ganho de
+   espaco nao compensa o clique errado numa acao como "Demitir".
+   ========================================================================== */
+
+.rh-acoes-icones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.rh-acao-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-color, #DDE1E8);
+  border-radius: 8px;
+  background: var(--surface-color, #fff);
+  color: inherit;
+  cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+
+.rh-acao-icone svg {
+  width: 18px;
+  height: 18px;
+}
+
+.rh-acao-icone:hover {
+  border-color: #2B5CE6;
+  color: #2B5CE6;
+  background: rgba(43, 92, 230, 0.07);
+}
+
+/* Foco visivel: a acao e so um icone, entao quem navega por teclado precisa ver onde esta. */
+.rh-acao-icone:focus-visible {
+  outline: 2px solid #2B5CE6;
+  outline-offset: 2px;
+}
+
+.dark .rh-acao-icone {
+  border-color: #2A303A;
+  background: #161A21;
+}
+
+.dark .rh-acao-icone:hover {
+  border-color: #7BA0F5;
+  color: #7BA0F5;
+  background: rgba(123, 160, 245, 0.12);
+}
+
+.dark .rh-acao-icone:focus-visible { outline-color: #7BA0F5; }
+
+/* Conteudo dentro do modal: respiro e rolagem propria quando o formulario e longo. */
+.rh-modal-conteudo {
+  padding: 20px;
+  overflow-y: auto;
+  max-height: min(86dvh, 860px);
+}
+
+/* Regra global de botao impoe `min-height: 42px`, e em CSS o `min-height` VENCE o `max-height` —
+   nao adianta limitar por cima. Aqui o `min-height` e sobrescrito com especificidade maior, para o
+   icone ficar quadrado (34x34) em vez de 34x42. */
+.rhdp-page .rh-acoes-icones .rh-acao-icone,
+.rh-pessoal-page .rh-acoes-icones .rh-acao-icone {
+  min-height: 34px;
+  height: 34px;
+  max-height: 34px;
+  padding: 0;
+  line-height: 1;
+}
+
+/* Troca de obra na linha: origem, seta, destino. O destino em destaque porque e o que muda. */
+.rh-troca-obra {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 0.88rem;
+}
+
+.rh-troca-obra-origem { opacity: 0.7; }
+.rh-troca-obra-seta { opacity: 0.5; }
+.rh-troca-obra-destino { font-weight: 600; }
+
+/* Linha de quem ainda nao comecou nesta obra: visivel, mas claramente fora do mes. */
+.rh-jornada-linha--futura { opacity: 0.62; }
+.rh-jornada-linha--futura > td:first-child { box-shadow: inset 3px 0 0 0 #B45309; }
+.rh-jornada-futura-nota { color: #B45309; }
+
+.dark .rh-jornada-linha--futura > td:first-child { box-shadow: inset 3px 0 0 0 #E9A153; }
+.dark .rh-jornada-futura-nota { color: #E9A153; }
+
+/* ============================================================================
+   Largura das telas do modulo DP (26/08)
+   ---------------------------------------------------------------------------
+   `.page` tem `max-width: 1100px`, medida boa para tela de LEITURA — o texto
+   nao fica largo demais para o olho acompanhar.
+
+   Mas Pessoal e Jornada sao GRADES DE DADOS. A jornada tem nove colunas
+   (colaborador, vinculo, salario, dias, faltas, horas extras, acrescimos,
+   descontos, observacao) e soma cerca de 1260px. Em 1100 ela nasce apertada:
+   o card fica menor que o de filtros logo acima e a tabela rola de lado desde
+   o primeiro acesso, mesmo numa tela larga.
+
+   1480px cabe a jornada inteira sem rolagem num monitor comum, e continua
+   longe de "texto atravessando a tela" — porque aqui nao ha texto corrido.
+
+   `width: 100%` no form e no card: na Jornada a tabela vive dentro de um
+   `<form>`, e sem isso ele se ajusta ao conteudo em vez de ocupar a linha,
+   deixando o card visivelmente mais estreito que o de filtros.
+   ========================================================================== */
+
+.rhdp-page {
+  max-width: 1480px;
+}
+
+/**
+ * DESCENDENTE, e nao filho direto (`>`).
+ *
+ * A primeira versao usava `.rhdp-page > form`. Funcionava na Jornada como PAGINA, onde o form e
+ * filho direto — e parava de funcionar quando a Jornada virou ABA, porque ali ela e envolvida por
+ * um `div` da pagina anfitria e o form desce um nivel.
+ *
+ * O sintoma: o card da tabela ficava mais estreito E recuado em relacao ao card de filtros logo
+ * acima, porque o form se ajustava ao conteudo em vez de ocupar a linha.
+ */
+.rhdp-page form,
+.rhdp-page .app-table-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+/* A tabela continua rolando DENTRO do quadro quando a tela for menor que ela.
+   A pagina nunca rola de lado. */
+.rhdp-page .app-dense-table-wrapper {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ============================================================================
+   Form que ENVOLVE TABELA ocupa a linha inteira (26/08)
+   ---------------------------------------------------------------------------
+   Existe uma regra do sistema:
+
+     .solicitacoes-page:not(.solicitacao-nova-page) form {
+       width: min(100%, var(--app-form-shell-max-width));
+       margin-inline: auto;
+     }
+
+   Ela esta CERTA para formulario de digitacao — campo de texto com 1300px de
+   largura e desconfortavel de ler e de preencher. Por isso nao a derrubo para
+   todo form.
+
+   Mas o form da Jornada envolve uma TABELA de nove colunas. Ali a largura de
+   leitura vira prejuizo: o card fica mais estreito e recuado em relacao ao de
+   filtros logo acima, e a tabela rola de lado antes do necessario.
+
+   `rh-form-com-tabela` marca essa excecao explicitamente. A especificidade
+   precisa empatar com a regra do sistema (`:not()` conta como classe), e o
+   `margin-inline` precisa ser desfeito — sem ele o form fica centralizado
+   mesmo com largura total.
+   ========================================================================== */
+
+/*
+ * `form.rh-form-com-tabela`, com o ELEMENTO junto da classe.
+ *
+ * A regra do sistema e `.solicitacoes-page:not(.solicitacao-nova-page) form` — duas classes e um
+ * elemento, especificidade (0,2,1). `.solicitacoes-page .rh-form-com-tabela` da (0,2,0) e PERDE,
+ * mesmo vindo depois no arquivo. Escrever `form.` na frente empata em (0,2,1), e a ordem decide a
+ * favor desta, que vem por ultimo.
+ */
+.solicitacoes-page form.rh-form-com-tabela,
+.rhdp-page form.rh-form-com-tabela {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+}
+
+/*
+ * O ALERTA DE APONTAMENTOS DA DEMISSAO (Fase 11).
+ *
+ * Cor de AVISO, e nao de erro. Ferias vencidas nao impedem demitir — mudam a rescisao, e quem
+ * decide isso e o DP. Pintar de vermelho faria parecer que o sistema recusou, e a pessoa procuraria
+ * o que "consertar" antes de seguir.
+ *
+ * Tokens dos dois temas: o bloco vive dentro de um modal, que herda o fundo do tema do visitante.
+ */
+.rh-alerta-apontamentos {
+  border: 1px solid var(--app-number-warning, #d97706);
+  border-left-width: 4px;
+  border-radius: 8px;
+  padding: 0.75rem 0.9rem;
+  background: color-mix(in srgb, var(--app-number-warning, #d97706) 10%, transparent);
+  color: var(--app-body-color, inherit);
+  font-size: 0.86rem;
+}
+
+.rh-alerta-apontamentos ul {
+  margin: 0.4rem 0 0;
+  padding-left: 1.1rem;
+  list-style: disc;
+}
+
+.rh-alerta-apontamentos li + li {
+  margin-top: 0.2rem;
+}
+
+/*
+ * ANEXOS DENTRO DO MODAL (27/08).
+ *
+ * Cada linha e "tipo + arquivo + remover". Em tela estreita as tres viram uma coluna: o seletor de
+ * tipo e o campo de arquivo lado a lado em 375px deixariam os dois ilegiveis, e o nome do arquivo
+ * escolhido — que e o que confirma que a pessoa pegou o certo — some primeiro.
+ */
+.rh-anexos-do-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.85rem;
+  border: 1px dashed var(--c-border, #d8e2f1);
+  border-radius: 10px;
+}
+
+.rh-anexos-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.rh-anexo-linha {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.5fr) auto;
+  gap: 0.6rem;
+  align-items: end;
+}
+
+/* `minmax(0, ...)` acima e o que impede o nome longo de arquivo de esticar a grade e empurrar o
+   botao Remover para fora do modal. */
+
+@media (max-width: 767px) {
+  .rh-anexo-linha {
+    grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * O chip do RASCUNHO — neutro de proposito.
+ *
+ * Rascunho nao e alerta nem sucesso: e trabalho que ainda nao saiu da mesa de quem abriu. Pintar de
+ * cor de aviso o colocaria no mesmo peso visual de "aguardando decisao", que e onde a bola esta com
+ * outra pessoa.
+ */
+.rh-chip--rascunho {
+  background: color-mix(in srgb, var(--app-muted-color, #64748b) 14%, transparent);
+  color: var(--app-muted-color, #64748b);
+  border: 1px dashed color-mix(in srgb, var(--app-muted-color, #64748b) 45%, transparent);
 }

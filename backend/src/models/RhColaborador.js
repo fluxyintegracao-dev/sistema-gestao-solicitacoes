@@ -50,6 +50,16 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(120),
       allowNull: true
     },
+    // Fase 7: o cargo passa a ter catalogo (`rh_cargos`). `cargo` (texto) continua como a prova do
+    // que estava escrito antes do de-para, e nao e apagada.
+    cargo_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    carga_horaria_semanal: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: true
+    },
     tipo_vinculo: {
       type: DataTypes.STRING(20),
       allowNull: false
@@ -85,6 +95,73 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     },
     observacoes: {
       type: DataTypes.TEXT,
+      allowNull: true
+    },
+    // --- Fase 8 (27/08): os campos que o item 8 do escopo exige na admissao.
+    // Todos anulaveis no schema: a obrigatoriedade e da ADMISSAO NOVA e mora na validacao do
+    // pedido, nao aqui — sao 137 colaboradores antigos sem esses dados.
+    nome_pai: {
+      type: DataTypes.STRING(180),
+      allowNull: true
+    },
+    nome_mae: {
+      type: DataTypes.STRING(180),
+      allowNull: true
+    },
+    endereco: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    numero: {
+      type: DataTypes.STRING(50),
+      allowNull: true
+    },
+    complemento: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    bairro: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    municipio: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    estado: {
+      type: DataTypes.STRING(2),
+      allowNull: true
+    },
+    cep: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    banco: {
+      type: DataTypes.STRING(120),
+      allowNull: true
+    },
+    agencia: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    conta: {
+      type: DataTypes.STRING(30),
+      allowNull: true
+    },
+    conta_tipo: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    pix_chave_tipo: {
+      type: DataTypes.STRING(20),
+      allowNull: true
+    },
+    pix_chave: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    responsavel_contratacao_id: {
+      type: DataTypes.INTEGER,
       allowNull: true
     },
     criado_por: {

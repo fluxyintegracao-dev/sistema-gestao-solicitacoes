@@ -115,7 +115,9 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'solicitacoes.acoes.alterar_status_qualquer_setor', label: 'Alterar status em qualquer setor', descricao: 'Permite alterar o status de solicitações em outros setores usando os status do setor do próprio usuário.' },
           { key: 'solicitacoes.acoes.alterar_valor', label: 'Alterar valor da solicitação', descricao: 'Permite editar o valor financeiro da solicitação sem exigir perfil administrativo do GEO.' },
           { key: 'solicitacoes.acoes.alterar_data_vencimento', label: 'Alterar data de vencimento', descricao: 'Permite editar a data de vencimento da solicitação sem exigir perfil administrativo do GEO.' },
-          { key: 'solicitacoes.apropriacoes.editar', label: 'Editar apropriações', descricao: 'Permite alterar a apropriação principal e o rateio de apropriações da solicitação, mantendo auditoria.' }
+          { key: 'solicitacoes.apropriacoes.editar', label: 'Editar apropriações', descricao: 'Permite alterar a apropriação principal e o rateio de apropriações da solicitação, mantendo auditoria.' },
+          { key: 'solicitacoes.retorno.solicitar', label: 'Solicitar retorno ao setor', descricao: 'Permite pedir que uma solicitação visível volte ao setor operacional do usuário.' },
+          { key: 'solicitacoes.retorno.decidir', label: 'Decidir pedidos de retorno', descricao: 'Permite aprovar ou rejeitar pedidos de retorno enquanto a solicitação está no próprio setor.' }
         ]
       },
       {
@@ -243,6 +245,13 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'compras.fornecedores.visualizar', label: 'Visualizar fornecedores', descricao: 'Ver fornecedores cadastrados para cotacao.' },
           { key: 'compras.fornecedores.gerenciar', label: 'Gerenciar fornecedores', descricao: 'Cadastrar, editar e inativar fornecedores.' }
+        ]
+      },
+      {
+        key: 'compras.insumos',
+        label: 'Insumos',
+        permissoes: [
+          { key: 'compras.insumos.catalogar_itens_manuais', label: 'Catalogar itens manuais', descricao: 'Vincular itens manuais a insumos existentes ou criar insumos oficiais pela tela de detalhes.' }
         ]
       },
       {
@@ -581,7 +590,80 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'contratos.geral.visualizar', label: 'Visualizar contratos', descricao: 'Ver lista e detalhes de contratos.' },
           { key: 'contratos.geral.criar', label: 'Criar contratos', descricao: 'Abrir novos contratos.' },
-          { key: 'contratos.geral.editar', label: 'Editar contratos', descricao: 'Alterar dados e status de contratos existentes.' }
+          { key: 'contratos.geral.editar', label: 'Editar contratos', descricao: 'Alterar dados e status de contratos existentes.' },
+          {
+            key: 'contratos.geral.encerrar',
+            label: 'Encerrar contrato (quebra de contrato)',
+            descricao: 'Encerra o contrato, zera o saldo restante e exclui os titulos em aberto. Nada mais do que estava previsto sera pago.'
+          },
+          {
+            key: 'contratos.credor.completar_cadastro',
+            label: 'Completar cadastro do credor no contrato',
+            descricao: 'Permite corrigir ENDERECO e CPF/CNPJ do contratado direto na conferencia '
+              + 'que antecede a criacao do contrato. Nao da acesso ao cadastro de parceiros: a rota '
+              + 'altera somente esses campos, e nada mais. Existe porque 98% dos fornecedores estao '
+              + 'sem endereco completo, e o Juridico precisa deles para montar a minuta.'
+          },
+          {
+            key: 'contratos.solicitacao.cancelar',
+            label: 'Cancelar a solicitacao do contrato',
+            descricao: 'Encerra o pedido em definitivo: a solicitacao NAO volta para ajuste. '
+              + 'Vale para o Juridico e para a Gerencia de Processos — quem manda e a permissao, nao o setor. '
+              + 'Rejeitar e diferente: devolve ao responsavel em PENDENTE DE AJUSTE, para corrigir e reenviar.'
+          },
+          {
+            key: 'contratos.fluxo.reenviar',
+            label: 'Agir no contrato DE OUTRA PESSOA',
+            descricao: 'Reenviar para aprovacao um contrato devolvido, e confirmar a assinatura, '
+              + 'em contratos que a pessoa NAO abriu. Quem abriu ja pode fazer as duas coisas sem esta permissao. '
+              + 'Existe porque antes esses dois botoes apareciam para qualquer um que pudesse CRIAR contratos — '
+              + 'e criar contrato nao e o mesmo que tramitar o contrato dos outros. Sem conceder esta permissao a '
+              + 'alguem, um contrato cujo autor esteja de ferias ou desligado fica parado.'
+          }
+        ]
+      },
+      {
+        key: 'contratos.juridico',
+        label: 'Juridico de contratos',
+        permissoes: [
+          {
+            key: 'contratos.juridico.tramitar',
+            label: 'Tramitar contrato no juridico',
+            descricao: 'Avaliar a documentacao, marcar a minuta como pronta e registrar a assinatura. E na assinatura que as parcelas viram titulos.'
+          }
+        ]
+      },
+      {
+        key: 'contratos.medicao',
+        label: 'Medicao de contrato',
+        permissoes: [
+          {
+            key: 'contratos.medicao.editar_valor',
+            label: 'Editar valor de medicao ja criada',
+            descricao: 'Permite alterar o valor da parcela depois que a solicitacao de medicao foi criada. Sem ela, o valor so pode ser definido na criacao.'
+          }
+        ]
+      },
+      {
+        key: 'contratos.aprovacao',
+        label: 'Aprovacao de contratos',
+        permissoes: [
+          {
+            key: 'contratos.aprovacao.aprovar',
+            label: 'Aprovar / rejeitar contratos',
+            // Unica permissao do sistema sem bypass: nem SUPERADMIN nem ADMINISTRADOR
+            // aprovam sem te-la marcada. Excecao deliberada, decidida pelo cliente.
+            //
+            // O rotulo dizia "acima do limite" e estava ERRADO: a checagem roda antes de o limite
+            // ser sequer lido (`aprovarContrato`), entao ela vale para QUALQUER valor. Quem lesse
+            // o texto antigo concluiria que contrato abaixo do limite dispensa a permissao — e
+            // deixaria a Gerencia de Processos sem conseguir aprovar nada.
+            descricao: 'Permite aprovar ou rejeitar contratos do fluxo novo, de QUALQUER valor. '
+              + 'O que o limite decide e o caminho depois da aprovacao: abaixo dele o contrato vai '
+              + 'direto a ATIVO e os titulos nascem; a partir dele segue para o JURIDICO, e os '
+              + 'titulos so nascem na conferencia final. '
+              + 'Exigida inclusive de SUPERADMIN e ADMINISTRADOR — sem ela, ninguem aprova.'
+          }
         ]
       },
       {
@@ -704,6 +786,42 @@ const MODULO_PERMISSION_GROUPS = [
         permissoes: [
           { key: 'rh_dp.colaboradores.visualizar', label: 'Visualizar colaboradores', descricao: 'Listar e detalhar colaboradores.' },
           { key: 'rh_dp.colaboradores.editar', label: 'Editar colaboradores', descricao: 'Cadastrar, editar e importar colaboradores.' }
+        ]
+      },
+      {
+        /**
+         * Pedido de pessoal (Fase 2 do modulo DP, 25/08): a Obra pede, o DP decide.
+         *
+         * O PREFIXO E `rh_dp`, MAS QUEM EXISTE HOJE E SO O DP.
+         *
+         * `RH` e `DEPARTAMENTO PESSOAL` sao setores DIFERENTES na empresa (setores 5 e 10). Em
+         * 26/08 o cliente confirmou: TODAS as etapas construidas aqui — decidir admissao, demissao,
+         * troca de obra, atestar documento, apurar folha, instruir alteracao salarial — sao do
+         * **DP**. O **RH ainda nao existe no sistema**; ele vai nascer depois e vai REUSAR parte
+         * disto.
+         *
+         * O prefixo `rh_dp` fica de proposito, por duas razoes:
+         *
+         * 1. ele ja esta em producao, dentro da configuracao VERSIONADA de permissoes de 30
+         *    usuarios. Renomear exigiria migrar essa configuracao, as 12 tabelas `rh_*`, as rotas e
+         *    as telas — refatoracao grande em codigo vivo, por ganho de nome;
+         * 2. `dp.colaboradores.visualizar` ficaria PIOR no dia em que o RH chegar. A permissao diz o
+         *    que ela libera, nao de quem e — e ver colaborador e coisa que os dois setores vao
+         *    precisar.
+         *
+         * O que garante que o RH consiga reusar: NENHUM servico deste modulo conhece o setor. Quem
+         * decide e definido por PERMISSAO, e `rh_solicitacoes` guarda so `setor_origem` (de onde
+         * veio, para a devolucao voltar) — nao ha setor de destino em lugar nenhum. Conceder a
+         * permissao a um usuario do RH basta; nao ha codigo a mudar.
+         */
+        key: 'rh_dp.solicitacoes',
+        label: 'Solicitacoes de pessoal',
+        permissoes: [
+          { key: 'rh_dp.solicitacoes.abrir', label: 'Abrir solicitacao de pessoal', descricao: 'Pedir admissao, demissao, troca de obra e evento recorrente.' },
+          { key: 'rh_dp.solicitacoes.anexar', label: 'Anexar documento na solicitacao', descricao: 'Enviar documentos, atestados e certificados junto do pedido.' },
+          { key: 'rh_dp.solicitacoes.decidir', label: 'Decidir solicitacao de pessoal', descricao: 'Aprovar ou devolver os pedidos abertos pelas obras.' },
+          { key: 'rh_dp.solicitacoes.ver_todas', label: 'Ver solicitacoes de todas as obras', descricao: 'Sem esta permissao o usuario enxerga apenas a obra dele.' },
+          { key: 'rh_dp.salario.aprovar', label: 'Aprovar alteracao salarial', descricao: 'Decisao de Diretoria sobre mudanca de salario. Concedida nominalmente.' }
         ]
       },
       {

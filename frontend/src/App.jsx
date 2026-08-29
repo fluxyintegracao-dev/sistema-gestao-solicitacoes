@@ -146,6 +146,9 @@ const Perfil = lazy(() => import('./pages/Perfil'));
 const PermissoesSetor = lazy(() => import('./pages/PermissoesSetor'));
 const CoresSistema = lazy(() => import('./pages/CoresSistema'));
 const AreasObra = lazy(() => import('./pages/AreasObra'));
+const ObraTipoApropriacao = lazy(() => import('./pages/ObraTipoApropriacao'));
+const ContratoObraCategorias = lazy(() => import('./pages/ContratoObraCategorias'));
+const ContratoFluxoNovo = lazy(() => import('./pages/ContratoFluxoNovo'));
 const AreasPorSetorOrigem = lazy(() => import('./pages/AreasPorSetorOrigem'));
 const SetoresVisiveisUsuario = lazy(() => import('./pages/SetoresVisiveisUsuario'));
 const ComportamentoRecebimentoSetor = lazy(() => import('./pages/ComportamentoRecebimentoSetor'));
@@ -174,6 +177,8 @@ const ConfiguracoesComercialCategorias = lazy(() => import('./pages/Configuracoe
 const ConfiguracoesProvisionamentoFluxo = lazy(() => import('./pages/ConfiguracoesProvisionamentoFluxo'));
 const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
 const ConfiguracoesNotificacoesSistema = lazy(() => import('./pages/ConfiguracoesNotificacoesSistema'));
+const ConfiguracoesContratoAlertasEFormas = lazy(() => import('./pages/ConfiguracoesContratoAlertasEFormas'));
+const CartoesRecarga = lazy(() => import('./pages/CartoesRecarga'));
 const Parceiros = lazy(() => import('./pages/Parceiros'));
 const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
 const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
@@ -192,6 +197,8 @@ const GestaoCategoriasMacro = lazy(() => import('./modules/provisionamento-finan
 const RhDpInicio = lazy(() => import('./pages/RhDpInicio'));
 const RhDpEmpresas = lazy(() => import('./pages/RhDpEmpresas'));
 const RhDpColaboradores = lazy(() => import('./pages/RhDpColaboradores'));
+const RhDpPessoal = lazy(() => import('./pages/RhDpPessoal'));
+const RhDpJornada = lazy(() => import('./pages/RhDpJornada'));
 const RhDpDocumentos = lazy(() => import('./pages/RhDpDocumentos'));
 const RhDpImportacoes = lazy(() => import('./pages/RhDpImportacoes'));
 const RhDpApuracao = lazy(() => import('./pages/RhDpApuracao'));
@@ -900,6 +907,9 @@ export default function App() {
         <Route path="permissoes-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><PermissoesSetor /></ConfiguracoesAreaRoute>} />
         <Route path="cores-sistema" element={<ConfiguracoesAreaRoute area="aparencia"><CoresSistema /></ConfiguracoesAreaRoute>} />
         <Route path="areas-obra" element={<ConfiguracoesAreaRoute area="status_vinculos"><AreasObra /></ConfiguracoesAreaRoute>} />
+        <Route path="obra-tipo-apropriacao" element={<ConfiguracoesAreaRoute area="status_vinculos"><ObraTipoApropriacao /></ConfiguracoesAreaRoute>} />
+        <Route path="contrato-obra-categorias" element={<ConfiguracoesAreaRoute area="geral"><ContratoObraCategorias /></ConfiguracoesAreaRoute>} />
+        <Route path="contratos/novo" element={<ContratoFluxoNovo />} />
         <Route path="areas-por-setor-origem" element={<ConfiguracoesAreaRoute area="status_vinculos"><AreasPorSetorOrigem /></ConfiguracoesAreaRoute>} />
         <Route path="setores-visiveis-usuario" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresVisiveisUsuario /></ConfiguracoesAreaRoute>} />
         <Route path="comportamento-recebimento-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><ComportamentoRecebimentoSetor /></ConfiguracoesAreaRoute>} />
@@ -926,6 +936,9 @@ export default function App() {
         <Route path="configuracoes-provisionamento-fluxo" element={<EnabledModuleRoute moduleKey="PROVISOES"><ConfiguracoesAreaRoute area="geral"><ConfiguracoesProvisionamentoFluxo /></ConfiguracoesAreaRoute></EnabledModuleRoute>} />
         <Route path="configuracoes-modulos" element={<ConfiguracoesAreaRoute area="modulos"><ConfiguracoesModulos /></ConfiguracoesAreaRoute>} />
         <Route path="configuracoes-notificacoes-sistema" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesNotificacoesSistema /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-contrato-alertas" element={<ConfiguracoesAreaRoute area="geral"><ConfiguracoesContratoAlertasEFormas /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-formas-pagamento-solicitacao" element={<ConfiguracoesAreaRoute area="geral"><ConfiguracoesContratoAlertasEFormas /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-cartoes-recarga" element={<SuperadminRoute><CartoesRecarga /></SuperadminRoute>} />
         <Route path="parceiros" element={<ConfiguracoesAreaRoute area="cadastros"><Parceiros /></ConfiguracoesAreaRoute>} />
         <Route path="parceiros-categorias" element={<ConfiguracoesAreaRoute area="cadastros"><ParceiroCategorias /></ConfiguracoesAreaRoute>} />
         <Route path="crm/dashboard" element={<CrmDashboardRoute><CrmDashboard /></CrmDashboardRoute>} />
@@ -974,6 +987,8 @@ export default function App() {
         <Route path="rh-dp/relatorios" element={<RhDpDashboardRoute><ModuloRelatorios modulo="rhdp" /></RhDpDashboardRoute>} />
         <Route path="rh-dp/relatorios/operacional" element={<RhDpColaboradoresRoute><RhDpRelatorioOperacional /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/empresas" element={<RhDpEmpresasRoute><RhDpEmpresas /></RhDpEmpresasRoute>} />
+        <Route path="rh-dp/pessoal" element={<RhDpColaboradoresRoute><RhDpPessoal /></RhDpColaboradoresRoute>} />
+        <Route path="rh-dp/jornada" element={<RhDpColaboradoresRoute><RhDpJornada /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
         <Route path="rh-dp/importacoes" element={<RhDpImportacoesRoute><RhDpImportacoes /></RhDpImportacoesRoute>} />

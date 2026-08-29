@@ -54,7 +54,18 @@ db.EmpresaGrupo = require('./EmpresaGrupo')(sequelize, Sequelize);
 db.RhEmpresaGrupo = require('./RhEmpresaGrupo')(sequelize, Sequelize);
 db.RhColaborador = require('./RhColaborador')(sequelize, Sequelize);
 db.RhColaboradorPagamento = require('./RhColaboradorPagamento')(sequelize, Sequelize);
+db.RhColaboradorVinculo = require('./RhColaboradorVinculo')(sequelize, Sequelize);
+db.RhSolicitacao = require('./RhSolicitacao')(sequelize, Sequelize);
+db.RhSolicitacaoHistorico = require('./RhSolicitacaoHistorico')(sequelize, Sequelize);
+db.RhSolicitacaoAnexo = require('./RhSolicitacaoAnexo')(sequelize, Sequelize);
+db.RhEventoRecorrente = require('./RhEventoRecorrente')(sequelize, Sequelize);
+db.RhApuracaoEventoItem = require('./RhApuracaoEventoItem')(sequelize, Sequelize);
+db.RhColaboradorSalario = require('./RhColaboradorSalario')(sequelize, Sequelize);
 db.RhDocumentoTipo = require('./RhDocumentoTipo')(sequelize, Sequelize);
+// FASE 7 do DP (27/08): o catalogo que os checklists dos itens 8 a 11 cobram.
+db.RhCargo = require('./RhCargo')(sequelize, Sequelize);
+db.RhDocumentoExigencia = require('./RhDocumentoExigencia')(sequelize, Sequelize);
+db.RhSolicitacaoChecklist = require('./RhSolicitacaoChecklist')(sequelize, Sequelize);
 db.RhDocumento = require('./RhDocumento')(sequelize, Sequelize);
 db.RhImportacao = require('./RhImportacao')(sequelize, Sequelize);
 db.RhImportacaoLinha = require('./RhImportacaoLinha')(sequelize, Sequelize);
@@ -70,6 +81,7 @@ db.TipoMacroContrato = require('./TipoMacroContrato')(sequelize, Sequelize);
 db.TipoSubContrato = require('./TipoSubContrato')(sequelize, Sequelize);
 db.SolicitacaoVisibilidadeUsuario =
   require('./SolicitacaoVisibilidadeUsuario')(sequelize, Sequelize);
+db.SolicitacaoPedidoRetorno = require('./SolicitacaoPedidoRetorno')(sequelize, Sequelize);
 db.SetorPermissao = require('./SetorPermissao')(sequelize, Sequelize);
 db.Notificacao = require('./Notificacao')(sequelize, Sequelize);
 db.NotificacaoDestinatario = require('./NotificacaoDestinatario')(sequelize, Sequelize);
@@ -94,6 +106,11 @@ db.TituloFinanceiro = require('./TituloFinanceiro')(sequelize, Sequelize);
 db.TituloFinanceiroRateio = require('./TituloFinanceiroRateio')(sequelize, Sequelize);
 db.TituloFinanceiroImposto = require('./TituloFinanceiroImposto')(sequelize, Sequelize);
 db.TituloFinanceiroSequencia = require('./TituloFinanceiroSequencia')(sequelize, Sequelize);
+db.CartaoRecarga = require('./CartaoRecarga')(sequelize, Sequelize);
+db.CartaoRecargaUsuario = require('./CartaoRecargaUsuario')(sequelize, Sequelize);
+db.SolicitacaoRecargaCartao = require('./SolicitacaoRecargaCartao')(sequelize, Sequelize);
+db.CartaoRecargaPrestacao = require('./CartaoRecargaPrestacao')(sequelize, Sequelize);
+db.CartaoRecargaPrestacaoRateio = require('./CartaoRecargaPrestacaoRateio')(sequelize, Sequelize);
 db.FinanceiroTituloImportacao = require('./FinanceiroTituloImportacao')(sequelize, Sequelize);
 db.FinanceiroTituloImportacaoLinha = require('./FinanceiroTituloImportacaoLinha')(sequelize, Sequelize);
 db.FinanceiroTituloImportacaoResultado = require('./FinanceiroTituloImportacaoResultado')(sequelize, Sequelize);
@@ -139,7 +156,15 @@ db.FinanceiroDdaEvento = require('./FinanceiroDdaEvento')(sequelize, Sequelize);
 db.Unidade = require('./Unidade')(sequelize, Sequelize);
 db.Categoria = require('./Categoria')(sequelize, Sequelize);
 db.Insumo = require('./Insumo')(sequelize, Sequelize);
+db.InsumoAlias = require('./InsumoAlias')(sequelize, Sequelize);
+db.InsumoCodigoSequencia = require('./InsumoCodigoSequencia')(sequelize, Sequelize);
 db.Apropriacao = require('./Apropriacao')(sequelize, Sequelize);
+db.ObraTipoApropriacaoPadrao = require('./ObraTipoApropriacaoPadrao')(sequelize, Sequelize);
+db.ContratoCodigoSequencia = require('./ContratoCodigoSequencia')(sequelize, Sequelize);
+db.ContratoParcela = require('./ContratoParcela')(sequelize, Sequelize);
+db.MedicaoParcela = require('./MedicaoParcela')(sequelize, Sequelize);
+db.ContratoAditivo = require('./ContratoAditivo')(sequelize, Sequelize);
+db.ContratoMedicao = require('./ContratoMedicao')(sequelize, Sequelize);
 db.SolicitacaoCompra = require('./SolicitacaoCompra')(sequelize, Sequelize);
 db.SolicitacaoCompraItem = require('./SolicitacaoCompraItem')(sequelize, Sequelize);
 db.SolicitacaoCompraItemApropriacao = require('./SolicitacaoCompraItemApropriacao')(sequelize, Sequelize);
@@ -388,6 +413,27 @@ db.UsuarioObra.belongsTo(db.Obra, {
   as: 'obra'
 });
 
+/* ===== Cartoes pre-pagos de recarga ===== */
+db.CartaoRecarga.belongsTo(db.Parceiro, { foreignKey: 'parceiro_id', as: 'parceiro' });
+db.CartaoRecarga.hasMany(db.CartaoRecargaUsuario, { foreignKey: 'cartao_recarga_id', as: 'vinculosUsuarios' });
+db.CartaoRecargaUsuario.belongsTo(db.CartaoRecarga, { foreignKey: 'cartao_recarga_id', as: 'cartao' });
+db.CartaoRecargaUsuario.belongsTo(db.User, { foreignKey: 'user_id', as: 'usuario' });
+db.User.hasMany(db.CartaoRecargaUsuario, { foreignKey: 'user_id', as: 'cartoesRecargaVinculos' });
+
+db.Solicitacao.hasOne(db.SolicitacaoRecargaCartao, { foreignKey: 'solicitacao_id', as: 'recargaCartao' });
+db.SolicitacaoRecargaCartao.belongsTo(db.Solicitacao, { foreignKey: 'solicitacao_id', as: 'solicitacao' });
+db.CartaoRecarga.hasMany(db.SolicitacaoRecargaCartao, { foreignKey: 'cartao_recarga_id', as: 'recargas' });
+db.SolicitacaoRecargaCartao.belongsTo(db.CartaoRecarga, { foreignKey: 'cartao_recarga_id', as: 'cartao' });
+db.TituloFinanceiro.hasOne(db.SolicitacaoRecargaCartao, { foreignKey: 'titulo_financeiro_id', as: 'recargaCartao' });
+db.SolicitacaoRecargaCartao.belongsTo(db.TituloFinanceiro, { foreignKey: 'titulo_financeiro_id', as: 'titulo' });
+
+db.SolicitacaoRecargaCartao.hasOne(db.CartaoRecargaPrestacao, { foreignKey: 'solicitacao_recarga_id', as: 'prestacao' });
+db.CartaoRecargaPrestacao.belongsTo(db.SolicitacaoRecargaCartao, { foreignKey: 'solicitacao_recarga_id', as: 'recarga' });
+db.CartaoRecargaPrestacao.hasMany(db.CartaoRecargaPrestacaoRateio, { foreignKey: 'prestacao_id', as: 'rateios' });
+db.CartaoRecargaPrestacaoRateio.belongsTo(db.CartaoRecargaPrestacao, { foreignKey: 'prestacao_id', as: 'prestacao' });
+db.CartaoRecargaPrestacaoRateio.belongsTo(db.Obra, { foreignKey: 'obra_id', as: 'obra' });
+db.CartaoRecargaPrestacaoRateio.belongsTo(db.Apropriacao, { foreignKey: 'apropriacao_id', as: 'apropriacao' });
+
 db.User.hasMany(db.UsuarioSetor, {
   foreignKey: 'user_id',
   as: 'setoresVinculos'
@@ -429,6 +475,97 @@ db.Solicitacao.belongsTo(db.Apropriacao, {
   as: 'apropriacao'
 });
 
+db.Contrato.hasMany(db.ContratoParcela, {
+  foreignKey: 'contrato_id',
+  as: 'parcelas'
+});
+
+db.ContratoParcela.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.ContratoParcela.belongsTo(db.TituloFinanceiro, {
+  foreignKey: 'titulo_financeiro_id',
+  as: 'titulo'
+});
+
+// Medicao do fluxo novo consome parcela existente (MD-6): o vinculo diz qual medicao
+// reduziu qual parcela e quanto.
+db.Solicitacao.hasMany(db.MedicaoParcela, {
+  foreignKey: 'solicitacao_id',
+  as: 'parcelasMedidas'
+});
+
+db.MedicaoParcela.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.Contrato.hasMany(db.ContratoAditivo, {
+  foreignKey: 'contrato_id',
+  as: 'aditivos'
+});
+
+// PI-16: a medicao virou evento proprio, com numero por contrato. E dona dos anexos e
+// comentarios daquela medicao — que o card do Financeiro abre a partir do titulo.
+db.Contrato.hasMany(db.ContratoMedicao, {
+  foreignKey: 'contrato_id',
+  as: 'medicoes'
+});
+
+db.ContratoMedicao.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.ContratoMedicao.hasMany(db.MedicaoParcela, {
+  foreignKey: 'medicao_id',
+  as: 'parcelasMedidas'
+});
+
+db.MedicaoParcela.belongsTo(db.ContratoMedicao, {
+  foreignKey: 'medicao_id',
+  as: 'medicao'
+});
+
+// A solicitacao unica do contrato (PI-16). Nao confundir com `solicitacoes.contrato_id`, que e
+// de muitos-para-um e continua valendo para a trilha legada.
+db.Contrato.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacaoContrato'
+});
+
+db.ContratoAditivo.belongsTo(db.Contrato, {
+  foreignKey: 'contrato_id',
+  as: 'contrato'
+});
+
+db.ContratoParcela.hasMany(db.MedicaoParcela, {
+  foreignKey: 'contrato_parcela_id',
+  as: 'medicoes'
+});
+
+db.MedicaoParcela.belongsTo(db.ContratoParcela, {
+  foreignKey: 'contrato_parcela_id',
+  as: 'parcela'
+});
+
+db.ObraTipoApropriacaoPadrao.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra'
+});
+
+db.ObraTipoApropriacaoPadrao.belongsTo(db.TipoSolicitacao, {
+  foreignKey: 'tipo_solicitacao_id',
+  as: 'tipo'
+});
+
+db.ObraTipoApropriacaoPadrao.belongsTo(db.Apropriacao, {
+  foreignKey: 'apropriacao_id',
+  as: 'apropriacao'
+});
+
 db.Parceiro.hasMany(db.Solicitacao, {
   foreignKey: 'parceiro_id',
   as: 'solicitacoes'
@@ -437,6 +574,26 @@ db.Parceiro.hasMany(db.Solicitacao, {
 db.Solicitacao.belongsTo(db.Parceiro, {
   foreignKey: 'parceiro_id',
   as: 'parceiro'
+});
+
+db.Parceiro.hasMany(db.Solicitacao, {
+  foreignKey: 'favorecido_id',
+  as: 'solicitacoesComoFavorecido'
+});
+
+db.Solicitacao.belongsTo(db.Parceiro, {
+  foreignKey: 'favorecido_id',
+  as: 'favorecido'
+});
+
+db.FormaPagamentoFinanceira.hasMany(db.Solicitacao, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'solicitacoes'
+});
+
+db.Solicitacao.belongsTo(db.FormaPagamentoFinanceira, {
+  foreignKey: 'forma_pagamento_id',
+  as: 'formaPagamento'
 });
 
 db.Parceiro.belongsToMany(db.ParceiroCategoria, {
@@ -1321,6 +1478,153 @@ db.RhColaboradorPagamento.belongsTo(db.RhColaborador, {
   as: 'colaborador'
 });
 
+// Historico de lotacao: onde o colaborador esteve, e desde quando. `obra_id` no colaborador
+// continua sendo a obra CORRENTE; estes sao os periodos fechados mais o aberto.
+db.RhColaborador.hasMany(db.RhColaboradorVinculo, {
+  foreignKey: 'colaborador_id',
+  as: 'vinculosObra',
+  onDelete: 'CASCADE'
+});
+
+db.RhColaboradorVinculo.belongsTo(db.RhColaborador, {
+  foreignKey: 'colaborador_id',
+  as: 'colaborador'
+});
+
+// Sem chave estrangeira no banco (ver a migration 202608250050): a associacao existe para o
+// include do Sequelize, e o historico precisa sobreviver a obra.
+db.RhColaboradorVinculo.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra',
+  constraints: false
+});
+
+db.RhColaboradorVinculo.belongsTo(db.Setor, {
+  foreignKey: 'setor_id',
+  as: 'setor',
+  constraints: false
+});
+
+// Pedido de pessoal: Obra pede, DP decide. `colaborador_id` e nulo na ADMISSAO — o colaborador so
+// passa a existir quando o pedido e aprovado.
+db.RhColaborador.hasMany(db.RhSolicitacao, {
+  foreignKey: 'colaborador_id',
+  as: 'solicitacoesRh',
+  onDelete: 'CASCADE'
+});
+
+db.RhSolicitacao.belongsTo(db.RhColaborador, {
+  foreignKey: 'colaborador_id',
+  as: 'colaborador'
+});
+
+db.RhSolicitacao.belongsTo(db.Obra, {
+  foreignKey: 'obra_id',
+  as: 'obra',
+  constraints: false
+});
+
+db.RhSolicitacao.hasMany(db.RhSolicitacaoHistorico, {
+  foreignKey: 'solicitacao_id',
+  as: 'historicos',
+  onDelete: 'CASCADE'
+});
+
+db.RhSolicitacaoHistorico.belongsTo(db.RhSolicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+// Anexos do pedido. Vivem aqui porque na ADMISSAO o colaborador ainda nao existe — eles viram
+// `rh_documentos` na aprovacao (ver a migration 202608250052).
+db.RhSolicitacao.hasMany(db.RhSolicitacaoAnexo, {
+  foreignKey: 'solicitacao_id',
+  as: 'anexos',
+  onDelete: 'CASCADE'
+});
+
+db.RhSolicitacaoAnexo.belongsTo(db.RhSolicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+
+db.RhSolicitacaoAnexo.belongsTo(db.RhDocumentoTipo, {
+  foreignKey: 'documento_tipo_id',
+  as: 'tipo',
+  constraints: false
+});
+
+// --- FASE 7 do DP: catalogo de cargos e de exigencias de documento.
+db.RhCargo.hasMany(db.RhColaborador, { foreignKey: 'cargo_id', as: 'colaboradores' });
+db.RhColaborador.belongsTo(db.RhCargo, { foreignKey: 'cargo_id', as: 'cargoCatalogo' });
+
+db.RhDocumentoExigencia.belongsTo(db.RhDocumentoTipo, {
+  foreignKey: 'documento_tipo_id',
+  as: 'tipo'
+});
+db.RhDocumentoTipo.hasMany(db.RhDocumentoExigencia, {
+  foreignKey: 'documento_tipo_id',
+  as: 'exigencias'
+});
+
+db.RhSolicitacao.hasMany(db.RhSolicitacaoChecklist, {
+  foreignKey: 'solicitacao_id',
+  as: 'checklist'
+});
+db.RhSolicitacaoChecklist.belongsTo(db.RhSolicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao'
+});
+db.RhSolicitacaoChecklist.belongsTo(db.RhDocumentoTipo, {
+  foreignKey: 'documento_tipo_id',
+  as: 'tipo'
+});
+
+// A REGRA do evento recorrente (vale alimentacao, desconto de adiantamento, pensao).
+db.RhColaborador.hasMany(db.RhEventoRecorrente, {
+  foreignKey: 'colaborador_id',
+  as: 'eventosRecorrentes',
+  onDelete: 'CASCADE'
+});
+
+db.RhEventoRecorrente.belongsTo(db.RhColaborador, {
+  foreignKey: 'colaborador_id',
+  as: 'colaborador'
+});
+
+// O LANCAMENTO na folha. `ajuste_credito_manual` e `ajuste_debito_manual` do evento passam a ser a
+// SOMA destes itens, em vez de dois numeros digitados sem memoria do que os compoe.
+db.RhApuracaoEvento.hasMany(db.RhApuracaoEventoItem, {
+  foreignKey: 'apuracao_evento_id',
+  as: 'itens',
+  onDelete: 'CASCADE'
+});
+
+db.RhApuracaoEventoItem.belongsTo(db.RhApuracaoEvento, {
+  foreignKey: 'apuracao_evento_id',
+  as: 'evento'
+});
+
+// Sem chave estrangeira no banco: desativar um evento que ja apareceu em folha e o caso comum.
+db.RhApuracaoEventoItem.belongsTo(db.RhEventoRecorrente, {
+  foreignKey: 'evento_recorrente_id',
+  as: 'regra',
+  constraints: false
+});
+
+// Historico de salario. Estrutura deliberadamente igual a de `rh_colaborador_vinculos`: quem
+// entender uma entende a outra, e a aritmetica de vigencia ja esta provada.
+db.RhColaborador.hasMany(db.RhColaboradorSalario, {
+  foreignKey: 'colaborador_id',
+  as: 'salarios',
+  onDelete: 'CASCADE'
+});
+
+db.RhColaboradorSalario.belongsTo(db.RhColaborador, {
+  foreignKey: 'colaborador_id',
+  as: 'colaborador'
+});
+
 db.RhDocumentoTipo.hasMany(db.RhDocumento, {
   foreignKey: 'documento_tipo_id',
   as: 'documentos'
@@ -1758,6 +2062,34 @@ db.SolicitacaoVisibilidadeUsuario.belongsTo(db.Solicitacao, {
   onUpdate: 'CASCADE'
 });
 
+db.Solicitacao.hasMany(db.SolicitacaoPedidoRetorno, {
+  foreignKey: 'solicitacao_id',
+  as: 'pedidosRetorno',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+db.SolicitacaoPedidoRetorno.belongsTo(db.Solicitacao, {
+  foreignKey: 'solicitacao_id',
+  as: 'solicitacao',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE'
+});
+
+db.SolicitacaoPedidoRetorno.belongsTo(db.User, {
+  foreignKey: 'solicitado_por',
+  as: 'solicitante',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE'
+});
+
+db.SolicitacaoPedidoRetorno.belongsTo(db.User, {
+  foreignKey: 'decidido_por',
+  as: 'decididoPor',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE'
+});
+
 // =====================
 // NOTIFICACOES
 // =====================
@@ -2027,6 +2359,36 @@ db.SolicitacaoCompraItem.belongsTo(db.Apropriacao, {
 db.SolicitacaoCompraItemManual.belongsTo(db.Apropriacao, {
   foreignKey: 'apropriacao_id',
   as: 'apropriacao'
+});
+
+db.SolicitacaoCompraItemManual.belongsTo(db.Insumo, {
+  foreignKey: 'insumo_catalogado_id',
+  as: 'insumoCatalogado'
+});
+
+db.SolicitacaoCompraItemManual.belongsTo(db.User, {
+  foreignKey: 'catalogado_por',
+  as: 'catalogador'
+});
+
+db.Insumo.hasMany(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'insumo_catalogado_id',
+  as: 'itensManuaisCatalogados'
+});
+
+db.Insumo.hasMany(db.InsumoAlias, {
+  foreignKey: 'insumo_id',
+  as: 'aliases'
+});
+
+db.InsumoAlias.belongsTo(db.Insumo, {
+  foreignKey: 'insumo_id',
+  as: 'insumo'
+});
+
+db.InsumoAlias.belongsTo(db.SolicitacaoCompraItemManual, {
+  foreignKey: 'origem_item_manual_id',
+  as: 'itemManualOrigem'
 });
 
 db.SolicitacaoCompraItem.hasMany(db.SolicitacaoCompraItemApropriacao, {

@@ -1856,3 +1856,20 @@ export function ignorarFinanceiroDda(id, motivo) {
     body: JSON.stringify({ motivo })
   }, 'Erro ao ignorar documento DDA');
 }
+
+/**
+ * Os arquivos de uma linha do relatorio Financeiro de Obras (item 22, 23/08).
+ *
+ * Recebe o TITULO, e nao a solicitacao: a rota e estreita de proposito, para nao virar um caminho
+ * lateral para ler anexo de qualquer solicitacao. E cobra a permissao do RELATORIO — quem le o
+ * relatorio pode nao ter acesso ao modulo de solicitacoes.
+ */
+export async function getArquivosDoTitulo(tituloId) {
+  const res = await fetch(
+    `${API_URL}/financeiro/relatorios/financeiro-obras/titulos/${tituloId}/arquivos`,
+    { headers: authHeaders() }
+  );
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.error || 'Erro ao buscar os arquivos do titulo');
+  return json;
+}

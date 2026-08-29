@@ -52,6 +52,13 @@ export default function RhDpInicio() {
         ) : null}
         {podeVerColaboradores ? (
           <EtapaCard
+            titulo="Pessoal"
+            href="/rh-dp/pessoal"
+            descricao="Solicitacoes, colaboradores, jornada e apuracao em uma tela so. A obra pede, o Departamento Pessoal decide — e quem tem solicitacao aberta aparece primeiro."
+          />
+        ) : null}
+        {podeVerColaboradores ? (
+          <EtapaCard
             titulo="Colaboradores"
             href="/rh-dp/colaboradores"
             descricao="Gerencie a base cadastral, os dados de pagamento e a importacao inicial de colaboradores."

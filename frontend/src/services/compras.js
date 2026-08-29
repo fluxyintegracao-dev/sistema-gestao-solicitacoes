@@ -20,6 +20,9 @@ function handleJsonResponse(response, fallbackMessage) {
       }
 
       const error = new Error(message || fallbackMessage);
+      error.status = response.status;
+      error.code = parsed?.code;
+      error.details = parsed?.details;
       if (parsed?.erros) {
         error.erros = parsed.erros;
       }
@@ -682,6 +685,15 @@ export async function atualizarApropriacoesItemSolicitacaoCompra(id, itemId, dat
     body: JSON.stringify(data)
   });
   return handleJsonResponse(response, 'Erro ao atualizar apropriacoes do item da solicitacao de compra');
+}
+
+export async function catalogarItemManualSolicitacaoCompra(id, itemId, data) {
+  const response = await fetch(`${API_URL}/compras/solicitacoes/${id}/itens-manuais/${itemId}/catalogar`, {
+    method: 'POST',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data)
+  });
+  return handleJsonResponse(response, 'Erro ao catalogar item manual');
 }
 
 export async function cancelarPedidoCompra(id, data = {}) {

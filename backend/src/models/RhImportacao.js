@@ -10,6 +10,13 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.STRING(30),
       allowNull: false
     },
+    // PLANILHA | FORMULARIO | INDIVIDUAL — o unico rastro que distingue as origens depois que os
+    // dados se encontram na mesma estrutura (ver a migration 202608260054).
+    origem: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: 'PLANILHA'
+    },
     competencia: {
       type: DataTypes.STRING(7),
       allowNull: false

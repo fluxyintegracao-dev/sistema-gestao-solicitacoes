@@ -257,6 +257,10 @@ const COMPRAS_PEDIDOS_AUDIT_KEYS = [
   'compras.pedidos.auditoria'
 ];
 
+const COMPRAS_PEDIDOS_ANEXAR_ESPELHO_KEYS = [
+  'compras.pedidos.anexar_espelho'
+];
+
 const COMPRAS_COTACOES_VIEW_KEYS = [
   'compras.cotacoes.visualizar',
   'compras.cotacoes.gerenciar',
@@ -329,6 +333,10 @@ const COMPRAS_FORNECEDORES_VIEW_KEYS = [
 
 const COMPRAS_FORNECEDORES_MANAGE_KEYS = [
   'compras.fornecedores.gerenciar'
+];
+
+const COMPRAS_INSUMOS_CATALOGAR_MANUAIS_KEYS = [
+  'compras.insumos.catalogar_itens_manuais'
 ];
 
 const COMPRAS_RELATORIOS_VIEW_KEYS = [
@@ -419,6 +427,7 @@ const COMPRAS_PERMISSION_KEYS = [
   ...COMPRAS_DELEGACAO_MANAGE_KEYS,
   ...COMPRAS_FORNECEDORES_VIEW_KEYS,
   ...COMPRAS_FORNECEDORES_MANAGE_KEYS,
+  ...COMPRAS_INSUMOS_CATALOGAR_MANUAIS_KEYS,
   ...COMPRAS_RELATORIOS_VIEW_KEYS,
   ...COMPRAS_CONFIGURACOES_MANAGE_KEYS
 ];
@@ -689,6 +698,42 @@ const TREINAMENTO_PUBLISH_KEYS = [
   'treinamento.conteudos.publicar'
 ];
 
+const OBRAS_CADASTRO_VIEW_KEYS = [
+  'obras.cadastro.visualizar',
+  'obras.cadastro.gerenciar'
+];
+
+const OBRAS_CADASTRO_MANAGE_KEYS = [
+  'obras.cadastro.gerenciar'
+];
+
+const OBRAS_GESTAO_VIEW_KEYS = [
+  'obras.gestao.visualizar',
+  'obras.gestao.apropriacoes'
+];
+
+const OBRAS_GESTAO_APROPRIACOES_KEYS = [
+  'obras.gestao.apropriacoes'
+];
+
+const BIBLIOTECA_VIEW_KEYS = [
+  'biblioteca.geral.visualizar',
+  'biblioteca.geral.gerenciar'
+];
+
+const BIBLIOTECA_MANAGE_KEYS = [
+  'biblioteca.geral.gerenciar'
+];
+
+const COMUNICACAO_VIEW_KEYS = [
+  'comunicacao.geral.visualizar',
+  'comunicacao.geral.enviar'
+];
+
+const COMUNICACAO_SEND_KEYS = [
+  'comunicacao.geral.enviar'
+];
+
 const SST_DASHBOARD_KEYS = [
   'sst.dashboard.visualizar',
   'sst.analytics.visualizar',
@@ -919,7 +964,9 @@ function normalizePermissoesAreasPadroes(input) {
       const perfil = normalizeToken(perfilKey);
       if (!perfil) return perfilAcc;
       const normalized = normalizeModuloPermissaoList(permissions);
-      if (normalized.length) perfilAcc[perfil] = normalized;
+      // A lista vazia e um estado configurado valido: significa negar todas as
+      // permissoes granulares para este setor/perfil. Nao a descarte.
+      perfilAcc[perfil] = normalized;
       return perfilAcc;
     }, {});
 
@@ -935,7 +982,10 @@ function normalizePermissoesAreasUsuarios(input) {
     const id = Number(userId);
     if (!Number.isInteger(id) || id <= 0) return acc;
     const normalized = normalizeModuloPermissaoList(permissions);
-    if (normalized.length) acc[id] = normalized;
+    // Preserva a diferenca entre "usuario nao configurado" e "usuario
+    // configurado sem permissoes". O primeiro mantem a compatibilidade legada;
+    // o segundo deve permanecer sem acesso granular.
+    acc[id] = normalized;
     return acc;
   }, {});
 }
@@ -1007,43 +1057,115 @@ async function resolveSetorPermissionKeys(user) {
   return Array.from(keys);
 }
 
-async function getPermissoesPadraoSetorPerfil(user, config) {
+async function resolvePermissoesPadraoSetorPerfil(user, config) {
   const padroes = config?.padroes_setor_perfil || {};
   const perfil = normalizeToken(user?.perfil);
-  if (!perfil) return [];
+  if (!perfil) return { configured: false, permissions: [] };
 
   const setorKeys = await resolveSetorPermissionKeys(user);
   const lista = [];
+  let configured = false;
 
   setorKeys.forEach((key) => {
     const perfis = padroes[String(key)] || padroes[normalizeToken(key)];
-    if (perfis?.[perfil]) {
+    if (perfis && Object.prototype.hasOwnProperty.call(perfis, perfil)) {
+      configured = true;
       lista.push(...perfis[perfil]);
     }
   });
 
   if (await userHasSetorCapability(user, 'eh_setor_obra')) {
+    configured = true;
     lista.push(PERMISSAO_SOLICITACOES_MINHAS);
   }
 
-  return normalizeModuloPermissaoList(lista);
+  return {
+    configured,
+    permissions: normalizeModuloPermissaoList(lista)
+  };
+}
+
+async function getAreaPermissionStateForUser(user) {
+  if (!user?.id) {
+    return { bypass: false, configured: false, permissions: [] };
+  }
+
+  const sessionPermissions = normalizeModuloPermissaoList(user.areas_permissoes);
+  const config = await getPermissoesAreasConfig();
+  const permissionMap = config.usuarios || {};
+  const blockMap = config.usuarios_bloqueios || {};
+  const userId = Number(user.id);
+  const padraoState = await resolvePermissoesPadraoSetorPerfil(user, config);
+  const hasDirectConfiguration = Object.prototype.hasOwnProperty.call(permissionMap, userId);
+  const hasSessionConfiguration = user?.areas_permissoes_configuradas === true;
+  const hasLegacySessionPermissions = sessionPermissions.length > 0;
+  const bloqueios = new Set(normalizeModuloPermissaoList(blockMap[userId] || []));
+
+  return {
+    bypass: isBusinessAdmin(user),
+    configured: !isBusinessAdmin(user) && (
+      hasDirectConfiguration ||
+      padraoState.configured ||
+      hasSessionConfiguration ||
+      hasLegacySessionPermissions
+    ),
+    permissions: normalizeModuloPermissaoList([
+      ...padraoState.permissions,
+      ...sessionPermissions,
+      ...(permissionMap[userId] || [])
+    ]).filter((permission) => !bloqueios.has(permission))
+  };
+}
+
+/**
+ * Monta a lista de permissoes efetivamente concedidas ao usuario, SEM atalho por perfil.
+ *
+ * Extraida de `getAreasPermissoesForUser` para poder ser usada pela verificacao estrita.
+ * Aquela funcao devolve lista vazia para BusinessAdmin (o front le isso como acesso total);
+ * quem precisa saber o que foi de fato concedido — e nao o que o perfil libera — usa esta.
+ */
+async function montarPermissoesConcedidas(user) {
+  const state = await getAreaPermissionStateForUser(user);
+  return state.permissions;
 }
 
 async function getAreasPermissoesForUser(user) {
   if (!user?.id) return [];
   // BusinessAdmin: sem restrições, retorna array vazio (frontend interpreta como acesso total)
   if (isBusinessAdmin(user)) return [];
-  const sessionPermissions = normalizeModuloPermissaoList(user.areas_permissoes);
-  const config = await getPermissoesAreasConfig();
-  const permissionMap = config.usuarios || {};
-  const blockMap = config.usuarios_bloqueios || {};
-  const padroes = await getPermissoesPadraoSetorPerfil(user, config);
-  const bloqueios = new Set(normalizeModuloPermissaoList(blockMap[Number(user.id)] || []));
-  return normalizeModuloPermissaoList([
-    ...padroes,
-    ...sessionPermissions,
-    ...(permissionMap[Number(user.id)] || [])
-  ]).filter((permission) => !bloqueios.has(permission));
+  const state = await getAreaPermissionStateForUser(user);
+  return state.permissions;
+}
+
+/**
+ * Verificacao ESTRITA de permissao: sem bypass de perfil.
+ *
+ * `userHasAreaPermission` libera SUPERADMIN e ADMINISTRADOR na primeira linha — hoje 17
+ * usuarios ativos. Isso e o padrao do sistema e continua valendo em todos os outros usos.
+ *
+ * Para a aprovacao de contrato acima do limite o cliente decidiu o contrario: so aprova
+ * quem tiver a permissao marcada, independentemente do perfil. Como a regra vale apenas
+ * para essa acao, ela vive em funcao propria — alterar `userHasAreaPermission` mudaria o
+ * comportamento de todos os controllers que dependem dela.
+ */
+async function userHasStrictAreaPermission(user, permissionKeys = []) {
+  if (!user?.id) return false;
+
+  const esperadas = (Array.isArray(permissionKeys) ? permissionKeys : [])
+    .map((item) => String(item || '').trim().toLowerCase())
+    .filter(Boolean);
+
+  if (esperadas.length === 0) return false;
+
+  // Usa a montagem crua, sem o atalho por perfil.
+  //
+  // Chamar getAreasPermissoesForUser aqui seria errado: ela devolve lista vazia para
+  // SUPERADMIN/ADMINISTRADOR, e a verificacao estrita leria isso como "nada concedido" —
+  // impedindo que um SUPERADMIN aprove mesmo COM a permissao marcada. O objetivo e tirar o
+  // passe livre, nao tirar o direito.
+  const concedidas = new Set(await montarPermissoesConcedidas(user));
+
+  return esperadas.every((chave) => concedidas.has(chave));
 }
 
 async function userHasAreaPermission(user, permissionKeys = []) {
@@ -1059,18 +1181,18 @@ async function userHasAreaPermission(user, permissionKeys = []) {
     return false;
   }
 
-  const permissions = await getAreasPermissoesForUser(user);
-  if (!Array.isArray(permissions) || permissions.length === 0) {
+  const state = await getAreaPermissionStateForUser(user);
+  if (!state.configured) {
     return true;
   }
 
-  return permissions.some((permission) => expected.has(String(permission || '').trim().toLowerCase()));
+  return state.permissions.some((permission) => expected.has(String(permission || '').trim().toLowerCase()));
 }
 
 async function userHasConfiguredAreaPermissions(user) {
   if (isBusinessAdmin(user)) return false;
-  const permissions = await getAreasPermissoesForUser(user);
-  return Array.isArray(permissions) && permissions.length > 0;
+  const state = await getAreaPermissionStateForUser(user);
+  return state.configured;
 }
 
 async function userHasAreaPermissionWhenConfigured(user, permissionKeys = []) {
@@ -1317,6 +1439,11 @@ async function canAccessFinanceiroRelatorio(user, permissionKeys = []) {
 }
 
 async function canViewSolicitacaoFinanceiro(user) {
+  // A Obra acompanha somente as solicitacoes dentro do proprio escopo. A autorizacao do endpoint
+  // ainda cruza a obra da solicitacao com `usuario_obras`; isto libera a ABA, nao o modulo
+  // Financeiro nem suas operacoes.
+  if (await userHasSetorCapability(user, 'eh_setor_obra')) return true;
+
   if (await canAccessFinanceiro(user)) return true;
 
   if (await userHasConfiguredAreaPermissions(user)) {
@@ -1791,6 +1918,18 @@ async function canManageComprasPedidos(user) {
   return userHasSetorCapability(user, 'eh_setor_compras');
 }
 
+async function canAnexarEspelhoComprasPedidos(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_PEDIDOS_ANEXAR_ESPELHO_KEYS);
+  }
+
+  return userHasSetorCapability(user, 'eh_setor_compras');
+}
+
 async function canEditarItensComprasPedidos(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -1959,6 +2098,19 @@ async function canManageComprasConfiguracoes(user) {
     return userHasAreaPermission(user, COMPRAS_CONFIGURACOES_MANAGE_KEYS);
   }
 
+  return false;
+}
+
+async function canCatalogarItensManuaisCompras(user) {
+  if (isBusinessAdmin(user)) {
+    return true;
+  }
+
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMPRAS_INSUMOS_CATALOGAR_MANUAIS_KEYS);
+  }
+
+  // Acao que altera o cadastro mestre: sem permissao granular configurada, permanece fechada.
   return false;
 }
 
@@ -2513,6 +2665,71 @@ async function canViewFiscalLogs(user) {
   return false;
 }
 
+async function canViewCadastroObras(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, OBRAS_CADASTRO_VIEW_KEYS);
+  }
+  return false;
+}
+
+async function canManageCadastroObras(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await canManageConfiguracoesArea(user, 'cadastros')) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, OBRAS_CADASTRO_MANAGE_KEYS);
+  }
+  return false;
+}
+
+async function canViewGestaoObras(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, OBRAS_GESTAO_VIEW_KEYS);
+  }
+  return canViewCadastroObras(user);
+}
+
+async function canManageGestaoObrasApropriacoes(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, OBRAS_GESTAO_APROPRIACOES_KEYS);
+  }
+  return false;
+}
+
+async function canViewBiblioteca(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, BIBLIOTECA_VIEW_KEYS);
+  }
+  return true;
+}
+
+async function canManageBiblioteca(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, BIBLIOTECA_MANAGE_KEYS);
+  }
+  return false;
+}
+
+async function canViewComunicacao(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMUNICACAO_VIEW_KEYS);
+  }
+  return true;
+}
+
+async function canSendComunicacao(user) {
+  if (isBusinessAdmin(user)) return true;
+  if (await userHasConfiguredAreaPermissions(user)) {
+    return userHasAreaPermission(user, COMUNICACAO_SEND_KEYS);
+  }
+  return true;
+}
+
 async function canAccessTreinamento(user) {
   if (isBusinessAdmin(user)) {
     return true;
@@ -3012,8 +3229,10 @@ module.exports = {
   canManageComercialEmpreendimentos,
   canAlterarQuantidadeSolicitacaoCompra,
   canAlterarStatusComprasPedidos,
+  canAnexarEspelhoComprasPedidos,
   canCancelarComprasPedidos,
   canCancelarFreteComprasPedidos,
+  canCatalogarItensManuaisCompras,
   canEditarItensComprasPedidos,
   canEditarItensSolicitacaoCompra,
   canEncerrarComprasCotacoes,
@@ -3030,6 +3249,9 @@ module.exports = {
   canRegistrarFreteComprasPedidos,
   canRemanejarComprasPedidos,
   canManageConfiguracoesArea,
+  canManageCadastroObras,
+  canManageGestaoObrasApropriacoes,
+  canManageBiblioteca,
   canManageCrmAutomacoes,
   canManageCrmConfiguracoes,
   canManageFiscalConfig,
@@ -3107,6 +3329,11 @@ module.exports = {
   canViewSystemGovernance,
   canViewSystemProductEvolution,
   canViewSystemTechMonitor,
+  canViewCadastroObras,
+  canViewGestaoObras,
+  canViewBiblioteca,
+  canViewComunicacao,
+  canSendComunicacao,
   getRhDpCapabilitiesForUser,
   isAdministrador,
   isBusinessAdmin,
@@ -3119,6 +3346,7 @@ module.exports = {
   hasAnyProfile,
   hasAnyScopeToken,
   hasObraAccess,
+  getAreaPermissionStateForUser,
   getAreasPermissoesForUser,
   getPermissoesAreasConfig,
   getPermissoesAreasUsuarios,
@@ -3130,6 +3358,8 @@ module.exports = {
   isSuperadmin,
   normalizeToken,
   userHasAreaPermission,
+  userHasAreaPermissionWhenConfigured,
+  userHasStrictAreaPermission,
   userHasFinanceiroAccessConfig,
   userHasAllObrasAccess,
   userHasAnyRhDpCapability,

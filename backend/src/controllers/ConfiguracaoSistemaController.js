@@ -75,6 +75,14 @@ const CHAVE_SETORES_ACESSO_TODAS_OBRAS = 'SETORES_ACESSO_TODAS_OBRAS';
 const CHAVE_USUARIOS_ACESSO_FINANCEIRO = 'USUARIOS_ACESSO_FINANCEIRO';
 const CHAVE_USUARIOS_PERMISSOES_RH_DP = 'USUARIOS_PERMISSOES_RH_DP';
 const CHAVE_COMERCIAL_CATEGORIAS_CONTRATO = 'COMERCIAL_CATEGORIAS_CONTRATO_VENDA';
+// Categorias liberadas para o contrato de obra (fluxo novo). Ha 160 categorias PAGAR
+// ativas; sem curadoria o solicitante escolheria numa lista impraticavel.
+const CHAVE_CONTRATO_OBRA_CATEGORIAS = 'CONTRATO_OBRA_CATEGORIAS_PERMITIDAS';
+const { obterLimiteJuridico, salvarLimiteJuridico } = require('../services/contratoLimiteConfigService');
+const {
+  obterConfiguracaoLimites: obterLimitesDespesaEventual,
+  salvarConfiguracaoLimites: salvarLimitesDespesaEventual
+} = require('../services/despesaEventualService');
 const CHAVE_SUPORTE_WHATSAPP = 'SUPORTE_WHATSAPP_NUMERO';
 const TIMEOUT_INATIVIDADE_PADRAO_MINUTOS = 20;
 
@@ -390,6 +398,50 @@ function normalizarMapaPermissoesRhDp(input) {
     acc[String(id)] = normalizadas;
     return acc;
   }, {});
+}
+
+/**
+ * Categorias financeiras liberadas para o contrato de obra do fluxo novo.
+ *
+ * Curadoria sobre o cadastro existente, nao cadastro novo — mesmo padrao ja usado nas
+ * categorias comerciais. Enquanto nada for selecionado, devolve a lista vazia: assim a
+ * tela do contrato mostra que a curadoria ainda nao foi feita, em vez de liberar as 160
+ * categorias como se fosse escolha deliberada.
+ */
+async function getContratoObraCategoriasConfig() {
+  const disponiveis = await CategoriaFinanceira.findAll({
+    where: { ativo: true },
+    order: [['nome', 'ASC']]
+  });
+
+  // Contrato de obra gera titulo a PAGAR: so faz sentido oferecer categorias compativeis.
+  const compativeis = disponiveis.filter((categoria) =>
+    ['PAGAR', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase())
+  );
+
+  const item = await ConfiguracaoSistema.findOne({
+    where: { chave: CHAVE_CONTRATO_OBRA_CATEGORIAS },
+    order: [['id', 'DESC']]
+  });
+  const config = parseJsonOrDefault(item?.valor, null);
+  const selecionadas = Array.isArray(config?.categoria_ids)
+    ? normalizarIdList(config.categoria_ids)
+    : [];
+
+  // Categoria pode ter sido inativada depois de selecionada: sinaliza em vez de sumir.
+  const idsCompativeis = new Set(compativeis.map((c) => Number(c.id)));
+  const invalidas = selecionadas.filter((id) => !idsCompativeis.has(id));
+
+  return {
+    categoria_ids: selecionadas,
+    categorias_disponiveis: compativeis.map((c) => ({
+      id: c.id,
+      nome: c.nome,
+      tipo: c.tipo,
+      dre_grupo: c.dre_grupo || null
+    })),
+    categorias_invalidas: invalidas
+  };
 }
 
 async function getComercialCategoriasContratoConfig() {
@@ -1430,6 +1482,161 @@ module.exports = {
     } catch (error) {
       console.error(error);
       return res.status(500).json({ error: 'Erro ao salvar configuracoes de status dos pedidos' });
+    }
+  },
+
+  /**
+   * Formas de pagamento que a MEDICAO oferece (item 9 do lote de 23/08).
+   *
+   * A configuracao apenas CURA a lista: as formas continuam vindo do cadastro financeiro. Lista
+   * vazia significa todas — sem isso o sistema nasceria travado, com a medicao sem nenhuma opcao
+   * ate alguem abrir esta tela.
+   */
+  async getFormasPagamentoMedicao(req, res) {
+    try {
+      const { listarCatalogoParaConfiguracao } = require('../services/formasPagamentoMedicaoService');
+      return res.json(await listarCatalogoParaConfiguracao());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar as formas de pagamento da medicao' });
+    }
+  },
+
+  async setFormasPagamentoMedicao(req, res) {
+    try {
+      const { salvarFormasLiberadas } = require('../services/formasPagamentoMedicaoService');
+      return res.json(await salvarFormasLiberadas(req.body?.formas));
+    } catch (error) {
+      console.error(error);
+      return res.status(400).json({ error: error.message || 'Erro ao salvar as formas de pagamento da medicao' });
+    }
+  },
+
+  async getDespesaEventualLimites(req, res) {
+    try {
+      return res.json(await obterLimitesDespesaEventual());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar os limites da Despesa Eventual.' });
+    }
+  },
+
+  async setDespesaEventualLimites(req, res) {
+    try {
+      return res.json(await salvarLimitesDespesaEventual(req.body || {}));
+    } catch (error) {
+      return res.status(Number(error?.statusCode) || 400).json({
+        error: error?.message || 'Erro ao salvar os limites da Despesa Eventual.'
+      });
+    }
+  },
+
+  /** ITEM 21 (23/08): os cortes e as cores do alerta de saldo do contrato. */
+  async getAlertaSaldoContrato(req, res) {
+    try {
+      const { obterConfiguracao } = require('../services/alertaSaldoContratoService');
+      return res.json(await obterConfiguracao());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar o alerta de saldo do contrato' });
+    }
+  },
+
+  async setAlertaSaldoContrato(req, res) {
+    try {
+      const { salvarConfiguracao } = require('../services/alertaSaldoContratoService');
+      return res.json(await salvarConfiguracao(req.body || {}, { usuarioId: req.user?.id || null }));
+    } catch (error) {
+      // A validacao devolve `statusCode`; qualquer outra coisa e 400 mesmo, porque o corpo veio da
+      // tela de configuracao.
+      return res.status(Number(error?.statusCode) || 400).json({
+        error: error.message || 'Erro ao salvar o alerta de saldo do contrato'
+      });
+    }
+  },
+
+  async getContratoLimiteJuridico(req, res) {
+    try {
+      return res.json(await obterLimiteJuridico());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar o limite de contrato' });
+    }
+  },
+
+  async setContratoLimiteJuridico(req, res) {
+    try {
+      return res.json(await salvarLimiteJuridico(req.body?.limite));
+    } catch (error) {
+      const status = Number(error?.statusCode) || 500;
+      if (status >= 500) console.error(error);
+      return res.status(status).json({ error: status >= 500 ? 'Erro ao salvar o limite de contrato' : error.message });
+    }
+  },
+
+  async getContratoObraCategorias(req, res) {
+    try {
+      return res.json(await getContratoObraCategoriasConfig());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao buscar categorias do contrato de obra' });
+    }
+  },
+
+  async setContratoObraCategorias(req, res) {
+    try {
+      // Entrada invalida NUNCA vira "limpar tudo": normalizar em silencio ja apagou
+      // configuracao neste projeto (auditoria da apropriacao padrao). Lista vazia so por
+      // array vazio explicito.
+      const bruto = req.body?.categoria_ids;
+      if (!Array.isArray(bruto)) {
+        return res.status(400).json({ error: 'categoria_ids deve ser uma lista.' });
+      }
+      const invalidos = bruto.filter((v) => !(Number.isInteger(Number(v)) && Number(v) > 0 && String(v).trim() !== ''));
+      if (invalidos.length > 0) {
+        return res.status(400).json({ error: `Ids invalidos em categoria_ids: ${invalidos.slice(0,5).join(', ')}` });
+      }
+      const ids = normalizarIdList(bruto);
+
+      // Valida contra o cadastro antes de gravar: id inexistente, inativo ou de tipo
+      // incompativel viraria opcao quebrada na tela do contrato.
+      if (ids.length > 0) {
+        const categorias = await CategoriaFinanceira.findAll({
+          where: { id: ids, ativo: true },
+          attributes: ['id', 'tipo']
+        });
+        const porId = new Map(categorias.map((c) => [Number(c.id), c]));
+
+        const invalida = ids.find((id) => {
+          const categoria = porId.get(id);
+          return !categoria || !['PAGAR', 'AMBOS'].includes(String(categoria.tipo || '').toUpperCase());
+        });
+
+        if (invalida) {
+          return res.status(400).json({
+            error: `Categoria financeira ${invalida} nao existe, esta inativa ou nao aceita titulo a pagar.`
+          });
+        }
+      }
+
+      const valor = JSON.stringify({ categoria_ids: ids });
+      const existente = await ConfiguracaoSistema.findOne({
+        where: { chave: CHAVE_CONTRATO_OBRA_CATEGORIAS },
+        order: [['id', 'DESC']]
+      });
+
+      // Atualiza a linha existente em vez de inserir outra: a tabela nao tem unicidade
+      // por chave e ja acumula duplicatas de outras configuracoes.
+      if (existente) {
+        await existente.update({ valor });
+      } else {
+        await ConfiguracaoSistema.create({ chave: CHAVE_CONTRATO_OBRA_CATEGORIAS, valor });
+      }
+
+      return res.json(await getContratoObraCategoriasConfig());
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar categorias do contrato de obra' });
     }
   },
 

@@ -11,6 +11,7 @@ import {
   HiPaperClip
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import { canSendComunicacao } from '../utils/acessoProduto';
 import { API_URL, authHeaders, fileUrl } from '../services/api';
 import { getSetores } from '../services/setores';
 import {
@@ -134,6 +135,7 @@ function AvatarConversa({ conv, size = 9 }) {
 export default function ComunicacaoInterna() {
   const { user } = useAuth();
   const userId = user?.id;
+  const podeEnviarComunicacao = canSendComunicacao(user);
 
   const [conversas, setConversas] = useState([]);
   const [loadingLista, setLoadingLista] = useState(true);
@@ -588,7 +590,7 @@ export default function ComunicacaoInterna() {
             {mostrandoArquivadas ? 'Arquivadas' : 'Comunicação Interna'}
           </span>
           <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            {!mostrandoArquivadas && (
+            {!mostrandoArquivadas && podeEnviarComunicacao && (
               <button className="btn btn-primary" style={{ fontSize: 12, padding: '4px 12px' }} onClick={abrirModalNova}>
                 + Nova
               </button>
@@ -623,9 +625,11 @@ export default function ComunicacaoInterna() {
           {!loadingLista && conversasFiltradas.length === 0 && (
             <div style={{ padding: 40, textAlign: 'center', color: 'var(--c-muted)', fontSize: 13 }}>
               <p>Nenhuma conversa</p>
-              <button onClick={abrirModalNova} style={{ color: 'var(--c-primary)', textDecoration: 'underline', fontSize: 12, marginTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
-                Criar nova conversa
-              </button>
+              {podeEnviarComunicacao ? (
+                <button onClick={abrirModalNova} style={{ color: 'var(--c-primary)', textDecoration: 'underline', fontSize: 12, marginTop: 8, background: 'none', border: 'none', cursor: 'pointer' }}>
+                  Criar nova conversa
+                </button>
+              ) : null}
             </div>
           )}
           {conversasFiltradas.map((conv) => {
@@ -684,7 +688,7 @@ export default function ComunicacaoInterna() {
           <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--c-muted)', gap: 12 }}>
             <HiOutlineChatBubbleLeftRight size={40} style={{ opacity: 0.35 }} />
             <span style={{ fontSize: 14 }}>Selecione uma conversa ou crie uma nova</span>
-            {!mostrandoArquivadas && (
+            {!mostrandoArquivadas && podeEnviarComunicacao && (
               <button onClick={abrirModalNova} className="btn btn-outline" style={{ fontSize: 13 }}>Nova conversa</button>
             )}
           </div>
@@ -781,17 +785,19 @@ export default function ComunicacaoInterna() {
                               borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
                               minWidth: 150, overflow: 'hidden'
                             }}>
+                              {podeEnviarComunicacao ? (
                                 <button
-                                onClick={() => { setMensagemRespondendo(msg); setMenuMsgId(null); inputRef.current?.focus(); }}
-                                style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
-                              ><HiOutlineArrowUturnLeft size={14} /> Responder</button>
-                              {msg.pode_editar && (
+                                  onClick={() => { setMensagemRespondendo(msg); setMenuMsgId(null); inputRef.current?.focus(); }}
+                                  style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
+                                ><HiOutlineArrowUturnLeft size={14} /> Responder</button>
+                              ) : null}
+                              {podeEnviarComunicacao && msg.pode_editar && (
                                 <button
                                   onClick={() => { setEditandoId(msg.id); setTextoEdicao(msg.mensagem); setMenuMsgId(null); }}
                                   style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--c-text)', gap: 8, alignItems: 'center' }}
                                 ><HiOutlinePencil size={14} /> Editar</button>
                               )}
-                              {msg.pode_deletar && (
+                              {podeEnviarComunicacao && msg.pode_deletar && (
                                 <button
                                   onClick={() => { deletarMensagem(msg.id); setMenuMsgId(null); }}
                                   style={{ display: 'flex', width: '100%', padding: '9px 14px', fontSize: 13, background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', gap: 8, alignItems: 'center' }}
@@ -902,7 +908,8 @@ export default function ComunicacaoInterna() {
             </div>
 
             {/* Input de mensagem */}
-            <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-surface)', padding: '10px 16px', flexShrink: 0 }}>
+            {podeEnviarComunicacao ? (
+              <div style={{ borderTop: '1px solid var(--c-border)', background: 'var(--c-surface)', padding: '10px 16px', flexShrink: 0 }}>
                 {mensagemRespondendo && (
                   <div style={{ display: 'flex', alignItems: 'stretch', gap: 0, marginBottom: 8, borderRadius: 8, overflow: 'hidden', border: '1px solid var(--c-border)', background: 'var(--c-bg, #f8fafc)' }}>
                     <div style={{ width: 4, flexShrink: 0, background: 'var(--c-primary)' }} />
@@ -958,6 +965,11 @@ export default function ComunicacaoInterna() {
                   </button>
                 </div>
               </div>
+            ) : (
+              <div style={{ borderTop: '1px solid var(--c-border)', padding: '10px 16px', color: 'var(--c-muted)', fontSize: 12 }}>
+                Somente leitura. Solicite a permissao de enviar mensagens para responder ou iniciar conversas.
+              </div>
+            )}
           </>
         )}
       </div>
@@ -1014,7 +1026,7 @@ export default function ComunicacaoInterna() {
       )}
 
       {/* === MODAL nova conversa === */}
-      {showNova && (
+      {showNova && podeEnviarComunicacao && (
         <div
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
           onClick={() => !salvando && setShowNova(false)}

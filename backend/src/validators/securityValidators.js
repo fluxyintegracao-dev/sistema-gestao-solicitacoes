@@ -168,12 +168,34 @@ function validateNumericIdParam(paramName, label) {
   };
 }
 
+function validateNumericIdAndSlugParams(paramName, slugName, allowedSlugs, label) {
+  const permitidos = new Set(allowedSlugs || []);
+  return (params = {}) => {
+    ensureAllowedKeys(params, [paramName, slugName], label || 'Parametros');
+    const rawValue = sanitizeString(params[paramName], label || paramName, {
+      required: true,
+      max: 20,
+      pattern: /^\d+$/
+    });
+    const slug = sanitizeString(params[slugName], slugName, {
+      required: true,
+      max: 50,
+      pattern: /^[a-z0-9-]+$/
+    }).toLowerCase();
+    if (!permitidos.has(slug)) {
+      throw new ValidationError(`${slugName} invalido.`);
+    }
+    return { ...params, [paramName]: rawValue, [slugName]: slug };
+  };
+}
+
 module.exports = {
   validateLoginBody,
   validateForgotPasswordBody,
   validateMfaCodeBody,
   validateMfaLoginBody,
   validateNumericIdParam,
+  validateNumericIdAndSlugParams,
   validatePasswordChangeBody,
   validateResetPasswordBody,
   validatePresignQuery

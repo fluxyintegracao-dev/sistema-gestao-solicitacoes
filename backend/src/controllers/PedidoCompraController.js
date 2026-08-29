@@ -27,6 +27,7 @@ const {
 const {
   getUserObraScopeIds,
   canAccessSolicitacaoCompraByScope,
+  canAnexarEspelhoComprasPedidos,
   canAlterarStatusComprasPedidos,
   canAuditComprasPedidos,
   canCancelarComprasPedidos,
@@ -79,9 +80,12 @@ async function validarAcessoPedidos(req, res, options = {}) {
 
   const exigeGestao = options.gerenciar === true;
   const exigeAuditoria = options.auditoria === true;
+  const exigeAnexarEspelho = options.anexarEspelho === true;
   let permitido = await podeVisualizarPedidos(usuario);
   if (exigeAuditoria) {
     permitido = await canAuditComprasPedidos(usuario);
+  } else if (exigeAnexarEspelho) {
+    permitido = await canAnexarEspelhoComprasPedidos(usuario);
   } else if (exigeGestao) {
     permitido = await podeGerenciarPedidos(usuario);
   }
@@ -90,9 +94,11 @@ async function validarAcessoPedidos(req, res, options = {}) {
     res.status(403).json({
       error: exigeAuditoria
         ? 'Acesso negado a auditoria dos pedidos de compra'
+        : (exigeAnexarEspelho
+          ? 'Acesso negado para anexar o espelho do pedido de compra'
         : (exigeGestao
           ? 'Apenas compras pode gerenciar pedidos de compra'
-          : 'Acesso negado aos pedidos de compra')
+          : 'Acesso negado aos pedidos de compra'))
     });
     return null;
   }
@@ -764,15 +770,10 @@ module.exports = {
     const transaction = await PedidoCompra.sequelize.transaction();
 
     try {
-      const usuario = await validarAcessoPedidos(req, res, { gerenciar: true });
+      const usuario = await validarAcessoPedidos(req, res, { anexarEspelho: true });
       if (!usuario) {
         await transaction.rollback();
         return;
-      }
-
-      if (!(await canRegistrarFreteComprasPedidos(usuario))) {
-        await transaction.rollback();
-        return res.status(403).json({ error: 'Acesso negado para editar frete do pedido' });
       }
 
       if (!(await carregarPedidoCompraNoEscopo(req, res, usuario, req.params.id))) {

@@ -6,6 +6,8 @@ import {
   listarArquivosModelos,
   uploadArquivoModelo
 } from '../services/arquivosModelos';
+import { useAuth } from '../contexts/AuthContext';
+import { canManageBiblioteca } from '../utils/acessoProduto';
 
 function formatarDataHora(valor) {
   if (!valor) return '-';
@@ -23,6 +25,8 @@ function formatarTamanho(bytes) {
 }
 
 export default function ArquivosModelos() {
+  const { user } = useAuth();
+  const podeGerenciarBiblioteca = canManageBiblioteca(user);
   const [contexto, setContexto] = useState(null);
   const [paginaSelecionada, setPaginaSelecionada] = useState('');
   const [arquivos, setArquivos] = useState([]);
@@ -35,8 +39,8 @@ export default function ArquivosModelos() {
 
   const podeUploadAtual = useMemo(() => {
     if (!contexto || !paginaSelecionada) return false;
-    return contexto?.uploadPermitidoPorPagina?.[paginaSelecionada] === true;
-  }, [contexto, paginaSelecionada]);
+    return podeGerenciarBiblioteca && contexto?.uploadPermitidoPorPagina?.[paginaSelecionada] === true;
+  }, [contexto, paginaSelecionada, podeGerenciarBiblioteca]);
 
   async function carregarContexto() {
     const data = await getContextoArquivosModelos();

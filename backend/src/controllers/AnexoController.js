@@ -18,6 +18,8 @@ const {
 } = require('../services/authorizationService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { publishSolicitacaoRealtimeEvent } = require('../services/solicitacaoRealtimeService');
+const { assertPodeInteragirSolicitacao } = require('../services/solicitacaoRetornoService');
+const { validarTokenUploadCriacaoSolicitacao } = require('../services/solicitacaoCriacaoUploadTokenService');
 
 function parseHistoricoMetadata(metadata) {
   if (!metadata) return {};
@@ -100,7 +102,8 @@ class AnexoController {
         'ANEXO',
         'SOLICITACAO',
         'CONTRATO',
-        'COMPROVANTE'
+        'COMPROVANTE',
+        'BOLETO'
       ];
 
       const tipoNormalizado = String(tipo).toUpperCase();
@@ -114,7 +117,7 @@ class AnexoController {
       }
 
       const solicitacao = await Solicitacao.findByPk(solicitacao_id, {
-        attributes: ['id', 'codigo', 'obra_id']
+        attributes: ['id', 'codigo', 'obra_id', 'criado_por', 'tipo_solicitacao_id', 'area_responsavel', 'status_global']
       });
       const acessoSolicitacao = await validarAcessoSolicitacao(req, solicitacao);
 
@@ -126,7 +129,50 @@ class AnexoController {
         return res.status(404).json({ error: 'Solicitação não encontrada' });
       }
 
+      // O upload selecionado na Nova Solicitacao ainda pertence ao ato de criacao. Sem esta
+      // autorizacao curta, o criador perde o direito entre o POST da solicitacao (que ja nasce no
+      // setor destino) e o POST do arquivo. Interacoes posteriores continuam submetidas a regra
+      // normal de setor/retorno.
+      const uploadInicialAutorizado = validarTokenUploadCriacaoSolicitacao({
+        token: req.body?.criacao_upload_token,
+        solicitacaoId: solicitacao.id,
+        usuarioId: req.user.id,
+        tipo: tipoNormalizado
+      });
+
+      if (!uploadInicialAutorizado) {
+        try {
+          await assertPodeInteragirSolicitacao(req, solicitacao);
+        } catch (errorAcesso) {
+          return res.status(Number(errorAcesso.statusCode) || 403).json({
+            error: errorAcesso.message,
+            code: errorAcesso.code || undefined
+          });
+        }
+      }
+
       const codigo = solicitacao.codigo;
+
+      // VINCULO DO ANEXO COM A MEDICAO (item 20 do lote de 23/08).
+      //
+      // `anexos.medicao_id` existia na tabela e no model desde 19/08 e NADA o preenchia: dos 30
+      // anexos da obra 23, zero tinham medicao. O modal "Medicao N" filtra por esse campo — entao
+      // ele nunca mostrava anexo nenhum, por construcao, e a separacao dos documentos de cada
+      // medicao (o motivo de o card existir) nao acontecia.
+      //
+      // A medicao e conferida contra a SOLICITACAO: sem isso, um id de outra solicitacao penduraria
+      // o documento no lugar errado — e quem olhasse a medicao veria papel que nao e dela.
+      const medicaoId = Number(req.body?.medicao_id) || null;
+      if (medicaoId) {
+        const { ContratoMedicao } = require('../models');
+        const medicao = await ContratoMedicao.findOne({
+          where: { id: medicaoId, solicitacao_id },
+          attributes: ['id']
+        });
+        if (!medicao) {
+          return res.status(400).json({ error: 'A medicao informada nao pertence a esta solicitacao.' });
+        }
+      }
 
       const registros = [];
 
@@ -143,7 +189,8 @@ class AnexoController {
           nome_original: nomeOriginal,
           caminho_arquivo: url,
           uploaded_by: usuario.id,
-          area_origem: usuario.setor_id
+          area_origem: usuario.setor_id,
+          medicao_id: medicaoId
         });
 
         registros.push(anexo);
@@ -315,12 +362,21 @@ class AnexoController {
       }
 
       const solicitacao = await Solicitacao.findByPk(historico.solicitacao_id, {
-        attributes: ['id', 'obra_id']
+        attributes: ['id', 'codigo', 'obra_id', 'criado_por', 'tipo_solicitacao_id', 'area_responsavel', 'status_global']
       });
       const acessoSolicitacao = await validarAcessoSolicitacao(req, solicitacao);
 
       if (!acessoSolicitacao.permitido) {
         return res.status(acessoSolicitacao.status).json({ error: acessoSolicitacao.error });
+      }
+
+      try {
+        await assertPodeInteragirSolicitacao(req, solicitacao);
+      } catch (errorAcesso) {
+        return res.status(Number(errorAcesso.statusCode) || 403).json({
+          error: errorAcesso.message,
+          code: errorAcesso.code || undefined
+        });
       }
 
       if (historico.acao !== 'ANEXO_ADICIONADO') {

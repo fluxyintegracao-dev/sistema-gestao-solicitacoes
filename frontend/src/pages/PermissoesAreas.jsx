@@ -62,7 +62,9 @@ function normalizeMapa(input) {
       ? [...new Set(perms.map(normalizeKey).filter(Boolean))]
       : [];
 
-    if (lista.length) acc[id] = lista;
+    // Lista vazia e uma configuracao explicita valida (nega todas). Remover a
+    // chave faria o runtime voltar ao acesso legado irrestrito.
+    acc[id] = lista;
     return acc;
   }, {});
 }
@@ -138,6 +140,17 @@ function getPermissoesPadraoUsuario(usuario, padroesSetorPerfil) {
   }
 
   return [...new Set(permissoes.map(normalizeKey).filter(Boolean))];
+}
+
+function hasPadraoConfiguradoUsuario(usuario, padroesSetorPerfil) {
+  if (!usuario || !padroesSetorPerfil || typeof padroesSetorPerfil !== 'object') return false;
+  if (isSetorObra(usuario?.setor)) return true;
+
+  const perfil = normalizePerfil(usuario?.perfil);
+  return getSetorPermissionKeys(usuario).some((setorKey) => {
+    const perfis = padroesSetorPerfil[setorKey] || padroesSetorPerfil[normalizeToken(setorKey)];
+    return Boolean(perfis) && Object.prototype.hasOwnProperty.call(perfis, perfil);
+  });
 }
 
 function isBypassAdmin(usuario) {
@@ -493,17 +506,19 @@ export default function PermissoesAreas() {
       .filter((key) => !bloqueadas.has(key));
   }, [permissoesBloqueadasUsuarioAtual, permissoesIndividuaisUsuarioAtual, permissoesPadraoUsuarioAtual]);
 
+  const usuarioSelecionadoTemConfiguracao = useMemo(() => {
+    if (!usuarioSelecionadoId || !usuarioSelecionado) return false;
+    return Object.prototype.hasOwnProperty.call(mapa, usuarioSelecionadoId) ||
+      hasPadraoConfiguradoUsuario(usuarioSelecionado, padroesSetorPerfil);
+  }, [mapa, padroesSetorPerfil, usuarioSelecionado, usuarioSelecionadoId]);
+
   function setUserList(setter, userId, updater) {
     setter((current) => {
       const listaAtual = current[userId] || [];
       const proximaLista = [...new Set(updater(listaAtual).map(normalizeKey).filter(Boolean))];
       const next = { ...current };
 
-      if (proximaLista.length) {
-        next[userId] = proximaLista;
-      } else {
-        delete next[userId];
-      }
+      next[userId] = proximaLista;
 
       return next;
     });
@@ -607,7 +622,10 @@ export default function PermissoesAreas() {
         const bloqueadas = new Set(persistedBlocks[usuarioSelecionadoId] || []);
         updateUser({
           areas_permissoes: [...new Set([...padroesUsuario, ...(persistedMap[usuarioSelecionadoId] || [])])]
-            .filter((key) => !bloqueadas.has(key))
+            .filter((key) => !bloqueadas.has(key)),
+          areas_permissoes_configuradas:
+            Object.prototype.hasOwnProperty.call(persistedMap, usuarioSelecionadoId) ||
+            hasPadraoConfiguradoUsuario(usuarioSelecionado, normalizePadroes(resultado?.padroes_setor_perfil))
         });
       }
       alert('Permissoes salvas com sucesso.');
@@ -683,6 +701,8 @@ export default function PermissoesAreas() {
                 const bloqueios = bloqueiosMapa[item.id] || [];
                 const padroes = getPermissoesPadraoUsuario(item, padroesSetorPerfil);
                 const qPerms = [...new Set([...padroes, ...extras])].filter((key) => !bloqueios.includes(key)).length;
+                const configurado = Object.prototype.hasOwnProperty.call(mapa, item.id) ||
+                  hasPadraoConfiguradoUsuario(item, padroesSetorPerfil);
                 const perfil = String(item.perfil || '').toUpperCase();
                 const ehBypass = perfil === 'SUPERADMIN' || perfil === 'ADMINISTRADOR';
                 const ativo = item.id === usuarioSelecionadoId;
@@ -707,11 +727,15 @@ export default function PermissoesAreas() {
                         <span className={`shrink-0 text-[10px] ${ativo ? 'text-white/70' : 'text-[var(--c-muted)]'}`}>
                           bypass
                         </span>
-                      ) : qPerms > 0 ? (
+                      ) : configurado ? (
                         <span className={`shrink-0 tabular-nums text-[10px] ${ativo ? 'text-white/80' : 'text-[var(--c-primary)]'}`}>
                           {qPerms} perm.
                         </span>
-                      ) : null}
+                      ) : (
+                        <span className={`shrink-0 text-[10px] ${ativo ? 'text-amber-100' : 'text-amber-700'}`}>
+                          legado
+                        </span>
+                      )}
                     </div>
 
                     <div className={`mt-0.5 flex items-center gap-2 ${ativo ? 'text-white/70' : 'text-[var(--c-muted)]'}`}>
@@ -761,6 +785,23 @@ export default function PermissoesAreas() {
                     )}
                   </div>
                 </div>
+
+                {!selectedUserIsBypassAdmin && !usuarioSelecionadoTemConfiguracao ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                    <div>
+                      <strong>Acesso legado irrestrito:</strong> este usuario ainda nao possui configuracao individual
+                      nem padrao de setor/perfil. Ative a matriz, marque somente o necessario e salve. Uma matriz ativa
+                      com tudo desmarcado bloqueia todas as areas granulares.
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm shrink-0"
+                      onClick={() => setUserList(setMapa, usuarioSelecionadoId, (lista) => lista)}
+                    >
+                      Ativar matriz granular
+                    </button>
+                  </div>
+                ) : null}
 
                 {registry.map((grupo) => {
                   const moduloKey = String(grupo.modulo || '').trim().toUpperCase();

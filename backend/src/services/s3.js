@@ -14,13 +14,41 @@ const INLINE_RISKY_EXTENSIONS = new Set([
   '.xml'
 ]);
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+// Ambiente local/offline: sem credenciais AWS o storage remoto fica desligado.
+// Evita que anexos herdados da copia do banco gerem URLs assinadas apontando
+// para os buckets de producao.
+function isStorageOfflineMode() {
+  return !(
+    process.env.AWS_REGION &&
+    process.env.AWS_ACCESS_KEY_ID &&
+    process.env.AWS_SECRET_ACCESS_KEY
+  );
+}
+
+let s3Client = null;
+
+// Instanciacao preguicosa: o SDK exige region no construtor e derrubaria o boot
+// do backend em ambientes sem AWS configurada.
+function getS3Client() {
+  if (isStorageOfflineMode()) {
+    const error = new Error('Storage S3 desabilitado neste ambiente (AWS nao configurada).');
+    error.code = 'STORAGE_DISABLED';
+    error.statusCode = 503;
+    throw error;
   }
-});
+
+  if (!s3Client) {
+    s3Client = new S3Client({
+      region: process.env.AWS_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+      }
+    });
+  }
+
+  return s3Client;
+}
 
 function createPresignTargetError(message) {
   const error = new Error(message);
@@ -132,7 +160,7 @@ async function uploadToS3(file, folder) {
     ContentType: file.mimetype
   });
 
-  await s3.send(command);
+  await getS3Client().send(command);
 
   return `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${command.input.Key}`;
 }
@@ -218,6 +246,12 @@ async function getPresignedUrl(urlOrKey, expiresIn = 300, options = {}) {
     return urlOrKey;
   }
 
+  // Sem AWS configurada nao ha o que assinar: devolve o valor original em vez de
+  // emitir uma URL para o bucket de producao.
+  if (isStorageOfflineMode()) {
+    return urlOrKey;
+  }
+
   const storageTarget = getStorageTarget(urlOrKey, options);
 
   if (!storageTarget?.key) {
@@ -241,7 +275,7 @@ async function getPresignedUrl(urlOrKey, expiresIn = 300, options = {}) {
       : {})
   });
 
-  return getSignedUrl(s3, command, { expiresIn });
+  return getSignedUrl(getS3Client(), command, { expiresIn });
 }
 
-module.exports = { uploadToS3, getPresignedUrl, shouldForceAttachmentForTarget };
+module.exports = { uploadToS3, getPresignedUrl, shouldForceAttachmentForTarget, isStorageOfflineMode };

@@ -1,7 +1,16 @@
+const {
+  TIPO_ANEXO_NEGOCIACAO,
+  TIPO_ANEXO_MINUTA,
+  TIPO_ANEXO_CARTAO_CNPJ,
+  TIPO_ANEXO_ATO_CONSTITUTIVO,
+  TIPO_ANEXO_DOCUMENTOS_REPRESENTANTE
+} = require('../services/contratoFluxoNovoService');
 const { Op } = require('sequelize');
 const {
   Contrato,
+  Anexo,
   ContratoAnexo,
+  Historico,
   ContratoApropriacao,
   ContratoCredor,
   EmpresaGrupo,
@@ -16,6 +25,7 @@ const {
   ConfiguracaoSistema,
   sequelize
 } = require('../models');
+const { codigoDoSetor } = require('../utils/codigoDoSetor');
 const { env } = require('../config/env');
 const { uploadToS3 } = require('../services/s3');
 const {
@@ -26,11 +36,31 @@ const {
   getUserObraScopeIds,
   isBusinessAdmin,
   isSuperadmin,
-  shouldRestrictContratosToObras
+  shouldRestrictContratosToObras,
+  userHasAreaPermission
 } = require('../services/authorizationService');
 const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { normalizeOriginalName } = require('../utils/fileName');
+const { assertPodeInteragirSolicitacao } = require('../services/solicitacaoRetornoService');
+
+const DOCUMENTACAO_JURIDICA_POR_SLUG = Object.freeze({
+  'cartao-cnpj': {
+    tipo: TIPO_ANEXO_CARTAO_CNPJ,
+    pasta: 'cartao-cnpj',
+    rotulo: 'Cartao CNPJ'
+  },
+  'ato-constitutivo': {
+    tipo: TIPO_ANEXO_ATO_CONSTITUTIVO,
+    pasta: 'ato-constitutivo',
+    rotulo: 'Ato constitutivo'
+  },
+  'representante-legal': {
+    tipo: TIPO_ANEXO_DOCUMENTOS_REPRESENTANTE,
+    pasta: 'representante-legal',
+    rotulo: 'Documentos do representante legal'
+  }
+});
 const CHAVE_SETORES_CRIACAO_TODAS_OBRAS = 'SETORES_CRIACAO_TODAS_OBRAS';
 
 function normalizarCabecalho(valor) {
@@ -609,13 +639,20 @@ function getContratoMetrics(contrato) {
   const valorContrato = toNumber(contrato.valor_total);
   const ajusteSolicitado = toNumber(contrato.ajuste_solicitado);
   const ajustePago = toNumber(contrato.ajuste_pago);
-  const totalSolicitado = valorContrato + ajusteSolicitado;
+  // PI-15: o termo aditivo passou a valer tambem para o contrato do fluxo ANTIGO, e o aprovado
+  // vai para `valor_aditivos`. Sem soma-lo aqui o aditivo seria um numero que nenhuma consulta
+  // do legado le. Cada mecanismo no seu campo: `ajuste_solicitado` continua sendo o ajuste
+  // manual, e a aprovacao do aditivo nunca escreve nele — assim nao ha duplo computo.
+  // Neutro hoje: os 335 contratos legados tem `valor_aditivos = 0`.
+  const valorAditivos = toNumber(contrato.valor_aditivos);
+  const totalSolicitado = valorContrato + ajusteSolicitado + valorAditivos;
   const totalPago = totalPagoStatus + ajustePago;
 
   return {
     valor_contrato: valorContrato,
     ajuste_solicitado: ajusteSolicitado,
     ajuste_pago: ajustePago,
+    valor_aditivos: valorAditivos,
     total_solicitado: totalSolicitado,
     total_pago: totalPago,
     total_a_pagar: Math.max(totalSolicitado - totalPago, 0),
@@ -714,6 +751,26 @@ module.exports = {
         });
       }
 
+      // CONTRATO NAO APROVADO NEM E LISTADO (item 8 do lote de 23/08).
+      //
+      // O modo CRIACAO e o da tela que abre solicitacao — na pratica, a medicao. O backend ja
+      // recusava medir contrato nao aprovado, mas a lista oferecia: a pessoa montava a medicao
+      // inteira e levava o erro no fim.
+      //
+      // So o fluxo NOVO e filtrado. Os 335 contratos legados tem `status_contrato` nulo, e olhar
+      // essa coluna sem a condicao de fluxo esconderia todos eles.
+      if (modoCriacao) {
+        where[Op.and] = [
+          ...(where[Op.and] || []),
+          {
+            [Op.or]: [
+              { fluxo_novo: { [Op.not]: true } },
+              { status_contrato: 'ATIVO' }
+            ]
+          }
+        ];
+      }
+
       if (modoCriacao && !acessoGlobalContratos) {
         const [tokensUsuario, setoresPermitidos] = await Promise.all([
           obterTokensSetorUsuario(req),
@@ -756,11 +813,34 @@ module.exports = {
           { model: Obra, as: 'obra', attributes: ['id', 'nome', 'codigo'] },
           { model: TipoSolicitacao, as: 'tipoMacro', attributes: ['id', 'nome'] },
           { model: TipoSubContrato, as: 'tipoSub', attributes: ['id', 'nome'] },
+          {
+            model: Solicitacao,
+            as: 'solicitacaoContrato',
+            attributes: ['id', 'codigo', 'obra_id', 'criado_por', 'tipo_solicitacao_id', 'area_responsavel', 'status_global'],
+            required: false
+          },
           contratoApropriacoesInclude(),
           contratoCredoresInclude()
         ],
         order: [['createdAt', 'DESC']]
       });
+
+      if (modoCriacao) {
+        const contratosDisponiveis = [];
+        for (const contrato of contratos) {
+          if (!contrato.fluxo_novo || !contrato.solicitacao_id) {
+            contratosDisponiveis.push(contrato);
+            continue;
+          }
+          try {
+            await assertPodeInteragirSolicitacao(req, contrato.solicitacaoContrato || contrato.solicitacao_id);
+            contratosDisponiveis.push(contrato);
+          } catch (errorAcesso) {
+            if (![403, 404, 409].includes(Number(errorAcesso?.statusCode))) throw errorAcesso;
+          }
+        }
+        return res.json(contratosDisponiveis);
+      }
 
       return res.json(contratos);
     } catch (error) {
@@ -864,6 +944,15 @@ module.exports = {
 
       return res.status(201).json(contratoCriado || contrato);
     } catch (error) {
+      // Codigo repetido na mesma obra e erro do cliente, nao do servidor: sem este
+      // tratamento a violacao do indice unico virava 500 generico e o usuario nao
+      // descobria que o problema era o codigo.
+      if (error?.name === 'SequelizeUniqueConstraintError') {
+        return res.status(400).json({
+          error: 'Ja existe um contrato com este codigo nesta obra.'
+        });
+      }
+
       console.error(error);
       return res.status(error.statusCode || 500).json({ error: error.statusCode ? error.message : 'Erro ao criar contrato' });
     }
@@ -1561,9 +1650,13 @@ module.exports = {
         const ajusteSolicitado = Number(c.ajuste_solicitado || 0);
         const ajustePago = Number(c.ajuste_pago || 0);
         const valorContrato = Number(c.valor_total || 0);
+        // PI-15: aditivo APROVADO tambem entra, no legado como no fluxo novo. Mesma conta de
+        // `getContratoMetrics` — as duas precisam bater, senao a listagem e o relatorio mostram
+        // saldos diferentes para o mesmo contrato. Neutro hoje: os 335 legados tem 0 aqui.
+        const valorAditivos = Number(c.valor_aditivos || 0);
         // "Solicitado" do contrato deve refletir apenas o valor do contrato e ajustes manuais,
         // sem somar automaticamente os valores das solicitacoes vinculadas.
-        const totalSolicitadoFinal = valorContrato + ajusteSolicitado;
+        const totalSolicitadoFinal = valorContrato + ajusteSolicitado + valorAditivos;
         const totalPagoFinal = totalPagoStatus + ajustePago;
 
         return {
@@ -1979,6 +2072,279 @@ module.exports = {
     }
   },
 
+  /**
+   * Faz o anexo do contrato aparecer TAMBEM na linha do tempo da solicitacao (20/08).
+   *
+   * O arquivo continua sendo UM so em disco: o que se acrescenta e o indice. Sem isso o documento
+   * ia parar apenas na tela de Gestao de Contratos, e o card Historico da solicitacao — que e por
+   * onde as pessoas acompanham o pedido — nao mostrava nada.
+   *
+   * Falha aqui NAO derruba o upload: o arquivo ja esta salvo e vinculado ao contrato. Perder a
+   * entrada da linha do tempo e ruim; perder o anexo por causa dela seria pior.
+   */
+  async espelharAnexoNaSolicitacao(contrato, { nomeOriginal, url, usuario, tipo = null, descricao = null }) {
+    try {
+      if (!contrato?.solicitacao_id) return null;
+
+      const anexo = await Anexo.create({
+        solicitacao_id: contrato.solicitacao_id,
+        // `anexos.tipo` e NOT NULL e o resto do sistema so grava 'SOLICITACAO' ou 'ANEXO'.
+        // Gravar aqui um valor novo ('MINUTA', 'NEGOCIACAO_DETALHADA') faria filtros e telas que
+        // esperam esses dois encontrarem algo que nao sabem tratar. O papel do documento no
+        // contrato fica no metadado e na descricao, onde nao quebra ninguem.
+        tipo: 'ANEXO',
+        nome_original: nomeOriginal,
+        caminho_arquivo: url,
+        area_origem: usuario?.setor_id || null,
+        uploaded_by: usuario?.id || null
+      });
+
+      await Historico.create({
+        solicitacao_id: contrato.solicitacao_id,
+        usuario_responsavel_id: usuario?.id || null,
+        setor: codigoDoSetor(usuario) || String(usuario?.setor_id || '') || '-',
+        acao: 'ANEXO_ADICIONADO',
+        descricao: descricao || nomeOriginal,
+        metadata: JSON.stringify({ anexo_id: anexo.id, caminho: url, contrato_id: contrato.id, tipo })
+      });
+
+      return anexo;
+    } catch (error) {
+      console.error('Falha ao espelhar anexo do contrato na solicitacao', error);
+      return null;
+    }
+  },
+
+  /**
+   * Anexo da NEGOCIACAO DETALHADA: um documento, com tipo, substituindo o anterior.
+   *
+   * Rota separada do upload geral de anexos porque este slot tem outro perfil de arquivo (so
+   * `.docx` e `.pdf`) e porque o registro precisa nascer com `tipo` — e o tipo e o que a aprovacao
+   * consulta. Enviar de novo TROCA o documento: manter os dois deixaria a aprovacao sem saber qual
+   * vale, e a negociacao detalhada e uma so.
+   */
+  /**
+   * Anexo da MINUTA, entregue pelo Juridico (20/08).
+   *
+   * Guarda propria: quem envia e o Juridico (`contratos.juridico.tramitar`), nao quem abriu o
+   * contrato — a minuta e a peca que ELE produz. E so enquanto o contrato esta em analise no
+   * Juridico: depois disso a minuta ja circulou, e trocar a peca em circulacao e outra coisa.
+   *
+   * Enviar de novo TROCA o documento: a minuta e uma so.
+   */
+  async uploadMinuta(req, res) {
+    try {
+      const contrato = await Contrato.findByPk(req.params.id);
+      if (!contrato) {
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
+      }
+
+      const { userHasStrictAreaPermission } = require('../services/authorizationService');
+      const podeTramitar = await userHasStrictAreaPermission(req.user, ['contratos.juridico.tramitar']);
+      if (!podeTramitar) {
+        return res.status(403).json({ error: 'Acesso negado: anexar a minuta exige permissao do Juridico.' });
+      }
+
+      if (contrato.status_contrato !== 'EM_ANALISE_JURIDICA') {
+        return res.status(409).json({
+          error: `A minuta so pode ser anexada com o contrato em analise no Juridico (status atual: ${contrato.status_contrato}).`
+        });
+      }
+
+      const file = req.file || (Array.isArray(req.files) ? req.files[0] : null);
+      if (!file) {
+        return res.status(400).json({ error: 'Envie a minuta em .docx ou .pdf.' });
+      }
+
+      const codigo = contrato.codigo || `CONTRATO-${contrato.id}`;
+      const url = await uploadToS3(file, `contratos/${String(codigo)}/minuta`);
+      const nomeOriginal = normalizeOriginalName(file.originalname);
+
+      await ContratoAnexo.destroy({ where: { contrato_id: contrato.id, tipo: TIPO_ANEXO_MINUTA } });
+
+      const anexo = await ContratoAnexo.create({
+        contrato_id: contrato.id,
+        nome_original: nomeOriginal,
+        caminho_arquivo: url,
+        uploaded_by: req.user.id,
+        tipo: TIPO_ANEXO_MINUTA
+      });
+
+      await module.exports.espelharAnexoNaSolicitacao(contrato, {
+        nomeOriginal,
+        url,
+        usuario: req.user,
+        tipo: TIPO_ANEXO_MINUTA,
+        descricao: `Minuta do contrato: ${nomeOriginal}`
+      });
+
+      return res.status(201).json(anexo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar a minuta do contrato' });
+    }
+  },
+
+  async uploadNegociacao(req, res) {
+    try {
+      const contrato = await Contrato.findByPk(req.params.id);
+      if (!contrato) {
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
+      }
+
+      // Anexar a negociacao faz parte de ABRIR a solicitacao — nao de gerir contratos.
+      //
+      // Duas tentativas erradas antes desta, e as duas pela mesma causa: a permissao foi escolhida
+      // pelo que a rota FAZ ("mexe em contrato") e nao por quem PRECISA usa-la.
+      //
+      //   1a) `canManageContratos` (= `contratos.geral.editar`): barrava o usuario da obra;
+      //   2a) somar `contratos.geral.criar`: ainda barrava, porque quem abre a solicitacao na tela
+      //       de Nova Solicitacao pode nao ter permissao NENHUMA de contrato — ele tem
+      //       `solicitacoes.acoes.criar`, e o contrato nasce por conta dele.
+      //
+      // O vinculo certo nao e permissao, e AUTORIA: quem criou aquele contrato anexa o documento
+      // dele. Isso nao abre nada — ninguem passa a mexer em contrato de outra pessoa —, e resolve
+      // o caso real, que e o contrato ficar **encalhado** logo depois de criado: sem o documento
+      // ele nao pode ser aprovado, e sem poder anexar nao ha como destravar.
+      //
+      // Continua valendo, e por isso a janela: a autoria so vale ENQUANTO o contrato aguarda
+      // aprovacao. Depois que entra no fluxo (Juridico, ativo, encerrado), trocar a negociacao
+      // exige gestao de contratos — senao o autor poderia substituir a peca que o Juridico esta
+      // avaliando.
+      //
+      // O escopo por obra continua valendo em qualquer caso: `requireContratoAccess` roda antes.
+      const podeGerir = await canManageContratos(req.user);
+      const emMontagem = contrato.status_contrato === 'AGUARDANDO_APROVACAO';
+
+      let ehAutor = false;
+      if (emMontagem && contrato.solicitacao_id) {
+        const solicitacao = await Solicitacao.findByPk(contrato.solicitacao_id, {
+          attributes: ['id', 'criado_por']
+        });
+        ehAutor = Number(solicitacao?.criado_por || 0) === Number(req.user?.id || -1);
+      }
+
+      // `contratos.geral.criar` segue valendo para quem abre pela tela de Contratos, onde nao ha
+      // solicitacao a que atribuir autoria.
+      const podeCriar = emMontagem && await userHasAreaPermission(req.user, ['contratos.geral.criar']);
+
+      if (!podeGerir && !ehAutor && !podeCriar) {
+        return res.status(403).json({
+          error: emMontagem
+            ? 'Acesso negado: so quem abriu o contrato, ou quem gerencia contratos, pode anexar a negociacao detalhada.'
+            : 'Contrato ja em andamento: trocar a negociacao detalhada exige permissao de edicao de contratos.'
+        });
+      }
+
+      const file = req.file || (Array.isArray(req.files) ? req.files[0] : null);
+      if (!file) {
+        return res.status(400).json({ error: 'Envie a negociacao detalhada em .docx ou .pdf.' });
+      }
+
+      const codigo = contrato.codigo || `CONTRATO-${contrato.id}`;
+      const url = await uploadToS3(file, `contratos/${String(codigo)}/negociacao`);
+
+      await ContratoAnexo.destroy({
+        where: { contrato_id: contrato.id, tipo: TIPO_ANEXO_NEGOCIACAO }
+      });
+
+      const nomeOriginal = normalizeOriginalName(file.originalname);
+      const anexo = await ContratoAnexo.create({
+        contrato_id: contrato.id,
+        nome_original: nomeOriginal,
+        caminho_arquivo: url,
+        uploaded_by: req.user.id,
+        tipo: TIPO_ANEXO_NEGOCIACAO
+      });
+
+      await module.exports.espelharAnexoNaSolicitacao(contrato, {
+        nomeOriginal,
+        url,
+        usuario: req.user,
+        tipo: TIPO_ANEXO_NEGOCIACAO,
+        descricao: `Negociacao detalhada: ${nomeOriginal}`
+      });
+
+      return res.status(201).json(anexo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar a negociacao detalhada do contrato' });
+    }
+  },
+
+  async uploadDocumentacaoJuridica(req, res) {
+    try {
+      const documento = DOCUMENTACAO_JURIDICA_POR_SLUG[String(req.params.tipo || '').toLowerCase()];
+      if (!documento) {
+        return res.status(400).json({ error: 'Tipo de documento juridico invalido.' });
+      }
+
+      const contrato = await Contrato.findByPk(req.params.id);
+      if (!contrato) {
+        return res.status(404).json({ error: 'Contrato nao encontrado' });
+      }
+
+      // Mesma fronteira da negociacao: o autor pode completar o dossie enquanto o contrato ainda
+      // aguarda aprovacao; depois disso, somente quem gerencia contratos pode substituir arquivos.
+      const podeGerir = await canManageContratos(req.user);
+      const emMontagem = contrato.status_contrato === 'AGUARDANDO_APROVACAO';
+      let ehAutor = false;
+      if (emMontagem && contrato.solicitacao_id) {
+        const solicitacao = await Solicitacao.findByPk(contrato.solicitacao_id, {
+          attributes: ['id', 'criado_por']
+        });
+        ehAutor = Number(solicitacao?.criado_por || 0) === Number(req.user?.id || -1);
+      }
+      const podeCriar = emMontagem && await userHasAreaPermission(req.user, ['contratos.geral.criar']);
+      if (!podeGerir && !ehAutor && !podeCriar) {
+        return res.status(403).json({
+          error: emMontagem
+            ? 'Acesso negado: so quem abriu o contrato, ou quem gerencia contratos, pode completar a documentacao juridica.'
+            : 'Contrato ja em andamento: substituir a documentacao juridica exige permissao de edicao de contratos.'
+        });
+      }
+
+      const file = req.file || (Array.isArray(req.files) ? req.files[0] : null);
+      if (!file) {
+        return res.status(400).json({ error: 'Envie o documento em PDF, DOCX, JPG ou PNG.' });
+      }
+
+      const codigo = contrato.codigo || `CONTRATO-${contrato.id}`;
+      const url = await uploadToS3(file, `contratos/${String(codigo)}/documentacao-juridica/${documento.pasta}`);
+      const nomeOriginal = normalizeOriginalName(file.originalname);
+
+      // Um slot por documento. O lock impede dois cliques concorrentes de criarem dois registros
+      // para o mesmo papel; reenviar substitui o slot de forma transacional.
+      const anexo = await sequelize.transaction(async (transaction) => {
+        await Contrato.findByPk(contrato.id, { transaction, lock: transaction.LOCK.UPDATE });
+        await ContratoAnexo.destroy({
+          where: { contrato_id: contrato.id, tipo: documento.tipo },
+          transaction
+        });
+        return ContratoAnexo.create({
+          contrato_id: contrato.id,
+          nome_original: nomeOriginal,
+          caminho_arquivo: url,
+          uploaded_by: req.user.id,
+          tipo: documento.tipo
+        }, { transaction });
+      });
+
+      await module.exports.espelharAnexoNaSolicitacao(contrato, {
+        nomeOriginal,
+        url,
+        usuario: req.user,
+        tipo: documento.tipo,
+        descricao: `${documento.rotulo}: ${nomeOriginal}`
+      });
+
+      return res.status(201).json(anexo);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao salvar a documentacao juridica do contrato' });
+    }
+  },
+
   async uploadAnexos(req, res) {
     try {
       const podeEditarContrato = await canManageContratos(req.user);
@@ -1997,6 +2363,10 @@ module.exports = {
       }
 
       const codigo = contrato.codigo || `CONTRATO-${contrato.id}`;
+      // O endpoint continua aceitando anexos gerais. O unico papel especial permitido aqui e
+      // BOLETO, usado na abertura do contrato; demais documentos juridicos mantem rotas proprias.
+      const tipoSolicitado = String(req.body?.tipo || '').trim().toUpperCase();
+      const tipoAnexo = tipoSolicitado === 'BOLETO' ? 'BOLETO' : null;
 
       const registros = [];
 
@@ -2011,9 +2381,23 @@ module.exports = {
           contrato_id: contrato.id,
           nome_original: nomeOriginal,
           caminho_arquivo: url,
-          uploaded_by: req.user.id
+          uploaded_by: req.user.id,
+          tipo: tipoAnexo
         });
         registros.push(anexo);
+
+        // O anexo enviado na abertura ia parar so em Gestao de Contratos (20/08). Agora aparece
+        // tambem na linha do tempo da solicitacao, que e por onde se acompanha o pedido.
+        // eslint-disable-next-line no-await-in-loop
+        await module.exports.espelharAnexoNaSolicitacao(contrato, {
+          nomeOriginal,
+          url,
+          usuario: req.user,
+          tipo: tipoAnexo || 'ANEXO',
+          descricao: tipoAnexo === 'BOLETO'
+            ? `Boleto do contrato: ${nomeOriginal}`
+            : undefined
+        });
       }
 
       return res.status(201).json(registros);

@@ -4,6 +4,7 @@
 Guia rapido para colaboradores e agentes automatizados.
 
 ## Regras
+- Autorizacao funcional do proprietario registrada em 2026-08-25: agentes podem analisar e atuar em qualquer area funcional deste sistema, sem divisao fixa por modulo. Essa autorizacao amplia o alcance possivel, mas nao autoriza automaticamente mutacoes fora da tarefa atual. Cada implementacao, teste com escrita, migration, reinicio, integracao externa, deploy ou operacao destrutiva continua limitado ao pedido e as autorizacoes explicitas do usuario para a tarefa em curso.
 - O sistema esta funcionando e pronto para deploy dentro dos objetivos pretendidos. Tudo o que for criado precisa levar em conta todo o contexto criado ate o momento para nao quebrar o sistema.
 - Nao alterar arquivos fora deste repositorio, exceto em sessoes explicitamente abertas para colaboracao multirrepositorio no workspace e seguindo obrigatoriamente `docs/COLABORACAO_WORKSPACE.md` e o `AGENTS.md` do repositorio alvo.
 - Evitar mudancas destrutivas.
@@ -101,7 +102,7 @@ Guia rapido para colaboradores e agentes automatizados.
   - agrega titulos financeiros por obra: executado (PAGAR baixado) e recebido (RECEBER baixado)
 - sistema de permissoes de areas por usuario:
   - registro central em `backend/src/constants/moduloPermissoes.js`
-  - 19 grupos, 93 areas e 323 permissoes no formato `modulo.area.acao` (as areas sao derivadas do registro central)
+  - 19 grupos, 98 areas e 338 permissoes no formato `modulo.area.acao` (as areas sao derivadas do registro central)
   - armazenado em `ConfiguracaoSistema` chave `PERMISSOES_AREAS_USUARIOS`
   - sessao do usuario: campo `areas_permissoes`
   - helper: `hasPermissao(user, 'chave')` em `frontend/src/utils/acessoProduto.js`

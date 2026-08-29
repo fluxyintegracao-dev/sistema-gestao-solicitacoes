@@ -26,6 +26,7 @@ const {
   Solicitacao,
   SolicitacaoCompra,
   SolicitacaoCompraAlocacao,
+  SolicitacaoRecargaCartao,
   TipoSolicitacao,
   TituloFinanceiroImposto,
   TituloFinanceiroRateio,
@@ -34,6 +35,7 @@ const {
 } = require('../models');
 const {
   canAccessFinanceiro,
+  canViewSolicitacaoFinanceiro,
   canDeleteTitulosFinanceiros,
   getFinanceiroObraScopeIds
 } = require('./authorizationService');
@@ -314,7 +316,13 @@ async function normalizarRateiosTitulo(req, payload = {}, defaultObra, defaultAp
       ? (valorBase > 0 ? roundCurrency((valorRateio / valorBase) * 100) : 0)
       : roundCurrency(percentualInformado);
 
-    if (!Number.isFinite(valorRateio) || valorRateio <= 0 || !Number.isFinite(percentual) || percentual <= 0) {
+    // No rateio por VALOR o proprio valor (>= 1 centavo) e a garantia; o percentual aqui e
+    // so informativo e, arredondado a 2 casas, zera para fracoes minimas — exigir > 0
+    // prendia contrato valido em AGUARDANDO_APROVACAO para sempre (auditoria v4).
+    const percentualInvalido = tipoRateio === 'VALOR'
+      ? (!Number.isFinite(percentual) || percentual < 0)
+      : (!Number.isFinite(percentual) || percentual <= 0);
+    if (!Number.isFinite(valorRateio) || valorRateio <= 0 || percentualInvalido) {
       throw createHttpError(400, `Informe percentual ou valor valido para o rateio ${index + 1}.`);
     }
 
@@ -1277,7 +1285,7 @@ function validarCategoriaDreTitulo(categoria, payload = {}) {
   }
 }
 
-async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
+async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}, { dispensarCartaoInstrucional = false } = {}) {
   if (!formaPagamentoId) {
     throw createHttpError(
       400,
@@ -1295,7 +1303,11 @@ async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}) {
     throw createHttpError(400, 'A forma de pagamento selecionada nao permite parcelamento.');
   }
 
-  if (forma.exige_cartao && !payload.cartao_id) {
+  // No fluxo novo de CONTRATO, "Cartao" e a instrucao combinada com o fornecedor — os dados
+  // para pagamento ficam no historico da solicitacao. Nao representa uma baixa ja realizada em
+  // um cartao corporativo cadastrado. A dispensa so pode vir pela opcao interna do servico;
+  // payload HTTP nao consegue liga-la e os demais titulos continuam exigindo `cartao_id`.
+  if (forma.exige_cartao && !payload.cartao_id && !dispensarCartaoInstrucional) {
     throw createHttpError(400, 'Informe o cartao utilizado nesta forma de pagamento.');
   }
 
@@ -1491,7 +1503,7 @@ async function marcarSolicitacaoComTituloCadastrado({ solicitacao, usuarioId, se
   );
 }
 
-async function validarObraTitulo(req, obraId) {
+async function validarObraTitulo(req, obraId, { pularEscopoObra = false } = {}) {
   const obra = await Obra.findByPk(obraId, {
     attributes: ['id', 'nome', 'codigo', 'tipo_centro_custo', 'empresa_grupo_id']
   });
@@ -1499,6 +1511,11 @@ async function validarObraTitulo(req, obraId) {
   if (!obra) {
     throw createHttpError(400, 'Obra invalida.');
   }
+
+  // Aprovacao de contrato (D36): a permissao estrita basta — o aprovador e um papel
+  // central e nao precisa de vinculo em usuarios_obras com a obra do contrato. Sem isto,
+  // aprovar exigia vinculo e rejeitar nao, e 10/14 ADMIN nao aprovariam nada.
+  if (pularEscopoObra) return obra;
 
   await assertObraScope(
     req,
@@ -2386,24 +2403,68 @@ async function listarBaixasRealizadas(req, filters = {}) {
 }
 
 async function listarTitulosPorSolicitacao(req, solicitacaoId) {
-  await assertFinanceAccess(req);
+  const acessoFinanceiroCompleto = await canAccessFinanceiro(req.user);
+  if (!acessoFinanceiroCompleto && !(await canViewSolicitacaoFinanceiro(req.user))) {
+    await registrarEventoSeguranca({
+      req,
+      usuarioId: req.user?.id || null,
+      tipoEvento: 'AUTHZ_DENIED',
+      recursoTipo: 'SOLICITACAO_FINANCEIRO',
+      recursoId: String(solicitacaoId),
+      status: 'DENIED',
+      descricao: 'Usuario sem permissao para visualizar a aba financeira da solicitacao'
+    });
+    throw createHttpError(403, 'Acesso negado para a aba financeira da solicitacao');
+  }
+
   const solicitacao = await carregarSolicitacaoFinanceira(req, solicitacaoId);
 
-  return TituloFinanceiro.findAll({
+  const consulta = {
     where: {
       solicitacao_id: solicitacao.id
     },
-    include: buildTituloInclude(),
     order: [
       ['data_vencimento', 'ASC'],
       ['createdAt', 'DESC']
     ]
-  });
+  };
+
+  if (acessoFinanceiroCompleto) {
+    consulta.include = buildTituloInclude();
+  } else {
+    // Leitura operacional da Obra: somente o resumo exibido dentro da solicitacao. Dados de banco,
+    // documentos, impostos, rateios, integracoes e beneficiarios permanecem restritos ao modulo.
+    consulta.attributes = [
+      'id',
+      'solicitacao_id',
+      'tipo',
+      'status',
+      'descricao',
+      'valor_original',
+      'valor_baixado',
+      'valor_saldo',
+      'data_vencimento'
+    ];
+    consulta.include = [{
+      model: Parceiro,
+      as: 'parceiro',
+      attributes: ['id', 'nome']
+    }];
+  }
+
+  return TituloFinanceiro.findAll(consulta);
 }
 
 async function criarTituloPorSolicitacao(req, solicitacaoId, payload = {}) {
   await assertFinanceAccess(req);
   const solicitacao = await carregarSolicitacaoFinanceira(req, solicitacaoId);
+  const recargaAutomatica = await SolicitacaoRecargaCartao.findOne({
+    where: { solicitacao_id: solicitacao.id },
+    attributes: ['id', 'titulo_financeiro_id']
+  });
+  if (recargaAutomatica) {
+    throw createHttpError(409, 'A Recarga de Cartao ja possui titulo automatico e nao aceita outro lancamento manual.');
+  }
 
   const tipo = normalizarTipoTitulo(payload.tipo || sugestaoTipoTitulo(solicitacao));
   if (!['PAGAR', 'RECEBER'].includes(tipo)) {
@@ -2707,9 +2768,16 @@ async function criarTituloManual(req, payload = {}, options = {}) {
     transaction: externalTransaction = null,
     origemTitulo = 'MANUAL',
     registrarSeguranca = true,
-    retornarTitulosCriados = false
+    retornarTitulosCriados = false,
+    // Uso interno (aprovacao de contrato): o chamador ja impos permissao ESTRITA propria,
+    // mais forte que o acesso ao modulo financeiro. Sem isto, ADMIN/USUARIO com a permissao
+    // de aprovar eram barrados aqui — regressao apontada em auditoria.
+    pularAcessoFinanceiro = false,
+    // Uso interno dos titulos automaticos de contrato/aditivo. A forma "Cartao" descreve como o
+    // fornecedor recebera; nao significa que um cartao financeiro do cadastro ja foi utilizado.
+    dispensarCartaoInstrucional = false
   } = options;
-  await assertFinanceAccess(req);
+  if (!pularAcessoFinanceiro) await assertFinanceAccess(req);
 
   const tipo = normalizarTipoTitulo(payload.tipo || 'PAGAR');
   if (!['PAGAR', 'RECEBER'].includes(tipo)) {
@@ -2738,7 +2806,7 @@ async function criarTituloManual(req, payload = {}, options = {}) {
   }
 
   const [obra, parceiro, categoriaPadrao] = await Promise.all([
-    validarObraTitulo(req, obraId),
+    validarObraTitulo(req, obraId, { pularEscopoObra: pularAcessoFinanceiro }),
     validarParceiro(parceiroId),
     validarCategoriaFinanceira(payload.categoria_financeira_id, tipo)
   ]);
@@ -2771,7 +2839,11 @@ async function criarTituloManual(req, payload = {}, options = {}) {
       ? await validarCategoriaFinanceira(pagamentoPayload.categoria_financeira_id, tipo)
       : categoriaPadrao;
     validarCategoriaDreTitulo(categoriaPagamento, payload);
-    const formaPagamento = await validarFormaPagamentoFinanceira(pagamentoPayload.forma_pagamento_id, pagamentoPayload);
+    const formaPagamento = await validarFormaPagamentoFinanceira(
+      pagamentoPayload.forma_pagamento_id,
+      pagamentoPayload,
+      { dispensarCartaoInstrucional }
+    );
     const intercompanyFields = await resolverIntercompanyPagamento({
       formaPagamento,
       pagamentoPayload,
@@ -2865,7 +2937,15 @@ async function criarTituloManual(req, payload = {}, options = {}) {
         };
 
         const titulo = await TituloFinanceiro.create({
-          solicitacao_id: null,
+          // ERA FIXO EM `null` — e por isso o titulo do CONTRATO nascia sem a solicitacao dele (24/08).
+          //
+          // `criarTituloManual` e o caminho de "titulo lancado a mao", e o nome explica o `null`
+          // original: nao havia quem chamasse com uma solicitacao. A aprovacao do contrato passou a
+          // chamar (PI-16), e o campo continuava sendo descartado em silencio — quem passasse
+          // `solicitacao_id` no payload nao recebia erro nenhum, so um titulo sem vinculo.
+          //
+          // Quem nao informa continua gravando `null`, exatamente como antes.
+          solicitacao_id: Number(payload.solicitacao_id) || null,
           obra_id: obra.id,
           apropriacao_id: apropriacao?.id || null,
           empresa_id: empresaTituloId,
@@ -3392,6 +3472,7 @@ async function sincronizarRealizacaoCompraPorTitulo({
   });
 }
 
+
 async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
   const valorBaixa = roundCurrency(payload.valor);
   const juros = roundCurrency(payload.juros || 0);
@@ -3427,7 +3508,18 @@ async function baixarTitulo(req, tituloId, payload = {}, options = {}) {
 
     const saldoAtual = roundCurrency(titulo.valor_saldo);
     if (valorBaixa > saldoAtual) {
-      throw createHttpError(400, 'Valor da baixa nao pode ser maior que o saldo do titulo.');
+      // A trava de pagar mais que o saldo cai SO para parcela de contrato do fluxo novo (item 33,
+      // 23/08): la o excedente e descontado da ultima parcela. Para todo o resto do Financeiro ela
+      // continua exatamente como estava — e quem decide isso e a propria regra do contrato.
+      const { liberarBaixaAcimaDoSaldo } = require('./medicaoContratoService');
+      const liberado = await liberarBaixaAcimaDoSaldo(
+        titulo.id,
+        roundCurrency(valorBaixa - saldoAtual),
+        transaction
+      );
+      if (!liberado) {
+        throw createHttpError(400, 'Valor da baixa nao pode ser maior que o saldo do titulo.');
+      }
     }
 
     const empresaTituloId = await resolverEmpresaTituloParaBaixa(titulo);
@@ -4722,6 +4814,12 @@ async function excluirTitulosEmMassa(req, payload = {}) {
       }
     }
   );
+
+  // Titulo de contrato do fluxo novo: o valor volta como saldo para a parcela final e o
+  // comprometimento e desfeito (PI-6). Silencioso para titulo que nao e de contrato.
+  // require aqui dentro para nao criar ciclo entre os dois servicos.
+  const { devolverSaldoDeTitulosExcluidos } = require('./medicaoContratoService');
+  await devolverSaldoDeTitulosExcluidos(idsUnicos, { usuarioId: req.user?.id || null, motivo });
 
   await registrarEventoSeguranca({
     req,

@@ -1,4 +1,4 @@
-const { Obra, TituloFinanceiro } = require('../models');
+const { Obra, TituloFinanceiro, TituloFinanceiroRateio } = require('../models');
 const { Op, fn, col, literal } = require('sequelize');
 const { TIPO_CENTRO_CUSTO_OBRA } = require('../constants/centroCusto');
 
@@ -34,6 +34,23 @@ module.exports = {
         raw: true
       });
 
+      // Recargas de cartao so recebem obra depois da prestacao de contas validada. O titulo
+      // continua unico para conciliacao bancaria; os custos das obras vivem no rateio.
+      const rateiosRecarga = await TituloFinanceiroRateio.findAll({
+        where: { obra_id: { [Op.in]: obraIds } },
+        include: [{
+          model: TituloFinanceiro,
+          as: 'tituloFinanceiro',
+          required: true,
+          where: {
+            origem_titulo: 'RECARGA_CARTAO',
+            considera_dre: true,
+            status: { [Op.notIn]: ['CANCELADO', 'ESTORNADO'] }
+          },
+          attributes: ['id', 'tipo', 'valor_original', 'valor_baixado', 'valor_saldo']
+        }]
+      });
+
       // Map agregados por obra_id
       const mapAgregados = {};
       for (const row of agregados) {
@@ -44,6 +61,29 @@ module.exports = {
           total_valor_baixado: Number(row.total_valor_baixado || 0),
           total_valor_saldo: Number(row.total_valor_saldo || 0),
           quantidade: Number(row.quantidade || 0)
+        };
+      }
+      for (const rateio of rateiosRecarga) {
+        const obraId = Number(rateio.obra_id);
+        const titulo = rateio.tituloFinanceiro;
+        const tipo = String(titulo?.tipo || 'PAGAR').toUpperCase();
+        const valorRateio = Number(rateio.valor_rateio || 0);
+        const valorOriginalTitulo = Number(titulo?.valor_original || 0);
+        const proporcaoBaixada = valorOriginalTitulo > 0
+          ? Math.min(Number(titulo?.valor_baixado || 0) / valorOriginalTitulo, 1)
+          : 0;
+        const atual = mapAgregados[obraId]?.[tipo] || {
+          total_valor_original: 0,
+          total_valor_baixado: 0,
+          total_valor_saldo: 0,
+          quantidade: 0
+        };
+        if (!mapAgregados[obraId]) mapAgregados[obraId] = {};
+        mapAgregados[obraId][tipo] = {
+          total_valor_original: atual.total_valor_original + valorRateio,
+          total_valor_baixado: atual.total_valor_baixado + (valorRateio * proporcaoBaixada),
+          total_valor_saldo: atual.total_valor_saldo + (valorRateio * (1 - proporcaoBaixada)),
+          quantidade: atual.quantidade + 1
         };
       }
 

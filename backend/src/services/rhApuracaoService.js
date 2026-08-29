@@ -411,6 +411,19 @@ function calcularItemApuracao(agrupado, diasBase) {
   const faltas = Number(jornada.faltas || 0);
   const horasExtras = Number(jornada.horas_extras || 0);
   const adicionais = Number(jornada.adicionais || 0);
+  /**
+   * OS QUATRO ADICIONAIS DO ITEM 11 DO ESCOPO (Fase 12).
+   *
+   * Entram na SOMA junto com `adicionais` — que continua sendo o campo livre para o que nao se
+   * encaixa nos quatro e para o que foi gravado antes desta fase. Ler os cinco e somar aqui e o
+   * que impede o valor antigo de sumir do bruto quando a tela nova passar a mandar os separados.
+   */
+  const adicionalNoturno = Number(jornada.adicional_noturno || 0);
+  const adicionalInsalubridade = Number(jornada.adicional_insalubridade || 0);
+  const adicionalPericulosidade = Number(jornada.adicional_periculosidade || 0);
+  const bonificacoes = Number(jornada.bonificacoes || 0);
+  const totalAdicionais =
+    adicionais + adicionalNoturno + adicionalInsalubridade + adicionalPericulosidade + bonificacoes;
   const descontosInformados = Number(jornada.descontos_informados || 0);
   const valorInformado = Number(jornada.valor_informado || 0);
   const creditos = Number(agrupado.creditos || 0);
@@ -418,6 +431,11 @@ function calcularItemApuracao(agrupado, diasBase) {
 
   let regraAplicada = 'NAO_IDENTIFICADA';
   let valorBruto = 0;
+
+  // A MEMORIA DE CALCULO, preenchida abaixo e devolvida em `detalhes_json.resumo`. E o que a
+  // "planilha-resumo para conferencia" do escopo mostra linha a linha — sem ela, o conferente ve um
+  // bruto e um liquido e nao tem como contestar nenhum dos dois.
+  const resumo = {};
 
   if (tipoVinculo === 'CLT') {
     regraAplicada = 'CLT_SIMPLIFICADA';
@@ -427,7 +445,10 @@ function calcularItemApuracao(agrupado, diasBase) {
         : valorBaseCalculo;
     const valorHora = calculateValorHoraReferencia(valorBaseCalculo);
     const valorHorasExtras = horasExtras * valorHora * 1.5;
-    valorBruto = salarioProporcional + valorHorasExtras + adicionais + creditos;
+    valorBruto = salarioProporcional + valorHorasExtras + totalAdicionais + creditos;
+    resumo.valor_proporcional = formatCurrencyValue(salarioProporcional);
+    resumo.valor_hora = formatCurrencyValue(valorHora);
+    resumo.valor_horas_extras = formatCurrencyValue(valorHorasExtras);
   } else {
     regraAplicada = valorInformado > 0 ? 'NAO_CLT_VALOR_INFORMADO' : 'NAO_CLT_SIMPLIFICADA';
     const baseNaoClt =
@@ -436,8 +457,33 @@ function calcularItemApuracao(agrupado, diasBase) {
         : diasTrabalhados > 0 && Number(diasBase || 0) > 0
           ? valorBaseCalculo * (diasTrabalhados / Number(diasBase))
           : valorBaseCalculo;
-    valorBruto = baseNaoClt + adicionais + creditos;
+    valorBruto = baseNaoClt + totalAdicionais + creditos;
+    resumo.valor_proporcional = formatCurrencyValue(baseNaoClt);
+    resumo.valor_horas_extras = 0;
   }
+
+  /**
+   * DESCONTO POR FALTAS — o escopo pede o numero, mas ele NAO E SUBTRAIDO DE NOVO.
+   *
+   * O salario proporcional ja e calculado sobre os DIAS TRABALHADOS, entao o dia de falta ja deixou
+   * de ser pago ali. Subtrair outra vez cobraria a falta em dobro do colaborador.
+   *
+   * O valor existe aqui como MEMORIA DE CALCULO: e a resposta a pergunta "quanto essas faltas
+   * custaram", que e o que o conferente quer ver na planilha. Por isso ele mora em `resumo`, e nao
+   * em `valor_descontos`.
+   */
+  resumo.desconto_faltas = formatCurrencyValue(
+    Number(diasBase || 0) > 0 ? valorBaseCalculo * (faltas / Number(diasBase)) : 0
+  );
+  resumo.desconto_faltas_ja_no_proporcional = true;
+  resumo.adicionais = {
+    noturno: formatCurrencyValue(adicionalNoturno),
+    insalubridade: formatCurrencyValue(adicionalInsalubridade),
+    periculosidade: formatCurrencyValue(adicionalPericulosidade),
+    bonificacoes: formatCurrencyValue(bonificacoes),
+    outros: formatCurrencyValue(adicionais),
+    total: formatCurrencyValue(totalAdicionais)
+  };
 
   const valorDescontos = descontosInformados + debitos;
   const valorLiquido = valorBruto - valorDescontos;
@@ -454,12 +500,17 @@ function calcularItemApuracao(agrupado, diasBase) {
     valor_descontos: formatCurrencyValue(valorDescontos),
     ajuste_credito_manual: 0,
     ajuste_debito_manual: 0,
+    adicional_noturno: formatCurrencyValue(adicionalNoturno),
+    adicional_insalubridade: formatCurrencyValue(adicionalInsalubridade),
+    adicional_periculosidade: formatCurrencyValue(adicionalPericulosidade),
+    bonificacoes: formatCurrencyValue(bonificacoes),
     valor_liquido: formatCurrencyValue(valorLiquido),
     observacoes: Array.from(agrupado.observacoes || []).filter(Boolean).join(' | ') || null,
     detalhes_json: {
       importacao_ids: Array.from(agrupado.importacao_ids || []).sort((a, b) => a - b),
       tipo_vinculo: tipoVinculo,
       dias_base: Number(diasBase || 0),
+      resumo,
       jornada: {
         dias_trabalhados: formatCurrencyValue(diasTrabalhados),
         faltas: formatCurrencyValue(faltas),
@@ -599,9 +650,67 @@ async function gerarApuracaoRecorteRh(data, user, transaction) {
   }
 
   await RhApuracaoEvento.bulkCreate(itens, { transaction });
+
+  /**
+   * OS EVENTOS RECORRENTES ENTRAM AQUI (Fase 4 do modulo DP, 26/08).
+   *
+   * Vale alimentacao, desconto de adiantamento em N parcelas, pensao, plano de saude. Sem esta
+   * chamada, `ajuste_credito_manual` e `ajuste_debito_manual` continuariam sendo dois numeros
+   * digitados a mao todo mes — o "controle paralelo" que o cliente pediu para eliminar.
+   *
+   * Roda DEPOIS do `bulkCreate` porque cada item precisa do proprio id para pendurar os lancamentos.
+   *
+   * E roda a cada geracao, inclusive quando a apuracao ja existia como rascunho: `aplicarRecorrentes`
+   * apaga e reescreve os itens de origem RECORRENTE, entao regerar da o mesmo resultado em vez de
+   * acumular. A parcela nao avanca, porque ela e DERIVADA da quantidade de competencias anteriores
+   * — nao de um contador. Esse e o ponto que impede o adiantamento de 6 parcelas de acabar em 3
+   * recalculos.
+   */
+  await aplicarRecorrentesNaApuracao(apuracao, transaction);
+
   await recalcularResumoApuracao(apuracao.id, transaction);
 
   return detalharApuracaoPorPk(apuracao.id, transaction);
+}
+
+/**
+ * Aplica os eventos recorrentes a todas as linhas de uma apuracao e leva o resultado para os
+ * campos de ajuste, que sao o que o calculo do liquido ja le.
+ *
+ * O que ENTRA NO LIQUIDO vira `ajuste_credito_manual` / `ajuste_debito_manual`. O que e pago a
+ * parte — vale alimentacao — NAO entra: ele e um pagamento proprio (recarga de cartao ou pagamento
+ * direto), e soma-lo ao liquido faria o colaborador receber duas vezes. Ele fica registrado nos
+ * itens, que e de onde o custo por obra vai busca-lo (Fase 7).
+ */
+async function aplicarRecorrentesNaApuracao(apuracao, transaction) {
+  // eslint-disable-next-line global-require
+  const { aplicarRecorrentes } = require('./rhEventoRecorrenteService');
+
+  const linhas = await RhApuracaoEvento.findAll({
+    where: { apuracao_id: apuracao.id },
+    transaction
+  });
+
+  for (const linha of linhas) {
+    // eslint-disable-next-line no-await-in-loop
+    const resultado = await aplicarRecorrentes(linha, apuracao.competencia, transaction);
+    if (!resultado.itens.length) continue;
+
+    const bruto = Number(linha.valor_bruto || 0);
+    const descontos = Number(linha.valor_descontos || 0);
+    const credito = resultado.creditoNoLiquido;
+    const debito = resultado.descontoNoLiquido;
+
+    // eslint-disable-next-line no-await-in-loop
+    await linha.update(
+      {
+        ajuste_credito_manual: formatCurrencyValue(credito),
+        ajuste_debito_manual: formatCurrencyValue(debito),
+        valor_liquido: formatCurrencyValue(bruto - descontos + credito - debito)
+      },
+      { transaction }
+    );
+  }
 }
 
 async function gerarApuracaoRh(data, user) {
@@ -731,6 +840,9 @@ async function conferirApuracaoRh(id, user) {
 }
 
 module.exports = {
+  // Exposto para a suite 59 poder conferir a memoria de calculo sem montar uma apuracao inteira.
+  // O nome diz que e para teste justamente para ninguem passar a chamar isto em producao.
+  calcularItemApuracaoParaTeste: calcularItemApuracao,
   conferirApuracaoRh,
   detalharApuracaoRh,
   gerarApuracaoRh,
