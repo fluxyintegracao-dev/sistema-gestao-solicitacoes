@@ -8,10 +8,11 @@ import {
   tramitarContratoNoJuridico,
   uploadMinutaContrato
 } from '../../services/contratos';
-import { HiPaperClip, HiTrash } from 'react-icons/hi2';
+import { HiArrowDownTray, HiArrowTopRightOnSquare, HiPaperClip, HiTrash } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../../components/ui/ApropriacaoAutocomplete';
 import PendingAttachmentsList from '../../components/attachments/PendingAttachmentsList';
 import { uploadArquivos } from '../../services/uploads';
+import { API_URL, authHeaders, fileUrl } from '../../services/api';
 import {
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
   concatenarAnexosPendentes,
@@ -49,7 +50,7 @@ const ESTADOS = {
   },
   AGUARDANDO_ASSINATURA: {
     titulo: 'Necessita assinatura',
-    ajuda: 'A minuta esta pronta. Anexe o contrato assinado e acione Solicitar revisao: a solicitacao volta ao Juridico, em destaque, para a conferencia final.'
+    ajuda: 'A minuta esta pronta. Anexe o contrato assinado ou confirme a assinatura pelo link e solicite a revisao final do Juridico.'
   },
   EM_REVISAO_JURIDICA: {
     titulo: 'Em revisao no Juridico',
@@ -72,6 +73,8 @@ export default function AcoesContrato({ contrato, onMudou }) {
   const [arquivoMinuta, setArquivoMinuta] = useState(null);
   const [arquivoAssinado, setArquivoAssinado] = useState(null);
   const [anexoAssinadoId, setAnexoAssinadoId] = useState(null);
+  const [assinadoPeloLink, setAssinadoPeloLink] = useState(false);
+  const [baixandoMinuta, setBaixandoMinuta] = useState(false);
   const [linkAssinatura, setLinkAssinatura] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
   const [motivo, setMotivo] = useState('');
@@ -86,6 +89,15 @@ export default function AcoesContrato({ contrato, onMudou }) {
   const inputReenvioRef = useRef(null);
 
   const status = contrato?.status_contrato || null;
+  const linkAssinaturaSeguro = (() => {
+    const valor = String(contrato?.link_assinatura || '').trim();
+    if (!valor) return null;
+    try {
+      return ['http:', 'https:'].includes(new URL(valor).protocol) ? valor : null;
+    } catch {
+      return null;
+    }
+  })();
 
   useEffect(() => {
     // O plano de contas inteiro de CONTAS A PAGAR (pedido do cliente, 20/08). Eram tres categorias
@@ -124,6 +136,7 @@ export default function AcoesContrato({ contrato, onMudou }) {
     if (status === 'AGUARDANDO_ASSINATURA') return;
     setArquivoAssinado(null);
     setAnexoAssinadoId(null);
+    setAssinadoPeloLink(false);
   }, [status]);
 
   if (!contrato?.fluxo_novo || !status) return null;
@@ -296,12 +309,55 @@ export default function AcoesContrato({ contrato, onMudou }) {
     });
   };
 
-  const solicitarRevisaoDoAssinado = () => {
-    if (!arquivoAssinado && !anexoAssinadoId) {
-      setErro('Anexe o contrato assinado antes de solicitar a revisao do Juridico.');
+  async function baixarMinuta() {
+    const minuta = contrato?.minuta;
+    const caminho = String(minuta?.caminho_arquivo || '').trim();
+    if (!caminho) {
+      setErro('A minuta nao possui um endereco de arquivo valido.');
       return;
     }
-    if (!contrato.solicitacao_id) {
+
+    setBaixandoMinuta(true);
+    setErro('');
+    try {
+      let url = fileUrl(caminho);
+      if (caminho.startsWith('http')) {
+        const params = new URLSearchParams({
+          url: caminho.replace(/%(?![0-9A-Fa-f]{2})/g, '%25')
+        });
+        const respostaPresign = await fetch(`${API_URL}/anexos/presign?${params.toString()}`, {
+          headers: authHeaders()
+        });
+        const dadosPresign = await respostaPresign.json().catch(() => null);
+        if (!respostaPresign.ok || !dadosPresign?.url) {
+          throw new Error(dadosPresign?.error || 'Nao foi possivel gerar o link seguro da minuta.');
+        }
+        url = dadosPresign.url;
+      }
+
+      const resposta = await fetch(url);
+      if (!resposta.ok) throw new Error('Nao foi possivel carregar a minuta.');
+      const blobUrl = window.URL.createObjectURL(await resposta.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = minuta.nome_original || 'minuta-contrato';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      setErro(e.message || 'Nao foi possivel baixar a minuta.');
+    } finally {
+      setBaixandoMinuta(false);
+    }
+  }
+
+  const solicitarRevisaoDoAssinado = () => {
+    if (!arquivoAssinado && !anexoAssinadoId && !assinadoPeloLink) {
+      setErro('Anexe o contrato assinado ou confirme que ele foi assinado pelo link informado.');
+      return;
+    }
+    if (arquivoAssinado && !contrato.solicitacao_id) {
       setErro('A solicitacao vinculada ao contrato nao foi identificada. Atualize a pagina e tente novamente.');
       return;
     }
@@ -322,9 +378,12 @@ export default function AcoesContrato({ contrato, onMudou }) {
         // arquivo no banco/S3.
         setAnexoAssinadoId(idAnexo);
       }
-      await tramitarContratoNoJuridico(contrato.id, 'assinado');
+      await tramitarContratoNoJuridico(contrato.id, 'assinado', assinadoPeloLink
+        ? { assinado_pelo_link: true }
+        : {});
       setArquivoAssinado(null);
       setAnexoAssinadoId(null);
+      setAssinadoPeloLink(false);
     });
   };
 
@@ -354,6 +413,42 @@ export default function AcoesContrato({ contrato, onMudou }) {
       )}
       {status === 'REJEITADO' && contrato.motivo_rejeicao && (
         <div className="app-alert app-alert--warning">Motivo: {contrato.motivo_rejeicao}</div>
+      )}
+
+      {status === 'AGUARDANDO_ASSINATURA' && (linkAssinaturaSeguro || contrato.minuta) && (
+        <section className="border-y border-[var(--c-border)] py-2" aria-label="Material para assinatura">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">
+            Material para assinatura
+          </h3>
+          <div className="divide-y divide-[var(--c-border)]">
+            {linkAssinaturaSeguro && (
+              <div className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--c-text)]">Link de assinatura</p>
+                  <p className="truncate text-xs text-[var(--c-muted)]">{linkAssinaturaSeguro}</p>
+                </div>
+                <a className="btn btn-outline btn-sm shrink-0" href={linkAssinaturaSeguro}
+                  target="_blank" rel="noreferrer" title="Abrir link de assinatura">
+                  <HiArrowTopRightOnSquare className="h-4 w-4" />
+                  <span className="ml-1">Abrir</span>
+                </a>
+              </div>
+            )}
+            {contrato.minuta && (
+              <div className="flex items-center justify-between gap-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[var(--c-text)]">Minuta do contrato</p>
+                  <p className="truncate text-xs text-[var(--c-muted)]">{contrato.minuta.nome_original}</p>
+                </div>
+                <button type="button" className="btn btn-outline btn-sm shrink-0"
+                  onClick={baixarMinuta} disabled={baixandoMinuta} title="Baixar minuta">
+                  <HiArrowDownTray className="h-4 w-4" />
+                  <span className="ml-1">{baixandoMinuta ? 'Baixando...' : 'Baixar'}</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {/* Confirmacao de motivo, compartilhada por rejeitar e cancelar. As duas exigem motivo:
@@ -622,10 +717,25 @@ export default function AcoesContrato({ contrato, onMudou }) {
               para a conferencia final — e e a conferencia que cria os titulos. */}
           {podeConfirmarAssinatura && (
           <div className="grid gap-2">
+            {linkAssinaturaSeguro && (
+              <label className="flex items-start gap-2 rounded-md bg-[var(--c-surface-muted)] px-3 py-2 text-sm text-[var(--c-text)]">
+                <input type="checkbox" className="mt-0.5" checked={assinadoPeloLink}
+                  onChange={(e) => { setAssinadoPeloLink(e.target.checked); setErro(''); }}
+                  data-testid="assinado-pelo-link" />
+                <span>
+                  <strong className="font-semibold">Contrato assinado pelo link informado</strong>
+                  <span className="block text-xs text-[var(--c-muted)]">
+                    Ao confirmar esta opcao, anexar o contrato assinado deixa de ser obrigatorio para solicitar a revisao.
+                  </span>
+                </span>
+              </label>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <label className="btn btn-outline btn-sm" style={{ cursor: anexoAssinadoId ? 'default' : 'pointer' }}>
                 <HiPaperClip className="w-4 h-4" />
-                <span className="ml-1">{arquivoAssinado || anexoAssinadoId ? 'Contrato assinado selecionado' : 'Anexar contrato assinado'}</span>
+                <span className="ml-1">{arquivoAssinado || anexoAssinadoId
+                  ? 'Contrato assinado selecionado'
+                  : `Anexar contrato assinado${assinadoPeloLink ? ' (opcional)' : ''}`}</span>
                 <input
                   type="file"
                   name="arquivo_contrato_assinado"

@@ -179,7 +179,9 @@ const DESCRICAO_HISTORICO_JURIDICO = {
     return `Juridico concluiu a minuta do contrato ${contrato.codigo} (${entregue}). `
       + 'Solicitacao devolvida para coleta de assinatura.';
   },
-  assinado: (contrato) => `Contrato ${contrato.codigo} assinado: devolvido ao Juridico para conferencia.`,
+  assinado: (contrato, { assinadoPeloLink }) => assinadoPeloLink
+    ? `Contrato ${contrato.codigo} assinado pela plataforma informada: devolvido ao Juridico para conferencia.`
+    : `Contrato ${contrato.codigo} assinado e anexado: devolvido ao Juridico para conferencia.`,
   conferido: (contrato) => `Juridico conferiu o contrato ${contrato.codigo} assinado e liberou os titulos.`
 };
 
@@ -2213,6 +2215,7 @@ async function listarParcelasDoContrato(contratoId, { usuario = null } = {}) {
     // decide por eles — a aprovacao exige a categoria, e o bloco so aparece na solicitacao dona.
     attributes: ['id', 'codigo', 'obra_id', 'valor_total', 'valor_aditivos', 'fluxo_novo',
       'status_contrato', 'ativo', 'categoria_financeira_id', 'solicitacao_id', 'motivo_rejeicao',
+      'link_assinatura',
       // `favorecido_id` faltava aqui, e sem ele a busca do favorecido nem acontecia — o cabecalho
       // ficava sem "Favorecido" e sem "Chave PIX", em silencio. Lista de atributos e armadilha:
       // o campo existe no banco e no model, mas some se nao for pedido.
@@ -2381,6 +2384,17 @@ async function listarParcelasDoContrato(contratoId, { usuario = null } = {}) {
     order: [['id', 'ASC']]
   });
 
+  // A minuta e o link precisam acompanhar o contrato enquanto a origem coleta a assinatura.
+  // O arquivo vive em `contrato_anexos` (nao nos anexos gerais da solicitacao), portanto deve ser
+  // exposto explicitamente neste payload usado pelo card do detalhe.
+  const minutaContrato = ehFluxoNovo
+    ? await ContratoAnexo.findOne({
+      where: { contrato_id: contrato.id, tipo: TIPO_ANEXO_MINUTA },
+      attributes: ['id', 'nome_original', 'caminho_arquivo', 'createdAt'],
+      order: [['createdAt', 'DESC'], ['id', 'DESC']]
+    })
+    : null;
+
   const medicaoPorParcela = new Map();
   medidas.forEach((m) => {
     if (!m.medicao) return;
@@ -2429,6 +2443,15 @@ async function listarParcelasDoContrato(contratoId, { usuario = null } = {}) {
       categoria_financeira_id: contrato.categoria_financeira_id || null,
       solicitacao_id: contrato.solicitacao_id || null,
       motivo_rejeicao: contrato.motivo_rejeicao || null,
+      link_assinatura: contrato.link_assinatura || null,
+      minuta: minutaContrato
+        ? {
+          id: minutaContrato.id,
+          nome_original: minutaContrato.nome_original,
+          caminho_arquivo: minutaContrato.caminho_arquivo,
+          criado_em: minutaContrato.createdAt || null
+        }
+        : null,
       objeto: contrato.objeto || null,
       responsavel: responsavelRegistro ? { id: responsavelRegistro.id, nome: responsavelRegistro.nome } : null,
       // PI-12: todos os contratados respondem pelo contrato, e podem ser varios.
@@ -2528,13 +2551,19 @@ async function listarParcelasDoContrato(contratoId, { usuario = null } = {}) {
  * Etapas do JURIDICO (MD-10), acima do limite.
  *
  * `minuta` : EM_ANALISE_JURIDICA -> AGUARDANDO_ASSINATURA (documentacao avaliada, minuta pronta)
- * `assinado`: AGUARDANDO_ASSINATURA -> ATIVO, e SO AQUI as parcelas viram titulos — e a
- *             assinatura que gera o compromisso (PI-5).
+ * `assinado`: AGUARDANDO_ASSINATURA -> EM_REVISAO_JURIDICA. A origem pode entregar o arquivo
+ *             assinado ou confirmar que a assinatura ocorreu pelo link enviado pelo Juridico.
  *
  * Permissao propria do setor: quem tramita no juridico nao e quem aprova na Gerencia de
  * Processos, e nenhum dos dois herda o do outro.
  */
-async function tramitarNoJuridico(contratoId, { usuario, req, etapa, linkAssinatura } = {}) {
+async function tramitarNoJuridico(contratoId, {
+  usuario,
+  req,
+  etapa,
+  linkAssinatura,
+  assinadoPeloLink = false
+} = {}) {
   // PI-18: TRES etapas, nao duas.
   //
   // `assinado` NAO cria mais titulo: ele devolve ao Juridico para conferencia. Quem cria os
@@ -2570,6 +2599,7 @@ async function tramitarNoJuridico(contratoId, { usuario, req, etapa, linkAssinat
   }
 
   const linkLimpo = validarLinkAssinatura(linkAssinatura);
+  const confirmouAssinaturaPeloLink = assinadoPeloLink === true;
   let temArquivo = false;
 
   // Concluir a minuta exige ENTREGAR alguma coisa: o documento, o link da plataforma, ou os dois
@@ -2607,10 +2637,10 @@ async function tramitarNoJuridico(contratoId, { usuario, req, etapa, linkAssinat
       );
     }
 
-    // A origem so pode devolver o contrato ao Juridico depois de anexar o documento assinado.
-    // Antes desta guarda, o botao dizia "contrato assinado anexado", mas a API aceitava a etapa
-    // sem arquivo algum. Exigimos um anexo proprio do ciclo atual (tipo CONTRATO, enviado depois
-    // de a minuta ficar pronta) para que um anexo antigo da solicitacao nao satisfaça a regra.
+    // A origem devolve o contrato ao Juridico com uma evidencia do ciclo atual: arquivo assinado
+    // OU confirmacao explicita de que a assinatura foi concluida pelo link entregue pelo proprio
+    // Juridico. A segunda opcao so existe quando o contrato realmente possui esse link; assim um
+    // cliente nao consegue contornar a obrigatoriedade enviando apenas o booleano pela API.
     if (etapaNormalizada === 'assinado') {
       const totalAssinadosDoCiclo = contrato.solicitacao_id
         ? await Anexo.count({
@@ -2623,9 +2653,17 @@ async function tramitarNoJuridico(contratoId, { usuario, req, etapa, linkAssinat
           transaction
         })
         : 0;
-      if (totalAssinadosDoCiclo === 0) {
+      const linkRegistrado = String(contrato.link_assinatura || '').trim();
+      if (confirmouAssinaturaPeloLink && !linkRegistrado) {
         throw Object.assign(
-          new Error('Anexe o contrato assinado antes de solicitar a revisao do Juridico.'),
+          new Error('Este contrato nao possui link de assinatura registrado pelo Juridico.'),
+          { statusCode: 400 }
+        );
+      }
+      if (confirmouAssinaturaPeloLink) validarLinkAssinatura(linkRegistrado);
+      if (totalAssinadosDoCiclo === 0 && !confirmouAssinaturaPeloLink) {
+        throw Object.assign(
+          new Error('Anexe o contrato assinado ou confirme a assinatura pelo link antes de solicitar a revisao do Juridico.'),
           { statusCode: 400 }
         );
       }
@@ -2644,13 +2682,23 @@ async function tramitarNoJuridico(contratoId, { usuario, req, etapa, linkAssinat
     }
     await contrato.update(alteracoes, { transaction });
 
-    // PI-16: `minuta` devolve a solicitacao ao responsavel como NEC. DE ASSINATURA. (A etapa
-    // `assinado` nao passa por aqui: ela cai em aplicarAprovacaoNaTransacao, que ja espelha.)
+    // PI-16: `minuta` devolve a solicitacao ao responsavel como NEC. DE ASSINATURA; `assinado`
+    // envia novamente ao Juridico. A aprovacao final (`conferido`) retorna antes deste bloco,
+    // dentro de `aplicarAprovacaoNaTransacao`, que ja atualiza o espelho da solicitacao.
     await espelharERegistrar(contrato, {
       acao: ACAO_HISTORICO_JURIDICO[etapaNormalizada],
-      descricao: DESCRICAO_HISTORICO_JURIDICO[etapaNormalizada](contrato, { link: linkLimpo, temArquivo }),
+      descricao: DESCRICAO_HISTORICO_JURIDICO[etapaNormalizada](contrato, {
+        link: linkLimpo,
+        temArquivo,
+        assinadoPeloLink: confirmouAssinaturaPeloLink
+      }),
       usuario,
-      metadata: { contrato_id: contrato.id, etapa: etapaNormalizada, link_assinatura: linkLimpo || null }
+      metadata: {
+        contrato_id: contrato.id,
+        etapa: etapaNormalizada,
+        link_assinatura: linkLimpo || null,
+        assinado_pelo_link: etapaNormalizada === 'assinado' ? confirmouAssinaturaPeloLink : null
+      }
     }, transaction);
     return {
       contrato: { id: contrato.id, codigo: contrato.codigo, status_contrato: passo.para },

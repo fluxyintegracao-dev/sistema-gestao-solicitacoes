@@ -1206,6 +1206,37 @@ function buildTituloInclude({ includeMovimentos = false } = {}) {
   return include;
 }
 
+async function obterSolicitacoesContratuaisPorParceiros(parceiroIds = []) {
+  const ids = Array.from(new Set(
+    parceiroIds.map((id) => Number(id)).filter(Boolean)
+  ));
+  if (ids.length === 0) return [];
+
+  const vinculos = await ContratoCredor.findAll({
+    where: {
+      parceiro_id: { [Op.in]: ids },
+      ativo: true
+    },
+    attributes: ['id'],
+    include: [{
+      model: Contrato,
+      as: 'contrato',
+      required: true,
+      attributes: ['solicitacao_id'],
+      where: {
+        fluxo_novo: true,
+        solicitacao_id: { [Op.ne]: null }
+      }
+    }]
+  });
+
+  return Array.from(new Set(
+    vinculos
+      .map((vinculo) => Number(vinculo.contrato?.solicitacao_id))
+      .filter(Boolean)
+  ));
+}
+
 async function carregarSolicitacaoFinanceira(req, solicitacaoId) {
   const solicitacao = await Solicitacao.findByPk(solicitacaoId, {
     include: [
@@ -2186,25 +2217,7 @@ async function listarTitulos(req, filters = {}) {
   }
   if (filters.parceiro_id) {
     const parceiroId = Number(filters.parceiro_id);
-    const vinculosContratuais = await ContratoCredor.findAll({
-      where: { parceiro_id: parceiroId, ativo: true },
-      attributes: ['id'],
-      include: [{
-        model: Contrato,
-        as: 'contrato',
-        required: true,
-        attributes: ['solicitacao_id'],
-        where: {
-          fluxo_novo: true,
-          solicitacao_id: { [Op.ne]: null }
-        }
-      }]
-    });
-    const solicitacoesContratuais = Array.from(new Set(
-      vinculosContratuais
-        .map((vinculo) => Number(vinculo.contrato?.solicitacao_id))
-        .filter(Boolean)
-    ));
+    const solicitacoesContratuais = await obterSolicitacoesContratuaisPorParceiros([parceiroId]);
 
     // A previsao nasce vinculada ao contratado, mas a aprovacao da medicao troca corretamente o
     // credor financeiro pelo favorecido que efetivamente recebera. O filtro por credor deve manter
@@ -2266,6 +2279,20 @@ async function listarTitulos(req, filters = {}) {
   }
   if (filters.q) {
     const term = String(filters.q).trim();
+    const parceirosContratuais = term
+      ? await Parceiro.findAll({
+        where: {
+          [Op.or]: [
+            { nome: { [Op.like]: `%${term}%` } },
+            { cpf_cnpj: { [Op.like]: `%${term}%` } }
+          ]
+        },
+        attributes: ['id']
+      })
+      : [];
+    const solicitacoesContratuais = await obterSolicitacoesContratuaisPorParceiros(
+      parceirosContratuais.map((parceiro) => parceiro.id)
+    );
     where[Op.or] = [
       ...buildTituloCodigoSearchConditions(term),
       { descricao: { [Op.like]: `%${term}%` } },
@@ -2274,7 +2301,11 @@ async function listarTitulos(req, filters = {}) {
       { '$parceiro.cpf_cnpj$': { [Op.like]: `%${term}%` } },
       { '$obra.nome$': { [Op.like]: `%${term}%` } },
       { '$obra.codigo$': { [Op.like]: `%${term}%` } },
-      { '$solicitacao.codigo$': { [Op.like]: `%${term}%` } }
+      { '$solicitacao.codigo$': { [Op.like]: `%${term}%` } },
+      ...(solicitacoesContratuais.length > 0 ? [{
+        origem_titulo: 'CONTRATO',
+        solicitacao_id: { [Op.in]: solicitacoesContratuais }
+      }] : [])
     ];
   }
 

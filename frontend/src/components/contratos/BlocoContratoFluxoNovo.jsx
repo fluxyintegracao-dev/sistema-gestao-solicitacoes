@@ -166,11 +166,10 @@ const ACEITE_DOCUMENTO_JURIDICO = '.pdf,.docx,.png,.jpg,.jpeg,application/pdf,im
 
 function AnexoJuridicoObrigatorio({ id, titulo, arquivo, onSelecionar, onRemover }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2"
-      style={{ borderBottom: '1px solid var(--c-border)' }}>
+    <div className="grid items-center gap-3 border-b border-[var(--c-border)] py-3 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto]">
       <div className="min-w-0">
         <div className="text-sm font-medium">{titulo} *</div>
-        <div className="text-xs truncate" style={{ color: arquivo ? 'var(--c-text)' : 'var(--c-muted)' }}
+        <div className="mt-1 truncate text-xs" style={{ color: arquivo ? 'var(--c-text)' : 'var(--c-muted)' }}
           data-testid={`${id}-nome`}>
           {arquivo?.name || 'Nenhum arquivo selecionado'}
         </div>
@@ -525,8 +524,8 @@ export default function BlocoContratoFluxoNovo({
       )}
 
       {exigeDocumentacaoJuridica && (
-        <section className="space-y-3" data-testid="documentacao-juridica-obrigatoria"
-          style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
+        <section className="space-y-5" data-testid="documentacao-juridica-obrigatoria"
+          style={{ borderTop: '1px solid var(--c-border)', paddingTop: 16 }}>
           <div>
             <div className="text-xs" style={{ fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--c-muted)' }}>
               Documentação jurídica obrigatória
@@ -536,7 +535,7 @@ export default function BlocoContratoFluxoNovo({
             </p>
           </div>
 
-          <div className="overflow-hidden" style={{ border: '1px solid var(--c-border)', borderRadius: 10 }}>
+          <div className="border-y border-[var(--c-border)]">
             <AnexoJuridicoObrigatorio
               id="cartao_cnpj"
               titulo="Cartão CNPJ"
@@ -551,51 +550,50 @@ export default function BlocoContratoFluxoNovo({
               onSelecionar={(arquivo) => setCampos((atuais) => ({ ...atuais, ato_constitutivo_arquivo: arquivo }))}
               onRemover={() => setCampos((atuais) => ({ ...atuais, ato_constitutivo_arquivo: null }))}
             />
-            <div style={{ marginBottom: -1 }}>
-              <AnexoJuridicoObrigatorio
-                id="documentos_representante_legal"
-                titulo="Documentos do representante legal"
-                arquivo={campos.documentos_representante_legal_arquivo}
-                onSelecionar={(arquivo) => setCampos((atuais) => ({ ...atuais, documentos_representante_legal_arquivo: arquivo }))}
-                onRemover={() => setCampos((atuais) => ({ ...atuais, documentos_representante_legal_arquivo: null }))}
-              />
-            </div>
+            <AnexoJuridicoObrigatorio
+              id="documentos_representante_legal"
+              titulo="Documentos do representante legal"
+              arquivo={campos.documentos_representante_legal_arquivo}
+              onSelecionar={(arquivo) => setCampos((atuais) => ({ ...atuais, documentos_representante_legal_arquivo: arquivo }))}
+              onRemover={() => setCampos((atuais) => ({ ...atuais, documentos_representante_legal_arquivo: null }))}
+            />
           </div>
-          <p className="text-xs" style={{ color: 'var(--c-muted)', marginTop: -4 }}>
+          <p className="text-xs" style={{ color: 'var(--c-muted)', marginTop: -12 }}>
             Formatos aceitos: PDF, DOCX, JPG ou PNG.
           </p>
 
-          <fieldset className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3"
-            style={{ border: 0, padding: 0, margin: 0 }}>
-            <legend className="text-sm font-semibold mb-2" style={{ color: 'var(--c-text)' }}>
+          <fieldset className="border-0 border-t border-[var(--c-border)] pt-4"
+            style={{ paddingLeft: 0, paddingRight: 0, paddingBottom: 0, margin: 0 }}>
+            <legend className="pr-3 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>
               Qualificação do representante legal
             </legend>
-            <label className="grid gap-1 text-sm md:col-span-2">
+            <div className="mt-3 grid grid-cols-1 gap-x-5 gap-y-4 md:grid-cols-2 lg:grid-cols-4">
+            <label className="grid gap-1.5 text-sm md:col-span-2">
               Nome completo *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.nome}
                 onChange={campoQualificacao('nome')} autoComplete="name" />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               CPF *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.cpf}
                 onChange={campoQualificacao('cpf')} inputMode="numeric" maxLength={14} placeholder="000.000.000-00" />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               RG *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.rg}
                 onChange={campoQualificacao('rg')} maxLength={40} />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               Cargo ou função *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.cargo}
                 onChange={campoQualificacao('cargo')} maxLength={80} placeholder="Ex.: Sócio administrador" />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               Nacionalidade *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.nacionalidade}
                 onChange={campoQualificacao('nacionalidade')} maxLength={60} />
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               Estado civil *
               <select className="input input-sm" value={campos.representante_legal_qualificacao.estado_civil}
                 onChange={campoQualificacao('estado_civil')} data-testid="estado-civil-representante">
@@ -605,7 +603,7 @@ export default function BlocoContratoFluxoNovo({
                 ))}
               </select>
             </label>
-            <label className="grid gap-1 text-sm">
+            <label className="grid gap-1.5 text-sm">
               Profissão *
               <input className="input input-sm" value={campos.representante_legal_qualificacao.profissao}
                 onChange={campoQualificacao('profissao')} maxLength={80} />
@@ -666,6 +664,7 @@ export default function BlocoContratoFluxoNovo({
                 </div>
               </fieldset>
             )}
+            </div>
           </fieldset>
         </section>
       )}

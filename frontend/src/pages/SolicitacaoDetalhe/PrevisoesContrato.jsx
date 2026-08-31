@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { HiEye } from 'react-icons/hi2';
 import { getContratoParcelas } from '../../services/contratos';
 
 /**
@@ -110,6 +112,7 @@ export default function PrevisoesContrato({
               <th className="px-2 py-2">Valor</th>
               <th className="px-2 py-2">Situacao</th>
               <th className="px-2 py-2">Medicao</th>
+              <th className="px-2 py-2 text-right"><span className="sr-only">Titulo</span></th>
             </tr>
           </thead>
           <tbody>
@@ -145,6 +148,21 @@ export default function PrevisoesContrato({
                         Medicao {p.medicao.numero}
                       </button>
                     )
+                  ) : (
+                    <span className="text-xs text-[var(--c-muted)]">-</span>
+                  )}
+                </td>
+                <td className="px-2 py-2 text-right align-top">
+                  {p.titulo_financeiro_id ? (
+                    <Link
+                      to={`/financeiro/titulos/${p.titulo_financeiro_id}`}
+                      className="btn btn-outline btn-sm !px-2"
+                      title={`Ver titulo da parcela ${p.numero}`}
+                      aria-label={`Ver titulo financeiro da parcela ${p.numero}`}
+                      data-testid={`ver-titulo-parcela-${p.numero}`}
+                    >
+                      <HiEye className="h-4 w-4" aria-hidden="true" />
+                    </Link>
                   ) : (
                     <span className="text-xs text-[var(--c-muted)]">-</span>
                   )}

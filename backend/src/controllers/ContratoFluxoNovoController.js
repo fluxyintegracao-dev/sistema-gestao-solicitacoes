@@ -120,7 +120,8 @@ module.exports = {
         usuario: req.user,
         req,
         etapa: req.body?.etapa,
-        linkAssinatura: req.body?.link_assinatura
+        linkAssinatura: req.body?.link_assinatura,
+        assinadoPeloLink: req.body?.assinado_pelo_link === true
       });
       return res.json(resultado);
     } catch (error) {

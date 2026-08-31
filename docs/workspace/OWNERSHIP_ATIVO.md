@@ -5,7 +5,7 @@
 Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e horario de inicio. Remover a reserva ao concluir o handoff.
 
 ### codex-data-resposta-pagamento-2026-08-31
-- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo, imutabilidade apos aprovacao e consulta financeira pelo credor contratual ou favorecido efetivo).
+- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo, imutabilidade apos aprovacao, consulta financeira pelo credor contratual ou favorecido efetivo, busca rapida equivalente, navegacao parcela-titulo, limpeza visual da documentacao juridica e assinatura contratual por link com minuta disponivel no card).
 - Inicio: 2026-08-31
 - Arquivos reservados:
   - `frontend/src/pages/NovaSolicitacao.jsx`
@@ -14,6 +14,7 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `frontend/src/pages/SolicitacaoDetalhe/ModalMedicao.jsx`
   - `frontend/src/pages/SolicitacaoDetalhe/FinanceiroCard.jsx`
   - `frontend/src/pages/SolicitacaoDetalhe/PrevisoesContrato.jsx`
+  - `frontend/src/pages/SolicitacaoDetalhe/AcoesContrato.jsx`
   - `frontend/src/pages/SolicitacaoDetalhe/PreviewAnexoModal.jsx`
   - `frontend/src/components/contratos/BlocoContratoFluxoNovo.jsx`
   - `frontend/src/utils/novaSolicitacaoCampos.js`
@@ -24,6 +25,7 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `frontend/src/pages/SolicitacaoDetalhe/Timeline.jsx`
   - `backend/src/services/novaSolicitacaoCamposConfig.js`
   - `backend/src/services/contratoFluxoNovoService.js`
+  - `backend/src/controllers/ContratoFluxoNovoController.js`
   - `backend/src/controllers/SolicitacaoController.js`
   - `backend/src/controllers/AnexoController.js`
   - `backend/src/validators/operationalValidators.js`
@@ -32,6 +34,7 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `docs/handoffs/AJUSTES_OPERACIONAIS_MEDICAO_2026-08-31.md`
   - `docs/handoffs/RECUPERACAO_ANEXOS_MEDICAO_2026-08-31.md`
   - `docs/handoffs/FILTRO_CREDOR_PARCELAS_CONTRATO_2026-08-31.md`
+  - `docs/handoffs/ASSINATURA_CONTRATO_POR_LINK_2026-08-31.md`
 
 Ownership da sessao `codex-snapshot-sanitizado-dev-v2-2026-08-29` liberado apos configurar
 `export-ignore` para QA, ambientes, uploads, artefatos locais e scripts de dados no pacote de deploy.
