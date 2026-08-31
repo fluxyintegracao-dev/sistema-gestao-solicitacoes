@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
-import { createSolicitacao, getApropriacaoPadraoSolicitacao, getSaldoDespesaEventual } from '../services/solicitacoes';
+import { createSolicitacao, getApropriacaoPadraoSolicitacao, getSaldoDespesaEventual, solicitarRetornoSolicitacao } from '../services/solicitacoes';
 import { uploadArquivos } from '../services/uploads';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getContratos, criarContratoFluxoNovo, getFormasPagamentoFluxos, getLimiteJuridico, uploadContratoAnexos, uploadNegociacaoContrato, uploadDocumentacaoJuridicaContrato } from '../services/contratos';
@@ -15,7 +15,7 @@ import { buscarParceiros, criarCredorNovaSolicitacao } from '../services/parceir
 import { listarApropriacoes } from '../services/apropriacoes';
 import { getAreasObra, getAreasPorSetorOrigem, getAutomacaoDestinoNovaSolicitacao, getCamposNovaSolicitacao, getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import { useAuth } from '../contexts/AuthContext';
-import { HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
+import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import ParceiroBuscaRemota from '../components/solicitacoes/ParceiroBuscaRemota';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
@@ -201,6 +201,12 @@ export default function NovaSolicitacao() {
   // Comeca com uma linha vazia — o caso de uma apropriacao so continua sendo o normal.
   const [rateioContrato, setRateioContrato] = useState([{ apropriacao_id: '', percentual: '100', valor: '' }]);
   const [medicaoContratoDados, setMedicaoContratoDados] = useState(null);
+  const [retornoContrato, setRetornoContrato] = useState({
+    aberto: false,
+    motivo: '',
+    processando: false,
+    erro: ''
+  });
   // PI-15: o aditivo virou uma ACAO sobre o contrato, pedida por um modal na tela de medicao.
   // Nao e mais um subtipo da Nova Solicitacao, e nao participa do envio deste formulario.
   const [modalAditivoAberto, setModalAditivoAberto] = useState(false);
@@ -932,6 +938,8 @@ export default function NovaSolicitacao() {
   }
 
   function aplicarContratoSelecionado(contrato) {
+    setRetornoContrato({ aberto: false, motivo: '', processando: false, erro: '' });
+    setMedicaoContratoDados(null);
     if (!contrato) {
       setForm(prev => ({
         ...prev,
@@ -972,6 +980,45 @@ export default function NovaSolicitacao() {
     }
     setParceiroResultados([]);
     setParceiroBuscaExecutada(false);
+  }
+
+  function atualizarContextoContrato(contratoId, contextoInteracao) {
+    const atualizarLista = (lista) => (Array.isArray(lista) ? lista.map((item) => (
+      String(item.id) === String(contratoId)
+        ? {
+          ...item,
+          disponivel_medicao: contextoInteracao?.pode_interagir === true,
+          contexto_interacao: contextoInteracao
+        }
+        : item
+    )) : []);
+    setContratos(atualizarLista);
+    setContratosRef(atualizarLista);
+  }
+
+  async function solicitarRetornoDoContrato() {
+    const motivo = String(retornoContrato.motivo || '').trim();
+    const solicitacaoId = Number(contratoSelecionado?.solicitacao_id);
+    if (!solicitacaoId || !motivo || retornoContrato.processando) return;
+
+    setRetornoContrato((atual) => ({ ...atual, processando: true, erro: '' }));
+    try {
+      const resultado = await solicitarRetornoSolicitacao(solicitacaoId, motivo);
+      const contextoAtual = contratoSelecionado?.contexto_interacao || {};
+      const contextoAtualizado = {
+        ...contextoAtual,
+        pode_solicitar_retorno: false,
+        pedido_retorno_pendente: resultado?.pedido || null
+      };
+      atualizarContextoContrato(contratoSelecionado.id, contextoAtualizado);
+      setRetornoContrato({ aberto: false, motivo: '', processando: false, erro: '' });
+    } catch (error) {
+      setRetornoContrato((atual) => ({
+        ...atual,
+        processando: false,
+        erro: error?.message || 'Nao foi possivel solicitar o retorno da solicitacao.'
+      }));
+    }
   }
 
   function alternarApropriacaoContratoRateio(index, checked) {
@@ -1157,6 +1204,14 @@ export default function NovaSolicitacao() {
 
     if (!form.obra_id) {
       alert('Selecione uma obra/centro de custo');
+      return;
+    }
+
+    if (tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada) {
+      alert(
+        `A solicitacao deste contrato esta no setor ${contratoSelecionado?.contexto_interacao?.setor_atual || 'responsavel atual'}. `
+        + 'Solicite o retorno antes de registrar a medicao.'
+      );
       return;
     }
 
@@ -1732,6 +1787,10 @@ export default function NovaSolicitacao() {
   // MD-2/MD-3: a bifurcacao da medicao le o marcador do CONTRATO escolhido. Contrato sem
   // marcador (os 335 existentes) cai na trilha antiga, que nao muda em nada.
   const contratoSelecionadoEhFluxoNovo = Boolean(contratoSelecionado?.fluxo_novo);
+  const contratoSelecionadoMedicaoBloqueada = Boolean(
+    contratoSelecionadoEhFluxoNovo
+    && contratoSelecionado?.disponivel_medicao === false
+  );
   const usaMedicaoFluxoNovo = exibirCamposContrato && Boolean(form.contrato_id) && contratoSelecionadoEhFluxoNovo;
 
   // MEDICAO DO FLUXO NOVO NAO TEM VALOR, TITULO NEM VENCIMENTO PROPRIOS (pedido do cliente, 20/08).
@@ -1762,7 +1821,10 @@ export default function NovaSolicitacao() {
   //
   // "Estar na medicao" foi derivado acima do COMPORTAMENTO do tipo (mostra/exige periodo),
   // nunca do nome nem do id: a mesma regra tambem forca o campo unico de anexos a aparecer.
-  const podeSolicitarAditivo = tipoEhDeMedicao && exibirCamposContrato && Boolean(form.contrato_id);
+  const podeSolicitarAditivo = tipoEhDeMedicao
+    && exibirCamposContrato
+    && Boolean(form.contrato_id)
+    && !contratoSelecionadoMedicaoBloqueada;
   const credoresContratoSelecionado = useMemo(
     () => getCredoresContrato(contratoSelecionado),
     [contratoSelecionado]
@@ -2634,10 +2696,102 @@ export default function NovaSolicitacao() {
                 {contratosDisponiveis.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.codigo} - {c.ref_contrato || '-'}
+                    {c.disponivel_medicao === false ? ' — retorno necessario' : ''}
                   </option>
                 ))}
               </select>
             </label>
+
+            {tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada && (
+              <section
+                className="md:col-span-2 border-l-4 border-amber-500 bg-amber-50/80 px-4 py-3 text-sm text-amber-950 dark:bg-amber-950/25 dark:text-amber-100"
+                aria-label="Medicao aguardando retorno da solicitacao"
+                data-testid="contrato-medicao-fora-setor"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <HiOutlineArrowUturnLeft className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                    <div>
+                      <p className="font-semibold">
+                        Contrato visivel · medicao temporariamente bloqueada
+                      </p>
+                      <p className="mt-0.5 text-xs leading-5 text-amber-800 dark:text-amber-200">
+                        A solicitacao {contratoSelecionado?.solicitacaoContrato?.codigo || contratoSelecionado?.codigo || ''}
+                        {' '}esta no setor {contratoSelecionado?.contexto_interacao?.setor_atual || 'responsavel atual'}.
+                        Ela precisa voltar para {contratoSelecionado?.contexto_interacao?.setor_usuario || 'seu setor'} antes de registrar a medicao.
+                      </p>
+                    </div>
+                  </div>
+
+                  {contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold dark:bg-transparent">
+                      <HiOutlineClock className="h-4 w-4" /> Retorno solicitado
+                    </span>
+                  ) : contratoSelecionado?.contexto_interacao?.pode_solicitar_retorno ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => setRetornoContrato((atual) => ({ ...atual, aberto: !atual.aberto, erro: '' }))}
+                    >
+                      Solicitar retorno
+                    </button>
+                  ) : null}
+                </div>
+
+                {contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente && (
+                  <p className="mt-2 border-t border-amber-200 pt-2 text-xs">
+                    <span className="font-semibold">Motivo enviado:</span>{' '}
+                    {contratoSelecionado.contexto_interacao.pedido_retorno_pendente.motivo}
+                  </p>
+                )}
+
+                {!contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente
+                  && !contratoSelecionado?.contexto_interacao?.pode_solicitar_retorno && (
+                  <p className="mt-2 border-t border-amber-200 pt-2 text-xs">
+                    Seu usuario pode visualizar o contrato, mas nao possui permissao para solicitar o retorno.
+                  </p>
+                )}
+
+                {retornoContrato.aberto
+                  && !contratoSelecionado?.contexto_interacao?.pedido_retorno_pendente && (
+                  <div className="mt-3 grid gap-2 border-t border-amber-200 pt-3 md:grid-cols-[1fr_auto]">
+                    <label className="min-w-0">
+                      <span className="mb-1 block text-xs font-semibold">Por que precisa do retorno? *</span>
+                      <textarea
+                        className="input min-h-20 w-full resize-y bg-white dark:bg-gray-950"
+                        value={retornoContrato.motivo}
+                        onChange={(event) => setRetornoContrato((atual) => ({
+                          ...atual,
+                          motivo: event.target.value,
+                          erro: ''
+                        }))}
+                        placeholder="Ex.: preciso registrar a medicao deste periodo e anexar os documentos."
+                        maxLength={2000}
+                        autoFocus
+                      />
+                    </label>
+                    <div className="flex items-end justify-end gap-2">
+                      <button type="button" className="btn btn-ghost btn-sm"
+                        onClick={() => setRetornoContrato({ aberto: false, motivo: '', processando: false, erro: '' })}
+                        disabled={retornoContrato.processando}>
+                        Fechar
+                      </button>
+                      <button type="button" className="btn btn-primary btn-sm"
+                        onClick={solicitarRetornoDoContrato}
+                        disabled={retornoContrato.processando || !retornoContrato.motivo.trim()}>
+                        {retornoContrato.processando ? 'Enviando...' : 'Enviar pedido'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {retornoContrato.erro && (
+                  <p className="mt-2 text-xs font-medium text-red-700 dark:text-red-300" role="alert">
+                    {retornoContrato.erro}
+                  </p>
+                )}
+              </section>
+            )}
 
             {/* O rateio de apropriacao tambem nao e da MEDICAO do fluxo novo.
                 Ela nao cria solicitacao (PI-16): o que o backend recebe aqui e descartado junto com
@@ -2714,7 +2868,7 @@ export default function NovaSolicitacao() {
           </div>
         )}
 
-        {usaMedicaoFluxoNovo && (
+        {usaMedicaoFluxoNovo && !contratoSelecionadoMedicaoBloqueada && (
           <BlocoMedicaoContrato
             contratoId={Number(form.contrato_id)}
             onChange={setMedicaoContratoDados}
@@ -3054,6 +3208,7 @@ export default function NovaSolicitacao() {
             className="btn btn-primary btn-sm"
             disabled={
               criandoSolicitacao ||
+              (tipoEhDeMedicao && contratoSelecionadoMedicaoBloqueada) ||
               (usaFluxoRecargaCartao && (!cartaoRecargaId || recargaCartaoContexto?.bloqueado)) ||
               (usaApropriacaoAutomaticaObra && apropriacaoAutomatica.status === 'loading') ||
               (usaFluxoDespesaEventual && despesaEventualSaldo.status === 'loading')

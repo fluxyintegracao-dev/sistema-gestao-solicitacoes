@@ -42,7 +42,9 @@ const {
 const { userHasSetorCapability } = require('../services/setorCapabilityService');
 const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { normalizeOriginalName } = require('../utils/fileName');
-const { assertPodeInteragirSolicitacao } = require('../services/solicitacaoRetornoService');
+const {
+  montarContextoInteracao
+} = require('../services/solicitacaoRetornoService');
 
 const DOCUMENTACAO_JURIDICA_POR_SLUG = Object.freeze({
   'cartao-cnpj': {
@@ -828,13 +830,30 @@ module.exports = {
       if (modoCriacao) {
         const contratosDisponiveis = [];
         for (const contrato of contratos) {
+          const contratoSerializado = contrato.toJSON ? contrato.toJSON() : { ...contrato };
           if (!contrato.fluxo_novo || !contrato.solicitacao_id) {
-            contratosDisponiveis.push(contrato);
+            contratosDisponiveis.push({
+              ...contratoSerializado,
+              disponivel_medicao: true,
+              contexto_interacao: null
+            });
             continue;
           }
           try {
-            await assertPodeInteragirSolicitacao(req, contrato.solicitacaoContrato || contrato.solicitacao_id);
-            contratosDisponiveis.push(contrato);
+            const solicitacaoContrato = contrato.solicitacaoContrato;
+            if (!solicitacaoContrato) continue;
+
+            // Estar em outro setor bloqueia a MEDICAO, nao a visibilidade do contrato dentro da
+            // obra. O contexto usa exatamente a mesma regra do detalhe da solicitacao e tambem
+            // informa permissao/pedido pendente de retorno. Falha real de visibilidade continua
+            // escondendo o registro, preservando o escopo de acesso.
+            const contextoInteracao = await montarContextoInteracao(req, solicitacaoContrato);
+            if (!contextoInteracao?.allowed) continue;
+            contratosDisponiveis.push({
+              ...contratoSerializado,
+              disponivel_medicao: contextoInteracao.pode_interagir === true,
+              contexto_interacao: contextoInteracao
+            });
           } catch (errorAcesso) {
             if (![403, 404, 409].includes(Number(errorAcesso?.statusCode))) throw errorAcesso;
           }
