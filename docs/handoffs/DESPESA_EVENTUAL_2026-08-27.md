@@ -71,3 +71,12 @@ As restrições sem critério técnico objetivo (continuidade, vínculo contratu
 declarações explícitas e persistidas para auditoria. O bloqueio automático cobre os limites
 financeiros. Se for desejada detecção automática de fracionamento por fornecedor/período, o período
 e a regra de similaridade precisam ser definidos em uma evolução separada.
+
+## Ajuste administrativo — 31/08/2026
+
+- A tela `Configurações > Tipos de Solicitação` passou a expor a opção
+  `Usar fluxo de Despesa Eventual` tanto na criação quanto na edição do tipo.
+- A opção utiliza a chave já existente `usa_fluxo_despesa_eventual`; o backend já normalizava,
+  serializava e persistia essa chave no campo `comportamento`.
+- Não foi necessária migration nem alteração de dados. A ativação continua sendo uma decisão
+  explícita do Superadmin pela interface.
