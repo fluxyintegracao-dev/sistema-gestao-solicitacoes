@@ -13,11 +13,7 @@ const { criarTituloManual } = require('./tituloFinanceiroService');
 const { gerarProximoCodigo } = require('./contratoCodigoService');
 const { gerarParcelas, paraCentavos, somenteData, formatarISO } = require('./contratoParcelasService');
 const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
-const {
-  formaPagamentoEhBoleto,
-  formaPagamentoEhPix,
-  listarFormasDosFluxos
-} = require('./formasPagamentoMedicaoService');
+const { formaPagamentoEhBoleto } = require('./formasPagamentoMedicaoService');
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
 const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 
@@ -642,17 +638,11 @@ async function criarContrato(dados, { usuarioId } = {}) {
     qtde_parcelas: qtdeParcelas,
     primeiro_vencimento: primeiroVencimento,
     periodicidade = 'MENSAL',
-    forma_pagamento_id: formaPagamentoId,
     parceiro_id: parceiroId,
-    // PI-12: todos os contratados respondem pelo contrato; o pagamento vai ao favorecido,
-    // que pode ser um terceiro. `parceiros` e a lista de contratados; `parceiro_id` continua
-    // aceito e vale como contratado unico (compatibilidade com o que ja chama este servico).
+    // Todos os contratados respondem pelo contrato. `parceiros` e a lista de contratados;
+    // `parceiro_id` continua aceito e vale como contratado unico (compatibilidade com quem ja
+    // chama este servico). Favorecido e forma de pagamento pertencem a medicao.
     parceiros: parceirosInformados,
-    favorecido_id: favorecidoId,
-    favorecido_chave_pix: favorecidoChavePix,
-    favorecido_contato: favorecidoContato,
-    dados_pagamento: dadosPagamento,
-    boleto_anexo_nome: boletoAnexoNome,
     vigencia_inicio: vigenciaInicio,
     vigencia_fim: vigenciaFim,
     responsavel_id: responsavelId,
@@ -701,9 +691,9 @@ async function criarContrato(dados, { usuarioId } = {}) {
     throw Object.assign(new Error('Informe ao menos um contratado.'), { statusCode: 400 });
   }
 
-  // Favorecido: o informado, ou o PRIMEIRO contratado. E quem recebe — as parcelas e os
-  // titulos apontam para ele, nao para os demais contratados.
-  const favorecido = Number(favorecidoId) > 0 ? Number(favorecidoId) : contratados[0];
+  // O primeiro contratado identifica a contraparte nas previsoes financeiras. Quem efetivamente
+  // recebe e por qual meio so e definido na medicao, que e a solicitacao de pagamento.
+  const parceiroPrevisao = contratados[0];
 
   // Normaliza UMA vez e grava o que validou: gravar Number(valorTotal) cru deixava o
   // MySQL rearredondar e divergir do centavo usado na validacao (F7).
@@ -733,7 +723,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
   // ponto em que o servidor consegue ver o documento, e onde o compromisso se materializa (PI-16).
   // `detalhes_contratacao` continua sendo aceito e gravado: os contratos antigos guardam o texto.
 
-  // A CATEGORIA NAO E MAIS EXIGIDA AQUI (PI-16).
+  // A CATEGORIA E OS DADOS OPERACIONAIS DE PAGAMENTO NAO SAO EXIGIDOS AQUI (PI-16).
   //
   // Ela era obrigatoria na criacao para o problema aparecer cedo, e nao la na aprovacao. So que
   // quem abre o contrato e o usuario da OBRA, que nao conhece os planos financeiros da empresa —
@@ -741,55 +731,8 @@ async function criarContrato(dados, { usuarioId } = {}) {
   // toma-la. A categoria passou a ser informada por quem APROVA, e a aprovacao e barrada sem ela
   // (`garantirCategoriaParaTitulos`), nos dois caminhos: abaixo e acima do limite do Juridico.
   //
-  // A forma de pagamento continua exigida: ela vem da mesma tela de quem abre, e o servico de
-  // titulo recusa a criacao sem ela.
-  if (!formaPagamentoId) {
-    throw Object.assign(new Error('Forma de pagamento e obrigatoria.'), { statusCode: 400 });
-  }
-
-  // PAGAMENTO DO CONTRATO E INSTRUCIONAL (29/08).
-  //
-  // A forma "Cartao" aqui nao significa que um cartao corporativo ja foi usado. Ela descreve o
-  // modo combinado com o fornecedor e, como transferencia/dinheiro/outros, exige uma instrucao
-  // textual. PIX exige a fotografia da chave e do contato; boleto exige o nome do arquivo que sera
-  // enviado logo apos a transacao de criacao. O backend repete a regra para impedir atalhos pela API.
-  const formasConfiguradas = await listarFormasDosFluxos();
-  const formaPagamento = formasConfiguradas.formas.find(
-    (forma) => Number(forma.id) === Number(formaPagamentoId)
-  );
-  if (!formaPagamento) {
-    throw Object.assign(
-      new Error('Forma de pagamento invalida ou nao liberada para o fluxo de contratos.'),
-      { statusCode: 400 }
-    );
-  }
-
-  const favorecidoRegistro = await Parceiro.findByPk(favorecido, {
-    attributes: ['id', 'ativo']
-  });
-  if (!favorecidoRegistro || favorecidoRegistro.ativo === false) {
-    throw Object.assign(new Error('Selecione um favorecido ativo para o pagamento.'), { statusCode: 400 });
-  }
-
-  const pagamentoViaPix = formaPagamentoEhPix(formaPagamento);
-  const pagamentoViaBoleto = formaPagamentoEhBoleto(formaPagamento);
-  const chavePixPagamento = pagamentoViaPix ? String(favorecidoChavePix || '').trim() : '';
-  const contatoPagamento = String(favorecidoContato || '').trim();
-  const dadosPagamentoTexto = String(dadosPagamento || '').trim();
-  const nomeBoleto = pagamentoViaBoleto ? String(boletoAnexoNome || '').trim() : '';
-
-  if (pagamentoViaPix && !chavePixPagamento) {
-    throw Object.assign(new Error('Informe a chave PIX do favorecido.'), { statusCode: 400 });
-  }
-  if (pagamentoViaPix && !contatoPagamento) {
-    throw Object.assign(new Error('Informe o contato do favorecido para o pagamento PIX.'), { statusCode: 400 });
-  }
-  if (pagamentoViaBoleto && !nomeBoleto) {
-    throw Object.assign(new Error('Anexe o boleto desta contratacao.'), { statusCode: 400 });
-  }
-  if (!pagamentoViaPix && !pagamentoViaBoleto && !dadosPagamentoTexto) {
-    throw Object.assign(new Error('Informe os dados para pagamento desta contratacao.'), { statusCode: 400 });
-  }
+  // A abertura grava apenas o cronograma previsto. Forma, favorecido, chave PIX, boleto e demais
+  // instrucoes sao validados e fotografados por `medicaoContratoService` em cada medicao.
 
 
   // Apropriacao e obrigatoria no fluxo novo: o titulo gerado na aprovacao precisa dela, e a
@@ -1034,8 +977,8 @@ async function criarContrato(dados, { usuarioId } = {}) {
         vigencia_inicio: vigenciaInicioPersistida || null,
         vigencia_fim: vigenciaFimPersistida || null,
         responsavel_id: responsavelIdPersistido || null,
-        forma_pagamento_id: formaPagamentoId || null,
-        favorecido_id: favorecido,
+        forma_pagamento_id: null,
+        favorecido_id: null,
         justificativa: justificativaPersistida || null,
         qtde_parcelas: parcelas.length,
         categoria_financeira_id: categoriaFinanceiraId,
@@ -1073,10 +1016,10 @@ async function criarContrato(dados, { usuarioId } = {}) {
         status: STATUS_PARCELA.PREVISAO,
         travada: false,
         titulo_financeiro_id: null,
-        // Quem recebe e o FAVORECIDO (PI-12) — os demais contratados respondem pelo contrato,
-        // mas nao pelo pagamento. O titulo criado na aprovacao herda daqui.
-        parceiro_id: favorecido,
-        forma_pagamento_id: formaPagamentoId || null,
+        // A contraparte identifica de quem e a previsao. Favorecido e forma de pagamento ficam
+        // nulos ate a medicao aprovada informar a instrucao de pagamento efetiva.
+        parceiro_id: parceiroPrevisao,
+        forma_pagamento_id: null,
         criado_por: usuarioId || null,
         atualizado_por: usuarioId || null
       })),
@@ -1095,7 +1038,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
       {
         codigo: await gerarCodigoSolicitacao(),
         obra_id: obraId,
-        parceiro_id: favorecido || null,
+        parceiro_id: parceiroPrevisao,
         apropriacao_id: apropriacoes.length === 1 ? apropriacoes[0].apropriacao_id : null,
         tipo_solicitacao_id: tipoMacroId || null,
         tipo_macro_id: tipoMacroId || null,
@@ -1103,11 +1046,9 @@ async function criarContrato(dados, { usuarioId } = {}) {
         contrato_id: contrato.id,
         codigo_contrato: contrato.codigo,
         descricao: descricaoPersistida || contrato.codigo,
-        favorecido_id: favorecido,
-        forma_pagamento_id: Number(formaPagamento.id),
-        // Fotografia da chave escolhida na abertura. O cadastro do parceiro pode mudar depois;
-        // o detalhe precisa mostrar a instrucao que efetivamente acompanhou esta solicitacao.
-        favorecido_chave_pix: pagamentoViaPix ? chavePixPagamento.slice(0, 255) : null,
+        favorecido_id: null,
+        forma_pagamento_id: null,
+        favorecido_chave_pix: null,
         valor: valor,
         area_responsavel: areaResponsavel || null,
         data_vencimento: parcelas[0]?.vencimento || null,
@@ -1153,29 +1094,6 @@ async function criarContrato(dados, { usuarioId } = {}) {
         transaction
       });
     }
-
-    // Forma e instrucao operacional ficam na linha do tempo. Favorecido e chave PIX nao sao
-    // repetidos aqui: eles pertencem ao cabecalho/detalhe da solicitacao, conforme decisao do
-    // cliente. O metadata preserva os dados estruturados sem criar coluna ou migration.
-    const detalhePagamento = pagamentoViaPix
-      ? `Contato para o pagamento PIX: ${contatoPagamento}`
-      : pagamentoViaBoleto
-        ? `Boleto informado para envio: ${nomeBoleto}`
-        : `Dados para pagamento: ${dadosPagamentoTexto}`;
-    await registrarHistoricoDoContrato(solicitacao, {
-      acao: 'PAGAMENTO_CONTRATO_INFORMADO',
-      descricao: `Forma de pagamento: ${formaPagamento.nome || formaPagamento.codigo}. ${detalhePagamento}`,
-      usuario: { id: usuarioId, setor: areaResponsavel },
-      metadata: {
-        contrato_id: contrato.id,
-        forma_pagamento_id: Number(formaPagamento.id),
-        forma_pagamento: formaPagamento.nome || formaPagamento.codigo || null,
-        favorecido_contato: pagamentoViaPix ? contatoPagamento.slice(0, 1000) : null,
-        dados_pagamento: !pagamentoViaPix && !pagamentoViaBoleto ? dadosPagamentoTexto.slice(0, 1500) : null,
-        boleto_anexo_nome: pagamentoViaBoleto ? nomeBoleto.slice(0, 255) : null
-      },
-      transaction
-    });
 
     // NENHUM contrato nasce aprovado, em qualquer valor: todos passam pela aprovacao da
     // Gerencia de Processos (decisao do cliente, 17/08 — corrigindo entendimento anterior).
@@ -1581,9 +1499,9 @@ async function aprovarContrato(contratoId, { usuario, req, categoriaFinanceiraId
         transaction
       })
       : null;
-    const formaContrato = await FormaPagamentoFinanceira.findByPk(contrato.forma_pagamento_id, {
-      transaction
-    });
+    const formaContrato = contrato.forma_pagamento_id
+      ? await FormaPagamentoFinanceira.findByPk(contrato.forma_pagamento_id, { transaction })
+      : null;
     if (historicoPagamento && formaPagamentoEhBoleto(formaContrato)) {
       let metadataPagamento = {};
       try {
@@ -1792,7 +1710,8 @@ async function aplicarAprovacaoNaTransacao({ contrato, usuario, req }, transacti
           retornarTitulosCriados: true,
           registrarSeguranca: false,
           pularAcessoFinanceiro: true,
-          dispensarCartaoInstrucional: true
+          dispensarCartaoInstrucional: true,
+          permitirFormaPagamentoPendente: true
         }
       );
 

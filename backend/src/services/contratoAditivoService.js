@@ -686,7 +686,8 @@ async function criarTituloDaParcelaDoAditivo(contrato, aditivo, parcela, { usuar
       retornarTitulosCriados: true,
       registrarSeguranca: false,
       pularAcessoFinanceiro: true,
-      dispensarCartaoInstrucional: true
+      dispensarCartaoInstrucional: true,
+      permitirFormaPagamentoPendente: true
     }
   );
 

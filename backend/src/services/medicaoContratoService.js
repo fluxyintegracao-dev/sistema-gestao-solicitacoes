@@ -1554,11 +1554,23 @@ async function aprovarMedicaoDoContrato(medicaoId, { usuario, req } = {}) {
     }
 
     await TituloFinanceiro.update(
-      { status: 'ABERTO', atualizado_por: usuario?.id || null },
+      {
+        status: 'ABERTO',
+        // A previsao nasceu com a contraparte contratual. A medicao e a solicitacao de pagamento
+        // efetiva e, por isso, define quem recebe e por qual meio antes de o titulo ficar aberto.
+        parceiro_id: medicao.favorecido_id,
+        forma_pagamento_id: medicao.forma_pagamento_id,
+        atualizado_por: usuario?.id || null
+      },
       { where: { id: { [Op.in]: tituloIds }, status: 'PREVISAO' }, transaction }
     );
     await ContratoParcela.update(
-      { status: 'APROVADA', atualizado_por: usuario?.id || null },
+      {
+        status: 'APROVADA',
+        parceiro_id: medicao.favorecido_id,
+        forma_pagamento_id: medicao.forma_pagamento_id,
+        atualizado_por: usuario?.id || null
+      },
       { where: { id: { [Op.in]: parcelaIds } }, transaction }
     );
 

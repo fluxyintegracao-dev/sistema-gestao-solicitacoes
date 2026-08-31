@@ -1285,8 +1285,16 @@ function validarCategoriaDreTitulo(categoria, payload = {}) {
   }
 }
 
-async function validarFormaPagamentoFinanceira(formaPagamentoId, payload = {}, { dispensarCartaoInstrucional = false } = {}) {
+async function validarFormaPagamentoFinanceira(
+  formaPagamentoId,
+  payload = {},
+  { dispensarCartaoInstrucional = false, permitirPendente = false } = {}
+) {
   if (!formaPagamentoId) {
+    // Titulos automaticos de contrato nascem como PREVISAO. A forma real pertence a medicao e
+    // sera gravada antes de o titulo passar a ABERTO; nenhum titulo manual ou ja aberto recebe
+    // esta dispensa.
+    if (permitirPendente) return null;
     throw createHttpError(
       400,
       'Forma de pagamento e obrigatoria para todos os titulos financeiros. Informe a forma correta antes de salvar.'
@@ -2775,7 +2783,10 @@ async function criarTituloManual(req, payload = {}, options = {}) {
     pularAcessoFinanceiro = false,
     // Uso interno dos titulos automaticos de contrato/aditivo. A forma "Cartao" descreve como o
     // fornecedor recebera; nao significa que um cartao financeiro do cadastro ja foi utilizado.
-    dispensarCartaoInstrucional = false
+    dispensarCartaoInstrucional = false,
+    // Uso interno do cronograma automatico de contratos. O titulo ainda e PREVISAO e recebe a
+    // forma efetiva somente na aprovacao da medicao.
+    permitirFormaPagamentoPendente = false
   } = options;
   if (!pularAcessoFinanceiro) await assertFinanceAccess(req);
 
@@ -2784,6 +2795,11 @@ async function criarTituloManual(req, payload = {}, options = {}) {
     throw createHttpError(400, 'Tipo de titulo invalido.');
   }
   const statusTitulo = normalizarStatusTituloInicial(payload.status);
+  const permitirFormaPagamentoPendenteNaPrevisao = Boolean(
+    permitirFormaPagamentoPendente
+    && statusTitulo === 'PREVISAO'
+    && origemTitulo === 'CONTRATO'
+  );
 
   const obraId = Number(payload.obra_id);
   if (!Number.isInteger(obraId) || obraId <= 0) {
@@ -2842,7 +2858,10 @@ async function criarTituloManual(req, payload = {}, options = {}) {
     const formaPagamento = await validarFormaPagamentoFinanceira(
       pagamentoPayload.forma_pagamento_id,
       pagamentoPayload,
-      { dispensarCartaoInstrucional }
+      {
+        dispensarCartaoInstrucional,
+        permitirPendente: permitirFormaPagamentoPendenteNaPrevisao
+      }
     );
     const intercompanyFields = await resolverIntercompanyPagamento({
       formaPagamento,

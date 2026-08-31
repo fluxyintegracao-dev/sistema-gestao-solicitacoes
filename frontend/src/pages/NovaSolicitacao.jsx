@@ -1398,20 +1398,6 @@ export default function NovaSolicitacao() {
         alert('O rateio da apropriacao deve fechar 100% (ou o valor total do contrato).');
         return;
       }
-      if (!d.forma_pagamento_id) { alert('Selecione a condicao de pagamento.'); return; }
-      if (!d.favorecido_id) { alert('Selecione o favorecido do pagamento.'); return; }
-      if (d.pagamento_via_pix && !String(d.favorecido_chave_pix || '').trim()) {
-        alert('Informe a chave PIX do favorecido.'); return;
-      }
-      if (d.pagamento_via_pix && !String(d.favorecido_contato || '').trim()) {
-        alert('Informe o contato do favorecido para o pagamento PIX.'); return;
-      }
-      if (d.pagamento_via_boleto && !d.boleto_arquivo) {
-        alert('Anexe o boleto desta contratacao.'); return;
-      }
-      if (!d.pagamento_via_pix && !d.pagamento_via_boleto && !String(d.dados_pagamento || '').trim()) {
-        alert('Informe os dados para pagamento desta contratacao.'); return;
-      }
       if (!d.qtde_parcelas || !d.primeiro_vencimento) { alert('Informe a quantidade de parcelas e o 1o vencimento.'); return; }
       const qtde = Number(d.qtde_parcelas);
       if (!Number.isInteger(qtde) || qtde < 1 || qtde > MAXIMO_PARCELAS_CONTRATO) {
@@ -1483,10 +1469,9 @@ export default function NovaSolicitacao() {
       // contratado — e 98% dos fornecedores estao sem endereco completo. A conferencia acontece
       // aqui, com a chance de corrigir, e nao la na frente com a minuta parada.
       if (acimaDoLimite && !confirmadoNaConferencia) {
-        // `d.parceiros` e a lista de ids dos contratados que o bloco emite (PI-12), e o
-        // `favorecido_id` entra tambem: se o pagamento vai para um terceiro, e o cadastro DELE
-        // que precisa estar completo para a minuta.
-        const ids = [Number(form.parceiro_id), ...(d.parceiros || []).map(Number), Number(d.favorecido_id)]
+        // `d.parceiros` e a lista de ids dos contratados que o bloco emite. Favorecido nao entra
+        // nesta conferencia porque sera escolhido na medicao, quando o pagamento for solicitado.
+        const ids = [Number(form.parceiro_id), ...(d.parceiros || []).map(Number)]
           .filter((n) => Number.isInteger(n) && n > 0);
         setCredoresParaConferir([...new Set(ids)]);
         setModalCredoresAberto(true);
@@ -1509,15 +1494,9 @@ export default function NovaSolicitacao() {
         const r = await criarContratoFluxoNovo({
           obra_id: Number(form.obra_id),
           parceiro_id: Number(form.parceiro_id),
-          // PI-12: contratados (o do formulario + os do bloco) e quem recebe.
+          // Contratados (o do formulario + os do bloco). Os dados do pagamento pertencem a
+          // medicao e nao sao antecipados na abertura do contrato.
           parceiros: (d.parceiros || []).map(Number).filter(Boolean),
-          favorecido_id: d.favorecido_id ? Number(d.favorecido_id) : null,
-          favorecido_chave_pix: d.pagamento_via_pix ? String(d.favorecido_chave_pix || '').trim() : null,
-          favorecido_contato: d.pagamento_via_pix ? String(d.favorecido_contato || '').trim() : null,
-          dados_pagamento: !d.pagamento_via_pix && !d.pagamento_via_boleto
-            ? String(d.dados_pagamento || '').trim()
-            : null,
-          boleto_anexo_nome: d.pagamento_via_boleto ? (d.boleto_arquivo?.name || null) : null,
           descricao: exibirDescricao ? form.descricao : null,
           // O titulo e a referencia do contrato: e o texto que a Medicao pesquisa depois.
           ref_contrato: exibirDescricao ? form.descricao : null,
@@ -1527,7 +1506,6 @@ export default function NovaSolicitacao() {
           // PI-16: a categoria financeira NAO vai mais daqui. Quem abre o contrato e o usuario da
           // obra, que nao conhece o plano financeiro da empresa — ela passou a ser informada por
           // quem APROVA, no detalhe da solicitacao, e a aprovacao e barrada sem ela.
-          forma_pagamento_id: Number(d.forma_pagamento_id),
           // O setor que recebe a solicitacao do contrato. Codigo do setor, nao nome.
           area_responsavel: form.area_responsavel,
           detalhes_contratacao: d.detalhes_contratacao,
@@ -1564,19 +1542,6 @@ export default function NovaSolicitacao() {
           } catch (erroNegociacao) {
             console.error(erroNegociacao);
             alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas a negociacao detalhada NAO foi enviada (${erroNegociacao.message}). Sem ela o contrato nao pode ser aprovado: abra o contrato e envie o documento.`);
-            navigate('/gestao-contratos', { replace: true });
-            return;
-          }
-        }
-
-        // Boleto do contrato tem papel proprio: e obrigatorio para esta forma e a aprovacao
-        // confere o registro tipado. Nao entra junto dos anexos gerais para nao depender do nome.
-        if (d.pagamento_via_boleto && d.boleto_arquivo && idContrato) {
-          try {
-            await uploadContratoAnexos(idContrato, [d.boleto_arquivo], { tipo: 'BOLETO' });
-          } catch (erroBoleto) {
-            console.error(erroBoleto);
-            alert(`O contrato ${r?.contrato?.codigo || idContrato} foi criado, mas o boleto nao foi enviado. Abra o contrato e anexe novamente o arquivo informado antes da aprovacao.`);
             navigate('/gestao-contratos', { replace: true });
             return;
           }

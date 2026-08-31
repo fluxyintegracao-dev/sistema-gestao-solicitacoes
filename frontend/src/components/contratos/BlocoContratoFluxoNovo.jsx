@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatCurrencyBRL as formatarMoedaBR } from '../../utils/formatters';
-import { HiPaperClip, HiPlus, HiTrash } from 'react-icons/hi2';
+import { HiPaperClip, HiTrash } from 'react-icons/hi2';
 import { getOpcoesFormularioContrato } from '../../services/contratos';
-import { buscarParceiros } from '../../services/parceiros';
-import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } from '../../utils/formaPagamento';
 
 /**
  * Bloco do fluxo novo de contratos (wireframe 1), montado DENTRO da Nova Solicitacao
@@ -14,9 +12,10 @@ import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } fro
  * ultimas com retrocesso, saldo em tempo real. O backend revalida tudo na gravacao.
  *
  * O bloco NAO conhece obra/credor/valor/descricao — esses vivem no formulario principal.
- * Ele emite via onChange: { forma_pagamento_id, qtde_parcelas,
- * primeiro_vencimento, negociacao_arquivo, parcelas }. `negociacao_arquivo` e o File da
- * negociacao detalhada, que a tela sobe depois de criar o contrato.
+ * Ele emite via onChange: { qtde_parcelas, primeiro_vencimento, negociacao_arquivo, parcelas }.
+ * `negociacao_arquivo` e o File da negociacao detalhada, que a tela sobe depois de criar o
+ * contrato. Forma de pagamento, favorecido e instrucoes pertencem a medicao, pois e nela que a
+ * solicitacao de pagamento efetivamente nasce.
  */
 
 /**
@@ -209,17 +208,10 @@ export default function BlocoContratoFluxoNovo({
   camposConfigurados = {},
   onChange
 }) {
-  // PI-12: todos os contratados respondem pelo contrato; o pagamento vai a UM favorecido, que
-  // pode ser um terceiro. O credor escolhido no formulario principal e o primeiro contratado;
-  // os demais entram aqui. O favorecido comeca no primeiro e pode ser trocado por qualquer
-  // contratado ou por um terceiro buscado pelo nome.
+  // Todos os contratados respondem pelo contrato. O credor escolhido no formulario principal e
+  // o primeiro contratado; os demais entram aqui. Favorecido nao e atributo da abertura: ele e
+  // informado na medicao, quando existe uma solicitacao de pagamento concreta.
   const [outrosContratados, setOutrosContratados] = useState([]);
-  const [favorecido, setFavorecido] = useState(null);
-  const [usarCredorComoFavorecido, setUsarCredorComoFavorecido] = useState(true);
-  const [buscaParceiro, setBuscaParceiro] = useState('');
-  const [resultadosParceiro, setResultadosParceiro] = useState([]);
-  const [alvoBusca, setAlvoBusca] = useState('contratado');
-  const [formas, setFormas] = useState([]);
   const [campos, setCampos] = useState({
     // O File fica no estado do bloco e sobe depois da criacao do contrato.
     negociacao_arquivo: null,
@@ -227,11 +219,6 @@ export default function BlocoContratoFluxoNovo({
     ato_constitutivo_arquivo: null,
     documentos_representante_legal_arquivo: null,
     representante_legal_qualificacao: QUALIFICACAO_REPRESENTANTE_VAZIA,
-    forma_pagamento_id: '',
-    favorecido_chave_pix: '',
-    favorecido_contato: '',
-    dados_pagamento: '',
-    boleto_arquivo: null,
     detalhes_contratacao: '',
     // Campos do escopo 3.1/3.2 que ja tinham coluna no banco e nao tinham campo na tela.
     objeto: '',
@@ -246,11 +233,8 @@ export default function BlocoContratoFluxoNovo({
 
   // Uma rota so, e acessivel a quem abre contrato.
   //
-  // Antes eram duas rotas ADMINISTRATIVAS — `/usuarios` (`allowGestaoUsuarios`) e
-  // `/financeiro/formas-pagamento` (`allowFinanceiro`). O usuario da OBRA nao tem nenhuma das
-  // duas: tomava 403 nas duas e os selects "Responsavel pela contratacao" e "Condicao de
-  // pagamento" ficavam VAZIOS. E vazios em silencio, porque o `.catch(() => [])` engolia o erro —
-  // a pessoa via um campo obrigatorio sem opcao nenhuma e nenhuma explicacao.
+  // Antes o responsavel vinha de uma rota administrativa (`/usuarios`, com `allowGestaoUsuarios`).
+  // O usuario da OBRA nao tem esse acesso, entao o select ficava vazio em silencio.
   //
   // Agora o erro APARECE. Falha silenciosa que apaga opcao ja reprovou este projeto antes.
   useEffect(() => {
@@ -259,13 +243,11 @@ export default function BlocoContratoFluxoNovo({
       .then((r) => {
         if (cancelado) return;
         setUsuarios(Array.isArray(r?.usuarios) ? r.usuarios : []);
-        setFormas(Array.isArray(r?.formas_pagamento) ? r.formas_pagamento : []);
       })
       .catch((e) => {
         if (cancelado) return;
         setUsuarios([]);
-        setFormas([]);
-        setErroLocal(e.message || 'Nao foi possivel carregar responsaveis e condicoes de pagamento.');
+        setErroLocal(e.message || 'Nao foi possivel carregar os responsaveis pela contratacao.');
       });
     return () => { cancelado = true; };
   }, []);
@@ -394,36 +376,6 @@ export default function BlocoContratoFluxoNovo({
     return lista;
   }, [contratadoPrincipal, outrosContratados]);
 
-  // Favorecido vale para TODAS as formas. O credor principal vem marcado por padrao; ao desmarcar,
-  // a busca precisa resultar numa escolha explicita — nao pode voltar silenciosamente ao credor.
-  const favorecidoEfetivo = usarCredorComoFavorecido ? (contratados[0] || null) : favorecido;
-  const formaPagamentoSelecionada = formas.find(
-    (forma) => String(forma.id) === String(campos.forma_pagamento_id)
-  ) || null;
-  const pagamentoViaPix = formaPagamentoEhPix(formaPagamentoSelecionada);
-  const pagamentoViaBoleto = formaPagamentoEhBoleto(formaPagamentoSelecionada);
-
-  useEffect(() => {
-    if (!pagamentoViaPix || !usarCredorComoFavorecido) return;
-    setCampos((atuais) => ({
-      ...atuais,
-      favorecido_chave_pix: chavePixPreferencial(contratados[0])
-    }));
-  }, [pagamentoViaPix, usarCredorComoFavorecido, contratados]);
-
-  // PI-12: o favorecido PODE SER UM TERCEIRO — nao precisa ser um dos contratados. Quando e,
-  // ele nao estava em `contratados` e, por isso, sumia da tabela: a coluna "recebe o pagamento"
-  // ficava vazia em todas as linhas e nao havia como ver quem receberia. Entra como linha propria,
-  // marcada, para a tela dizer a verdade inteira.
-  const linhasContratados = useMemo(() => {
-    const linhas = contratados.map((p, i) => ({ parceiro: p, ordem: `${i + 1}º`, contratado: true }));
-    const favorecidoEhContratado = contratados.some((p) => String(p.id) === String(favorecidoEfetivo?.id));
-    if (favorecidoEfetivo && !favorecidoEhContratado) {
-      linhas.push({ parceiro: favorecidoEfetivo, ordem: '—', contratado: false });
-    }
-    return linhas;
-  }, [contratados, favorecidoEfetivo]);
-
   useEffect(() => {
     onChange?.({
       ...campos,
@@ -434,51 +386,10 @@ export default function BlocoContratoFluxoNovo({
       qtde_parcelas: parcelas.length,
       primeiro_vencimento: parcelas[0]?.vencimento || '',
       parcelas,
-      parceiros: contratados.map((p) => p.id),
-      favorecido_id: favorecidoEfetivo?.id || null,
-      pagamento_via_pix: pagamentoViaPix,
-      pagamento_via_boleto: pagamentoViaBoleto,
-      boleto_anexo_nome: pagamentoViaBoleto ? (campos.boleto_arquivo?.name || null) : null
+      parceiros: contratados.map((p) => p.id)
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campos, parcelas, contratados, favorecidoEfetivo, pagamentoViaPix, pagamentoViaBoleto]);
-
-  async function procurarParceiro() {
-    const termo = buscaParceiro.trim();
-    if (!termo) return;
-    // `q`, nao `search`: o backend le `q` (parceiroService) e IGNORA qualquer outro nome. Com
-    // `search` o filtro nunca era aplicado e a lista voltava inteira, dando a impressao de que a
-    // busca "nao funcionava" — ela funcionava, so nao filtrava nada.
-    const r = await buscarParceiros({ q: termo, ativo: 1 }).catch(() => null);
-    const lista = Array.isArray(r) ? r : (r?.parceiros || r?.data || []);
-    setResultadosParceiro(lista.slice(0, 20));
-  }
-
-  // Busca AO DIGITAR, sem minimo de caracteres (pedido do cliente, 19/08). O atraso so evita uma
-  // consulta por tecla e e cancelado a cada digito novo. O botao Buscar continua valendo.
-  //
-  // Nao auto-seleciona no resultado unico: quem esta escrevendo o nome inteiro teria a lista
-  // fechada no meio da digitacao.
-  useEffect(() => {
-    const termo = buscaParceiro.trim();
-    if (!termo) { setResultadosParceiro([]); return undefined; }
-    const id = window.setTimeout(() => { void procurarParceiro(); }, 350);
-    return () => window.clearTimeout(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [buscaParceiro]);
-
-  function escolherParceiro(p) {
-    if (alvoBusca === 'favorecido') {
-      setFavorecido(p);
-      setCampos((atuais) => ({
-        ...atuais,
-        favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(p) : atuais.favorecido_chave_pix
-      }));
-    }
-    else setOutrosContratados((atual) => (atual.some((x) => String(x.id) === String(p.id)) ? atual : [...atual, p]));
-    setResultadosParceiro([]);
-    setBuscaParceiro('');
-  }
+  }, [campos, parcelas, contratados]);
 
   const campoVisivel = (id) => camposConfigurados?.[id]?.visivel !== false;
   const campoObrigatorio = (id) => Boolean(camposConfigurados?.[id]?.obrigatorio);
@@ -497,9 +408,8 @@ export default function BlocoContratoFluxoNovo({
       {erroLocal && <div className="app-alert app-alert--error">{erroLocal}</div>}
       {avisoQtde && <div className="app-alert app-alert--error">{avisoQtde}</div>}
 
-      {/* Ordem da tela: O QUE se contrata -> QUEM -> COMO paga. Antes os campos de pagamento
-          vinham primeiro e os do contrato no fim, o que fazia o usuario preencher parcelas
-          antes de dizer o que estava contratando. */}
+      {/* Ordem da tela: O QUE se contrata -> documentos -> cronograma financeiro. Os dados
+          operacionais de pagamento ficam na medicao e nao poluem a abertura do contrato. */}
       {exibirDetalhamentoContratacao && <div className="space-y-2">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {exibirObjeto && <label className="grid gap-1 text-sm md:col-span-3">
@@ -536,176 +446,13 @@ export default function BlocoContratoFluxoNovo({
       </div>}
 
       <div className="space-y-2" style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}>
-        <div className="text-xs" style={{ fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--c-muted)' }}>Pagamento e parcelas</div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {/* PI-16: a categoria financeira SAIU daqui. Quem abre o contrato e o usuario da obra,
-              que nao conhece o plano financeiro da empresa. Ela passou a ser informada por quem
-              APROVA, no detalhe da solicitacao, e vale para todos os titulos do contrato. */}
-          <label className="grid gap-1 text-sm">
-            Condição de pagamento *
-            <select
-              className="input input-sm"
-              name="forma_pagamento_id"
-              value={campos.forma_pagamento_id}
-              onChange={(e) => {
-                const proximoId = e.target.value;
-                const proximaForma = formas.find((forma) => String(forma.id) === String(proximoId)) || null;
-                const proximaEhPix = formaPagamentoEhPix(proximaForma);
-                setCampos((atuais) => ({
-                  ...atuais,
-                  forma_pagamento_id: proximoId,
-                  favorecido_chave_pix: proximaEhPix ? chavePixPreferencial(favorecidoEfetivo) : '',
-                  favorecido_contato: '',
-                  dados_pagamento: '',
-                  boleto_arquivo: null
-                }));
-              }}
-            >
-              <option value="">Selecione</option>
-              {formas.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
-            </select>
-          </label>
+        <div className="text-xs" style={{ fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--c-muted)' }}>
+          Previsao de pagamento
         </div>
-
-        {campos.forma_pagamento_id && (
-          <div className="space-y-3" data-testid="pagamento-contrato">
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="credor_como_favorecido_contrato"
-                checked={usarCredorComoFavorecido && Boolean(contratadoPrincipal)}
-                disabled={!contratadoPrincipal}
-                onChange={(e) => {
-                  const usarCredor = e.target.checked;
-                  setUsarCredorComoFavorecido(usarCredor);
-                  if (usarCredor) {
-                    setFavorecido(null);
-                    setBuscaParceiro('');
-                  }
-                  setCampos((atuais) => ({
-                    ...atuais,
-                    favorecido_chave_pix: pagamentoViaPix && usarCredor
-                      ? chavePixPreferencial(contratadoPrincipal)
-                      : ''
-                  }));
-                }}
-              />
-              <span>
-                Usar o credor como favorecido{contratadoPrincipal?.nome ? ` (${contratadoPrincipal.nome})` : ''}
-              </span>
-            </label>
-
-            {!usarCredorComoFavorecido && (
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    className="input input-sm"
-                    style={{ minWidth: 280 }}
-                    name="busca_favorecido_contrato"
-                    value={buscaParceiro}
-                    onChange={(e) => {
-                      setAlvoBusca('favorecido');
-                      setBuscaParceiro(e.target.value);
-                      setFavorecido(null);
-                    }}
-                    placeholder="Buscar favorecido por nome ou CPF/CNPJ"
-                  />
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => { setAlvoBusca('favorecido'); void procurarParceiro(); }}>
-                    Buscar
-                  </button>
-                </div>
-                {resultadosParceiro.length > 0 && (
-                  <div className="max-h-40 max-w-2xl overflow-auto rounded border p-1" style={{ borderColor: 'var(--c-border)' }}>
-                    {resultadosParceiro.map((p) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        className="block w-full px-2 py-1.5 text-left text-sm"
-                        onClick={() => escolherParceiro(p)}
-                      >
-                        {p.nome}{p.cpf_cnpj ? ` — ${p.cpf_cnpj}` : ''}
-                      </button>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs" style={{ color: favorecido ? 'var(--c-muted)' : 'var(--c-danger, #b91c1c)' }}>
-                  {favorecido ? `Favorecido selecionado: ${favorecido.nome}` : 'Selecione o favorecido do pagamento.'}
-                </p>
-              </div>
-            )}
-
-            {pagamentoViaPix && (
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2" data-testid="pagamento-contrato-pix">
-                <label className="grid gap-1 text-sm">
-                  Chave PIX do favorecido *
-                  <input
-                    className="input input-sm"
-                    name="favorecido_chave_pix_contrato"
-                    value={campos.favorecido_chave_pix}
-                    onChange={campo('favorecido_chave_pix')}
-                    placeholder="Chave para o pagamento"
-                  />
-                </label>
-                <label className="grid gap-1 text-sm">
-                  Contato do favorecido *
-                  <input
-                    className="input input-sm"
-                    name="favorecido_contato_contrato"
-                    value={campos.favorecido_contato}
-                    onChange={campo('favorecido_contato')}
-                    placeholder="Telefone, e-mail ou pessoa de contato"
-                  />
-                </label>
-              </div>
-            )}
-
-            {pagamentoViaBoleto && (
-              <div className="grid max-w-xl gap-1 text-sm" data-testid="pagamento-contrato-boleto">
-                <span>Boleto *</span>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="btn btn-outline btn-sm inline-flex cursor-pointer items-center gap-2">
-                    <HiPaperClip className="h-4 w-4" />
-                    <span>{campos.boleto_arquivo ? 'Trocar boleto' : 'Selecionar boleto'}</span>
-                    <input
-                      type="file"
-                      className="hidden"
-                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
-                      onChange={(e) => {
-                        const arquivo = e.target.files?.[0] || null;
-                        setCampos((atuais) => ({ ...atuais, boleto_arquivo: arquivo }));
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                  <span className="text-xs text-[var(--c-muted)]">
-                    {campos.boleto_arquivo?.name || 'Nenhum boleto selecionado'}
-                  </span>
-                  {campos.boleto_arquivo && (
-                    <button type="button" className="btn btn-outline btn-sm"
-                      onClick={() => setCampos((atuais) => ({ ...atuais, boleto_arquivo: null }))}>
-                      Remover
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {!pagamentoViaPix && !pagamentoViaBoleto && (
-              <label className="grid max-w-2xl gap-1 text-sm" data-testid="pagamento-contrato-dados">
-                Dados para pagamento *
-                <textarea
-                  className="input input-sm"
-                  name="dados_pagamento_contrato"
-                  rows={2}
-                  maxLength={1500}
-                  value={campos.dados_pagamento}
-                  onChange={campo('dados_pagamento')}
-                  placeholder="Informe os dados ou instrucoes que o Financeiro precisara para realizar o pagamento"
-                />
-              </label>
-            )}
-          </div>
-        )}
+        <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
+          Defina abaixo os valores e vencimentos previstos. A forma de pagamento, o favorecido e
+          as instrucoes serao informados em cada medicao.
+        </p>
         {/* "Saldo a distribuir: R$ 0,00" confundiu o cliente (20/08): zero sem contexto parece
             campo vazio ou erro, quando e exatamente o estado CERTO — as parcelas fecham o valor do
             contrato. O numero sozinho nao diz se e bom ou ruim; agora a frase diz. */}
