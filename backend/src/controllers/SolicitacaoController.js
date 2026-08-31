@@ -2693,7 +2693,7 @@ module.exports = {
       }
       if (campoObrigatorio('data_vencimento') && !data_vencimento) {
         return res.status(400).json({
-          error: 'Informe a data de vencimento.'
+          error: 'Informe a Data Resposta/Pagamento.'
         });
       }
       if (usaFluxoRecargaCartao && !cartao_recarga_id) {
@@ -2708,7 +2708,7 @@ module.exports = {
         const vencimentoStr = String(data_vencimento).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
           return res.status(400).json({
-            error: 'Data de vencimento invalida. Use o formato YYYY-MM-DD.'
+            error: 'Data Resposta/Pagamento invalida. Use o formato YYYY-MM-DD.'
           });
         }
 
@@ -2717,7 +2717,7 @@ module.exports = {
 
         if (vencimentoStr < hojeStr) {
           return res.status(400).json({
-            error: 'A data de vencimento nao pode ser menor que a data atual.'
+            error: 'A Data Resposta/Pagamento nao pode ser menor que a data atual.'
           });
         }
       }

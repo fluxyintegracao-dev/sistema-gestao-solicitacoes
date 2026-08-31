@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import OverlayModal from '../../components/ui/OverlayModal';
+import DateInputBR from '../../components/DateInputBR';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 import { aprovarMedicaoContrato, atualizarMedicaoContrato } from '../../services/contratos';
+import { HiArrowDownTray, HiEye } from 'react-icons/hi2';
+import PreviewAnexoModal from './PreviewAnexoModal';
 
 const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-BR') : '');
 const soData = (v) => (v ? String(v).slice(0, 10) : '');
@@ -42,6 +45,8 @@ export default function ModalMedicao({
   const [salvando, setSalvando] = useState(false);
   const [aprovando, setAprovando] = useState(false);
   const [abrindoAnexoId, setAbrindoAnexoId] = useState(null);
+  const [baixandoAnexoId, setBaixandoAnexoId] = useState(null);
+  const [previewAnexo, setPreviewAnexo] = useState(null);
 
   useEffect(() => {
     const inicial = {};
@@ -64,10 +69,11 @@ export default function ModalMedicao({
   const favorecido = medicao.favorecido?.nome || 'Nao informado';
   const documentoFavorecido = medicao.favorecido?.cpf_cnpj || '';
   const ehPix = /PIX/i.test(`${medicao.forma_pagamento?.nome || ''} ${medicao.forma_pagamento?.tipo || ''}`);
+  const medicaoAprovada = Boolean(medicao.aprovada_em);
 
   const temBaixa = (p) => Number(p?.titulo_valor_baixado || 0) > 0;
-  const editaveis = daMedicao.filter((p) => !temBaixa(p));
-  const podeSalvar = podeEditar && editaveis.length > 0;
+  const editaveis = medicaoAprovada ? [] : daMedicao.filter((p) => !temBaixa(p));
+  const podeSalvar = podeEditar && !medicaoAprovada && editaveis.length > 0;
 
   async function salvar() {
     setErro('');
@@ -106,27 +112,29 @@ export default function ModalMedicao({
     }
   }
 
+  async function resolverUrlAnexo(anexo) {
+    const caminho = String(anexo.caminho_arquivo || '');
+    if (!caminho) throw new Error('Arquivo sem endereco para abertura.');
+    if (!caminho.startsWith('http')) return fileUrl(caminho);
+
+    const params = new URLSearchParams({ url: normalizarUrlArquivo(caminho) });
+    const resposta = await fetch(`${API_URL}/anexos/presign?${params.toString()}`, {
+      headers: authHeaders()
+    });
+    const dados = await resposta.json().catch(() => null);
+    if (!resposta.ok || !dados?.url) {
+      throw new Error(dados?.error || 'Nao foi possivel gerar o link seguro do arquivo.');
+    }
+    return dados.url;
+  }
+
   async function abrirAnexo(anexo) {
     setErro('');
     setAbrindoAnexoId(anexo.id);
     try {
-      const caminho = String(anexo.caminho_arquivo || '');
-      if (!caminho) throw new Error('Arquivo sem endereco para abertura.');
-
-      let url = fileUrl(caminho);
-      if (caminho.startsWith('http')) {
-        const params = new URLSearchParams({ url: normalizarUrlArquivo(caminho) });
-        const resposta = await fetch(`${API_URL}/anexos/presign?${params.toString()}`, {
-          headers: authHeaders()
-        });
-        const dados = await resposta.json().catch(() => null);
-        if (!resposta.ok || !dados?.url) {
-          throw new Error(dados?.error || 'Nao foi possivel gerar o link seguro do arquivo.');
-        }
-        url = dados.url;
-      }
-
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const url = await resolverUrlAnexo(anexo);
+      const nome = anexo.nome_original || 'Arquivo da medicao';
+      setPreviewAnexo({ nome, caminho: nome, url, downloadUrl: url });
     } catch (e) {
       setErro(e.message || 'Nao foi possivel abrir o arquivo.');
     } finally {
@@ -134,12 +142,36 @@ export default function ModalMedicao({
     }
   }
 
+  async function baixarAnexo(anexo) {
+    setErro('');
+    setBaixandoAnexoId(anexo.id);
+    try {
+      const url = await resolverUrlAnexo(anexo);
+      const resposta = await fetch(url);
+      if (!resposta.ok) throw new Error('Nao foi possivel carregar o arquivo para download.');
+      const blobUrl = window.URL.createObjectURL(await resposta.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = anexo.nome_original || 'arquivo-medicao';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      setErro(e.message || 'Nao foi possivel baixar o arquivo.');
+    } finally {
+      setBaixandoAnexoId(null);
+    }
+  }
+
   return (
-    <OverlayModal
+    <>
+      <OverlayModal
       aberto
       largura="var(--modal-max-w-lg, 860px)"
       rotulo={`Medicao ${medicao.numero}`}
       onFechar={onFechar}
+      fecharComEscape={!previewAnexo}
     >
       <div data-testid="modal-medicao" className="flex min-h-0 flex-1 flex-col">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
@@ -240,14 +272,28 @@ export default function ModalMedicao({
                       <span className="min-w-0 flex-1 truncate text-sm text-[var(--c-text)]" title={anexo.nome_original}>
                         {anexo.nome_original || 'Arquivo sem nome'}
                       </span>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm shrink-0"
-                        disabled={abrindoAnexoId === anexo.id}
-                        onClick={() => abrirAnexo(anexo)}
-                      >
-                        {abrindoAnexoId === anexo.id ? 'Abrindo...' : 'Abrir'}
-                      </button>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm !px-2"
+                          title="Visualizar arquivo"
+                          aria-label={`Visualizar ${anexo.nome_original || 'arquivo'}`}
+                          disabled={abrindoAnexoId === anexo.id}
+                          onClick={() => abrirAnexo(anexo)}
+                        >
+                          <HiEye className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm !px-2"
+                          title="Baixar arquivo"
+                          aria-label={`Baixar ${anexo.nome_original || 'arquivo'}`}
+                          disabled={baixandoAnexoId === anexo.id}
+                          onClick={() => baixarAnexo(anexo)}
+                        >
+                          <HiArrowDownTray className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -277,7 +323,7 @@ export default function ModalMedicao({
                       <span className="block text-[11px] text-[var(--c-muted)]">{p.situacao || p.status}</span>
                     </div>
 
-                    {podeEditar && !temBaixa(p) ? (
+                    {podeEditar && !medicaoAprovada && !temBaixa(p) ? (
                       <>
                         <label className="grid gap-1 text-xs text-[var(--c-muted)]">
                           Valor
@@ -292,9 +338,9 @@ export default function ModalMedicao({
                         </label>
                         <label className="grid gap-1 text-xs text-[var(--c-muted)]">
                           Vencimento
-                          <input
+                          <DateInputBR
                             className="input input-sm"
-                            type="date"
+                            name={`vencimento_medicao_${p.id}`}
                             data-testid={`medicao-vencimento-${p.numero}`}
                             value={edicao[p.id]?.vencimento ?? ''}
                             onChange={(e) => setEdicao((s) => ({ ...s, [p.id]: { ...s[p.id], vencimento: e.target.value } }))}
@@ -332,7 +378,13 @@ export default function ModalMedicao({
                 </div>
               )}
 
-              {!podeEditar && (
+              {medicaoAprovada && (
+                <p className="border-t border-[var(--c-border)] pt-3 text-xs text-[var(--c-muted)]" data-testid="medicao-aprovada-somente-leitura">
+                  Medicao aprovada e liberada para o Financeiro. Valor e vencimento permanecem somente para consulta.
+                </p>
+              )}
+
+              {!podeEditar && !medicaoAprovada && (
                 <p className="border-t border-[var(--c-border)] pt-3 text-xs text-[var(--c-muted)]" data-testid="medicao-sem-permissao">
                   Alterar uma medicao exige permissao especifica.
                 </p>
@@ -362,6 +414,10 @@ export default function ModalMedicao({
           )}
         </div>
       </div>
-    </OverlayModal>
+      </OverlayModal>
+      {previewAnexo && (
+        <PreviewAnexoModal anexo={previewAnexo} onClose={() => setPreviewAnexo(null)} usarPortal />
+      )}
+    </>
   );
 }

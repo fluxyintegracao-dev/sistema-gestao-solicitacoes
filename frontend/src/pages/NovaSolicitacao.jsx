@@ -702,9 +702,9 @@ export default function NovaSolicitacao() {
   const permitirVinculoCredor = exibirCampoCredor || exibirCadastroCredor;
   const permitirCredorAvulsoComContrato = opcoesNovaSolicitacao.permitir_credor_avulso_com_contrato === true;
   const restringirCredorAoContrato = exibirCamposContrato && !permitirCredorAvulsoComContrato;
-  // No fluxo novo de contratos o vencimento que vale e o 1o vencimento do bloco (as parcelas
-  // derivam dele); manter o campo do formulario exigiria um dado que nao vai no payload (M1).
-  const exibirDataVencimento = campoVisivel('data_vencimento') && !usaFluxoContratoNovo;
+  // Esta e a data operacional da SOLICITACAO (resposta/pagamento), inclusive no fluxo novo de
+  // contratos. Os vencimentos do cronograma continuam independentes e ficam em cada parcela.
+  const exibirDataVencimento = campoVisivel('data_vencimento');
   // Campo invisivel nao pode ser exigido: sem esta guarda o submit ficaria travado por um
   // campo que o usuario nao tem como preencher (a validacao roda antes do fluxo do contrato).
   const dataVencimentoObrigatoria = exibirDataVencimento && campoObrigatorio('data_vencimento');
@@ -1204,7 +1204,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (dataVencimentoExigida && !form.data_vencimento) {
-      alert(usaFluxoRecargaCartao ? 'Informe a data prevista para recarga.' : 'Informe a data de vencimento.');
+      alert(usaFluxoRecargaCartao ? 'Informe a data prevista para recarga.' : 'Informe a Data Resposta/Pagamento.');
       return;
     }
     if (dataDemissaoObrigatoria && !form.data_demissao) {
@@ -1257,7 +1257,7 @@ export default function NovaSolicitacao() {
     }
 
     if (exibirCampoDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
-      alert('Data de vencimento não pode ser menor que a data atual.');
+      alert('Data Resposta/Pagamento não pode ser menor que a data atual.');
       return;
     }
 
@@ -1503,6 +1503,9 @@ export default function NovaSolicitacao() {
           valor_total: form.valor,
           qtde_parcelas: Number(d.qtde_parcelas),
           primeiro_vencimento: d.primeiro_vencimento,
+          // Data operacional exibida na lista de solicitacoes. Nao se confunde com os
+          // vencimentos individuais do cronograma de parcelas do contrato.
+          data_vencimento: exibirDataVencimento ? (form.data_vencimento || null) : null,
           // PI-16: a categoria financeira NAO vai mais daqui. Quem abre o contrato e o usuario da
           // obra, que nao conhece o plano financeiro da empresa — ela passou a ser informada por
           // quem APROVA, no detalhe da solicitacao, e a aprovacao e barrada sem ela.
@@ -2911,7 +2914,7 @@ export default function NovaSolicitacao() {
 
           {exibirCampoDataVencimento && (
           <label className="grid gap-1 text-sm">
-            {usaFluxoRecargaCartao ? 'Data prevista para recarga' : 'Data de vencimento'}
+            {usaFluxoRecargaCartao ? 'Data prevista para recarga' : 'Data Resposta/Pagamento'}
             <input
               name="data_vencimento"
               type="date"

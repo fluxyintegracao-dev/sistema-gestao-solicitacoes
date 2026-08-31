@@ -215,7 +215,7 @@ export default function Timeline({
             PEDIDO_COMPRA_STATUS_ALTERADO: 'Status do pedido de compra alterado',
             PEDIDO_COMPRA_ENCERRADO: 'Pedido de compra encerrado/cancelado',
             RESPONSAVEL_REMOVIDO: 'Responsavel removido',
-            DATA_VENCIMENTO_ATUALIZADA: 'Data de vencimento atualizada'
+            DATA_VENCIMENTO_ATUALIZADA: 'Data Resposta/Pagamento atualizada'
           }[h.acao] || h.acao;
           const atorNome = meta?.ator_nome || null;
           const responsavelNome = meta?.responsavel_nome || h.usuario?.nome || null;

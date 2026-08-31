@@ -32,6 +32,7 @@ const { formaPagamentoEhBoleto, formaPagamentoEhPix, listarFormasDaMedicao } = r
 // Para onde a medicao aprovada vai. Codigo do setor, nao nome: a resolucao por nome e exata e
 // ha setor com espaco no fim do nome neste banco — armadilha ja registrada.
 const SETOR_FINANCEIRO = 'FINANCEIRO';
+const SETOR_GERENCIA_PROCESSOS = 'GEO';
 
 const STATUS_TITULO_EDITAVEL = new Set(['PREVISAO', 'ABERTO']);
 const STATUS_PARCELA_EDITAVEL = new Set(['PREVISAO', 'APROVADA']);
@@ -770,6 +771,36 @@ async function registrarMedicaoDoContrato({ contratoId, itens, periodoInicio, pe
     // somar `medicao_parcelas` a cada listagem.
     await medicao.update({ valor_total: resultado.total_medido }, { transaction });
 
+    // A medicao nasce para conferencia da Gerencia de Processos. Alterar apenas o status deixava
+    // a solicitacao na caixa anterior (normalmente OBRA), embora o botao de aprovacao pertenca ao
+    // GEO. O encaminhamento e gravado na mesma transacao da medicao para nao existir medicao criada
+    // sem uma equipe responsavel por conferi-la.
+    const solicitacao = await Solicitacao.findByPk(contrato.solicitacao_id, {
+      lock: transaction.LOCK.UPDATE,
+      transaction
+    });
+    if (!solicitacao) {
+      throw erro('A solicitacao vinculada ao contrato nao foi encontrada.', 409);
+    }
+
+    const areaAnterior = solicitacao.area_responsavel || null;
+    if (areaAnterior !== SETOR_GERENCIA_PROCESSOS) {
+      await solicitacao.update(
+        { area_responsavel: SETOR_GERENCIA_PROCESSOS },
+        { transaction }
+      );
+
+      // O formato e o mesmo consumido pela regra de visibilidade "passou pelo meu setor".
+      await Historico.create({
+        solicitacao_id: solicitacao.id,
+        medicao_id: medicao.id,
+        usuario_responsavel_id: usuarioId || null,
+        setor: SETOR_GERENCIA_PROCESSOS,
+        acao: 'ENVIADA_SETOR',
+        descricao: `De ${areaAnterior || '-'} para ${SETOR_GERENCIA_PROCESSOS}`
+      }, { transaction });
+    }
+
     // A solicitacao do contrato sai de APROVADA e passa a dizer que ha medicao esperando pagamento.
     // Dentro da MESMA transacao: medicao aplicada com status antigo seria a solicitacao contando
     // uma historia diferente das parcelas.
@@ -1239,6 +1270,12 @@ async function atualizarMedicaoDoContrato(medicaoId, { itens, usuario } = {}) {
       transaction
     });
     if (!medicao) throw erro('Medicao nao encontrada.', 404);
+    if (medicao.aprovada_em) {
+      throw erro(
+        `Medicao ${medicao.numero} ja foi aprovada e liberada para o Financeiro; valor e vencimento nao podem mais ser alterados.`,
+        409
+      );
+    }
 
     const vinculos = await MedicaoParcela.findAll({
       where: { medicao_id: medicao.id, devolvido_em: null },

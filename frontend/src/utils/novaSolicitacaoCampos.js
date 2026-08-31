@@ -10,7 +10,7 @@ export const CAMPOS_NOVA_SOLICITACAO = [
   { id: 'contrato', label: 'Contrato', descricao: 'Referencia e contrato vinculado.' },
   { id: 'apropriacoes_contrato', label: 'Apropriacoes do contrato', descricao: 'Rateio entre apropriacoes vinculadas ao contrato selecionado.' },
   { id: 'valor', label: 'Valor', descricao: 'Valor da solicitacao.' },
-  { id: 'data_vencimento', label: 'Data de vencimento', descricao: 'Prazo ou vencimento esperado.' },
+  { id: 'data_vencimento', label: 'Data Resposta/Pagamento', descricao: 'Prazo esperado para resposta ou pagamento da solicitacao.' },
   { id: 'data_demissao', label: 'Data de demissao', descricao: 'Data efetiva de desligamento do colaborador.' },
   { id: 'periodo_medicao', label: 'Periodo de medicao', descricao: 'Data inicial e final da medicao.' },
   { id: 'ref_contrato_abertura', label: 'Ref. contrato abertura', descricao: 'Referencia usada para abertura de contrato.' },

@@ -99,8 +99,8 @@ const CAMPOS_NOVA_SOLICITACAO = [
   },
   {
     id: 'data_vencimento',
-    label: 'Data de vencimento',
-    descricao: 'Prazo ou vencimento esperado.',
+    label: 'Data Resposta/Pagamento',
+    descricao: 'Prazo esperado para resposta ou pagamento da solicitacao.',
     visivelPadrao: true,
     obrigatorioPadrao: true
   },

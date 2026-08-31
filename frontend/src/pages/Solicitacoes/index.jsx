@@ -848,7 +848,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     { id: 'setor', label: 'Setor' },
     { id: 'responsavel', label: 'Responsável' },
     { id: 'status', label: 'Status' },
-    { id: 'vencimento', label: 'Vencimento' }
+    { id: 'vencimento', label: 'Data Resposta/Pagamento' }
   ], [moduloContratosHabilitado, isSetorObra]);
 
   useEffect(() => {
@@ -1047,7 +1047,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         'Responsável',
         'Status',
         'Data Registro',
-        'Data Vencimento'
+        'Data Resposta/Pagamento'
       ],
       ...lista.map(item => [
         item.codigo || '',

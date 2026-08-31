@@ -207,7 +207,7 @@ export default function Header({
             )}
           </div>
           <div className="sol-detail-header-date">
-            <span className="sol-detail-header-date-label">Vencimento</span>
+            <span className="sol-detail-header-date-label">Data Resposta/Pagamento</span>
             <strong className="sol-detail-header-date-value">{formatarData(solicitacao.data_vencimento)}</strong>
           </div>
         </div>

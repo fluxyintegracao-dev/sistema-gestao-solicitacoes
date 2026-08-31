@@ -4,6 +4,7 @@ import { buscarParceiros } from '../../services/parceiros';
 import { paraCentavosContrato } from './BlocoContratoFluxoNovo';
 import { HiPaperClip } from 'react-icons/hi2';
 import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } from '../../utils/formaPagamento';
+import DateInputBR from '../DateInputBR';
 
 /**
  * Bloco de MEDICAO (wireframe 2), montado dentro da Nova Solicitacao quando o contrato
@@ -12,12 +13,63 @@ import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } fro
  *
  * O backend ja entrega tudo pronto em GET /contratos/:id/parcelas: saldo, comprometido, o
  * status REAL de cada linha (do titulo quando existe, da parcela quando ainda nao) e se a
- * linha aceita medicao. A tela nao recalcula regra — apenas mostra e coleta.
+ * linha aceita medicao. A tela projeta a mesma redistribuicao em cascata do backend apenas para
+ * mostrar o resultado antes do envio; a regra definitiva continua sendo aplicada na transacao.
  *
  * Emite via onChange: { itens: [{ contrato_parcela_id, valor_medido, vencimento }], saldo }.
  */
 
 const formatarMoeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Espelho visual de `redistribuirNasUltimas` / `aplicarMedicaoNasParcelas` do backend.
+ *
+ * A diferenca de uma parcela medida vai primeiro para a ultima parcela livre. Se ela nao tiver
+ * saldo suficiente, o desconto segue em cascata para as anteriores. Parcelas de medicoes ja
+ * criadas (`medivel === false`) nunca entram como destino. Esta funcao nao altera o payload nem
+ * substitui a validacao transacional; ela so antecipa na tabela os valores que serao gravados.
+ */
+export function projetarValoresRedistribuidos(parcelas, selecao) {
+  const trabalho = parcelas.map((parcela) => ({
+    parcela,
+    cent: paraCentavosContrato(parcela.valor),
+    editavel: Boolean(parcela.editavel)
+  }));
+  const porId = new Map(trabalho.map((item) => [item.parcela.id, item]));
+  const jaMedidas = new Set(
+    parcelas.filter((parcela) => parcela.medivel === false).map((parcela) => parcela.id)
+  );
+
+  parcelas
+    .filter((parcela) => selecao[parcela.id]?.marcada)
+    .forEach((parcela) => {
+      const alvo = porId.get(parcela.id);
+      const medidoCent = paraCentavosContrato(selecao[parcela.id]?.valor ?? parcela.valor);
+      if (!alvo || !Number.isFinite(medidoCent) || medidoCent <= 0) return;
+
+      const diferencaCent = alvo.cent - medidoCent;
+      const destinos = [...trabalho]
+        .reverse()
+        .filter((item) => item.editavel && item.parcela.id !== parcela.id && !jaMedidas.has(item.parcela.id));
+
+      if (diferencaCent > 0) {
+        // Devolucao sem destino vira saldo livre do contrato, como no backend.
+        if (destinos[0]) destinos[0].cent += diferencaCent;
+      } else if (diferencaCent < 0) {
+        let faltaCent = -diferencaCent;
+        for (const destino of destinos) {
+          if (faltaCent <= 0) break;
+          const disponivel = Math.min(destino.cent, faltaCent);
+          destino.cent -= disponivel;
+          faltaCent -= disponivel;
+        }
+      }
+
+      alvo.cent = medidoCent;
+    });
+
+  return new Map(trabalho.map((item) => [item.parcela.id, item.cent / 100]));
+}
 
 export default function BlocoMedicaoContrato({
   contratoId,
@@ -41,6 +93,7 @@ export default function BlocoMedicaoContrato({
   const [favorecido, setFavorecido] = useState(null);
   const [buscaFavorecido, setBuscaFavorecido] = useState('');
   const [resultadosFavorecido, setResultadosFavorecido] = useState([]);
+  const [carregandoFavorecido, setCarregandoFavorecido] = useState(false);
   const [chavePix, setChavePix] = useState('');
   const [contato, setContato] = useState('');
   const [formaPagamentoId, setFormaPagamentoId] = useState('');
@@ -111,6 +164,11 @@ export default function BlocoMedicaoContrato({
       vencimento: selecao[p.id]?.vencimento ?? p.vencimento
     })), [parcelas, selecao]);
 
+  const valoresProjetados = useMemo(
+    () => projetarValoresRedistribuidos(parcelas, selecao),
+    [parcelas, selecao]
+  );
+
   const totalSelecionadoCent = itens.reduce((acc, i) => {
     const c = paraCentavosContrato(i.valor_medido);
     return acc + (Number.isFinite(c) ? c : 0);
@@ -145,21 +203,39 @@ export default function BlocoMedicaoContrato({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itens, excedeSaldo, usarCredor, favorecido, chavePix, contato, formaPagamentoId, confirmado, credorDoContrato, pagamentoViaPix, pagamentoViaBoleto, boletoArquivo]);
 
-  async function procurarFavorecido() {
+  // Autocomplete sem quantidade minima de caracteres. O pequeno debounce evita uma requisicao por
+  // tecla sem obrigar o usuario a interromper a digitacao para clicar em "Buscar".
+  useEffect(() => {
     const termo = buscaFavorecido.trim();
-    if (!termo) return;
-    try {
-      // `q` e o parametro que o backend le — `search` seria ignorado em silencio e a lista voltaria
-      // inteira, dando a impressao de que a busca nao funciona. Armadilha ja registrada.
-      const achados = await buscarParceiros({ q: termo, limit: 10 });
-      setResultadosFavorecido(Array.isArray(achados) ? achados : []);
-    } catch {
+    if (!termo || (favorecido && termo === favorecido.nome) || (usarCredor && credorDoContrato)) {
       setResultadosFavorecido([]);
+      setCarregandoFavorecido(false);
+      return undefined;
     }
-  }
+
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setCarregandoFavorecido(true);
+      try {
+        // `q` e o parametro que o backend le; nao existe limite minimo de caracteres no servico.
+        const achados = await buscarParceiros({ q: termo, limit: 10 }, { signal: controller.signal });
+        setResultadosFavorecido(Array.isArray(achados) ? achados : []);
+      } catch (error) {
+        if (error?.name !== 'AbortError') setResultadosFavorecido([]);
+      } finally {
+        if (!controller.signal.aborted) setCarregandoFavorecido(false);
+      }
+    }, 280);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [buscaFavorecido, favorecido, usarCredor, credorDoContrato]);
 
   function escolherFavorecido(p) {
     setFavorecido(p);
+    setConfirmado(false);
     setResultadosFavorecido([]);
     setBuscaFavorecido(p.nome);
     // A chave vem preenchida do cadastro quando existir, e continua editavel: e ela que sera
@@ -189,9 +265,8 @@ export default function BlocoMedicaoContrato({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <label className="grid gap-1 text-sm">
             Data inicial (Medição)
-            <input
+            <DateInputBR
               name="data_inicio_medicao"
-              type="date"
               className="input input-sm"
               value={periodo.inicio || ''}
               onChange={onPeriodoChange}
@@ -200,9 +275,8 @@ export default function BlocoMedicaoContrato({
           </label>
           <label className="grid gap-1 text-sm">
             Data final (Medição)
-            <input
+            <DateInputBR
               name="data_fim_medicao"
-              type="date"
               className="input input-sm"
               value={periodo.fim || ''}
               onChange={onPeriodoChange}
@@ -258,6 +332,9 @@ export default function BlocoMedicaoContrato({
           <tbody>
             {parcelas.map((p) => {
               const sel = selecao[p.id] || {};
+              const valorProjetado = valoresProjetados.get(p.id) ?? p.valor;
+              const foiReajustadaNaProjecao = !sel.marcada
+                && paraCentavosContrato(valorProjetado) !== paraCentavosContrato(p.valor);
               // `medivel` e nao `editavel`: parcela ja medida segue com o titulo ABERTO ate o
               // pagamento, entao `editavel` continua verdadeiro nela — e o checkbox ficava liberado
               // para medir a mesma parcela de novo.
@@ -284,14 +361,20 @@ export default function BlocoMedicaoContrato({
                   <td>
                     <input
                       className="input" type="number" step="0.01" style={{ width: 120 }}
-                      value={sel.valor ?? p.valor}
+                      value={sel.valor ?? valorProjetado}
                       disabled={!p.editavel || p.medivel === false || !sel.marcada}
                       onChange={(e) => alterar(p.id, 'valor', e.target.value)}
                     />
+                    {foiReajustadaNaProjecao && (
+                      <span className="text-xs" style={{ display: 'block', marginTop: 3, color: 'var(--c-primary)' }}>
+                        reajustado nesta medicao
+                      </span>
+                    )}
                   </td>
                   <td>
-                    <input
-                      className="input" type="date" style={{ width: 150 }}
+                    <DateInputBR
+                      className="input" style={{ width: 150 }}
+                      name={`vencimento_parcela_${p.id}`}
                       value={sel.vencimento ?? p.vencimento ?? ''}
                       disabled={!p.editavel || p.medivel === false || !sel.marcada}
                       onChange={(e) => alterar(p.id, 'vencimento', e.target.value)}
@@ -373,21 +456,37 @@ export default function BlocoMedicaoContrato({
 
             {(!usarCredor || !credorDoContrato) && (
               <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="relative">
                   <input
                     className="input input-sm"
-                    style={{ minWidth: 260 }}
+                    style={{ width: '100%' }}
                     name="busca_favorecido"
                     placeholder="Buscar favorecido por nome ou CPF/CNPJ"
                     value={buscaFavorecido}
-                    onChange={(e) => setBuscaFavorecido(e.target.value)}
+                    autoComplete="off"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={resultadosFavorecido.length > 0}
+                    aria-controls="resultados-favorecido-medicao"
+                    onChange={(e) => {
+                      setBuscaFavorecido(e.target.value);
+                      setFavorecido(null);
+                      setConfirmado(false);
+                    }}
                   />
-                  <button type="button" className="btn btn-outline btn-sm" onClick={procurarFavorecido}>Buscar</button>
                 </div>
+                {carregandoFavorecido && (
+                  <p className="text-xs" style={{ color: 'var(--c-muted)' }}>Buscando favorecidos...</p>
+                )}
                 {resultadosFavorecido.length > 0 && (
-                  <div className="max-h-40 overflow-auto rounded border p-2">
+                  <div
+                    id="resultados-favorecido-medicao"
+                    role="listbox"
+                    className="max-h-40 overflow-auto rounded border bg-[var(--c-surface)] p-1"
+                  >
                     {resultadosFavorecido.map((p) => (
-                      <button key={p.id} type="button" className="block w-full p-1 text-left text-sm"
+                      <button key={p.id} type="button" role="option" aria-selected={false}
+                        className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--c-surface-subtle)]"
                         onClick={() => escolherFavorecido(p)}>
                         {p.nome}{p.cpf_cnpj ? ` — ${p.cpf_cnpj}` : ''}
                       </button>

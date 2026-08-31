@@ -63,7 +63,7 @@ export default function TabelaSolicitacoes({
       { id: 'setor', label: 'Setor', width: 110, min: 90, weight: 0.9 },
       { id: 'responsavel', label: 'Responsável', width: 130, min: 100, weight: 1.1 },
       { id: 'status', label: 'Status', width: 140, min: 110, weight: 1 },
-      { id: 'vencimento', label: 'Vencimento', width: 120, min: 100, weight: 0.9 },
+      { id: 'vencimento', label: 'Data Resposta/Pagamento', width: 170, min: 145, weight: 1 },
       { id: 'acoes', label: 'Ações', width: 220, min: 190, weight: 1.4 }
     ];
 

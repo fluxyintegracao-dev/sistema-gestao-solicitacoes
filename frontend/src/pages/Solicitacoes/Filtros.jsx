@@ -13,7 +13,7 @@ const FILTROS_DISPONIVEIS = [
   { id: 'valor_min', label: 'Valor minimo' },
   { id: 'valor_max', label: 'Valor maximo' },
   { id: 'data_registro', label: 'Data de registro' },
-  { id: 'data_vencimento', label: 'Periodo de vencimento' },
+  { id: 'data_vencimento', label: 'Periodo Data Resposta/Pagamento' },
   { id: 'responsavel', label: 'Responsavel' }
 ];
 
@@ -843,7 +843,7 @@ export default function Filtros({
 
           {mostrarPeriodoVencimento && (
             <div className="sol-filter-field">
-              <label className="sol-filter-label">Vencimento de</label>
+              <label className="sol-filter-label">Data Resposta/Pagamento de</label>
               <input
                 name="data_vencimento_inicio"
                 className="input"
@@ -862,7 +862,7 @@ export default function Filtros({
 
           {mostrarPeriodoVencimento && (
             <div className="sol-filter-field">
-              <label className="sol-filter-label">Vencimento ate</label>
+              <label className="sol-filter-label">Data Resposta/Pagamento ate</label>
               <input
                 name="data_vencimento_fim"
                 className="input"

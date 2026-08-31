@@ -163,3 +163,30 @@ Nao ha trabalho ativo desta sessao.
     - Modulo de Contratos esta fora deste ownership.
     - Migration executada somente no banco local fluxy_main_copia.
     - Nenhum acesso a GitHub, EC2 ou producao foi realizado.
+- id: 2026-08-31-data-resposta-pagamento
+  sessao: codex-data-resposta-pagamento-2026-08-31
+  responsavel: Codex / sessao atual
+  status: implementado_aguardando_commit
+  escopo: Separar a Data Resposta/Pagamento da solicitacao dos vencimentos das parcelas do CONTRATO.
+  feito:
+    - Campo habilitado no fluxo novo de CONTRATO conforme configuracao por tipo.
+    - Rotulo alinhado na criacao, lista, detalhe, filtros, exportacao, historico e validacoes.
+    - Backend grava a data informada na solicitacao sem deriva-la da primeira parcela.
+    - Build, sintaxe e teste de vencimento aprovados.
+  pendencias:
+    - Commit e validacao funcional no ambiente dev.
+  validacao:
+    - Ver `docs/handoffs/DATA_RESPOSTA_PAGAMENTO_SOLICITACOES_2026-08-31.md`.
+- id: 2026-08-31-projecao-reajuste-parcelas-medicao
+  sessao: codex-data-resposta-pagamento-2026-08-31
+  responsavel: Codex / sessao atual
+  status: implementado_aguardando_commit
+  escopo: Mostrar na medicao os valores projetados das parcelas reajustadas pela edicao.
+  feito:
+    - Projecao visual alinhada a redistribuicao em cascata do backend.
+    - Previsto preservado e parcelas afetadas identificadas.
+    - Build e quatro cenarios de calculo aprovados.
+  pendencias:
+    - Commit e validacao visual no ambiente dev.
+  validacao:
+    - Ver `docs/handoffs/PROJECAO_REAJUSTE_PARCELAS_MEDICAO_2026-08-31.md`.

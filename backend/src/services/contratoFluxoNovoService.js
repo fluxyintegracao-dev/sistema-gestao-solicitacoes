@@ -637,6 +637,8 @@ async function criarContrato(dados, { usuarioId } = {}) {
     valor_total: valorTotal,
     qtde_parcelas: qtdeParcelas,
     primeiro_vencimento: primeiroVencimento,
+    // Data operacional da solicitacao. Os vencimentos financeiros continuam nas parcelas.
+    data_vencimento: dataRespostaPagamento,
     periodicidade = 'MENSAL',
     parceiro_id: parceiroId,
     // Todos os contratados respondem pelo contrato. `parceiros` e a lista de contratados;
@@ -665,6 +667,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
   let vigenciaFimPersistida = vigenciaFim;
   let responsavelIdPersistido = responsavelId;
   let justificativaPersistida = justificativa;
+  let dataRespostaPagamentoPersistida = dataRespostaPagamento;
 
   if (!obraId) {
     throw Object.assign(new Error('Obra e obrigatoria.'), { statusCode: 400 });
@@ -853,6 +856,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     const campoObrigatorio = (campoId) => Boolean(camposResolvidos?.[campoId]?.obrigatorio);
     const exigencias = [
       ['descricao', descricao, 'Informe o titulo do contrato.'],
+      ['data_vencimento', dataRespostaPagamento, 'Informe a Data Resposta/Pagamento.'],
       ['contrato_objeto', objeto, 'Informe o objeto do contrato.'],
       ['contrato_justificativa', justificativa, 'Informe a justificativa da contratacao.'],
       ['contrato_responsavel', responsavelId, 'Selecione o responsavel pela contratacao.'],
@@ -870,6 +874,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
       descricaoPersistida = null;
       refContratoPersistido = null;
     }
+    if (!campoVisivel('data_vencimento')) dataRespostaPagamentoPersistida = null;
     if (!campoVisivel('contrato_objeto')) objetoPersistido = null;
     if (!campoVisivel('contrato_justificativa')) justificativaPersistida = null;
     if (!campoVisivel('contrato_responsavel')) responsavelIdPersistido = null;
@@ -897,6 +902,31 @@ async function criarContrato(dados, { usuarioId } = {}) {
         );
       }
     }
+  }
+
+  if (dataRespostaPagamentoPersistida) {
+    const dataNormalizada = somenteData(dataRespostaPagamentoPersistida);
+    if (!dataNormalizada) {
+      throw Object.assign(new Error('Data Resposta/Pagamento invalida.'), { statusCode: 400 });
+    }
+    dataRespostaPagamentoPersistida = formatarISO(dataNormalizada);
+
+    const partesHoje = new Intl.DateTimeFormat('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    }).formatToParts(new Date());
+    const hoje = Object.fromEntries(partesHoje.map((parte) => [parte.type, parte.value]));
+    const hojeIso = `${hoje.year}-${hoje.month}-${hoje.day}`;
+    if (dataRespostaPagamentoPersistida < hojeIso) {
+      throw Object.assign(
+        new Error('Data Resposta/Pagamento nao pode ser anterior a data atual.'),
+        { statusCode: 400 }
+      );
+    }
+  } else {
+    dataRespostaPagamentoPersistida = null;
   }
 
   // Calcula as parcelas antes de abrir a transacao: erro de regra nao deve consumir
@@ -1051,7 +1081,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
         favorecido_chave_pix: null,
         valor: valor,
         area_responsavel: areaResponsavel || null,
-        data_vencimento: parcelas[0]?.vencimento || null,
+        data_vencimento: dataRespostaPagamentoPersistida,
         criado_por: usuarioId || null,
         status_global: 'PENDENTE'
       },

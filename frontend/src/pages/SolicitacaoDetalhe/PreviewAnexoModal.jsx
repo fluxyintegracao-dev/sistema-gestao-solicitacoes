@@ -1,6 +1,7 @@
 import { fileUrl } from '../../services/api';
+import ModalPortal from '../../components/ui/ModalPortal';
 
-export default function PreviewAnexoModal({ anexo, onClose }) {
+export default function PreviewAnexoModal({ anexo, onClose, usarPortal = false }) {
   const temUrlExplicita = Object.prototype.hasOwnProperty.call(anexo, 'url');
   const url = temUrlExplicita ? anexo.url : fileUrl(anexo.caminho);
   const downloadUrl = anexo.downloadUrl || url;
@@ -68,8 +69,11 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  const conteudo = (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+      style={usarPortal ? { zIndex: 'calc(var(--z-modal, 50) + 1)' } : undefined}
+    >
       <div className="card w-11/12 md:w-3/4 relative">
         <button
           onClick={onClose}
@@ -84,4 +88,10 @@ export default function PreviewAnexoModal({ anexo, onClose }) {
       </div>
     </div>
   );
+
+  if (usarPortal) {
+    return <ModalPortal onClose={onClose}>{conteudo}</ModalPortal>;
+  }
+
+  return conteudo;
 }
