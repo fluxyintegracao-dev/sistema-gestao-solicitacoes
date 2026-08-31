@@ -6,6 +6,8 @@ const {
   ChequeTerceiroMovimento,
   ConciliacaoBancaria,
   ContaBancaria,
+  Contrato,
+  ContratoCredor,
   EmpresaGrupo,
   Apropriacao,
   sequelize,
@@ -2183,7 +2185,44 @@ async function listarTitulos(req, filters = {}) {
     where.descricao = { [Op.like]: `%${filters.descricao}%` };
   }
   if (filters.parceiro_id) {
-    where.parceiro_id = Number(filters.parceiro_id);
+    const parceiroId = Number(filters.parceiro_id);
+    const vinculosContratuais = await ContratoCredor.findAll({
+      where: { parceiro_id: parceiroId, ativo: true },
+      attributes: ['id'],
+      include: [{
+        model: Contrato,
+        as: 'contrato',
+        required: true,
+        attributes: ['solicitacao_id'],
+        where: {
+          fluxo_novo: true,
+          solicitacao_id: { [Op.ne]: null }
+        }
+      }]
+    });
+    const solicitacoesContratuais = Array.from(new Set(
+      vinculosContratuais
+        .map((vinculo) => Number(vinculo.contrato?.solicitacao_id))
+        .filter(Boolean)
+    ));
+
+    // A previsao nasce vinculada ao contratado, mas a aprovacao da medicao troca corretamente o
+    // credor financeiro pelo favorecido que efetivamente recebera. O filtro por credor deve manter
+    // a trilha completa do contrato sem desfazer essa troca: encontra o titulo tanto pelo recebedor
+    // atual quanto pelo vinculo contratual de origem. `origem_titulo` impede trazer outro titulo
+    // eventual que por acaso esteja na mesma solicitacao.
+    where[Op.and] = [
+      ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+      {
+        [Op.or]: [
+          { parceiro_id: parceiroId },
+          ...(solicitacoesContratuais.length > 0 ? [{
+            origem_titulo: 'CONTRATO',
+            solicitacao_id: { [Op.in]: solicitacoesContratuais }
+          }] : [])
+        ]
+      }
+    ];
   }
   if (filters.categoria_financeira_id) {
     where.categoria_financeira_id = Number(filters.categoria_financeira_id);
