@@ -299,17 +299,22 @@ export default function NovaSolicitacao() {
     if (!form.tipo_solicitacao_id) {
       setTiposSub([]);
       setForm(prev => ({ ...prev, tipo_sub_id: '' }));
-      return;
+      return undefined;
     }
 
+    let cancelado = false;
     async function loadSub() {
       const data = await getTiposSubContrato({
         tipo_macro_id: form.tipo_solicitacao_id
       });
+      if (cancelado) return;
       setTiposSub(Array.isArray(data) ? data.filter(item => item?.ativo !== false) : []);
     }
 
     loadSub();
+    return () => {
+      cancelado = true;
+    };
   }, [form.tipo_solicitacao_id]);
 
   useEffect(() => {
@@ -374,6 +379,17 @@ export default function NovaSolicitacao() {
 
   function handleChange(e) {
     const { name, value } = e.target;
+    if (name === 'tipo_solicitacao_id') {
+      // Um subtipo pertence ao tipo anterior. Limpar no mesmo evento evita que a regra
+      // `tipo:subtipo` antiga continue controlando os campos enquanto a nova lista carrega.
+      setTiposSub([]);
+      setForm((atual) => ({
+        ...atual,
+        tipo_solicitacao_id: value,
+        tipo_sub_id: ''
+      }));
+      return;
+    }
     setForm((atual) => ({ ...atual, [name]: value }));
   }
 
@@ -535,6 +551,7 @@ export default function NovaSolicitacao() {
   ), [comportamentoTipo, camposNovaSolicitacaoConfig, form.tipo_solicitacao_id, form.area_responsavel, form.tipo_sub_id, moduloApropriacoesHabilitado]);
   const tipoConfiguradoComoDespesaEventual = Boolean(comportamentoTipo.usa_fluxo_despesa_eventual);
   const tipoConfiguradoComoRecargaCartao = isTipoRecargaCartao(tipoSelecionado, comportamentoTipo);
+  const tipoSolicitacaoEscolhido = Boolean(form.tipo_solicitacao_id);
   const camposFixosDespesaEventual = new Set([
     'valor',
     'credor',
@@ -548,11 +565,16 @@ export default function NovaSolicitacao() {
   ]);
   const camposFixosRecargaCartao = new Set(['valor', 'data_vencimento']);
   const campoVisivel = (campo) => {
+    // Antes de o tipo ser escolhido, nenhum campo funcional deve herdar o comportamento
+    // generico. A obra, o setor e o proprio tipo continuam fixos no topo; o restante entra
+    // somente depois que a regra do tipo (e, quando houver, do subtipo) puder ser resolvida.
+    if (!tipoSolicitacaoEscolhido) return false;
     if (tipoConfiguradoComoRecargaCartao) return camposFixosRecargaCartao.has(campo);
     return (tipoConfiguradoComoDespesaEventual && camposFixosDespesaEventual.has(campo))
       || camposNovaSolicitacao?.[campo]?.visivel !== false;
   };
   const campoObrigatorio = (campo) => {
+    if (!tipoSolicitacaoEscolhido) return false;
     if (tipoConfiguradoComoRecargaCartao) return camposFixosRecargaCartao.has(campo);
     return (tipoConfiguradoComoDespesaEventual && camposFixosDespesaEventual.has(campo))
       || Boolean(camposNovaSolicitacao?.[campo]?.obrigatorio);
@@ -575,6 +597,10 @@ export default function NovaSolicitacao() {
   const usaFluxoDespesaEventual = tipoConfiguradoComoDespesaEventual;
   const usaFluxoRecargaCartao = tipoConfiguradoComoRecargaCartao;
   const usaApropriacaoAutomaticaObra = Boolean(comportamentoTipo.usa_apropriacao_automatica_obra);
+  const rotuloContratoVinculado = tipoEhDeMedicao ? 'Título do Contrato' : 'Ref. do Contrato';
+  const placeholderContratoVinculado = tipoEhDeMedicao
+    ? 'Buscar pelo título do contrato'
+    : 'Buscar por referência do contrato';
 
   useEffect(() => {
     if (!usaApropriacaoAutomaticaObra || !form.obra_id || !form.tipo_solicitacao_id) {
@@ -1040,7 +1066,7 @@ export default function NovaSolicitacao() {
   async function buscarRefContrato() {
     try {
       if (!form.obra_id) {
-        alert('Selecione uma obra antes de buscar a ref. do contrato.');
+        alert(`Selecione uma obra antes de buscar ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
         setRefResultados([]);
         setContratosRef([]);
         return;
@@ -1271,7 +1297,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (camposContratoObrigatorios && !refContratoBusca.trim()) {
-      alert('Informe a ref. do contrato.');
+      alert(`Informe ${tipoEhDeMedicao ? 'o título do contrato' : 'a ref. do contrato'}.`);
       return;
     }
     if (itensApropriacaoObrigatorio && !form.itens_apropriacao && apropriacoesRateioSelecionadas.length === 0) {
@@ -2366,6 +2392,12 @@ export default function NovaSolicitacao() {
             </select>
           </label>
 
+          {form.area_responsavel && !tipoSolicitacaoEscolhido && (
+            <div className="lg:col-span-12 border-t border-[var(--c-border)] pt-3 text-sm text-[var(--c-muted)]">
+              Selecione o tipo de solicitação para carregar somente os campos necessários.
+            </div>
+          )}
+
           <RecargaCartaoFields
             ativo={usaFluxoRecargaCartao}
             value={cartaoRecargaId}
@@ -2473,11 +2505,11 @@ export default function NovaSolicitacao() {
 
           {exibirCamposContrato && (
             <label className="grid gap-1 text-sm lg:col-span-12">
-              Ref. do Contrato
+              {rotuloContratoVinculado}
               <div className="flex gap-2 nova-solicitacao-inline-actions">
                 <input
                   className="input input-sm"
-                  placeholder="Buscar por referência do contrato"
+                  placeholder={placeholderContratoVinculado}
                   value={refContratoBusca}
                   onChange={e => setRefContratoBusca(e.target.value)}
                   required={camposContratoObrigatorios}
@@ -3164,6 +3196,7 @@ export default function NovaSolicitacao() {
         )}
 
 
+        {tipoSolicitacaoEscolhido && (
         <div className="nova-solicitacao-actions-bar">
           {exibirAnexos && !(tipoEhDeMedicao && (pagamentoViaBoleto || medicaoContratoDados?.pagamento?.via_boleto)) && (
           <label className="grid gap-1 text-sm nova-solicitacao-anexos">
@@ -3218,6 +3251,7 @@ export default function NovaSolicitacao() {
           </button>
           </div>
         </div>
+        )}
         </div>
       </form>
 
