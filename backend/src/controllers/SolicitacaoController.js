@@ -2855,6 +2855,18 @@ module.exports = {
           // le `solicitacao.id` direto e navega para o detalhe. Aqui ela navega para a solicitacao
           // DO CONTRATO, que e exatamente onde a medicao acabou de aparecer.
           const solicitacaoDoContrato = await Solicitacao.findByPk(contratoAlvo.solicitacao_id);
+          // A medicao e criada na solicitacao do contrato e, no mesmo ato, segue de OBRA para GEO.
+          // O upload ocorre logo depois deste POST; sem uma autorizacao curta, ele seria recusado
+          // porque o criador ja nao esta no setor atual da solicitacao. O token vale apenas para
+          // os tipos efetivamente selecionados e expira conforme o fluxo normal de criacao.
+          const tiposUploadInicialMedicao = [];
+          if (String(boleto_anexo_nome || '').trim()) tiposUploadInicialMedicao.push('BOLETO');
+          if (nomesAnexosPendentes.length > 0) tiposUploadInicialMedicao.push('SOLICITACAO');
+          const criacaoUploadTokenMedicao = gerarTokenUploadCriacaoSolicitacao({
+            solicitacaoId: contratoAlvo.solicitacao_id,
+            usuarioId: Number(req.user.id),
+            tipos: tiposUploadInicialMedicao
+          });
           return res.status(201).json({
             ...(solicitacaoDoContrato?.toJSON ? solicitacaoDoContrato.toJSON() : solicitacaoDoContrato),
             medicao: registro.medicao,
@@ -2864,7 +2876,10 @@ module.exports = {
             // teria como avisar que sobrou — o numero so apareceria no saldo, sem explicacao.
             sobra: Number(registro.sobra || 0),
             // Deixa explicito para quem consumir: nao houve solicitacao nova (PI-16).
-            criou_solicitacao: false
+            criou_solicitacao: false,
+            ...(criacaoUploadTokenMedicao
+              ? { criacao_upload_token: criacaoUploadTokenMedicao }
+              : {})
           });
         } catch (erroMedicao) {
           return res.status(Number(erroMedicao.statusCode) || 400).json({ error: erroMedicao.message });

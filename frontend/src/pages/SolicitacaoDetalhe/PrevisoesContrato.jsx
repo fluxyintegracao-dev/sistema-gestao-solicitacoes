@@ -37,7 +37,8 @@ export default function PrevisoesContrato({
   atualizarEm,
   onAbrirMedicao,
   onDados,
-  somenteLeitura = false
+  somenteLeitura = false,
+  permitirAbrirMedicaoSomenteLeitura = false
 }) {
   const [dados, setDados] = useState(null);
   const [erro, setErro] = useState('');
@@ -129,7 +130,7 @@ export default function PrevisoesContrato({
                 </td>
                 <td className="px-2 py-2 align-top">
                   {p.medicao ? (
-                    somenteLeitura ? (
+                    somenteLeitura && !permitirAbrirMedicaoSomenteLeitura ? (
                       <span className="text-sm text-[var(--c-text)]">Medicao {p.medicao.numero}</span>
                     ) : (
                       // O botao por titulo que o cliente pediu: abre os anexos e comentarios

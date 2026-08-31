@@ -5,14 +5,17 @@
 Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e horario de inicio. Remover a reserva ao concluir o handoff.
 
 ### codex-data-resposta-pagamento-2026-08-31
-- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download de anexos e imutabilidade apos aprovacao).
+- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo e imutabilidade apos aprovacao).
 - Inicio: 2026-08-31
 - Arquivos reservados:
   - `frontend/src/pages/NovaSolicitacao.jsx`
   - `frontend/src/components/contratos/BlocoMedicaoContrato.jsx`
   - `frontend/src/components/DateInputBR.jsx`
   - `frontend/src/pages/SolicitacaoDetalhe/ModalMedicao.jsx`
+  - `frontend/src/pages/SolicitacaoDetalhe/FinanceiroCard.jsx`
+  - `frontend/src/pages/SolicitacaoDetalhe/PrevisoesContrato.jsx`
   - `frontend/src/pages/SolicitacaoDetalhe/PreviewAnexoModal.jsx`
+  - `frontend/src/components/contratos/BlocoContratoFluxoNovo.jsx`
   - `frontend/src/utils/novaSolicitacaoCampos.js`
   - `frontend/src/pages/Solicitacoes/TabelaSolicitacoes.jsx`
   - `frontend/src/pages/Solicitacoes/index.jsx`
@@ -22,9 +25,11 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `backend/src/services/novaSolicitacaoCamposConfig.js`
   - `backend/src/services/contratoFluxoNovoService.js`
   - `backend/src/controllers/SolicitacaoController.js`
+  - `backend/src/controllers/AnexoController.js`
   - `backend/src/validators/operationalValidators.js`
   - `backend/src/services/medicaoContratoService.js`
   - `docs/handoffs/AJUSTES_OPERACIONAIS_MEDICAO_2026-08-31.md`
+  - `docs/handoffs/RECUPERACAO_ANEXOS_MEDICAO_2026-08-31.md`
 
 Ownership da sessao `codex-snapshot-sanitizado-dev-v2-2026-08-29` liberado apos configurar
 `export-ignore` para QA, ambientes, uploads, artefatos locais e scripts de dados no pacote de deploy.

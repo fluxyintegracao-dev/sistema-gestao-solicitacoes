@@ -1635,8 +1635,10 @@ export default function FinanceiroCard({
         medicao={medicaoAberta}
         historicos={solicitacao?.historicos || []}
         parcelas={dadosContrato?.parcelas || []}
+        solicitacaoId={solicitacao?.id}
         podeEditar={!somenteLeitura && dadosContrato?.contrato?.permissoes?.editar_medicao === true}
         podeAprovar={!somenteLeitura && dadosContrato?.contrato?.permissoes?.aprovar === true}
+        podeAnexar={somenteLeitura}
         onFechar={() => setMedicaoAberta(null)}
         onSalvo={() => setRecarregarParcelas((n) => n + 1)}
       />
@@ -1718,6 +1720,7 @@ export default function FinanceiroCard({
           onDados={setDadosContrato}
           onAbrirMedicao={setMedicaoAberta}
           somenteLeitura={somenteLeitura}
+          permitirAbrirMedicaoSomenteLeitura={somenteLeitura}
         />
 
         {exibirTitulosDetalhados && (

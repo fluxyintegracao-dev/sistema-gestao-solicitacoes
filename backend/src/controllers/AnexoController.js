@@ -2,7 +2,8 @@ const {
   Anexo,
   Solicitacao,
   Historico,
-  User
+  User,
+  ContratoMedicao
 } = require('../models');
 const { criarNotificacao } = require('../services/notificacoes');
 const { uploadToS3, getPresignedUrl } = require('../services/s3');
@@ -20,6 +21,7 @@ const { registrarEventoSeguranca } = require('../services/securityLogService');
 const { publishSolicitacaoRealtimeEvent } = require('../services/solicitacaoRealtimeService');
 const { assertPodeInteragirSolicitacao } = require('../services/solicitacaoRetornoService');
 const { validarTokenUploadCriacaoSolicitacao } = require('../services/solicitacaoCriacaoUploadTokenService');
+const { userHasSetorCapability } = require('../services/setorCapabilityService');
 
 function parseHistoricoMetadata(metadata) {
   if (!metadata) return {};
@@ -140,7 +142,30 @@ class AnexoController {
         tipo: tipoNormalizado
       });
 
-      if (!uploadInicialAutorizado) {
+      // Recuperacao de anexo ausente: OBRA pode completar exclusivamente os arquivos de uma
+      // medicao ainda pendente e pertencente a esta solicitacao. O acesso base acima continua
+      // exigindo que o usuario tenha escopo sobre a solicitacao/obra. Nenhuma outra interacao
+      // (editar parcela, aprovar, mudar status) passa por esta excecao.
+      const medicaoId = Number(req.body?.medicao_id) || null;
+      let medicao = null;
+      if (medicaoId) {
+        medicao = await ContratoMedicao.findOne({
+          where: { id: medicaoId, solicitacao_id },
+          attributes: ['id', 'aprovada_em']
+        });
+        if (!medicao) {
+          return res.status(400).json({ error: 'A medicao informada nao pertence a esta solicitacao.' });
+        }
+      }
+
+      const uploadRecuperacaoMedicaoObra = Boolean(
+        medicao
+        && !medicao.aprovada_em
+        && tipoNormalizado === 'SOLICITACAO'
+        && await userHasSetorCapability(usuario, 'eh_setor_obra')
+      );
+
+      if (!uploadInicialAutorizado && !uploadRecuperacaoMedicaoObra) {
         try {
           await assertPodeInteragirSolicitacao(req, solicitacao);
         } catch (errorAcesso) {
@@ -162,18 +187,6 @@ class AnexoController {
       //
       // A medicao e conferida contra a SOLICITACAO: sem isso, um id de outra solicitacao penduraria
       // o documento no lugar errado — e quem olhasse a medicao veria papel que nao e dela.
-      const medicaoId = Number(req.body?.medicao_id) || null;
-      if (medicaoId) {
-        const { ContratoMedicao } = require('../models');
-        const medicao = await ContratoMedicao.findOne({
-          where: { id: medicaoId, solicitacao_id },
-          attributes: ['id']
-        });
-        if (!medicao) {
-          return res.status(400).json({ error: 'A medicao informada nao pertence a esta solicitacao.' });
-        }
-      }
-
       const registros = [];
 
       for (const file of req.files) {
@@ -198,13 +211,15 @@ class AnexoController {
         // ??? HIST??RICO COM METADATA
         await Historico.create({
           solicitacao_id,
+          medicao_id: medicaoId,
           usuario_responsavel_id: usuario.id,
           setor: usuario.setor_id,
           acao: 'ANEXO_ADICIONADO',
           descricao: nomeOriginal,
           metadata: JSON.stringify({
             anexo_id: anexo.id,
-            caminho: url
+            caminho: url,
+            medicao_id: medicaoId
           })
         });
       }

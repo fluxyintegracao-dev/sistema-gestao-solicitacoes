@@ -462,7 +462,10 @@ export default function BlocoContratoFluxoNovo({
               As parcelas fecham o valor do contrato.
             </span>
           ) : (
-            <span style={{ color: 'var(--c-danger, #b91c1c)' }}>
+            <span style={{
+              color: saldoCent < 0 ? '#dc2626' : 'var(--c-danger, #b91c1c)',
+              fontWeight: saldoCent < 0 ? 600 : undefined
+            }}>
               <strong>{saldoCent > 0 ? 'Falta distribuir' : 'Passou do valor do contrato em'}:</strong>
               {' '}{formatarMoedaBR(Math.abs(saldoCent) / 100)}
               {saldoCent > 0

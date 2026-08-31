@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import OverlayModal from '../../components/ui/OverlayModal';
 import DateInputBR from '../../components/DateInputBR';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 import { aprovarMedicaoContrato, atualizarMedicaoContrato } from '../../services/contratos';
-import { HiArrowDownTray, HiEye } from 'react-icons/hi2';
+import { uploadArquivos } from '../../services/uploads';
+import { HiArrowDownTray, HiEye, HiPaperClip } from 'react-icons/hi2';
 import PreviewAnexoModal from './PreviewAnexoModal';
 
 const dataHora = (v) => (v ? new Date(v).toLocaleString('pt-BR') : '');
@@ -35,7 +36,15 @@ function normalizarUrlArquivo(url) {
 }
 
 export default function ModalMedicao({
-  medicao, historicos = [], parcelas = [], podeEditar = false, podeAprovar = false, onFechar, onSalvo
+  medicao,
+  historicos = [],
+  parcelas = [],
+  solicitacaoId = null,
+  podeEditar = false,
+  podeAprovar = false,
+  podeAnexar = false,
+  onFechar,
+  onSalvo
 }) {
   const daMedicao = (Array.isArray(parcelas) ? parcelas : [])
     .filter((p) => p?.medicao && String(p.medicao.id) === String(medicao?.id || ''));
@@ -47,6 +56,9 @@ export default function ModalMedicao({
   const [abrindoAnexoId, setAbrindoAnexoId] = useState(null);
   const [baixandoAnexoId, setBaixandoAnexoId] = useState(null);
   const [previewAnexo, setPreviewAnexo] = useState(null);
+  const [anexosAdicionados, setAnexosAdicionados] = useState([]);
+  const [enviandoAnexos, setEnviandoAnexos] = useState(false);
+  const inputAnexosRef = useRef(null);
 
   useEffect(() => {
     const inicial = {};
@@ -58,11 +70,18 @@ export default function ModalMedicao({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [medicao?.id, parcelas]);
 
+  useEffect(() => {
+    setAnexosAdicionados([]);
+  }, [medicao?.id]);
+
   if (!medicao || typeof document === 'undefined') return null;
 
   const comentarios = (Array.isArray(historicos) ? historicos : [])
     .filter((h) => String(h?.medicao_id || '') === String(medicao.id));
-  const anexos = [...(Array.isArray(medicao.anexos) ? medicao.anexos : [])]
+  const anexosPorId = new Map();
+  [...(Array.isArray(medicao.anexos) ? medicao.anexos : []), ...anexosAdicionados]
+    .forEach((anexo) => anexosPorId.set(String(anexo.id), anexo));
+  const anexos = [...anexosPorId.values()]
     .sort((a, b) => Number(String(b?.tipo).toUpperCase() === 'BOLETO')
       - Number(String(a?.tipo).toUpperCase() === 'BOLETO'));
   const formaPagamento = medicao.forma_pagamento?.nome || medicao.forma_pagamento?.codigo || 'Nao informada';
@@ -70,6 +89,8 @@ export default function ModalMedicao({
   const documentoFavorecido = medicao.favorecido?.cpf_cnpj || '';
   const ehPix = /PIX/i.test(`${medicao.forma_pagamento?.nome || ''} ${medicao.forma_pagamento?.tipo || ''}`);
   const medicaoAprovada = Boolean(medicao.aprovada_em);
+  const temAnexo = anexos.length > 0;
+  const podeCompletarAnexos = podeAnexar && !medicaoAprovada && Boolean(solicitacaoId);
 
   const temBaixa = (p) => Number(p?.titulo_valor_baixado || 0) > 0;
   const editaveis = medicaoAprovada ? [] : daMedicao.filter((p) => !temBaixa(p));
@@ -100,6 +121,10 @@ export default function ModalMedicao({
 
   async function aprovar() {
     setErro('');
+    if (!temAnexo) {
+      setErro(`Anexe ao menos um arquivo na medicao ${medicao.numero} antes de aprovar.`);
+      return;
+    }
     setAprovando(true);
     try {
       await aprovarMedicaoContrato(medicao.id);
@@ -109,6 +134,29 @@ export default function ModalMedicao({
       setErro(e.message || 'Nao foi possivel aprovar a medicao.');
     } finally {
       setAprovando(false);
+    }
+  }
+
+  async function anexarArquivos(event) {
+    const files = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (files.length === 0) return;
+
+    setErro('');
+    setEnviandoAnexos(true);
+    try {
+      const registros = await uploadArquivos({
+        files,
+        solicitacao_id: solicitacaoId,
+        medicao_id: medicao.id,
+        tipo: 'SOLICITACAO'
+      });
+      setAnexosAdicionados((atuais) => [...atuais, ...(Array.isArray(registros) ? registros : [])]);
+      onSalvo?.();
+    } catch (e) {
+      setErro(e.message || 'Nao foi possivel anexar os arquivos da medicao.');
+    } finally {
+      setEnviandoAnexos(false);
     }
   }
 
@@ -211,13 +259,20 @@ export default function ModalMedicao({
                   type="button"
                   className="btn btn-primary btn-sm"
                   data-testid="aprovar-medicao"
-                  disabled={aprovando}
+                  disabled={aprovando || !temAnexo}
+                  title={!temAnexo ? 'Anexe ao menos um arquivo antes de aprovar.' : undefined}
                   onClick={aprovar}
                 >
                   {aprovando ? 'Aprovando...' : 'Aprovar e enviar ao Financeiro'}
                 </button>
               )}
             </div>
+
+            {podeAprovar && !medicaoAprovada && !temAnexo && (
+              <div className="app-alert app-alert--error mt-3" data-testid="medicao-sem-anexo">
+                Anexe ao menos um arquivo na medicao {medicao.numero} antes de aprovar.
+              </div>
+            )}
 
             <dl className="grid gap-x-6 gap-y-3 py-3 sm:grid-cols-2">
               <div>
@@ -258,10 +313,37 @@ export default function ModalMedicao({
                 <span className="text-xs font-semibold uppercase tracking-[0.06em] text-[var(--c-muted)]">
                   Arquivos da medicao
                 </span>
-                <span className="text-xs text-[var(--c-muted)]">{anexos.length} arquivo(s)</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-[var(--c-muted)]">{anexos.length} arquivo(s)</span>
+                  {podeCompletarAnexos && (
+                    <>
+                      <input
+                        ref={inputAnexosRef}
+                        type="file"
+                        multiple
+                        className="sr-only"
+                        data-testid="anexar-arquivos-medicao-input"
+                        onChange={anexarArquivos}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        data-testid="anexar-arquivos-medicao"
+                        disabled={enviandoAnexos}
+                        onClick={() => inputAnexosRef.current?.click()}
+                      >
+                        <HiPaperClip className="h-4 w-4" aria-hidden="true" />
+                        {enviandoAnexos ? 'Enviando...' : 'Anexar arquivos'}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
               {anexos.length === 0 ? (
-                <p className="py-3 text-sm text-[var(--c-muted)]">Nenhum arquivo vinculado a esta medicao.</p>
+                <p className="py-3 text-sm text-[var(--c-muted)]">
+                  Nenhum arquivo vinculado a esta medicao.
+                  {podeCompletarAnexos && ' Anexe o documento para que GEO possa aprovar.'}
+                </p>
               ) : (
                 <div className="mt-1 divide-y divide-[var(--c-border)]">
                   {anexos.map((anexo) => (
