@@ -349,7 +349,7 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
                     onClick={() => onConfirmarEstornoTarifa(item, tarifa)}
                     title={isSaida ? 'Estornos de tarifa devem ser lancamentos de entrada.' : elegibilidade.motivo}
                   >
-                    {processingId === key ? 'Lancando...' : `Lancar estorno - ${tarifa.nome}`}
+                    {processingId === key ? 'Lancando...' : `Estorno - ${tarifa.nome}`}
                   </button>
                 );
               })}
