@@ -1790,13 +1790,11 @@ module.exports = {
 
         if (podeAplicarEscopoSetor) {
           // Setor atual ve
-          const setoresPermitidos = [];
-          if (areaUsuario) setoresPermitidos.push(areaUsuario);
-          if (setorAtual?.codigo) setoresPermitidos.push(setorAtual.codigo);
-          if (setorAtual?.nome) setoresPermitidos.push(setorAtual.nome);
-          if (setorAtual?.id) setoresPermitidos.push(String(setorAtual.id));
-          if (req.user.setor_id) setoresPermitidos.push(String(req.user.setor_id));
-          const setoresUnicos = Array.from(new Set(setoresPermitidos.filter(Boolean)));
+          // `setorTokens` ja contem id, codigo e nome do setor, alem dos aliases operacionais
+          // GEO <-> GERENCIA DE PROCESSOS. Usar aqui somente os valores literais do cadastro
+          // fazia o usuario comum da Gerencia nao enxergar solicitacoes persistidas como GEO
+          // (e vice-versa), embora o restante do fluxo trate os dois tokens como equivalentes.
+          const setoresUnicos = Array.from(new Set(setorTokens.filter(Boolean)));
           if (setoresUnicos.length > 0) {
             condicoes.push({ area_responsavel: { [Op.in]: setoresUnicos } });
           }
