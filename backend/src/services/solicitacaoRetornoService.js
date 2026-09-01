@@ -99,6 +99,29 @@ async function assertPodeInteragirSolicitacao(req, solicitacaoOuId) {
   return { solicitacao, contexto };
 }
 
+async function assertPodeVisualizarSolicitacao(req, solicitacaoOuId) {
+  const solicitacao = typeof solicitacaoOuId === 'object' && solicitacaoOuId
+    ? solicitacaoOuId
+    : await Solicitacao.findByPk(Number(solicitacaoOuId), {
+      attributes: ['id', 'codigo', 'obra_id', 'criado_por', 'tipo_solicitacao_id', 'area_responsavel', 'status_global']
+    });
+  if (!solicitacao) throw erro('Solicitacao nao encontrada.', 404);
+
+  // Require tardio pelo mesmo motivo de `avaliarInteracao`: o controller importa este servico
+  // para compor o payload do detalhe.
+  const controller = require('../controllers/SolicitacaoController');
+  const verificador = controller._verificarAcessoDetalheSolicitacao;
+  if (typeof verificador !== 'function') {
+    throw erro('A regra de leitura da solicitacao nao esta disponivel.', 500);
+  }
+
+  const acesso = await verificador(req, solicitacao, { permitirLeituraGlobal: true });
+  if (!acesso.allowed) {
+    throw erro(acesso.error || 'Acesso negado.', acesso.status || 403);
+  }
+  return { solicitacao, acesso };
+}
+
 async function podeSolicitarRetorno(user) {
   return userHasAreaPermission(user, [PERMISSAO_SOLICITAR]);
 }
@@ -482,6 +505,7 @@ async function cancelarRetorno(req, pedidoId) {
 module.exports = {
   STATUS,
   assertPodeInteragirSolicitacao,
+  assertPodeVisualizarSolicitacao,
   cancelarRetorno,
   decidirRetorno,
   montarContextoInteracao,

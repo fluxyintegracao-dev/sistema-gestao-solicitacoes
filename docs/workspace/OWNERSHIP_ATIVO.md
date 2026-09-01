@@ -5,7 +5,7 @@
 Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e horario de inicio. Remover a reserva ao concluir o handoff.
 
 ### codex-data-resposta-pagamento-2026-08-31
-- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo, imutabilidade apos aprovacao, consulta financeira pelo credor contratual ou favorecido efetivo, busca rapida equivalente, navegacao parcela-titulo, limpeza visual da documentacao juridica, assinatura contratual por link com minuta disponivel no card, contratos visiveis com medicao bloqueada/solicitacao de retorno quando estiverem em outro setor, revelacao progressiva dos campos por tipo/subtipo, rotulo de Titulo do Contrato em MEDICAO e visibilidade setorial equivalente entre GEO e GERENCIA DE PROCESSOS para Recarga de Cartao e demais solicitacoes).
+- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo, imutabilidade apos aprovacao, consulta financeira pelo credor contratual ou favorecido efetivo, busca rapida equivalente, navegacao parcela-titulo, limpeza visual da documentacao juridica, assinatura contratual por link com minuta disponivel no card, contratos visiveis com medicao bloqueada/solicitacao de retorno quando estiverem em outro setor, revelacao progressiva dos campos por tipo/subtipo, rotulo de Titulo do Contrato em MEDICAO, visibilidade setorial equivalente entre GEO e GERENCIA DE PROCESSOS e alinhamento da leitura da Recarga de Cartao com o setor atual e com mencoes, sem liberar interacao fora do setor principal).
 - Inicio: 2026-08-31
 - Arquivos reservados:
   - `frontend/src/pages/NovaSolicitacao.jsx`
@@ -28,6 +28,9 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `backend/src/controllers/ContratoFluxoNovoController.js`
   - `backend/src/controllers/ContratoController.js`
   - `backend/src/controllers/SolicitacaoController.js`
+  - `backend/src/controllers/RecargaCartaoController.js`
+  - `backend/src/services/recargaCartaoService.js`
+  - `backend/src/services/solicitacaoRetornoService.js`
   - `backend/src/controllers/AnexoController.js`
   - `backend/src/validators/operationalValidators.js`
   - `backend/src/services/medicaoContratoService.js`
@@ -39,6 +42,7 @@ Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e hora
   - `docs/handoffs/MEDICAO_CONTRATO_FORA_SETOR_2026-08-31.md`
   - `docs/handoffs/NOVA_SOLICITACAO_REVELACAO_PROGRESSIVA_2026-08-31.md`
   - `docs/handoffs/RECARGA_CARTAO_VISIBILIDADE_GEO_2026-09-01.md`
+  - `docs/handoffs/RECARGA_CARTAO_ACESSO_FINANCEIRO_MENCAO_2026-09-01.md`
 
 Ownership da sessao `codex-snapshot-sanitizado-dev-v2-2026-08-29` liberado apos configurar
 `export-ignore` para QA, ambientes, uploads, artefatos locais e scripts de dados no pacote de deploy.

@@ -428,6 +428,41 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLei
     };
   }
 
+  // Uma mencao e um convite explicito para acompanhar esta solicitacao. Ela concede somente
+  // leitura do detalhe, mesmo quando obra e setor normalmente nao fariam parte do escopo do
+  // usuario. A escrita continua sendo calculada separadamente pelo setor principal em
+  // `avaliarContextoInteracaoSolicitacao`, portanto o mencionado precisa solicitar retorno
+  // quando a demanda estiver em outro setor.
+  if (perfil !== 'SUPERADMIN') {
+    const mencaoUsuario = await NotificacaoDestinatario.findOne({
+      include: [
+        {
+          model: Notificacao,
+          as: 'notificacao',
+          required: true,
+          where: {
+            solicitacao_id: solicitacao.id,
+            tipo: 'MENCAO_COMENTARIO'
+          },
+          attributes: ['id']
+        }
+      ],
+      where: {
+        usuario_id: req.user.id
+      },
+      attributes: ['id']
+    });
+
+    if (mencaoUsuario) {
+      return {
+        allowed: true,
+        acessoPorMencao: true,
+        areaUsuario,
+        tokensSetorUsuario
+      };
+    }
+  }
+
   const acessoObra = await validarAcessoObra(req, solicitacao);
   if (!acessoObra) {
     return {

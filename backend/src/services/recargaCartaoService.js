@@ -375,17 +375,27 @@ async function carregarRecargaPorSolicitacao(solicitacaoId, transaction = null) 
   });
 }
 
-async function obterContextoSolicitacao(solicitacaoId, user) {
+async function obterContextoSolicitacao(solicitacaoId, user, { acessoSolicitacaoValidado = false } = {}) {
   const recarga = await carregarRecargaPorSolicitacao(solicitacaoId);
   if (!recarga) throw erro(404, 'Esta solicitacao nao pertence ao fluxo de Recarga de Cartao.');
   const vinculado = await CartaoRecargaUsuario.findOne({
     where: { cartao_recarga_id: recarga.cartao_recarga_id, user_id: Number(user.id), ativo: true }
   });
   const podeValidar = isGerenciaProcessos(user);
-  if (!vinculado && !podeValidar && Number(recarga.solicitacao?.criado_por) !== Number(user.id)) {
+  const criouSolicitacao = Number(recarga.solicitacao?.criado_por) === Number(user.id);
+  const podeOperarRecarga = Boolean(vinculado || podeValidar || criouSolicitacao);
+  if (
+    !acessoSolicitacaoValidado &&
+    !podeOperarRecarga
+  ) {
     throw erro(403, 'Acesso negado a esta recarga.');
   }
-  const obras = await listarObrasDoUsuario(recarga.solicitacao?.criado_por || recarga.criado_por);
+  // A lista de obras serve ao formulario de prestacao. Quem chegou somente pela visibilidade
+  // da solicitacao (setor atual ou mencao) pode acompanhar o card, mas nao recebe escopo auxiliar
+  // de outro usuario nem ganha permissao para operar a recarga.
+  const obras = podeOperarRecarga
+    ? await listarObrasDoUsuario(recarga.solicitacao?.criado_por || recarga.criado_por)
+    : [];
   const media = podeValidar ? await calcularMedia(recarga.cartao_recarga_id) : null;
   return serializarContexto(recarga, { obras, media, podeValidar });
 }

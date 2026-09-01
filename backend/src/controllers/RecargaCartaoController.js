@@ -7,7 +7,10 @@ const {
   salvarCartao,
   salvarPrestacao
 } = require('../services/recargaCartaoService');
-const { assertPodeInteragirSolicitacao } = require('../services/solicitacaoRetornoService');
+const {
+  assertPodeInteragirSolicitacao,
+  assertPodeVisualizarSolicitacao
+} = require('../services/solicitacaoRetornoService');
 
 function responderErro(res, error, fallback) {
   console.error(error);
@@ -36,7 +39,10 @@ module.exports = {
 
   async contextoSolicitacao(req, res) {
     try {
-      return res.json(await obterContextoSolicitacao(req.params.id, req.user));
+      await assertPodeVisualizarSolicitacao(req, req.params.id);
+      return res.json(await obterContextoSolicitacao(req.params.id, req.user, {
+        acessoSolicitacaoValidado: true
+      }));
     } catch (error) {
       return responderErro(res, error, 'Erro ao carregar o fluxo da recarga.');
     }
