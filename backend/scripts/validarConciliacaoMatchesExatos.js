@@ -337,6 +337,8 @@ assert(
     && serviceSource.includes('origemSemBaixa = true')
     && serviceSource.includes('pareado_sem_baixa: origemSemBaixa')
     && reconciliationPageSource.includes('Sem baixa de titulo: a saida e a devolucao serao pareadas')
+    && reconciliationPageSource.includes('if (!candidatoEstornoApto(candidato))')
+    && !reconciliationPageSource.includes("if (!candidato?.titulo || !candidato?.movimento?.id)")
     && reconciliationPageSource.includes('Confirmar devolucao'),
   'Estornos bancarios devem aceitar o par do extrato sem exigir baixa previa do titulo.'
 );

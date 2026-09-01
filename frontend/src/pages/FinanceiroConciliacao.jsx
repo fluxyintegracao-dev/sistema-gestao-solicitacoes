@@ -1948,12 +1948,19 @@ export default function FinanceiroConciliacao() {
   async function handleConfirmarEstornoBancario(item, conciliacaoOrigemId, motivo) {
     if (!item?.id || !conciliacaoOrigemId) return;
     const candidato = item.estorno_bancario?.candidatos?.find((value) => Number(value.conciliacao_id) === Number(conciliacaoOrigemId));
-    if (!candidato?.titulo || !candidato?.movimento?.id) {
-      setError('Concilie primeiro a saida original com a baixa do titulo correto.');
+    if (!candidatoEstornoApto(candidato)) {
+      setError('A saida original nao esta apta para confirmar esta devolucao. Atualize a conciliacao e tente novamente.');
       return;
     }
-    const tituloInfo = ` O titulo #${candidato.titulo.id} sera reaberto.`;
-    if (!window.confirm(`Confirmar que este credito devolveu o lancamento #${conciliacaoOrigemId}?${tituloInfo}`)) return;
+    const tipoMovimento = String(candidato.movimento?.tipo_movimento || '').toUpperCase();
+    const baixaDeTitulo = tipoMovimento === 'BAIXA' && candidato.titulo;
+    const tarifaRegistrada = tipoMovimento === 'TARIFA_BANCARIA';
+    const confirmacaoInfo = baixaDeTitulo
+      ? ` O titulo #${candidato.titulo.id} sera reaberto.`
+      : tarifaRegistrada
+        ? ' A devolucao sera registrada como estorno da tarifa, preservando sua classificacao.'
+        : ' A saida e a devolucao serao pareadas, mantendo o titulo aberto.';
+    if (!window.confirm(`Confirmar que este credito devolveu o lancamento #${conciliacaoOrigemId}?${confirmacaoInfo}`)) return;
     try {
       setProcessingId(`estorno-bancario-${item.id}`);
       setError(''); setFeedback('');
@@ -1962,7 +1969,11 @@ export default function FinanceiroConciliacao() {
         motivo
       });
       setConciliacoesSelecionadas((current) => current.filter((id) => Number(id) !== Number(item.id)));
-      setFeedback(`Estorno confirmado. O titulo #${candidato.titulo.id} foi reaberto e os dois lancamentos OFX permaneceram auditados.`);
+      setFeedback(baixaDeTitulo
+        ? `Estorno confirmado. O titulo #${candidato.titulo.id} foi reaberto e os dois lancamentos OFX permaneceram auditados.`
+        : tarifaRegistrada
+          ? 'Estorno de tarifa confirmado. A classificacao financeira foi preservada e os dois lancamentos OFX permaneceram auditados.'
+          : 'Estorno confirmado. A saida e a devolucao foram pareadas sem baixar o titulo, que permanece aberto para o pagamento efetivo.');
       await carregarConciliacoes();
     } catch (err) {
       setError(err?.message || 'Erro ao confirmar estorno bancario');
