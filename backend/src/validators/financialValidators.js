@@ -1022,12 +1022,19 @@ function validateFinanceConciliacaoTarifaBody(body = {}) {
 function validateFinanceConciliacaoEstornoTarifaBody(body = {}) {
   ensureAllowedKeys(
     body,
-    ['movimento_tarifa_id', 'descricao'],
+    ['codigo', 'movimento_tarifa_id', 'descricao'],
     'Conciliacao bancaria por estorno de tarifa'
   );
 
+  const codigo = parseOptionalText(body.codigo, 'Codigo da tarifa', 80);
+  const movimentoTarifaId = parseInteger(body.movimento_tarifa_id, 'Movimento da tarifa');
+  if (!codigo && !movimentoTarifaId) {
+    throw new ValidationError('Codigo da tarifa e obrigatorio.');
+  }
+
   return {
-    movimento_tarifa_id: parseInteger(body.movimento_tarifa_id, 'Movimento da tarifa', { required: true }),
+    codigo,
+    movimento_tarifa_id: movimentoTarifaId,
     descricao: parseOptionalText(body.descricao, 'Descricao', 255)
   };
 }

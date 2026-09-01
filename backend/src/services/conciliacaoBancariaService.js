@@ -2632,7 +2632,19 @@ async function listarTarifasParaEstorno(req, conciliacaoId) {
 
 async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {}) {
   await assertFinanceAccess(req);
-  const movimentoTarifaId = parseInteger(payload.movimento_tarifa_id, 'Movimento da tarifa');
+  const codigoTarifa = normalizeConfigCode(payload.codigo);
+  const movimentoTarifaIdLegado = payload.movimento_tarifa_id
+    ? parseInteger(payload.movimento_tarifa_id, 'Movimento da tarifa')
+    : null;
+
+  let tarifa = null;
+  if (codigoTarifa) {
+    const atalhos = await listarTarifasBancariasConfig(req);
+    tarifa = atalhos.find((item) => normalizeConfigCode(item.codigo) === codigoTarifa && item.ativo !== false);
+    if (!tarifa) {
+      throw createHttpError(400, 'Tarifa bancaria inativa ou nao configurada.');
+    }
+  }
 
   const transaction = await sequelize.transaction();
   try {
@@ -2651,7 +2663,6 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
       if (
         movimentoExistente
         && String(movimentoExistente.tipo_movimento || '').toUpperCase() === 'ESTORNO_TARIFA_BANCARIA'
-        && Number(movimentoExistente.movimento_origem_id) === movimentoTarifaId
       ) {
         await transaction.commit();
         return { ...conciliacao.toJSON(), movimento: movimentoExistente.toJSON(), idempotente: true };
@@ -2664,47 +2675,26 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
       throw createHttpError(400, 'O estorno de tarifa deve ser um lancamento de entrada da conta.');
     }
 
-    const tarifaOriginal = await MovimentoFinanceiro.findOne({
-      where: { id: movimentoTarifaId, tipo_movimento: 'TARIFA_BANCARIA' },
-      transaction,
-      lock: transaction.LOCK.UPDATE
-    });
-    if (!tarifaOriginal) throw createHttpError(404, 'Tarifa bancaria original nao encontrada.');
-    if (String(tarifaOriginal.status || '').toUpperCase() !== 'ATIVO') {
-      throw createHttpError(409, 'A tarifa bancaria original nao esta ativa.');
-    }
-    if (Number(tarifaOriginal.conta_bancaria_id) !== Number(conciliacao.conta_bancaria_id)) {
-      throw createHttpError(409, 'A tarifa original pertence a outra conta bancaria.');
-    }
-    if (String(tarifaOriginal.data_movimento) > String(conciliacao.data_movimento)) {
-      throw createHttpError(409, 'A tarifa original nao pode ser posterior ao estorno bancario.');
-    }
-
     const valor = roundCurrency(Math.abs(valorBanco));
-    const valorTarifa = roundCurrency(Math.abs(Number(tarifaOriginal.valor_quitacao || tarifaOriginal.valor || 0)));
-    if (valor !== valorTarifa) {
-      throw createHttpError(409, 'O valor do estorno nao corresponde ao valor integral da tarifa original.');
-    }
-
-    const estornoAtivo = await MovimentoFinanceiro.findOne({
-      where: {
-        movimento_origem_id: tarifaOriginal.id,
-        tipo_movimento: 'ESTORNO_TARIFA_BANCARIA',
-        status: 'ATIVO'
-      },
-      transaction,
-      lock: transaction.LOCK.UPDATE
-    });
-    if (estornoAtivo) throw createHttpError(409, 'A tarifa selecionada ja possui estorno bancario ativo.');
-
     const { conta, empresaId: empresaConciliacaoId } = await validarEmpresaConciliacaoComConta(conciliacao, { transaction });
-    if (
-      tarifaOriginal.empresa_id
-      && empresaConciliacaoId
-      && Number(tarifaOriginal.empresa_id) !== Number(empresaConciliacaoId)
-    ) {
-      throw createHttpError(409, 'A tarifa original pertence a outra empresa.');
+
+    // Compatibilidade temporaria com telas em cache que ainda enviam o id da tarifa.
+    // O registro e usado somente para descobrir a classificacao; o novo estorno nao fica vinculado a ele.
+    if (!tarifa && movimentoTarifaIdLegado) {
+      const tarifaLegada = await MovimentoFinanceiro.findOne({
+        where: { id: movimentoTarifaIdLegado, tipo_movimento: 'TARIFA_BANCARIA' },
+        transaction
+      });
+      if (!tarifaLegada) throw createHttpError(404, 'Tarifa bancaria informada nao foi encontrada.');
+      tarifa = {
+        codigo: 'ESTORNO_TARIFA',
+        nome: 'Estorno de tarifa bancaria',
+        categoria_financeira_id: tarifaLegada.categoria_financeira_id
+      };
     }
+    if (!tarifa) throw createHttpError(400, 'Selecione o tipo de tarifa bancaria para classificar o estorno.');
+
+    const categoria = await resolveCategoriaTarifaBancaria(tarifa, { transaction });
 
     const sessao = await obterSessaoAbertaParaConta(conta, conciliacao.data_movimento, { transaction });
     const descricao = String(payload.descricao || conciliacao.descricao_banco || 'Estorno de tarifa bancaria')
@@ -2712,12 +2702,12 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
       .slice(0, 255);
     const movimento = await MovimentoFinanceiro.create({
       titulo_financeiro_id: null,
-      categoria_financeira_id: tarifaOriginal.categoria_financeira_id,
+      categoria_financeira_id: categoria.id,
       conta_bancaria_id: conta.id,
       empresa_id: empresaConciliacaoId,
       caixa_sessao_id: sessao?.id || null,
       conciliacao_bancaria_id: conciliacao.id,
-      movimento_origem_id: tarifaOriginal.id,
+      movimento_origem_id: null,
       tipo_movimento: 'ESTORNO_TARIFA_BANCARIA',
       status: 'ATIVO',
       valor,
@@ -2726,8 +2716,8 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
       desconto: 0,
       valor_quitacao: valor,
       data_movimento: conciliacao.data_movimento,
-      documento_referencia: conciliacao.documento || tarifaOriginal.documento_referencia,
-      observacoes: `[ESTORNO_TARIFA:${tarifaOriginal.id}] ${descricao}`,
+      documento_referencia: conciliacao.documento || tarifa.codigo,
+      observacoes: `[ESTORNO_TARIFA:${tarifa.codigo}] ${descricao}`,
       criado_por: req.user?.id || null
     }, { transaction });
 
@@ -2755,9 +2745,10 @@ async function confirmarConciliacaoEstornoTarifa(req, conciliacaoId, payload = {
       descricao: 'Credito bancario conciliado como estorno de tarifa',
       metadata: {
         movimento_financeiro_id: movimento.id,
-        movimento_tarifa_origem_id: tarifaOriginal.id,
         conta_bancaria_id: conta.id,
-        categoria_financeira_id: tarifaOriginal.categoria_financeira_id,
+        categoria_financeira_id: categoria.id,
+        codigo_tarifa: tarifa.codigo,
+        lancamento_independente: true,
         valor
       }
     });
