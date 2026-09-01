@@ -9,9 +9,17 @@ function moeda(value) {
 
 function numero(value) {
   if (typeof value === 'number') return value;
-  const texto = String(value || '').trim().replace(/\s/g, '');
+  const texto = String(value || '')
+    .trim()
+    .replace(/\s/g, '')
+    .replace(/[^\d,.-]/g, '');
   if (!texto) return 0;
   return Number(texto.includes(',') ? texto.replace(/\./g, '').replace(',', '.') : texto) || 0;
+}
+
+function moedaCampo(value) {
+  if (String(value ?? '').trim() === '') return '';
+  return moeda(numero(value));
 }
 
 function linhaVazia(obraId = '') {
@@ -27,6 +35,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
   const [apropriacoesPorObra, setApropriacoesPorObra] = useState({});
   const [observacoes, setObservacoes] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [valorEmEdicao, setValorEmEdicao] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
 
@@ -174,8 +183,10 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                 <span className="lg:hidden">Valor</span>
                   <input
                     className="input input-sm w-full font-[inherit] tabular-nums"
-                    value={linha.valor_rateio}
+                    value={valorEmEdicao === index ? linha.valor_rateio : moedaCampo(linha.valor_rateio)}
                     onChange={(event) => atualizar(index, 'valor_rateio', event.target.value)}
+                    onFocus={() => setValorEmEdicao(index)}
+                    onBlur={() => setValorEmEdicao(null)}
                     disabled={bloqueada || salvando}
                     inputMode="decimal"
                     placeholder="R$ 0,00"

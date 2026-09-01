@@ -9,7 +9,8 @@ const {
 } = require('../services/recargaCartaoService');
 const {
   assertPodeInteragirSolicitacao,
-  assertPodeVisualizarSolicitacao
+  assertPodeVisualizarSolicitacao,
+  montarContextoInteracao
 } = require('../services/solicitacaoRetornoService');
 
 function responderErro(res, error, fallback) {
@@ -31,7 +32,12 @@ module.exports = {
 
   async contextoCartao(req, res) {
     try {
-      return res.json(await obterContextoCartao(req.params.id, req.user));
+      const contexto = await obterContextoCartao(req.params.id, req.user);
+      const solicitacaoAnterior = contexto?.ultima_recarga?.solicitacao || null;
+      if (solicitacaoAnterior) {
+        contexto.contexto_interacao = await montarContextoInteracao(req, solicitacaoAnterior);
+      }
+      return res.json(contexto);
     } catch (error) {
       return responderErro(res, error, 'Erro ao conferir a ultima recarga do cartao.');
     }

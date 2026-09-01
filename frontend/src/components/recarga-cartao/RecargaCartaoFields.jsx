@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import PrestacaoRecargaCartao from './PrestacaoRecargaCartao';
+import { useNavigate } from 'react-router-dom';
+import { HiOutlineArrowTopRightOnSquare, HiOutlineArrowUturnLeft, HiOutlineClock } from 'react-icons/hi2';
 import { listarMeusCartoesRecarga, obterContextoCartaoRecarga } from '../../services/recargasCartao';
+import { solicitarRetornoSolicitacao } from '../../services/solicitacoes';
 
 function moeda(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -12,16 +14,19 @@ function valorUltimaRecarga(recarga) {
 }
 
 export default function RecargaCartaoFields({ ativo, value, onChange, onContextChange }) {
+  const navigate = useNavigate();
   const [cartoes, setCartoes] = useState([]);
   const [contexto, setContexto] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
+  const [retorno, setRetorno] = useState({ aberto: false, motivo: '', processando: false, erro: '' });
 
   useEffect(() => {
     if (!ativo) {
       setCartoes([]);
       setContexto(null);
       setErro('');
+      setRetorno({ aberto: false, motivo: '', processando: false, erro: '' });
       onContextChange?.(null);
       return;
     }
@@ -33,6 +38,7 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
   }, [ativo, onContextChange]);
 
   async function carregarContexto(cartaoId) {
+    setRetorno({ aberto: false, motivo: '', processando: false, erro: '' });
     if (!cartaoId) {
       setContexto(null);
       onContextChange?.(null);
@@ -58,10 +64,31 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
   }, [ativo, value]);
 
   const ultima = contexto?.ultima_recarga || null;
+  const solicitacaoAnterior = ultima?.solicitacao || null;
+  const contextoInteracao = contexto?.contexto_interacao || null;
   const rotuloSituacao = useMemo(() => {
     if (!ultima) return 'Sem recarga anterior';
     return ultima.prestacao?.status || ultima.status_ciclo || ultima.titulo?.status || '-';
   }, [ultima]);
+
+  async function solicitarRetorno() {
+    const solicitacaoId = Number(solicitacaoAnterior?.id);
+    const motivo = String(retorno.motivo || '').trim();
+    if (!solicitacaoId || !motivo || retorno.processando) return;
+
+    setRetorno((atual) => ({ ...atual, processando: true, erro: '' }));
+    try {
+      await solicitarRetornoSolicitacao(solicitacaoId, motivo);
+      setRetorno({ aberto: false, motivo: '', processando: false, erro: '' });
+      await carregarContexto(value);
+    } catch (error) {
+      setRetorno((atual) => ({
+        ...atual,
+        processando: false,
+        erro: error?.message || 'Não foi possível solicitar o retorno da solicitação.'
+      }));
+    }
+  }
 
   if (!ativo) return null;
 
@@ -96,19 +123,92 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
       </div>
 
       {contexto?.bloqueado ? (
-        <div className="app-alert app-alert--warning" role="status">
-          {contexto.motivo_bloqueio}
+        <div className="space-y-3 border-y border-amber-300 bg-amber-50/70 px-3 py-3 text-amber-950" role="status">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 space-y-1">
+              <p className="text-sm font-semibold">
+                Continue pela solicitação anterior {solicitacaoAnterior?.codigo ? `(${solicitacaoAnterior.codigo})` : ''}
+              </p>
+              <p className="max-w-3xl text-xs leading-5">
+                {contextoInteracao?.pode_interagir
+                  ? 'A solicitação já está no seu setor. Abra o registro anterior para concluir a prestação de contas ou corrigir o ciclo antes de pedir uma nova recarga.'
+                  : `A solicitação está no setor ${contextoInteracao?.setor_atual || solicitacaoAnterior?.area_responsavel || 'responsável atual'}. Solicite o retorno ao seu setor antes de continuar. Quando ela retornar, edite a solicitação anterior em vez de criar uma nova.`}
+              </p>
+              <p className="text-xs font-medium">{contexto.motivo_bloqueio}</p>
+              <p className="text-xs leading-5">
+                Recargas quitadas integralmente, parcialmente ou com valor efetivo diferente do solicitado exigem prestação de contas no registro anterior antes de uma nova solicitação.
+              </p>
+            </div>
+
+            {contextoInteracao?.pode_interagir && solicitacaoAnterior?.id ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm shrink-0"
+                onClick={() => navigate(`/solicitacoes/${solicitacaoAnterior.id}`)}
+              >
+                <HiOutlineArrowTopRightOnSquare aria-hidden="true" />
+                Abrir e editar solicitação
+              </button>
+            ) : contextoInteracao?.pedido_retorno_pendente ? (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold">
+                <HiOutlineClock aria-hidden="true" />
+                Retorno solicitado
+              </span>
+            ) : contextoInteracao?.pode_solicitar_retorno ? (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm shrink-0"
+                onClick={() => setRetorno((atual) => ({ ...atual, aberto: true, erro: '' }))}
+              >
+                <HiOutlineArrowUturnLeft aria-hidden="true" />
+                Solicitar retorno
+              </button>
+            ) : null}
+          </div>
+
+          {contextoInteracao?.pedido_retorno_pendente?.motivo ? (
+            <p className="border-t border-amber-200 pt-2 text-xs">
+              Motivo enviado: {contextoInteracao.pedido_retorno_pendente.motivo}
+            </p>
+          ) : null}
+
+          {retorno.aberto && !contextoInteracao?.pedido_retorno_pendente ? (
+            <div className="grid gap-2 border-t border-amber-200 pt-3 md:grid-cols-[1fr_auto] md:items-end">
+              <label className="grid gap-1 text-xs font-semibold">
+                Motivo do retorno *
+                <textarea
+                  className="input min-h-[68px] bg-[var(--c-surface)]"
+                  value={retorno.motivo}
+                  onChange={(event) => setRetorno((atual) => ({ ...atual, motivo: event.target.value, erro: '' }))}
+                  placeholder="Ex.: preciso concluir a prestação de contas desta recarga."
+                  disabled={retorno.processando}
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setRetorno({ aberto: false, motivo: '', processando: false, erro: '' })}
+                  disabled={retorno.processando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={solicitarRetorno}
+                  disabled={retorno.processando || !retorno.motivo.trim()}
+                >
+                  {retorno.processando ? 'Enviando...' : 'Enviar pedido'}
+                </button>
+              </div>
+            </div>
+          ) : null}
+
+          {retorno.erro ? <div className="app-alert app-alert--error" role="alert">{retorno.erro}</div> : null}
         </div>
       ) : null}
       {erro ? <div className="app-alert app-alert--error" role="alert">{erro}</div> : null}
-
-      {ultima?.prestacao && ultima?.solicitacao?.id ? (
-        <PrestacaoRecargaCartao
-          solicitacaoId={ultima.solicitacao.id}
-          contexto={contexto}
-          onAtualizado={() => carregarContexto(value)}
-        />
-      ) : null}
     </section>
   );
 }
