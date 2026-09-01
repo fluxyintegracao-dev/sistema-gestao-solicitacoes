@@ -38,12 +38,23 @@ sobre o modo legado `ADMIN_PRIMEIRO`, para qualquer setor e qualquer tipo de sol
 por tipo continua sendo aplicado somente ao comportamento legado, quando essa permissao granular
 nao foi configurada. As permissoes das acoes continuam independentes da simples visibilidade.
 
+A mesma precedencia passou a ser aplicada na autorizacao do detalhe. Assim, uma solicitacao que
+aparece pela permissao granular tambem pode ser aberta. Se ela estiver no setor principal do
+usuario (incluindo os aliases GEO/Gerencia de Processos), o contexto de interacao e liberado; cada
+acao ainda exige sua propria permissao granular quando aplicavel.
+
+A precedencia do detalhe foi centralizada antes das regras especializadas de GEO e Administrativo.
+Na lista do setor Administrativo, a permissao tambem passou a incluir o proprio setor, nao apenas
+setores extras configurados. Usuarios de OBRA continuam sujeitos ao vinculo com a obra.
+
 ## Impacto
 
 - usuarios de GEO enxergam solicitacoes atuais da Gerencia de Processos;
 - usuarios da Gerencia de Processos enxergam solicitacoes atuais persistidas como GEO;
 - qualquer solicitacao do setor deixa de ser escondida por `ADMIN_PRIMEIRO` quando a permissao
   granular "Ver solicitacoes do setor" estiver ativa;
+- a listagem e o detalhe passam a usar a mesma precedencia, evitando item visivel com clique
+  negado;
 - continuam valendo as permissoes granulares e os vinculos de obra;
 - usuarios sem `solicitacoes.lista.visualizar_setor` nao recebem essa ampliacao;
 - nao ha migration nem alteracao de dados.

@@ -451,6 +451,23 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLei
     };
   }
 
+  // Precedencia global da permissao granular: depois de validar o vinculo com a obra, quem tem
+  // "Ver solicitacoes do setor" pode abrir qualquer demanda que esteja no seu setor principal.
+  // Isso evita que regras legadas especializadas (ADMIN_PRIMEIRO, Administrativo ou GEO)
+  // contradigam a lista. Outros setores continuam fora deste atalho.
+  if (
+    perfil !== 'SUPERADMIN' &&
+    temPermissoesAreasConfiguradas &&
+    podeVerSolicitacoesSetor &&
+    setorPertenceAoUsuario(tokensSetorUsuario, solicitacao.area_responsavel)
+  ) {
+    return {
+      allowed: true,
+      areaUsuario,
+      tokensSetorUsuario
+    };
+  }
+
   if (
     perfil !== 'SUPERADMIN' &&
     temPermissoesAreasConfiguradas &&
@@ -608,9 +625,16 @@ async function verificarAcessoDetalheSolicitacao(req, solicitacao, { permitirLei
       });
     }
 
+    // A mesma precedencia da lista precisa valer no detalhe. Sem esta guarda, a solicitacao
+    // aparecia para quem tem "Ver solicitacoes do setor", mas o clique ainda era negado pelo
+    // modo legado ADMIN_PRIMEIRO. Estar no setor continua obrigatorio; a permissao nao libera
+    // detalhes de outros setores.
     const podeVerPeloModoRecebimento =
       solicitacaoDoSetorUsuario &&
-      String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS';
+      (
+        (temPermissoesAreasConfiguradas && podeVerSolicitacoesSetor) ||
+        String(modoRecebimentoGeo || '').toUpperCase() === 'TODOS_VISIVEIS'
+      );
     const solicitacaoEmSetorExtra = await solicitacaoPertenceASetoresVisiveis(
       solicitacao,
       setoresExtrasVisiveisUsuario
@@ -1665,7 +1689,10 @@ module.exports = {
         }
 
         if (!temPermissoesAreasConfiguradas || podeVerSolicitacoesSetor) {
-          condicoesAdministrativo.push(...montarCondicoesVisibilidadeSetores(setoresExtrasUsuario));
+          condicoesAdministrativo.push(...montarCondicoesVisibilidadeSetores([
+            ...setorTokens,
+            ...setoresExtrasUsuario
+          ]));
         }
 
         where[Op.and] = where[Op.and] || [];
