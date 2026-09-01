@@ -793,6 +793,17 @@ function ContextoObraTitulo({ registro }) {
   );
 }
 
+function candidatoEstornoApto(candidato) {
+  if (!candidato) return false;
+  const tipoMovimento = String(candidato.movimento?.tipo_movimento || '').toUpperCase();
+  const baixaDeTitulo = Boolean(candidato.titulo && candidato.movimento?.id && tipoMovimento === 'BAIXA');
+  const tarifaRegistrada = Boolean(candidato.movimento?.id && tipoMovimento === 'TARIFA_BANCARIA');
+  const saidaPendenteSemBaixa = String(candidato.status || '').toUpperCase() === 'PENDENTE'
+    && !candidato.titulo
+    && !candidato.movimento?.id;
+  return baixaDeTitulo || tarifaRegistrada || saidaPendenteSemBaixa;
+}
+
 function ItemConciliacao({ item, associacaoPreparada = null, processingId, selected = false, canEstornarTransferencia = false, onToggleSelecao, onConfirmar, onConfirmarEstorno, onIgnorar, onRemover, onAssociarManual, onPrepararSugestao, onAssociarFatura, onAssociarTransferencia, onEstornarTransferencia, onAcoesRapidas }) {
   const [expandirSugestoes, setExpandirSugestoes] = useState(false);
   const [estornoExpandido, setEstornoExpandido] = useState(false);
@@ -841,12 +852,12 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
   const isConfirmandoEstorno = processingId === `estorno-bancario-${item.id}`;
   const podeConfirmar = isPendente && movimentoIdsConfirmacao.length > 0 && !isConfirmando;
   const candidatoEstornoSelecionado = alertaEstorno?.candidatos?.find((candidato) => Number(candidato.conciliacao_id) === Number(estornoOrigemId));
+  const candidatoSelecionadoApto = candidatoEstornoApto(candidatoEstornoSelecionado);
   const podeConfirmarEstorno = Boolean(
     alertaEstorno
     && canEstornarTransferencia
     && estornoOrigemId
-    && candidatoEstornoSelecionado?.titulo
-    && candidatoEstornoSelecionado?.movimento?.id
+    && candidatoSelecionadoApto
     && String(estornoMotivo || '').trim()
     && !isConfirmandoEstorno
   );
@@ -862,14 +873,20 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                   Estorno bancario
                 </span>
                 <strong className="text-xs">
-                  {alertaEstorno.tipo === 'PIX_REJEITADO' ? 'PIX rejeitado/devolvido' : alertaEstorno.tipo === 'CHEQUE_DEVOLVIDO' ? 'Cheque devolvido' : 'Possivel devolucao'}
+                  {alertaEstorno.tipo === 'PIX_REJEITADO'
+                    ? 'PIX rejeitado/devolvido'
+                    : alertaEstorno.tipo === 'CHEQUE_DEVOLVIDO'
+                      ? 'Cheque devolvido'
+                      : alertaEstorno.tipo === 'ESTORNO_TARIFA_BANCARIA'
+                        ? 'Estorno de tarifa bancaria'
+                        : 'Possivel devolucao'}
                 </strong>
                 <span className="text-[10px] text-amber-800">
                   {alertaEstorno.total_candidatos} lancamento(s) original(is) compativel(is)
                 </span>
               </div>
               <p className="mt-0.5 text-[10px] text-amber-800">
-                Bloqueado para conciliacao automatica. Confirme qual saida foi devolvida para reabrir o titulo correto.
+                Confirme qual saida e a contraparte. Sem baixa anterior, o par sera neutralizado e o titulo permanecera aberto para o pagamento efetivo.
               </p>
             </div>
             <button type="button" className="btn btn-outline btn-sm" onClick={() => setEstornoExpandido((value) => !value)}>
@@ -883,21 +900,34 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
                 <p className="text-xs font-medium text-rose-700">Nenhuma saida de mesmo valor foi localizada na janela de conferencia.</p>
               ) : (
                 <div className="grid gap-1.5 lg:grid-cols-2">
-                  {alertaEstorno.candidatos.map((candidato) => (
-                    <label key={candidato.conciliacao_id} className={`flex gap-2 rounded border px-2 py-1.5 ${candidato.titulo && candidato.movimento?.id ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} ${Number(estornoOrigemId) === Number(candidato.conciliacao_id) ? 'border-amber-600 bg-amber-100' : 'border-amber-200 bg-[var(--c-surface)]'}`}>
-                      <input type="radio" name={`estorno-${item.id}`} disabled={!candidato.titulo || !candidato.movimento?.id} checked={Number(estornoOrigemId) === Number(candidato.conciliacao_id)} onChange={() => setEstornoOrigemId(Number(candidato.conciliacao_id))} />
+                  {alertaEstorno.candidatos.map((candidato) => {
+                    const candidatoApto = candidatoEstornoApto(candidato);
+                    const tipoMovimento = String(candidato.movimento?.tipo_movimento || '').toUpperCase();
+                    const saidaSemBaixa = String(candidato.status || '').toUpperCase() === 'PENDENTE'
+                      && !candidato.titulo
+                      && !candidato.movimento?.id;
+                    return (
+                    <label key={candidato.conciliacao_id} className={`flex gap-2 rounded border px-2 py-1.5 ${candidatoApto ? 'cursor-pointer' : 'cursor-not-allowed opacity-75'} ${Number(estornoOrigemId) === Number(candidato.conciliacao_id) ? 'border-amber-600 bg-amber-100' : 'border-amber-200 bg-[var(--c-surface)]'}`}>
+                      <input type="radio" name={`estorno-${item.id}`} disabled={!candidatoApto} checked={Number(estornoOrigemId) === Number(candidato.conciliacao_id)} onChange={() => setEstornoOrigemId(Number(candidato.conciliacao_id))} />
                       <span className="min-w-0">
                         <span className="block truncate text-[11px] font-semibold">{candidato.descricao_banco || `Lancamento #${candidato.conciliacao_id}`}</span>
                         <span className="block text-[10px] text-amber-800">{formatDate(candidato.data_movimento)} · {formatCurrency(Math.abs(Number(candidato.valor || 0)))} · {candidato.status}</span>
                         {candidato.titulo && (
                           <span className="block truncate text-[10px] text-[var(--c-muted)]">Titulo #{candidato.titulo.id} · {candidato.titulo.parceiro_nome || candidato.titulo.descricao}</span>
                         )}
-                        {(!candidato.titulo || !candidato.movimento?.id) && (
+                        {saidaSemBaixa && (
+                          <span className="block text-[10px] font-medium text-emerald-700">Sem baixa de titulo: a saida e a devolucao serao pareadas, mantendo o titulo aberto.</span>
+                        )}
+                        {tipoMovimento === 'TARIFA_BANCARIA' && (
+                          <span className="block text-[10px] font-medium text-emerald-700">Tarifa ja registrada: a devolucao preservara a mesma classificacao financeira.</span>
+                        )}
+                        {!candidatoApto && (
                           <span className="block text-[10px] font-medium text-rose-700">Concilie esta saida com o titulo correto antes de confirmar a devolucao.</span>
                         )}
                       </span>
                     </label>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
               <div className="mt-2 flex flex-col gap-2 md:flex-row md:items-end">
