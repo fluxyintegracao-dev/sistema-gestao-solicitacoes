@@ -1,5 +1,6 @@
 const {
   decidirPrestacao,
+  editarRecargaPendente,
   listarAdmin,
   listarMeusCartoes,
   obterContextoCartao,
@@ -61,6 +62,16 @@ module.exports = {
       return res.json({ recarga });
     } catch (error) {
       return responderErro(res, error, 'Erro ao salvar a prestacao de contas.');
+    }
+  },
+
+  async editarPendente(req, res) {
+    try {
+      await assertPodeInteragirSolicitacao(req, req.params.id);
+      const recarga = await editarRecargaPendente(req.params.id, req.body || {}, req.user);
+      return res.json({ recarga });
+    } catch (error) {
+      return responderErro(res, error, 'Erro ao editar a solicitacao de recarga.');
     }
   },
 

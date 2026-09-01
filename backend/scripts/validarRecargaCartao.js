@@ -17,6 +17,7 @@ const {
 } = require('../src/models');
 const {
   decidirPrestacao,
+  editarRecargaPendente,
   executarCriacaoRecargaComControle,
   salvarCartao,
   salvarPrestacao,
@@ -132,10 +133,6 @@ async function executar() {
     assert.strictEqual(criacao.titulo.obra_id, null);
     assert.strictEqual(criacao.titulo.considera_dre, false);
 
-    await sincronizarTituloComStatusSolicitacao(ids.solicitacao, 'LIBERADO', base.user_id, transaction);
-    await criacao.titulo.reload({ transaction });
-    assert.strictEqual(criacao.titulo.status, 'ABERTO');
-
     await Historico.create({
       solicitacao_id: ids.solicitacao,
       usuario_responsavel_id: base.user_id,
@@ -143,9 +140,35 @@ async function executar() {
       acao: 'SOLICITACAO_CRIADA',
       status_novo: 'PENDENTE'
     }, { transaction });
+
+    await sincronizarTituloComStatusSolicitacao(ids.solicitacao, 'LIBERADO', base.user_id, transaction);
+    await criacao.titulo.reload({ transaction });
+    assert.strictEqual(criacao.titulo.status, 'ABERTO');
+
+    const dataReagendada = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+    await criacao.resultado.update({ area_responsavel: 'OBRA' }, { transaction });
+    await editarRecargaPendente(ids.solicitacao, {
+      valor: 90,
+      data_vencimento: dataReagendada
+    }, usuario, transaction);
+    await Promise.all([
+      criacao.resultado.reload({ transaction }),
+      criacao.titulo.reload({ transaction }),
+      criacao.recarga.reload({ transaction })
+    ]);
+    assert.strictEqual(Number(criacao.resultado.valor), 90);
+    assert.strictEqual(criacao.resultado.data_vencimento, dataReagendada);
+    assert.strictEqual(Number(criacao.titulo.valor_original), 90);
+    assert.strictEqual(Number(criacao.titulo.valor_saldo), 90);
+    assert.strictEqual(criacao.titulo.data_vencimento, dataReagendada);
+    assert.strictEqual(criacao.titulo.status, 'PREVISAO');
+    assert.strictEqual(Number(criacao.recarga.valor_solicitado), 90);
+    assert(isGeoToken(criacao.resultado.area_responsavel), 'A edicao deve reenviar a recarga para a Gerencia de Processos.');
+
+    await sincronizarTituloComStatusSolicitacao(ids.solicitacao, 'LIBERADO', base.user_id, transaction);
     await criacao.resultado.update({ area_responsavel: 'FINANCEIRO' }, { transaction });
 
-    await criacao.titulo.update({ status: 'PARCIAL', valor_baixado: 60, valor_saldo: 40 }, { transaction });
+    await criacao.titulo.update({ status: 'PARCIAL', valor_baixado: 60, valor_saldo: 30 }, { transaction });
     await sincronizarStatusSolicitacaoPorBaixaTitulos({
       solicitacaoId: ids.solicitacao,
       usuarioId: base.user_id,
@@ -163,8 +186,8 @@ async function executar() {
         where: { solicitacao_id: ids.solicitacao, acao: 'ENVIADA_SETOR' },
         transaction
       }),
-      1,
-      'A quitacao deve devolver a solicitacao uma unica vez ao setor criador.'
+      2,
+      'A quitacao deve acrescentar um unico retorno ao setor criador depois do reenvio da edicao.'
     );
     await sincronizarStatusSolicitacaoPorBaixaTitulos({
       solicitacaoId: ids.solicitacao,
@@ -177,7 +200,7 @@ async function executar() {
         where: { solicitacao_id: ids.solicitacao, acao: 'ENVIADA_SETOR' },
         transaction
       }),
-      1,
+      2,
       'O retry da sincronizacao nao pode duplicar o retorno ao setor criador.'
     );
 

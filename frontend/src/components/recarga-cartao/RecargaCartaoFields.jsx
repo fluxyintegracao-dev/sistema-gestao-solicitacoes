@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { HiOutlineArrowTopRightOnSquare, HiOutlineArrowUturnLeft, HiOutlineClock } from 'react-icons/hi2';
+import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlinePencilSquare } from 'react-icons/hi2';
+import DateInputBR from '../DateInputBR';
 import PrestacaoRecargaCartao from './PrestacaoRecargaCartao';
-import { listarMeusCartoesRecarga, obterContextoCartaoRecarga } from '../../services/recargasCartao';
+import { editarRecargaPendente, listarMeusCartoesRecarga, obterContextoCartaoRecarga } from '../../services/recargasCartao';
 import { solicitarRetornoSolicitacao } from '../../services/solicitacoes';
 
 function moeda(value) {
@@ -14,13 +14,31 @@ function valorUltimaRecarga(recarga) {
   return valorEfetivo > 0 ? valorEfetivo : Number(recarga?.valor_solicitado || 0);
 }
 
-export default function RecargaCartaoFields({ ativo, value, onChange, onContextChange }) {
-  const navigate = useNavigate();
+function textoMoeda(value) {
+  return Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function numeroMoeda(value) {
+  const limpo = String(value || '').trim().replace(/\s/g, '').replace(/[^\d,.-]/g, '');
+  if (!limpo) return 0;
+  return Number(limpo.includes(',') ? limpo.replace(/\./g, '').replace(',', '.') : limpo);
+}
+
+function hojeLocal() {
+  const hoje = new Date();
+  const ano = hoje.getFullYear();
+  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+  const dia = String(hoje.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+export default function RecargaCartaoFields({ ativo, value, onChange, onContextChange, onSolicitacaoAnteriorEnviada }) {
   const [cartoes, setCartoes] = useState([]);
   const [contexto, setContexto] = useState(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState('');
   const [retorno, setRetorno] = useState({ aberto: false, motivo: '', processando: false, erro: '' });
+  const [edicao, setEdicao] = useState({ aberto: false, valor: '', data_vencimento: '', processando: false, erro: '' });
 
   useEffect(() => {
     if (!ativo) {
@@ -28,6 +46,7 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
       setContexto(null);
       setErro('');
       setRetorno({ aberto: false, motivo: '', processando: false, erro: '' });
+      setEdicao({ aberto: false, valor: '', data_vencimento: '', processando: false, erro: '' });
       onContextChange?.(null);
       return;
     }
@@ -40,6 +59,7 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
 
   async function carregarContexto(cartaoId) {
     setRetorno({ aberto: false, motivo: '', processando: false, erro: '' });
+    setEdicao({ aberto: false, valor: '', data_vencimento: '', processando: false, erro: '' });
     if (!cartaoId) {
       setContexto(null);
       onContextChange?.(null);
@@ -68,6 +88,17 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
   const solicitacaoAnterior = ultima?.solicitacao || null;
   const contextoInteracao = contexto?.contexto_interacao || null;
   const statusPrestacao = String(ultima?.prestacao?.status || '').trim().toUpperCase();
+  const statusTitulo = String(ultima?.titulo?.status || '').trim().toUpperCase();
+  const valorBaixado = Number(ultima?.titulo?.valor_baixado || ultima?.valor_efetivo || 0);
+  const podeEditarRecargaAnterior = contexto?.bloqueado
+    && contextoInteracao?.pode_interagir === true
+    && !ultima?.prestacao
+    && valorBaixado <= 0
+    && ['PREVISAO', 'ABERTO'].includes(statusTitulo);
+  const aguardandoBaixa = contexto?.bloqueado
+    && !ultima?.prestacao
+    && !podeEditarRecargaAnterior
+    && ['PREVISAO', 'ABERTO', 'PARCIAL'].includes(statusTitulo);
   const podePrestarNestaTela = contexto?.bloqueado
     && contextoInteracao?.pode_interagir === true
     && ['PENDENTE', 'REJEITADA'].includes(statusPrestacao);
@@ -75,6 +106,34 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
     if (!ultima) return 'Sem recarga anterior';
     return ultima.prestacao?.status || ultima.status_ciclo || ultima.titulo?.status || '-';
   }, [ultima]);
+
+  useEffect(() => {
+    if (!ativo || !value || !contexto?.bloqueado || podePrestarNestaTela) return undefined;
+
+    let cancelado = false;
+    let consultando = false;
+    const atualizarSilenciosamente = async () => {
+      if (consultando) return;
+      consultando = true;
+      try {
+        const dados = await obterContextoCartaoRecarga(value);
+        if (cancelado) return;
+        setContexto(dados);
+        onContextChange?.(dados);
+      } catch {
+        // A consulta inicial continua responsavel por exibir falhas. O acompanhamento silencioso
+        // nao deve apagar o formulario nem gerar alertas repetidos por uma oscilacao de rede.
+      } finally {
+        consultando = false;
+      }
+    };
+
+    const timer = window.setInterval(atualizarSilenciosamente, 6000);
+    return () => {
+      cancelado = true;
+      window.clearInterval(timer);
+    };
+  }, [ativo, value, contexto?.bloqueado, podePrestarNestaTela, onContextChange]);
 
   async function solicitarRetorno() {
     const solicitacaoId = Number(solicitacaoAnterior?.id);
@@ -91,6 +150,46 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
         ...atual,
         processando: false,
         erro: error?.message || 'Não foi possível solicitar o retorno da solicitação.'
+      }));
+    }
+  }
+
+  function abrirEdicao() {
+    setEdicao({
+      aberto: true,
+      valor: textoMoeda(ultima?.valor_solicitado),
+      data_vencimento: ultima?.titulo?.data_vencimento || solicitacaoAnterior?.data_vencimento || '',
+      processando: false,
+      erro: ''
+    });
+  }
+
+  async function enviarEdicao() {
+    const solicitacaoId = Number(solicitacaoAnterior?.id);
+    const valor = numeroMoeda(edicao.valor);
+    if (!solicitacaoId || edicao.processando) return;
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setEdicao((atual) => ({ ...atual, erro: 'Informe um valor de recarga maior que zero.' }));
+      return;
+    }
+    if (!edicao.data_vencimento || edicao.data_vencimento < hojeLocal()) {
+      setEdicao((atual) => ({ ...atual, erro: 'A nova data de recarga deve ser hoje ou uma data futura.' }));
+      return;
+    }
+
+    setEdicao((atual) => ({ ...atual, processando: true, erro: '' }));
+    try {
+      await editarRecargaPendente(solicitacaoId, {
+        valor,
+        data_vencimento: edicao.data_vencimento
+      });
+      setEdicao({ aberto: false, valor: '', data_vencimento: '', processando: false, erro: '' });
+      onSolicitacaoAnteriorEnviada?.();
+    } catch (error) {
+      setEdicao((atual) => ({
+        ...atual,
+        processando: false,
+        erro: error?.message || 'Não foi possível editar e reenviar a solicitação.'
       }));
     }
   }
@@ -135,10 +234,14 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
                 Continue pela solicitação anterior {solicitacaoAnterior?.codigo ? `(${solicitacaoAnterior.codigo})` : ''}
               </p>
               <p className="max-w-3xl text-xs leading-5">
-                {podePrestarNestaTela
+                {aguardandoBaixa
+                  ? 'Esta recarga ainda não possui valor efetivamente baixado. Assim que o Financeiro registrar uma baixa, a solicitação voltará automaticamente para a Obra e o card de prestação aparecerá aqui, sem atualizar o navegador.'
+                  : podePrestarNestaTela
                   ? 'A solicitação já está no seu setor. Preencha a prestação abaixo; quando os rateios fecharem o valor efetivamente recarregado, o próximo pedido será liberado e esta solicitação seguirá para conferência da Gerência de Processos.'
+                  : podeEditarRecargaAnterior
+                  ? 'A solicitação já voltou ao seu setor. Corrija o valor e a data prevista abaixo para reenviar o mesmo pedido à Gerência de Processos.'
                   : contextoInteracao?.pode_interagir
-                  ? 'A solicitação já está no seu setor. Abra o registro anterior para corrigir o ciclo antes de pedir uma nova recarga.'
+                  ? 'A solicitação já está no seu setor. Conclua o ciclo anterior antes de pedir uma nova recarga.'
                   : `A solicitação está no setor ${contextoInteracao?.setor_atual || solicitacaoAnterior?.area_responsavel || 'responsável atual'}. Solicite o retorno ao seu setor antes de continuar. Quando ela retornar, edite a solicitação anterior em vez de criar uma nova.`}
               </p>
               <p className="text-xs font-medium">{contexto.motivo_bloqueio}</p>
@@ -147,21 +250,27 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
               </p>
             </div>
 
-            {contextoInteracao?.pode_interagir && !podePrestarNestaTela && solicitacaoAnterior?.id ? (
+            {aguardandoBaixa ? (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold">
+                <HiOutlineClock aria-hidden="true" />
+                Aguardando baixa
+              </span>
+            ) : podeEditarRecargaAnterior && solicitacaoAnterior?.id ? (
               <button
                 type="button"
                 className="btn btn-outline btn-sm shrink-0"
-                onClick={() => navigate(`/solicitacoes/${solicitacaoAnterior.id}`)}
+                onClick={abrirEdicao}
+                disabled={edicao.processando}
               >
-                <HiOutlineArrowTopRightOnSquare aria-hidden="true" />
-                Abrir e editar solicitação
+                <HiOutlinePencilSquare aria-hidden="true" />
+                Editar valor e data
               </button>
             ) : contextoInteracao?.pedido_retorno_pendente ? (
               <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-semibold">
                 <HiOutlineClock aria-hidden="true" />
                 Retorno solicitado
               </span>
-            ) : contextoInteracao?.pode_solicitar_retorno ? (
+            ) : contextoInteracao?.pode_solicitar_retorno && !aguardandoBaixa ? (
               <button
                 type="button"
                 className="btn btn-outline btn-sm shrink-0"
@@ -209,6 +318,58 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
                   {retorno.processando ? 'Enviando...' : 'Enviar pedido'}
                 </button>
               </div>
+            </div>
+          ) : null}
+
+          {edicao.aberto && podeEditarRecargaAnterior ? (
+            <div className="grid gap-3 border-t border-amber-200 pt-3 md:grid-cols-[minmax(180px,0.7fr)_minmax(210px,0.8fr)_auto] md:items-end">
+              <label className="grid gap-1 text-xs font-semibold">
+                Novo valor *
+                <div className="input input-sm flex items-center gap-2 bg-[var(--c-surface)] focus-within:ring-2 focus-within:ring-blue-200">
+                  <span className="text-[var(--c-muted)]">R$</span>
+                  <input
+                    className="min-w-0 flex-1 bg-transparent text-right tabular-nums outline-none"
+                    inputMode="decimal"
+                    value={edicao.valor}
+                    onChange={(event) => setEdicao((atual) => ({ ...atual, valor: event.target.value, erro: '' }))}
+                    onBlur={() => {
+                      const valor = numeroMoeda(edicao.valor);
+                      if (Number.isFinite(valor)) setEdicao((atual) => ({ ...atual, valor: textoMoeda(valor) }));
+                    }}
+                    disabled={edicao.processando}
+                    aria-label="Novo valor da recarga"
+                  />
+                </div>
+              </label>
+              <label className="grid gap-1 text-xs font-semibold">
+                Nova data prevista *
+                <DateInputBR
+                  className="input input-sm bg-[var(--c-surface)]"
+                  value={edicao.data_vencimento}
+                  onChange={(event) => setEdicao((atual) => ({ ...atual, data_vencimento: event.target.value, erro: '' }))}
+                  disabled={edicao.processando}
+                  required
+                />
+              </label>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setEdicao({ aberto: false, valor: '', data_vencimento: '', processando: false, erro: '' })}
+                  disabled={edicao.processando}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  onClick={enviarEdicao}
+                  disabled={edicao.processando || !edicao.valor || !edicao.data_vencimento}
+                >
+                  {edicao.processando ? 'Reenviando...' : 'Salvar e enviar'}
+                </button>
+              </div>
+              {edicao.erro ? <div className="app-alert app-alert--error md:col-span-3" role="alert">{edicao.erro}</div> : null}
             </div>
           ) : null}
 

@@ -676,6 +676,13 @@ export default function NovaSolicitacao() {
     setRecargaCartaoContexto(null);
   }, [usaFluxoRecargaCartao]);
 
+  function limparCamposNovaRecargaAposReenvio() {
+    setCartaoRecargaId('');
+    setRecargaCartaoContexto(null);
+    setValorTexto('');
+    setForm((atual) => ({ ...atual, valor: '', data_vencimento: '' }));
+  }
+
   useEffect(() => {
     if (!usaFluxoRecargaCartao) return;
     const gerencia = setores.find(isSetorGerenciaProcessos);
@@ -2403,6 +2410,7 @@ export default function NovaSolicitacao() {
             value={cartaoRecargaId}
             onChange={setCartaoRecargaId}
             onContextChange={setRecargaCartaoContexto}
+            onSolicitacaoAnteriorEnviada={limparCamposNovaRecargaAposReenvio}
           />
 
           {false && exibirCampoCredor && (

@@ -22,6 +22,15 @@ export async function obterRecargaDaSolicitacao(solicitacaoId) {
   return parse(res, 'Nao foi possivel carregar a prestacao de contas da recarga.');
 }
 
+export async function editarRecargaPendente(solicitacaoId, payload) {
+  const res = await fetch(`${API_URL}/recargas-cartao/solicitacoes/${solicitacaoId}`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parse(res, 'Nao foi possivel editar a solicitacao de recarga.');
+}
+
 export async function enviarPrestacaoRecarga(solicitacaoId, payload) {
   const res = await fetch(`${API_URL}/recargas-cartao/solicitacoes/${solicitacaoId}/prestacao`, {
     method: 'POST',

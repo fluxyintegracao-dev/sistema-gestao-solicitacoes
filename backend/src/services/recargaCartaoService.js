@@ -46,6 +46,37 @@ function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
 }
 
+function hojeEmSaoPaulo() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(new Date());
+  const mapa = Object.fromEntries(partes.map((parte) => [parte.type, parte.value]));
+  return `${mapa.year}-${mapa.month}-${mapa.day}`;
+}
+
+function validarDataRecarga(value) {
+  const data = String(value || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) {
+    throw erro(400, 'Informe a data prevista para recarga no formato DD/MM/AAAA.');
+  }
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const dataUtc = new Date(Date.UTC(ano, mes - 1, dia));
+  if (
+    dataUtc.getUTCFullYear() !== ano
+    || dataUtc.getUTCMonth() !== mes - 1
+    || dataUtc.getUTCDate() !== dia
+  ) {
+    throw erro(400, 'Informe uma data prevista para recarga valida.');
+  }
+  if (data < hojeEmSaoPaulo()) {
+    throw erro(400, 'A nova data prevista para recarga nao pode ser anterior a data atual.');
+  }
+  return data;
+}
+
 function tipoEhRecargaCartao(tipo = {}) {
   const codigo = normalizarToken(tipo.codigo_interno || tipo.nome);
   if (codigo === 'RECARGA_DE_CARTAO' || codigo === 'RECARGA_CARTAO') return true;
@@ -367,6 +398,102 @@ async function sincronizarTituloComStatusSolicitacao(solicitacaoId, status, user
     }
     return null;
   };
+  return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);
+}
+
+async function editarRecargaPendente(solicitacaoId, payload, user, externalTransaction = null) {
+  const valor = roundCurrency(payload?.valor);
+  if (!Number.isFinite(valor) || valor <= 0) {
+    throw erro(400, 'Informe um valor de recarga maior que zero.');
+  }
+  const dataVencimento = validarDataRecarga(payload?.data_vencimento);
+
+  const executar = async (transaction) => {
+    const recarga = await SolicitacaoRecargaCartao.findOne({
+      where: { solicitacao_id: Number(solicitacaoId) },
+      include: [
+        { model: Solicitacao, as: 'solicitacao' },
+        { model: TituloFinanceiro, as: 'titulo' },
+        { model: CartaoRecargaPrestacao, as: 'prestacao', required: false }
+      ],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!recarga?.solicitacao || !recarga?.titulo) {
+      throw erro(404, 'Solicitacao de recarga nao encontrada.');
+    }
+
+    const tituloStatus = normalizarToken(recarga.titulo.status);
+    const valorBaixado = roundCurrency(recarga.titulo.valor_baixado);
+    if (valorBaixado > 0 || recarga.prestacao) {
+      throw erro(409, 'Esta recarga ja possui baixa financeira e deve seguir para prestacao de contas.');
+    }
+    if (!['PREVISAO', 'ABERTO'].includes(tituloStatus)) {
+      throw erro(409, 'Somente recargas em previsao ou abertas, sem baixa, podem ser editadas.');
+    }
+
+    const valorAnterior = roundCurrency(recarga.valor_solicitado);
+    const dataAnterior = recarga.titulo.data_vencimento || recarga.solicitacao.data_vencimento || null;
+    const setorAnterior = recarga.solicitacao.area_responsavel || null;
+    const statusAnterior = recarga.solicitacao.status_global || null;
+    const setorGeo = await resolverDestinoGeo(transaction);
+
+    await recarga.solicitacao.update({
+      valor,
+      data_vencimento: dataVencimento,
+      area_responsavel: setorGeo,
+      status_global: 'PENDENTE'
+    }, { transaction });
+    await recarga.titulo.update({
+      competencia_data: dataVencimento,
+      status: 'PREVISAO',
+      valor_original: valor,
+      valor_bruto: valor,
+      valor_liquido: valor,
+      valor_saldo: valor,
+      data_vencimento: dataVencimento,
+      atualizado_por: user.id
+    }, { transaction });
+    await recarga.update({
+      valor_solicitado: valor,
+      status_ciclo: STATUS_CICLO.PENDENTE,
+      atualizado_por: user.id
+    }, { transaction });
+
+    await Historico.create({
+      solicitacao_id: recarga.solicitacao_id,
+      usuario_responsavel_id: user.id,
+      setor: setorAnterior || user.area || null,
+      acao: 'RECARGA_CARTAO_EDITADA',
+      status_anterior: statusAnterior,
+      status_novo: 'PENDENTE',
+      observacao: `Recarga alterada de R$ ${valorAnterior.toFixed(2)} (${dataAnterior || '-'}) para R$ ${valor.toFixed(2)} (${dataVencimento}).`
+    }, { transaction });
+    if (normalizarToken(setorAnterior) !== normalizarToken(setorGeo)) {
+      await Historico.create({
+        solicitacao_id: recarga.solicitacao_id,
+        usuario_responsavel_id: user.id,
+        setor: setorGeo,
+        acao: 'ENVIADA_SETOR',
+        observacao: `De ${setorAnterior || '-'} para ${setorGeo}`,
+        descricao: 'Recarga corrigida e reenviada para analise da Gerencia de Processos.'
+      }, { transaction });
+    }
+
+    agendarAtualizacaoFila({
+      transaction,
+      solicitacaoId: recarga.solicitacao_id,
+      codigo: recarga.solicitacao.codigo,
+      usuario: user,
+      tipo: normalizarToken(setorAnterior) === normalizarToken(setorGeo) ? 'STATUS_ALTERADO' : 'ENVIADA_SETOR',
+      mensagem: `A solicitacao ${recarga.solicitacao.codigo || recarga.solicitacao_id} foi corrigida e enviada para nova analise.`,
+      setorOrigem: setorAnterior,
+      setorDestino: setorGeo,
+      status: 'PENDENTE'
+    });
+    return carregarRecargaPorSolicitacao(solicitacaoId, transaction);
+  };
+
   return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);
 }
 
@@ -801,6 +928,7 @@ module.exports = {
   STATUS_CICLO,
   calcularMedia,
   decidirPrestacao,
+  editarRecargaPendente,
   executarCriacaoRecargaComControle,
   isGerenciaProcessos,
   listarAdmin,

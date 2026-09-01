@@ -26,6 +26,10 @@ atual, setor do usuario, permissao de solicitar retorno e eventual pedido penden
 
 Na Nova Solicitacao:
 
+- enquanto o titulo esta em `PREVISAO`, `ABERTO` ou `PARCIAL` e ainda nao existe prestacao,
+  mostra `Aguardando baixa` em vez de sugerir retorno manual;
+- acompanha esse estado a cada seis segundos e, quando a baixa criar a prestacao e devolver a
+  solicitacao para a Obra, revela o formulario na mesma tela sem exigir recarga do navegador;
 - se a solicitacao anterior estiver fora do setor, explica que ela precisa retornar e permite
   solicitar o retorno com motivo, quando o usuario possui a permissao granular;
 - se ja existir pedido, mostra `Retorno solicitado` e o motivo enviado;
@@ -88,3 +92,17 @@ Cartao e contratos do fluxo novo.
 - execucao local do QA depende de credenciais MySQL, ausentes neste workspace.
 
 Nao houve migration.
+
+## Edicao apos retorno (01/09/2026)
+
+- Uma recarga sem baixa que voltou ao setor solicitante pode ter valor e data prevista corrigidos
+  na propria tela de Nova Solicitacao; a data deve ser igual ou posterior ao dia atual.
+- Ao salvar, o mesmo registro e reenviado para `GEO/PENDENTE` e cartao, valor e data do formulario
+  de nova solicitacao sao limpos.
+- A atualizacao e transacional entre solicitacao, titulo financeiro e controle da recarga. A API
+  recusa a edicao depois de qualquer baixa ou depois da abertura da prestacao de contas.
+- O titulo volta para `PREVISAO` no reenvio e somente reabre para pagamento apos a nova aprovacao,
+  evitando baixa do valor corrigido antes da conferencia do GEO.
+- Build do frontend e teste responsivo (204 rotas) aprovados; `node --check` aprovado nos arquivos
+  de backend. O QA transacional contempla a edicao, mas sua execucao local segue bloqueada pela
+  ausencia das credenciais MySQL no workspace.
