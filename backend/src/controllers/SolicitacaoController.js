@@ -2228,8 +2228,17 @@ module.exports = {
 
           if (!itemEhDoSetorUsuario) return true;
           if (itemCriadoPeloUsuario || itemComInteracaoUsuario) return true;
+          // A permissao granular explicita prevalece sobre o modo operacional legado
+          // ADMIN_PRIMEIRO. Se o administrador marcou "Ver solicitacoes do setor", o usuario
+          // deve receber todas as demandas do proprio setor, independentemente do tipo.
+          if (temPermissoesAreasConfiguradas && podeVerSolicitacoesSetor) return true;
 
-          const regraTipo = obterRegrasTipoPorTokensSetor(regrasTiposPorSetor, [areaItem]);
+          // A regra de recebimento pertence ao setor do USUARIO. O item pode estar persistido
+          // com outro alias operacional (por exemplo GEO), enquanto o usuario pertence a
+          // GERENCIA DE PROCESSOS. Consultar apenas `areaItem` escolhia a configuracao do alias
+          // errado e podia rebaixar o tipo para ADMIN_PRIMEIRO depois de a consulta ja o ter
+          // autorizado. `setorTokens` preserva a mesma identidade usada no escopo SQL acima.
+          const regraTipo = obterRegrasTipoPorTokensSetor(regrasTiposPorSetor, setorTokens);
           let modoPorTipo = null;
           if (regraTipo?.modos && Number.isInteger(tipoId) && tipoId > 0) {
             modoPorTipo = regraTipo.modos[String(tipoId)] || null;
