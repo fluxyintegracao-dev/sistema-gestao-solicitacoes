@@ -27,7 +27,9 @@ function classifyBankReversal({ descricao_banco, valor } = {}) {
   const numericValue = Number(valor || 0);
   if (!description || !Number.isFinite(numericValue) || numericValue === 0) return null;
   if (!includesAny(description, REVERSAL_KEYWORDS)) return null;
-  if (description.includes('TARIFA')) return null;
+  if (description.includes('TARIFA')) {
+    return { tipo: 'ESTORNO_TARIFA_BANCARIA', janela_dias: 5 };
+  }
 
   if (includesAny(description, PIX_KEYWORDS)) {
     return { tipo: 'PIX_REJEITADO', janela_dias: 2 };

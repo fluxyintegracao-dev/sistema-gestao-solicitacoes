@@ -5079,11 +5079,16 @@ async function gerarRelatorioConciliacaoContas(req, filters = {}) {
     const status = conciliacao.deleted_at ? 'REMOVIDO' : String(conciliacao.status || 'PENDENTE').toUpperCase();
     const valor = toNumber(conciliacao.valor);
     const tipoMovimento = String(movimento?.tipo_movimento || '').toUpperCase();
+    const resolucaoTipo = String(conciliacao.resolucao_tipo || '').toUpperCase();
     const tipoConciliacao = transferencia
       ? 'TRANSFERENCIA'
       : conciliacao.fatura_cartao_id
         ? 'FATURA_CARTAO'
         : movimento && tipoMovimento === 'ESTORNO_BANCARIO'
+          ? 'ESTORNO_BANCARIO'
+        : resolucaoTipo === 'ESTORNO_TARIFA_BANCARIA'
+          ? 'ESTORNO_TARIFA'
+        : ['ESTORNO_BANCARIO', 'ESTORNADO_POR_OFX'].includes(resolucaoTipo)
           ? 'ESTORNO_BANCARIO'
         : titulo
           ? 'TITULO'

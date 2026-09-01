@@ -59,10 +59,10 @@ assert.deepStrictEqual(
   classifyBankReversal({ descricao_banco: 'CHEQUE DEVOLVIDO', valor: 1250 }),
   { tipo: 'CHEQUE_DEVOLVIDO', janela_dias: 30 }
 );
-assert.strictEqual(
+assert.deepStrictEqual(
   classifyBankReversal({ descricao_banco: 'ESTORNO DE TARIFA BANCARIA', valor: 12.5 }),
-  null,
-  'Estorno de tarifa deve continuar no fluxo especializado existente.'
+  { tipo: 'ESTORNO_TARIFA_BANCARIA', janela_dias: 5 },
+  'Estorno de tarifa deve procurar a contraparte no proprio extrato antes do fluxo manual.'
 );
 assert.strictEqual(hasOppositeExactAmount(850, -850), true);
 assert.strictEqual(hasOppositeExactAmount(850, -849.99), false);
@@ -334,8 +334,11 @@ assert(
   routesSource.includes("router.post('/financeiro/conciliacoes/:id/confirmar-estorno-bancario'")
     && serviceSource.includes("tipo_movimento: 'ESTORNO_BANCARIO'")
     && serviceSource.includes("match_inicial_tipo: 'ESTORNO_ALERTA'")
+    && serviceSource.includes('origemSemBaixa = true')
+    && serviceSource.includes('pareado_sem_baixa: origemSemBaixa')
+    && reconciliationPageSource.includes('Sem baixa de titulo: a saida e a devolucao serao pareadas')
     && reconciliationPageSource.includes('Confirmar devolucao'),
-  'Estornos bancarios devem ser alertados, bloqueados no lote e confirmados por fluxo dedicado.'
+  'Estornos bancarios devem aceitar o par do extrato sem exigir baixa previa do titulo.'
 );
 assert.throws(
   () => validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, valor: 100 }),
@@ -364,8 +367,9 @@ assert(
 );
 assert(
   financialReportServiceSource.includes("tipoMovimento === 'ESTORNO_TARIFA_BANCARIA'")
+    && financialReportServiceSource.includes("resolucaoTipo === 'ESTORNO_TARIFA_BANCARIA'")
     && financialReportServiceSource.includes("? 'ESTORNO_TARIFA'"),
-  'Relatorios devem classificar o estorno de tarifa como entrada vinculada.'
+  'Relatorios devem classificar estornos de tarifa com ou sem movimento financeiro associado.'
 );
 assert(
   reconciliationPageSource.includes('Registrar liberacao')

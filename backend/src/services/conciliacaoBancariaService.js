@@ -1220,6 +1220,11 @@ async function analisarPossivelEstornoBancario(conciliacao, { transaction = null
     })
   ));
 
+  // Sem contraparte no extrato, o estorno de tarifa continua disponivel no atalho manual.
+  if (classificacao.tipo === 'ESTORNO_TARIFA_BANCARIA' && candidatas.length === 0) {
+    return null;
+  }
+
   const movimentoIds = [...new Set(candidatas.map((item) => Number(item.movimento_financeiro_id || 0)).filter(Boolean))];
   const tituloIds = [...new Set(candidatas.map((item) => Number(item.titulo_financeiro_id || 0)).filter(Boolean))];
   const [movimentos, titulos] = await Promise.all([
@@ -1313,7 +1318,7 @@ async function registrarClassificacaoEstornoBancario(conciliacao) {
 
 function assertSemAlertaEstornoBancario(conciliacao) {
   if (
-    classifyBankReversal(conciliacao)
+    String(conciliacao.match_inicial_tipo || '').toUpperCase() === 'ESTORNO_ALERTA'
     && String(conciliacao.estorno_status || '').toUpperCase() !== 'CONFIRMADO'
   ) {
     throw createHttpError(
@@ -2789,6 +2794,8 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
   if (!origem || origem.deleted_at) throw createHttpError(404, 'Lancamento bancario original nao encontrado.');
   let movimentoOriginalId = Number(origem.movimento_financeiro_id || 0) || null;
   let tituloOriginalId = Number(origem.titulo_financeiro_id || 0) || null;
+  let tipoMovimentoOriginal = null;
+  let origemSemBaixa = false;
   const movimentosOrigem = await MovimentoFinanceiro.findAll({
     where: {
       conciliacao_bancaria_id: origem.id,
@@ -2811,28 +2818,43 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
   if (movimentoOriginalId) {
     const movimentoOriginal = await MovimentoFinanceiro.findByPk(movimentoOriginalId);
     if (!movimentoOriginal) throw createHttpError(409, 'Movimento financeiro original nao encontrado.');
-    if (String(movimentoOriginal.tipo_movimento || '').toUpperCase() !== 'BAIXA') {
-      throw createHttpError(409, 'O lancamento original nao corresponde a uma baixa de titulo estornavel.');
-    }
-    if (!tituloOriginalId || Number(movimentoOriginal.titulo_financeiro_id) !== tituloOriginalId) {
-      throw createHttpError(409, 'O vinculo entre o titulo e a baixa original esta inconsistente.');
-    }
+    tipoMovimentoOriginal = String(movimentoOriginal.tipo_movimento || '').toUpperCase();
     if (!movimentoOriginal.conciliacao_bancaria_id) {
       await movimentoOriginal.update({ conciliacao_bancaria_id: origem.id });
     } else if (Number(movimentoOriginal.conciliacao_bancaria_id) !== Number(origem.id)) {
-      throw createHttpError(409, 'A baixa original esta vinculada a outro lancamento bancario.');
+      throw createHttpError(409, 'O movimento original esta vinculado a outro lancamento bancario.');
     }
-    if (String(movimentoOriginal.status || '').toUpperCase() === 'ATIVO') {
-      await estornarMovimentoTitulo(req, tituloOriginalId, movimentoOriginalId, {
-        observacoes: `Estorno bancario confirmado pelo OFX #${estorno.id}: ${motivo}`
-      });
-    } else if (String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
-      throw createHttpError(409, 'A baixa original nao esta ativa nem estornada para concluir esta devolucao.');
+
+    if (tipoMovimentoOriginal === 'BAIXA') {
+      if (!tituloOriginalId || Number(movimentoOriginal.titulo_financeiro_id) !== tituloOriginalId) {
+        throw createHttpError(409, 'O vinculo entre o titulo e a baixa original esta inconsistente.');
+      }
+      if (String(movimentoOriginal.status || '').toUpperCase() === 'ATIVO') {
+        await estornarMovimentoTitulo(req, tituloOriginalId, movimentoOriginalId, {
+          observacoes: `Estorno bancario confirmado pelo OFX #${estorno.id}: ${motivo}`
+        });
+      } else if (String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
+        throw createHttpError(409, 'A baixa original nao esta ativa nem estornada para concluir esta devolucao.');
+      }
+    } else if (tipoMovimentoOriginal === 'TARIFA_BANCARIA') {
+      tituloOriginalId = null;
+      if (String(movimentoOriginal.status || '').toUpperCase() !== 'ATIVO') {
+        throw createHttpError(409, 'A tarifa bancaria original nao esta ativa para concluir esta devolucao.');
+      }
+    } else {
+      throw createHttpError(409, 'O movimento original nao corresponde a uma baixa ou tarifa bancaria estornavel.');
     }
+  } else if (
+    String(origem.status || '').toUpperCase() === 'PENDENTE'
+    && !tituloOriginalId
+    && !origem.transferencia_financeira_id
+    && !origem.fatura_cartao_id
+  ) {
+    origemSemBaixa = true;
   } else {
     throw createHttpError(
       409,
-      'Concilie primeiro o lancamento bancario original com a baixa do titulo correto. Depois confirme a devolucao.'
+      'O lancamento original possui vinculos incompatíveis com a confirmacao desta devolucao.'
     );
   }
 
@@ -2855,6 +2877,12 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
       await transaction.commit();
       return loadConciliacaoById(req, estorno.id);
     }
+    if (String(estorno.status || '').toUpperCase() !== 'PENDENTE') {
+      throw createHttpError(409, 'O lancamento de devolucao recebeu outra conciliacao antes da confirmacao.');
+    }
+    if (origem.deleted_at || Number(estorno.conta_bancaria_id) !== Number(origem.conta_bancaria_id)) {
+      throw createHttpError(409, 'A contraparte selecionada nao pertence mais ao mesmo extrato bancario.');
+    }
     if (!hasOppositeExactAmount(estorno.valor, origem.valor)) {
       throw createHttpError(409, 'Os valores bancarios deixaram de ser compativeis para estorno.');
     }
@@ -2867,51 +2895,103 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
       throw createHttpError(409, 'O lancamento original esta fora da janela permitida para o estorno.');
     }
 
+    let movimentoOriginal = null;
     let movimentoEstorno = null;
-    const movimentoOriginal = await MovimentoFinanceiro.findByPk(movimentoOriginalId, {
+    if (!origemSemBaixa) {
+      movimentoOriginal = await MovimentoFinanceiro.findByPk(movimentoOriginalId, {
         transaction,
         lock: transaction.LOCK.UPDATE
       });
-    if (!movimentoOriginal || String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
-      throw createHttpError(409, 'A baixa original precisa estar estornada antes de vincular a devolucao bancaria.');
-    }
-    movimentoEstorno = await MovimentoFinanceiro.findOne({
-        where: {
-          movimento_origem_id: movimentoOriginal.id,
-          tipo_movimento: 'ESTORNO_BANCARIO',
-          status: 'ATIVO'
-        },
-        transaction,
-        lock: transaction.LOCK.UPDATE
-      });
-    if (!movimentoEstorno) {
-      movimentoEstorno = await MovimentoFinanceiro.create({
-          titulo_financeiro_id: tituloOriginalId,
-          conta_bancaria_id: estorno.conta_bancaria_id,
-          empresa_id: estorno.empresa_id,
-          conciliacao_bancaria_id: estorno.id,
-          movimento_origem_id: movimentoOriginal.id,
-          forma_pagamento_id: movimentoOriginal.forma_pagamento_id || null,
-          forma_recebimento: movimentoOriginal.forma_recebimento || null,
-          documento_referencia: estorno.documento || movimentoOriginal.documento_referencia || null,
-          tipo_movimento: 'ESTORNO_BANCARIO',
-          status: 'ATIVO',
-          valor: roundCurrency(Math.abs(Number(estorno.valor || 0))),
-          juros: 0,
-          multa: 0,
-          desconto: 0,
-          valor_quitacao: roundCurrency(Math.abs(Number(estorno.valor || 0))),
-          data_movimento: estorno.data_movimento,
-          observacoes: `[ESTORNO_BANCARIO:${movimentoOriginal.id}] ${motivo}`,
-          criado_por: req.user?.id || null
-      }, { transaction });
+      if (!movimentoOriginal) {
+        throw createHttpError(409, 'O movimento financeiro original nao foi encontrado durante a confirmacao.');
+      }
+
+      if (tipoMovimentoOriginal === 'BAIXA') {
+        if (String(movimentoOriginal.status || '').toUpperCase() !== 'ESTORNADO') {
+          throw createHttpError(409, 'A baixa original precisa estar estornada antes de vincular a devolucao bancaria.');
+        }
+        movimentoEstorno = await MovimentoFinanceiro.findOne({
+          where: {
+            movimento_origem_id: movimentoOriginal.id,
+            tipo_movimento: 'ESTORNO_BANCARIO',
+            status: 'ATIVO'
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+        if (!movimentoEstorno) {
+          movimentoEstorno = await MovimentoFinanceiro.create({
+            titulo_financeiro_id: tituloOriginalId,
+            conta_bancaria_id: estorno.conta_bancaria_id,
+            empresa_id: estorno.empresa_id,
+            conciliacao_bancaria_id: estorno.id,
+            movimento_origem_id: movimentoOriginal.id,
+            forma_pagamento_id: movimentoOriginal.forma_pagamento_id || null,
+            forma_recebimento: movimentoOriginal.forma_recebimento || null,
+            documento_referencia: estorno.documento || movimentoOriginal.documento_referencia || null,
+            tipo_movimento: 'ESTORNO_BANCARIO',
+            status: 'ATIVO',
+            valor: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+            juros: 0,
+            multa: 0,
+            desconto: 0,
+            valor_quitacao: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+            data_movimento: estorno.data_movimento,
+            observacoes: `[ESTORNO_BANCARIO:${movimentoOriginal.id}] ${motivo}`,
+            criado_por: req.user?.id || null
+          }, { transaction });
+        }
+      } else if (tipoMovimentoOriginal === 'TARIFA_BANCARIA') {
+        if (String(movimentoOriginal.status || '').toUpperCase() !== 'ATIVO') {
+          throw createHttpError(409, 'A tarifa bancaria original deixou de estar ativa.');
+        }
+        movimentoEstorno = await MovimentoFinanceiro.findOne({
+          where: {
+            conciliacao_bancaria_id: estorno.id,
+            tipo_movimento: 'ESTORNO_TARIFA_BANCARIA',
+            status: 'ATIVO'
+          },
+          transaction,
+          lock: transaction.LOCK.UPDATE
+        });
+        if (!movimentoEstorno) {
+          movimentoEstorno = await MovimentoFinanceiro.create({
+            titulo_financeiro_id: null,
+            categoria_financeira_id: movimentoOriginal.categoria_financeira_id || null,
+            conta_bancaria_id: estorno.conta_bancaria_id,
+            empresa_id: estorno.empresa_id,
+            caixa_sessao_id: movimentoOriginal.caixa_sessao_id || null,
+            conciliacao_bancaria_id: estorno.id,
+            movimento_origem_id: null,
+            documento_referencia: estorno.documento || movimentoOriginal.documento_referencia || null,
+            tipo_movimento: 'ESTORNO_TARIFA_BANCARIA',
+            status: 'ATIVO',
+            valor: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+            juros: 0,
+            multa: 0,
+            desconto: 0,
+            valor_quitacao: roundCurrency(Math.abs(Number(estorno.valor || 0))),
+            data_movimento: estorno.data_movimento,
+            observacoes: `[ESTORNO_TARIFA:OFX-${origem.id}] ${motivo}`,
+            criado_por: req.user?.id || null
+          }, { transaction });
+        }
+      }
+    } else if (
+      String(origem.status || '').toUpperCase() !== 'PENDENTE'
+      || origem.movimento_financeiro_id
+      || origem.titulo_financeiro_id
+      || origem.transferencia_financeira_id
+      || origem.fatura_cartao_id
+    ) {
+      throw createHttpError(409, 'A saida original recebeu outro vinculo antes da confirmacao. Atualize a conciliacao e tente novamente.');
     }
 
     const confirmadoEm = new Date();
     await origem.update({
       status: 'CONCILIADO',
-      movimento_financeiro_id: movimentoOriginalId,
-      titulo_financeiro_id: tituloOriginalId,
+      movimento_financeiro_id: movimentoOriginal?.id || null,
+      titulo_financeiro_id: tituloOriginalId || null,
       resolucao_tipo: 'ESTORNADO_POR_OFX',
       confirmado_por: req.user?.id || null,
       confirmado_em: confirmadoEm
@@ -2923,8 +3003,10 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
       estorno_candidatos: analise.total_candidatos,
       estorno_avaliado_em: confirmadoEm,
       movimento_financeiro_id: movimentoEstorno?.id || null,
-      titulo_financeiro_id: tituloOriginalId,
-      resolucao_tipo: 'ESTORNO_BANCARIO',
+      titulo_financeiro_id: tituloOriginalId || null,
+      resolucao_tipo: classificacao.tipo === 'ESTORNO_TARIFA_BANCARIA'
+        ? 'ESTORNO_TARIFA_BANCARIA'
+        : 'ESTORNO_BANCARIO',
       status: 'CONCILIADO',
       confirmado_por: req.user?.id || null,
       confirmado_em: confirmadoEm
@@ -2939,13 +3021,16 @@ async function confirmarConciliacaoEstornoBancario(req, conciliacaoId, payload =
       recursoTipo: 'CONCILIACAO_BANCARIA',
       recursoId: estorno.id,
       status: 'SUCCESS',
-      descricao: 'Estorno bancario confirmado e vinculado ao lancamento original',
+      descricao: origemSemBaixa
+        ? 'Estorno bancario confirmado pelo par de movimentos do extrato, sem baixa de titulo'
+        : 'Estorno bancario confirmado e vinculado ao lancamento original',
       metadata: {
         conciliacao_origem_id: origem.id,
-        titulo_financeiro_id: tituloOriginalId,
-        movimento_origem_id: movimentoOriginalId,
+        titulo_financeiro_id: tituloOriginalId || null,
+        movimento_origem_id: movimentoOriginal?.id || null,
         movimento_estorno_id: movimentoEstorno?.id || null,
         evento_bancario_tipo: classificacao.tipo,
+        pareado_sem_baixa: origemSemBaixa,
         valor: Math.abs(Number(estorno.valor || 0)),
         motivo
       }
