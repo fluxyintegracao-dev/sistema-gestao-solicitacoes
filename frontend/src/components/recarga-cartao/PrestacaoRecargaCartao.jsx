@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ApropriacaoAutocomplete from '../ui/ApropriacaoAutocomplete';
 import { listarApropriacoes } from '../../services/apropriacoes';
-import { decidirPrestacaoRecarga, enviarPrestacaoRecarga } from '../../services/recargasCartao';
+import { decidirPrestacaoRecarga, editarRateiosPrestacaoRecarga, enviarPrestacaoRecarga } from '../../services/recargasCartao';
 
 function moeda(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -38,11 +38,16 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
   const [valorEmEdicao, setValorEmEdicao] = useState(null);
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+  const [rateiosAlterados, setRateiosAlterados] = useState(false);
+  const assinaturaRateios = (prestacao?.rateios || [])
+    .map((item) => `${item.id}:${item.obra_id}:${item.apropriacao_id}:${item.valor_rateio}`)
+    .join('|');
 
   useEffect(() => {
     const rateios = prestacao?.rateios || [];
     setLinhas(rateios.length
       ? rateios.map((item) => ({
+          id: String(item.id || ''),
           obra_id: String(item.obra_id || item.obra?.id || ''),
           apropriacao_id: String(item.apropriacao_id || item.apropriacao?.id || ''),
           valor_rateio: String(item.valor_rateio ?? '')
@@ -50,7 +55,8 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
       : [linhaVazia(obras.length === 1 ? obras[0]?.id : '')]);
     setObservacoes(prestacao?.observacoes || '');
     setMotivo(prestacao?.motivo_rejeicao || '');
-  }, [prestacao?.id, prestacao?.updatedAt, obras.length]);
+    setRateiosAlterados(false);
+  }, [prestacao?.id, prestacao?.updatedAt, assinaturaRateios, obras.length]);
 
   useEffect(() => {
     const ids = [...new Set(linhas.map((linha) => Number(linha.obra_id)).filter(Boolean))];
@@ -74,7 +80,8 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
   const status = String(prestacao?.status || 'PENDENTE').toUpperCase();
   // A prestacao faz parte das interacoes da solicitacao. Vinculos secundarios e permissoes de
   // visualizacao podem mostrar os dados, mas nunca liberam rateio, envio ou decisao fora do setor.
-  const bloqueada = !podeInteragir || status === 'VALIDADA' || status === 'ENVIADA';
+  const podeEditarPrestacao = podeInteragir && ['PENDENTE', 'REJEITADA'].includes(status);
+  const podeEditarDestinosGeo = podeInteragir && podeValidar && status === 'ENVIADA';
 
   function atualizar(index, campo, value) {
     setLinhas((atuais) => atuais.map((linha, i) => {
@@ -82,6 +89,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
       if (campo === 'obra_id') return { ...linha, obra_id: value, apropriacao_id: '' };
       return { ...linha, [campo]: value };
     }));
+    if (podeEditarDestinosGeo && ['obra_id', 'apropriacao_id'].includes(campo)) setRateiosAlterados(true);
   }
 
   async function enviar() {
@@ -111,6 +119,27 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
     setSalvando(true);
     try {
       await decidirPrestacaoRecarga(solicitacaoId, { aprovar, motivo });
+      await onAtualizado?.();
+    } catch (error) {
+      setErro(error.message);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvarDestinosGeo() {
+    if (!solicitacaoId || salvando || !rateiosAlterados) return;
+    setErro('');
+    setSalvando(true);
+    try {
+      await editarRateiosPrestacaoRecarga(solicitacaoId, {
+        rateios: linhas.map((linha) => ({
+          id: Number(linha.id),
+          obra_id: Number(linha.obra_id),
+          apropriacao_id: Number(linha.apropriacao_id)
+        }))
+      });
+      setRateiosAlterados(false);
       await onAtualizado?.();
     } catch (error) {
       setErro(error.message);
@@ -159,7 +188,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     className="input input-sm w-full"
                     value={linha.obra_id}
                     onChange={(event) => atualizar(index, 'obra_id', event.target.value)}
-                    disabled={bloqueada || salvando}
+                    disabled={(!podeEditarPrestacao && !podeEditarDestinosGeo) || salvando}
                     aria-label={`Obra do rateio ${index + 1}`}
                   >
                     <option value="">Selecione</option>
@@ -173,7 +202,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     value={linha.apropriacao_id}
                     options={apropriacoesPorObra[Number(linha.obra_id)] || []}
                     onChange={(value) => atualizar(index, 'apropriacao_id', value)}
-                    disabled={!linha.obra_id || bloqueada || salvando}
+                    disabled={!linha.obra_id || (!podeEditarPrestacao && !podeEditarDestinosGeo) || salvando}
                     placeholder={linha.obra_id ? 'Buscar apropriação' : 'Selecione a obra'}
                     inputClassName="input input-sm w-full"
                   />
@@ -187,7 +216,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     onChange={(event) => atualizar(index, 'valor_rateio', event.target.value)}
                     onFocus={() => setValorEmEdicao(index)}
                     onBlur={() => setValorEmEdicao(null)}
-                    disabled={bloqueada || salvando}
+                    disabled={!podeEditarPrestacao || salvando}
                     inputMode="decimal"
                     placeholder="R$ 0,00"
                     aria-label={`Valor do rateio ${index + 1}`}
@@ -195,21 +224,23 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
               </label>
 
               <div className="flex items-end justify-end sm:col-span-2 lg:col-span-1">
+                {podeEditarPrestacao ? (
                   <button
                     type="button"
                     className="btn btn-ghost btn-sm"
                     onClick={() => setLinhas((atuais) => atuais.filter((_, i) => i !== index))}
-                    disabled={bloqueada || salvando || linhas.length === 1}
+                    disabled={salvando || linhas.length === 1}
                   >
                     Remover
                   </button>
+                ) : <span className="px-3 py-2 text-xs text-[var(--c-muted)]">—</span>}
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {!bloqueada ? (
+      {podeEditarPrestacao ? (
         <button
           type="button"
           className="btn btn-outline btn-sm"
@@ -226,14 +257,14 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
           <span>Informado: <strong>{moeda(total)}</strong></span>
           <span className={saldo === 0 ? 'text-emerald-700' : 'text-amber-700'}>Diferença: <strong>{moeda(saldo)}</strong></span>
         </div>
-        {!bloqueada ? (
+        {podeEditarPrestacao ? (
           <button type="button" className="btn btn-primary btn-sm w-full sm:w-auto" onClick={enviar} disabled={salvando || saldo !== 0}>
             {salvando ? 'Enviando prestação...' : 'Enviar prestação'}
           </button>
         ) : null}
       </div>
 
-      {!bloqueada ? (
+      {podeEditarPrestacao ? (
         <label className="grid gap-1 text-sm">
           Observações
           <textarea className="input min-h-[72px]" value={observacoes} onChange={(event) => setObservacoes(event.target.value)} disabled={salvando} />
@@ -241,15 +272,31 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
       ) : null}
 
       {podeInteragir && podeValidar && status === 'ENVIADA' ? (
-        <div className="grid gap-3 border-t border-[var(--c-border)] pt-3 md:grid-cols-[1fr_auto]">
-          <label className="grid gap-1 text-sm">
-            Motivo para rejeição
-            <input className="input input-sm" value={motivo} onChange={(event) => setMotivo(event.target.value)} placeholder="Obrigatório somente ao rejeitar" />
-          </label>
-          <div className="flex items-end gap-2">
-            <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(false)} disabled={salvando || !motivo.trim()}>Rejeitar prestação</button>
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => decidir(true)} disabled={salvando}>Validar prestação</button>
+        <div className="grid gap-3 border-t border-[var(--c-border)] pt-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-[var(--c-surface-alt)] px-3 py-2">
+            <p className="text-xs text-[var(--c-muted)]">
+              Ajuste obra e apropriação acima, se necessário. Os valores informados pelo solicitante permanecem preservados.
+            </p>
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={salvarDestinosGeo}
+              disabled={salvando || !rateiosAlterados || linhas.some((linha) => !linha.obra_id || !linha.apropriacao_id)}
+            >
+              {salvando && rateiosAlterados ? 'Salvando rateio...' : 'Salvar obra e apropriação'}
+            </button>
           </div>
+          <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+            <label className="grid gap-1 text-sm">
+              Motivo para rejeição
+              <input className="input input-sm" value={motivo} onChange={(event) => setMotivo(event.target.value)} placeholder="Obrigatório somente ao rejeitar" />
+            </label>
+            <div className="flex items-end gap-2">
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(false)} disabled={salvando || !motivo.trim() || rateiosAlterados}>Rejeitar prestação</button>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => decidir(true)} disabled={salvando || rateiosAlterados}>Validar prestação</button>
+            </div>
+          </div>
+          {rateiosAlterados ? <p className="text-xs text-amber-700">Salve as alterações de obra e apropriação antes de validar ou rejeitar.</p> : null}
         </div>
       ) : null}
 

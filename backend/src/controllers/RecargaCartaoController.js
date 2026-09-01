@@ -1,6 +1,7 @@
 const {
   decidirPrestacao,
   editarRecargaPendente,
+  editarRateiosPrestacaoGeo,
   listarAdmin,
   listarMeusCartoes,
   obterContextoCartao,
@@ -82,6 +83,16 @@ module.exports = {
       return res.json({ recarga });
     } catch (error) {
       return responderErro(res, error, 'Erro ao decidir a prestacao de contas.');
+    }
+  },
+
+  async editarRateiosPrestacao(req, res) {
+    try {
+      await assertPodeInteragirSolicitacao(req, req.params.id);
+      const recarga = await editarRateiosPrestacaoGeo(req.params.id, req.body || {}, req.user);
+      return res.json({ recarga });
+    } catch (error) {
+      return responderErro(res, error, 'Erro ao corrigir obra e apropriacao da prestacao.');
     }
   },
 

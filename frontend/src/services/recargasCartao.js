@@ -40,6 +40,15 @@ export async function enviarPrestacaoRecarga(solicitacaoId, payload) {
   return parse(res, 'Nao foi possivel enviar a prestacao de contas.');
 }
 
+export async function editarRateiosPrestacaoRecarga(solicitacaoId, payload) {
+  const res = await fetch(`${API_URL}/recargas-cartao/solicitacoes/${solicitacaoId}/prestacao/rateios`, {
+    method: 'PATCH',
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(payload)
+  });
+  return parse(res, 'Nao foi possivel corrigir obra e apropriacao da prestacao.');
+}
+
 export async function decidirPrestacaoRecarga(solicitacaoId, payload) {
   const res = await fetch(`${API_URL}/recargas-cartao/solicitacoes/${solicitacaoId}/prestacao/decisao`, {
     method: 'POST',

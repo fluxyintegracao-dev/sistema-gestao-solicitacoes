@@ -1522,6 +1522,7 @@ router.get('/recargas-cartao/cartoes/:id/contexto', validateRequest({ params: va
 router.get('/recargas-cartao/solicitacoes/:id', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), RecargaCartaoController.contextoSolicitacao);
 router.patch('/recargas-cartao/solicitacoes/:id', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), RecargaCartaoController.editarPendente);
 router.post('/recargas-cartao/solicitacoes/:id/prestacao', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), RecargaCartaoController.enviarPrestacao);
+router.patch('/recargas-cartao/solicitacoes/:id/prestacao/rateios', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), RecargaCartaoController.editarRateiosPrestacao);
 router.post('/recargas-cartao/solicitacoes/:id/prestacao/decisao', criticalRateLimit, validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), RecargaCartaoController.decidirPrestacao);
 router.get('/configuracoes/cartoes-recarga', RecargaCartaoController.adminIndex);
 router.post('/configuracoes/cartoes-recarga', criticalRateLimit, RecargaCartaoController.adminCreate);

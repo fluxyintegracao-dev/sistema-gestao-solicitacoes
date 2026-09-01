@@ -18,6 +18,7 @@ const {
 const {
   decidirPrestacao,
   editarRecargaPendente,
+  editarRateiosPrestacaoGeo,
   executarCriacaoRecargaComControle,
   salvarCartao,
   salvarPrestacao,
@@ -279,6 +280,36 @@ async function executar() {
     assert(isGeoToken(solicitacaoEmConferencia.area_responsavel), 'Prestacao enviada deve mover a solicitacao para a Gerencia de Processos.');
     assert.strictEqual(solicitacaoEmConferencia.status_global, 'PENDENTE');
 
+    const rateioEnviado = await CartaoRecargaPrestacaoRateio.findOne({
+      where: { prestacao_id: ids.prestacao },
+      transaction
+    });
+    const apropriacaoAlternativa = await sequelize.query(
+      `SELECT id
+         FROM apropriacoes
+        WHERE obra_id = :obra_id
+          AND id <> :apropriacao_id
+          AND ativo = 1
+          AND somadora = 0
+        ORDER BY id
+        LIMIT 1`,
+      {
+        replacements: { obra_id: base.obra_id, apropriacao_id: base.apropriacao_id },
+        type: QueryTypes.SELECT,
+        transaction
+      }
+    );
+    const apropriacaoGeo = apropriacaoAlternativa[0]?.id || base.apropriacao_id;
+    await editarRateiosPrestacaoGeo(ids.solicitacao, {
+      rateios: [{
+        id: rateioEnviado.id,
+        obra_id: base.obra_id,
+        apropriacao_id: apropriacaoGeo
+      }]
+    }, usuario, transaction);
+    await rateioEnviado.reload({ transaction });
+    assert.strictEqual(Number(rateioEnviado.apropriacao_id), Number(apropriacaoGeo));
+
     const proximaCriacao = await executarCriacaoRecargaComControle({
       cartaoId: cartao.id,
       user: usuario,
@@ -319,6 +350,7 @@ async function executar() {
     assert.strictEqual(tituloFinal.possui_rateio, true);
     assert.strictEqual(rateios.length, 1);
     assert.strictEqual(Number(rateios[0].valor_rateio), 60);
+    assert.strictEqual(Number(rateios[0].apropriacao_id), Number(apropriacaoGeo));
 
     await transaction.rollback();
 

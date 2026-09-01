@@ -106,3 +106,14 @@ Nao houve migration.
 - Build do frontend e teste responsivo (204 rotas) aprovados; `node --check` aprovado nos arquivos
   de backend. O QA transacional contempla a edicao, mas sua execucao local segue bloqueada pela
   ausencia das credenciais MySQL no workspace.
+
+## Correcao de destino contabil pelo GEO (01/09/2026)
+
+- Enquanto a prestacao esta `ENVIADA` e aguarda validacao, o GEO pode corrigir a obra/centro de
+  custo e a apropriacao de cada rateio diretamente no card da prestacao.
+- Os valores e a quantidade de linhas permanecem bloqueados nessa etapa; somente o destino
+  contabil pode ser alterado.
+- A API confere setor, status, ids das linhas, vinculo da obra com o solicitante e pertencimento da
+  apropriacao a obra. A alteracao e transacional e deixa historico com valores anteriores e novos.
+- Validar ou rejeitar fica bloqueado no frontend enquanto houver mudancas de destino ainda nao
+  salvas. Depois da validacao, o rateio continua imutavel por este fluxo.

@@ -729,6 +729,123 @@ async function salvarPrestacao(solicitacaoId, payload, user, externalTransaction
   return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);
 }
 
+function normalizarDestinosRateioGeo(rateios = []) {
+  if (!Array.isArray(rateios) || rateios.length === 0) {
+    throw erro(400, 'Informe os rateios da prestacao de contas.');
+  }
+  if (rateios.length > 50) throw erro(400, 'A prestacao excede o limite de 50 linhas de rateio.');
+  const ids = new Set();
+  return rateios.map((item, index) => {
+    const id = Number(item?.id);
+    const obraId = Number(item?.obra_id);
+    const apropriacaoId = Number(item?.apropriacao_id);
+    if (!Number.isInteger(id) || id <= 0 || ids.has(id)) throw erro(400, `Rateio invalido na linha ${index + 1}.`);
+    if (!Number.isInteger(obraId) || obraId <= 0) throw erro(400, `Selecione a obra da linha ${index + 1}.`);
+    if (!Number.isInteger(apropriacaoId) || apropriacaoId <= 0) throw erro(400, `Selecione a apropriacao da linha ${index + 1}.`);
+    ids.add(id);
+    return { id, obra_id: obraId, apropriacao_id: apropriacaoId };
+  });
+}
+
+async function editarRateiosPrestacaoGeo(solicitacaoId, payload, user, externalTransaction = null) {
+  if (!isGerenciaProcessos(user)) {
+    throw erro(403, 'Somente a Gerencia de Processos pode corrigir obra e apropriacao da prestacao.');
+  }
+  const destinos = normalizarDestinosRateioGeo(payload?.rateios);
+
+  const executar = async (transaction) => {
+    const recarga = await SolicitacaoRecargaCartao.findOne({
+      where: { solicitacao_id: Number(solicitacaoId) },
+      include: [
+        { model: Solicitacao, as: 'solicitacao', attributes: ['id', 'codigo', 'criado_por', 'area_responsavel', 'status_global'] },
+        {
+          model: CartaoRecargaPrestacao,
+          as: 'prestacao',
+          required: true,
+          include: [{ model: CartaoRecargaPrestacaoRateio, as: 'rateios', required: false }]
+        }
+      ],
+      transaction,
+      lock: transaction.LOCK.UPDATE
+    });
+    if (!recarga?.prestacao) throw erro(404, 'Prestacao de contas nao encontrada.');
+    if (normalizarToken(recarga.prestacao.status) !== 'ENVIADA') {
+      throw erro(409, 'Obra e apropriacao so podem ser corrigidas enquanto a prestacao aguarda validacao.');
+    }
+
+    const atuais = recarga.prestacao.rateios || [];
+    const atuaisPorId = new Map(atuais.map((item) => [Number(item.id), item]));
+    if (destinos.length !== atuais.length || destinos.some((item) => !atuaisPorId.has(item.id))) {
+      throw erro(409, 'Os rateios foram alterados por outro usuario. Atualize a pagina e tente novamente.');
+    }
+
+    const obrasPermitidas = await UsuarioObra.findAll({
+      where: { user_id: Number(recarga.solicitacao.criado_por) },
+      attributes: ['obra_id'],
+      raw: true,
+      transaction
+    });
+    const idsPermitidos = new Set(obrasPermitidas.map((item) => Number(item.obra_id)));
+    for (const item of destinos) {
+      if (!idsPermitidos.has(item.obra_id)) {
+        throw erro(403, 'Uma das obras informadas nao esta vinculada ao solicitante da recarga.');
+      }
+      const apropriacao = await Apropriacao.findOne({
+        where: { id: item.apropriacao_id, obra_id: item.obra_id, ativo: true, somadora: false },
+        attributes: ['id'],
+        transaction
+      });
+      if (!apropriacao) {
+        throw erro(400, 'Uma das apropriacoes nao pertence a obra informada ou nao aceita lancamentos.');
+      }
+    }
+
+    const alterados = destinos.filter((item) => {
+      const atual = atuaisPorId.get(item.id);
+      return Number(atual.obra_id) !== item.obra_id || Number(atual.apropriacao_id) !== item.apropriacao_id;
+    }).map((item) => {
+      const atual = atuaisPorId.get(item.id);
+      return {
+        ...item,
+        obra_id_anterior: Number(atual.obra_id),
+        apropriacao_id_anterior: Number(atual.apropriacao_id)
+      };
+    });
+    if (alterados.length === 0) return carregarRecargaPorSolicitacao(solicitacaoId, transaction);
+
+    for (const item of alterados) {
+      await atuaisPorId.get(item.id).update({
+        obra_id: item.obra_id,
+        apropriacao_id: item.apropriacao_id
+      }, { transaction });
+    }
+    await Historico.create({
+      solicitacao_id: recarga.solicitacao_id,
+      usuario_responsavel_id: user.id,
+      setor: recarga.solicitacao.area_responsavel || user.area || 'GEO',
+      acao: 'PRESTACAO_RECARGA_RATEIO_EDITADO_GEO',
+      status_anterior: recarga.solicitacao.status_global,
+      status_novo: recarga.solicitacao.status_global,
+      observacao: `${alterados.length} rateio(s) tiveram obra ou apropriacao corrigida pela Gerencia de Processos.`,
+      metadata: JSON.stringify({
+        alteracoes: alterados.map((item) => {
+          return {
+            rateio_id: item.id,
+            obra_id_anterior: item.obra_id_anterior,
+            apropriacao_id_anterior: item.apropriacao_id_anterior,
+            obra_id_novo: item.obra_id,
+            apropriacao_id_novo: item.apropriacao_id
+          };
+        })
+      })
+    }, { transaction });
+
+    return carregarRecargaPorSolicitacao(solicitacaoId, transaction);
+  };
+
+  return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);
+}
+
 async function decidirPrestacao(solicitacaoId, payload, user, externalTransaction = null) {
   if (!isGerenciaProcessos(user)) throw erro(403, 'Somente a Gerencia de Processos pode validar a prestacao de contas.');
   const aprovar = payload.aprovar === true;
@@ -929,6 +1046,7 @@ module.exports = {
   calcularMedia,
   decidirPrestacao,
   editarRecargaPendente,
+  editarRateiosPrestacaoGeo,
   executarCriacaoRecargaComControle,
   isGerenciaProcessos,
   listarAdmin,
