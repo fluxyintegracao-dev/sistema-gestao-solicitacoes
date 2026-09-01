@@ -7,6 +7,7 @@ const {
   CartaoRecargaPrestacao,
   CartaoRecargaPrestacaoRateio,
   CartaoRecargaUsuario,
+  Historico,
   SolicitacaoRecargaCartao,
   TituloFinanceiro,
   TituloFinanceiroRateio,
@@ -18,9 +19,11 @@ const {
   executarCriacaoRecargaComControle,
   salvarCartao,
   salvarPrestacao,
-  sincronizarCicloAposBaixa,
   sincronizarTituloComStatusSolicitacao
 } = require('../src/services/recargaCartaoService');
+const {
+  sincronizarStatusSolicitacaoPorBaixaTitulos
+} = require('../src/services/solicitacaoFinanceiroStatusService');
 const {
   formaPagamentoEhBoleto,
   formaPagamentoEhPix
@@ -131,12 +134,50 @@ async function executar() {
     await criacao.titulo.reload({ transaction });
     assert.strictEqual(criacao.titulo.status, 'ABERTO');
 
+    await Historico.create({
+      solicitacao_id: ids.solicitacao,
+      usuario_responsavel_id: base.user_id,
+      setor: 'OBRA',
+      acao: 'SOLICITACAO_CRIADA',
+      status_novo: 'PENDENTE'
+    }, { transaction });
+    await criacao.resultado.update({ area_responsavel: 'FINANCEIRO' }, { transaction });
+
     await criacao.titulo.update({ status: 'PARCIAL', valor_baixado: 60, valor_saldo: 40 }, { transaction });
-    await sincronizarCicloAposBaixa({ solicitacaoId: ids.solicitacao, usuarioId: base.user_id, setor: 'FINANCEIRO', transaction });
+    await sincronizarStatusSolicitacaoPorBaixaTitulos({
+      solicitacaoId: ids.solicitacao,
+      usuarioId: base.user_id,
+      setor: 'FINANCEIRO',
+      transaction
+    });
     await criacao.titulo.reload({ transaction });
+    await criacao.resultado.reload({ transaction });
     assert.strictEqual(criacao.titulo.status, 'QUITADO');
     assert.strictEqual(Number(criacao.titulo.valor_original), 60);
     assert.strictEqual(Number(criacao.titulo.valor_saldo), 0);
+    assert.strictEqual(criacao.resultado.area_responsavel, 'OBRA');
+    assert.strictEqual(
+      await Historico.count({
+        where: { solicitacao_id: ids.solicitacao, acao: 'ENVIADA_SETOR' },
+        transaction
+      }),
+      1,
+      'A quitacao deve devolver a solicitacao uma unica vez ao setor criador.'
+    );
+    await sincronizarStatusSolicitacaoPorBaixaTitulos({
+      solicitacaoId: ids.solicitacao,
+      usuarioId: base.user_id,
+      setor: 'FINANCEIRO',
+      transaction
+    });
+    assert.strictEqual(
+      await Historico.count({
+        where: { solicitacao_id: ids.solicitacao, acao: 'ENVIADA_SETOR' },
+        transaction
+      }),
+      1,
+      'O retry da sincronizacao nao pode duplicar o retorno ao setor criador.'
+    );
 
     const prestacao = await CartaoRecargaPrestacao.findOne({ where: { solicitacao_recarga_id: ids.recarga }, transaction });
     assert(prestacao, 'A baixa parcial deve abrir a prestacao de contas.');

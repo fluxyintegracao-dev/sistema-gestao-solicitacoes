@@ -66,7 +66,7 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
   if (!ativo) return null;
 
   return (
-    <section className="md:col-span-2 space-y-3 border-y border-[var(--c-border)] py-3" aria-labelledby="recarga-cartao-heading">
+    <section className="min-w-0 space-y-3 border-y border-[var(--c-border)] py-3 lg:col-span-12" aria-labelledby="recarga-cartao-heading">
       <div className="grid gap-3 md:grid-cols-[minmax(260px,1fr)_minmax(320px,1.4fr)]">
         <label className="grid gap-1 text-sm">
           <span id="recarga-cartao-heading">Cartão para recarga *</span>

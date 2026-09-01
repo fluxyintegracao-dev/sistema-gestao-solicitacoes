@@ -113,7 +113,7 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
   if (!prestacao || valorBase <= 0) return null;
 
   return (
-    <section className="space-y-3" aria-labelledby={`prestacao-recarga-${solicitacaoId}`}>
+    <section className="min-w-0 space-y-3" aria-labelledby={`prestacao-recarga-${solicitacaoId}`}>
       <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--c-border)] pb-3">
         <div>
           <h3 id={`prestacao-recarga-${solicitacaoId}`} className="text-sm font-semibold text-[var(--c-text)]">
@@ -130,20 +130,22 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
         <div className="app-alert app-alert--warning">Correção solicitada: {prestacao.motivo_rejeicao}</div>
       ) : null}
 
-      <div className="overflow-x-auto rounded-lg border border-[var(--c-border)]">
-        <table className="w-full min-w-[760px] text-sm">
-          <thead className="bg-[var(--c-surface-alt)] text-left text-xs uppercase tracking-wide text-[var(--c-muted)]">
-            <tr>
-              <th className="px-3 py-2">Obra / Centro de custo</th>
-              <th className="px-3 py-2">Apropriação</th>
-              <th className="w-40 px-3 py-2">Valor</th>
-              <th className="w-24 px-3 py-2 text-right">Ação</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--c-border)]">
-            {linhas.map((linha, index) => (
-              <tr key={`prestacao-${index}`}>
-                <td className="p-2 align-top">
+      <div className="overflow-hidden rounded-lg border border-[var(--c-border)]">
+        <div className="hidden grid-cols-[minmax(190px,0.9fr)_minmax(240px,1.3fr)_minmax(130px,0.45fr)_auto] gap-3 bg-[var(--c-surface-alt)] px-3 py-2 text-xs uppercase tracking-wide text-[var(--c-muted)] lg:grid">
+          <span>Obra / Centro de custo</span>
+          <span>Apropriação</span>
+          <span>Valor</span>
+          <span className="text-right">Ação</span>
+        </div>
+
+        <div className="divide-y divide-[var(--c-border)]">
+          {linhas.map((linha, index) => (
+            <div
+              key={`prestacao-${index}`}
+              className="grid min-w-0 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(190px,0.9fr)_minmax(240px,1.3fr)_minmax(130px,0.45fr)_auto] lg:items-start"
+            >
+              <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--c-muted)] lg:block">
+                <span className="lg:hidden">Obra / Centro de custo</span>
                   <select
                     className="input input-sm w-full"
                     value={linha.obra_id}
@@ -154,8 +156,10 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     <option value="">Selecione</option>
                     {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.codigo} - {obra.nome}</option>)}
                   </select>
-                </td>
-                <td className="p-2 align-top">
+              </label>
+
+              <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--c-muted)] lg:block">
+                <span className="lg:hidden">Apropriação</span>
                   <ApropriacaoAutocomplete
                     value={linha.apropriacao_id}
                     options={apropriacoesPorObra[Number(linha.obra_id)] || []}
@@ -164,8 +168,10 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     placeholder={linha.obra_id ? 'Buscar apropriação' : 'Selecione a obra'}
                     inputClassName="input input-sm w-full"
                   />
-                </td>
-                <td className="p-2 align-top">
+              </label>
+
+              <label className="grid min-w-0 gap-1 text-xs font-semibold text-[var(--c-muted)] lg:block">
+                <span className="lg:hidden">Valor</span>
                   <input
                     className="input input-sm w-full font-[inherit] tabular-nums"
                     value={linha.valor_rateio}
@@ -175,21 +181,21 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
                     placeholder="R$ 0,00"
                     aria-label={`Valor do rateio ${index + 1}`}
                   />
-                </td>
-                <td className="p-2 text-right align-top">
+              </label>
+
+              <div className="flex items-end justify-end sm:col-span-2 lg:col-span-1">
                   <button
                     type="button"
-                    className="btn btn-outline btn-sm"
+                    className="btn btn-ghost btn-sm"
                     onClick={() => setLinhas((atuais) => atuais.filter((_, i) => i !== index))}
                     disabled={bloqueada || salvando || linhas.length === 1}
                   >
                     Remover
                   </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {!bloqueada ? (
@@ -203,14 +209,14 @@ export default function PrestacaoRecargaCartao({ solicitacaoId, contexto, podeIn
         </button>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-        <div className="flex flex-wrap gap-x-5 gap-y-1 tabular-nums">
+      <div className="grid gap-3 text-sm lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-1 tabular-nums sm:grid-cols-3 sm:gap-x-5">
           <span>Valor a prestar: <strong>{moeda(valorBase)}</strong></span>
           <span>Informado: <strong>{moeda(total)}</strong></span>
           <span className={saldo === 0 ? 'text-emerald-700' : 'text-amber-700'}>Diferença: <strong>{moeda(saldo)}</strong></span>
         </div>
         {!bloqueada ? (
-          <button type="button" className="btn btn-primary btn-sm" onClick={enviar} disabled={salvando || saldo !== 0}>
+          <button type="button" className="btn btn-primary btn-sm w-full sm:w-auto" onClick={enviar} disabled={salvando || saldo !== 0}>
             {salvando ? 'Enviando prestação...' : 'Enviar prestação'}
           </button>
         ) : null}
