@@ -305,8 +305,16 @@ assert(
 );
 
 assert.deepStrictEqual(
-  validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }),
-  { movimento_tarifa_id: 12, descricao: 'Devolucao bancaria' }
+  validateFinanceConciliacaoEstornoTarifaBody({ codigo: 'TAR_PIX', descricao: 'Devolucao bancaria' }),
+  { codigo: 'TAR_PIX', movimento_tarifa_id: undefined, descricao: 'Devolucao bancaria' }
+);
+assert.deepStrictEqual(
+  validateFinanceConciliacaoEstornoTarifaBody({ movimento_tarifa_id: 12, descricao: 'Cliente em cache' }),
+  { codigo: undefined, movimento_tarifa_id: 12, descricao: 'Cliente em cache' }
+);
+assert.throws(
+  () => validateFinanceConciliacaoEstornoTarifaBody({ descricao: 'Sem classificacao' }),
+  /Codigo da tarifa.*obrigatorio/i
 );
 assert.deepStrictEqual(
   validateFinanceConciliacaoEstornoBancarioBody({
@@ -338,9 +346,10 @@ assert(
   routesSource.includes("router.get('/financeiro/conciliacoes/:id/tarifas-estorno'")
     && routesSource.includes("router.post('/financeiro/conciliacoes/:id/confirmar-estorno-tarifa'")
     && serviceSource.includes("tipo_movimento: 'ESTORNO_TARIFA_BANCARIA'")
-    && serviceSource.includes('movimento_origem_id: tarifaOriginal.id')
-    && serviceSource.includes('A tarifa selecionada ja possui estorno bancario ativo.'),
-  'Estorno bancario de tarifa deve localizar a origem, vincular o movimento e impedir duplicidade.'
+    && serviceSource.includes('movimento_origem_id: null')
+    && serviceSource.includes('lancamento_independente: true')
+    && serviceSource.includes("statusConciliacao === 'CONCILIADO'"),
+  'Estorno bancario de tarifa deve criar movimento independente e usar a conciliacao como protecao de idempotencia.'
 );
 
 const financialReportServiceSource = fs.readFileSync(
@@ -361,7 +370,11 @@ assert(
 assert(
   reconciliationPageSource.includes('Registrar liberacao')
     && reconciliationPageSource.includes('Registrar amortizacao')
-    && reconciliationPageSource.includes('Estorno de tarifa bancaria'),
+    && reconciliationPageSource.includes('Lancar estorno de tarifa')
+    && reconciliationPageSource.includes('codigo: tarifa.codigo')
+    && reconciliationPageSource.includes('handleConfirmarEstornoTarifa')
+    && !reconciliationPageSource.includes('getTarifasEstornoConciliacao')
+    && !reconciliationPageSource.includes('EstornoTarifaModal'),
   'A conferencia OFX deve expor a acao conforme o sinal do lancamento.'
 );
 

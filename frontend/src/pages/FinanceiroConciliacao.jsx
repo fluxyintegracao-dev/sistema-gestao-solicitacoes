@@ -18,7 +18,6 @@ import {
   getFaturasAssociacaoConciliacao,
   getImportacoesConciliacao,
   getMovimentosAssociacaoConciliacao,
-  getTarifasEstornoConciliacao,
   getTarifasBancariasAtalhos,
   getTitulosFinanceiros,
   ignorarConciliacaoBancaria,
@@ -236,7 +235,7 @@ function ValorBanco({ value, size = 'lg' }) {
 
 // ─── NovoTituloRapidoModal ────────────────────────────────────────────────────
 
-function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onClose, onNovoTitulo, onConfirmarCreditoRotativo, onConfirmarTarifa, onAbrirEstornoTarifa }) {
+function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onClose, onNovoTitulo, onConfirmarCreditoRotativo, onConfirmarTarifa, onConfirmarEstornoTarifa }) {
   const tarifasAtivas = Array.isArray(tarifas) ? tarifas.filter((tarifa) => tarifa.ativo !== false) : [];
   const isSaida = Number(item?.valor || 0) < 0;
   const creditoRotativoNatureza = isSaida ? 'amortizacao' : 'liberacao';
@@ -328,92 +327,34 @@ function AcoesRapidasConciliacaoModal({ item, tarifas, processingId, error, onCl
           </div>
 
           <div className="rounded-xl border border-[var(--c-border)] px-4 py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-[var(--c-text)]">Estorno de tarifa bancaria</p>
-                <p className="text-xs text-[var(--c-muted)]">
-                  Vincula este credito a uma tarifa anterior e neutraliza o efeito no caixa e na DRE.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm shrink-0"
-                disabled={isSaida || processingId === `buscar-estorno-tarifa-${item?.id}`}
-                onClick={() => onAbrirEstornoTarifa(item)}
-                title={isSaida ? 'Estornos de tarifa devem ser lancamentos de entrada.' : 'Localizar tarifa original'}
-              >
-                {processingId === `buscar-estorno-tarifa-${item?.id}` ? 'Localizando...' : 'Localizar tarifa original'}
-              </button>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[var(--c-text)]">Lancar estorno de tarifa</p>
+              <p className="text-xs text-[var(--c-muted)]">
+                Registra este credito como um lancamento independente, sem exigir uma tarifa anterior.
+              </p>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function EstornoTarifaModal({ modal, onClose, onSelect, onConfirm }) {
-  const itens = Array.isArray(modal.itens) ? modal.itens : [];
-  return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/45 px-4 py-6">
-      <div className="flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[var(--c-surface)]">
-        <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-5">
-          <div>
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Conciliar estorno de tarifa</h2>
-            <p className="mt-0.5 text-sm text-[var(--c-muted)]">Selecione a tarifa original que este credito bancario devolveu.</p>
-            {modal.item && (
-              <div className="mt-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm">
-                <span className="font-medium">{modal.item.descricao_banco || 'Credito bancario'}</span>
-                {' - '}{formatDate(modal.item.data_movimento)}{' - '}<ValorBanco value={modal.item.valor} size="sm" />
-              </div>
-            )}
-          </div>
-          <button type="button" className="btn btn-outline btn-sm shrink-0" disabled={modal.processing} onClick={onClose}>Fechar</button>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-5">
-          {modal.loading ? (
-            <p className="py-8 text-center text-sm text-[var(--c-muted)]">Localizando tarifas compativeis...</p>
-          ) : itens.length === 0 ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
-              Nenhuma tarifa ativa da mesma conta e do mesmo valor foi encontrada em data igual ou anterior. Revise o extrato e a tarifa original.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {itens.map((tarifa) => {
-                const selected = Number(modal.selectedId) === Number(tarifa.id);
-                const categoria = tarifa.categoria
-                  ? [tarifa.categoria.codigo, tarifa.categoria.nome].filter(Boolean).join(' - ')
-                  : 'Categoria nao informada';
+            <div className="mt-3 flex flex-wrap gap-2">
+              {tarifasAtivas.length === 0 ? (
+                <span className="text-xs text-[var(--c-muted)]">Nenhuma tarifa ativa configurada.</span>
+              ) : tarifasAtivas.map((tarifa) => {
+                const key = `estorno-tarifa-${item?.id}-${tarifa.codigo}`;
+                const itemEmProcessamento = String(processingId || '').startsWith(`estorno-tarifa-${item?.id}-`);
+                const elegibilidade = tarifaAtalhoAptaParaConciliacao(tarifa);
                 return (
-                  <label key={tarifa.id} className={`block cursor-pointer rounded-xl border p-3 transition ${selected ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/20' : 'border-[var(--c-border)] hover:border-blue-300'}`}>
-                    <div className="flex items-start gap-3">
-                      <input type="radio" className="mt-1 h-4 w-4" name="tarifa-estorno" checked={selected} onChange={() => onSelect(tarifa.id)} />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-[var(--c-text)]">Tarifa de {formatDate(tarifa.data_movimento)}</span>
-                          <span className="text-sm font-semibold text-rose-700 dark:text-rose-300">-{formatCurrency(tarifa.valor)}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-[var(--c-muted)]">{categoria}</p>
-                        <p className="mt-1 text-xs text-[var(--c-muted)]">{tarifa.observacoes || tarifa.conciliacao_origem?.descricao_banco || 'Sem descricao adicional'}</p>
-                        <p className="mt-1 text-[11px] text-[var(--c-muted)]">Movimento #{tarifa.id}{tarifa.documento ? ` - Documento ${tarifa.documento}` : ''}</p>
-                      </div>
-                    </div>
-                  </label>
+                  <button
+                    key={`estorno-${tarifa.codigo}`}
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={isSaida || !elegibilidade.ok || itemEmProcessamento}
+                    onClick={() => onConfirmarEstornoTarifa(item, tarifa)}
+                    title={isSaida ? 'Estornos de tarifa devem ser lancamentos de entrada.' : elegibilidade.motivo}
+                  >
+                    {processingId === key ? 'Lancando...' : `Estorno - ${tarifa.nome}`}
+                  </button>
                 );
               })}
             </div>
-          )}
-          {modal.error && (
-            <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-200">{modal.error}</div>
-          )}
-        </div>
-
-        <div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4">
-          <button type="button" className="btn btn-outline" disabled={modal.processing} onClick={onClose}>Cancelar</button>
-          <button type="button" className="btn btn-primary" disabled={modal.processing || modal.loading || !modal.selectedId} onClick={onConfirm}>
-            {modal.processing ? 'Conciliando...' : 'Confirmar estorno de tarifa'}
-          </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1666,15 +1607,6 @@ export default function FinanceiroConciliacao() {
   const tarifaRequestsEmAndamentoRef = useRef(new Set());
   const [acoesRapidasItem, setAcoesRapidasItem] = useState(null);
   const [acoesRapidasError, setAcoesRapidasError] = useState('');
-  const [estornoTarifaModal, setEstornoTarifaModal] = useState({
-    open: false,
-    item: null,
-    loading: false,
-    processing: false,
-    error: '',
-    selectedId: '',
-    itens: []
-  });
   const [novoTituloItem, setNovoTituloItem] = useState(null); // item OFX para o modal de novo título
   const [associacaoModal, setAssociacaoModal] = useState({
     open: false, item: null, filters: buildAssociacaoDefaults(null),
@@ -2380,68 +2312,32 @@ export default function FinanceiroConciliacao() {
     }
   }
 
-  async function abrirEstornoTarifa(item) {
-    if (!item?.id) return;
-    const processingKey = `buscar-estorno-tarifa-${item.id}`;
+  async function handleConfirmarEstornoTarifa(item, tarifa) {
+    if (!item?.id || !tarifa?.codigo) return;
+    const lockKey = `estorno-tarifa-${item.id}`;
+    const processingKey = `${lockKey}-${tarifa.codigo}`;
+    if (tarifaRequestsEmAndamentoRef.current.has(lockKey)) return;
+    tarifaRequestsEmAndamentoRef.current.add(lockKey);
+
     try {
       setProcessingId(processingKey);
       setAcoesRapidasError('');
-      const response = await getTarifasEstornoConciliacao(item.id);
-      const itens = Array.isArray(response?.itens) ? response.itens : [];
-      setAcoesRapidasItem(null);
-      setEstornoTarifaModal({
-        open: true,
-        item,
-        loading: false,
-        processing: false,
-        error: '',
-        selectedId: itens.length === 1 ? String(itens[0].id) : '',
-        itens
-      });
-    } catch (err) {
-      const message = err?.message || 'Erro ao localizar tarifas para estorno';
-      setAcoesRapidasError(message);
-      setError(message);
-    } finally {
-      setProcessingId(null);
-    }
-  }
-
-  function fecharEstornoTarifa() {
-    if (estornoTarifaModal.processing) return;
-    setEstornoTarifaModal({
-      open: false,
-      item: null,
-      loading: false,
-      processing: false,
-      error: '',
-      selectedId: '',
-      itens: []
-    });
-  }
-
-  async function handleConfirmarEstornoTarifa() {
-    const item = estornoTarifaModal.item;
-    const movimentoTarifaId = Number(estornoTarifaModal.selectedId || 0);
-    if (!item?.id || !movimentoTarifaId || estornoTarifaModal.processing) return;
-
-    try {
-      setEstornoTarifaModal((current) => ({ ...current, processing: true, error: '' }));
       setError('');
       setFeedback('');
       await confirmarConciliacaoEstornoTarifa(item.id, {
-        movimento_tarifa_id: movimentoTarifaId,
-        descricao: item.descricao_banco || 'Estorno de tarifa bancaria'
+        codigo: tarifa.codigo,
+        descricao: item.descricao_banco || `Estorno de ${tarifa.nome}`
       });
-      setEstornoTarifaModal({ open: false, item: null, loading: false, processing: false, error: '', selectedId: '', itens: [] });
-      setFeedback('Estorno de tarifa conciliado. A tarifa original foi neutralizada no caixa e na DRE.');
+      setAcoesRapidasItem(null);
+      setFeedback(`Estorno de tarifa lancado como movimento independente (${tarifa.nome}).`);
       await carregarConciliacoes();
     } catch (err) {
-      setEstornoTarifaModal((current) => ({
-        ...current,
-        processing: false,
-        error: err?.message || 'Erro ao conciliar estorno de tarifa bancaria'
-      }));
+      const message = err?.message || 'Erro ao conciliar estorno de tarifa bancaria';
+      setAcoesRapidasError(message);
+      setError(message);
+    } finally {
+      tarifaRequestsEmAndamentoRef.current.delete(lockKey);
+      setProcessingId(null);
     }
   }
 
@@ -2955,20 +2851,11 @@ export default function FinanceiroConciliacao() {
           }}
           onConfirmarCreditoRotativo={handleConfirmarCreditoRotativo}
           onConfirmarTarifa={handleConfirmarTarifa}
-          onAbrirEstornoTarifa={abrirEstornoTarifa}
+          onConfirmarEstornoTarifa={handleConfirmarEstornoTarifa}
         />
       )}
 
       {/* Modal: Novo título + baixa */}
-      {estornoTarifaModal.open && (
-        <EstornoTarifaModal
-          modal={estornoTarifaModal}
-          onClose={fecharEstornoTarifa}
-          onSelect={(id) => setEstornoTarifaModal((current) => ({ ...current, selectedId: String(id), error: '' }))}
-          onConfirm={handleConfirmarEstornoTarifa}
-        />
-      )}
-
       {novoTituloItem && (
         <NovoTituloRapidoModal
           item={novoTituloItem}
