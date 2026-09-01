@@ -8,6 +8,7 @@ const {
   CartaoRecargaPrestacaoRateio,
   CartaoRecargaUsuario,
   Historico,
+  Solicitacao,
   SolicitacaoRecargaCartao,
   TituloFinanceiro,
   TituloFinanceiroRateio,
@@ -28,6 +29,7 @@ const {
   formaPagamentoEhBoleto,
   formaPagamentoEhPix
 } = require('../src/services/formasPagamentoMedicaoService');
+const { isGeoToken } = require('../src/services/setorCapabilityService');
 
 async function obterBase(transaction) {
   const [base] = await sequelize.query(
@@ -246,6 +248,30 @@ async function executar() {
       1,
       'Duplo envio deve manter um unico rateio da prestacao.'
     );
+    const [recargaEnviada, solicitacaoEmConferencia] = await Promise.all([
+      SolicitacaoRecargaCartao.findByPk(ids.recarga, { transaction }),
+      Solicitacao.findByPk(ids.solicitacao, { transaction })
+    ]);
+    assert.strictEqual(recargaEnviada.status_ciclo, 'PRESTACAO_ENVIADA');
+    assert(isGeoToken(solicitacaoEmConferencia.area_responsavel), 'Prestacao enviada deve mover a solicitacao para a Gerencia de Processos.');
+    assert.strictEqual(solicitacaoEmConferencia.status_global, 'PENDENTE');
+
+    const proximaCriacao = await executarCriacaoRecargaComControle({
+      cartaoId: cartao.id,
+      user: usuario,
+      transaction,
+      dadosSolicitacao: {
+        obra_id: base.obra_id,
+        tipo_solicitacao_id: base.tipo_id,
+        tipo_macro_id: base.tipo_id,
+        valor: 120,
+        area_responsavel: 'GEO',
+        data_vencimento: new Date().toISOString().slice(0, 10),
+        criado_por: base.user_id,
+        status_global: 'PENDENTE'
+      }
+    });
+    assert(proximaCriacao?.resultado?.id, 'Prestacao enviada deve liberar a criacao da proxima recarga antes da validacao do GEO.');
 
     const validacoesDuplicadas = await Promise.allSettled([
       decidirPrestacao(ids.solicitacao, { aprovar: true }, usuario, transaction),

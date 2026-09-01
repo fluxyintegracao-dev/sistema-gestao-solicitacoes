@@ -34,6 +34,7 @@
     "test:solicitacao-vencimento": "node scripts/validarSolicitacaoDataVencimento.js",
     "test:despesa-eventual": "node scripts/validarDespesaEventual.js",
     "test:recarga-cartao": "node scripts/validarRecargaCartao.js",
+    "reconcile:recarga-prestacoes": "node scripts/reconciliarPrestacoesRecargaEnviadas.js",
     "test:importacao-apropriacoes": "node scripts/validarImportacaoApropriacoes.js",
     "test:obra-gestao-apropriacoes": "node scripts/validarObraGestaoApropriacoes.js",
     "auditoria-operacional:retencao:simular": "node scripts/limparAuditoriaOperacional.js",

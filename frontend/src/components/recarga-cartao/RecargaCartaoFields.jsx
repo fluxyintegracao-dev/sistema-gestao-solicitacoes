@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { HiOutlineArrowTopRightOnSquare, HiOutlineArrowUturnLeft, HiOutlineClock } from 'react-icons/hi2';
+import PrestacaoRecargaCartao from './PrestacaoRecargaCartao';
 import { listarMeusCartoesRecarga, obterContextoCartaoRecarga } from '../../services/recargasCartao';
 import { solicitarRetornoSolicitacao } from '../../services/solicitacoes';
 
@@ -66,6 +67,10 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
   const ultima = contexto?.ultima_recarga || null;
   const solicitacaoAnterior = ultima?.solicitacao || null;
   const contextoInteracao = contexto?.contexto_interacao || null;
+  const statusPrestacao = String(ultima?.prestacao?.status || '').trim().toUpperCase();
+  const podePrestarNestaTela = contexto?.bloqueado
+    && contextoInteracao?.pode_interagir === true
+    && ['PENDENTE', 'REJEITADA'].includes(statusPrestacao);
   const rotuloSituacao = useMemo(() => {
     if (!ultima) return 'Sem recarga anterior';
     return ultima.prestacao?.status || ultima.status_ciclo || ultima.titulo?.status || '-';
@@ -130,8 +135,10 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
                 Continue pela solicitação anterior {solicitacaoAnterior?.codigo ? `(${solicitacaoAnterior.codigo})` : ''}
               </p>
               <p className="max-w-3xl text-xs leading-5">
-                {contextoInteracao?.pode_interagir
-                  ? 'A solicitação já está no seu setor. Abra o registro anterior para concluir a prestação de contas ou corrigir o ciclo antes de pedir uma nova recarga.'
+                {podePrestarNestaTela
+                  ? 'A solicitação já está no seu setor. Preencha a prestação abaixo; quando os rateios fecharem o valor efetivamente recarregado, o próximo pedido será liberado e esta solicitação seguirá para conferência da Gerência de Processos.'
+                  : contextoInteracao?.pode_interagir
+                  ? 'A solicitação já está no seu setor. Abra o registro anterior para corrigir o ciclo antes de pedir uma nova recarga.'
                   : `A solicitação está no setor ${contextoInteracao?.setor_atual || solicitacaoAnterior?.area_responsavel || 'responsável atual'}. Solicite o retorno ao seu setor antes de continuar. Quando ela retornar, edite a solicitação anterior em vez de criar uma nova.`}
               </p>
               <p className="text-xs font-medium">{contexto.motivo_bloqueio}</p>
@@ -140,7 +147,7 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
               </p>
             </div>
 
-            {contextoInteracao?.pode_interagir && solicitacaoAnterior?.id ? (
+            {contextoInteracao?.pode_interagir && !podePrestarNestaTela && solicitacaoAnterior?.id ? (
               <button
                 type="button"
                 className="btn btn-outline btn-sm shrink-0"
@@ -209,6 +216,20 @@ export default function RecargaCartaoFields({ ativo, value, onChange, onContextC
         </div>
       ) : null}
       {erro ? <div className="app-alert app-alert--error" role="alert">{erro}</div> : null}
+
+      {podePrestarNestaTela && solicitacaoAnterior?.id ? (
+        <PrestacaoRecargaCartao
+          solicitacaoId={solicitacaoAnterior.id}
+          contexto={contexto}
+          onAtualizado={() => carregarContexto(value)}
+        />
+      ) : null}
+
+      {!contexto?.bloqueado && statusPrestacao === 'ENVIADA' ? (
+        <div className="app-alert app-alert--success" role="status">
+          Prestação enviada para conferência da Gerência de Processos. Você já pode criar a próxima solicitação de recarga.
+        </div>
+      ) : null}
     </section>
   );
 }

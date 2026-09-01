@@ -16,6 +16,9 @@ const {
   UsuarioObra,
   sequelize
 } = require('../models');
+const { criarNotificacao } = require('./notificacoes');
+const { publishSolicitacaoRealtimeEvent } = require('./solicitacaoRealtimeService');
+const { findSetorByCapability, resolveSetorPersistenciaValue } = require('./setorCapabilityService');
 
 const STATUS_CICLO = {
   PENDENTE: 'PENDENTE',
@@ -130,11 +133,79 @@ function motivoBloqueio(recarga) {
   if (tituloStatus === 'ABERTO' || tituloStatus === 'PARCIAL') return 'A recarga anterior ainda possui pagamento pendente.';
   if (Number(recarga.valor_efetivo || recarga.titulo?.valor_baixado || 0) > 0) {
     const statusPrestacao = normalizarToken(recarga.prestacao?.status || 'PENDENTE');
-    if (statusPrestacao === 'ENVIADA') return 'A prestacao de contas anterior aguarda validacao da Gerencia de Processos.';
+    // O envio com rateio fechado encerra a trava operacional do cartao. A validacao do GEO
+    // continua necessaria para liberar o custo nos relatorios, mas pode ocorrer em paralelo com
+    // a analise da proxima solicitacao de recarga.
+    if (statusPrestacao === 'ENVIADA') return null;
     if (statusPrestacao === 'REJEITADA') return 'A prestacao de contas anterior foi rejeitada e precisa ser corrigida.';
     return 'Preste contas da recarga anterior antes de solicitar uma nova.';
   }
   return 'Ja existe uma solicitacao ativa para este cartao.';
+}
+
+async function resolverDestinoGeo(transaction) {
+  const setor = await findSetorByCapability('eh_setor_geo', {
+    transaction,
+    attributes: ['id', 'codigo', 'nome']
+  });
+  return resolveSetorPersistenciaValue(setor, 'GEO');
+}
+
+async function resolverSetorCriador(solicitacao, transaction) {
+  const historicoCriacao = await Historico.findOne({
+    where: {
+      solicitacao_id: solicitacao.id,
+      acao: 'SOLICITACAO_CRIADA',
+      setor: { [Op.ne]: null }
+    },
+    attributes: ['setor'],
+    order: [['createdAt', 'ASC'], ['id', 'ASC']],
+    transaction
+  });
+  return String(historicoCriacao?.setor || 'OBRA').trim().toUpperCase();
+}
+
+function agendarAtualizacaoFila({
+  transaction,
+  solicitacaoId,
+  codigo,
+  usuario,
+  tipo,
+  mensagem,
+  setorOrigem,
+  setorDestino,
+  status
+}) {
+  const publicar = async () => {
+    const resultados = await Promise.allSettled([
+      criarNotificacao({
+        solicitacao_id: solicitacaoId,
+        tipo,
+        mensagem,
+        created_by: usuario.id,
+        metadata: {
+          setor_origem: setorOrigem,
+          setor_destino: setorDestino,
+          status
+        }
+      }),
+      publishSolicitacaoRealtimeEvent({
+        action: tipo,
+        solicitacaoId,
+        actor: { id: usuario.id, nome: usuario.nome || null },
+        metadata: { setor_origem: setorOrigem, setor_destino: setorDestino, status }
+      })
+    ]);
+    resultados
+      .filter((item) => item.status === 'rejected')
+      .forEach((item) => console.error(`Falha ao publicar atualizacao da recarga ${codigo || solicitacaoId}:`, item.reason));
+  };
+
+  if (transaction && typeof transaction.afterCommit === 'function') {
+    transaction.afterCommit(publicar);
+  } else {
+    void publicar();
+  }
 }
 
 async function listarObrasDoUsuario(userId, transaction = null) {
@@ -420,7 +491,7 @@ async function salvarPrestacao(solicitacaoId, payload, user, externalTransaction
     const recarga = await SolicitacaoRecargaCartao.findOne({
       where: { solicitacao_id: Number(solicitacaoId) },
       include: [
-        { model: Solicitacao, as: 'solicitacao', attributes: ['id', 'criado_por', 'area_responsavel'] },
+        { model: Solicitacao, as: 'solicitacao', attributes: ['id', 'codigo', 'criado_por', 'area_responsavel', 'status_global'] },
         { model: CartaoRecargaPrestacao, as: 'prestacao', required: false }
       ],
       transaction,
@@ -489,13 +560,43 @@ async function salvarPrestacao(solicitacaoId, payload, user, externalTransaction
       validado_em: null
     }, { transaction });
     await recarga.update({ status_ciclo: STATUS_CICLO.PRESTACAO_ENVIADA, atualizado_por: user.id }, { transaction });
+    const setorAnterior = recarga.solicitacao.area_responsavel || null;
+    const statusAnterior = recarga.solicitacao.status_global || null;
+    const setorGeo = await resolverDestinoGeo(transaction);
+    await recarga.solicitacao.update({
+      area_responsavel: setorGeo,
+      status_global: 'PENDENTE'
+    }, { transaction });
     await Historico.create({
       solicitacao_id: recarga.solicitacao_id,
       usuario_responsavel_id: user.id,
       setor: user.area || recarga.solicitacao.area_responsavel,
       acao: 'PRESTACAO_RECARGA_ENVIADA',
+      status_anterior: statusAnterior,
+      status_novo: 'PENDENTE',
       observacao: `Prestacao de contas enviada com ${rateios.length} rateio(s), total R$ ${base.toFixed(2)}.`
     }, { transaction });
+    if (normalizarToken(setorAnterior) !== normalizarToken(setorGeo)) {
+      await Historico.create({
+        solicitacao_id: recarga.solicitacao_id,
+        usuario_responsavel_id: user.id,
+        setor: setorGeo,
+        acao: 'ENVIADA_SETOR',
+        observacao: `De ${setorAnterior || '-'} para ${setorGeo}`,
+        descricao: 'Prestacao de contas enviada para conferencia da Gerencia de Processos.'
+      }, { transaction });
+    }
+    agendarAtualizacaoFila({
+      transaction,
+      solicitacaoId: recarga.solicitacao_id,
+      codigo: recarga.solicitacao.codigo,
+      usuario: user,
+      tipo: normalizarToken(setorAnterior) === normalizarToken(setorGeo) ? 'STATUS_ALTERADO' : 'ENVIADA_SETOR',
+      mensagem: `A prestacao de contas da solicitacao ${recarga.solicitacao.codigo || recarga.solicitacao_id} foi enviada para conferencia.`,
+      setorOrigem: setorAnterior,
+      setorDestino: setorGeo,
+      status: 'PENDENTE'
+    });
     return carregarRecargaPorSolicitacao(solicitacaoId, transaction);
   };
   return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);
@@ -512,6 +613,7 @@ async function decidirPrestacao(solicitacaoId, payload, user, externalTransactio
       where: { solicitacao_id: Number(solicitacaoId) },
       include: [
         { model: TituloFinanceiro, as: 'titulo' },
+        { model: Solicitacao, as: 'solicitacao', attributes: ['id', 'codigo', 'area_responsavel', 'status_global'] },
         {
           model: CartaoRecargaPrestacao,
           as: 'prestacao',
@@ -533,9 +635,15 @@ async function decidirPrestacao(solicitacaoId, payload, user, externalTransactio
       throw erro(409, 'A prestacao ja foi validada ou esta sendo processada.');
     }
 
+    const setorAnterior = recarga.solicitacao?.area_responsavel || 'GEO';
+    const statusAnterior = recarga.solicitacao?.status_global || null;
+    let setorDestino = setorAnterior;
+    const statusDestino = aprovar ? 'APROVADA' : 'PENDENTE';
+
     if (!aprovar) {
       await recarga.prestacao.update({ status: 'REJEITADA', motivo_rejeicao: motivo, validado_por: user.id, validado_em: new Date() }, { transaction });
       await recarga.update({ status_ciclo: STATUS_CICLO.PRESTACAO_PENDENTE, atualizado_por: user.id }, { transaction });
+      setorDestino = await resolverSetorCriador(recarga.solicitacao, transaction);
     } else {
       const rateios = recarga.prestacao.rateios || [];
       if (rateios.length === 0) throw erro(409, 'A prestacao nao possui rateios para validar.');
@@ -562,13 +670,43 @@ async function decidirPrestacao(solicitacaoId, payload, user, externalTransactio
       await recarga.update({ status_ciclo: STATUS_CICLO.VALIDADA, atualizado_por: user.id }, { transaction });
     }
 
+    await recarga.solicitacao.update({
+      area_responsavel: setorDestino,
+      status_global: statusDestino
+    }, { transaction });
+
     await Historico.create({
       solicitacao_id: recarga.solicitacao_id,
       usuario_responsavel_id: user.id,
       setor: user.area || 'GEO',
       acao: aprovar ? 'PRESTACAO_RECARGA_VALIDADA' : 'PRESTACAO_RECARGA_REJEITADA',
+      status_anterior: statusAnterior,
+      status_novo: statusDestino,
       observacao: aprovar ? 'Prestacao validada e custo liberado para os relatorios das obras.' : motivo
     }, { transaction });
+    if (normalizarToken(setorAnterior) !== normalizarToken(setorDestino)) {
+      await Historico.create({
+        solicitacao_id: recarga.solicitacao_id,
+        usuario_responsavel_id: user.id,
+        setor: setorDestino,
+        acao: 'ENVIADA_SETOR',
+        observacao: `De ${setorAnterior || '-'} para ${setorDestino}`,
+        descricao: 'Prestacao rejeitada e devolvida ao setor criador para correcao.'
+      }, { transaction });
+    }
+    agendarAtualizacaoFila({
+      transaction,
+      solicitacaoId: recarga.solicitacao_id,
+      codigo: recarga.solicitacao?.codigo,
+      usuario: user,
+      tipo: normalizarToken(setorAnterior) === normalizarToken(setorDestino) ? 'STATUS_ALTERADO' : 'ENVIADA_SETOR',
+      mensagem: aprovar
+        ? `A prestacao de contas da solicitacao ${recarga.solicitacao?.codigo || recarga.solicitacao_id} foi validada.`
+        : `A prestacao de contas da solicitacao ${recarga.solicitacao?.codigo || recarga.solicitacao_id} foi devolvida para correcao.`,
+      setorOrigem: setorAnterior,
+      setorDestino,
+      status: statusDestino
+    });
     return carregarRecargaPorSolicitacao(solicitacaoId, transaction);
   };
   return externalTransaction ? executar(externalTransaction) : sequelize.transaction(executar);

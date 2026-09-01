@@ -2254,12 +2254,17 @@ module.exports = {
         perfil === 'USUARIO' &&
         !adminGEO &&
         !isSetorObra;
+      // A fila do GEO e operacional: uma prestacao, retorno ou nova movimentacao precisa voltar
+      // ao topo para conferencia. Os demais setores preservam a ordenacao historica por criacao.
+      const ordenacaoLista = isUsuarioGeo
+        ? [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
+        : [['createdAt', 'DESC']];
 
       if (usuarioComRegraMistaPorTipo) {
         const solicitacoesFiltro = await Solicitacao.findAll({
           where,
           attributes: ['id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id', 'criado_por', 'status_global', 'createdAt'],
-          order: [['createdAt', 'DESC']]
+          order: ordenacaoLista
         });
         let resultadoFiltro = solicitacoesFiltro.map(item => item.toJSON());
 
@@ -2370,7 +2375,7 @@ module.exports = {
         const solicitacoes = await Solicitacao.findAll({
           where,
           include: includeBase,
-          order: [['createdAt', 'DESC']],
+          order: ordenacaoLista,
           ...(paginacaoSolicitada
             ? { limit: limitePorPagina, offset }
             : {})

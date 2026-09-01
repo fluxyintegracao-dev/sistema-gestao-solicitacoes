@@ -15,9 +15,9 @@ O bloco agora ocupa a largura integral do formulario e usa linhas responsivas:
 - valores de rateio aparecem em moeda brasileira (`R$ 3.000,00`) e alternam para o numero
   editavel somente enquanto o campo esta em foco.
 
-O formulario de prestacao permanece no detalhe da solicitacao anterior. A Nova Solicitacao nao
-duplica mais esse formulario: quando o cartao esta bloqueado por um ciclo anterior, orienta o
-usuario a continuar no registro existente.
+O formulario de prestacao permanece no detalhe e tambem aparece na Nova Solicitacao quando a
+recarga anterior esta `PENDENTE` ou `REJEITADA` e ja voltou ao setor do usuario. Assim, a
+prestacao pode ser concluida sem abandonar o fluxo de abertura da proxima recarga.
 
 ## Nova recarga bloqueada por ciclo anterior
 
@@ -29,10 +29,25 @@ Na Nova Solicitacao:
 - se a solicitacao anterior estiver fora do setor, explica que ela precisa retornar e permite
   solicitar o retorno com motivo, quando o usuario possui a permissao granular;
 - se ja existir pedido, mostra `Retorno solicitado` e o motivo enviado;
-- quando a solicitacao voltar ao setor do usuario, oferece `Abrir solicitacao anterior`;
+- quando a solicitacao voltar ao setor do usuario e houver prestacao disponivel, exibe os rateios
+  na propria tela; para outros bloqueios, oferece `Abrir e editar solicitacao`;
 - orienta que quitacao integral, parcial ou valor efetivo diferente do solicitado exige concluir
   a prestacao no registro anterior antes de uma nova recarga;
-- o botao de criar permanece bloqueado enquanto o ciclo anterior nao for validado.
+- o botao de criar permanece bloqueado somente ate a prestacao fechar exatamente o valor
+  efetivamente recarregado e ser enviada;
+- `ENVIADA` libera imediatamente a proxima recarga; a validacao do GEO continua ocorrendo em
+  paralelo e e responsavel por liberar os rateios para os relatorios das obras.
+
+Ao enviar a prestacao, a solicitacao anterior muda para o setor GEO com status `PENDENTE`, gera
+historico, notificacao e evento em tempo real. A fila do GEO passou a ordenar por `updatedAt`,
+garantindo que a demanda movimentada volte ao topo sem alterar artificialmente sua data de criacao.
+Se o GEO rejeitar, a solicitacao retorna automaticamente ao setor criador para correcao. Se
+validar, o ciclo da recarga fica `VALIDADA`, o titulo recebe os rateios e a solicitacao fica
+`APROVADA`.
+
+Prestacoes que ja estavam `ENVIADA` antes desta regra podem ser auditadas e corrigidas pelo script
+`reconcile:recarga-prestacoes`. Ele roda em simulacao por padrao, aceita `--solicitacao=<id>` para
+limitar o alvo e somente grava com `--confirm`.
 
 ## Retorno ao setor criador
 
@@ -55,16 +70,21 @@ Cartao e contratos do fluxo novo.
 - `frontend/src/components/recarga-cartao/RecargaCartaoFields.jsx`
 - `frontend/src/components/recarga-cartao/PrestacaoRecargaCartao.jsx`
 - `backend/src/controllers/RecargaCartaoController.js`
+- `backend/src/controllers/SolicitacaoController.js`
 - `backend/src/services/recargaCartaoService.js`
 - `backend/src/services/solicitacaoFinanceiroStatusService.js`
 - `backend/scripts/validarRecargaCartao.js`
+- `backend/scripts/reconciliarPrestacoesRecargaEnviadas.js`
+- `backend/package.json`
 
 ## Validacoes
 
 - build do frontend aprovado: 373 modulos;
-- `node --check` aprovado no servico financeiro e no QA de recarga;
+- teste responsivo aprovado: 204 rotas;
+- `node --check` aprovado nos servicos, controllers, QA e reconciliacao de recarga;
 - `git diff --check` aprovado;
-- QA transacional ampliado para conferir retorno `FINANCEIRO -> OBRA` e idempotencia do retry;
+- QA transacional ampliado para conferir retorno `FINANCEIRO -> OBRA`, idempotencia do retry,
+  envio para `GEO/PENDENTE` e liberacao da proxima recarga antes da validacao;
 - execucao local do QA depende de credenciais MySQL, ausentes neste workspace.
 
 Nao houve migration.
