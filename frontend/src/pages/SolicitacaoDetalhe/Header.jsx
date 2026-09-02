@@ -100,6 +100,11 @@ export default function Header({
   // Com ação principal mapeada, as ações secundárias moram no menu "⋯".
   const [menuAcoesAberto, setMenuAcoesAberto] = useState(false);
   const menuAcoesRef = useRef(null);
+  // Campos VAZIOS ficam ocultos por padrão; o alternador revela todos.
+  // Só apresentação: quais campos existem (e de onde vêm) é a regra do
+  // grid abaixo — campos que não se aplicam ao contexto (ex.: campo de
+  // contrato numa compra) continuam fora mesmo com o alternador ligado.
+  const [mostrarTodosCampos, setMostrarTodosCampos] = useState(false);
 
   useEffect(() => {
     if (!menuAcoesAberto) return undefined;
@@ -199,6 +204,27 @@ export default function Header({
       return c.cpf_cnpj ? `${identificacao} — ${c.cpf_cnpj}` : identificacao;
     })
     .join(' · ');
+
+  // Conta os campos que o alternador pode revelar: o CONTEXTO do campo se
+  // aplica (mesma condição de negócio do grid) mas o valor está vazio.
+  // Espelha, ladrilho a ladrilho, as condições de ocultação por vazio do
+  // grid abaixo — campos de contexto que não se aplica não entram na conta.
+  const camposVaziosOcultos = [
+    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.objeto)],
+    [Boolean(contratoDoFluxo), contratados.length > 0],
+    [!contratoDoFluxo, Boolean(solicitacao?.parceiro)],
+    [!contratoDoFluxo, Boolean(solicitacao?.favorecido)],
+    [!contratoDoFluxo, Boolean(solicitacao?.formaPagamento?.nome)],
+    [!contratoDoFluxo, Boolean(solicitacao?.favorecido_chave_pix)],
+    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.responsavel?.nome)],
+    [!contratoDoFluxo, Boolean(solicitacao?.justificativa)],
+    [true, Boolean(solicitacao?.data_demissao)],
+    [true, Boolean(solicitacao?.data_inicio_medicao || solicitacao?.data_fim_medicao)],
+    [true, Boolean(solicitacao?.data_inicio_medicao || solicitacao?.data_fim_medicao)],
+    [true, exibirSubtipo],
+    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.favorecido)],
+    [Boolean(contratoDoFluxo), Boolean(contratoDoFluxo?.favorecido && chavePixContrato)]
+  ].filter(([contexto, temValor]) => contexto && !temValor).length;
 
   return (
     <div className="sol-detail-header">
@@ -329,8 +355,8 @@ export default function Header({
           <InfoItem label="Contrato" value={codigoContratoAtual} span={2} />
         )}
 
-        {contratoDoFluxo?.objeto && (
-          <InfoItem label="Objeto" value={contratoDoFluxo.objeto} fullWidth />
+        {contratoDoFluxo && (contratoDoFluxo.objeto || mostrarTodosCampos) && (
+          <InfoItem label="Objeto" value={contratoDoFluxo.objeto || '-'} fullWidth />
         )}
         {/* No fluxo novo o Titulo agora faz parte da identidade do cabecalho. Contratos legados
             preservam a antiga Ref. do contrato na grade, pois esse dado nao representa um titulo. */}
@@ -346,51 +372,55 @@ export default function Header({
         {/* Uma coluna com um contratado, duas com varios: e a linha que o esboco desenha
             (Contratado · Responsavel · Setor · Criado em), e uma lista de nomes nao cabe em um
             quarto da largura. */}
-        {contratados.length > 0 && (
-          <InfoItem label="Contratado" value={rotuloContratado} span={contratados.length > 1 ? 2 : 1} />
+        {contratoDoFluxo && (contratados.length > 0 || mostrarTodosCampos) && (
+          <InfoItem label="Contratado" value={rotuloContratado || '-'} span={contratados.length > 1 ? 2 : 1} />
         )}
-        {!contratoDoFluxo && solicitacao.parceiro && (
+        {!contratoDoFluxo && (solicitacao.parceiro || mostrarTodosCampos) && (
           <InfoItem
             label="Fornecedor / Credor"
-            value={solicitacao.parceiro.cpf_cnpj
-              ? `${solicitacao.parceiro.nome} — ${solicitacao.parceiro.cpf_cnpj}`
-              : solicitacao.parceiro.nome}
+            value={!solicitacao.parceiro
+              ? '-'
+              : solicitacao.parceiro.cpf_cnpj
+                ? `${solicitacao.parceiro.nome} — ${solicitacao.parceiro.cpf_cnpj}`
+                : solicitacao.parceiro.nome}
             span={2}
           />
         )}
-        {!contratoDoFluxo && solicitacao.favorecido && (
+        {!contratoDoFluxo && (solicitacao.favorecido || mostrarTodosCampos) && (
           <InfoItem
             label="Favorecido"
-            value={solicitacao.favorecido.cpf_cnpj
-              ? `${solicitacao.favorecido.nome} — ${solicitacao.favorecido.cpf_cnpj}`
-              : solicitacao.favorecido.nome}
+            value={!solicitacao.favorecido
+              ? '-'
+              : solicitacao.favorecido.cpf_cnpj
+                ? `${solicitacao.favorecido.nome} — ${solicitacao.favorecido.cpf_cnpj}`
+                : solicitacao.favorecido.nome}
             span={2}
           />
         )}
-        {!contratoDoFluxo && solicitacao.formaPagamento?.nome && (
-          <InfoItem label="Forma de pagamento" value={solicitacao.formaPagamento.nome} span={2} />
+        {!contratoDoFluxo && (solicitacao.formaPagamento?.nome || mostrarTodosCampos) && (
+          <InfoItem label="Forma de pagamento" value={solicitacao.formaPagamento?.nome || '-'} span={2} />
         )}
-        {!contratoDoFluxo && solicitacao.favorecido_chave_pix && (
-          <InfoItem label="Chave PIX informada" value={solicitacao.favorecido_chave_pix} span={2} />
+        {!contratoDoFluxo && (solicitacao.favorecido_chave_pix || mostrarTodosCampos) && (
+          <InfoItem label="Chave PIX informada" value={solicitacao.favorecido_chave_pix || '-'} span={2} />
         )}
-        {contratoDoFluxo?.responsavel?.nome && (
-          <InfoItem label="Responsavel" value={contratoDoFluxo.responsavel.nome} />
+        {contratoDoFluxo && (contratoDoFluxo.responsavel?.nome || mostrarTodosCampos) && (
+          <InfoItem label="Responsavel" value={contratoDoFluxo.responsavel?.nome || '-'} />
         )}
         <InfoItem label="Setor" value={solicitacao.area_responsavel || '-'} />
         <InfoItem label="Criado em" value={formatarDataHora(solicitacao.createdAt)} />
 
         <InfoItem label="Valor" value={formatarValor(solicitacao.valor)} />
-        {!contratoDoFluxo && solicitacao.justificativa && (
-          <InfoItem label="Justificativa" value={solicitacao.justificativa} span={4} />
+        {!contratoDoFluxo && (solicitacao.justificativa || mostrarTodosCampos) && (
+          <InfoItem label="Justificativa" value={solicitacao.justificativa || '-'} span={4} />
         )}
-        {solicitacao.data_demissao && <InfoItem label="Data de demissao" value={formatarData(solicitacao.data_demissao)} />}
+        {(solicitacao.data_demissao || mostrarTodosCampos) && <InfoItem label="Data de demissao" value={formatarData(solicitacao.data_demissao)} />}
         {/* O periodo da medicao so aparece quando EXISTE — mesma regra ja aplicada a Objeto,
             Contratado e Responsavel logo acima: ladrilho vazio e ruido que a pessoa aprende a
             ignorar, e ai para de ler os que importam.
             Antes eles apareciam com travessao em toda solicitacao, e o buraco passava despercebido
             porque o ladrilho "Status" fechava a linha. Com o Status fora (item 10), dois campos
             vazios passariam a desalinhar tudo o que vem depois. */}
-        {(solicitacao.data_inicio_medicao || solicitacao.data_fim_medicao) && (
+        {(solicitacao.data_inicio_medicao || solicitacao.data_fim_medicao || mostrarTodosCampos) && (
           <>
             <InfoItem label="Inicio da medicao" value={formatarData(solicitacao.data_inicio_medicao)} />
             <InfoItem label="Fim da medicao" value={formatarData(solicitacao.data_fim_medicao)} />
@@ -408,30 +438,47 @@ export default function Header({
             Financeiro (esse ultimo saiu pelo item 17). O card de baixo fica: e o unico dos tres que
             tambem EDITA o rateio. */}
 
-        {exibirSubtipo && <InfoItem label="Subtipo" value={subtipoSolicitacao} span={2} />}
+        {(exibirSubtipo || mostrarTodosCampos) && <InfoItem label="Subtipo" value={subtipoSolicitacao || '-'} span={2} />}
 
         {/* Quem recebe o pagamento e a chave para pagar. A chave segue a ordem definida pelo
             cliente (19/08): fixa 1, senao fixa 2, senao a variavel — a escolha e feita no backend,
             para a tela nao ter uma segunda versao da mesma regra. */}
-        {contratoDoFluxo?.favorecido && (
+        {contratoDoFluxo && (contratoDoFluxo.favorecido || mostrarTodosCampos) && (
           <InfoItem
             label="Favorecido"
             span={2}
-            value={contratoDoFluxo.favorecido.cpf_cnpj
-              ? `${contratoDoFluxo.favorecido.nome} — ${contratoDoFluxo.favorecido.cpf_cnpj}`
-              : contratoDoFluxo.favorecido.nome}
+            value={!contratoDoFluxo.favorecido
+              ? '-'
+              : contratoDoFluxo.favorecido.cpf_cnpj
+                ? `${contratoDoFluxo.favorecido.nome} — ${contratoDoFluxo.favorecido.cpf_cnpj}`
+                : contratoDoFluxo.favorecido.nome}
           />
         )}
-        {contratoDoFluxo?.favorecido && chavePixContrato && (
+        {contratoDoFluxo && ((contratoDoFluxo.favorecido && chavePixContrato) || mostrarTodosCampos) && (
           <InfoItem
             label="Chave PIX"
             span={2}
-            value={`${chavePixContrato}${!solicitacao?.favorecido_chave_pix && contratoDoFluxo.favorecido.tipo
-              ? ` (${contratoDoFluxo.favorecido.tipo})`
-              : ''}`}
+            value={!chavePixContrato
+              ? '-'
+              : `${chavePixContrato}${!solicitacao?.favorecido_chave_pix && contratoDoFluxo.favorecido?.tipo
+                ? ` (${contratoDoFluxo.favorecido.tipo})`
+                : ''}`}
           />
         )}
       </div>
+
+      {/* Alternador dos campos vazios: revelar é decisão do usuário. */}
+      {(camposVaziosOcultos > 0 || mostrarTodosCampos) && (
+        <button
+          type="button"
+          className="sol-detail-toggle-campos"
+          onClick={() => setMostrarTodosCampos((atual) => !atual)}
+        >
+          {mostrarTodosCampos
+            ? 'Ocultar campos vazios'
+            : `Ver todos os campos (${camposVaziosOcultos} vazio${camposVaziosOcultos === 1 ? '' : 's'})`}
+        </button>
+      )}
 
       {/* Pares "Rótulo: valor" da DESCRIÇÃO: leitura do texto livre,
           não são campos do sistema — não alimentam título, previsão
