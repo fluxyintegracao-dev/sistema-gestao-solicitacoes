@@ -6,6 +6,7 @@ import {
   limparCacheExpiradoSst,
   processarWorkerSst
 } from '../services/sst';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const DEFAULT_JOBS = [
   'SstScoreRecalculationJob',
@@ -65,32 +66,40 @@ function PerformanceList({ items }) {
   return (
     <section className="rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-5">
       <h2 className="text-lg font-semibold text-[var(--c-text)]">Performance recente</h2>
-      <div className="mt-4 max-h-80 overflow-y-auto rounded-lg border border-[var(--c-border)]">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            <tr>
-              <th className="px-3 py-3">Metrica</th>
-              <th className="px-3 py-3">Grupo</th>
-              <th className="px-3 py-3">Valor</th>
-              <th className="px-3 py-3">Status</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--c-border)]">
-            {(items || []).map((item) => (
-              <tr key={item.id} className="bg-[var(--c-bg)] text-[var(--c-text)]">
-                <td className="px-3 py-3 font-semibold">{item.metric_name}</td>
-                <td className="px-3 py-3 text-[var(--c-muted)]">{item.metric_group || item.scope_type || 'SISTEMA'}</td>
-                <td className="px-3 py-3">{fmt(item.value)} {item.unit || ''}</td>
-                <td className="px-3 py-3"><Pill value={item.status || 'REGISTRADO'} /></td>
-              </tr>
-            ))}
-            {!(items || []).length ? (
-              <tr>
-                <td colSpan={4} className="px-3 py-6 text-center text-sm text-[var(--c-muted)]">Nenhuma metrica recente registrada.</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
+      <div className="mt-4 max-h-80 overflow-y-auto">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'metrica',
+              titulo: 'Metrica',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => <span className="font-semibold">{item.metric_name}</span>
+            },
+            {
+              id: 'grupo',
+              titulo: 'Grupo',
+              tipo: 'texto',
+              render: (item) => item.metric_group || item.scope_type || 'SISTEMA'
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'numero',
+              render: (item) => `${fmt(item.value)} ${item.unit || ''}`.trim()
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => <Pill value={item.status || 'REGISTRADO'} />
+            }
+          ]}
+          itens={items || []}
+          vazio="Nenhuma metrica recente registrada."
+          storageKey="tabela:sst-observabilidade-avancada:performance"
+          rotuloRolagem="Performance recente"
+        />
       </div>
     </section>
   );

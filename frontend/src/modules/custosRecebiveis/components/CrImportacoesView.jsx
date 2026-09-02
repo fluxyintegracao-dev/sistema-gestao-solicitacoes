@@ -5,6 +5,7 @@ import {
   HiOutlineDocumentArrowUp,
   HiOutlineExclamationCircle
 } from 'react-icons/hi2';
+import { TabelaPadrao } from '../../../components/padrao';
 import CrStatusPill from './CrStatusPill';
 
 function formatDate(value) {
@@ -226,69 +227,61 @@ export default function CrImportacoesView({
         {(data?.planos || []).length === 0 ? (
           <div className="cr-empty-state">Nenhuma versão importada para esta obra.</div>
         ) : (
-          <>
-            <div className="cr-table-shell cr-desktop-table">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Versão</th>
-                    <th>Arquivo</th>
-                    <th>Importado por</th>
-                    <th>Data</th>
-                    <th>Linhas</th>
-                    <th>Situação</th>
-                    <th aria-label="Ação" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {(data.planos || []).map((plan) => {
-                    const importInfo = importsByPlan.get(Number(plan.id));
-                    return (
-                      <tr key={plan.id}>
-                        <td><strong>v{plan.versao}</strong></td>
-                        <td>{importInfo?.arquivo_nome || '-'}</td>
-                        <td>{importInfo?.usuario?.nome || '-'}</td>
-                        <td>{formatDate(importInfo?.createdAt || plan.createdAt)}</td>
-                        <td>
-                          {importInfo
-                            ? `${importInfo.linhas_validas}/${importInfo.linhas_total}`
-                            : '-'}
-                        </td>
-                        <td><CrStatusPill status={plan.situacao} /></td>
-                        <td className="text-right">
-                          <button type="button" className="btn btn-outline" onClick={() => onOpenPlan(plan.id)}>
-                            Abrir
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            <div className="cr-mobile-list">
-              {(data.planos || []).map((plan) => {
-                const importInfo = importsByPlan.get(Number(plan.id));
-                return (
-                  <article className="cr-mobile-record" key={plan.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <strong className="text-base text-[var(--c-text)]">Versão v{plan.versao}</strong>
-                      <CrStatusPill status={plan.situacao} />
-                    </div>
-                    <dl className="cr-mobile-record-grid">
-                      <div><dt>Arquivo</dt><dd>{importInfo?.arquivo_nome || '-'}</dd></div>
-                      <div><dt>Linhas válidas</dt><dd>{importInfo?.linhas_validas ?? '-'}</dd></div>
-                      <div><dt>Importado por</dt><dd>{importInfo?.usuario?.nome || '-'}</dd></div>
-                      <div><dt>Data</dt><dd>{formatDate(importInfo?.createdAt || plan.createdAt)}</dd></div>
-                    </dl>
-                    <button type="button" className="btn btn-outline w-full" onClick={() => onOpenPlan(plan.id)}>
-                      Abrir estrutura
-                    </button>
-                  </article>
-                );
-              })}
-            </div>
-          </>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'versao',
+                titulo: 'Versão',
+                // R17: a versão importada NOMEIA a linha do histórico.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (plan) => <strong>v{plan.versao}</strong>
+              },
+              {
+                id: 'arquivo',
+                titulo: 'Arquivo',
+                tipo: 'texto',
+                render: (plan) => importsByPlan.get(Number(plan.id))?.arquivo_nome || '-'
+              },
+              {
+                id: 'usuario',
+                titulo: 'Importado por',
+                tipo: 'texto',
+                render: (plan) => importsByPlan.get(Number(plan.id))?.usuario?.nome || '-'
+              },
+              {
+                id: 'data',
+                titulo: 'Data',
+                tipo: 'data',
+                render: (plan) => formatDate(importsByPlan.get(Number(plan.id))?.createdAt || plan.createdAt)
+              },
+              {
+                id: 'linhas',
+                titulo: 'Linhas',
+                tipo: 'numero',
+                render: (plan) => {
+                  const importInfo = importsByPlan.get(Number(plan.id));
+                  return importInfo ? `${importInfo.linhas_validas}/${importInfo.linhas_total}` : '-';
+                }
+              },
+              {
+                id: 'situacao',
+                titulo: 'Situação',
+                tipo: 'badge',
+                render: (plan) => <CrStatusPill status={plan.situacao} />
+              }
+            ]}
+            itens={data.planos || []}
+            getId={(plan) => plan.id}
+            storageKey="tabela:custos-recebiveis-importacoes:historico"
+            rotuloRolagem="Histórico de versões"
+            acoesLinha={(plan) => (
+              <button type="button" className="btn btn-outline" onClick={() => onOpenPlan(plan.id)}>
+                Abrir
+              </button>
+            )}
+            larguraAcoes={140}
+          />
         )}
       </section>
     </div>

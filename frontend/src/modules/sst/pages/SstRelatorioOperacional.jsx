@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getObras } from '../../../services/obras';
 import { getRhEmpresasGrupo } from '../../../services/rhDp';
 import { getSstRelatorioOperacional, sincronizarEventosVencimentoSst } from '../services/sst';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function moneyless(value) {
   return value ?? 0;
@@ -38,28 +39,16 @@ function Metric({ label, value, detail, tone = 'default' }) {
   );
 }
 
-function SimpleTable({ title, columns, rows, renderRow, empty = 'Nenhum registro encontrado.' }) {
+// R17: o painel só emoldura a tabela — as COLUNAS (com o `tipo` de cada uma)
+// são declaradas no ponto de uso, uma a uma, por quem conhece o dado.
+function PainelTabela({ title, total, children }) {
   return (
     <section className="overflow-hidden rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] shadow-sm">
       <div className="flex items-center justify-between border-b border-[var(--c-border)] px-5 py-4">
         <h2 className="text-lg font-semibold text-[var(--c-text)]">{title}</h2>
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{rows.length} item(ns)</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{total} item(ns)</span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-            <tr>{columns.map((column) => <th key={column} className="px-4 py-3">{column}</th>)}</tr>
-          </thead>
-          <tbody className="divide-y divide-[var(--c-border)]">
-            {rows.map(renderRow)}
-            {!rows.length ? (
-              <tr>
-                <td className="px-4 py-8 text-center text-sm text-[var(--c-muted)]" colSpan={columns.length}>{empty}</td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+      <div className="p-2">{children}</div>
     </section>
   );
 }
@@ -215,78 +204,119 @@ export default function SstRelatorioOperacional() {
 
       {loading ? <p className="text-sm text-[var(--c-muted)]">Carregando relatorio...</p> : null}
 
-      <SimpleTable
-        title="Pendencias de conformidade"
-        columns={['Tipo', 'Severidade', 'Mensagem', 'Origem']}
-        rows={conformidade.pendencias || []}
-        renderRow={(row, index) => (
-          <tr key={`pendencia-${index}-${row.origem_tipo}-${row.origem_id}`}>
-            <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{row.tipo}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{row.severidade}</td>
-            <td className="px-4 py-3 text-[var(--c-text)]">{row.mensagem}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{row.origem_tipo || '-'} #{row.origem_id || '-'}</td>
-          </tr>
-        )}
-      />
+      <PainelTabela title="Pendencias de conformidade" total={(conformidade.pendencias || []).length}>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo}</span>
+            },
+            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
+            { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem },
+            {
+              id: 'origem',
+              titulo: 'Origem',
+              tipo: 'codigo',
+              render: (row) => `${row.origem_tipo || '-'} #${row.origem_id || '-'}`
+            }
+          ]}
+          itens={conformidade.pendencias || []}
+          getId={(row) => `${row.origem_tipo}-${row.origem_id}-${row.tipo}`}
+          vazio="Nenhum registro encontrado."
+          storageKey="tabela:sst-relatorio-operacional:pendencias"
+          rotuloRolagem="Pendencias de conformidade"
+        />
+      </PainelTabela>
 
-      <SimpleTable
-        title="Eventos operacionais abertos"
-        columns={['Tipo', 'Severidade', 'Empresa', 'Obra', 'Mensagem']}
-        rows={data?.eventos_abertos || []}
-        renderRow={(row) => (
-          <tr key={`evento-${row.id}`}>
-            <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{row.tipo_evento}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{row.severidade}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{getLabel(row.empresa)}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{getLabel(row.obra)}</td>
-            <td className="px-4 py-3 text-[var(--c-text)]">{row.mensagem}</td>
-          </tr>
-        )}
-      />
+      <PainelTabela title="Eventos operacionais abertos" total={(data?.eventos_abertos || []).length}>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'tipo_evento',
+              titulo: 'Tipo',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo_evento}</span>
+            },
+            { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
+            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) },
+            { id: 'mensagem', titulo: 'Mensagem', tipo: 'texto', render: (row) => row.mensagem }
+          ]}
+          itens={data?.eventos_abertos || []}
+          vazio="Nenhum registro encontrado."
+          storageKey="tabela:sst-relatorio-operacional:eventos-abertos"
+          rotuloRolagem="Eventos operacionais abertos"
+        />
+      </PainelTabela>
 
       <div className="grid gap-5 xl:grid-cols-2">
-        <SimpleTable
-          title="Riscos criticos"
-          columns={['Risco', 'Severidade', 'Probabilidade', 'Obra']}
-          rows={data?.riscos_criticos || []}
-          renderRow={(row) => (
-            <tr key={`risco-${row.id}`}>
-              <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{row.nome}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{row.severidade}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{row.probabilidade}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{getLabel(row.obra)}</td>
-            </tr>
-          )}
-        />
-        <SimpleTable
-          title="Acidentes e incidentes recentes"
-          columns={['Data', 'Tipo', 'Gravidade', 'Obra']}
-          rows={data?.acidentes_recentes || []}
-          renderRow={(row) => (
-            <tr key={`acidente-${row.id}`}>
-              <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{row.data_ocorrencia}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{row.tipo}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{row.gravidade}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{getLabel(row.obra)}</td>
-            </tr>
-          )}
-        />
+        <PainelTabela title="Riscos criticos" total={(data?.riscos_criticos || []).length}>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'risco',
+                titulo: 'Risco',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.nome}</span>
+              },
+              { id: 'severidade', titulo: 'Severidade', tipo: 'badge', render: (row) => row.severidade },
+              { id: 'probabilidade', titulo: 'Probabilidade', tipo: 'badge', render: (row) => row.probabilidade },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+            ]}
+            itens={data?.riscos_criticos || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:riscos-criticos"
+            rotuloRolagem="Riscos criticos"
+          />
+        </PainelTabela>
+        <PainelTabela title="Acidentes e incidentes recentes" total={(data?.acidentes_recentes || []).length}>
+          <TabelaPadrao
+            colunas={[
+              { id: 'data_ocorrencia', titulo: 'Data', tipo: 'data', render: (row) => row.data_ocorrencia },
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.tipo}</span>
+              },
+              { id: 'gravidade', titulo: 'Gravidade', tipo: 'badge', render: (row) => row.gravidade },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (row) => getLabel(row.obra) }
+            ]}
+            itens={data?.acidentes_recentes || []}
+            vazio="Nenhum registro encontrado."
+            storageKey="tabela:sst-relatorio-operacional:acidentes-recentes"
+            rotuloRolagem="Acidentes e incidentes recentes"
+          />
+        </PainelTabela>
       </div>
 
-      <SimpleTable
-        title="Historico recente SST"
-        columns={['Data', 'Recurso', 'Acao', 'Empresa', 'Resumo']}
-        rows={data?.historicos_recentes || []}
-        renderRow={(row) => (
-          <tr key={`historico-${row.id}`}>
-            <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{new Date(row.createdAt).toLocaleString('pt-BR')}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{row.recurso}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{row.acao}</td>
-            <td className="px-4 py-3 text-[var(--c-muted)]">{getLabel(row.empresa)}</td>
-            <td className="px-4 py-3 text-[var(--c-text)]">{row.resumo}</td>
-          </tr>
-        )}
-      />
+      <PainelTabela title="Historico recente SST" total={(data?.historicos_recentes || []).length}>
+        <TabelaPadrao
+          colunas={[
+            { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => new Date(row.createdAt).toLocaleString('pt-BR') },
+            {
+              id: 'recurso',
+              titulo: 'Recurso',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => <span className="font-semibold text-[var(--c-text)]">{row.recurso}</span>
+            },
+            { id: 'acao', titulo: 'Acao', tipo: 'texto', render: (row) => row.acao },
+            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => getLabel(row.empresa) },
+            { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (row) => row.resumo }
+          ]}
+          itens={data?.historicos_recentes || []}
+          vazio="Nenhum registro encontrado."
+          storageKey="tabela:sst-relatorio-operacional:historico"
+          rotuloRolagem="Historico recente SST"
+        />
+      </PainelTabela>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   ativarCategoriaMacroProvisionamento,
   atualizarCategoriaMacroProvisionamento,
@@ -141,63 +142,74 @@ export default function GestaoCategoriasMacro() {
         {loading ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Descricao</th>
-                  <th>Ordem</th>
-                  <th>Status</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categorias.map((categoria) => (
-                  <tr key={categoria.id}>
-                    <td>
-                      {editId === categoria.id ? (
-                        <input className="input" value={editForm.nome} onChange={(event) => setEditForm((atual) => ({ ...atual, nome: event.target.value }))} />
-                      ) : categoria.nome}
-                    </td>
-                    <td>
-                      {editId === categoria.id ? (
-                        <textarea className="input min-h-[80px]" value={editForm.descricao} onChange={(event) => setEditForm((atual) => ({ ...atual, descricao: event.target.value }))} />
-                      ) : (categoria.descricao || '-')}
-                    </td>
-                    <td>
-                      {editId === categoria.id ? (
-                        <input className="input" type="number" value={editForm.ordem_exibicao} onChange={(event) => setEditForm((atual) => ({ ...atual, ordem_exibicao: event.target.value }))} />
-                      ) : (categoria.ordem_exibicao ?? '-')}
-                    </td>
-                    <td>{categoria.ativo === false ? 'Inativa' : 'Ativa'}</td>
-                    <td>
-                      <div className="flex flex-wrap gap-2">
-                        {editId === categoria.id ? (
-                          <>
-                            <button type="button" className="btn btn-primary" onClick={salvarEdicao} disabled={saving}>Salvar</button>
-                            <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>Cancelar</button>
-                          </>
-                        ) : (
-                          <>
-                            <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(categoria)}>Editar</button>
-                            <button type="button" className="btn btn-outline" onClick={() => alternarStatus(categoria)}>
-                              {categoria.ativo === false ? 'Ativar' : 'Desativar'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {categorias.length === 0 && (
-                  <tr>
-                    <td colSpan="5" align="center">Nenhuma categoria macro cadastrada.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'nome',
+                titulo: 'Nome',
+                // R17: o nome NOMEIA a categoria macro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (categoria) => (editId === categoria.id ? (
+                  <input
+                    className="input"
+                    value={editForm.nome}
+                    onChange={(event) => setEditForm((atual) => ({ ...atual, nome: event.target.value }))}
+                  />
+                ) : categoria.nome)
+              },
+              {
+                id: 'descricao',
+                titulo: 'Descricao',
+                tipo: 'texto',
+                render: (categoria) => (editId === categoria.id ? (
+                  <textarea
+                    className="input min-h-[80px]"
+                    value={editForm.descricao}
+                    onChange={(event) => setEditForm((atual) => ({ ...atual, descricao: event.target.value }))}
+                  />
+                ) : (categoria.descricao || '-'))
+              },
+              {
+                id: 'ordem',
+                titulo: 'Ordem',
+                tipo: 'numero',
+                render: (categoria) => (editId === categoria.id ? (
+                  <input
+                    className="input"
+                    type="number"
+                    value={editForm.ordem_exibicao}
+                    onChange={(event) => setEditForm((atual) => ({ ...atual, ordem_exibicao: event.target.value }))}
+                  />
+                ) : (categoria.ordem_exibicao ?? '-'))
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (categoria) => (categoria.ativo === false ? 'Inativa' : 'Ativa')
+              }
+            ]}
+            itens={categorias}
+            getId={(categoria) => categoria.id}
+            storageKey="tabela:provisionamento-categorias-macro"
+            rotuloRolagem="Categorias macro cadastradas"
+            vazio="Nenhuma categoria macro cadastrada."
+            acoesLinha={(categoria) => (editId === categoria.id ? (
+              <>
+                <button type="button" className="btn btn-primary" onClick={salvarEdicao} disabled={saving}>Salvar</button>
+                <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>Cancelar</button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(categoria)}>Editar</button>
+                <button type="button" className="btn btn-outline" onClick={() => alternarStatus(categoria)}>
+                  {categoria.ativo === false ? 'Ativar' : 'Desativar'}
+                </button>
+              </>
+            ))}
+            larguraAcoes={240}
+          />
         )}
       </div>
     </div>

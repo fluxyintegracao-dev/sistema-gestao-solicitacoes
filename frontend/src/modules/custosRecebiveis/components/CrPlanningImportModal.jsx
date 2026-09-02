@@ -7,6 +7,7 @@ import {
   HiOutlineTrash,
   HiOutlineXMark
 } from 'react-icons/hi2';
+import { TabelaPadrao } from '../../../components/padrao';
 import { revalidarItensPlanilhaPlanejamento } from '../services/custosRecebiveis';
 
 const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -141,6 +142,10 @@ export default function CrPlanningImportModal({
 
   const valid = Boolean(result?.resumo?.valido) && !dirty && rows.length > 0;
 
+  // A edição inline grava por ÍNDICE (updateRow/removeRow): a tabela recebe
+  // a linha já emparelhada com o seu índice na prévia.
+  const linhas = rows.map((row, index) => ({ id: keyOf(row, index), index, row }));
+
   return (
     <div className="cr-import-modal-backdrop" role="presentation">
       <section
@@ -215,38 +220,70 @@ export default function CrPlanningImportModal({
           </details>
         ) : null}
 
-        <div className="cr-import-modal__table cr-table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Etapa / item</th>
-                {isCosts ? <><th>Descrição</th><th>Unid.</th><th>Valor unit.</th></> : <><th>Unid.</th><th>Orçado</th><th>Saldo</th></>}
-                <th>Qtde.</th>
-                <th>Total</th>
-                <th aria-label="Ações" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, index) => (
-                <tr key={keyOf(row, index)} data-invalid={row.erros?.length ? 'true' : 'false'}>
-                  <td>
+        <div className="cr-import-modal__table">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'etapa',
+                titulo: 'Etapa / item',
+                // R17: a etapa/item NOMEIA a linha da prévia.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: ({ row }) => (
+                  <>
                     <strong>{row.etapa_macro_codigo}</strong>
                     <span>{isCosts ? row.etapa_macro_descricao : `${row.item_codigo} · ${row.descricao}`}</span>
-                  </td>
-                  {isCosts ? (
-                    <>
-                      <td><input value={row.descricao || ''} onChange={(event) => updateRow(index, 'descricao', event.target.value)} /></td>
-                      <td><input value={row.unidade || ''} onChange={(event) => updateRow(index, 'unidade', event.target.value)} /></td>
-                      <td><input type="number" min="0" step="0.0001" value={row.valor_unitario} onChange={(event) => updateRow(index, 'valor_unitario', event.target.value)} /></td>
-                    </>
-                  ) : (
-                    <>
-                      <td>{row.unidade || 'un'}</td>
-                      <td>{row.quantidade_orcada}</td>
-                      <td>{row.saldo_disponivel}</td>
-                    </>
-                  )}
-                  <td>
+                  </>
+                )
+              },
+              ...(isCosts ? [
+                {
+                  id: 'descricao',
+                  titulo: 'Descrição',
+                  tipo: 'texto',
+                  render: ({ row, index }) => (
+                    <input
+                      value={row.descricao || ''}
+                      onChange={(event) => updateRow(index, 'descricao', event.target.value)}
+                    />
+                  )
+                },
+                {
+                  id: 'unidade',
+                  titulo: 'Unid.',
+                  tipo: 'texto',
+                  render: ({ row, index }) => (
+                    <input
+                      value={row.unidade || ''}
+                      onChange={(event) => updateRow(index, 'unidade', event.target.value)}
+                    />
+                  )
+                },
+                {
+                  id: 'valor_unitario',
+                  titulo: 'Valor unit.',
+                  tipo: 'valor',
+                  render: ({ row, index }) => (
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={row.valor_unitario}
+                      onChange={(event) => updateRow(index, 'valor_unitario', event.target.value)}
+                    />
+                  )
+                }
+              ] : [
+                { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: ({ row }) => row.unidade || 'un' },
+                { id: 'quantidade_orcada', titulo: 'Orçado', tipo: 'numero', render: ({ row }) => row.quantidade_orcada },
+                { id: 'saldo_disponivel', titulo: 'Saldo', tipo: 'numero', render: ({ row }) => row.saldo_disponivel }
+              ]),
+              {
+                id: 'quantidade',
+                titulo: 'Qtde.',
+                tipo: 'numero',
+                render: ({ row, index }) => (
+                  <>
                     <input
                       type="number"
                       min="0"
@@ -256,20 +293,34 @@ export default function CrPlanningImportModal({
                       onChange={(event) => updateRow(index, 'quantidade', event.target.value)}
                     />
                     {row.erros?.length ? <small>{row.erros.join(' ')}</small> : null}
-                  </td>
-                  <td><strong>{currency.format(row.valor_total || 0)}</strong></td>
-                  <td>
-                    <button type="button" className="cr-icon-action" onClick={() => removeRow(index)} aria-label="Excluir item da prévia">
-                      <HiOutlineTrash className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {!rows.length ? (
-                <tr><td colSpan={isCosts ? 7 : 6} className="cr-table-empty">Nenhuma linha com quantidade maior que zero.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+                  </>
+                )
+              },
+              {
+                id: 'valor_total',
+                titulo: 'Total',
+                tipo: 'valor',
+                render: ({ row }) => <strong>{currency.format(row.valor_total || 0)}</strong>
+              }
+            ]}
+            itens={linhas}
+            getId={(linha) => linha.id}
+            urgencia={(linha) => (linha.row.erros?.length ? 'danger' : null)}
+            storageKey={`tabela:custos-recebiveis-previa-importacao:${isCosts ? 'custos' : 'medicao'}`}
+            rotuloRolagem="Prévia da importação"
+            vazio="Nenhuma linha com quantidade maior que zero."
+            acoesLinha={({ index }) => (
+              <button
+                type="button"
+                className="cr-icon-action"
+                onClick={() => removeRow(index)}
+                aria-label="Excluir item da prévia"
+              >
+                <HiOutlineTrash className="h-4 w-4" />
+              </button>
+            )}
+            larguraAcoes={120}
+          />
         </div>
 
         <footer className="cr-import-modal__footer">

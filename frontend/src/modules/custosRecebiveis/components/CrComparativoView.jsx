@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { HiOutlineExclamationTriangle } from 'react-icons/hi2';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import { COMPARATIVO_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import { obterComparativoCompetencia } from '../services/custosRecebiveis';
 
@@ -105,61 +106,66 @@ export default function CrComparativoView({ obra, competencia }) {
           <strong>{currency.format(data?.recebiveis?.receita_recebida || 0)}</strong>
         </div>
       </div>
-      <div className="cr-table-shell cr-desktop-table">
-        <table>
-          <thead>
-            <tr>
-              <th>Macro / item micro</th>
-              <th>Medição prevista</th>
-              <th>Medição aprovada</th>
-              <th>Glosa</th>
-              <th>Aprovação</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((item) => (
-              <tr key={item.key}>
-                <td>
-                  <strong>{item.codigo} · {item.descricao}</strong>
-                  <span>{item.etapa_macro_codigo || 'Sem macro'}</span>
-                </td>
-                <td>{currency.format(item.previsto)}</td>
-                <td>{item.tem_aprovacao ? currency.format(item.aprovado) : 'Aguardando'}</td>
-                <td data-negative={item.glosa > 0}>{item.tem_aprovacao ? currency.format(item.glosa) : '—'}</td>
-                <td>{item.percentual_aprovacao == null ? '—' : `${item.percentual_aprovacao}%`}</td>
-                <td>
-                  <span className="cr-status-pill" data-status={item.estado}>
-                    {APPROVAL_STATUS[item.estado] || COMPARATIVO_ESTADO_LABELS[item.estado] || item.estado}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="cr-mobile-list">
-        {rows.map((item) => (
-          <article className="cr-mobile-record" key={item.key}>
-            <div>
-              <strong>{item.codigo} · {item.descricao}</strong>
-              <span>{item.etapa_macro_codigo || 'Sem macro'}</span>
-            </div>
-            <dl className="cr-mobile-record-grid">
-              <div><dt>Medição prevista</dt><dd>{currency.format(item.previsto)}</dd></div>
-              <div><dt>Medição aprovada</dt><dd>{item.tem_aprovacao ? currency.format(item.aprovado) : 'Aguardando'}</dd></div>
-              <div><dt>Glosa</dt><dd>{item.tem_aprovacao ? currency.format(item.glosa) : '—'}</dd></div>
-              <div>
-                <dt>Estado</dt>
-                <dd>{APPROVAL_STATUS[item.estado] || COMPARATIVO_ESTADO_LABELS[item.estado] || item.estado}</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
-      </div>
-      {!rows.length ? (
-        <div className="cr-empty-state">Nenhum item com medição prevista ou aprovada nesta competência.</div>
-      ) : null}
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'item',
+            titulo: 'Macro / item micro',
+            // R17: o item micro NOMEIA a linha do comparativo.
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (item) => (
+              <CelulaDupla
+                principal={`${item.codigo} · ${item.descricao}`}
+                sub={item.etapa_macro_codigo || 'Sem macro'}
+              />
+            )
+          },
+          {
+            id: 'previsto',
+            titulo: 'Medição prevista',
+            tipo: 'valor',
+            render: (item) => currency.format(item.previsto)
+          },
+          {
+            id: 'aprovado',
+            titulo: 'Medição aprovada',
+            tipo: 'valor',
+            render: (item) => (item.tem_aprovacao ? currency.format(item.aprovado) : 'Aguardando')
+          },
+          {
+            id: 'glosa',
+            titulo: 'Glosa',
+            tipo: 'valor',
+            render: (item) => (item.tem_aprovacao ? (
+              <span style={{ color: Number(item.glosa || 0) > 0 ? '#c73847' : undefined }}>
+                {currency.format(item.glosa)}
+              </span>
+            ) : '—')
+          },
+          {
+            id: 'percentual_aprovacao',
+            titulo: 'Aprovação',
+            tipo: 'numero',
+            render: (item) => (item.percentual_aprovacao == null ? '—' : `${item.percentual_aprovacao}%`)
+          },
+          {
+            id: 'estado',
+            titulo: 'Estado',
+            tipo: 'badge',
+            render: (item) => (
+              <span className="cr-status-pill" data-status={item.estado}>
+                {APPROVAL_STATUS[item.estado] || COMPARATIVO_ESTADO_LABELS[item.estado] || item.estado}
+              </span>
+            )
+          }
+        ]}
+        itens={rows}
+        getId={(item) => item.key}
+        storageKey="tabela:custos-recebiveis-comparativo"
+        rotuloRolagem="Comparativo operacional por item"
+        vazio="Nenhum item com medição prevista ou aprovada nesta competência."
+      />
     </section>
   );
 }

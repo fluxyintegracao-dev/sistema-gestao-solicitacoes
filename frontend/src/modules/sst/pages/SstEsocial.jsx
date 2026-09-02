@@ -13,6 +13,7 @@ import {
   getEsocialLotesSst,
   validarXmlEsocialSst
 } from '../services/sst';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function statusClass(status) {
   const value = String(status || '').toUpperCase();
@@ -154,48 +155,61 @@ export default function SstEsocial() {
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Eventos preparados</h2>
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{loading ? 'Carregando' : `${eventos.length} evento(s)`}</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-              <tr>
-                {canManage ? <th className="px-4 py-3">Selecionar</th> : null}
-                <th className="px-4 py-3">Evento</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Ambiente</th>
-                <th className="px-4 py-3">Protocolo</th>
-                {canManage ? <th className="px-4 py-3">Ações</th> : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {eventos.map((evento) => (
-                <tr key={evento.id}>
-                  {canManage ? (
-                    <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedSet.has(evento.id)}
-                        onChange={(event) => setSelected((current) => (event.target.checked ? [...current, evento.id] : current.filter((id) => id !== evento.id)))}
-                      />
-                    </td>
-                  ) : null}
-                  <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{evento.tipo_evento}</td>
-                  <td className="px-4 py-3"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(evento.status)}`}>{evento.status}</span></td>
-                  <td className="px-4 py-3 text-[var(--c-muted)]">{evento.ambiente || '-'}</td>
-                  <td className="px-4 py-3 text-[var(--c-muted)]">{evento.protocolo || '-'}</td>
-                  {canManage ? (
-                    <td className="space-x-3 whitespace-nowrap px-4 py-3">
-                      <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, gerarXmlEsocialSst, 'Gerar XML')} className="text-sm font-semibold text-sky-700 disabled:opacity-50">Gerar XML</button>
-                      <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, validarXmlEsocialSst, 'Validar XML')} className="text-sm font-semibold text-emerald-700 disabled:opacity-50">Validar</button>
-                      <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, assinarXmlEsocialSst, 'Assinar XML')} className="text-sm font-semibold text-indigo-700 disabled:opacity-50">Assinar</button>
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-              {!eventos.length && !loading ? (
-                <tr><td className="px-4 py-8 text-center text-sm text-[var(--c-muted)]" colSpan={canManage ? 6 : 4}>Nenhum evento preparado.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="p-2">
+          <TabelaPadrao
+            colunas={[
+              ...(canManage ? [{
+                id: 'selecionar',
+                titulo: 'Selecionar',
+                tipo: 'status',
+                render: (evento) => (
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(evento.id)}
+                    onChange={(event) => setSelected((current) => (event.target.checked ? [...current, evento.id] : current.filter((id) => id !== evento.id)))}
+                  />
+                )
+              }] : []),
+              {
+                id: 'evento',
+                titulo: 'Evento',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (evento) => <span className="font-semibold text-[var(--c-text)]">{evento.tipo_evento}</span>
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (evento) => <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(evento.status)}`}>{evento.status}</span>
+              },
+              {
+                id: 'ambiente',
+                titulo: 'Ambiente',
+                tipo: 'texto',
+                render: (evento) => evento.ambiente || '-'
+              },
+              {
+                id: 'protocolo',
+                titulo: 'Protocolo',
+                tipo: 'codigo',
+                render: (evento) => evento.protocolo || '-'
+              }
+            ]}
+            itens={eventos}
+            carregando={loading}
+            vazio="Nenhum evento preparado."
+            storageKey="tabela:sst-esocial:eventos"
+            rotuloRolagem="Eventos preparados"
+            larguraAcoes={320}
+            acoesLinha={canManage ? (evento) => (
+              <>
+                <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, gerarXmlEsocialSst, 'Gerar XML')} className="text-sm font-semibold text-sky-700 disabled:opacity-50">Gerar XML</button>
+                <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, validarXmlEsocialSst, 'Validar XML')} className="text-sm font-semibold text-emerald-700 disabled:opacity-50">Validar</button>
+                <button type="button" disabled={Boolean(actionId)} onClick={() => runEventAction(evento.id, assinarXmlEsocialSst, 'Assinar XML')} className="text-sm font-semibold text-indigo-700 disabled:opacity-50">Assinar</button>
+              </>
+            ) : undefined}
+          />
         </div>
       </section>
       ) : null}
@@ -205,37 +219,48 @@ export default function SstEsocial() {
         <div className="border-b border-[var(--c-border)] px-5 py-4">
           <h2 className="text-lg font-semibold text-[var(--c-text)]">Lotes restritos</h2>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-              <tr>
-                <th className="px-4 py-3">Lote</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Ambiente</th>
-                <th className="px-4 py-3">Protocolo</th>
-                {canManage ? <th className="px-4 py-3">Ações</th> : null}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {lotes.map((lote) => (
-                <tr key={lote.id}>
-                  <td className="px-4 py-3 font-semibold text-[var(--c-text)]">#{lote.id}</td>
-                  <td className="px-4 py-3"><span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(lote.status)}`}>{lote.status}</span></td>
-                  <td className="px-4 py-3 text-[var(--c-muted)]">{lote.ambiente}</td>
-                  <td className="px-4 py-3 text-[var(--c-muted)]">{lote.protocolo || '-'}</td>
-                  {canManage ? (
-                    <td className="space-x-3 whitespace-nowrap px-4 py-3">
-                      <button type="button" disabled={Boolean(actionId)} onClick={() => runBatchAction(lote.id, enviarLoteRestritaEsocialSst, 'Enviar restrita')} className="text-sm font-semibold text-sky-700 disabled:opacity-50">Enviar restrita</button>
-                      <button type="button" disabled={Boolean(actionId)} onClick={() => runBatchAction(lote.id, consultarRetornoEsocialSst, 'Consultar retorno')} className="text-sm font-semibold text-emerald-700 disabled:opacity-50">Consultar</button>
-                    </td>
-                  ) : null}
-                </tr>
-              ))}
-              {!lotes.length && !loading ? (
-                <tr><td className="px-4 py-8 text-center text-sm text-[var(--c-muted)]" colSpan={canManage ? 5 : 4}>Nenhum lote restrito criado.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
+        <div className="p-2">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'lote',
+                titulo: 'Lote',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (lote) => <span className="font-semibold text-[var(--c-text)]">#{lote.id}</span>
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (lote) => <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusClass(lote.status)}`}>{lote.status}</span>
+              },
+              {
+                id: 'ambiente',
+                titulo: 'Ambiente',
+                tipo: 'texto',
+                render: (lote) => lote.ambiente
+              },
+              {
+                id: 'protocolo',
+                titulo: 'Protocolo',
+                tipo: 'codigo',
+                render: (lote) => lote.protocolo || '-'
+              }
+            ]}
+            itens={lotes}
+            carregando={loading}
+            vazio="Nenhum lote restrito criado."
+            storageKey="tabela:sst-esocial:lotes"
+            rotuloRolagem="Lotes restritos"
+            larguraAcoes={280}
+            acoesLinha={canManage ? (lote) => (
+              <>
+                <button type="button" disabled={Boolean(actionId)} onClick={() => runBatchAction(lote.id, enviarLoteRestritaEsocialSst, 'Enviar restrita')} className="text-sm font-semibold text-sky-700 disabled:opacity-50">Enviar restrita</button>
+                <button type="button" disabled={Boolean(actionId)} onClick={() => runBatchAction(lote.id, consultarRetornoEsocialSst, 'Consultar retorno')} className="text-sm font-semibold text-emerald-700 disabled:opacity-50">Consultar</button>
+              </>
+            ) : undefined}
+          />
         </div>
       </section>
       ) : null}

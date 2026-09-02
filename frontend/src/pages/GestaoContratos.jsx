@@ -37,6 +37,7 @@ import {
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 
 const CONTRATOS_TABLE_COLUMNS = [
   { key: 'selecionar', width: 56, minWidth: 48 },
@@ -1236,59 +1237,55 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
         {renderFiltros()}
 
         <div className="card sol-surface-card app-table-shell">
-          <div className="table-wrapper">
-          <table className="table min-w-[900px]">
-            <thead>
-              <tr>
-                <th className="text-left p-3">Contrato</th>
-                <th className="text-left p-3">Obra</th>
-                <th className="text-left p-3">Ref. do Contrato</th>
-                <th className="text-left p-3">Descrição</th>
-                <th className="text-left p-3">Itens de Apropriação</th>
-                <th className="text-right p-3">Solicitado</th>
-                <th className="text-right p-3">Pago</th>
-                <th className="text-right p-3">A pagar</th>
-              </tr>
-            </thead>
-            <tbody>
-              {contratosOrdenados.length === 0 && (
-                <tr>
-                  <td colSpan="8" className="p-4 text-center text-gray-500">
-                    Nenhum contrato encontrado.
-                  </td>
-                </tr>
-              )}
-              {contratos.map(c => (
-                <tr key={c.id} className="border-t">
-                  <td className="p-3 font-medium">{c.codigo}</td>
-                  <td className="p-3">{c.obra?.nome || '-'}</td>
-                  <td className="p-3">{c.ref_contrato || '-'}</td>
-                  <td className="p-3">{c.descricao || '-'}</td>
-                  <td className="p-3">{resumoApropriacoesContrato(c)}</td>
-                  <td className="p-3 text-right">
-                    {Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    })}
-                  </td>
-                  <td className="p-3 text-right">
-                    {Number(c.total_pago || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    })}
-                  </td>
-                  <td className="p-3 text-right">
-                    {Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
-                      style: 'currency',
-                      currency: 'BRL'
-                    })}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'contrato',
+                titulo: 'Contrato',
+                // R17: o codigo do contrato nomeia o registro desta lista.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: c => c.codigo
+              },
+              { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => c.obra?.nome || '-' },
+              { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => c.ref_contrato || '-' },
+              { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => c.descricao || '-' },
+              { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => resumoApropriacoesContrato(c) },
+              {
+                id: 'total_solicitado',
+                titulo: 'Solicitado',
+                tipo: 'valor',
+                render: c => Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                })
+              },
+              {
+                id: 'total_pago',
+                titulo: 'Pago',
+                tipo: 'valor',
+                render: c => Number(c.total_pago || 0).toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                })
+              },
+              {
+                id: 'total_a_pagar',
+                titulo: 'A pagar',
+                tipo: 'valor',
+                render: c => Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL'
+                })
+              }
+            ]}
+            itens={contratos}
+            getId={c => c.id}
+            storageKey="tabela:gestao-contratos:setor-obra"
+            rotuloRolagem="Contratos das suas obras"
+            vazio="Nenhum contrato encontrado."
+          />
         </div>
-      </div>
       </div>
     );
   }
