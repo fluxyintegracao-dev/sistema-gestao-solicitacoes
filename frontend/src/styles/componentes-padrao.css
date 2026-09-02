@@ -9,6 +9,8 @@
    - tarja de urgência é UM utilitário (.tarja--*) — a receita que existia
      copiada em ListaAvancada (linha e card) e no cartão da Home.
    Só tokens (--c-*, --sem-*, --ui-*); nenhuma cor à mão.
+   Medidas SÓ da escala (styles/escala.css) — conforto de leitura governa:
+   linha de tabela com respiro, blocos que respiram, nada abaixo de 12px.
    ========================================================================== */
 
 /* ---- REGRAS MECÂNICAS (docs/REGRAS-LAYOUT.md) — números, não adjetivos --- */
@@ -52,6 +54,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Campo de moeda com prefixo "R$" sobreposto: o recuo é do componente. */
+.input-prefixo-moeda {
+  padding-left: 2.25rem;
+}
+
 /* R4 — respiro entre a barra fixa e o primeiro conteúdo. */
 .layout-main .app-page-header {
   margin-top: var(--respiro-topbar);
@@ -59,12 +66,12 @@
 
 /* R5 — texto de apoio ancorado: contagem forte + apoio muted, sob o título. */
 .app-page-lead {
-  margin: 4px 0 0;
-  font-size: 0.9rem;
+  margin: var(--esp-1) 0 0;
+  font-size: var(--fonte-corpo);
   font-weight: 500;
   color: var(--c-muted);
   max-width: 78ch;
-  line-height: 1.45;
+  line-height: var(--lh-corpo);
 }
 
 .app-page-lead strong {
@@ -75,6 +82,14 @@
 /* R8 — série neutra de comparação (par da saturada --c-primary). */
 .barra-serie-neutra {
   background: var(--ui-border-strong);
+}
+
+/* Painel lateral padrão (formulário/apoio ao lado da lista): a medida mora
+   aqui, não na tela. Em viewport compacto ele empilha e ocupa a largura. */
+@media (min-width: 768px) {
+  .app-painel-lateral {
+    min-width: 320px;
+  }
 }
 
 /* ---- Tarja lateral de urgência/estado (aplicável a linha, card, bloco) ---- */
@@ -102,16 +117,16 @@
 .app-bloco {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 14px;
+  border-radius: var(--raio-3);
   box-shadow: var(--ui-shadow-sm);
-  padding: 0.9rem 1rem;
+  padding: var(--esp-4);
   min-width: 0;
 }
 
 /* Principal: barra de cor à esquerda (semântica ou do módulo). Um por tela. */
 .app-bloco--primario {
   border-left: 4px solid var(--bloco-cor, var(--c-primary));
-  padding-left: calc(1rem - 3px);
+  padding-left: calc(var(--esp-4) - 3px);
 }
 
 /* Secundário: branco rebaixado, sem sombra — recua sem pedir licença. */
@@ -124,18 +139,21 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: var(--esp-2);
   flex-wrap: wrap;
 }
 
+/* Título de bloco no degrau 18px: a hierarquia da página é visível de longe
+   (página 22 > bloco 18 > corpo 14 > detalhe 12 — nada de tudo-quase-igual). */
 .app-bloco-titulo {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: var(--fonte-bloco);
+  line-height: var(--lh-titulo);
   font-weight: 700;
   color: var(--c-text);
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--esp-2);
 }
 
 .app-bloco-acoes {
@@ -143,14 +161,14 @@
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 0.45rem;
+  gap: var(--esp-2);
   /* R3: a área de ações cresce para a busca ocupar a faixa (220–480px). */
   flex: 1 1 auto;
   min-width: 0;
 }
 
 .app-bloco-corpo {
-  margin-top: 0.7rem;
+  margin-top: var(--esp-3);
   min-width: 0;
 }
 
@@ -191,22 +209,24 @@
 .app-stat-grid {
   display: grid;
   grid-template-columns: repeat(var(--stat-colunas, 4), minmax(0, 1fr));
-  gap: 0.6rem;
+  gap: var(--esp-3);
 }
 
 .app-stat {
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--raio-2);
   background: var(--ui-surface-2);
-  padding: 0.55rem 0.7rem;
+  padding: var(--esp-3);
   min-width: 0;
 }
 
 .app-stat--full { grid-column: 1 / -1; }
 
+/* Rótulo no piso da escala (12px) — abaixo disso é apertar os olhos. */
 .app-stat-label {
   display: block;
-  font-size: 0.68rem;
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -215,8 +235,9 @@
 
 .app-stat-valor {
   display: block;
-  margin-top: 0.18rem;
-  font-size: 0.91rem;
+  margin-top: var(--esp-1);
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
   font-weight: 600;
   color: var(--c-text);
   overflow-wrap: anywhere;
@@ -224,8 +245,9 @@
 
 .app-stat-sub {
   display: block;
-  margin-top: 0.1rem;
-  font-size: 0.72rem;
+  margin-top: var(--esp-1);
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
   color: var(--c-muted);
 }
 
@@ -244,8 +266,8 @@
   border: 0;
   background: none;
   padding: 0;
-  margin-top: 0.55rem;
-  font-size: 0.78rem;
+  margin-top: var(--esp-2);
+  font-size: var(--fonte-detalhe);
   font-weight: 600;
   color: var(--c-primary);
   text-decoration: underline;
@@ -267,9 +289,9 @@
   min-width: 220px;
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: var(--raio-2);
   box-shadow: var(--ui-shadow-lg);
-  padding: 0.35rem;
+  padding: var(--esp-1);
   display: flex;
   flex-direction: column;
 }
@@ -278,16 +300,17 @@
   appearance: none;
   border: 0;
   background: none;
-  border-radius: 8px;
-  padding: 0.5rem 0.65rem;
-  font-size: 0.84rem;
+  border-radius: var(--raio-1);
+  padding: var(--esp-2) var(--esp-3);
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
   font-weight: 500;
   color: var(--c-text);
   text-align: left;
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--esp-2);
 }
 
 .app-mais-item:hover { background: var(--ui-surface-soft); }
@@ -301,9 +324,9 @@
 .app-mais-item--perigosa {
   color: var(--sem-danger);
   border-top: 1px solid var(--ui-border);
-  border-radius: 0 0 8px 8px;
-  margin-top: 0.25rem;
-  padding-top: 0.6rem;
+  border-radius: 0 0 var(--raio-1) var(--raio-1);
+  margin-top: var(--esp-1);
+  padding-top: var(--esp-2);
 }
 
 .app-mais-item--perigosa:hover { background: var(--sem-danger-bg); }
@@ -313,13 +336,13 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--esp-2);
 }
 
 .app-actionbar-apartada {
   margin-left: auto;
   display: inline-flex;
-  gap: 0.5rem;
+  gap: var(--esp-2);
 }
 
 /* Vermelho suave para destrutivos visíveis (não o btn-danger cheio). */
@@ -338,7 +361,7 @@
 .app-celula-dupla {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -351,7 +374,8 @@
 }
 
 .app-celula-dupla-sub {
-  font-size: 0.74rem;
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
   color: var(--c-muted);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -359,8 +383,9 @@
 }
 
 /* ---- TabelaPadrao ------------------------------------------------------ */
-/* Linha de altura média: mais que a densa do financeiro, menos que a folgada
-   das telas antigas — equilíbrio entre densidade e leitura pedido no padrão. */
+/* Linha com respiro (decisão do cliente, 02/09): corpo 14px, altura de linha
+   1.5 e vão vertical de um degrau — o sistema é usado o dia inteiro; entre
+   caber mais linhas e ler melhor, vence a leitura. */
 /* O ResizableTable fixa width inline na soma das colunas; aqui a tabela
    ocupa o card inteiro (sem espaço morto à direita) e o min-width inline
    segue garantindo rolagem em viewport estreita. Escopo .app-tabela só. */
@@ -379,16 +404,23 @@
 }
 
 .app-tabela .resizable-table td {
-  padding: 0.5rem 0.65rem;
-  font-size: 0.84rem;
+  padding: var(--esp-3);
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
   vertical-align: middle;
 }
 
 .app-tabela .resizable-table th {
-  font-size: 0.7rem;
+  font-size: var(--fonte-detalhe);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--c-muted);
+}
+
+/* Colunas de dinheiro/número alinham à direita com dígito tabular. */
+.app-tabela td.celula-valor {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .app-tabela-linha { cursor: default; }
@@ -419,29 +451,30 @@
 .app-tabela-cards {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--esp-3);
 }
 
 .app-tabela-card {
   background: var(--ui-surface);
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
-  padding: 0.7rem 0.8rem;
+  border-radius: var(--raio-2);
+  padding: var(--esp-3) var(--esp-4);
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: var(--esp-2);
 }
 
 .app-tabela-card.tarja--danger,
 .app-tabela-card.tarja--warning {
-  padding-left: calc(0.8rem + 4px);
+  padding-left: calc(var(--esp-4) + 4px);
 }
 
 .app-tabela-card-par {
   display: flex;
   justify-content: space-between;
-  gap: 0.6rem;
-  font-size: 0.82rem;
+  gap: var(--esp-2);
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
   min-width: 0;
 }
 
@@ -461,15 +494,15 @@
 .app-tabela-card-acoes {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 0.2rem;
+  gap: var(--esp-2);
+  margin-top: var(--esp-1);
 }
 
 /* ---- Formulário: grid disciplinado sobre .form-* já existentes --------- */
 .form-grid {
   display: grid;
   grid-template-columns: repeat(var(--form-colunas, 2), minmax(0, 1fr));
-  gap: 0.75rem 0.9rem;
+  gap: var(--esp-3) var(--esp-4);
 }
 
 .form-grid--3 { --form-colunas: 3; }
@@ -487,8 +520,8 @@ fieldset.form-section {
 
 .form-section-legenda {
   padding: 0;
-  margin-bottom: 0.15rem;
-  font-size: 0.8rem;
+  margin-bottom: var(--esp-1);
+  font-size: var(--fonte-detalhe);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;

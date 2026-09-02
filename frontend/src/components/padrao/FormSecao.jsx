@@ -14,11 +14,20 @@ export function FormSecao({ legenda, colunas = 2, children }) {
   );
 }
 
-export function CampoForm({ label, obrigatorio = false, hint, erro, span, linha = false, children }) {
+// O papel do campo decide o espaço que ele ocupa no grid — a tela não mede.
+// data/moeda/numero cabem numa célula normal (o input interno já tem o piso
+// certo: .input-moeda garante 180px); texto-longo toma a linha inteira.
+const TIPOS_CAMPO = {
+  'texto-longo': 'form-campo--linha',
+  observacao: 'form-campo--linha'
+};
+
+export function CampoForm({ label, obrigatorio = false, hint, erro, span, linha = false, tipo, children }) {
   const classes = [
     'form-group',
     span === 2 && 'form-campo--span2',
-    linha && 'form-campo--linha'
+    linha && 'form-campo--linha',
+    tipo && TIPOS_CAMPO[tipo]
   ].filter(Boolean).join(' ');
   return (
     <label className={classes}>

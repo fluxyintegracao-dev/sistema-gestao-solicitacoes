@@ -24,6 +24,9 @@
     "src/pages/UsuariosAcessoPrioridadeDiretoria.jsx",
     "src/pages/UsuariosPermissoesRhDp.jsx"
   ],
+  "excecoes_medidas": {
+    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
+  },
   "excecoes_tabela_crua": {
     "src/pages/ObraGestao.jsx": "5 tabelas internas das abas (2-3 colunas, uma editável) — conversão para ResizableTable pendente de decisão",
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado"

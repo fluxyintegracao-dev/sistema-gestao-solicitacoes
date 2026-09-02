@@ -11,7 +11,7 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessGestaoObras, canManageCadastroObras } from '../utils/acessoProduto';
-import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function formatCurrency(value) {
@@ -54,7 +54,7 @@ function CurrencyInput({ value, onChange, placeholder, className }) {
       <span className="pointer-events-none absolute left-3 select-none text-sm" style={{ color: 'var(--c-muted)' }}>R$</span>
       <input
         ref={inputRef}
-        className={`${className} pl-9`}
+        className={`${className} input-prefixo-moeda`}
         value={editing ? raw : formatted}
         onChange={(e) => setRaw(e.target.value)}
         onFocus={handleFocus}
@@ -323,7 +323,7 @@ export default function Obras() {
   }, [busca, obras]);
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Gestão de Obras e Centros de Custo"
         contagem={loading ? null : `${obras.length} cadastro(s)`}
@@ -360,8 +360,7 @@ export default function Obras() {
             {
               id: 'obra',
               titulo: 'Obra / Centro de custo',
-              largura: 230,
-              minWidth: 180,
+              tipo: 'texto',
               noCard: 'titulo',
               render: (obra) => (
                 <CelulaDupla
@@ -373,7 +372,8 @@ export default function Obras() {
             {
               id: 'empresa',
               titulo: 'Empresa / Tipo',
-              largura: 150,
+              tipo: 'texto',
+              flex: false,
               render: (obra) => (
                 <CelulaDupla
                   principal={obra.empresaGrupo?.nome || 'Não vinculada'}
@@ -385,8 +385,7 @@ export default function Obras() {
             {
               id: 'vgv',
               titulo: 'VGV / Orçamento',
-              largura: 145,
-              alinhar: 'right',
+              tipo: 'valor',
               render: (obra) => {
                 if (!isCadastroObra(obra)) return '-';
                 const ref = obra.vgv ?? obra.planilha_geral;
@@ -407,8 +406,7 @@ export default function Obras() {
             {
               id: 'executado',
               titulo: 'Executado',
-              largura: 140,
-              alinhar: 'right',
+              tipo: 'valor',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
                 const orcado = Number(obra.resumo?.orcado || 0);
@@ -425,8 +423,7 @@ export default function Obras() {
             {
               id: 'recebido',
               titulo: 'Recebido',
-              largura: 150,
-              alinhar: 'right',
+              tipo: 'valor',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
                 const recebido = Number(obra.resumo?.recebido || 0);
@@ -442,8 +439,7 @@ export default function Obras() {
             {
               id: 'lucro',
               titulo: 'Lucro/Prejuízo',
-              largura: 125,
-              alinhar: 'right',
+              tipo: 'valor',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
                 const lucroPrejuizo = Number(obra.resumo?.lucro_prejuizo || 0);
@@ -457,7 +453,7 @@ export default function Obras() {
             {
               id: 'status',
               titulo: 'Status',
-              largura: 96,
+              tipo: 'status',
               render: (obra) => <StatusBadge status={obra.ativo ? 'Ativa' : 'Inativa'} />
             }
           ]}
@@ -735,6 +731,6 @@ export default function Obras() {
           </div>
         </div>
       )}
-    </div>
+    </Pagina>
   );
 }

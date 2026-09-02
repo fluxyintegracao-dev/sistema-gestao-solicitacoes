@@ -14,7 +14,7 @@ import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { PageHeader, BlocoConteudo, StatGrid, StatTile, CamposComVazios } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, StatGrid, StatTile, CamposComVazios } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
@@ -663,7 +663,7 @@ export default function FinanceiroTituloDetalhe() {
 
   return (
     <>
-      <div className="page solicitacoes-page">
+      <Pagina>
         <Link className="btn btn-outline btn-sm mb-1 self-start" to={tituloListPath}>
           ← Voltar para {tituloListLabel}
         </Link>
@@ -1158,7 +1158,7 @@ export default function FinanceiroTituloDetalhe() {
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="font-medium text-[var(--c-text)]">{evento.label}</div>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${auditStatusClass(evento.status)}`}>
+                          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${auditStatusClass(evento.status)}`}>
                             {evento.status}
                           </span>
                         </div>
@@ -1210,12 +1210,12 @@ export default function FinanceiroTituloDetalhe() {
           )}
         </BlocoConteudo>
         )}
-      </div>
+      </Pagina>
 
       {modalBaixaOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-4">
           <div className="card flex max-h-[calc(100vh-2rem)] w-full max-w-2xl flex-col overflow-hidden p-0">
-            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-5 py-4">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--c-border)] px-6 py-4">
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
                   {corrigindoMovimentoId ? 'Corrigir baixa' : 'Registrar baixa'}
@@ -1240,7 +1240,7 @@ export default function FinanceiroTituloDetalhe() {
             </div>
 
             <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleBaixaSubmit}>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">{baixaFormaLabel}</span>
@@ -1690,14 +1690,14 @@ export default function FinanceiroTituloDetalhe() {
               <label className="text-sm block">
                 <span className="mb-1 block text-slate-500">Observacoes</span>
                 <textarea
-                  className="input min-h-[96px] w-full"
+                  className="input min-h-24 w-full"
                   value={baixaForm.observacoes}
                   onChange={(event) => setBaixaForm((current) => ({ ...current, observacoes: event.target.value }))}
                 />
               </label>
               </div>
 
-              <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-4">
+              <div className="flex shrink-0 justify-end gap-2 border-t border-[var(--c-border)] bg-[var(--c-surface)] px-6 py-4">
                 <button
                   type="button"
                   className="btn btn-outline"

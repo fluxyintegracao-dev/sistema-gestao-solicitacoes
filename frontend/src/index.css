@@ -7,7 +7,9 @@
   --c-surface: #ffffff;
   --c-border: #e4e9f0;
   --c-text: #0f1c2e;
-  --c-muted: #64748b;
+  /* 4.62:1 sobre o canvas #eef2f7 (o antigo #64748b dava 4.23 — reprovava AA
+     em texto pequeno; achado do impeccable, 02/09). */
+  --c-muted: #5f6e83;
   --c-primary: #3b5bdb;
   --c-primary-600: #2f4ac0;
   --c-secondary: #7c3aed;
@@ -7290,13 +7292,12 @@ body {
 }
 
 .layout-shell.fluxy-app-shell {
-  --shell-page-bg:
-    radial-gradient(circle at top right, rgba(67, 148, 255, 0.18), transparent 28%),
-    radial-gradient(circle at 10% 20%, rgba(42, 103, 255, 0.12), transparent 30%),
-    linear-gradient(180deg, #eef4fb 0%, #e6edf8 100%);
-  --shell-panel: rgba(255, 255, 255, 0.82);
-  --shell-panel-strong: rgba(255, 255, 255, 0.94);
-  --shell-panel-soft: rgba(245, 249, 255, 0.76);
+  /* Fundo PLANO: os holofotes radiais decorativos variavam o fundo sob o
+     texto e derrubavam o contraste (achado do impeccable, 02/09). */
+  --shell-page-bg: linear-gradient(180deg, #eef4fb 0%, #e6edf8 100%);
+  --shell-panel: rgba(255, 255, 255, 0.92);
+  --shell-panel-strong: rgba(255, 255, 255, 0.97);
+  --shell-panel-soft: rgba(245, 249, 255, 0.9);
   --shell-border: rgba(148, 163, 184, 0.22);
   --shell-border-strong: rgba(59, 130, 246, 0.18);
   --shell-shadow: 0 26px 60px rgba(15, 23, 42, 0.08);
@@ -7312,13 +7313,10 @@ body {
 }
 
 .dark .layout-shell.fluxy-app-shell {
-  --shell-page-bg:
-    radial-gradient(circle at top right, rgba(29, 78, 216, 0.18), transparent 28%),
-    radial-gradient(circle at 14% 18%, rgba(14, 165, 233, 0.14), transparent 24%),
-    linear-gradient(180deg, #07111f 0%, #0a1528 44%, #0d1626 100%);
-  --shell-panel: rgba(8, 15, 29, 0.82);
-  --shell-panel-strong: rgba(10, 17, 33, 0.94);
-  --shell-panel-soft: rgba(15, 24, 43, 0.78);
+  --shell-page-bg: linear-gradient(180deg, #07111f 0%, #0a1528 44%, #0d1626 100%);
+  --shell-panel: rgba(8, 15, 29, 0.92);
+  --shell-panel-strong: rgba(10, 17, 33, 0.97);
+  --shell-panel-soft: rgba(15, 24, 43, 0.9);
   --shell-border: rgba(148, 163, 184, 0.16);
   --shell-border-strong: rgba(59, 130, 246, 0.24);
   --shell-shadow: 0 32px 70px rgba(1, 4, 12, 0.55);
@@ -7330,14 +7328,14 @@ body {
   --shell-accent: #38bdf8;
 }
 
+/* Sem véus decorativos sobre o conteúdo: fundo plano garante o contraste
+   medido dos textos (achado do impeccable, 02/09). */
 .layout-shell-backdrop {
   position: fixed;
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.22), transparent 30%),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.08), transparent 42%);
+  background: none;
 }
 
 .layout-shell.fluxy-app-shell > .layout-main {

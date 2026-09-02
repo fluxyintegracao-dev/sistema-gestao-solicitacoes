@@ -1,0 +1,50 @@
+/* ============================================================================
+   ESCALA — a ÚNICA fonte de medida das telas reformadas (docs/REGRAS-LAYOUT.md)
+   ----------------------------------------------------------------------------
+   Nenhuma tela escreve pixel: escolhe um degrau daqui (ou uma classe de
+   componente que já o usa). O verificador (validarLayout.mjs) reprova medida
+   à mão nas telas do manifesto.
+
+   Critério que governa os valores: CONFORTO E CLAREZA DE LEITURA (decisão do
+   cliente, 02/09). Quando "cabe mais informação" briga com "lê-se melhor",
+   vence a leitura — mais rolagem é aceitável, apertar os olhos não.
+   ========================================================================== */
+
+:root {
+  /* Espaço — degraus 4/8/12/16/24/32/48 (subconjunto Tailwind 1/2/3/4/6/8/12) */
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-6: 24px;
+  --esp-8: 32px;
+  --esp-12: 48px;
+
+  /* Tipo — quatro tamanhos com papel fixo, e altura de linha de leitura.
+     Nada abaixo de 12px em conteúdo. */
+  --fonte-detalhe: 0.75rem;   /* 12px: apoio, rótulos, subtexto de célula */
+  --fonte-corpo: 0.875rem;    /* 14px: corpo, células, botões, menus */
+  --fonte-bloco: 1.125rem;    /* 18px: título de bloco/seção */
+  --fonte-pagina: 1.375rem;   /* 22px: título de página */
+  --lh-detalhe: 1.45;
+  --lh-corpo: 1.5;
+  --lh-titulo: 1.3;
+
+  /* Raios — três, do controle ao cartão. */
+  --raio-1: 8px;
+  --raio-2: 12px;
+  --raio-3: 14px;
+}
+
+/* ---- Pagina: o ritmo vertical pertence ao componente, não à tela --------- */
+.app-pagina {
+  display: grid;
+  gap: var(--esp-4);
+  align-content: start;
+}
+
+.app-pagina > .page-title,
+.app-pagina .app-page-header .page-title {
+  font-size: clamp(1.25rem, 2.5vw, var(--fonte-pagina));
+  line-height: var(--lh-titulo);
+}

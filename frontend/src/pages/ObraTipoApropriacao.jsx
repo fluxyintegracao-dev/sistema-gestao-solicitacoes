@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 import {
   getObraTipoApropriacao,
   getApropriacoesDaObra,
@@ -152,15 +152,15 @@ export default function ObraTipoApropriacao() {
 
   if (carregando) {
     return (
-      <div className="page solicitacoes-page">
+      <Pagina>
         <h1 className="page-title">Apropriacao padrao por obra</h1>
         <div className="card">Carregando...</div>
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Apropriacao padrao por obra"
         subtitulo="Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra."
@@ -168,7 +168,7 @@ export default function ObraTipoApropriacao() {
 
       {padroesNovaObra.length > 0 && (
         <BlocoConteudo titulo="Novas obras recebem automaticamente" variante="secundario" recolhivel>
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
             {padroesNovaObra.map((padrao) => (
               <span key={padrao.tipo_codigo} className="text-[var(--c-muted)]">
                 <strong className="text-[var(--c-text)]">{padrao.codigo}</strong> — {padrao.descricao}
@@ -277,13 +277,12 @@ export default function ObraTipoApropriacao() {
                           <div className="card mt-2" style={{ padding: 8 }}>
                             <input
                               type="text"
-                              className="input"
+                              className="input w-full"
                               placeholder="Buscar por codigo ou descricao"
                               value={buscaOpcao}
                               onChange={(e) => buscarOpcoes(obra.id, e.target.value)}
-                              style={{ width: '100%' }}
                             />
-                            <div style={{ maxHeight: 220, overflowY: 'auto', marginTop: 8 }}>
+                            <div className="max-h-56 overflow-y-auto mt-2">
                               {carregandoOpcoes && (
                                 <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
                                   Carregando...
@@ -298,8 +297,7 @@ export default function ObraTipoApropriacao() {
                                 <button
                                   key={ap.id}
                                   type="button"
-                                  className="btn btn-outline btn-sm"
-                                  style={{ display: 'block', width: '100%', textAlign: 'left', marginBottom: 4 }}
+                                  className="btn btn-outline btn-sm block w-full text-left mb-1"
                                   onClick={() => definir(obra.id, tipo.id, ap.id)}
                                 >
                                   <strong>{ap.codigo}</strong> — {ap.descricao}
@@ -323,6 +321,6 @@ export default function ObraTipoApropriacao() {
           </div>
         )}
       </div>
-    </div>
+    </Pagina>
   );
 }

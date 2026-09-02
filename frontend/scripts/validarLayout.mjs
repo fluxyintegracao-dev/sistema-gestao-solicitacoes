@@ -26,7 +26,17 @@ export function validarLayout() {
     const codigo = fs.readFileSync(caminho, 'utf8');
     const linhas = codigo.split('\n');
 
+    // R10 (escala): exceção registrada rebaixa a violação de medida à mão
+    // para AVISO — com a justificativa gravada no manifesto.
+    const excecaoMedidas = manifesto.excecoes_medidas?.[tela];
     const aponta = (i, regra, mensagem) => falhas.push(`${tela}:${i + 1} [${regra}] ${mensagem}`);
+    const apontaMedida = (i, mensagem) => {
+      if (excecaoMedidas) {
+        avisos.push(`${tela}:${i + 1} [R10] medida à mão tolerada por exceção registrada (${excecaoMedidas}): ${mensagem}`);
+      } else {
+        aponta(i, 'R10', mensagem);
+      }
+    };
 
     linhas.forEach((linha, i) => {
       // R1 — tabela crua é proibida: toda tabela é redimensionável
@@ -65,6 +75,52 @@ export function validarLayout() {
       // R5 — contagem embutida no texto em vez da prop contagem.
       if (/subtitulo=\{[^}]*\.length[^}]*[·:]/.test(linha) || /subtitulo=\{`\$\{/.test(linha)) {
         aponta(i, 'R5', 'contagem embutida no subtítulo — use a prop contagem do PageHeader (renderiza em strong, ancorada).');
+      }
+
+      // ---- R10 — tela NÃO escreve medida: só escala (styles/escala.css) ----
+      // e componentes. Exceção precisa estar registrada no manifesto
+      // (excecoes_medidas) com justificativa.
+
+      // Coluna de TabelaPadrao medida na tela — a medida é do tipo.
+      if (/\blargura\s*:\s*\d/.test(linha)) {
+        apontaMedida(i, `largura de coluna escrita na tela ("${linha.trim().slice(0, 60)}") — declare o papel (tipo: texto|codigo|valor|numero|data|status|badge); a medida é do componente.`);
+      }
+
+      // Pixel em style inline (width/height/padding/margin/gap/fontSize…).
+      const estiloPx = linha.match(/\b(minWidth|maxWidth|width|minHeight|maxHeight|height|padding(?:Top|Bottom|Left|Right)?|margin(?:Top|Bottom|Left|Right)?|gap|fontSize)\s*:\s*['"]?(\d+)(?:px)?['"]?\s*[,}]/);
+      if (estiloPx && !/largura\s*:\s*\d/.test(linha)) {
+        apontaMedida(i, `${estiloPx[1]}: ${estiloPx[2]} em style inline — use um degrau da escala via classe/componente (styles/escala.css).`);
+      }
+      if (/\b(padding|margin)\s*:\s*['"][^'"]*\d/.test(linha) && !estiloPx) {
+        apontaMedida(i, 'padding/margin composto em style inline — use degraus da escala via classe.');
+      }
+
+      // Valor arbitrário Tailwind em px (w-[64px], text-[13px], p-[6px]…).
+      if (/-\[\d+(?:\.\d+)?px\]/.test(linha)) {
+        apontaMedida(i, `valor arbitrário em px ("${linha.match(/\S*-\[\d+(?:\.\d+)?px\]\S*/)?.[0]}") — não existe medida fora da escala.`);
+      }
+
+      // Espaçamento Tailwind fora dos degraus 0/1/2/3/4/6/8/12 (=0–48px).
+      const DEGRAUS = new Set(['0', '1', '2', '3', '4', '6', '8', '12']);
+      for (const util of linha.matchAll(/\b((?:[mp][trblxy]?|gap(?:-[xy])?|space-[xy])-(\d+(?:\.\d+)?))\b/g)) {
+        if (!DEGRAUS.has(util[2])) {
+          apontaMedida(i, `espaçamento fora da escala ("${util[1]}") — degraus permitidos: 0/1/2/3/4/6/8/12 (4–48px).`);
+        }
+      }
+
+      // Largura/altura fixa fora dos degraus (w-28, h-10, h-2.5) — medida à
+      // mão. Nos degraus (h-4 = 16px p/ ícone) passa; w-0/h-0 é o idioma de
+      // truncagem, não medida.
+      for (const fixa of linha.matchAll(/(?<!max-)(?<!min-)\b([wh]-(\d+(?:\.\d+)?))\b/g)) {
+        if (!DEGRAUS.has(fixa[2])) {
+          apontaMedida(i, `dimensão fixa fora da escala ("${fixa[1]}") — a largura de campo/controle vem do componente (.app-busca, .input-moeda, CampoForm tipo…); dimensões avulsas só nos degraus.`);
+        }
+      }
+
+      // Tamanho de fonte fora dos papéis 12/14/18 (page-title = 22 é do Pagina).
+      const fonteFora = linha.match(/\btext-(base|xl|2xl|3xl|4xl|5xl)\b/);
+      if (fonteFora) {
+        apontaMedida(i, `tamanho de fonte fora da escala ("text-${fonteFora[1]}") — papéis: text-xs (detalhe 12), text-sm (corpo 14), text-lg (título de bloco 18), título de página no Pagina/PageHeader (22).`);
       }
     });
   }

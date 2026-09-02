@@ -84,13 +84,42 @@ automaticamente se sair do padrão.
 - Cadastro de uso FREQUENTE no fluxo (pessoas/parceiros) mantém o padrão de
   painel acima da lista (decisão registrada — reversível).
 
+## R10 — Escala como única fonte de medida (e conforto de leitura)
+
+- **Critério que governa (decisão do cliente, 02/09): CONFORTO E CLAREZA DE
+  LEITURA, não densidade máxima.** Quando "cabe mais informação" briga com
+  "lê-se melhor", vence a leitura — mais rolagem é aceitável, apertar os
+  olhos não. O sistema é usado o dia inteiro.
+- A escala mora em `frontend/src/styles/escala.css` e é a ÚNICA fonte de
+  medida das telas reformadas:
+  - **Espaço**: 4/8/12/16/24/32/48px (`--esp-1/2/3/4/6/8/12`; em Tailwind,
+    só os degraus `1/2/3/4/6/8/12` e o `0`).
+  - **Tipo**: 12/14/18/22px com papel fixo — detalhe/rótulo (12,
+    lh 1.45), corpo/célula/botão (14, lh 1.5), título de bloco (18),
+    título de página (22, no `Pagina`/`PageHeader`). Nada abaixo de 12px em
+    conteúdo; em Tailwind, só `text-xs`/`text-sm`/`text-lg`.
+  - **Raios**: 8/12/14px (`--raio-1/2/3`).
+  - **Linha de tabela com respiro**: célula 14px/lh 1.5 com padding de um
+    degrau (12px) — imposto pelo CSS da TabelaPadrao, não pela tela.
+- **Tela não escreve medida.** Nenhum px em `style` inline, nenhum
+  `*-[NNNpx]`, nenhuma largura/altura utilitária fora dos degraus, nenhuma
+  `largura`/`minWidth` em coluna de TabelaPadrao (declare o **`tipo`** da
+  coluna: `texto`/`codigo`/`valor`/`numero`/`data`/`status`/`badge` — a
+  medida é do componente). Ritmo vertical da tela vem do componente
+  **`Pagina`** (vão de 16px entre blocos), não de `space-y-*` na raiz.
+- Exceção só com REGISTRO: `excecoes_medidas` no manifesto
+  (`telas-reformadas.json`), com justificativa — o verificador rebaixa para
+  AVISO e o aviso aparece em todo teste.
+
 ## Verificação
 
 1. **Estática** (`validarLayout.mjs`, dentro do `npm run test:responsive`):
    roda sobre as telas do manifesto e reprova — `<table` crua; `w-[NNNpx]` em
    input; `page-subtitle`/parágrafo de apoio fora do PageHeader;
    `larguraAcoes` > 320; botão com classe de altura < h-8 (32px);
-   subtítulo com contagem embutida em vez da prop `contagem`.
+   subtítulo com contagem embutida em vez da prop `contagem`; e TODA medida
+   à mão (R10): px em style inline, `*-[NNNpx]`, espaçamento/dimensão fora
+   dos degraus, `largura`/`minWidth` em coluna, `text-base`/`text-xl`+.
 2. **Runtime** (auditoria embutida no roteiro de capturas): mede alvo de
    clique < 32px, `.input-moeda` < 180px, vão topbar < 24px, tabela sem
    alças de redimensionamento, overflow horizontal da página.

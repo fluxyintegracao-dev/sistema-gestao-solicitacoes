@@ -31,10 +31,37 @@ export function CelulaDupla({ principal, sub, title }) {
  * detalhe e telas mistas usam esta). Um markup só: no celular as MESMAS
  * colunas viram cards — nunca dois códigos para o mesmo dado.
  *
- * colunas: [{ id, titulo, render(item), largura?, minWidth?, alinhar?,
+ * colunas: [{ id, titulo, render(item), tipo?, alinhar?,
  *             noCard? ('titulo' destaca no card; false omite do card) }]
+ * A LARGURA é decisão do componente, não da tela: cada `tipo` já carrega a
+ * medida das regras (docs/REGRAS-LAYOUT.md R1/R6/R7) — a tela só declara o
+ * que a coluna É. `largura`/`minWidth` seguem aceitos apenas para exceção
+ * registrada no manifesto (validarLayout reprova sem registro).
  * urgencia(item): 'danger' | 'warning' | null → tarja lateral.
  */
+
+// Medidas por papel da coluna — pior caso real de cada dado (R1/R6/R7).
+const TIPOS_COLUNA = {
+  texto:  { largura: 180, flexPadrao: true },        // conteúdo: recebe a sobra
+  codigo: { largura: 130 },                          // OB-2024-0117
+  valor:  { largura: 150, alinhar: 'right', valor: true }, // R$ 9.999.999.999,99
+  numero: { largura: 110, alinhar: 'right', valor: true },
+  data:   { largura: 110 },                          // 22/08/2026
+  status: { largura: 96 },
+  badge:  { largura: 120 }
+};
+
+function normalizarColuna(coluna) {
+  const base = TIPOS_COLUNA[coluna.tipo];
+  if (!base) return coluna;
+  return {
+    ...coluna,
+    largura: coluna.largura ?? base.largura,
+    alinhar: coluna.alinhar ?? base.alinhar,
+    flex: coluna.flex ?? (base.flexPadrao || undefined),
+    __valor: base.valor || undefined
+  };
+}
 export default function TabelaPadrao({
   colunas = [],
   itens = [],
@@ -52,6 +79,9 @@ export default function TabelaPadrao({
   const shellRef = useRef(null);
   const [larguraDisponivel, setLarguraDisponivel] = useState(null);
 
+  // A tela declara o papel (`tipo`); a medida vem da tabela de tipos.
+  const colunasBase = colunas.map(normalizarColuna);
+
   // R1 (docs/REGRAS-LAYOUT.md): ação no máximo 320px; a sobra do card vai
   // SEMPRE para a coluna de conteúdo (flex) — medida uma vez no mount.
   const larguraAcoesEfetiva = Math.min(larguraAcoes, 320);
@@ -68,15 +98,15 @@ export default function TabelaPadrao({
   }, [carregando, ehMovel, itens.length]);
 
   const indiceFlex = (() => {
-    const marcada = colunas.findIndex((c) => c.flex);
+    const marcada = colunasBase.findIndex((c) => c.flex);
     if (marcada >= 0) return marcada;
-    const titulo = colunas.findIndex((c) => c.noCard === 'titulo');
+    const titulo = colunasBase.findIndex((c) => c.noCard === 'titulo');
     return titulo >= 0 ? titulo : 0;
   })();
 
-  const colunasComFlex = colunas.map((coluna, i) => {
+  const colunasComFlex = colunasBase.map((coluna, i) => {
     if (i !== indiceFlex || !larguraDisponivel) return coluna;
-    const fixas = colunas.reduce(
+    const fixas = colunasBase.reduce(
       (soma, c, j) => (j === indiceFlex ? soma : soma + Number(c.largura || 140)),
       acoesLinha ? larguraAcoesEfetiva : 0
     );
@@ -98,8 +128,8 @@ export default function TabelaPadrao({
   }
 
   if (ehMovel) {
-    const colunaTitulo = colunas.find((c) => c.noCard === 'titulo') || colunas[0];
-    const demais = colunas.filter((c) => c !== colunaTitulo && c.noCard !== false);
+    const colunaTitulo = colunasBase.find((c) => c.noCard === 'titulo') || colunasBase[0];
+    const demais = colunasBase.filter((c) => c !== colunaTitulo && c.noCard !== false);
     return (
       <div className="app-tabela-cards">
         {itens.map((item) => {
@@ -170,8 +200,12 @@ export default function TabelaPadrao({
                 className={classes}
                 onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
               >
-                {colunas.map((coluna) => (
-                  <td key={coluna.id} style={coluna.alinhar ? { textAlign: coluna.alinhar } : undefined}>
+                {colunasBase.map((coluna) => (
+                  <td
+                    key={coluna.id}
+                    className={coluna.__valor ? 'celula-valor' : undefined}
+                    style={coluna.alinhar ? { textAlign: coluna.alinhar } : undefined}
+                  >
                     {coluna.render(item)}
                   </td>
                 ))}

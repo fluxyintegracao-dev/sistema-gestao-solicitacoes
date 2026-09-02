@@ -12,6 +12,7 @@ import {
   HiOutlineReceiptPercent,
   HiOutlineTrash
 } from 'react-icons/hi2';
+import { Pagina } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageGestaoObrasApropriacoes } from '../utils/acessoProduto';
 import { getObraGestao, obterUrlArquivoObra } from '../services/obras';
@@ -60,7 +61,7 @@ function percent(value) {
 
 function DetailTableEmpty({ message }) {
   return (
-    <div className="card px-5 py-9 text-center text-sm" style={{ color: 'var(--c-muted)' }}>
+    <div className="card px-4 py-8 text-center text-sm" style={{ color: 'var(--c-muted)' }}>
       {message}
     </div>
   );
@@ -233,48 +234,48 @@ export default function ObraGestao() {
 
   if (loading) {
     return (
-      <div className="page max-w-[1420px] mx-auto">
+      <Pagina>
         <DetailTableEmpty message="Carregando gerenciamento da obra..." />
-      </div>
+      </Pagina>
     );
   }
 
   if (!data?.obra) {
     return (
-      <div className="page max-w-[1420px] mx-auto">
+      <Pagina>
         <DetailTableEmpty message="Obra nao encontrada." />
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page max-w-[1480px] mx-auto">
-      <section className="card px-4 py-4 md:px-5 md:py-4">
+    <Pagina>
+      <section className="card px-4 py-4 md:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-1 items-start gap-4">
             <button
               type="button"
-              className="btn btn-outline mt-1 inline-flex h-10 w-10 items-center justify-center rounded-2xl"
+              className="btn btn-outline mt-1 inline-flex items-center justify-center rounded-xl"
               onClick={() => navigate('/obras')}
             >
-              <HiOutlineArrowLeft className="h-5 w-5" />
+              <HiOutlineArrowLeft aria-hidden="true" />
             </button>
 
             <div>
               <div className="text-xs font-semibold uppercase" style={{ color: 'var(--c-muted)' }}>
                 {data.obra.codigo || `OBRA ${data.obra.id}`}
               </div>
-              <h1 className="mt-0.5 text-xl font-bold uppercase" style={{ color: 'var(--c-text)' }}>
+              <h1 className="mt-1 text-lg font-bold uppercase" style={{ color: 'var(--c-text)' }}>
                 {data.obra.nome}
               </h1>
-              <div className="mt-1 inline-flex items-center gap-1.5 text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>
-                <HiOutlineMapPin className="h-3.5 w-3.5" />
+              <div className="mt-1 inline-flex items-center gap-2 text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>
+                <HiOutlineMapPin className="h-4 w-4" />
                 {data.obra.cidade || 'Cidade nao informada'}
               </div>
             </div>
           </div>
 
-          <div className="grid gap-2.5 sm:grid-cols-2 lg:min-w-[320px]">
+          <div className="app-painel-lateral grid gap-3 sm:grid-cols-2">
             <CompactHeaderMetric label="Custo pago" value={formatCurrency(kpis.custo_pago)} />
             <CompactHeaderMetric label="Saldo projetado" value={formatCurrency(kpis.saldo_projetado)} accentColor="var(--accent-green)" />
           </div>
@@ -325,7 +326,7 @@ export default function ObraGestao() {
 
                 return (
                   <div key={item.id}>
-                    <div className="mb-1.5 flex items-center justify-between gap-4 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                    <div className="mb-2 flex items-center justify-between gap-4 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                       <span className="min-w-0 flex-1 truncate" title={item.descricao}>{item.descricao}</span>
                       <div className="flex shrink-0 items-center gap-3 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
                         <span>Pago {formatCurrency(item.pago)}</span>
@@ -333,11 +334,11 @@ export default function ObraGestao() {
                         <span className="font-bold obra-accent-blue">{percent(item.percentual_execucao)}</span>
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
+                    <div className="space-y-2">
+                      <div className="h-2 overflow-hidden rounded-full obra-bar-track">
                         <div className="h-full rounded-full barra-serie-neutra" style={{ width: widthOrcado }} />
                       </div>
-                      <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
+                      <div className="h-2 overflow-hidden rounded-full obra-bar-track">
                         <div className="h-full rounded-full" style={{ width: widthPago, background: 'var(--c-primary)' }} />
                       </div>
                     </div>
@@ -396,7 +397,7 @@ export default function ObraGestao() {
                           <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>{item.codigo}</div>
                           {podeEditarApropriacoes ? (
                             <input
-                              className="input mt-1.5"
+                              className="input mt-2"
                               style={{ borderColor: 'var(--ui-border)' }}
                               value={item.descricao}
                               onChange={(event) => setOrcamentoDraft((current) => current.map((row) => (
@@ -411,7 +412,7 @@ export default function ObraGestao() {
                           {podeEditarApropriacoes ? (
                             <input
                               className="input input-moeda ml-auto"
-                              style={{ borderColor: 'var(--ui-border)', width: 200 }}
+                              style={{ borderColor: 'var(--ui-border)' }}
                               value={item.valor_orcado}
                               onChange={(event) => setOrcamentoDraft((current) => current.map((row) => (
                                 row.id === item.id ? { ...row, valor_orcado: event.target.value } : row
@@ -422,10 +423,10 @@ export default function ObraGestao() {
                           )}
                         </td>
                         {podeEditarApropriacoes ? (
-                          <td className="px-4 py-3.5 text-right">
+                          <td className="px-4 py-3 text-right">
                             <button
                               type="button"
-                              className="btn btn-outline inline-flex h-10 w-10 items-center justify-center rounded-xl"
+                              className="btn btn-outline inline-flex items-center justify-center rounded-xl"
                               onClick={() => removerItemOrcamento(item.id)}
                             >
                               <HiOutlineTrash className="h-4 w-4" />
@@ -440,7 +441,7 @@ export default function ObraGestao() {
                       <td className="px-4 py-3 text-right text-xs font-semibold uppercase" style={{ color: 'var(--c-muted)' }}>
                         Total orcado
                       </td>
-                      <td className="px-4 py-3 text-right text-xl font-bold" style={{ color: 'var(--c-text)' }}>
+                      <td className="px-4 py-3 text-right text-lg font-bold" style={{ color: 'var(--c-text)' }}>
                         {formatCurrency(
                           orcamentoDraft.reduce((total, item) => total + normalizeMoneyInput(item.valor_orcado), 0)
                         )}
@@ -498,7 +499,7 @@ export default function ObraGestao() {
                     <tr key={`${item.id}-${item.data_movimento}`} className="border-t" style={{ borderColor: 'var(--ui-border)' }}>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>
                         <div className="font-semibold">{formatDate(item.data_vencimento)}</div>
-                        <div className="mt-0.5 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
+                        <div className="mt-1 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
                           Lanc.: {formatDate(item.data_movimento)}
                         </div>
                       </td>
@@ -553,7 +554,7 @@ export default function ObraGestao() {
                       <td className="px-4 py-3 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatDate(item.data_vencimento)}</td>
                       <td className="px-4 py-3 text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.parceiro_nome}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>
-                        <div className="line-clamp-2 max-w-[620px]">{item.descricao}</div>
+                        <div className="line-clamp-2 max-w-prose">{item.descricao}</div>
                       </td>
                       <td className="px-4 py-3 text-xs font-semibold uppercase obra-accent-blue">{item.status}</td>
                       <td className="px-4 py-3 text-right text-sm font-semibold" style={{ color: 'var(--c-text)' }}>{formatCurrency(item.valor_saldo)}</td>
@@ -612,7 +613,7 @@ export default function ObraGestao() {
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{item.origem}</td>
                       <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{item.nome_original}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{formatDate(item.createdAt)}</td>
-                      <td className="px-4 py-3.5 text-right">
+                      <td className="px-4 py-3 text-right">
                         <button type="button" className="btn btn-outline" onClick={() => abrirArquivo(item)}>
                           Abrir
                         </button>
@@ -680,8 +681,8 @@ export default function ObraGestao() {
       )}
 
       {novoItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]">
-          <div className="card w-full max-w-xl px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="card w-full max-w-xl px-6 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Novo item do orcamento</h2>
@@ -737,6 +738,6 @@ export default function ObraGestao() {
           </div>
         </div>
       )}
-    </div>
+    </Pagina>
   );
 }

@@ -54,6 +54,26 @@ primário por tela; a hierarquia segue o foco). Campos raros do form em
 (`recolhidoPadrao={!temDado}`, com `key` por registro para remontar). Mesma
 rota, mesmos handlers — reorganização pura.
 
+## Escala e decisões nos componentes (pivô de 02/09)
+
+- **Critério vigente: CONFORTO E CLAREZA DE LEITURA** (correção de direção do
+  cliente, 02/09 — substitui o "denso"): linha de tabela com respiro (corpo
+  14px, altura de linha 1.5, vão de 12px), blocos que respiram, nada abaixo
+  de 12px. Entre "cabe mais" e "lê-se melhor", vence a leitura.
+- **`styles/escala.css` é a única fonte de medida** — espaço 4/8/12/16/24/32/48,
+  tipo 12/14/18/22 com papel fixo, raios 8/12/14. Tela reformada não escreve
+  pixel (R10 no docs/REGRAS-LAYOUT.md; o verificador reprova).
+- **`Pagina`**: raiz de toda tela reformada. Dá o ritmo vertical (16px entre
+  blocos) e o título de página (22px). A tela só declara os blocos na ordem.
+- **Coluna de `TabelaPadrao` declara `tipo`, não largura**: `texto` (sobra),
+  `codigo` 130, `valor` 150 à direita tabular, `numero` 110, `data` 110,
+  `status` 96, `badge` 120. `largura`/`minWidth` só sobrevivem como exceção
+  registrada no manifesto.
+- **`CampoForm` aceita `tipo`** (`texto-longo`/`observacao` tomam a linha);
+  moeda continua na classe `.input-moeda` do input.
+- **`.app-painel-lateral`**: painel de apoio ao lado da lista (mín. 320px em
+  tela larga) — a medida mora na classe, não na tela.
+
 ## Tokens e utilitários novos
 
 - `--ui-surface-2` (`#f7f9fc` claro / `#182642` escuro): branco rebaixado de

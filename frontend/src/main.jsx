@@ -11,6 +11,7 @@ import { installFetchSecurityDefaults } from './services/api';
 import './index.css';
 import './styles/design-tokens.css';
 import './components/lista-avancada/lista-avancada.css';
+import './styles/escala.css';
 import './styles/componentes-padrao.css';
 import './modules/solicitacao-compra/compras-responsive.css';
 import './styles/responsive-system.css';

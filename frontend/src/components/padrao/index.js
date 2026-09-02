@@ -1,3 +1,4 @@
+export { default as Pagina } from './Pagina';
 export { default as PageHeader } from './PageHeader';
 export { default as MenuMais } from './MenuMais';
 export { default as BlocoConteudo } from './BlocoConteudo';
