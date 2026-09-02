@@ -340,7 +340,6 @@ export const NAV_MODULES = [
       || canAccessBancosEnterprise(user)
       || canAccessPagamentos(user)
       || canAccessBoletos(user)
-      || canAccessCustosRecebiveis(user)
     ),
     children: [
       { id: 'fin-receber', ordem: 20, label: 'Contas a Receber', desc: 'Títulos a receber em aberto e baixados.', icon: HiOutlineArrowDownCircle, to: '/financeiro/contas-a-receber', can: (user) => canAccessFinanceiro(user) },
@@ -360,8 +359,17 @@ export const NAV_MODULES = [
       { id: 'fin-caixas', ordem: 50, label: 'Caixas e Contas', desc: 'Caixas operacionais e contas bancárias.', icon: HiOutlineWallet, to: '/financeiro/caixas', can: (user) => canAccessFinanceiro(user) },
       { id: 'fin-cadastros', ordem: 190, label: 'Cadastros Financeiros', desc: 'Categorias, formas de pagamento e afins.', icon: HiOutlineRectangleGroup, to: '/financeiro/cadastros', can: (user) => canAccessFinanceiro(user) },
       { id: 'fin-upload-comprovantes', fixavel: 'acao', ordem: 140, label: 'Upload Comprovantes', desc: 'Envio de comprovantes de pagamento.', icon: HiOutlineCloudArrowUp, to: '/comprovantes/upload', can: (user) => canAccessFinanceiro(user) },
-      { id: 'fin-comprovantes-pendentes', ordem: 150, label: 'Comprovantes Pendentes', desc: 'Comprovantes aguardando conferência.', icon: HiOutlineReceiptRefund, to: '/comprovantes/pendentes', can: (user) => canAccessFinanceiro(user) },
-      { id: 'custos-recebiveis', ordem: 180, label: 'Custos e Recebíveis', desc: 'Análise de custos e recebíveis por obra.', icon: HiOutlineArrowTrendingUp, to: '/custos-recebiveis', can: (user) => canAccessCustosRecebiveis(user) }
+      { id: 'fin-comprovantes-pendentes', ordem: 150, label: 'Comprovantes Pendentes', desc: 'Comprovantes aguardando conferência.', icon: HiOutlineReceiptRefund, to: '/comprovantes/pendentes', can: (user) => canAccessFinanceiro(user) }
+    ]
+  },
+  {
+    id: 'custos-recebiveis',
+    label: 'Custos e Recebíveis',
+    desc: 'Planejamento, custos realizados e recebíveis por obra.',
+    icon: HiOutlineArrowTrendingUp,
+    gate: (user) => canAccessCustosRecebiveis(user),
+    children: [
+      { id: 'custos-recebiveis', ordem: 10, label: 'Custos e Recebíveis', desc: 'Planejamento, custos realizados e recebíveis por obra.', icon: HiOutlineArrowTrendingUp, to: '/custos-recebiveis', can: (user) => canAccessCustosRecebiveis(user) }
     ]
   },
   {
