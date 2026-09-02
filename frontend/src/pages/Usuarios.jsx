@@ -179,7 +179,7 @@ export default function Usuarios() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 110,
+      largura: 96,
       render: (u) => <StatusBadge status={u.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
@@ -188,9 +188,8 @@ export default function Usuarios() {
     <div className="page solicitacoes-page">
       <PageHeader
         titulo="Usuarios"
-        subtitulo={loading
-          ? 'Cadastro, importacao e gestao operacional de usuarios.'
-          : `${usuarios.length} usuario(s) · cadastro, importacao e gestao operacional.`}
+        contagem={loading ? null : `${usuarios.length} usuario(s)`}
+        subtitulo="Cadastro, importacao e gestao operacional de usuarios."
         acaoPrincipal={{ rotulo: 'Novo usuario', onClick: () => navigate('/usuarios/novo') }}
         mais={[
           { rotulo: 'Baixar modelo CSV', onClick: baixarModeloImportacaoUsuarios },
@@ -235,7 +234,7 @@ export default function Usuarios() {
             itens={usuarios}
             carregando={loading}
             storageKey="tabela:usuarios"
-            larguraAcoes={330}
+            larguraAcoes={320}
             aoClicarLinha={(u) => navigate(`/usuarios/${u.id}`)}
             vazio={{
               title: 'Nenhum usuario cadastrado',

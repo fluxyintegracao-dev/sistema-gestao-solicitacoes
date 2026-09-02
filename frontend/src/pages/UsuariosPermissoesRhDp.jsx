@@ -161,7 +161,7 @@ export default function UsuariosPermissoesRhDp() {
           cor="var(--c-primary)"
           acoes={(
             <input
-              className="input input-sm w-[220px]"
+              className="input input-sm app-busca"
               placeholder="Nome, email, perfil ou setor"
               aria-label="Buscar usuario"
               value={filtro}

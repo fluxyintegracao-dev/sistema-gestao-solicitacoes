@@ -1624,7 +1624,7 @@ export default function FinanceiroTituloDetalhe() {
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Valor referencia</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     inputMode="decimal"
                     value={baixaForm.valor_referencia_bem}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, valor_referencia_bem: normalizeCurrencyTyping(event.target.value) }))}
@@ -1647,7 +1647,7 @@ export default function FinanceiroTituloDetalhe() {
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Valor base</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     inputMode="decimal"
                     value={baixaForm.valor}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))}
@@ -1658,7 +1658,7 @@ export default function FinanceiroTituloDetalhe() {
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Juros</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     inputMode="decimal"
                     value={baixaForm.juros}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, juros: normalizeCurrencyTyping(event.target.value) }))}
@@ -1668,7 +1668,7 @@ export default function FinanceiroTituloDetalhe() {
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Multa</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     inputMode="decimal"
                     value={baixaForm.multa}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, multa: normalizeCurrencyTyping(event.target.value) }))}
@@ -1678,7 +1678,7 @@ export default function FinanceiroTituloDetalhe() {
                 <label className="text-sm">
                   <span className="mb-1 block text-slate-500">Desconto</span>
                   <input
-                    className="input w-full"
+                    className="input input-moeda w-full"
                     inputMode="decimal"
                     value={baixaForm.desconto}
                     onChange={(event) => setBaixaForm((current) => ({ ...current, desconto: normalizeCurrencyTyping(event.target.value) }))}

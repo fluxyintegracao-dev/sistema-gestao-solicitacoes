@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getTiposSolicitacao,
   criarTipoSolicitacao,
@@ -20,6 +20,7 @@ import {
   FormSecao,
   CampoForm
 } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
 
 const BEHAVIOR_FIELDS = [
@@ -89,7 +90,6 @@ export default function TiposSolicitacao() {
   const [editComportamento, setEditComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
   const [saving, setSaving] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
-  const formRef = useRef(null);
 
   async function carregar() {
     const [tiposData, setoresData, cfg] = await Promise.all([
@@ -117,7 +117,6 @@ export default function TiposSolicitacao() {
 
   function abrirNovoTipo() {
     setFormAberto(true);
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   async function handleSubmit(e) {
@@ -239,7 +238,7 @@ export default function TiposSolicitacao() {
       id: 'nome',
       titulo: 'Nome',
       largura: 210,
-      minWidth: 150,
+      minWidth: 160,
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (
@@ -303,7 +302,7 @@ export default function TiposSolicitacao() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 110,
+      largura: 96,
       render: (t) => <StatusBadge status={t.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
@@ -317,21 +316,17 @@ export default function TiposSolicitacao() {
       />
 
       <div className="space-y-3">
-        {/* PADRÃO DE TELA MISTA (piloto Parceiros): o form de criação abre
-            como painel ACIMA da lista e assume a barra de cor; a lista
-            rebaixa para neutra enquanto o painel está ativo. */}
+        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+            principal do cabeçalho; a lista é o bloco primário PERMANENTE. */}
         {formAberto && (
-          <div ref={formRef}>
-            <BlocoConteudo
-              titulo="Novo tipo"
-              variante="primario"
-              cor="var(--sem-info)"
-              acoes={(
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                  Fechar
-                </button>
-              )}
-            >
+          <OverlayModal rotulo="Novo tipo" onFechar={() => setFormAberto(false)}>
+            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo tipo</h3>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                Fechar
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-3">
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <FormSecao legenda="Identificacao" colunas={2}>
                   <CampoForm label="Nome do tipo" obrigatorio>
@@ -389,19 +384,19 @@ export default function TiposSolicitacao() {
                   </button>
                 </div>
               </form>
-            </BlocoConteudo>
-          </div>
+            </div>
+          </OverlayModal>
         )}
 
         <BlocoConteudo
           titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
-          variante={formAberto ? 'neutro' : 'primario'}
+          variante="primario"
           cor="var(--c-primary)"
           acoes={(
-            <label className="flex items-center gap-2 text-sm font-normal">
+            <label className="app-busca flex items-center gap-2 text-sm font-normal">
               <span className="text-[var(--c-muted)]">Setor</span>
               <select
-                className="input input-sm w-[200px]"
+                className="input input-sm flex-1"
                 value={setorSelecionado}
                 onChange={e => setSetorSelecionado(e.target.value)}
                 aria-label="Setor dos tipos listados e do vinculo de novos tipos"
@@ -420,7 +415,7 @@ export default function TiposSolicitacao() {
             colunas={colunas}
             itens={tiposFiltrados}
             storageKey="tabela:tipos-solicitacao"
-            larguraAcoes={330}
+            larguraAcoes={320}
             aoClicarLinha={(t) => {
               // Clique na linha abre a edição inline; com uma edição ativa
               // o clique não faz nada (evita perder o que foi digitado).

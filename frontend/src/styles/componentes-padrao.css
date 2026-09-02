@@ -139,9 +139,14 @@
 }
 
 .app-bloco-acoes {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.45rem;
+  /* R3: a área de ações cresce para a busca ocupar a faixa (220–480px). */
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .app-bloco-corpo {

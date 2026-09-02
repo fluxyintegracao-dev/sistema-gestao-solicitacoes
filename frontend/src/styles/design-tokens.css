@@ -839,8 +839,9 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
+  /* R2 (REGRAS-LAYOUT): alvo mínimo de 32px. */
+  width: 32px;
+  height: 32px;
   border: 1px solid var(--ui-border);
   border-radius: 9px;
   background: var(--ui-surface);

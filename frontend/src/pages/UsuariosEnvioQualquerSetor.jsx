@@ -140,7 +140,7 @@ export default function UsuariosEnvioQualquerSetor() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 110,
+      largura: 96,
       render: (usuario) => <StatusBadge status={usuario?.ativo !== false ? 'Ativo' : 'Inativo'} />
     }
   ];
@@ -168,7 +168,7 @@ export default function UsuariosEnvioQualquerSetor() {
           cor="var(--c-primary)"
           acoes={(
             <input
-              className="input input-sm w-[220px]"
+              className="input input-sm app-busca"
               placeholder="Nome, email, perfil ou setor"
               aria-label="Buscar usuario"
               value={busca}

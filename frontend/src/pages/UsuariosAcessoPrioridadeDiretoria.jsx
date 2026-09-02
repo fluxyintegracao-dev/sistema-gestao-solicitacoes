@@ -198,7 +198,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 100,
+      largura: 96,
       render: (usuario) => <StatusBadge status={usuario?.ativo !== false ? 'Ativo' : 'Inativo'} />
     },
     {
@@ -293,7 +293,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
           cor="var(--c-primary)"
           acoes={(
             <input
-              className="input input-sm w-[220px]"
+              className="input input-sm app-busca"
               placeholder="Nome, email, perfil ou setor"
               aria-label="Buscar usuario"
               value={busca}

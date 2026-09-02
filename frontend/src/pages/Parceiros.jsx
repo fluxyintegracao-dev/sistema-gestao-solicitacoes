@@ -392,7 +392,7 @@ export default function Parceiros() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 100,
+      largura: 96,
       render: (p) => <StatusBadge status={p.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
@@ -664,7 +664,7 @@ export default function Parceiros() {
           cor="var(--c-primary)"
           acoes={(
             <input
-              className="input input-sm w-[220px]"
+              className="input input-sm app-busca"
               placeholder="Buscar pessoa"
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}
@@ -687,7 +687,7 @@ export default function Parceiros() {
                   </label>
                   <select
                     id="pessoas-page-size"
-                    className="input input-sm w-[110px]"
+                    className="input input-sm w-28"
                     value={pageSize}
                     onChange={(event) => setPageSize(event.target.value)}
                   >

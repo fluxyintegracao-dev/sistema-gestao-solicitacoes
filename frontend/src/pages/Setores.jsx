@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getSetores,
   criarSetor,
@@ -13,6 +13,7 @@ import {
   FormSecao,
   CampoForm
 } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
 
 const CAPABILITY_FIELDS = [
@@ -48,7 +49,6 @@ export default function Setores() {
   const [editCapabilities, setEditCapabilities] = useState(emptyCapabilities);
   const [saving, setSaving] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
-  const formRef = useRef(null);
 
   useEffect(() => {
     carregarSetores();
@@ -68,7 +68,6 @@ export default function Setores() {
 
   function abrirNovoSetor() {
     setFormAberto(true);
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   async function handleSubmit(e) {
@@ -127,7 +126,7 @@ export default function Setores() {
       id: 'nome',
       titulo: 'Nome',
       largura: 220,
-      minWidth: 150,
+      minWidth: 160,
       noCard: 'titulo',
       render: (s) => (
         editId === s.id ? (
@@ -191,7 +190,7 @@ export default function Setores() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 110,
+      largura: 96,
       render: (s) => <StatusBadge status={s.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
@@ -200,28 +199,23 @@ export default function Setores() {
     <div className="page solicitacoes-page">
       <PageHeader
         titulo="Setores"
-        subtitulo={loading
-          ? 'Cadastro e manutencao de setores.'
-          : `${setores.length} setor(es) · cadastro e manutencao.`}
+        contagem={loading ? undefined : `${setores.length} setor(es)`}
+        subtitulo="Cadastro e manutencao de setores."
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
 
       <div className="space-y-3">
-        {/* PADRÃO DE TELA MISTA (piloto Parceiros): o form de criação abre
-            como painel ACIMA da lista e assume a barra de cor; a lista
-            rebaixa para neutra enquanto o painel está ativo. */}
+        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+            principal do cabeçalho; a lista é o bloco primário PERMANENTE. */}
         {formAberto && (
-          <div ref={formRef}>
-            <BlocoConteudo
-              titulo="Novo setor"
-              variante="primario"
-              cor="var(--sem-info)"
-              acoes={(
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                  Fechar
-                </button>
-              )}
-            >
+          <OverlayModal rotulo="Novo setor" onFechar={() => setFormAberto(false)}>
+            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo setor</h3>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                Fechar
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-3">
               <form className="space-y-4" onSubmit={handleSubmit}>
                 <FormSecao legenda="Identificacao" colunas={2}>
                   <CampoForm label="Nome do setor" obrigatorio>
@@ -268,13 +262,13 @@ export default function Setores() {
                   </button>
                 </div>
               </form>
-            </BlocoConteudo>
-          </div>
+            </div>
+          </OverlayModal>
         )}
 
         <BlocoConteudo
           titulo="Setores cadastrados"
-          variante={formAberto ? 'neutro' : 'primario'}
+          variante="primario"
           cor="var(--c-primary)"
         >
           <TabelaPadrao

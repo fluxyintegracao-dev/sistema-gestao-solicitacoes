@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   atualizarCategoriaParceiro,
   criarCategoriaParceiro,
@@ -12,6 +12,7 @@ import {
   FormSecao,
   CampoForm
 } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
 
 function defaultCategoriaForm() {
@@ -45,7 +46,6 @@ export default function ParceiroCategorias() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filtro, setFiltro] = useState('');
-  const formRef = useRef(null);
 
   async function carregar() {
     try {
@@ -79,13 +79,11 @@ export default function ParceiroCategorias() {
   function abrirNovaCategoria() {
     setCategoriaForm(defaultCategoriaForm());
     setFormAberto(true);
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   function abrirEdicao(categoria) {
     setCategoriaForm(pickCategoriaFormData(categoria));
     setFormAberto(true);
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   function fecharForm() {
@@ -141,7 +139,7 @@ export default function ParceiroCategorias() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 120,
+      largura: 96,
       render: (categoria) => <StatusBadge status={categoria.ativo ? 'Ativa' : 'Inativa'} />
     }
   ];
@@ -161,21 +159,24 @@ export default function ParceiroCategorias() {
       )}
 
       <div className="space-y-3">
-        {/* PADRÃO DE TELA MISTA (piloto Parceiros): o form abre como painel
-            ACIMA da lista e assume a barra de cor; a lista rebaixa para
-            neutra enquanto o painel está ativo. */}
+        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+            principal do cabeçalho (e pela edição na linha); a lista é o
+            bloco primário PERMANENTE. */}
         {formAberto && (
-          <div ref={formRef} key={categoriaForm.id || 'nova'}>
-            <BlocoConteudo
-              titulo={categoriaForm.id ? `Editar categoria — ${categoriaForm.nome || ''}` : 'Nova categoria'}
-              variante="primario"
-              cor="var(--sem-info)"
-              acoes={(
-                <button type="button" className="btn btn-outline btn-sm" onClick={fecharForm}>
-                  Fechar
-                </button>
-              )}
-            >
+          <OverlayModal
+            key={categoriaForm.id || 'nova'}
+            rotulo={categoriaForm.id ? 'Editar categoria' : 'Nova categoria'}
+            onFechar={fecharForm}
+          >
+            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+              <h3 className="text-base font-semibold text-[var(--c-text)]">
+                {categoriaForm.id ? `Editar categoria — ${categoriaForm.nome || ''}` : 'Nova categoria'}
+              </h3>
+              <button type="button" className="btn btn-outline btn-sm" onClick={fecharForm}>
+                Fechar
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-3">
               <form className="space-y-4" onSubmit={handleSalvarCategoria}>
                 <FormSecao legenda="Identificacao" colunas={2}>
                   <CampoForm label="Nome da categoria" obrigatorio>
@@ -208,17 +209,17 @@ export default function ParceiroCategorias() {
                   </button>
                 </div>
               </form>
-            </BlocoConteudo>
-          </div>
+            </div>
+          </OverlayModal>
         )}
 
         <BlocoConteudo
           titulo="Categorias cadastradas"
-          variante={formAberto ? 'neutro' : 'primario'}
+          variante="primario"
           cor="var(--c-primary)"
           acoes={(
             <input
-              className="input input-sm w-[220px]"
+              className="input input-sm app-busca"
               placeholder="Buscar categoria"
               value={filtro}
               onChange={(e) => setFiltro(e.target.value)}

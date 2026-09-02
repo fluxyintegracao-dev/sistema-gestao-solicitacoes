@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getTiposSubContrato,
   criarTipoSubContrato,
@@ -18,6 +18,7 @@ import {
   FormSecao,
   CampoForm
 } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
 
 function setorKey(setor) {
@@ -51,7 +52,6 @@ export default function TiposSubContrato() {
   const [editNome, setEditNome] = useState('');
   const [editMacroId, setEditMacroId] = useState('');
   const [saving, setSaving] = useState(false);
-  const formRef = useRef(null);
 
   async function carregar() {
     const data = await getTiposSubContrato();
@@ -82,7 +82,6 @@ export default function TiposSubContrato() {
 
   function abrirNovoSubtipo() {
     setFormAberto(true);
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
   }
 
   async function handleSubmit(e) {
@@ -241,7 +240,7 @@ export default function TiposSubContrato() {
       id: 'subtipo',
       titulo: 'Subtipo',
       largura: 200,
-      minWidth: 150,
+      minWidth: 160,
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (
@@ -286,7 +285,7 @@ export default function TiposSubContrato() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 150,
+      largura: 96,
       render: (t) => {
         const macro = macroDoSubtipo(t);
         const statusTipo = macro?.ativo === false ? 'inativo' : 'ativo';
@@ -310,23 +309,19 @@ export default function TiposSubContrato() {
       />
 
       <div className="space-y-3">
-        {/* PADRÃO DE TELA MISTA (piloto Parceiros): a lista é o bloco
-            principal em largura total; o formulário de cadastro abre como
-            painel ACIMA quando acionado e assume a barra de cor — a lista
-            rebaixa para neutra. O seletor de Setor ficou junto da lista
-            porque também é o recorte dela (mesmo estado de sempre). */}
+        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+            principal do cabeçalho; a lista é o bloco primário PERMANENTE.
+            O seletor de Setor ficou junto da lista porque também é o recorte
+            dela (mesmo estado de sempre). */}
         {formAberto && (
-          <div ref={formRef}>
-            <BlocoConteudo
-              titulo="Novo subtipo"
-              variante="primario"
-              cor="var(--sem-info)"
-              acoes={(
-                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                  Fechar
-                </button>
-              )}
-            >
+          <OverlayModal rotulo="Novo subtipo" onFechar={() => setFormAberto(false)}>
+            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo subtipo</h3>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                Fechar
+              </button>
+            </div>
+            <div className="overflow-y-auto px-4 py-3">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <FormSecao legenda="Dados do subtipo" colunas={3}>
                   <CampoForm
@@ -369,18 +364,18 @@ export default function TiposSubContrato() {
                   O subtipo continua vinculado ao ID do tipo. O setor serve para evitar escolher um tipo duplicado por engano.
                 </p>
               </form>
-            </BlocoConteudo>
-          </div>
+            </div>
+          </OverlayModal>
         )}
 
         <BlocoConteudo
           titulo="Subtipos cadastrados"
-          variante={formAberto ? 'neutro' : 'primario'}
+          variante="primario"
           cor="var(--c-primary)"
           acoes={(
             <>
               <select
-                className="input input-sm w-[220px]"
+                className="input input-sm app-busca"
                 aria-label="Setor"
                 value={setorSelecionado}
                 onChange={e => {
