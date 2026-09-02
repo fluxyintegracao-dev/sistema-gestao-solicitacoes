@@ -824,6 +824,24 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
       .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'));
   }, [fornecedor.fornecedor_compra_id, itensGanhos, itensSelecionados]);
 
+  // A TabelaPadrao sempre oferece "selecionar todos" na selecao em lote;
+  // aqui isso marca (ou limpa) todos os itens ganhos, ja preenchendo a
+  // quantidade a remanejar de cada um — o mesmo que `toggleItem` faz um a um.
+  function marcarTodosItensGanhos(marcar) {
+    setDestinoFornecedorId('');
+    if (!marcar) {
+      setItensSelecionados([]);
+      setQuantidadesRemanejar({});
+      return;
+    }
+    const elegiveis = itensGanhos.filter((item) => item.resposta_item_id);
+    setItensSelecionados(elegiveis.map((item) => item.resposta_item_id));
+    setQuantidadesRemanejar(elegiveis.reduce((acumulado, item) => ({
+      ...acumulado,
+      [String(item.resposta_item_id)]: formatNumeroCompra(item.quantidade)
+    }), {}));
+  }
+
   function toggleItem(item) {
     const respItemId = item.resposta_item_id;
     setItensSelecionados((prev) => {
@@ -934,40 +952,29 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                 </button>
               )}
             </div>
-            <div className="compras-responsive-table rounded-xl border border-[var(--c-border)]">
-              <table className="table min-w-[720px] w-full">
-                <thead>
-                  <tr>
-                    {modoRemanejar && <th className="w-8"></th>}
-                    <th>Item</th>
-                    <th>Qtd</th>
-                    <th>Preco unit.</th>
-                    <th>Total</th>
-                    {!modoRemanejar && <th>Prazo</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {itensGanhos.map((it) => (
-                    <tr key={it.resposta_item_id || it.nome}>
-                      {modoRemanejar && (
-                        <td>
-                          <input
-                            type="checkbox"
-                            checked={itensSelecionados.includes(it.resposta_item_id)}
-                            onChange={() => toggleItem(it)}
-                          />
-                        </td>
-                      )}
-                      <td>
-                        <div className="font-medium">{it.nome || '-'}</div>
-                        {it.especificacao && <div className="text-xs text-[var(--c-muted)]">{it.especificacao}</div>}
-                      </td>
-                      <td>
-                        {it.quantidade} {it.unidade || ''}
+            <div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'item',
+                    titulo: 'Item',
+                    // R17: o nome do insumo nomeia a linha ganha.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (it) => <CelulaDupla principal={it.nome || '-'} sub={it.especificacao || null} />
+                  },
+                  {
+                    id: 'quantidade',
+                    titulo: 'Qtd',
+                    tipo: 'numero',
+                    render: (it) => (
+                      <span className="block">
+                        <span>{it.quantidade} {it.unidade || ''}</span>
                         {modoRemanejar && itensSelecionados.includes(it.resposta_item_id) && (
                           <input
                             className="input mt-2 h-8 w-24 px-2 text-xs"
                             value={quantidadesRemanejar[String(it.resposta_item_id)] ?? ''}
+                            aria-label={`Quantidade a remanejar de ${it.nome || 'item'}`}
                             onChange={(event) => setQuantidadesRemanejar((current) => ({
                               ...current,
                               [String(it.resposta_item_id)]: event.target.value
@@ -975,21 +982,53 @@ function ModalPedidoFinal({ fornecedor, itensGanhos, solicitacaoId, onRemanejame
                             placeholder="Qtd."
                           />
                         )}
-                      </td>
-                      <td>{fmtMoeda(it.preco)}</td>
-                      <td className="font-semibold">{fmtMoeda(Number(it.quantidade) * Number(it.preco || 0))}</td>
-                      {!modoRemanejar && <td>{it.prazo || '-'}</td>}
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr>
-                    <td colSpan={modoRemanejar ? 4 : 3} className="text-right font-semibold text-sm pr-2">Total do pedido:</td>
-                    <td className="font-bold text-emerald-700">{fmtMoeda(totalGanho)}</td>
-                    {!modoRemanejar && <td></td>}
-                  </tr>
-                </tfoot>
-              </table>
+                      </span>
+                    )
+                  },
+                  {
+                    id: 'preco',
+                    titulo: 'Preco unit.',
+                    tipo: 'valor',
+                    render: (it) => fmtMoeda(it.preco)
+                  },
+                  {
+                    id: 'total',
+                    titulo: 'Total',
+                    tipo: 'valor',
+                    ordenavel: true,
+                    ordemInicial: 'desc',
+                    valorOrdenacao: (it) => Number(it.quantidade) * Number(it.preco || 0),
+                    render: (it) => <span className="font-semibold">{fmtMoeda(Number(it.quantidade) * Number(it.preco || 0))}</span>
+                  },
+                  ...(modoRemanejar ? [] : [
+                    {
+                      id: 'prazo',
+                      titulo: 'Prazo',
+                      tipo: 'texto',
+                      render: (it) => it.prazo || '-'
+                    }
+                  ])
+                ]}
+                itens={itensGanhos}
+                getId={(it) => it.resposta_item_id || it.nome}
+                storageKey="tabela:gerenciar-cotacao:itens-ganhos"
+                rotuloRolagem="Itens que este fornecedor ganhou"
+                vazio="Nenhum item ganho por este fornecedor."
+                {...(modoRemanejar ? {
+                  selecao: {
+                    selecionados: itensSelecionados,
+                    aoAlternar: (id, it) => toggleItem(it),
+                    aoAlternarTodos: (marcar) => marcarTodosItensGanhos(marcar),
+                    elegivel: (it) => Boolean(it.resposta_item_id)
+                  }
+                } : null)}
+              />
+              {/* O total saiu do <tfoot> e virou resumo apartado: a
+                  TabelaPadrao nao tem rodape de tabela. */}
+              <div className="mt-2 flex items-center justify-end gap-2 text-sm">
+                <span className="font-semibold">Total do pedido:</span>
+                <strong className="font-bold text-emerald-700">{fmtMoeda(totalGanho)}</strong>
+              </div>
             </div>
           </div>
 
@@ -2002,100 +2041,135 @@ function SecaoComparativo({
                 )}
               </div>
 
-              <div className="app-table-shell compras-responsive-table">
-                <table className="table min-w-[1180px] text-xs">
-                  <thead>
-                    <tr>
-                      <th>Fornecedor</th>
-                      <th>Qtd. disponivel</th>
-                      <th>Preco unit.</th>
-                      <th>Valor total</th>
-                      <th>IPI</th>
-                      <th>ICMS</th>
-                      <th>ST</th>
-                      <th>DIFAL</th>
-                      <th>Frete</th>
-                      <th>Prazo entrega</th>
-                      <th>Cond. pag.</th>
-                      <th>Qtd. min.</th>
-                      <th>Observacao</th>
-                      <th className="min-w-[150px]">Comprar</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {item.respostas.map((resp) => {
-                      const quantidadeAlocada = getQuantidadeAlocada(resp.resposta_item_id);
-                      const isVencedor = quantidadeAlocada > 0;
-                      const totalAlocadoItem = getTotalAlocadoItem(item);
-                      const saldoDisponivel = getSaldoDisponivelItem(item);
-                      const excedeu = totalAlocadoItem > saldoDisponivel + 0.0001;
-                      return (
-                        <tr
-                          key={`${item.id}-${resp.fornecedor_id}`}
-                          className={`cotacao-comparativo-resposta ${isVencedor ? 'cotacao-comparativo-resposta-vencedora bg-emerald-50' : ''} ${excedeu ? 'cotacao-comparativo-resposta-excedida bg-amber-50' : ''}`}
-                        >
-                          <td className="text-xs font-medium">{resp.fornecedor_nome}</td>
-                          <td>
-                            <span className="block font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</span>
-                            <span className="block text-[10px] text-blue-700">Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
-                          </td>
-                          <td>{resp.preco ? fmtMoeda(resp.preco) : '-'}</td>
-                          <td className="font-medium">{resp.preco ? fmtMoeda(resp.valor_total_cotado) : '-'}</td>
-                          <td>{fmtMoeda(resp.ipi_valor)}</td>
-                          <td>{fmtMoeda(resp.icms_valor)}</td>
-                          <td>{fmtMoeda(resp.st_valor)}</td>
-                          <td>{fmtMoeda(resp.difal_valor)}</td>
-                          <td className="max-w-[130px] text-xs">
-                            {resp.frete_tipo === 'SEM_FRETE'
-                              ? 'Sem frete'
-                              : `${resp.frete_tipo === 'TERCEIRO' ? 'Terceiro' : 'Embutido'} ${fmtMoeda(resp.frete_item_valor || resp.frete_valor)}${resp.frete_modo === 'POR_ITEM' ? ' (item)' : ' (global)'}`}
-                          </td>
-                          <td>{resp.prazo_entrega_fornecedor || '-'}</td>
-                          <td className="max-w-[150px] text-xs">{resp.condicao_pagamento || '-'}</td>
-                          <td>{resp.quantidade_minima_item || '-'}</td>
-                          <td className="max-w-[160px] text-xs">{resp.observacao || '-'}</td>
-                          <td>
-                            {resp.resposta_item_id ? (
-                              <div className="flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={isVencedor}
-                                  disabled={!podeEncerrar || getSaldoDisponivelFornecedor(resp) <= 0 || !resp.disponivel || !resp.preco}
-                                  onChange={(event) => {
-                                    const checked = event.target.checked;
-                                    onVencedorChange({
-                                      item,
-                                      resposta: resp,
-                                      quantidade: checked
-                                        ? getQuantidadeInicialSelecao(item, resp)
-                                        : 0
-                                    });
-                                  }}
-                                />
-                                <input
-                                  className="input h-8 w-20 px-2 text-xs"
-                                  value={isVencedor ? getQuantidadeAlocadaInput(resp.resposta_item_id) : ''}
-                                  placeholder="Qtd."
-                                  disabled={!podeEncerrar || !isVencedor}
-                                  onChange={(event) => onVencedorChange({
-                                    item,
-                                    resposta: resp,
-                                    quantidade: event.target.value
-                                  })}
-                                />
-                                {excedeu ? (
-                                  <span className="text-[10px] font-semibold text-amber-700" title="Exige justificativa no fechamento">
-                                    Acima do solicitado
-                                  </span>
-                                ) : null}
-                              </div>
-                            ) : '-'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div>
+                <TabelaPadrao
+                  colunas={[
+                    {
+                      id: 'fornecedor',
+                      titulo: 'Fornecedor',
+                      // R17: o fornecedor e quem nomeia a resposta.
+                      tipo: 'identidade',
+                      noCard: 'titulo',
+                      render: (resp) => resp.fornecedor_nome
+                    },
+                    {
+                      id: 'quantidade_disponivel',
+                      titulo: 'Qtd. disponivel',
+                      tipo: 'numero',
+                      render: (resp) => (
+                        <span className="block">
+                          <span className="block font-semibold text-emerald-700">{formatNumeroCompra(resp.quantidade_disponivel)}</span>
+                          <span className="block text-[10px] text-blue-700">Saldo: {formatNumeroCompra(getSaldoDisponivelFornecedor(resp))}</span>
+                        </span>
+                      )
+                    },
+                    {
+                      id: 'preco',
+                      titulo: 'Preco unit.',
+                      tipo: 'valor',
+                      ordenavel: true,
+                      valorOrdenacao: (resp) => (resp.preco ? parseNumeroCompra(resp.preco) : null),
+                      render: (resp) => (resp.preco ? fmtMoeda(resp.preco) : '-')
+                    },
+                    {
+                      id: 'valor_total_cotado',
+                      titulo: 'Valor total',
+                      tipo: 'valor',
+                      ordenavel: true,
+                      valorOrdenacao: (resp) => (resp.preco ? parseNumeroCompra(resp.valor_total_cotado) : null),
+                      render: (resp) => (resp.preco ? <span className="font-medium">{fmtMoeda(resp.valor_total_cotado)}</span> : '-')
+                    },
+                    { id: 'ipi_valor', titulo: 'IPI', tipo: 'valor', render: (resp) => fmtMoeda(resp.ipi_valor) },
+                    { id: 'icms_valor', titulo: 'ICMS', tipo: 'valor', render: (resp) => fmtMoeda(resp.icms_valor) },
+                    { id: 'st_valor', titulo: 'ST', tipo: 'valor', render: (resp) => fmtMoeda(resp.st_valor) },
+                    { id: 'difal_valor', titulo: 'DIFAL', tipo: 'valor', render: (resp) => fmtMoeda(resp.difal_valor) },
+                    {
+                      id: 'frete',
+                      titulo: 'Frete',
+                      tipo: 'texto',
+                      render: (resp) => (
+                        resp.frete_tipo === 'SEM_FRETE'
+                          ? 'Sem frete'
+                          : `${resp.frete_tipo === 'TERCEIRO' ? 'Terceiro' : 'Embutido'} ${fmtMoeda(resp.frete_item_valor || resp.frete_valor)}${resp.frete_modo === 'POR_ITEM' ? ' (item)' : ' (global)'}`
+                      )
+                    },
+                    {
+                      id: 'prazo_entrega_fornecedor',
+                      titulo: 'Prazo entrega',
+                      tipo: 'texto',
+                      render: (resp) => resp.prazo_entrega_fornecedor || '-'
+                    },
+                    {
+                      id: 'condicao_pagamento',
+                      titulo: 'Cond. pag.',
+                      tipo: 'texto',
+                      render: (resp) => resp.condicao_pagamento || '-'
+                    },
+                    {
+                      id: 'quantidade_minima_item',
+                      titulo: 'Qtd. min.',
+                      tipo: 'numero',
+                      render: (resp) => resp.quantidade_minima_item || '-'
+                    },
+                    {
+                      id: 'observacao',
+                      titulo: 'Observacao',
+                      tipo: 'texto',
+                      render: (resp) => resp.observacao || '-'
+                    }
+                  ]}
+                  itens={item.respostas}
+                  getId={(resp) => `${item.id}-${resp.fornecedor_id}`}
+                  storageKey="tabela:gerenciar-cotacao:respostas-item"
+                  rotuloRolagem={`Respostas dos fornecedores para ${item.nome}`}
+                  vazio="Nenhuma resposta para este item."
+                  // Linha vencedora (quantidade alocada > 0) fica realcada; o
+                  // aviso de rodada acima do saldo vira tarja de atencao.
+                  linhaSelecionada={(resp) => getQuantidadeAlocada(resp.resposta_item_id) > 0}
+                  urgencia={() => (getTotalAlocadoItem(item) > getSaldoDisponivelItem(item) + 0.0001 ? 'warning' : null)}
+                  larguraAcoes={260}
+                  acoesLinha={(resp) => {
+                    const quantidadeAlocada = getQuantidadeAlocada(resp.resposta_item_id);
+                    const isVencedor = quantidadeAlocada > 0;
+                    const excedeu = getTotalAlocadoItem(item) > getSaldoDisponivelItem(item) + 0.0001;
+                    if (!resp.resposta_item_id) return '-';
+                    return (
+                      <>
+                        <input
+                          type="checkbox"
+                          checked={isVencedor}
+                          aria-label={`Comprar de ${resp.fornecedor_nome}`}
+                          disabled={!podeEncerrar || getSaldoDisponivelFornecedor(resp) <= 0 || !resp.disponivel || !resp.preco}
+                          onChange={(event) => {
+                            const checked = event.target.checked;
+                            onVencedorChange({
+                              item,
+                              resposta: resp,
+                              quantidade: checked ? getQuantidadeInicialSelecao(item, resp) : 0
+                            });
+                          }}
+                        />
+                        <input
+                          className="input h-8 w-20 px-2 text-xs"
+                          value={isVencedor ? getQuantidadeAlocadaInput(resp.resposta_item_id) : ''}
+                          placeholder="Qtd."
+                          aria-label={`Quantidade comprada de ${resp.fornecedor_nome}`}
+                          disabled={!podeEncerrar || !isVencedor}
+                          onChange={(event) => onVencedorChange({
+                            item,
+                            resposta: resp,
+                            quantidade: event.target.value
+                          })}
+                        />
+                        {excedeu ? (
+                          <span className="text-[10px] font-semibold text-amber-700" title="Exige justificativa no fechamento">
+                            Acima do solicitado
+                          </span>
+                        ) : null}
+                      </>
+                    );
+                  }}
+                />
               </div>
             </div>
           ))}
