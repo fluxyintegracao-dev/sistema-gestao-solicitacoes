@@ -8,6 +8,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { hasPermissao } from '../utils/acessoProduto';
+import { TabelaPadrao } from '../components/padrao';
 
 const money = (value) => Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const dateBr = (value) => value ? String(value).slice(0, 10).split('-').reverse().join('/') : '-';
@@ -55,19 +56,35 @@ function Modal({ item, onClose, onReverse, canReverse, saving }) {
                 <p className="mt-1 text-sm text-[var(--c-muted)]">
                   {component.contaBancaria?.nome || component.cartao?.nome || component.chequeTerceiro?.codigo || 'Sem instrumento financeiro'}
                 </p>
-                <div className="finance-operation-table-shell mt-3">
-                  <table className="table min-w-[560px]">
-                    <thead><tr><th>Título</th><th>Descrição</th><th className="text-right">Valor alocado</th></tr></thead>
-                    <tbody>
-                      {(component.alocacoes || []).map((allocation) => (
-                        <tr key={allocation.id}>
-                          <td>{allocation.titulo?.codigo}</td>
-                          <td>{allocation.titulo?.descricao}</td>
-                          <td className="text-right">{money(allocation.valor)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="mt-3">
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'titulo',
+                        titulo: 'Título',
+                        // R17: o código do título NOMEIA a alocação.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (allocation) => allocation.titulo?.codigo
+                      },
+                      {
+                        id: 'descricao',
+                        titulo: 'Descrição',
+                        tipo: 'texto',
+                        render: (allocation) => allocation.titulo?.descricao
+                      },
+                      {
+                        id: 'valor',
+                        titulo: 'Valor alocado',
+                        tipo: 'valor',
+                        render: (allocation) => money(allocation.valor)
+                      }
+                    ]}
+                    itens={component.alocacoes || []}
+                    storageKey="tabela:baixas-compostas:alocacoes"
+                    rotuloRolagem={`Alocações da fonte ${component.ordem}`}
+                    vazio="Nenhuma alocação nesta fonte."
+                  />
                 </div>
               </section>
             ))}
@@ -127,7 +144,28 @@ export default function FinanceiroBaixasCompostas() {
     <header><p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Financeiro · Rastreabilidade</p><h1 className="text-2xl font-bold">Baixas com múltiplas fontes</h1><p className="text-sm text-[var(--c-muted)]">Consulte os pagamentos combinados, suas fontes, alocações e estornos.</p></header>
     {error ? <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div> : null}
     <section className="card p-4"><div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_220px_auto]"><label className="form-control"><span>Empresa</span><select className="select" value={filters.empresa_id} onChange={(event) => setFilters((value) => ({ ...value, empresa_id: event.target.value }))}><option value="">Todas</option>{companies.map((company) => <option key={company.id} value={company.id}>{company.nome}</option>)}</select></label><label className="form-control"><span>Status</span><select className="select" value={filters.status} onChange={(event) => setFilters((value) => ({ ...value, status: event.target.value }))}><option value="">Todos</option><option value="CONFIRMADO">Confirmados</option><option value="ESTORNADO">Estornados</option></select></label><button type="button" className="btn btn-outline self-end" disabled={loading} onClick={load}><HiOutlineArrowPath className={loading ? 'animate-spin' : ''} /> Atualizar</button></div></section>
-    <section className="card overflow-hidden"><div className="overflow-x-auto"><table className="table min-w-[900px]"><thead><tr><th>Código</th><th>Data</th><th>Empresa</th><th>Credor</th><th className="text-right">Valor</th><th>Status</th><th /></tr></thead><tbody>{items.map((item) => <tr key={item.id}><td><strong>{item.codigo}</strong></td><td>{dateBr(item.data_movimento)}</td><td>{item.empresa?.nome}</td><td>{item.parceiro?.nome}</td><td className="text-right font-semibold">{money(item.valor_quitacao)}</td><td>{item.status}</td><td><button type="button" className="btn btn-outline btn-sm" title="Ver composição" onClick={() => open(item.id)}><HiOutlineEye /></button></td></tr>)}</tbody></table></div>{!loading && !items.length ? <div className="p-8 text-center text-sm text-[var(--c-muted)]">Nenhuma baixa composta encontrada.</div> : null}</section>
+    <section className="card overflow-hidden">
+      <TabelaPadrao
+        colunas={[
+          { id: 'codigo', titulo: 'Código', tipo: 'codigo', render: (item) => <strong>{item.codigo}</strong> },
+          { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => dateBr(item.data_movimento) },
+          { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa?.nome },
+          // R17: o credor NOMEIA a baixa composta.
+          { id: 'credor', titulo: 'Credor', tipo: 'identidade', noCard: 'titulo', render: (item) => item.parceiro?.nome },
+          { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => item.valor_quitacao == null ? '-' : money(item.valor_quitacao) },
+          { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status }
+        ]}
+        itens={items}
+        carregando={loading}
+        vazio="Nenhuma baixa composta encontrada."
+        storageKey="tabela:baixas-compostas"
+        rotuloRolagem="Baixas com múltiplas fontes"
+        acoesLinha={(item) => (
+          <button type="button" className="btn btn-outline btn-sm" title="Ver composição" onClick={() => open(item.id)}><HiOutlineEye /></button>
+        )}
+        larguraAcoes={120}
+      />
+    </section>
     {selected ? <Modal item={selected} onClose={() => setSelected(null)} onReverse={reverse} canReverse={canReverse} saving={saving} /> : null}
   </div>;
 }

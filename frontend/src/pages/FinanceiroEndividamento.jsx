@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioEndividamentoFinanceiro } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -14,35 +14,6 @@ const DEFAULT_FILTERS = {
   obra_id: '',
   excluir_intercompany: true
 };
-
-const EMPRESAS_COLUMNS = [
-  { key: 'empresa', width: 190, minWidth: 130 },
-  { key: 'titulos', width: 86, minWidth: 74 },
-  { key: 'saldo', width: 132, minWidth: 112 }
-];
-
-const CATEGORIAS_COLUMNS = [
-  { key: 'categoria', width: 190, minWidth: 130 },
-  { key: 'titulos', width: 86, minWidth: 74 },
-  { key: 'saldo', width: 132, minWidth: 112 }
-];
-
-const TITULOS_COLUMNS = [
-  { key: 'vencimento', width: 116, minWidth: 98 },
-  { key: 'titulo', width: 180, minWidth: 130 },
-  { key: 'empresa', width: 170, minWidth: 128 },
-  { key: 'categoria', width: 180, minWidth: 130 },
-  { key: 'parceiro', width: 190, minWidth: 130 },
-  { key: 'saldo', width: 132, minWidth: 112 }
-];
-
-const CREDITO_ROTATIVO_COLUMNS = [
-  { key: 'data', width: 116, minWidth: 98 },
-  { key: 'empresa', width: 190, minWidth: 140 },
-  { key: 'natureza', width: 130, minWidth: 112 },
-  { key: 'documento', width: 150, minWidth: 120 },
-  { key: 'valor', width: 138, minWidth: 118 }
-];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -66,16 +37,6 @@ function Metric({ label, value, detail, critical = false }) {
       </strong>
       {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
     </div>
-  );
-}
-
-function EmptyRow({ colSpan, message }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center text-[var(--c-muted)]">
-        {message}
-      </td>
-    </tr>
   );
 }
 
@@ -292,34 +253,25 @@ export default function FinanceiroEndividamento() {
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Por empresa</h2>
               <p className="text-sm text-[var(--c-muted)]">Saldo aberto por empresa do titulo.</p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={EMPRESAS_COLUMNS}
-                storageKey="fluxy.financeiro.endividamento.empresas.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                    <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
-                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {empresasResumo.length === 0 ? (
-                    <EmptyRow colSpan={3} message="Nenhuma empresa com divida classificada." />
-                  ) : (
-                    empresasResumo.map((empresa) => (
-                      <tr key={empresa.empresa_id || empresa.empresa_nome}>
-                        <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                        <td className="text-right">{empresa.titulos}</td>
-                        <td className="text-right font-semibold">{formatCurrency(empresa.saldo_total)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'empresa',
+                  titulo: 'Empresa',
+                  // R17: a empresa NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (empresa) => empresa.empresa_nome
+                },
+                { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (empresa) => empresa.titulos },
+                { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (empresa) => formatCurrency(empresa.saldo_total) }
+              ]}
+              itens={empresasResumo}
+              getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+              storageKey="tabela:financeiro-endividamento:empresas"
+              rotuloRolagem="Endividamento por empresa"
+              vazio="Nenhuma empresa com divida classificada."
+            />
           </section>
 
           <section className="card sol-surface-card app-table-shell">
@@ -327,34 +279,25 @@ export default function FinanceiroEndividamento() {
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Por categoria</h2>
               <p className="text-sm text-[var(--c-muted)]">Apenas categorias marcadas como Endividamento.</p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={CATEGORIAS_COLUMNS}
-                storageKey="fluxy.financeiro.endividamento.categorias.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                    <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
-                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoriasResumo.length === 0 ? (
-                    <EmptyRow colSpan={3} message="Nenhuma categoria classificada como endividamento." />
-                  ) : (
-                    categoriasResumo.map((categoria) => (
-                      <tr key={categoria.categoria_id || categoria.categoria_nome}>
-                        <td className="font-semibold text-[var(--c-text)]">{categoria.categoria_nome}</td>
-                        <td className="text-right">{categoria.titulos}</td>
-                        <td className="text-right font-semibold">{formatCurrency(categoria.saldo_total)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'categoria',
+                  titulo: 'Categoria',
+                  // R17: a categoria NOMEIA a linha deste resumo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (categoria) => categoria.categoria_nome
+                },
+                { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (categoria) => categoria.titulos },
+                { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (categoria) => formatCurrency(categoria.saldo_total) }
+              ]}
+              itens={categoriasResumo}
+              getId={(categoria) => categoria.categoria_id || categoria.categoria_nome}
+              storageKey="tabela:financeiro-endividamento:categorias"
+              rotuloRolagem="Endividamento por categoria"
+              vazio="Nenhuma categoria classificada como endividamento."
+            />
           </section>
 
           <section className="card sol-surface-card app-table-shell xl:col-span-3">
@@ -364,43 +307,41 @@ export default function FinanceiroEndividamento() {
                 A origem do numero e a classificacao gerencial da categoria financeira, sem leitura por texto livre.
               </p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={TITULOS_COLUMNS}
-                storageKey="fluxy.financeiro.endividamento.titulos.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="vencimento">Vencimento</ResizableTh>
-                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
-                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                    <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                    <ResizableTh columnKey="parceiro">Parceiro</ResizableTh>
-                    <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {titulos.length === 0 ? (
-                    <EmptyRow colSpan={6} message="Nenhum titulo de endividamento encontrado para os filtros." />
-                  ) : (
-                    titulos.map((titulo) => (
-                      <tr key={titulo.id}>
-                        <td className={titulo.vencido ? 'font-semibold text-red-700' : ''}>{formatDate(titulo.data_vencimento)}</td>
-                        <td>
-                          <div className="font-semibold text-[var(--c-text)]">{titulo.codigo || `Titulo #${titulo.id}`}</div>
-                          <div className="text-xs text-[var(--c-muted)]">{titulo.descricao || titulo.numero_documento || '-'}</div>
-                        </td>
-                        <td>{titulo.empresa_nome}</td>
-                        <td>{titulo.categoria_nome}</td>
-                        <td>{titulo.parceiro_nome || '-'}</td>
-                        <td className="text-right font-semibold">{formatCurrency(titulo.valor_saldo)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'vencimento',
+                  titulo: 'Vencimento',
+                  tipo: 'data',
+                  render: (titulo) => (
+                    <span className={titulo.vencido ? 'font-semibold text-red-700' : undefined}>
+                      {formatDate(titulo.data_vencimento)}
+                    </span>
+                  )
+                },
+                {
+                  id: 'titulo',
+                  titulo: 'Titulo',
+                  // R17: o codigo do titulo NOMEIA o registro.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (titulo) => (
+                    <div>
+                      <div className="font-semibold text-[var(--c-text)]">{titulo.codigo || `Titulo #${titulo.id}`}</div>
+                      <div className="text-xs text-[var(--c-muted)]">{titulo.descricao || titulo.numero_documento || '-'}</div>
+                    </div>
+                  )
+                },
+                { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (titulo) => titulo.empresa_nome },
+                { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (titulo) => titulo.categoria_nome },
+                { id: 'parceiro', titulo: 'Parceiro', tipo: 'texto', render: (titulo) => titulo.parceiro_nome || '-' },
+                { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo) }
+              ]}
+              itens={titulos}
+              storageKey="tabela:financeiro-endividamento:titulos"
+              rotuloRolagem="Titulos classificados como endividamento"
+              vazio="Nenhum titulo de endividamento encontrado para os filtros."
+            />
           </section>
 
           <section className="card sol-surface-card app-table-shell xl:col-span-3">
@@ -410,40 +351,35 @@ export default function FinanceiroEndividamento() {
                 Liberacoes e amortizacoes conciliadas pelo extrato, sem cadastro de linha e sem impacto na DRE.
               </p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={CREDITO_ROTATIVO_COLUMNS}
-                storageKey="fluxy.financeiro.endividamento.creditoRotativo.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="data">Data</ResizableTh>
-                    <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                    <ResizableTh columnKey="natureza">Natureza</ResizableTh>
-                    <ResizableTh columnKey="documento">Documento</ResizableTh>
-                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimentosCreditoRotativo.length === 0 ? (
-                    <EmptyRow colSpan={5} message="Nenhuma movimentacao de credito rotativo encontrada." />
-                  ) : movimentosCreditoRotativo.map((movimento) => (
-                    <tr key={movimento.id}>
-                      <td>{formatDate(movimento.data_movimento)}</td>
-                      <td>{movimento.empresa_nome}</td>
-                      <td>
-                        <span className={`badge ${movimento.natureza === 'LIBERACAO' ? 'badge-success' : 'badge-danger'}`}>
-                          {movimento.natureza === 'LIBERACAO' ? 'Liberacao' : 'Amortizacao'}
-                        </span>
-                      </td>
-                      <td>{movimento.documento || '-'}</td>
-                      <td className="text-right font-semibold">{formatCurrency(movimento.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                { id: 'data', titulo: 'Data', tipo: 'data', render: (movimento) => formatDate(movimento.data_movimento) },
+                {
+                  id: 'empresa',
+                  titulo: 'Empresa',
+                  // R17: a empresa NOMEIA a movimentacao de credito rotativo.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (movimento) => movimento.empresa_nome
+                },
+                {
+                  id: 'natureza',
+                  titulo: 'Natureza',
+                  tipo: 'badge',
+                  render: (movimento) => (
+                    <span className={`badge ${movimento.natureza === 'LIBERACAO' ? 'badge-success' : 'badge-danger'}`}>
+                      {movimento.natureza === 'LIBERACAO' ? 'Liberacao' : 'Amortizacao'}
+                    </span>
+                  )
+                },
+                { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (movimento) => movimento.documento || '-' },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (movimento) => formatCurrency(movimento.valor) }
+              ]}
+              itens={movimentosCreditoRotativo}
+              storageKey="tabela:financeiro-endividamento:credito-rotativo"
+              rotuloRolagem="Movimentacoes de credito rotativo"
+              vazio="Nenhuma movimentacao de credito rotativo encontrada."
+            />
           </section>
         </div>
       )}

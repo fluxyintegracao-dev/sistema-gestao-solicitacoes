@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   atualizarInsumo,
   criarInsumo,
@@ -240,79 +241,63 @@ export default function GestaoInsumos() {
           <h2 className="font-semibold">Insumos cadastrados</h2>
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
-        ) : (
-          <div className="compras-responsive-table">
-          <table className="table min-w-[920px]">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Codigo</th>
-                <th>Unidade</th>
-                <th>Categoria</th>
-                <th>Descricao</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {insumosFiltrados.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.nome}</td>
-                  <td>{item.codigo || '-'}</td>
-                  <td>
-                    {item.unidade_manual ? (
-                      <span className="text-red-600 dark:text-red-400 font-semibold">{item.unidade_manual}</span>
-                    ) : (
-                      item.unidade?.sigla || item.unidade?.nome || '-'
-                    )}
-                  </td>
-                  <td>{item.categoria?.nome || '-'}</td>
-                  <td>{item.descricao || '-'}</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-outline" onClick={() => abrirEdicao(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn btn-danger" onClick={() => handleExcluir(item.id)}>
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {insumosFiltrados.length === 0 && (
-                <tr>
-                  <td colSpan="6" align="center">Nenhum insumo cadastrado.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        )}
-        {!loading && insumosFiltrados.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Insumos cadastrados">
-            {insumosFiltrados.map((item) => (
-              <article key={`mobile-${item.id}`} className="compras-mobile-record">
-                <div className="compras-mobile-record-head">
-                  <div className="compras-mobile-record-title">
-                    <strong>{item.nome}</strong>
-                    <span>{item.codigo || 'Sem codigo'}</span>
-                  </div>
-                </div>
-                <div className="compras-mobile-record-grid">
-                  <div className="compras-mobile-field"><span>Unidade</span><strong>{item.unidade_manual || item.unidade?.sigla || item.unidade?.nome || '-'}</strong></div>
-                  <div className="compras-mobile-field"><span>Categoria</span><strong>{item.categoria?.nome || '-'}</strong></div>
-                  <div className="compras-mobile-field"><span>Descricao</span><strong>{item.descricao || '-'}</strong></div>
-                </div>
-                <div className="compras-mobile-record-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => abrirEdicao(item)}>Editar</button>
-                  <button type="button" className="btn btn-danger" onClick={() => handleExcluir(item.id)}>Excluir</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.nome
+            },
+            {
+              id: 'codigo',
+              titulo: 'Codigo',
+              tipo: 'codigo',
+              render: (item) => item.codigo || '-'
+            },
+            {
+              id: 'unidade',
+              titulo: 'Unidade',
+              tipo: 'codigo',
+              render: (item) => (
+                item.unidade_manual ? (
+                  <span className="text-red-600 dark:text-red-400 font-semibold">{item.unidade_manual}</span>
+                ) : (
+                  item.unidade?.sigla || item.unidade?.nome || '-'
+                )
+              )
+            },
+            {
+              id: 'categoria',
+              titulo: 'Categoria',
+              tipo: 'texto',
+              render: (item) => item.categoria?.nome || '-'
+            },
+            {
+              id: 'descricao',
+              titulo: 'Descricao',
+              tipo: 'texto',
+              render: (item) => item.descricao || '-'
+            }
+          ]}
+          itens={insumosFiltrados}
+          carregando={loading}
+          vazio="Nenhum insumo cadastrado."
+          storageKey="tabela:gestao-insumos"
+          rotuloRolagem="Insumos cadastrados"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => abrirEdicao(item)}>
+                Editar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => handleExcluir(item.id)}>
+                Excluir
+              </button>
+            </>
+          )}
+          larguraAcoes={240}
+        />
       </div>
 
       {modalAberto && (

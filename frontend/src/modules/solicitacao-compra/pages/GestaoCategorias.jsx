@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   atualizarCategoria,
   criarCategoria,
@@ -192,76 +193,46 @@ export default function GestaoCategorias() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
-        ) : (
-          <div className="compras-responsive-table">
-          <table className="table min-w-[560px]">
-            <thead>
-              <tr>
-                <th className="w-12">
-                  <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
-                </th>
-                <th>Nome</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categorias.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selecionados.includes(item.id)}
-                      onChange={() => toggleSelecionado(item.id)}
-                    />
-                  </td>
-                  <td>{item.nome}</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {categorias.length === 0 && (
-                <tr>
-                  <td colSpan="3" align="center">Nenhuma categoria cadastrada.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        )}
-        {!loading && categorias.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Categorias cadastradas">
-            {categorias.map((item) => (
-              <article key={`mobile-${item.id}`} className="compras-mobile-record">
-                <div className="compras-mobile-record-head">
-                  <label className="compras-mobile-record-title">
-                    <strong>{item.nome}</strong>
-                    <span>Categoria do modulo de Compras</span>
-                  </label>
-                  <input
-                    type="checkbox"
-                    checked={selecionados.includes(item.id)}
-                    onChange={() => toggleSelecionado(item.id)}
-                    aria-label={`Selecionar categoria ${item.nome}`}
-                  />
-                </div>
-                <div className="compras-mobile-record-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>Editar</button>
-                  <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>Excluir</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'selecao',
+              titulo: 'Sel.',
+              tipo: 'status',
+              render: (item) => (
+                <input
+                  type="checkbox"
+                  checked={selecionados.includes(item.id)}
+                  onChange={() => toggleSelecionado(item.id)}
+                  aria-label={`Selecionar categoria ${item.nome}`}
+                />
+              )
+            },
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.nome
+            }
+          ]}
+          itens={categorias}
+          carregando={loading}
+          vazio="Nenhuma categoria cadastrada."
+          storageKey="tabela:gestao-categorias"
+          rotuloRolagem="Categorias cadastradas"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
+                Editar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
+                Excluir
+              </button>
+            </>
+          )}
+          larguraAcoes={240}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   atualizarUnidade,
   criarUnidade,
@@ -221,78 +222,52 @@ export default function GestaoUnidades() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
-        ) : (
-          <div className="compras-responsive-table">
-          <table className="table min-w-[640px]">
-            <thead>
-              <tr>
-                <th className="w-12">
-                  <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
-                </th>
-                <th>Nome</th>
-                <th>Sigla</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {unidades.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selecionados.includes(item.id)}
-                      onChange={() => toggleSelecionado(item.id)}
-                    />
-                  </td>
-                  <td>{item.nome}</td>
-                  <td>{item.sigla}</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {unidades.length === 0 && (
-                <tr>
-                  <td colSpan="4" align="center">Nenhuma unidade cadastrada.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        )}
-        {!loading && unidades.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Unidades cadastradas">
-            {unidades.map((item) => (
-              <article key={`mobile-${item.id}`} className="compras-mobile-record">
-                <div className="compras-mobile-record-head">
-                  <div className="compras-mobile-record-title">
-                    <strong>{item.nome}</strong>
-                    <span>Sigla: {item.sigla || '-'}</span>
-                  </div>
-                  <input
-                    type="checkbox"
-                    checked={selecionados.includes(item.id)}
-                    onChange={() => toggleSelecionado(item.id)}
-                    aria-label={`Selecionar unidade ${item.nome}`}
-                  />
-                </div>
-                <div className="compras-mobile-record-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>Editar</button>
-                  <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>Excluir</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'selecao',
+              titulo: 'Sel.',
+              tipo: 'status',
+              render: (item) => (
+                <input
+                  type="checkbox"
+                  checked={selecionados.includes(item.id)}
+                  onChange={() => toggleSelecionado(item.id)}
+                  aria-label={`Selecionar unidade ${item.nome}`}
+                />
+              )
+            },
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.nome
+            },
+            {
+              id: 'sigla',
+              titulo: 'Sigla',
+              tipo: 'codigo',
+              render: (item) => item.sigla || '-'
+            }
+          ]}
+          itens={unidades}
+          carregando={loading}
+          vazio="Nenhuma unidade cadastrada."
+          storageKey="tabela:gestao-unidades"
+          rotuloRolagem="Unidades cadastradas"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
+                Editar
+              </button>
+              <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
+                Excluir
+              </button>
+            </>
+          )}
+          larguraAcoes={240}
+        />
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -298,48 +299,65 @@ export default function RhDpFechamentos() {
       </div>
 
       <div className="sol-surface-card rounded-xl p-4">
-        {carregandoBase || carregandoLista ? (
-          <p className="text-sm text-slate-500">Carregando fechamentos RH/DP...</p>
-        ) : !fechamentos.length ? (
-          <p className="text-sm text-slate-500">Nenhum fechamento encontrado para os filtros atuais.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-3 py-2 font-medium">Competencia</th>
-                  <th className="px-3 py-2 font-medium">Empresa</th>
-                  <th className="px-3 py-2 font-medium">Obra</th>
-                  <th className="px-3 py-2 font-medium">Vencimento</th>
-                  <th className="px-3 py-2 font-medium">Titulos</th>
-                  <th className="px-3 py-2 font-medium">Valor</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fechamentos.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top">
-                    <td className="px-3 py-3">{item.apuracao?.competencia || '-'}</td>
-                    <td className="px-3 py-3">{item.apuracao?.empresaGrupo?.nome || '-'}</td>
-                    <td className="px-3 py-3">{item.apuracao?.obra?.nome || 'Todas as obras'}</td>
-                    <td className="px-3 py-3">{formatDate(item.data_vencimento)}</td>
-                    <td className="px-3 py-3">{item.total_titulos || 0}</td>
-                    <td className="px-3 py-3">{formatCurrency(item.total_valor)}</td>
-                    <td className="px-3 py-3">
-                      <span className={statusClass(item.status)}>{item.status}</span>
-                    </td>
-                    <td className="px-3 py-3">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => selecionarFechamento(item)}>
-                        Abrir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'competencia',
+              titulo: 'Competencia',
+              tipo: 'codigo',
+              render: (item) => item.apuracao?.competencia || '-'
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              // R17: a EMPRESA do grupo é o que nomeia o lote fechado.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.apuracao?.empresaGrupo?.nome || '-'
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (item) => item.apuracao?.obra?.nome || 'Todas as obras'
+            },
+            {
+              id: 'vencimento',
+              titulo: 'Vencimento',
+              tipo: 'data',
+              render: (item) => formatDate(item.data_vencimento)
+            },
+            {
+              id: 'titulos',
+              titulo: 'Titulos',
+              tipo: 'numero',
+              render: (item) => item.total_titulos || 0
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (item) => formatCurrency(item.total_valor)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => <span className={statusClass(item.status)}>{item.status}</span>
+            }
+          ]}
+          itens={fechamentos}
+          storageKey="tabela:rh-dp-fechamentos:lista"
+          rotuloRolagem="Fechamentos RH/DP"
+          carregando={carregandoBase || carregandoLista}
+          vazio="Nenhum fechamento encontrado para os filtros atuais."
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => selecionarFechamento(item)}>
+              Abrir
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
 
       {detalhe ? (
@@ -393,49 +411,67 @@ export default function RhDpFechamentos() {
                 </div>
               ) : null}
 
-              {!detalhe.titulos?.length ? (
-                <p className="text-sm text-slate-500">Nenhum titulo foi vinculado a este fechamento.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 text-left text-slate-500">
-                        <th className="px-3 py-2 font-medium">Colaborador</th>
-                        <th className="px-3 py-2 font-medium">Vinculo</th>
-                        <th className="px-3 py-2 font-medium">Titulo</th>
-                        <th className="px-3 py-2 font-medium">Parceiro</th>
-                        <th className="px-3 py-2 font-medium">Obra</th>
-                        <th className="px-3 py-2 font-medium">Valor</th>
-                        <th className="px-3 py-2 font-medium">Vencimento</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detalhe.titulos.map((item) => (
-                        <tr key={item.id} className="border-b border-slate-100 align-top">
-                          <td className="px-3 py-3">
-                            <div className="font-medium text-slate-800">{item.itemApuracao?.colaborador?.nome || '-'}</div>
-                            <div className="text-xs text-slate-500">
-                              {item.itemApuracao?.colaborador?.matricula || '-'}
-                            </div>
-                          </td>
-                          <td className="px-3 py-3">{item.itemApuracao?.colaborador?.tipo_vinculo || '-'}</td>
-                          <td className="px-3 py-3">
-                            {item.tituloFinanceiro?.id ? (
-                              <Link className="text-blue-600 hover:underline" to={`/financeiro/titulos/${item.tituloFinanceiro.id}`}>
-                                #{item.tituloFinanceiro.id} - {item.tituloFinanceiro.descricao || 'Titulo'}
-                              </Link>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-3">{item.tituloFinanceiro?.parceiro?.nome || '-'}</td>
-                          <td className="px-3 py-3">{item.tituloFinanceiro?.obra?.nome || '-'}</td>
-                          <td className="px-3 py-3">{formatCurrency(item.valor_gerado || item.itemApuracao?.valor_liquido)}</td>
-                          <td className="px-3 py-3">{formatDate(item.tituloFinanceiro?.data_vencimento)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'colaborador',
+                    titulo: 'Colaborador',
+                    // R17: o titulo gerado pertence a um COLABORADOR nomeado.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => (
+                      <CelulaDupla
+                        principal={item.itemApuracao?.colaborador?.nome || '-'}
+                        sub={item.itemApuracao?.colaborador?.matricula || '-'}
+                      />
+                    )
+                  },
+                  {
+                    id: 'vinculo',
+                    titulo: 'Vinculo',
+                    tipo: 'badge',
+                    render: (item) => item.itemApuracao?.colaborador?.tipo_vinculo || '-'
+                  },
+                  {
+                    id: 'titulo',
+                    titulo: 'Titulo',
+                    tipo: 'texto',
+                    render: (item) => (item.tituloFinanceiro?.id ? (
+                      <Link className="text-blue-600 hover:underline" to={`/financeiro/titulos/${item.tituloFinanceiro.id}`}>
+                        #{item.tituloFinanceiro.id} - {item.tituloFinanceiro.descricao || 'Titulo'}
+                      </Link>
+                    ) : '-')
+                  },
+                  {
+                    id: 'parceiro',
+                    titulo: 'Parceiro',
+                    tipo: 'texto',
+                    render: (item) => item.tituloFinanceiro?.parceiro?.nome || '-'
+                  },
+                  {
+                    id: 'obra',
+                    titulo: 'Obra',
+                    tipo: 'texto',
+                    render: (item) => item.tituloFinanceiro?.obra?.nome || '-'
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (item) => formatCurrency(item.valor_gerado || item.itemApuracao?.valor_liquido)
+                  },
+                  {
+                    id: 'vencimento',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: (item) => formatDate(item.tituloFinanceiro?.data_vencimento)
+                  }
+                ]}
+                itens={detalhe.titulos || []}
+                storageKey="tabela:rh-dp-fechamentos:titulos"
+                rotuloRolagem="Titulos do fechamento"
+                vazio="Nenhum titulo foi vinculado a este fechamento."
+              />
             </>
           )}
         </div>

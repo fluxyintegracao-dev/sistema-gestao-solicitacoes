@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
@@ -13,23 +13,6 @@ const DEFAULT_FILTERS = {
   holding_id: '',
   excluir_intercompany: true
 };
-
-const EMPRESAS_CAIXA_COLUMNS = [
-  { key: 'empresa', width: 250, minWidth: 180 },
-  { key: 'entradas', width: 150, minWidth: 120 },
-  { key: 'saidas', width: 150, minWidth: 120 },
-  { key: 'saldo', width: 140, minWidth: 115 }
-];
-
-const RESULTADO_COLUMNS = [
-  { key: 'nome', width: 220, minWidth: 160 },
-  { key: 'resultado', width: 150, minWidth: 120 }
-];
-
-const INTERCOMPANY_COLUMNS = [
-  { key: 'relacao', width: 280, minWidth: 180 },
-  { key: 'valor', width: 140, minWidth: 115 }
-];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -75,16 +58,6 @@ function Metric({ label, value, detail, color }) {
       </strong>
       {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
     </div>
-  );
-}
-
-function EmptyRow({ colSpan, message }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center text-[var(--c-muted)]">
-        {message}
-      </td>
-    </tr>
   );
 }
 
@@ -324,38 +297,35 @@ export default function FinanceiroExecutivoGrupo() {
                   Usa a empresa informada na baixa financeira.
                 </p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  columns={EMPRESAS_CAIXA_COLUMNS}
-                  storageKey="fluxy.financeiro.grupoConsolidado.empresasCaixa.columnWidths"
-                  className="table"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                      <ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh>
-                      <ResizableTh columnKey="saidas" className="text-right">Saidas</ResizableTh>
-                      <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topEmpresasCaixa.length === 0 ? (
-                      <EmptyRow colSpan={4} message="Nenhuma empresa com movimento realizado no periodo." />
-                    ) : (
-                      topEmpresasCaixa.map((empresa) => (
-                        <tr key={empresa.empresa_id || empresa.empresa_nome}>
-                          <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                          <td className="text-right">{formatCurrency(empresa.entradas_realizadas)}</td>
-                          <td className="text-right">{formatCurrency(empresa.saidas_realizadas)}</td>
-                          <td className="text-right font-semibold" style={{ color: metricColor(empresa.saldo_realizado) }}>
-                            {formatCurrency(empresa.saldo_realizado)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'empresa',
+                    titulo: 'Empresa',
+                    // R17: a empresa NOMEIA a linha do caixa realizado.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (empresa) => empresa.empresa_nome
+                  },
+                  { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.entradas_realizadas) },
+                  { id: 'saidas', titulo: 'Saidas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.saidas_realizadas) },
+                  {
+                    id: 'saldo',
+                    titulo: 'Saldo',
+                    tipo: 'valor',
+                    render: (empresa) => (
+                      <strong style={{ color: metricColor(empresa.saldo_realizado) }}>
+                        {formatCurrency(empresa.saldo_realizado)}
+                      </strong>
+                    )
+                  }
+                ]}
+                itens={topEmpresasCaixa}
+                getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+                storageKey="tabela:financeiro-executivo-grupo:empresas-caixa"
+                rotuloRolagem="Empresas por caixa realizado"
+                vazio="Nenhuma empresa com movimento realizado no periodo."
+              />
             </div>
             ) : null}
 
@@ -406,34 +376,33 @@ export default function FinanceiroExecutivoGrupo() {
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Resultado por empresa</h2>
                 <p className="text-sm text-[var(--c-muted)]">Ordenado pelas empresas com menor resultado liquido.</p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  columns={RESULTADO_COLUMNS}
-                  storageKey="fluxy.financeiro.grupoConsolidado.resultadoEmpresas.columnWidths"
-                  className="table"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="nome">Empresa</ResizableTh>
-                      <ResizableTh columnKey="resultado" className="text-right">Resultado</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topEmpresasResultado.length === 0 ? (
-                      <EmptyRow colSpan={2} message="Nenhuma empresa na DRE do periodo." />
-                    ) : (
-                      topEmpresasResultado.map((empresa) => (
-                        <tr key={empresa.empresa_id || empresa.empresa_nome}>
-                          <td className="font-semibold text-[var(--c-text)]">{empresa.empresa_nome}</td>
-                          <td className="text-right font-semibold" style={{ color: metricColor(empresa.resultado) }}>
-                            {formatCurrency(empresa.resultado)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'nome',
+                    titulo: 'Empresa',
+                    // R17: a empresa NOMEIA a linha do resultado.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (empresa) => empresa.empresa_nome
+                  },
+                  {
+                    id: 'resultado',
+                    titulo: 'Resultado',
+                    tipo: 'valor',
+                    render: (empresa) => (
+                      <strong style={{ color: metricColor(empresa.resultado) }}>
+                        {formatCurrency(empresa.resultado)}
+                      </strong>
+                    )
+                  }
+                ]}
+                itens={topEmpresasResultado}
+                getId={(empresa) => empresa.empresa_id || empresa.empresa_nome}
+                storageKey="tabela:financeiro-executivo-grupo:resultado-empresas"
+                rotuloRolagem="Resultado por empresa"
+                vazio="Nenhuma empresa na DRE do periodo."
+              />
             </div>
             ) : null}
 
@@ -443,34 +412,32 @@ export default function FinanceiroExecutivoGrupo() {
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Obras por caixa</h2>
                 <p className="text-sm text-[var(--c-muted)]">Recebido menos executado na base atual de obras.</p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  columns={RESULTADO_COLUMNS}
-                  storageKey="fluxy.financeiro.grupoConsolidado.resultadoObras.columnWidths"
-                  className="table"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="nome">Obra</ResizableTh>
-                      <ResizableTh columnKey="resultado" className="text-right">Resultado</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topObras.length === 0 ? (
-                      <EmptyRow colSpan={2} message="Nenhuma obra encontrada." />
-                    ) : (
-                      topObras.map((obra) => (
-                        <tr key={obra.id}>
-                          <td className="font-semibold text-[var(--c-text)]">{obra.nome}</td>
-                          <td className="text-right font-semibold" style={{ color: metricColor(obra.resultado_caixa) }}>
-                            {formatCurrency(obra.resultado_caixa)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'nome',
+                    titulo: 'Obra',
+                    // R17: a obra NOMEIA a linha do resultado por caixa.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (obra) => obra.nome
+                  },
+                  {
+                    id: 'resultado',
+                    titulo: 'Resultado',
+                    tipo: 'valor',
+                    render: (obra) => (
+                      <strong style={{ color: metricColor(obra.resultado_caixa) }}>
+                        {formatCurrency(obra.resultado_caixa)}
+                      </strong>
+                    )
+                  }
+                ]}
+                itens={topObras}
+                storageKey="tabela:financeiro-executivo-grupo:resultado-obras"
+                rotuloRolagem="Obras por caixa"
+                vazio="Nenhuma obra encontrada."
+              />
             </div>
             ) : null}
 
@@ -480,34 +447,29 @@ export default function FinanceiroExecutivoGrupo() {
                 <h2 className="text-lg font-semibold text-[var(--c-text)]">Maiores relacoes internas</h2>
                 <p className="text-sm text-[var(--c-muted)]">Origem e destino de movimentos entre empresas.</p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  columns={INTERCOMPANY_COLUMNS}
-                  storageKey="fluxy.financeiro.grupoConsolidado.intercompany.columnWidths"
-                  className="table"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="relacao">Relacao</ResizableTh>
-                      <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {relacoesIntercompany.slice(0, 6).length === 0 ? (
-                      <EmptyRow colSpan={2} message="Nenhuma relacao entre empresas no periodo." />
-                    ) : (
-                      relacoesIntercompany.slice(0, 6).map((relacao) => (
-                        <tr key={`${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}>
-                          <td className="font-semibold text-[var(--c-text)]">
-                            {relacao.empresa_origem_nome}{' -> '}{relacao.empresa_destino_nome}
-                          </td>
-                          <td className="text-right">{formatCurrency(relacao.valor_realizado || relacao.valor_previsto)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'relacao',
+                    titulo: 'Relacao',
+                    // R17: o par origem -> destino NOMEIA a relacao interna.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (relacao) => `${relacao.empresa_origem_nome} -> ${relacao.empresa_destino_nome}`
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (relacao) => formatCurrency(relacao.valor_realizado || relacao.valor_previsto)
+                  }
+                ]}
+                itens={relacoesIntercompany.slice(0, 6)}
+                getId={(relacao) => `${relacao.empresa_origem_id || 'origem'}-${relacao.empresa_destino_id || 'destino'}`}
+                storageKey="tabela:financeiro-executivo-grupo:intercompany"
+                rotuloRolagem="Maiores relacoes internas"
+                vazio="Nenhuma relacao entre empresas no periodo."
+              />
             </div>
             ) : null}
           </section>

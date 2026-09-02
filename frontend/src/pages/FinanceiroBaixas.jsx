@@ -16,6 +16,7 @@ import {
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
+import { TabelaPadrao } from '../components/padrao';
 
 const DEFAULT_FILTERS = {
   tipo: '',
@@ -417,62 +418,65 @@ export default function FinanceiroBaixas() {
             </button>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
-                {['Data', 'Titulo', 'Tipo', 'Parceiro', 'Obra', 'Conta', 'Valor', 'Quitacao', 'Status', 'Acoes'].map((header) => (
-                  <th key={header} className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap">{header}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {loading ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-[var(--c-muted)]">Carregando baixas...</td></tr>
-              ) : null}
-              {!loading && baixas.length === 0 ? (
-                <tr><td colSpan={10} className="px-3 py-8 text-center text-[var(--c-muted)]">Nenhuma baixa encontrada.</td></tr>
-              ) : null}
-              {!loading && baixasPaginadas.map((baixa) => (
-                <tr key={baixa.id} className="align-top hover:bg-[var(--c-bg)]">
-                  <td className="px-3 py-2 whitespace-nowrap">{formatDate(baixa.data_movimento)}</td>
-                  <td className="px-3 py-2">
-                    <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`}>
-                      {baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`}
-                    </Link>
-                    <div className="max-w-[220px] truncate text-[10px] text-[var(--c-muted)]">{baixa.titulo?.descricao || '-'}</div>
-                  </td>
-                  <td className="px-3 py-2 whitespace-nowrap">{baixa.titulo?.tipo || '-'}</td>
-                  <td className="px-3 py-2">
-                    <div className="max-w-[180px] truncate">{baixa.titulo?.parceiro?.nome || '-'}</div>
-                    <div className="text-[10px] text-[var(--c-muted)]">{baixa.titulo?.parceiro?.cpf_cnpj || ''}</div>
-                  </td>
-                  <td className="px-3 py-2">{baixa.titulo?.obra?.nome || '-'}</td>
-                  <td className="px-3 py-2">{baixa.contaBancaria?.nome || '-'}</td>
-                  <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatCurrency(baixa.valor)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap tabular-nums">{formatCurrency(baixa.valor_quitacao)}</td>
-                  <td className="px-3 py-2 whitespace-nowrap"><span className={statusClass(baixa.status)}>{baixa.status}</span></td>
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`} title="Abrir titulo">
-                        <HiOutlineEye className="h-4 w-4" />
-                      </Link>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        onClick={() => estornarBaixa(baixa)}
-                        disabled={processingId === baixa.id || String(baixa.status || '').toUpperCase() !== 'ATIVO'}
-                        title="Estornar baixa"
-                      >
-                        {processingId === baixa.id ? <HiOutlineArrowPath className="h-4 w-4 animate-spin" /> : <HiOutlineBanknotes className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            { id: 'data', titulo: 'Data', tipo: 'data', render: (baixa) => formatDate(baixa.data_movimento) },
+            {
+              id: 'titulo',
+              titulo: 'Titulo',
+              tipo: 'codigo',
+              render: (baixa) => (
+                <div>
+                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`}>
+                    {baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`}
+                  </Link>
+                  <div className="truncate text-xs text-[var(--c-muted)]">{baixa.titulo?.descricao || '-'}</div>
+                </div>
+              )
+            },
+            { id: 'tipo', titulo: 'Tipo', tipo: 'badge', render: (baixa) => baixa.titulo?.tipo || '-' },
+            {
+              id: 'parceiro',
+              titulo: 'Parceiro',
+              // R17: o parceiro NOMEIA a baixa listada.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (baixa) => (
+                <div>
+                  <div className="truncate">{baixa.titulo?.parceiro?.nome || '-'}</div>
+                  <div className="text-xs text-[var(--c-muted)]">{baixa.titulo?.parceiro?.cpf_cnpj || ''}</div>
+                </div>
+              )
+            },
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (baixa) => baixa.titulo?.obra?.nome || '-' },
+            { id: 'conta', titulo: 'Conta', tipo: 'texto', render: (baixa) => baixa.contaBancaria?.nome || '-' },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (baixa) => formatCurrency(baixa.valor) },
+            { id: 'quitacao', titulo: 'Quitacao', tipo: 'valor', render: (baixa) => formatCurrency(baixa.valor_quitacao) },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (baixa) => <span className={statusClass(baixa.status)}>{baixa.status}</span> }
+          ]}
+          itens={loading ? [] : baixasPaginadas}
+          carregando={loading}
+          vazio="Nenhuma baixa encontrada."
+          storageKey="tabela:financeiro-baixas"
+          rotuloRolagem="Baixas financeiras"
+          larguraAcoes={140}
+          acoesLinha={(baixa) => (
+            <>
+              <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`} title="Abrir titulo">
+                <HiOutlineEye className="h-4 w-4" />
+              </Link>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => estornarBaixa(baixa)}
+                disabled={processingId === baixa.id || String(baixa.status || '').toUpperCase() !== 'ATIVO'}
+                title="Estornar baixa"
+              >
+                {processingId === baixa.id ? <HiOutlineArrowPath className="h-4 w-4 animate-spin" /> : <HiOutlineBanknotes className="h-4 w-4" />}
+              </button>
+            </>
+          )}
+        />
       </section>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -307,84 +308,93 @@ export default function RhDpDocumentos() {
         </div>
       </div>
 
-      <div className="card sol-surface-card app-table-shell">
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Colaborador</th>
-                <th>Tipo</th>
-                <th>Arquivo</th>
-                <th>Status</th>
-                <th>Validade</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {documentos.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <div className="font-medium text-slate-900">{item.colaborador?.nome || '-'}</div>
-                    <div className="text-xs text-slate-500">
-                      {formatCpf(item.colaborador?.cpf)} · {item.colaborador?.matricula || '-'} · {item.colaborador?.empresaGrupo?.nome || '-'}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="font-medium text-slate-900">{item.tipoDocumento?.nome || '-'}</div>
-                    <div className="text-xs text-slate-500">{item.colaborador?.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.colaborador?.tipo_vinculo || '-'}</div>
-                  </td>
-                  <td>
-                    <div className="font-medium text-slate-900">{item.nome_original}</div>
-                    <div className="text-xs text-slate-500">{item.observacoes || '-'}</div>
-                  </td>
-                  <td>
-                    <div>{item.status}</div>
-                    <div className="text-xs text-slate-500">{item.ativo ? 'Atual' : 'Historico'}</div>
-                  </td>
-                  <td>
-                    <div>{formatDate(item.validade)}</div>
-                    <div className="text-xs text-slate-500">{validadeLabel(item.validade_status)}</div>
-                  </td>
-                  <td>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" className="btn btn-outline" onClick={() => abrirDocumento(item.id)}>
-                        Abrir
-                      </button>
-                      <Link
-                        to={`/rh-dp/colaboradores?colaborador_id=${item.colaborador_id}`}
-                        className="btn btn-outline"
-                      >
-                        Colaborador
-                      </Link>
-                      {podeEditar && item.ativo && (
-                        <label className={`btn btn-outline cursor-pointer ${substituindoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
-                          Substituir
-                          <input
-                            type="file"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              e.target.value = '';
-                              onSelecionarSubstituicao(item, file);
-                            }}
-                            disabled={substituindoId === item.id}
-                          />
-                        </label>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {!documentos.length && (
-                <tr>
-                  <td colSpan="6" align="center">
-                    {carregando ? 'Carregando...' : 'Nenhum documento localizado'}
-                  </td>
-                </tr>
+      <div className="card sol-surface-card">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'colaborador',
+              titulo: 'Colaborador',
+              // R17: o documento é lido pelo COLABORADOR dono dele.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.colaborador?.nome || '-'}
+                  sub={`${formatCpf(item.colaborador?.cpf)} · ${item.colaborador?.matricula || '-'} · ${item.colaborador?.empresaGrupo?.nome || '-'}`}
+                />
+              )
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'texto',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.tipoDocumento?.nome || '-'}
+                  sub={item.colaborador?.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.colaborador?.tipo_vinculo || '-'}
+                />
+              )
+            },
+            {
+              id: 'arquivo',
+              titulo: 'Arquivo',
+              tipo: 'texto',
+              render: (item) => (
+                <CelulaDupla principal={item.nome_original} sub={item.observacoes || '-'} />
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => (
+                <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Historico'} />
+              )
+            },
+            {
+              id: 'validade',
+              titulo: 'Validade',
+              tipo: 'data',
+              render: (item) => (
+                <CelulaDupla principal={formatDate(item.validade)} sub={validadeLabel(item.validade_status)} />
+              )
+            }
+          ]}
+          itens={documentos}
+          storageKey="tabela:rh-dp-documentos"
+          rotuloRolagem="Documentos RH/DP"
+          carregando={carregando}
+          vazio="Nenhum documento localizado"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-outline" onClick={() => abrirDocumento(item.id)}>
+                Abrir
+              </button>
+              <Link
+                to={`/rh-dp/colaboradores?colaborador_id=${item.colaborador_id}`}
+                className="btn btn-outline"
+              >
+                Colaborador
+              </Link>
+              {podeEditar && item.ativo && (
+                <label className={`btn btn-outline cursor-pointer ${substituindoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
+                  Substituir
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      onSelecionarSubstituicao(item, file);
+                    }}
+                    disabled={substituindoId === item.id}
+                  />
+                </label>
               )}
-            </tbody>
-          </table>
-        </div>
+            </>
+          )}
+          larguraAcoes={320}
+        />
       </div>
 
       {totalPaginas > 0 && (
