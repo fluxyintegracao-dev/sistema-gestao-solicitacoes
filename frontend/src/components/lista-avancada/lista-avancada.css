@@ -396,13 +396,38 @@
 
 .la-etiqueta-dim { opacity: 0.75; font-weight: 500; }
 
+/* O × de remover é ALVO DE CLIQUE, não enfeite: 2px de padding sobre um
+   ícone de 13px dava 17×17 — abaixo dos 32px de desktop e MUITO abaixo dos
+   44px de toque. No celular, com a etiqueta quebrando em duas linhas, ele
+   virava praticamente intocável. A área cresce sem engordar a pílula:
+   o ícone continua 13px, o alvo é que passa a caber o dedo. */
 .la-etiqueta button {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   background: none;
   color: inherit;
   cursor: pointer;
-  padding: 2px;
+  padding: 0;
+  /* Sangra sobre o padding da pílula em vez de esticá-la. */
+  margin: -8px -4px -8px 0;
+  min-width: 32px;
+  min-height: 32px;
+}
+
+@media (pointer: coarse) {
+  .la-etiqueta button {
+    margin: -12px -6px -12px 0;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+.la-etiqueta button:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: -2px;
+  border-radius: 999px;
 }
 
 .la-etiqueta svg { width: 13px; height: 13px; }

@@ -378,6 +378,25 @@ automaticamente se sair do padrão.
   prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
   página real reprova a tela em que qualquer caixa dispara.
 
+## R22 — hook usado é hook importado (02/09)
+
+- **O problema**: `useRef` (ou qualquer hook) usado sem estar no `import`.
+  O `npm run build` **PASSA** — o bundler não resolve identificadores
+  globais — e a tela quebra com `ReferenceError` só quando renderiza. Tela
+  branca em produção, silêncio no CI.
+- **Onde vale**: todo o `frontend/src`, para os hooks do React e para os
+  hooks próprios do projeto (`useAvisos`, `useConfirmacao`). O check aceita
+  `React.useState(...)` e hooks declarados no próprio arquivo.
+- **História**: aconteceu numa correção do próprio orquestrador em 02/09, e
+  o processo inteiro usava "o build passou" como prova de que a tela estava
+  de pé. Nenhum dos outros checks via essa classe.
+- **A lição maior**: **`npm run build` não é prova de que a tela funciona.**
+  Ele prova que o código compila e empacota — nada mais. Toda vez que um
+  contrato de agente disser "o build tem de passar", isso é o piso, nunca o
+  teto; a prova de verdade é o harness contra o preview.
+- **Verificação**: `validarLayout.mjs`, provado no ponto exato onde importa
+  — com o defeito plantado, o build sai 0 e o validador sai 1.
+
 ## R21 — retorno de `confirmar()` se desestrutura (02/09)
 
 - **O problema**: `useConfirmacao().confirmar()` devolve `{ ok, texto }` — e

@@ -413,13 +413,16 @@ export default function EmpresasGrupo() {
           filtros={[{
             id: 'situacao',
             rotulo: 'Situação',
+            // O parâmetro `ativo` do serviço aceita um valor só; sem `unico`
+            // marcar Ativas+Inativas deixava duas etiquetas e filtro nenhum.
+            unico: true,
             opcoes: [
               { valor: 'true', rotulo: 'Ativas' },
               { valor: 'false', rotulo: 'Inativas' }
             ]
           }]}
           ativos={{ situacao: filtros.situacao }}
-          aoAlternar={(dim, valor) => setFiltros((prev) => ({ ...alternarValorFiltro(prev, dim, valor), q: prev.q }))}
+          aoAlternar={(dim, valor, opcoes) => setFiltros((prev) => ({ ...alternarValorFiltro(prev, dim, valor, opcoes), q: prev.q }))}
           aoLimpar={() => setFiltros((prev) => ({ ...prev, situacao: new Set() }))}
         />
 

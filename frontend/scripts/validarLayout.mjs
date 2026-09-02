@@ -182,6 +182,10 @@ export function validarLayout() {
   const r21 = validarUsoDaConfirmacao();
   falhas.push(...r21.falhas);
 
+  // R22 — hook do React usado sem import: o build PASSA e a tela quebra.
+  const r22 = validarImportesDeHooks();
+  falhas.push(...r22.falhas);
+
   return {
     falhas,
     avisos,
@@ -190,6 +194,73 @@ export function validarLayout() {
     dialogosDoNavegador: r19.total,
     dialogosNoTrinco: r19.noTrinco
   };
+}
+
+/**
+ * R22 — hook do React usado SEM IMPORT. O `npm run build` passa: o bundler
+ * não resolve identificadores globais, então `useRef` sem import vira um
+ * `ReferenceError` só quando a tela renderiza — tela branca em produção.
+ *
+ * Aconteceu em 02/09 numa correção do próprio orquestrador, e o processo
+ * inteiro usava "o build passou" como prova. Uma classe de defeito grave
+ * que nenhum dos checks existentes via.
+ *
+ * Cobre também os hooks próprios do projeto (`useAvisos`, `useConfirmacao`),
+ * que têm exatamente o mesmo comportamento.
+ */
+function validarImportesDeHooks() {
+  const falhas = [];
+  const HOOKS_REACT = [
+    'useState', 'useEffect', 'useMemo', 'useCallback', 'useRef',
+    'useContext', 'useReducer', 'useLayoutEffect', 'useId', 'useTransition',
+    'useDeferredValue', 'useSyncExternalStore', 'useImperativeHandle'
+  ];
+  const HOOKS_PADRAO = ['useAvisos', 'useConfirmacao'];
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      const original = fs.readFileSync(caminho, 'utf8');
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      // Sem comentários: exemplo de uso em documentação não é chamada.
+      const codigo = original.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+        (trecho) => trecho.replace(/[^\n]/g, ' '));
+
+      // Tudo que o arquivo importa OU declara (um hook próprio definido no
+      // mesmo arquivo não precisa de import).
+      const importados = new Set();
+      for (const bloco of original.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+        bloco[1].split(',').forEach((nome) => {
+          const limpo = nome.split(' as ').pop().trim();
+          if (limpo) importados.add(limpo);
+        });
+      }
+      for (const decl of original.matchAll(/(?:export\s+)?(?:function|const|let|var)\s+(use[A-Z][A-Za-z0-9_$]*)/g)) {
+        importados.add(decl[1]);
+      }
+      // `React.useState(...)` e `import * as React` também valem.
+      const usaNamespace = /\bReact\s*\./.test(codigo) || /import\s+\*\s+as\s+React/.test(original);
+
+      for (const hook of [...HOOKS_REACT, ...HOOKS_PADRAO]) {
+        if (importados.has(hook)) continue;
+        if (usaNamespace && HOOKS_REACT.includes(hook)) continue;
+        // Chamada direta, não precedida de ponto (`algo.useState` é outra coisa).
+        const chamada = new RegExp(`(^|[^.\\w])${hook}\\s*\\(`);
+        if (!chamada.test(codigo)) continue;
+        const linha = codigo.split('\n').findIndex((l) => chamada.test(l)) + 1;
+        falhas.push(`${rel}:${linha} [R22] "${hook}" é usado e NÃO está importado — o build passa e a tela quebra em execução (ReferenceError).`);
+      }
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+  return { falhas };
 }
 
 /**

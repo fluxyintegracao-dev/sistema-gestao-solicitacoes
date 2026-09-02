@@ -142,8 +142,12 @@ export default function RhDpDocumentos() {
     }
   }
 
-  function alternarFiltro(dimensao, valor) {
-    setAtivos((atual) => alternarValorFiltro(atual, dimensao, valor));
+  // O terceiro argumento (`{ unico }`) vem da BarraFiltros e PRECISA ser
+  // repassado: sem ele, marcar dois valores numa dimensão de valor único
+  // fazia o parâmetro sair da consulta — a lista abria para tudo com duas
+  // etiquetas afirmando que estava filtrando.
+  function alternarFiltro(dimensao, valor, opcoes) {
+    setAtivos((atual) => alternarValorFiltro(atual, dimensao, valor, opcoes));
     setPagina(1);
   }
 
@@ -201,11 +205,15 @@ export default function RhDpDocumentos() {
     {
       id: 'empresa_grupo_id',
       rotulo: 'Empresa',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: empresas.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
     },
     {
       id: 'obra_id',
       rotulo: 'Obra',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: obras.map((item) => ({
         valor: String(item.id),
         rotulo: item.codigo ? `${item.codigo} - ${item.nome}` : item.nome
@@ -214,6 +222,8 @@ export default function RhDpDocumentos() {
     {
       id: 'tipo_vinculo',
       rotulo: 'Vínculo',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: [
         { valor: 'CLT', rotulo: 'CLT' },
         { valor: 'NAO_CLT', rotulo: 'Não CLT' }
@@ -222,11 +232,15 @@ export default function RhDpDocumentos() {
     {
       id: 'tipo_documento_id',
       rotulo: 'Tipo de documento',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: tipos.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
     },
     {
       id: 'status',
       rotulo: 'Status',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: [
         { valor: 'ENVIADO', rotulo: 'Enviado' },
         { valor: 'CONFERIDO', rotulo: 'Conferido' },
@@ -237,6 +251,8 @@ export default function RhDpDocumentos() {
     {
       id: 'validade_status',
       rotulo: 'Validade',
+      // O serviço aceita UM valor por recorte (getRhDocumentos).
+      unico: true,
       opcoes: [
         { valor: 'VALIDO', rotulo: 'Válido' },
         { valor: 'A_VENCER', rotulo: 'A vencer' },

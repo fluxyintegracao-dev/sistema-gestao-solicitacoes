@@ -192,9 +192,18 @@
 }
 
 /* Vão entre a linha de filtros e o que vem depois (a tabela): um degrau da
-   escala, igual em toda tela — nem colado, nem espaço sobrando. */
+   escala, igual em toda tela — nem colado, nem espaço sobrando.
+
+   A margem NÃO se aplica quando a barra é filha direta do grid da página:
+   ali o vão já vem do `gap` do `.app-pagina`, e somar os dois dava 32px
+   (medido em 02/09, F4 do Pessoal). Dentro de um cartão, que não tem gap,
+   a margem continua sendo o que separa. */
 .app-filtros:not(:last-child) {
   margin-block-end: var(--esp-4);
+}
+
+.app-pagina > .app-filtros:not(:last-child) {
+  margin-block-end: 0;
 }
 
 .app-filtros .app-filtros-busca {

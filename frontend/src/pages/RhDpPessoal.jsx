@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   HiOutlineArrowPath,
@@ -303,23 +303,85 @@ export default function RhDpPessoal() {
     redirecionam para cá com ?aba=..., então favorito e link salvo continuam
     chegando onde chegavam; e voltar pelo navegador volta para a aba de
     onde a pessoa saiu, não para o começo.
+
+    Sobre `replace`: a primeira versão usava `{ replace: true }` em toda
+    troca de aba — e aí a segunda promessa era FALSA. Trocar de aba
+    reescrevia a entrada de histórico, então "voltar" pulava a tela inteira
+    e caía na página anterior. O revisor provou no preview: Colaboradores →
+    Pessoal → aba Jornada → Voltar caía em Colaboradores.
+
+    Agora: troca de aba EMPILHA (`push`), porque é navegação — a pessoa
+    escolheu ir para outro lugar e espera poder voltar. O `replace` fica
+    para a normalização da URL na entrada (quando `?aba=` vem ausente ou
+    com valor inválido, corrigir a URL não é um passo que mereça histórico).
   */
   const [parametros, setParametros] = useSearchParams();
   const podeVerApuracao = canViewRhDpApuracao(user);
-  const abasDisponiveis = useMemo(
-    () => ['solicitacoes', 'colaboradores', 'jornada', ...(podeVerApuracao ? ['apuracao'] : [])],
-    [podeVerApuracao]
-  );
+  /*
+    Uma fonte só para rótulo, apoio do cabeçalho e ordem. O `apoio` existe
+    porque o cabeçalho é ÚNICO para as quatro abas: o texto fixo antigo
+    ("A obra pede, o Departamento Pessoal decide...") descrevia só a aba de
+    solicitações e continuava lá, mentindo, em Jornada e Apuração.
+    A permissão que a rota /rh-dp/apuracao exigia continua valendo: quem não
+    podia ver a apuração não vê a aba.
+  */
+  const ABAS = useMemo(() => [
+    {
+      id: 'solicitacoes',
+      rotulo: 'Solicitações',
+      apoio: 'A obra pede, o Departamento Pessoal decide. Quem tem solicitação em aberto aparece primeiro.'
+    },
+    {
+      id: 'colaboradores',
+      rotulo: 'Colaboradores',
+      apoio: 'Quem está na obra hoje, com o que cada um tem em curso.'
+    },
+    {
+      id: 'jornada',
+      rotulo: 'Jornada',
+      apoio: 'A obra informa dias trabalhados, faltas e horas extras; o sistema calcula o pagamento.'
+    },
+    ...(podeVerApuracao ? [{
+      id: 'apuracao',
+      rotulo: 'Apuração',
+      apoio: 'Pré-folha por competência a partir das obras importadas, com ajustes auditados.'
+    }] : [])
+  ], [podeVerApuracao]);
+  const abasDisponiveis = useMemo(() => ABAS.map((aba) => aba.id), [ABAS]);
   const abaDaUrl = parametros.get('aba');
   const abaAtiva = abasDisponiveis.includes(abaDaUrl) ? abaDaUrl : 'solicitacoes';
+
+  /*
+    A régua de abas rola na horizontal no celular (índice.css). Sem trazer a
+    ativa para dentro do campo de visão, quem chega por
+    /rh-dp/apuracao (redirecionamento da D1) caía numa tela cuja aba ativa
+    estava INTEIRAMENTE fora da tela em 390px — sem saber onde estava.
+  */
+  const refAbaAtiva = useRef(null);
+  useEffect(() => {
+    refAbaAtiva.current?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  }, [abaAtiva]);
   const setAbaAtiva = useCallback((aba) => {
     setParametros((atuais) => {
       const proximos = new URLSearchParams(atuais);
       if (aba === 'solicitacoes') proximos.delete('aba');
       else proximos.set('aba', aba);
       return proximos;
-    }, { replace: true });
+    });
   }, [setParametros]);
+
+  // Normalização da URL: `?aba=` inválido (ou de uma aba que esta pessoa não
+  // pode ver) é corrigido SEM empilhar histórico — senão "voltar" ficaria
+  // preso repetindo a mesma correção.
+  useEffect(() => {
+    if (abaDaUrl && !abasDisponiveis.includes(abaDaUrl)) {
+      setParametros((atuais) => {
+        const proximos = new URLSearchParams(atuais);
+        proximos.delete('aba');
+        return proximos;
+      }, { replace: true });
+    }
+  }, [abaDaUrl, abasDisponiveis, setParametros]);
 
   /**
    * R12: o recorte por obra e MARCACAO, nao lista suspensa.
@@ -787,6 +849,18 @@ export default function RhDpPessoal() {
    * D6/R11: "Voltar ao RH/DP" e "Cadastro completo" sairam — sao navegacao, e
    * disso cuidam o breadcrumb e o menu (Colaboradores esta la).
    */
+  /*
+    C2 — a contagem é da ABA, não da tela. Um número único no cabeçalho de
+    uma tela com quatro abas estaria errado em três delas. Jornada e
+    Apuração montam a própria lista e não têm contagem a oferecer daqui:
+    ali o cabeçalho fica sem número, que é honesto.
+  */
+  const contagemDaAba = abaAtiva === 'solicitacoes'
+    ? `${pendentes.length} em aberto`
+    : abaAtiva === 'colaboradores'
+      ? `${colaboradores.length} colaborador${colaboradores.length === 1 ? '' : 'es'}`
+      : undefined;
+
   const acoesDaAba = abaAtiva === 'colaboradores'
     ? [
       podeAbrir ? { rotulo: 'Enviar jornada', onClick: () => setAbaAtiva('jornada') } : null,
@@ -802,7 +876,8 @@ export default function RhDpPessoal() {
     <Pagina className="rhdp-page rh-pessoal-page">
       <PageHeader
         titulo="Pessoal"
-        descricao="A obra pede, o Departamento Pessoal decide. Quem tem solicitacao em aberto aparece primeiro na lista."
+        contagem={contagemDaAba}
+        descricao={ABAS.find((aba) => aba.id === abaAtiva)?.apoio}
         acaoPrincipal={abaAtiva === 'colaboradores' && podeAbrir
           ? { rotulo: 'Pedir admissao', onClick: () => novoPedido('ADMISSAO') }
           : undefined}
@@ -811,58 +886,38 @@ export default function RhDpPessoal() {
 
       {!algumModalAberto && faixaAvisos}
 
-      {/* As abas (quatro desde a D1). A de solicitacoes carrega o numero do que esta parado, no
-          proprio rotulo — e o aviso visual que o cliente pediu, no lugar onde o olho ja vai. */}
-      <div className="rh-pessoal-abas" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={abaAtiva === 'solicitacoes'}
-          className={`rh-pessoal-aba${abaAtiva === 'solicitacoes' ? ' rh-pessoal-aba--ativa' : ''}`}
-          onClick={() => setAbaAtiva('solicitacoes')}
-        >
-          Solicitacoes
-          {pendentes.length ? <span className="rh-pessoal-aba-contador">{pendentes.length}</span> : null}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={abaAtiva === 'colaboradores'}
-          className={`rh-pessoal-aba${abaAtiva === 'colaboradores' ? ' rh-pessoal-aba--ativa' : ''}`}
-          onClick={() => setAbaAtiva('colaboradores')}
-        >
-          Colaboradores
-        </button>
-        {/*
-          Jornada e Apuracao entram como abas, e nao como paginas separadas, porque sao o MESMO
-          trabalho em sequencia: a obra pede e informa a jornada; o DP decide e apura. Obrigar a
-          trocar de pagina no meio disso e o que fazia a pessoa perder o fio.
+      {/*
+        As abas (quatro desde a D1), dirigidas por dados e não escritas
+        quatro vezes: assim o rótulo, o apoio do cabeçalho e a contagem
+        saem sempre da mesma fonte. Escritas à mão, três nasceram sem
+        acento e uma com ("Solicitacoes" ao lado de "Apuração").
 
-          As rotas proprias (/rh-dp/jornada e /rh-dp/apuracao) continuam existindo — o mesmo
-          componente serve aos dois usos, com `comoAba` tirando so o cabecalho.
-        */}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={abaAtiva === 'jornada'}
-          className={`rh-pessoal-aba${abaAtiva === 'jornada' ? ' rh-pessoal-aba--ativa' : ''}`}
-          onClick={() => setAbaAtiva('jornada')}
-        >
-          Jornada
-        </button>
-        {/* A permissão que a rota /rh-dp/apuracao exigia continua valendo:
-            quem não podia ver a apuração não vê a aba. */}
-        {podeVerApuracao ? (
+        Jornada e Apuração entram como abas, e não como páginas separadas,
+        porque são o MESMO trabalho em sequência: a obra pede e informa a
+        jornada; o DP decide e apura. Obrigar a trocar de página no meio
+        disso é o que fazia a pessoa perder o fio. As rotas antigas
+        REDIRECIONAM para cá com ?aba=... (App.jsx), então favorito e link
+        salvo continuam chegando; e os dois componentes deixaram de ter
+        cabeçalho próprio — quem é dono do título e da faixa fixa é esta
+        página.
+      */}
+      <div className="rh-pessoal-abas" role="tablist" aria-label="Áreas do Pessoal">
+        {ABAS.map((aba) => (
           <button
+            key={aba.id}
             type="button"
             role="tab"
-            aria-selected={abaAtiva === 'apuracao'}
-            className={`rh-pessoal-aba${abaAtiva === 'apuracao' ? ' rh-pessoal-aba--ativa' : ''}`}
-            onClick={() => setAbaAtiva('apuracao')}
+            aria-selected={abaAtiva === aba.id}
+            ref={abaAtiva === aba.id ? refAbaAtiva : undefined}
+            className={`rh-pessoal-aba${abaAtiva === aba.id ? ' rh-pessoal-aba--ativa' : ''}`}
+            onClick={() => setAbaAtiva(aba.id)}
           >
-            Apuração
+            {aba.rotulo}
+            {aba.id === 'solicitacoes' && pendentes.length
+              ? <span className="rh-pessoal-aba-contador">{pendentes.length}</span>
+              : null}
           </button>
-        ) : null}
+        ))}
       </div>
 
       {abaAtiva === 'solicitacoes' ? (

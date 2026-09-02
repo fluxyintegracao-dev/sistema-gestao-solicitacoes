@@ -398,9 +398,33 @@ async function checarEtiquetasFiltro(page, resultado) {
   }
   await filtro.click();
   await page.waitForTimeout(300);
-  const opcao = page.locator('.la-rapido-pop input[type="checkbox"]').first();
-  if (!(await opcao.count())) {
-    resultado.F3 = { estado: 'FALHOU', motivo: 'filtro abriu sem opções de MARCAÇÃO (checkbox)' };
+  /*
+    Marcação é `checkbox` OU `radio`: a dimensão que declara `unico` (o
+    serviço aceita um valor por recorte) renderiza marca REDONDA, porque a
+    forma do controle tem de dizer o que ele aceita. O check só olhava
+    checkbox e reprovava as telas que fizeram a coisa certa — defeito do
+    verificador introduzido na mesma leva que criou o `unico`.
+  */
+  const opcoes = page.locator('.la-rapido-pop input[type="checkbox"], .la-rapido-pop input[type="radio"]');
+  if (!(await opcoes.count())) {
+    resultado.F3 = { estado: 'FALHOU', motivo: 'filtro abriu sem opções de MARCAÇÃO (checkbox/radio)' };
+    await page.mouse.click(4, 4);
+    return;
+  }
+  /*
+    Marca uma opção AINDA NÃO MARCADA. Clicar na primeira às cegas
+    DESMARCAVA o filtro padrão da tela (o Relatório Operacional já nasce com
+    "Mês atual" marcado) e o check então reclamava que não havia etiqueta —
+    ele mesmo tinha acabado de tirar.
+  */
+  const total = await opcoes.count();
+  let opcao = null;
+  for (let i = 0; i < total; i += 1) {
+    const candidata = opcoes.nth(i);
+    if (!(await candidata.isChecked())) { opcao = candidata; break; }
+  }
+  if (!opcao) {
+    resultado.F3 = { estado: 'N/A', motivo: 'todas as opções do primeiro filtro já vinham marcadas — sem opção livre para exercitar' };
     await page.mouse.click(4, 4);
     return;
   }

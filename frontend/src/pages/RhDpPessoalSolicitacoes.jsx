@@ -371,6 +371,8 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
     }
   }
 
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     /*
       SEM `Pagina` e SEM `PageHeader` aqui, de proposito: este arquivo e o CONTEUDO da aba
@@ -380,7 +382,15 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
       vertical que o `space-y-4` dava na mao.
     */
     <div className="app-pagina">
-      <Avisos avisos={avisos} aoFechar={fechar} />
+      {/*
+        A faixa tem UM dono, mas dois lugares: com o modal de detalhe aberto
+        ela sobe para dentro dele. Atestar/recusar anexo, enviar documento e
+        as validações de "escolha o arquivo antes de enviar" acontecem TODAS
+        com o modal aberto — no topo da página a mensagem ficava atrás do
+        fundo escuro: existia no DOM e ninguém lia. É a mesma correção que o
+        RhDpPessoal e o RhDpColaboradores já tinham.
+      */}
+      {!aberta && faixaAvisos}
 
       <div className="rh-pessoal-alertas">
         <div className="rh-pessoal-alerta">
@@ -548,6 +558,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           onFechar={() => setAberta(null)}
         >
         <div className="rh-modal-conteudo space-y-4">
+          {faixaAvisos}
           <div className="app-page-header-row">
             <div>
               <h2 className="app-bloco-titulo">

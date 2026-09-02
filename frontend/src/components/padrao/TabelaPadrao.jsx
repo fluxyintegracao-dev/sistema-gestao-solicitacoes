@@ -92,7 +92,13 @@ const TIPOS_COLUNA = {
   valor:  { largura: 190, alinhar: 'right', valor: true },
   numero: { largura: 120, alinhar: 'right', valor: true },
   data:   { largura: 110 },                          // 22/08/2026
-  status: { largura: 96, alinhar: 'center' },
+  /*
+    132px, não 96 (medido no preview em 02/09): com 96 a coluna deixava
+    ~72px úteis, e "ESTORNADO"/"CONFIRMADA" em 12px semibold não cabiam —
+    o badge era cortado no meio da palavra. Largura é decisão do
+    componente, então o conserto é aqui e vale para toda tela.
+  */
+  status: { largura: 132, alinhar: 'center' },
   badge:  { largura: 120, alinhar: 'center' }
 };
 
@@ -167,8 +173,9 @@ function IconeSeta({ aberta }) {
  * Desenho da coexistência ordenação × alinhamento (decisão do cliente,
  * 02/09): o CLIQUE NO TÍTULO ORDENA, e o menu de alinhamento vira um ícone
  * próprio, ancorado à direita e revelado no hover/foco (a affordance da
- * R15). Os dois não cabem lado a lado: numa coluna de status (96px, 72px
- * úteis) o título com o indicador de ordem já ocupa ~54px e o alvo mínimo
+ * R15). Os dois não cabem lado a lado: numa coluna estreita (a de status
+ * tinha 96px, 72px úteis, quando esta decisão foi tomada; hoje tem 132 para
+ * o badge caber) o título com o indicador de ordem já ocupa ~54px e o alvo mínimo
  * de clique do ícone é 32px (R2). Por isso o ícone é ancorado sobre a borda
  * direita, com fundo próprio, e o título trunca atrás dele — o mesmo
  * arranjo de Excel e Planilhas. Coluna sem `ordenavel` mantém o título como

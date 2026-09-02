@@ -116,6 +116,13 @@
   line-height: 1.5;
   white-space: nowrap;
   max-width: 100%;
+  /* Sem isto o texto VAZAVA para fora da pílula colorida e era cortado a
+     seco pela borda da coluna: "FECHADO" virava "FECHADC" e "ESTORNADO"
+     virava "ESTORNA" — status truncado vira OUTRA palavra, que é pior que
+     status ilegível. O recorte agora acontece dentro da pílula (e o `title`
+     da célula, posto pelo T6, carrega o texto inteiro).
+     `overflow: clip` e não `hidden`: R18 — não criar scrollport à toa. */
+  overflow: clip;
 }
 
 .fx-badge > svg {

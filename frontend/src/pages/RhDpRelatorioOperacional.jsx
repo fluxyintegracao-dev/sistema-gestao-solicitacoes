@@ -160,19 +160,28 @@ export default function RhDpRelatorioOperacional() {
     status: new Set(filters.status ? [String(filters.status)] : [])
   }), [filters]);
 
+  /*
+    `unico: true` nas quatro: o endpoint aceita UM valor por chave e o
+    `alternarFiltro` abaixo já guarda escalar (marcar outro substitui). Sem
+    declarar, o menu abria com caixa QUADRADA prometendo múltipla escolha e
+    entregando exclusiva — a forma do controle tem de dizer o que ele
+    aceita (R15).
+  */
   const dimensoes = useMemo(() => [
-    { id: 'periodo', rotulo: 'Período', opcoes: PERIODOS },
+    { id: 'periodo', rotulo: 'Período', unico: true, opcoes: PERIODOS },
     {
       id: 'empresa_grupo_id',
       rotulo: 'Empresa',
+      unico: true,
       opcoes: empresas.map((empresa) => ({ valor: String(empresa.id), rotulo: empresa.nome }))
     },
     {
       id: 'obra_id',
       rotulo: 'Obra/Centro',
+      unico: true,
       opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
     },
-    { id: 'status', rotulo: 'Status', opcoes: STATUS_COLABORADOR }
+    { id: 'status', rotulo: 'Status', unico: true, opcoes: STATUS_COLABORADOR }
   ], [empresas, obras]);
 
   function updateFilter(field, value) {
