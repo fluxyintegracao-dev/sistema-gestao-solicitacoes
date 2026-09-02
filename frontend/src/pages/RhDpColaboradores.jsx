@@ -1,7 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { HiOutlineEye, HiOutlinePencilSquare } from 'react-icons/hi2';
-import { CelulaDupla, TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  CampoForm,
+  CelulaDupla,
+  FormSecao,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -69,13 +85,28 @@ function formatCpf(value) {
   return value || '-';
 }
 
-const RH_COLABORADORES_FILTROS_INICIAIS = {
-  q: '',
-  empresa_grupo_id: '',
-  obra_id: '',
-  tipo_vinculo: '',
-  status: ''
+const FILTROS_MARCADOS_INICIAIS = {
+  empresa_grupo_id: new Set(),
+  obra_id: new Set(),
+  tipo_vinculo: new Set(),
+  status: new Set()
 };
+
+const FILTROS_DOCUMENTOS_INICIAIS = {
+  tipo_documento_id: new Set(),
+  status: new Set(),
+  validade_status: new Set(),
+  incluir_historico: new Set()
+};
+
+// R12: o recorte vira MARCAÇÃO. A API do RH/DP aceita UM valor por recorte
+// (`empresa_grupo_id=1`), então cada dimensão é declarada `unico: true` na
+// BarraFiltros — marca redonda, marcar outro substitui — e daqui sai o
+// mesmo parâmetro de sempre: o valor marcado, ou `undefined` sem marca.
+// Nenhum parâmetro novo, nenhum formato novo.
+function valorUnico(conjunto) {
+  return conjunto && conjunto.size === 1 ? conjunto.values().next().value : undefined;
+}
 
 function formatDate(value) {
   if (!value) return '-';
@@ -248,6 +279,9 @@ export default function RhDpColaboradores() {
   const [searchParams, setSearchParams] = useSearchParams();
   const podeEditar = canManageRhDpColaboradores(user);
   const podeGerirDocumentos = canManageRhDpDocumentos(user);
+  // R3: aviso e confirmação do SISTEMA — nenhuma caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [colaboradores, setColaboradores] = useState([]);
   const [empresas, setEmpresas] = useState([]);
   const [obras, setObras] = useState([]);
@@ -259,27 +293,30 @@ export default function RhDpColaboradores() {
   const [salvandoDocumento, setSalvandoDocumento] = useState(false);
   const [substituindoDocumentoId, setSubstituindoDocumentoId] = useState(null);
   const [form, setForm] = useState(emptyForm());
+  // R1 da DoD: o cadastro abre em MODAL — antes o formulário nascia abaixo
+  // de uma tabela de centenas de linhas e clicar em "editar" não parecia
+  // fazer nada.
+  const [formAberto, setFormAberto] = useState(false);
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [documentos, setDocumentos] = useState([]);
   const [resumoDocumentos, setResumoDocumentos] = useState(null);
   // ?q= da busca universal abre a lista já filtrada pelo nome/CPF.
-  const [filtros, setFiltros] = useState(() => ({
-    ...RH_COLABORADORES_FILTROS_INICIAIS,
-    q: new URLSearchParams(window.location.search).get('q') || ''
-  }));
-  const [filtrosDocumentos, setFiltrosDocumentos] = useState({
-    q: '',
-    tipo_documento_id: '',
-    status: '',
-    validade_status: '',
-    incluir_historico: false
-  });
+  const [busca, setBusca] = useState(() => new URLSearchParams(window.location.search).get('q') || '');
+  const [marcados, setMarcados] = useState(FILTROS_MARCADOS_INICIAIS);
+  const [buscaDocumentos, setBuscaDocumentos] = useState('');
+  const [marcadosDocumentos, setMarcadosDocumentos] = useState(FILTROS_DOCUMENTOS_INICIAIS);
   const [novoDocumento, setNovoDocumento] = useState({
     tipo_documento_id: '',
     validade: '',
     status: 'ENVIADO',
     observacoes: ''
   });
+  const inputImportacaoRef = useRef(null);
+
+  const filtroTipoDocumento = valorUnico(marcadosDocumentos.tipo_documento_id);
+  const filtroStatusDocumento = valorUnico(marcadosDocumentos.status);
+  const filtroValidadeDocumento = valorUnico(marcadosDocumentos.validade_status);
+  const incluirHistoricoDocumentos = marcadosDocumentos.incluir_historico.has('sim');
 
   function syncColaboradorNaQuery(colaboradorId) {
     const next = new URLSearchParams(searchParams);
@@ -295,6 +332,14 @@ export default function RhDpColaboradores() {
     carregarBase();
   }, []);
 
+  // A marcação aplica sozinha (não existe mais "Aplicar filtros"); a busca
+  // digitada espera 350ms para não martelar a API a cada tecla. Os
+  // parâmetros enviados são exatamente os de antes.
+  useEffect(() => {
+    const atraso = setTimeout(() => { recarregarColaboradores(); }, 350);
+    return () => clearTimeout(atraso);
+  }, [busca, marcados]);
+
   useEffect(() => {
     if (!form.id) {
       setTiposDocumento([]);
@@ -305,15 +350,15 @@ export default function RhDpColaboradores() {
 
     carregarDocumentosColaborador(form.id).catch((error) => {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar documentos do colaborador');
+      avisar.erro(error?.message || 'Erro ao carregar documentos do colaborador');
     });
   }, [
     form.id,
-    filtrosDocumentos.incluir_historico,
-    filtrosDocumentos.q,
-    filtrosDocumentos.status,
-    filtrosDocumentos.tipo_documento_id,
-    filtrosDocumentos.validade_status
+    incluirHistoricoDocumentos,
+    buscaDocumentos,
+    filtroStatusDocumento,
+    filtroTipoDocumento,
+    filtroValidadeDocumento
   ]);
 
   async function carregarBase() {
@@ -328,7 +373,6 @@ export default function RhDpColaboradores() {
       setEmpresas(Array.isArray(listaEmpresas) ? listaEmpresas : []);
       setObras(Array.isArray(listaObras) ? listaObras : []);
       setSetores(Array.isArray(listaSetores) ? listaSetores : []);
-      await carregarColaboradores();
 
       const colaboradorId = Number(searchParams.get('colaborador_id'));
       if (Number.isInteger(colaboradorId) && colaboradorId > 0) {
@@ -336,7 +380,7 @@ export default function RhDpColaboradores() {
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar base RH/DP');
+      avisar.erro(error?.message || 'Erro ao carregar base RH/DP');
     } finally {
       setCarregando(false);
     }
@@ -344,39 +388,29 @@ export default function RhDpColaboradores() {
 
   async function carregarColaboradores() {
     const data = await getRhColaboradores({
-      q: filtros.q || undefined,
-      empresa_grupo_id: filtros.empresa_grupo_id || undefined,
-      obra_id: filtros.obra_id || undefined,
-      tipo_vinculo: filtros.tipo_vinculo || undefined,
-      status: filtros.status || undefined
+      q: busca || undefined,
+      empresa_grupo_id: valorUnico(marcados.empresa_grupo_id),
+      obra_id: valorUnico(marcados.obra_id),
+      tipo_vinculo: valorUnico(marcados.tipo_vinculo),
+      status: valorUnico(marcados.status)
     });
     setColaboradores(Array.isArray(data) ? data : []);
   }
 
-  async function aplicarFiltros() {
+  async function recarregarColaboradores() {
     try {
       setCarregando(true);
       await carregarColaboradores();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao filtrar colaboradores');
+      avisar.erro(error?.message || 'Erro ao filtrar colaboradores');
     } finally {
       setCarregando(false);
     }
   }
 
-  async function limparFiltros() {
-    try {
-      setCarregando(true);
-      setFiltros(RH_COLABORADORES_FILTROS_INICIAIS);
-      const data = await getRhColaboradores({});
-      setColaboradores(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao limpar filtros de colaboradores');
-    } finally {
-      setCarregando(false);
-    }
+  function limparFiltros() {
+    setMarcados(FILTROS_MARCADOS_INICIAIS);
   }
 
   function limparFormulario() {
@@ -387,26 +421,32 @@ export default function RhDpColaboradores() {
       status: 'ENVIADO',
       observacoes: ''
     });
-    setFiltrosDocumentos({
-      q: '',
-      tipo_documento_id: '',
-      status: '',
-      validade_status: '',
-      incluir_historico: false
-    });
+    setBuscaDocumentos('');
+    setMarcadosDocumentos(FILTROS_DOCUMENTOS_INICIAIS);
     syncColaboradorNaQuery(null);
+  }
+
+  function abrirNovoColaborador() {
+    limparFormulario();
+    setFormAberto(true);
+  }
+
+  function fecharFormulario() {
+    limparFormulario();
+    setFormAberto(false);
   }
 
   async function abrirColaborador(id, { syncQuery = true } = {}) {
     try {
       const data = await getRhColaborador(id);
       setForm(toFormData(data));
+      setFormAberto(true);
       if (syncQuery) {
         syncColaboradorNaQuery(id);
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar colaborador');
+      avisar.erro(error?.message || 'Erro ao carregar colaborador');
     }
   }
 
@@ -429,10 +469,11 @@ export default function RhDpColaboradores() {
 
       setForm(toFormData(salvo));
       syncColaboradorNaQuery(salvo.id);
-      await aplicarFiltros();
+      await recarregarColaboradores();
+      avisar.sucesso('Colaborador salvo.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar colaborador');
+      avisar.erro(error?.message || 'Erro ao salvar colaborador');
     } finally {
       setSalvando(false);
     }
@@ -443,27 +484,35 @@ export default function RhDpColaboradores() {
     e.target.value = '';
     if (!file) return;
 
-    if (!confirm(`Importar colaboradores em massa usando o arquivo "${file.name}"?`)) {
+    const ok = await confirmar({
+      titulo: 'Importar colaboradores em massa',
+      mensagem: `Importar colaboradores em massa usando o arquivo "${file.name}"?`,
+      rotuloConfirmar: 'Importar'
+    });
+    if (!ok) {
       return;
     }
 
     try {
       setImportando(true);
       const resultado = await importarRhColaboradores(file);
-      await aplicarFiltros();
+      await recarregarColaboradores();
 
       const importados = Number(resultado?.importados || 0);
       const ignorados = Number(resultado?.ignorados || 0);
       const erros = Array.isArray(resultado?.erros) ? resultado.erros : [];
       if (erros.length > 0) {
-        const resumo = erros.slice(0, 5).map((item) => `Linha ${item.linha}: ${item.error}`).join('\n');
-        alert(`Importados: ${importados}. Ignorados: ${ignorados}. Erros: ${erros.length}.\n${resumo}${erros.length > 5 ? '\n...' : ''}`);
+        const resumo = erros.slice(0, 5).map((item) => `Linha ${item.linha}: ${item.error}`).join(' · ');
+        avisar.alerta(
+          `Importados: ${importados}. Ignorados: ${ignorados}. Erros: ${erros.length}. ${resumo}${erros.length > 5 ? ' …' : ''}`,
+          'Importacao concluida com erros'
+        );
       } else {
-        alert(`Importacao concluida. Importados: ${importados}. Ignorados: ${ignorados}.`);
+        avisar.sucesso(`Importacao concluida. Importados: ${importados}. Ignorados: ${ignorados}.`);
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao importar colaboradores RH/DP');
+      avisar.erro(error?.message || 'Erro ao importar colaboradores RH/DP');
     } finally {
       setImportando(false);
     }
@@ -479,11 +528,11 @@ export default function RhDpColaboradores() {
         }),
         getRhDocumentos({
           colaborador_id: colaboradorId,
-          q: filtrosDocumentos.q || undefined,
-          tipo_documento_id: filtrosDocumentos.tipo_documento_id || undefined,
-          status: filtrosDocumentos.status || undefined,
-          validade_status: filtrosDocumentos.validade_status || undefined,
-          incluir_historico: filtrosDocumentos.incluir_historico ? true : undefined,
+          q: buscaDocumentos || undefined,
+          tipo_documento_id: filtroTipoDocumento,
+          status: filtroStatusDocumento,
+          validade_status: filtroValidadeDocumento,
+          incluir_historico: incluirHistoricoDocumentos ? true : undefined,
           limit: 50
         })
       ]);
@@ -504,7 +553,7 @@ export default function RhDpColaboradores() {
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao abrir documento RH/DP');
+      avisar.erro(error?.message || 'Erro ao abrir documento RH/DP');
     }
   }
 
@@ -516,7 +565,7 @@ export default function RhDpColaboradores() {
     }
 
     if (!novoDocumento.tipo_documento_id) {
-      alert('Selecione o tipo de documento antes de enviar o arquivo.');
+      avisar.alerta('Selecione o tipo de documento antes de enviar o arquivo.');
       return;
     }
 
@@ -541,7 +590,7 @@ export default function RhDpColaboradores() {
       await carregarDocumentosColaborador(form.id);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao enviar documento RH/DP');
+      avisar.erro(error?.message || 'Erro ao enviar documento RH/DP');
     } finally {
       setSalvandoDocumento(false);
     }
@@ -554,7 +603,13 @@ export default function RhDpColaboradores() {
       return;
     }
 
-    if (!confirm(`Substituir o documento "${documento.nome_original}"?`)) {
+    const ok = await confirmar({
+      titulo: 'Substituir documento',
+      mensagem: `Substituir o documento "${documento.nome_original}"? A versao atual passa para o historico.`,
+      rotuloConfirmar: 'Substituir',
+      destrutiva: true
+    });
+    if (!ok) {
       return;
     }
 
@@ -570,762 +625,730 @@ export default function RhDpColaboradores() {
       await carregarDocumentosColaborador(form.id);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao substituir documento RH/DP');
+      avisar.erro(error?.message || 'Erro ao substituir documento RH/DP');
     } finally {
       setSubstituindoDocumentoId(null);
     }
   }
 
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele (senão o aviso de erro do salvar ficaria atrás do fundo escuro);
+  // com o modal fechado, logo abaixo do PageHeader.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
-    <div className="page solicitacoes-page rhdp-page rh-colaboradores-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">RH/DP • Colaboradores</h1>
-            <p className="page-subtitle">
-              Base cadastral com empresa do grupo, obra, vinculo, dados pessoais e dados de pagamento.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/rh-dp" className="btn btn-outline">
-              Voltar ao RH/DP
-            </Link>
-            <Link to="/rh-dp/empresas" className="btn btn-outline">
-              Empresas do grupo
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina className="rhdp-page rh-colaboradores-page">
+      <PageHeader
+        titulo="Colaboradores"
+        contagem={carregando ? null : `${colaboradores.length} colaborador(es)`}
+        descricao="Base cadastral com empresa do grupo, obra, vinculo, dados pessoais e dados de pagamento."
+        acaoPrincipal={podeEditar ? { rotulo: 'Novo colaborador', onClick: abrirNovoColaborador } : undefined}
+        mais={podeEditar ? [
+          { rotulo: 'Baixar modelo', onClick: downloadModeloColaboradores },
+          {
+            rotulo: importando ? 'Importando massa...' : 'Importar massa',
+            onClick: () => inputImportacaoRef.current?.click(),
+            desabilitada: importando
+          }
+        ] : []}
+      />
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rh-colaboradores-filter-card rounded-xl p-3 md:p-4 space-y-3">
-        <div className="rh-colaboradores-filter-grid">
-          <input
-            className="form-control"
-            placeholder="Buscar por nome, CPF ou matricula"
-            value={filtros.q}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
-          />
-          <select
-            className="form-control"
-            value={filtros.empresa_grupo_id}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
-          >
-            <option value="">Todas as empresas</option>
-            {empresas.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={filtros.obra_id}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, obra_id: e.target.value }))}
-          >
-            <option value="">Todas as obras</option>
-            {obras.map((item) => (
-              <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={filtros.tipo_vinculo}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, tipo_vinculo: e.target.value }))}
-          >
-            <option value="">Todos os vinculos</option>
-            <option value="CLT">CLT</option>
-            <option value="NAO_CLT">Nao CLT</option>
-          </select>
-          <select
-            className="form-control"
-            value={filtros.status}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, status: e.target.value }))}
-          >
-            <option value="">Todos os status</option>
-            <option value="ATIVO">Ativo</option>
-            <option value="INATIVO">Inativo</option>
-            <option value="AFASTADO">Afastado</option>
-          </select>
-        </div>
+      {!formAberto && faixaAvisos}
 
-        <div className="app-page-actions rh-colaboradores-actions">
-          <button type="button" className="btn btn-outline" onClick={aplicarFiltros} disabled={carregando}>
-            Aplicar filtros
-          </button>
-          <button type="button" className="btn btn-outline" onClick={limparFiltros} disabled={carregando}>
-            Limpar filtros
-          </button>
-          {podeEditar && (
-            <>
-              <button type="button" className="btn btn-outline" onClick={downloadModeloColaboradores}>
-                Baixar modelo
-              </button>
-              <label className={`btn btn-outline cursor-pointer ${importando ? 'opacity-60 pointer-events-none' : ''}`}>
-                Importar massa
-                <input
-                  type="file"
-                  accept=".csv,.xls,.xlsx"
-                  className="hidden"
-                  onChange={onSelecionarArquivoImportacao}
-                  disabled={importando}
-                />
-              </label>
-              <button type="button" className="btn btn-primary" onClick={limparFormulario}>
-                Novo colaborador
-              </button>
-            </>
+      {podeEditar && (
+        <input
+          ref={inputImportacaoRef}
+          type="file"
+          accept=".csv,.xls,.xlsx"
+          className="hidden"
+          onChange={onSelecionarArquivoImportacao}
+          disabled={importando}
+        />
+      )}
+
+      <BlocoConteudo
+        titulo="Colaboradores cadastrados"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
+        {/* F1/R12: uma busca larga em cima e os recortes por marcação, com
+            etiqueta removível — o filtro aplica ao marcar, sem "Aplicar". */}
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Buscar por nome, CPF ou matricula'
+          }}
+          filtros={[
+            {
+              id: 'empresa_grupo_id',
+              rotulo: 'Empresa',
+              unico: true,
+              opcoes: empresas.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
+            },
+            {
+              id: 'obra_id',
+              rotulo: 'Obra',
+              unico: true,
+              opcoes: obras.map((item) => ({
+                valor: String(item.id),
+                rotulo: item.codigo ? `${item.codigo} - ${item.nome}` : item.nome
+              }))
+            },
+            {
+              id: 'tipo_vinculo',
+              rotulo: 'Vinculo',
+              unico: true,
+              opcoes: [
+                { valor: 'CLT', rotulo: 'CLT' },
+                { valor: 'NAO_CLT', rotulo: 'Nao CLT' }
+              ]
+            },
+            {
+              id: 'status',
+              rotulo: 'Status',
+              unico: true,
+              opcoes: [
+                { valor: 'ATIVO', rotulo: 'Ativo' },
+                { valor: 'INATIVO', rotulo: 'Inativo' },
+                { valor: 'AFASTADO', rotulo: 'Afastado' }
+              ]
+            }
+          ]}
+          ativos={marcados}
+          aoAlternar={(dimensao, valor, opcoes) => setMarcados((atual) => alternarValorFiltro(atual, dimensao, valor, opcoes))}
+          aoLimpar={limparFiltros}
+        />
+
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              // R17: o NOME do colaborador é o que identifica o registro.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <CelulaDupla principal={item.nome} sub={item.cargo || item.matricula || '-'} />
+              )
+            },
+            {
+              id: 'matricula',
+              titulo: 'Matricula',
+              tipo: 'codigo',
+              render: (item) => item.matricula || '-'
+            },
+            {
+              id: 'cpf',
+              titulo: 'CPF',
+              tipo: 'codigo',
+              render: (item) => formatCpf(item.cpf)
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'texto',
+              render: (item) => item.empresaGrupo?.nome || '-'
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (item) => item.obra?.nome || '-'
+            },
+            {
+              id: 'vinculo',
+              titulo: 'Vinculo',
+              tipo: 'badge',
+              render: (item) => (item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => item.status
+            }
+          ]}
+          itens={colaboradores}
+          storageKey="tabela:rh-dp-colaboradores:lista"
+          rotuloRolagem="Colaboradores"
+          carregando={carregando}
+          vazio="Nenhum colaborador cadastrado"
+          acoesLinha={(item) => (
+            <button
+              type="button"
+              className="app-dense-icon-action"
+              onClick={() => abrirColaborador(item.id)}
+              title={podeEditar ? 'Editar colaborador' : 'Ver colaborador'}
+              aria-label={podeEditar ? `Editar colaborador ${item.nome}` : `Ver colaborador ${item.nome}`}
+            >
+              {podeEditar ? <HiOutlinePencilSquare aria-hidden="true" /> : <HiOutlineEye aria-hidden="true" />}
+            </button>
           )}
-        </div>
-      </div>
+          larguraAcoes={96}
+        />
+      </BlocoConteudo>
 
-      <div className="space-y-6">
-        <div className="card sol-surface-card">
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'nome',
-                titulo: 'Nome',
-                // R17: o NOME do colaborador é o que identifica o registro.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (item) => (
-                  <CelulaDupla principal={item.nome} sub={item.cargo || item.matricula || '-'} />
-                )
-              },
-              {
-                id: 'matricula',
-                titulo: 'Matricula',
-                tipo: 'codigo',
-                render: (item) => item.matricula || '-'
-              },
-              {
-                id: 'cpf',
-                titulo: 'CPF',
-                tipo: 'codigo',
-                render: (item) => formatCpf(item.cpf)
-              },
-              {
-                id: 'empresa',
-                titulo: 'Empresa',
-                tipo: 'texto',
-                render: (item) => item.empresaGrupo?.nome || '-'
-              },
-              {
-                id: 'obra',
-                titulo: 'Obra',
-                tipo: 'texto',
-                render: (item) => item.obra?.nome || '-'
-              },
-              {
-                id: 'vinculo',
-                titulo: 'Vinculo',
-                tipo: 'badge',
-                render: (item) => (item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo)
-              },
-              {
-                id: 'status',
-                titulo: 'Status',
-                tipo: 'status',
-                render: (item) => item.status
-              }
-            ]}
-            itens={colaboradores}
-            storageKey="tabela:rh-dp-colaboradores:lista"
-            rotuloRolagem="Colaboradores"
-            carregando={carregando}
-            vazio="Nenhum colaborador cadastrado"
-            acoesLinha={(item) => (
-              <button
-                type="button"
-                className="app-dense-icon-action"
-                onClick={() => abrirColaborador(item.id)}
-                title={podeEditar ? 'Editar colaborador' : 'Ver colaborador'}
-                aria-label={podeEditar ? `Editar colaborador ${item.nome}` : `Ver colaborador ${item.nome}`}
-              >
-                {podeEditar ? <HiOutlinePencilSquare aria-hidden="true" /> : <HiOutlineEye aria-hidden="true" />}
-              </button>
-            )}
-            larguraAcoes={96}
-          />
-        </div>
-
-        <form className="sol-surface-card rh-colaborador-form-card rounded-xl p-4 space-y-4" onSubmit={salvar}>
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">
-              {form.id ? 'Detalhe do colaborador' : 'Novo colaborador'}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Cadastro base do RH/DP com dados operacionais e forma de pagamento.
-            </p>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Empresa do grupo</span>
-              <select
-                className="form-control"
-                value={form.empresa_grupo_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
-                disabled={!podeEditar}
-                required
-              >
-                <option value="">Selecione</option>
-                {empresas.map((item) => (
-                  <option key={item.id} value={item.id}>{item.nome}</option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Obra principal</span>
-              <select
-                className="form-control"
-                value={form.obra_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, obra_id: e.target.value }))}
-                disabled={!podeEditar}
-              >
-                <option value="">Nao vinculada</option>
-                {obras.map((item) => (
-                  <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Nome</span>
-              <input
-                className="form-control"
-                value={form.nome}
-                onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
-                disabled={!podeEditar}
-                required
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>CPF</span>
-              <input
-                className="form-control"
-                value={form.cpf}
-                onChange={(e) => setForm((prev) => ({ ...prev, cpf: maskCpfCnpj(e.target.value) }))}
-                disabled={!podeEditar}
-                required
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Matricula</span>
-              <input
-                className="form-control"
-                value={form.matricula}
-                onChange={(e) => setForm((prev) => ({ ...prev, matricula: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Setor</span>
-              <select
-                className="form-control"
-                value={form.setor_id}
-                onChange={(e) => setForm((prev) => ({ ...prev, setor_id: e.target.value }))}
-                disabled={!podeEditar}
-              >
-                <option value="">Nao vinculado</option>
-                {setores.map((item) => (
-                  <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Cargo</span>
-              <input
-                className="form-control"
-                value={form.cargo}
-                onChange={(e) => setForm((prev) => ({ ...prev, cargo: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Tipo de vinculo</span>
-              <select
-                className="form-control"
-                value={form.tipo_vinculo}
-                onChange={(e) => setForm((prev) => ({ ...prev, tipo_vinculo: e.target.value }))}
-                disabled={!podeEditar}
-              >
-                <option value="CLT">CLT</option>
-                <option value="NAO_CLT">Nao CLT</option>
-              </select>
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Status</span>
-              <select
-                className="form-control"
-                value={form.status}
-                onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
-                disabled={!podeEditar}
-              >
-                <option value="ATIVO">Ativo</option>
-                <option value="INATIVO">Inativo</option>
-                <option value="AFASTADO">Afastado</option>
-              </select>
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>RG</span>
-              <input
-                className="form-control"
-                value={form.rg}
-                onChange={(e) => setForm((prev) => ({ ...prev, rg: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-3">
-            <label className="space-y-1 text-sm">
-              <span>Data de admissão</span>
-              <input
-                type="date"
-                className="form-control"
-                value={form.data_admissao}
-                onChange={(e) => setForm((prev) => ({ ...prev, data_admissao: e.target.value, data_inicio: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Data de demissão</span>
-              <input
-                type="date"
-                className="form-control"
-                value={form.data_demissao}
-                onChange={(e) => setForm((prev) => ({ ...prev, data_demissao: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Data de nascimento</span>
-              <input
-                type="date"
-                className="form-control"
-                value={form.data_nascimento}
-                onChange={(e) => setForm((prev) => ({ ...prev, data_nascimento: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Telefone</span>
-              <input
-                className="form-control"
-                value={form.telefone}
-                onChange={(e) => setForm((prev) => ({ ...prev, telefone: maskPhone(e.target.value) }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Email</span>
-              <input
-                type="email"
-                className="form-control"
-                value={form.email}
-                onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
-                disabled={!podeEditar}
-              />
-            </label>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="space-y-1 text-sm">
-              <span>Salario base</span>
-              <input
-                className="form-control"
-                inputMode="decimal"
-                value={form.salario_base}
-                onChange={(e) => setForm((prev) => ({ ...prev, salario_base: normalizeCurrencyTyping(e.target.value) }))}
-                onBlur={(e) => setForm((prev) => ({ ...prev, salario_base: formatCurrencyInput(e.target.value) }))}
-                disabled={!podeEditar}
-              />
-            </label>
-            <label className="space-y-1 text-sm">
-              <span>Valor contratual</span>
-              <input
-                className="form-control"
-                inputMode="decimal"
-                value={form.valor_contratual}
-                onChange={(e) => setForm((prev) => ({ ...prev, valor_contratual: normalizeCurrencyTyping(e.target.value) }))}
-                onBlur={(e) => setForm((prev) => ({ ...prev, valor_contratual: formatCurrencyInput(e.target.value) }))}
-                disabled={!podeEditar}
-              />
-            </label>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Dados de pagamento</h3>
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span>Favorecido</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.favorecido_nome}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, favorecido_nome: e.target.value } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span>Documento do favorecido</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.favorecido_documento}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, favorecido_documento: maskCpfCnpj(e.target.value) } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span>Banco</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.banco}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, banco: e.target.value } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span>Agencia</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.agencia}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, agencia: e.target.value } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="space-y-1 text-sm">
-                <span>Conta</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.conta}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, conta: e.target.value } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-              <label className="space-y-1 text-sm">
-                <span>Tipo de conta</span>
-                <input
-                  className="form-control"
-                  value={form.pagamento.tipo_conta}
-                  onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, tipo_conta: e.target.value } }))}
-                  disabled={!podeEditar}
-                />
-              </label>
-            </div>
-
+      {/* R1 da DoD / R9: cadastro abre em MODAL. Mesmos campos, mesma
+          validação, mesmo salvar, mesmo limpar — só a moldura mudou. */}
+      {formAberto && (
+        <OverlayModal
+          aberto
+          largura="var(--modal-max-w-xl, 1120px)"
+          rotulo={form.id ? 'Detalhe do colaborador' : 'Novo colaborador'}
+          onFechar={fecharFormulario}
+        >
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ borderColor: 'var(--ui-border)' }}>
             <div>
-              <div className="grid gap-3 md:grid-cols-3">
-                <label className="space-y-1 text-sm block">
-                  <span>Chave PIX principal</span>
-                  <input
-                    className="form-control"
-                    value={form.pagamento.chave_pix}
-                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix: e.target.value } }))}
-                    disabled={!podeEditar}
-                  />
-                </label>
-                <label className="space-y-1 text-sm block">
-                  <span>Chave PIX fixa 2</span>
-                  <input
-                    className="form-control"
-                    value={form.pagamento.chave_pix_secundaria}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_secundaria: e.target.value } }))
-                    }
-                    disabled={!podeEditar}
-                  />
-                </label>
-                <label className="space-y-1 text-sm block">
-                  <span>Chave PIX variavel</span>
-                  <input
-                    className="form-control"
-                    value={form.pagamento.chave_pix_variavel}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_variavel: e.target.value } }))
-                    }
-                    disabled={!podeEditar}
-                  />
-                </label>
-              </div>
-              <p className="mt-2 text-xs text-slate-500">
-                A chave principal e usada por padrao nos titulos RH/DP. Na conferencia da apuracao e possivel trocar para uma das chaves cadastradas.
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>
+                {form.id ? 'Detalhe do colaborador' : 'Novo colaborador'}
+              </h2>
+              <p className="app-note">
+                Cadastro base do RH/DP com dados operacionais e forma de pagamento.
               </p>
             </div>
+            <button type="button" className="btn btn-outline btn-sm" onClick={fecharFormulario}>
+              Fechar
+            </button>
           </div>
 
-          <label className="space-y-1 text-sm block">
-            <span>Observacoes</span>
-            <textarea
-              className="form-control min-h-[96px]"
-              value={form.observacoes}
-              onChange={(e) => setForm((prev) => ({ ...prev, observacoes: e.target.value }))}
-              disabled={!podeEditar}
-            />
-          </label>
+          <div className="overflow-y-auto px-4 py-3">
+            {faixaAvisos}
 
-          {!form.id && podeGerirDocumentos && (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              Salve o colaborador primeiro para liberar o envio e a gestão dos documentos anexados.
-            </div>
-          )}
+            <form id="rh-colaborador-form" className="space-y-4" onSubmit={salvar}>
+              <FormSecao colunas={2}>
+                <CampoForm label="Empresa do grupo" obrigatorio>
+                  <select
+                    className="form-control"
+                    value={form.empresa_grupo_id}
+                    onChange={(e) => setForm((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
+                    disabled={!podeEditar}
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    {empresas.map((item) => (
+                      <option key={item.id} value={item.id}>{item.nome}</option>
+                    ))}
+                  </select>
+                </CampoForm>
+                <CampoForm label="Obra principal">
+                  <select
+                    className="form-control"
+                    value={form.obra_id}
+                    onChange={(e) => setForm((prev) => ({ ...prev, obra_id: e.target.value }))}
+                    disabled={!podeEditar}
+                  >
+                    <option value="">Nao vinculada</option>
+                    {obras.map((item) => (
+                      <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
+                    ))}
+                  </select>
+                </CampoForm>
 
-          {form.id && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Documentos do colaborador</h3>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Pasta digital do colaborador com checklist por vinculo, validade e historico de substituicao.
-                  </p>
-                </div>
-                <Link to={`/rh-dp/documentos?q=${encodeURIComponent(form.nome || '')}`} className="btn btn-outline">
-                  Painel geral de documentos
-                </Link>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Anexados</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{resumoDocumentos?.total_documentos_anexados || 0}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Validos</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{resumoDocumentos?.documentos_validos || 0}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Vencidos</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{resumoDocumentos?.documentos_vencidos || 0}</div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="text-xs uppercase tracking-wide text-slate-500">Obrigatorios pendentes</div>
-                  <div className="mt-1 text-2xl font-semibold text-slate-900">{resumoDocumentos?.obrigatorios_pendentes || 0}</div>
-                </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-                <input
-                  className="form-control"
-                  placeholder="Buscar por arquivo ou observacao"
-                  value={filtrosDocumentos.q}
-                  onChange={(e) => setFiltrosDocumentos((prev) => ({ ...prev, q: e.target.value }))}
-                />
-                <select
-                  className="form-control"
-                  value={filtrosDocumentos.tipo_documento_id}
-                  onChange={(e) => setFiltrosDocumentos((prev) => ({ ...prev, tipo_documento_id: e.target.value }))}
-                >
-                  <option value="">Todos os tipos</option>
-                  {tiposDocumento.map((item) => (
-                    <option key={item.id} value={item.id}>{item.nome}</option>
-                  ))}
-                </select>
-                <select
-                  className="form-control"
-                  value={filtrosDocumentos.status}
-                  onChange={(e) => setFiltrosDocumentos((prev) => ({ ...prev, status: e.target.value }))}
-                >
-                  <option value="">Todos os status</option>
-                  <option value="ENVIADO">Enviado</option>
-                  <option value="CONFERIDO">Conferido</option>
-                  <option value="REJEITADO">Rejeitado</option>
-                  <option value="SUBSTITUIDO">Substituido</option>
-                </select>
-                <select
-                  className="form-control"
-                  value={filtrosDocumentos.validade_status}
-                  onChange={(e) => setFiltrosDocumentos((prev) => ({ ...prev, validade_status: e.target.value }))}
-                >
-                  <option value="">Todas as validades</option>
-                  <option value="VALIDO">Valido</option>
-                  <option value="A_VENCER">A vencer</option>
-                  <option value="VENCIDO">Vencido</option>
-                  <option value="SEM_VALIDADE">Sem validade</option>
-                </select>
-                <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
+                <CampoForm label="Nome" obrigatorio>
                   <input
-                    type="checkbox"
-                    checked={filtrosDocumentos.incluir_historico}
-                    onChange={(e) => setFiltrosDocumentos((prev) => ({ ...prev, incluir_historico: e.target.checked }))}
+                    className="form-control"
+                    value={form.nome}
+                    onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
+                    disabled={!podeEditar}
+                    required
                   />
-                  Incluir historico
-                </label>
-              </div>
+                </CampoForm>
+                <CampoForm label="CPF" obrigatorio>
+                  <input
+                    className="form-control"
+                    value={form.cpf}
+                    onChange={(e) => setForm((prev) => ({ ...prev, cpf: maskCpfCnpj(e.target.value) }))}
+                    disabled={!podeEditar}
+                    required
+                  />
+                </CampoForm>
 
-              {podeGerirDocumentos && (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 space-y-3">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Enviar novo documento</h4>
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <select
-                      className="form-control"
-                      value={novoDocumento.tipo_documento_id}
-                      onChange={(e) => setNovoDocumento((prev) => ({ ...prev, tipo_documento_id: e.target.value }))}
-                    >
-                      <option value="">Tipo de documento</option>
-                      {tiposDocumento.map((item) => (
-                        <option key={item.id} value={item.id}>{item.nome}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="date"
-                      className="form-control"
-                      value={novoDocumento.validade}
-                      onChange={(e) => setNovoDocumento((prev) => ({ ...prev, validade: e.target.value }))}
-                    />
-                    <select
-                      className="form-control"
-                      value={novoDocumento.status}
-                      onChange={(e) => setNovoDocumento((prev) => ({ ...prev, status: e.target.value }))}
-                    >
-                      <option value="ENVIADO">Enviado</option>
-                      <option value="CONFERIDO">Conferido</option>
-                      <option value="REJEITADO">Rejeitado</option>
-                    </select>
-                    <label className={`btn btn-outline cursor-pointer ${salvandoDocumento ? 'opacity-60 pointer-events-none' : ''}`}>
-                      {salvandoDocumento ? 'Enviando...' : 'Anexar arquivo'}
-                      <input
-                        type="file"
-                        className="hidden"
-                        onChange={onSelecionarNovoDocumento}
-                        disabled={salvandoDocumento}
-                      />
-                    </label>
-                  </div>
-                  <textarea
-                    className="form-control min-h-[88px]"
-                    placeholder="Observacoes do documento"
-                    value={novoDocumento.observacoes}
-                    onChange={(e) => setNovoDocumento((prev) => ({ ...prev, observacoes: e.target.value }))}
+                <CampoForm label="Matricula">
+                  <input
+                    className="form-control"
+                    value={form.matricula}
+                    onChange={(e) => setForm((prev) => ({ ...prev, matricula: e.target.value }))}
+                    disabled={!podeEditar}
                   />
-                  <p className="text-xs text-slate-500">
-                    Selecione o tipo e depois clique em <strong>Anexar arquivo</strong> para enviar o documento deste colaborador.
-                  </p>
+                </CampoForm>
+                <CampoForm label="Setor">
+                  <select
+                    className="form-control"
+                    value={form.setor_id}
+                    onChange={(e) => setForm((prev) => ({ ...prev, setor_id: e.target.value }))}
+                    disabled={!podeEditar}
+                  >
+                    <option value="">Nao vinculado</option>
+                    {setores.map((item) => (
+                      <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
+                    ))}
+                  </select>
+                </CampoForm>
+
+                <CampoForm label="Cargo">
+                  <input
+                    className="form-control"
+                    value={form.cargo}
+                    onChange={(e) => setForm((prev) => ({ ...prev, cargo: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Tipo de vinculo">
+                  <select
+                    className="form-control"
+                    value={form.tipo_vinculo}
+                    onChange={(e) => setForm((prev) => ({ ...prev, tipo_vinculo: e.target.value }))}
+                    disabled={!podeEditar}
+                  >
+                    <option value="CLT">CLT</option>
+                    <option value="NAO_CLT">Nao CLT</option>
+                  </select>
+                </CampoForm>
+
+                <CampoForm label="Status">
+                  <select
+                    className="form-control"
+                    value={form.status}
+                    onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
+                    disabled={!podeEditar}
+                  >
+                    <option value="ATIVO">Ativo</option>
+                    <option value="INATIVO">Inativo</option>
+                    <option value="AFASTADO">Afastado</option>
+                  </select>
+                </CampoForm>
+                <CampoForm label="RG">
+                  <input
+                    className="form-control"
+                    value={form.rg}
+                    onChange={(e) => setForm((prev) => ({ ...prev, rg: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              <FormSecao colunas={3}>
+                <CampoForm label="Data de admissão">
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.data_admissao}
+                    onChange={(e) => setForm((prev) => ({ ...prev, data_admissao: e.target.value, data_inicio: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Data de demissão">
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.data_demissao}
+                    onChange={(e) => setForm((prev) => ({ ...prev, data_demissao: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Data de nascimento">
+                  <input
+                    type="date"
+                    className="form-control"
+                    value={form.data_nascimento}
+                    onChange={(e) => setForm((prev) => ({ ...prev, data_nascimento: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              <FormSecao colunas={2}>
+                <CampoForm label="Telefone">
+                  <input
+                    className="form-control"
+                    value={form.telefone}
+                    onChange={(e) => setForm((prev) => ({ ...prev, telefone: maskPhone(e.target.value) }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Email">
+                  <input
+                    type="email"
+                    className="form-control"
+                    value={form.email}
+                    onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+
+                <CampoForm label="Salario base">
+                  <input
+                    className="form-control"
+                    inputMode="decimal"
+                    value={form.salario_base}
+                    onChange={(e) => setForm((prev) => ({ ...prev, salario_base: normalizeCurrencyTyping(e.target.value) }))}
+                    onBlur={(e) => setForm((prev) => ({ ...prev, salario_base: formatCurrencyInput(e.target.value) }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Valor contratual">
+                  <input
+                    className="form-control"
+                    inputMode="decimal"
+                    value={form.valor_contratual}
+                    onChange={(e) => setForm((prev) => ({ ...prev, valor_contratual: normalizeCurrencyTyping(e.target.value) }))}
+                    onBlur={(e) => setForm((prev) => ({ ...prev, valor_contratual: formatCurrencyInput(e.target.value) }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              <FormSecao legenda="Dados de pagamento" colunas={2}>
+                <CampoForm label="Favorecido">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.favorecido_nome}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, favorecido_nome: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Documento do favorecido">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.favorecido_documento}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, favorecido_documento: maskCpfCnpj(e.target.value) } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+
+                <CampoForm label="Banco">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.banco}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, banco: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Agencia">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.agencia}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, agencia: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+
+                <CampoForm label="Conta">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.conta}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, conta: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+                <CampoForm label="Tipo de conta">
+                  <input
+                    className="form-control"
+                    value={form.pagamento.tipo_conta}
+                    onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, tipo_conta: e.target.value } }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+
+                <div className="form-grid form-grid--3 form-campo--linha">
+                  <CampoForm label="Chave PIX principal">
+                    <input
+                      className="form-control"
+                      value={form.pagamento.chave_pix}
+                      onChange={(e) => setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix: e.target.value } }))}
+                      disabled={!podeEditar}
+                    />
+                  </CampoForm>
+                  <CampoForm label="Chave PIX fixa 2">
+                    <input
+                      className="form-control"
+                      value={form.pagamento.chave_pix_secundaria}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_secundaria: e.target.value } }))
+                      }
+                      disabled={!podeEditar}
+                    />
+                  </CampoForm>
+                  <CampoForm label="Chave PIX variavel">
+                    <input
+                      className="form-control"
+                      value={form.pagamento.chave_pix_variavel}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, pagamento: { ...prev.pagamento, chave_pix_variavel: e.target.value } }))
+                      }
+                      disabled={!podeEditar}
+                    />
+                  </CampoForm>
                 </div>
+
+                <p className="app-note form-campo--linha">
+                  A chave principal e usada por padrao nos titulos RH/DP. Na conferencia da apuracao e possivel trocar para uma das chaves cadastradas.
+                </p>
+              </FormSecao>
+
+              <FormSecao colunas={2}>
+                <CampoForm label="Observacoes" tipo="observacao">
+                  <textarea
+                    className="form-control"
+                    rows={4}
+                    value={form.observacoes}
+                    onChange={(e) => setForm((prev) => ({ ...prev, observacoes: e.target.value }))}
+                    disabled={!podeEditar}
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              {!form.id && podeGerirDocumentos && (
+                <p className="app-note">
+                  Salve o colaborador primeiro para liberar o envio e a gestão dos documentos anexados.
+                </p>
               )}
 
-              <div className="grid gap-4 xl:grid-cols-[1.4fr,1fr]">
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Arquivos do colaborador</h4>
-                  <TabelaPadrao
-                    colunas={[
+              {form.id && (
+                <BlocoConteudo
+                  titulo="Documentos do colaborador"
+                  descricao="Pasta digital do colaborador com checklist por vinculo, validade e historico de substituicao."
+                  variante="secundario"
+                  acoes={(
+                    <Link to={`/rh-dp/documentos?q=${encodeURIComponent(form.nome || '')}`} className="btn btn-outline btn-sm">
+                      Painel geral de documentos
+                    </Link>
+                  )}
+                >
+                  <StatGrid colunas={4}>
+                    <StatTile label="Anexados" valor={resumoDocumentos?.total_documentos_anexados || 0} />
+                    <StatTile label="Validos" valor={resumoDocumentos?.documentos_validos || 0} tom="success" />
+                    <StatTile label="Vencidos" valor={resumoDocumentos?.documentos_vencidos || 0} tom="danger" />
+                    <StatTile label="Obrigatorios pendentes" valor={resumoDocumentos?.obrigatorios_pendentes || 0} tom="warning" />
+                  </StatGrid>
+
+                  <BarraFiltros
+                    busca={{
+                      valor: buscaDocumentos,
+                      aoMudar: setBuscaDocumentos,
+                      placeholder: 'Buscar por arquivo ou observacao'
+                    }}
+                    filtros={[
                       {
-                        id: 'tipo',
-                        titulo: 'Tipo',
-                        tipo: 'texto',
-                        render: (item) => item.tipoDocumento?.nome || '-'
-                      },
-                      {
-                        id: 'arquivo',
-                        titulo: 'Arquivo',
-                        // R17: o ARQUIVO é o que nomeia o documento na pasta.
-                        tipo: 'identidade',
-                        noCard: 'titulo',
-                        render: (item) => (
-                          <CelulaDupla principal={item.nome_original} sub={item.observacoes || '-'} />
-                        )
+                        id: 'tipo_documento_id',
+                        rotulo: 'Tipo',
+                        unico: true,
+                        opcoes: tiposDocumento.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
                       },
                       {
                         id: 'status',
-                        titulo: 'Status',
-                        tipo: 'status',
-                        render: (item) => (
-                          <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Historico'} />
-                        )
+                        rotulo: 'Status',
+                        unico: true,
+                        opcoes: [
+                          { valor: 'ENVIADO', rotulo: 'Enviado' },
+                          { valor: 'CONFERIDO', rotulo: 'Conferido' },
+                          { valor: 'REJEITADO', rotulo: 'Rejeitado' },
+                          { valor: 'SUBSTITUIDO', rotulo: 'Substituido' }
+                        ]
                       },
                       {
-                        id: 'validade',
-                        titulo: 'Validade',
-                        tipo: 'data',
-                        render: (item) => (
-                          <CelulaDupla principal={formatDate(item.validade)} sub={validadeLabel(item.validade_status)} />
-                        )
+                        id: 'validade_status',
+                        rotulo: 'Validade',
+                        unico: true,
+                        opcoes: [
+                          { valor: 'VALIDO', rotulo: 'Valido' },
+                          { valor: 'A_VENCER', rotulo: 'A vencer' },
+                          { valor: 'VENCIDO', rotulo: 'Vencido' },
+                          { valor: 'SEM_VALIDADE', rotulo: 'Sem validade' }
+                        ]
+                      },
+                      {
+                        id: 'incluir_historico',
+                        rotulo: 'Historico',
+                        opcoes: [{ valor: 'sim', rotulo: 'Incluir historico' }]
                       }
                     ]}
-                    itens={documentos}
-                    storageKey="tabela:rh-dp-colaboradores:documentos"
-                    rotuloRolagem="Arquivos do colaborador"
-                    carregando={carregandoDocumentos}
-                    vazio="Nenhum documento localizado para este colaborador"
-                    acoesLinha={(item) => (
-                      <>
-                        <button type="button" className="btn btn-outline" onClick={() => abrirDocumento(item.id)}>
-                          Abrir
-                        </button>
-                        {podeGerirDocumentos && item.ativo && (
-                          <label className={`btn btn-outline cursor-pointer ${substituindoDocumentoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
-                            Substituir
-                            <input
-                              type="file"
-                              className="hidden"
-                              onChange={(e) => onSelecionarSubstituicao(item, e)}
-                              disabled={substituindoDocumentoId === item.id}
-                            />
-                          </label>
-                        )}
-                      </>
-                    )}
-                    larguraAcoes={220}
+                    ativos={marcadosDocumentos}
+                    aoAlternar={(dimensao, valor, opcoes) => setMarcadosDocumentos((atual) => alternarValorFiltro(atual, dimensao, valor, opcoes))}
+                    aoLimpar={() => setMarcadosDocumentos(FILTROS_DOCUMENTOS_INICIAIS)}
                   />
-                </div>
 
-                <div className="space-y-3">
-                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Checklist documental</h4>
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
-                    {(resumoDocumentos?.checklist || []).map((item) => (
-                      <div key={item.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                        <div>
-                          <div className="font-medium text-slate-900">{item.nome}</div>
-                          <div className="text-xs text-slate-500">
-                            {item.obrigatorio ? 'Obrigatorio' : 'Opcional'} · {item.exige_validade ? 'Com validade' : 'Sem validade obrigatoria'}
+                  {podeGerirDocumentos && (
+                    <FormSecao legenda="Enviar novo documento" colunas={4}>
+                      <CampoForm label="Tipo de documento">
+                        <select
+                          className="form-control"
+                          value={novoDocumento.tipo_documento_id}
+                          onChange={(e) => setNovoDocumento((prev) => ({ ...prev, tipo_documento_id: e.target.value }))}
+                        >
+                          <option value="">Tipo de documento</option>
+                          {tiposDocumento.map((item) => (
+                            <option key={item.id} value={item.id}>{item.nome}</option>
+                          ))}
+                        </select>
+                      </CampoForm>
+                      <CampoForm label="Validade">
+                        <input
+                          type="date"
+                          className="form-control"
+                          value={novoDocumento.validade}
+                          onChange={(e) => setNovoDocumento((prev) => ({ ...prev, validade: e.target.value }))}
+                        />
+                      </CampoForm>
+                      <CampoForm label="Situacao do documento">
+                        <select
+                          className="form-control"
+                          value={novoDocumento.status}
+                          onChange={(e) => setNovoDocumento((prev) => ({ ...prev, status: e.target.value }))}
+                        >
+                          <option value="ENVIADO">Enviado</option>
+                          <option value="CONFERIDO">Conferido</option>
+                          <option value="REJEITADO">Rejeitado</option>
+                        </select>
+                      </CampoForm>
+                      {/* Não é CampoForm: o gatilho de arquivo JÁ é um
+                          <label>, e label dentro de label não é HTML válido. */}
+                      <div className="form-group">
+                        <span className="form-label">Arquivo</span>
+                        <label className={`btn btn-outline cursor-pointer ${salvandoDocumento ? 'opacity-60 pointer-events-none' : ''}`}>
+                          {salvandoDocumento ? 'Enviando...' : 'Anexar arquivo'}
+                          <input
+                            type="file"
+                            className="hidden"
+                            onChange={onSelecionarNovoDocumento}
+                            disabled={salvandoDocumento}
+                          />
+                        </label>
+                      </div>
+                      <CampoForm label="Observacoes do documento" tipo="observacao">
+                        <textarea
+                          className="form-control"
+                          rows={3}
+                          placeholder="Observacoes do documento"
+                          value={novoDocumento.observacoes}
+                          onChange={(e) => setNovoDocumento((prev) => ({ ...prev, observacoes: e.target.value }))}
+                        />
+                      </CampoForm>
+                      <p className="app-note form-campo--linha">
+                        Selecione o tipo e depois clique em <strong>Anexar arquivo</strong> para enviar o documento deste colaborador.
+                      </p>
+                    </FormSecao>
+                  )}
+
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <div className="space-y-3">
+                      <h3 className="form-section-legenda">Arquivos do colaborador</h3>
+                      <TabelaPadrao
+                        colunas={[
+                          {
+                            id: 'tipo',
+                            titulo: 'Tipo',
+                            tipo: 'texto',
+                            render: (item) => item.tipoDocumento?.nome || '-'
+                          },
+                          {
+                            id: 'arquivo',
+                            titulo: 'Arquivo',
+                            // R17: o ARQUIVO é o que nomeia o documento na pasta.
+                            tipo: 'identidade',
+                            noCard: 'titulo',
+                            render: (item) => (
+                              <CelulaDupla principal={item.nome_original} sub={item.observacoes || '-'} />
+                            )
+                          },
+                          {
+                            id: 'status',
+                            titulo: 'Status',
+                            tipo: 'status',
+                            render: (item) => (
+                              <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Historico'} />
+                            )
+                          },
+                          {
+                            id: 'validade',
+                            titulo: 'Validade',
+                            tipo: 'data',
+                            render: (item) => (
+                              <CelulaDupla principal={formatDate(item.validade)} sub={validadeLabel(item.validade_status)} />
+                            )
+                          }
+                        ]}
+                        itens={documentos}
+                        storageKey="tabela:rh-dp-colaboradores:documentos"
+                        rotuloRolagem="Arquivos do colaborador"
+                        carregando={carregandoDocumentos}
+                        vazio="Nenhum documento localizado para este colaborador"
+                        acoesLinha={(item) => (
+                          <>
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirDocumento(item.id)}>
+                              Abrir
+                            </button>
+                            {podeGerirDocumentos && item.ativo && (
+                              <label className={`btn btn-outline btn-sm cursor-pointer ${substituindoDocumentoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
+                                Substituir
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  onChange={(e) => onSelecionarSubstituicao(item, e)}
+                                  disabled={substituindoDocumentoId === item.id}
+                                />
+                              </label>
+                            )}
+                          </>
+                        )}
+                        larguraAcoes={220}
+                      />
+                    </div>
+
+                    <div className="space-y-3">
+                      <h3 className="form-section-legenda">Checklist documental</h3>
+                      <div className="space-y-2">
+                        {(resumoDocumentos?.checklist || []).map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex items-start justify-between gap-3 rounded-xl border p-3"
+                            style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-surface)' }}
+                          >
+                            <div>
+                              <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{item.nome}</div>
+                              <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                                {item.obrigatorio ? 'Obrigatorio' : 'Opcional'} · {item.exige_validade ? 'Com validade' : 'Sem validade obrigatoria'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-medium" style={{ color: 'var(--c-text)' }}>{item.situacao}</div>
+                              <div className="text-xs" style={{ color: 'var(--c-muted)' }}>{item.documento?.nome_original || '-'}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium text-slate-900">{item.situacao}</div>
-                          <div className="text-xs text-slate-500">{item.documento?.nome_original || '-'}</div>
-                        </div>
+                        ))}
+                        {!resumoDocumentos?.checklist?.length && (
+                          <p className="app-note">
+                            Nenhum checklist aplicavel carregado para este colaborador.
+                          </p>
+                        )}
                       </div>
-                    ))}
-                    {!resumoDocumentos?.checklist?.length && (
-                      <div className="text-sm text-slate-500">
-                        Nenhum checklist aplicavel carregado para este colaborador.
-                      </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
+                </BlocoConteudo>
+              )}
+            </form>
+          </div>
 
           {podeEditar && (
-            <div className="app-page-actions">
-              <button type="submit" className="btn btn-primary" disabled={salvando}>
+            <div className="app-actionbar border-t px-4 py-3" style={{ borderColor: 'var(--ui-border)' }}>
+              <button type="submit" form="rh-colaborador-form" className="btn btn-primary" disabled={salvando}>
                 {form.id ? 'Salvar alteracoes' : 'Criar colaborador'}
               </button>
-              <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={form.id ? fecharFormulario : limparFormulario}
+                disabled={salvando}
+              >
                 {form.id ? 'Cancelar edicao' : 'Limpar'}
               </button>
             </div>
           )}
-        </form>
-      </div>
-    </div>
+        </OverlayModal>
+      )}
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

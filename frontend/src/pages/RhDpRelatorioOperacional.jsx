@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  BarraFiltros,
+  BlocoConteudo,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getObras } from '../services/obras';
 import { getRhEmpresasGrupo, getRhRelatorioOperacional } from '../services/rhDp';
@@ -15,6 +23,19 @@ const DEFAULT_FILTERS = {
   status: ''
 };
 
+const PERIODOS = [
+  { valor: 'MES_ATUAL', rotulo: 'Mês atual' },
+  { valor: '30_DIAS', rotulo: '30 dias' },
+  { valor: '90_DIAS', rotulo: '90 dias' },
+  { valor: 'ANO_ATUAL', rotulo: 'Ano atual' }
+];
+
+const STATUS_COLABORADOR = [
+  { valor: 'ATIVO', rotulo: 'Ativo' },
+  { valor: 'AFASTADO', rotulo: 'Afastado' },
+  { valor: 'INATIVO', rotulo: 'Inativo' }
+];
+
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -28,48 +49,41 @@ function formatDate(value) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function statusColor(value) {
+/**
+ * A família semântica do status é a MESMA que o mapa de cores à mão
+ * (emerald/amber/rose/slate) representava — só que agora quem desenha a
+ * pílula é o StatusBadge do sistema: token semântico + ícone (cor sozinha
+ * não comunica para daltônicos) e nada de paleta escrita na tela (R10).
+ */
+function familiaStatus(value) {
   const normalized = String(value || '').toUpperCase();
-  if (['ATIVO', 'CONFERIDO', 'VALIDO'].includes(normalized)) return 'text-emerald-700 bg-emerald-50';
-  if (['A_VENCER', 'AFASTADO'].includes(normalized)) return 'text-amber-700 bg-amber-50';
-  if (['VENCIDO', 'REJEITADO', 'INATIVO'].includes(normalized)) return 'text-rose-700 bg-rose-50';
-  return 'text-slate-700 bg-slate-100';
-}
-
-function Metric({ label, value, detail, tone = 'default' }) {
-  const color = {
-    danger: '#b91c1c',
-    warning: '#b45309',
-    success: '#15803d',
-    default: 'var(--c-text)'
-  }[tone] || 'var(--c-text)';
-
-  return (
-    <div className="app-summary-card">
-      <span className="app-summary-label">{label}</span>
-      <strong className="app-summary-value" style={{ color }}>{value}</strong>
-      {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
-    </div>
-  );
+  if (['ATIVO', 'CONFERIDO', 'VALIDO'].includes(normalized)) return 'success';
+  if (['A_VENCER', 'AFASTADO'].includes(normalized)) return 'warning';
+  if (['VENCIDO', 'REJEITADO', 'INATIVO'].includes(normalized)) return 'danger';
+  return 'neutral';
 }
 
 function DistributionList({ title, rows, valueKey = 'total', formatter = (value) => value }) {
   const max = Math.max(...(rows || []).map((row) => Number(row[valueKey] || 0)), 0);
 
   return (
-    <section className="card sol-surface-card p-4">
-      <h2 className="text-base font-semibold text-[var(--c-text)]">{title}</h2>
-      <div className="mt-4 space-y-3">
+    <BlocoConteudo titulo={title} variante="secundario">
+      <div className="space-y-3">
         {rows?.length ? rows.slice(0, 8).map((row) => {
           const value = Number(row[valueKey] || 0);
           const width = max > 0 ? Math.max(4, Math.round((value / max) * 100)) : 0;
           return (
             <div key={`${title}-${row.nome}`} className="space-y-1">
               <div className="flex items-center justify-between gap-3 text-sm">
-                <span className="truncate text-[var(--c-text)]">{row.nome}</span>
+                <span className="truncate text-[var(--c-text)]" title={row.nome}>{row.nome}</span>
                 <span className="font-semibold text-[var(--c-text)]">{formatter(row[valueKey])}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[var(--c-bg-subtle)]">
+              {/* A largura em % é DADO (a proporção da barra), não medida de
+                  layout — por isso continua no style. Trilho e preenchimento
+                  vêm de token; a altura é o degrau de 8px da escala.
+                  R18 (onde NÃO vale, 2): o overflow aqui só recorta a FORMA
+                  da barra e não é ancestral de nada fixo. */}
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
                 <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
               </div>
             </div>
@@ -78,7 +92,7 @@ function DistributionList({ title, rows, valueKey = 'total', formatter = (value)
           <p className="text-sm text-[var(--c-muted)]">Sem dados para o recorte.</p>
         )}
       </div>
-    </section>
+    </BlocoConteudo>
   );
 }
 
@@ -116,7 +130,7 @@ export default function RhDpRelatorioOperacional() {
         if (active) setRelatorio(data);
       })
       .catch((err) => {
-        if (active) setError(err.message || 'Erro ao carregar relatorio RH/DP');
+        if (active) setError(err.message || 'Erro ao carregar relatório RH/DP');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -130,17 +144,49 @@ export default function RhDpRelatorioOperacional() {
   const colaboradores = relatorio?.colaboradores || {};
   const documentos = relatorio?.documentos || {};
   const periodoTexto = relatorio?.filtro?.data_inicial && relatorio?.filtro?.data_final
-    ? `${formatDate(relatorio.filtro.data_inicial)} ate ${formatDate(relatorio.filtro.data_final)}`
+    ? `${formatDate(relatorio.filtro.data_inicial)} até ${formatDate(relatorio.filtro.data_final)}`
     : '';
 
   const docCriticos = useMemo(() => documentos.criticos || [], [documentos]);
+
+  // R12: os recortes enumeráveis viram MARCAÇÃO com etiqueta removível.
+  // O endpoint recebe UM valor por recorte (periodo, empresa_grupo_id,
+  // obra_id, status), então marcar outro valor TROCA a escolha — não
+  // inventamos filtro múltiplo que o serviço não aceita.
+  const ativos = useMemo(() => ({
+    periodo: new Set(filters.periodo ? [String(filters.periodo)] : []),
+    empresa_grupo_id: new Set(filters.empresa_grupo_id ? [String(filters.empresa_grupo_id)] : []),
+    obra_id: new Set(filters.obra_id ? [String(filters.obra_id)] : []),
+    status: new Set(filters.status ? [String(filters.status)] : [])
+  }), [filters]);
+
+  const dimensoes = useMemo(() => [
+    { id: 'periodo', rotulo: 'Período', opcoes: PERIODOS },
+    {
+      id: 'empresa_grupo_id',
+      rotulo: 'Empresa',
+      opcoes: empresas.map((empresa) => ({ valor: String(empresa.id), rotulo: empresa.nome }))
+    },
+    {
+      id: 'obra_id',
+      rotulo: 'Obra/Centro',
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    },
+    { id: 'status', rotulo: 'Status', opcoes: STATUS_COLABORADOR }
+  ], [empresas, obras]);
 
   function updateFilter(field, value) {
     setFilters((current) => ({ ...current, [field]: value }));
   }
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
+  function alternarFiltro(dimensao, valor) {
+    setFilters((current) => ({
+      ...current,
+      [dimensao]: String(current[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  function aplicarFiltros() {
     setAppliedFilters(filters);
   }
 
@@ -150,90 +196,59 @@ export default function RhDpRelatorioOperacional() {
   }
 
   return (
-    <div className="page solicitacoes-page rhdp-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Relatorio Operacional RH/DP</h1>
-            <p className="page-subtitle">
-              Colaboradores, documentos, apuracoes e fechamentos com base nos cadastros reais do modulo.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/rh-dp/colaboradores" className="btn btn-outline">Colaboradores</Link>
-            <Link to="/rh-dp/documentos" className="btn btn-outline">Documentos</Link>
-            <Link to="/rh-dp/apuracao" className="btn btn-outline">Apuracao</Link>
-          </div>
-        </div>
-      </div>
+    <Pagina className="rhdp-page">
+      {/* D6/R11: os links "Colaboradores", "Documentos" e "Apuração" saíram —
+          eram navegação disfarçada de ação; menu e breadcrumb resolvem.
+          Sobram as duas AÇÕES da tela: atualizar o recorte e limpar. */}
+      <PageHeader
+        titulo="Relatório Operacional"
+        contagem={periodoTexto ? `Período ${periodoTexto}` : null}
+        descricao="Colaboradores, documentos, apurações e fechamentos com base nos cadastros reais do módulo."
+        acaoPrincipal={{ rotulo: 'Atualizar relatório', onClick: aplicarFiltros }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
 
-      <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
-        <div className="grid gap-3 lg:grid-cols-6">
-          <label className="app-filter-field">
-            <span className="app-filter-label">Periodo</span>
-            <select className="input input-sm" value={filters.periodo} onChange={(event) => updateFilter('periodo', event.target.value)}>
-              <option value="MES_ATUAL">Mes atual</option>
-              <option value="30_DIAS">30 dias</option>
-              <option value="90_DIAS">90 dias</option>
-              <option value="ANO_ATUAL">Ano atual</option>
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Data inicial</span>
-            <input className="input input-sm" type="date" value={filters.data_inicial} onChange={(event) => updateFilter('data_inicial', event.target.value)} />
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Data final</span>
-            <input className="input input-sm" type="date" value={filters.data_final} onChange={(event) => updateFilter('data_final', event.target.value)} />
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Empresa</span>
-            <select className="input input-sm" value={filters.empresa_grupo_id} onChange={(event) => updateFilter('empresa_grupo_id', event.target.value)}>
-              <option value="">Todas</option>
-              {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome}</option>)}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Obra/Centro</span>
-            <select className="input input-sm" value={filters.obra_id} onChange={(event) => updateFilter('obra_id', event.target.value)}>
-              <option value="">Todos</option>
-              {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
-            </select>
-          </label>
-          <label className="app-filter-field">
-            <span className="app-filter-label">Status</span>
-            <select className="input input-sm" value={filters.status} onChange={(event) => updateFilter('status', event.target.value)}>
-              <option value="">Todos</option>
-              <option value="ATIVO">Ativo</option>
-              <option value="AFASTADO">Afastado</option>
-              <option value="INATIVO">Inativo</option>
-            </select>
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <span className="text-xs text-[var(--c-muted)]">{periodoTexto || 'Use as datas para recorte personalizado.'}</span>
-          <div className="flex gap-2">
-            <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
-            <button type="submit" className="btn btn-primary btn-sm">Atualizar relatorio</button>
-          </div>
-        </div>
-      </form>
+      <BlocoConteudo variante="secundario">
+        {/* R12/R16b: recorte enumerável (período, empresa, obra, status) em
+            marcação; data inicial/final são contínuos e vão em `campos`. */}
+        <BarraFiltros
+          campos={[
+            {
+              id: 'data_inicial',
+              rotulo: 'Data inicial',
+              tipo: 'date',
+              valor: filters.data_inicial,
+              aoMudar: (valor) => updateFilter('data_inicial', valor)
+            },
+            {
+              id: 'data_final',
+              rotulo: 'Data final',
+              tipo: 'date',
+              valor: filters.data_final,
+              aoMudar: (valor) => updateFilter('data_final', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+        />
+      </BlocoConteudo>
 
       {error ? <div className="app-alert app-alert--warning">{error}</div> : null}
 
       {loading ? (
-        <div className="app-empty-card">Carregando relatorio RH/DP...</div>
+        <div className="app-empty-card">Carregando relatório RH/DP...</div>
       ) : (
         <>
           {isVisible('rhdp.relatorio_operacional.metricas') ? (
-          <div className="app-summary-grid">
-            <Metric label="Colaboradores ativos" value={resumo.colaboradores_ativos || 0} detail={`${resumo.colaboradores_total || 0} no recorte`} tone="success" />
-            <Metric label="Afastados" value={resumo.colaboradores_afastados || 0} detail="Status cadastral atual" tone={resumo.colaboradores_afastados > 0 ? 'warning' : 'default'} />
-            <Metric label="Documentos vencidos" value={resumo.documentos_vencidos || 0} detail={`${resumo.documentos_a_vencer || 0} a vencer`} tone={resumo.documentos_vencidos > 0 ? 'danger' : 'success'} />
-            <Metric label="Apuracoes no periodo" value={resumo.apuracoes_periodo || 0} detail={formatCurrency(resumo.total_liquido_apurado)} />
-            <Metric label="Fechamentos no periodo" value={resumo.fechamentos_periodo || 0} detail={formatCurrency(resumo.total_fechado)} />
-            <Metric label="Base mensal cadastrada" value={formatCurrency(resumo.base_mensal_cadastrada)} detail="Salario base ou valor contratual" />
-          </div>
+          <StatGrid colunas={3}>
+            <StatTile label="Colaboradores ativos" valor={resumo.colaboradores_ativos || 0} sub={`${resumo.colaboradores_total || 0} no recorte`} tom="success" />
+            <StatTile label="Afastados" valor={resumo.colaboradores_afastados || 0} sub="Status cadastral atual" tom={resumo.colaboradores_afastados > 0 ? 'warning' : undefined} />
+            <StatTile label="Documentos vencidos" valor={resumo.documentos_vencidos || 0} sub={`${resumo.documentos_a_vencer || 0} a vencer`} tom={resumo.documentos_vencidos > 0 ? 'danger' : 'success'} />
+            <StatTile label="Apurações no período" valor={resumo.apuracoes_periodo || 0} sub={formatCurrency(resumo.total_liquido_apurado)} />
+            <StatTile label="Fechamentos no período" valor={resumo.fechamentos_periodo || 0} sub={formatCurrency(resumo.total_fechado)} />
+            <StatTile label="Base mensal cadastrada" valor={formatCurrency(resumo.base_mensal_cadastrada)} sub="Salário base ou valor contratual" />
+          </StatGrid>
           ) : null}
 
           {isVisible('rhdp.relatorio_operacional.distribuicoes') ? (
@@ -245,11 +260,12 @@ export default function RhDpRelatorioOperacional() {
           ) : null}
 
           {isVisible('rhdp.relatorio_operacional.colaboradores') ? (
-          <section className="card sol-surface-card">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Colaboradores</h2>
-              <p className="text-sm text-[var(--c-muted)]">Amostra operacional com a empresa, obra/centro e base cadastrada.</p>
-            </div>
+          <BlocoConteudo
+            titulo="Colaboradores"
+            descricao="Amostra operacional com a empresa, obra/centro e base cadastrada."
+            variante="primario"
+            cor="var(--c-primary)"
+          >
             <TabelaPadrao
               colunas={[
                 {
@@ -280,7 +296,7 @@ export default function RhDpRelatorioOperacional() {
                 },
                 {
                   id: 'tipo',
-                  titulo: 'Vinculo',
+                  titulo: 'Vínculo',
                   tipo: 'badge',
                   render: (item) => item.tipo_vinculo || '-'
                 },
@@ -289,9 +305,7 @@ export default function RhDpRelatorioOperacional() {
                   titulo: 'Status',
                   tipo: 'status',
                   render: (item) => (
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusColor(item.status)}`}>
-                      {item.status || '-'}
-                    </span>
+                    <StatusBadge status={item.status || '-'} kind={familiaStatus(item.status)} />
                   )
                 },
                 {
@@ -306,15 +320,14 @@ export default function RhDpRelatorioOperacional() {
               rotuloRolagem="Colaboradores"
               vazio="Nenhum colaborador encontrado."
             />
-          </section>
+          </BlocoConteudo>
           ) : null}
 
           {isVisible('rhdp.relatorio_operacional.documentos') ? (
-          <section className="card sol-surface-card">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Documentos criticos</h2>
-              <p className="text-sm text-[var(--c-muted)]">Documentos vencidos, a vencer ou rejeitados.</p>
-            </div>
+          <BlocoConteudo
+            titulo="Documentos críticos"
+            descricao="Documentos vencidos, a vencer ou rejeitados."
+          >
             <TabelaPadrao
               colunas={[
                 {
@@ -347,22 +360,21 @@ export default function RhDpRelatorioOperacional() {
                   id: 'status',
                   titulo: 'Status',
                   tipo: 'status',
-                  render: (item) => (
-                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusColor(item.validade_status || item.status)}`}>
-                      {item.validade_status || item.status}
-                    </span>
-                  )
+                  render: (item) => {
+                    const status = item.validade_status || item.status;
+                    return <StatusBadge status={status || '-'} kind={familiaStatus(status)} />;
+                  }
                 }
               ]}
               itens={docCriticos}
               storageKey="tabela:rh-dp-relatorio-operacional:documentos"
-              rotuloRolagem="Documentos criticos"
-              vazio="Nenhum documento critico no recorte."
+              rotuloRolagem="Documentos críticos"
+              vazio="Nenhum documento crítico no recorte."
             />
-          </section>
+          </BlocoConteudo>
           ) : null}
         </>
       )}
-    </div>
+    </Pagina>
   );
 }

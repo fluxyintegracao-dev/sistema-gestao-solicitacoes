@@ -1118,3 +1118,51 @@ fieldset.form-section {
   outline: 2px solid var(--c-primary);
   outline-offset: 1px;
 }
+
+/* Rodapé de lista paginada (R16b, 02/09). Um dono só: antes cada tela
+   reinventava com app-page-actions e cor fixa. */
+.app-paginacao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--esp-3);
+  flex-wrap: wrap;
+}
+
+.app-paginacao .app-paginacao-posicao {
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
+  color: var(--c-muted);
+}
+
+/* Campo de texto da confirmação (R16b, 02/09) — a justificativa que antes
+   saía em window.prompt. Fica DENTRO do mesmo passo: confirmar e justificar
+   é um gesto só. */
+.app-confirmacao .app-confirmacao-campo {
+  display: grid;
+  gap: var(--esp-1);
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
+  color: var(--c-muted);
+}
+
+.app-confirmacao .app-confirmacao-campo :is(input, textarea) {
+  min-height: 32px;
+  padding: var(--esp-2);
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
+  color: var(--c-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--raio-1);
+}
+
+.app-confirmacao .app-confirmacao-campo textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.app-confirmacao .app-confirmacao-campo :is(input, textarea):focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}

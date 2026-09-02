@@ -189,9 +189,17 @@ export function validarLayout() {
 }
 
 /**
- * R19 — `window.alert()` e `window.confirm()` NUNCA (decisão do cliente,
- * 02/09). Aviso e confirmação usam o componente próprio do sistema
- * (`Avisos`/`useAvisos` e `useConfirmacao`, em components/padrao).
+ * R19 — `window.alert()`, `window.confirm()` e `window.prompt()` NUNCA
+ * (decisão do cliente, 02/09). Aviso e confirmação usam o componente
+ * próprio do sistema (`Avisos`/`useAvisos` e `useConfirmacao`, em
+ * components/padrao).
+ *
+ * `prompt` entrou depois, no mesmo dia: a primeira versão da regra só
+ * bania alert/confirm, e o estorno do RhDpFechamentos passava batido
+ * pedindo a justificativa em `window.prompt` — a MESMA caixa do navegador,
+ * pelos mesmos motivos. Regra com buraco declarado é regra que não pega o
+ * caso vizinho; o `useConfirmacao` ganhou campo de texto (R16b) e a regra
+ * fechou o buraco.
  *
  * A caixa do navegador ignora tema, tipografia e tokens; bloqueia a página;
  * o harness não consegue medi-la; e ela some sem deixar rastro no DOM.
@@ -222,7 +230,7 @@ function validarDialogosDoNavegador() {
 
   // `alert(` precedido de ponto é método de objeto (`toast.alert`), não a
   // caixa do navegador; `confirmar(`/`confirmacao` não são `confirm(`.
-  const padrao = /(^|[^.\w])(window\s*\.\s*)?(alert|confirm)\s*\(/g;
+  const padrao = /(^|[^.\w])(window\s*\.\s*)?(alert|confirm|prompt)\s*\(/g;
   const contagens = {};
 
   const varrer = (dir) => {
@@ -249,11 +257,11 @@ function validarDialogosDoNavegador() {
     total += quantidade;
     const limite = herdado[rel];
     if (limite === undefined) {
-      falhas.push(`${rel} [R19] ${quantidade} chamada(s) de alert()/confirm() do navegador em arquivo NOVO para a regra — use Avisos/useAvisos (aviso) e useConfirmacao (confirmação) de components/padrao.`);
+      falhas.push(`${rel} [R19] ${quantidade} chamada(s) de alert()/confirm()/prompt() do navegador em arquivo NOVO para a regra — use Avisos/useAvisos (aviso) e useConfirmacao (confirmação, com a prop campo quando precisar de texto) de components/padrao.`);
       continue;
     }
     if (quantidade > limite) {
-      falhas.push(`${rel} [R19] alert()/confirm() do navegador AUMENTOU de ${limite} para ${quantidade} — o trinco só aperta: troque por Avisos/useConfirmacao.`);
+      falhas.push(`${rel} [R19] alert()/confirm()/prompt() do navegador AUMENTOU de ${limite} para ${quantidade} — o trinco só aperta: troque por Avisos/useConfirmacao.`);
       continue;
     }
     noTrinco += quantidade;
@@ -265,7 +273,7 @@ function validarDialogosDoNavegador() {
   // a linha, senão o passivo "some" sem ninguém ver que caiu.
   for (const rel of Object.keys(herdado)) {
     if (contagens[rel] === undefined) {
-      avisos.push(`${rel} [R19] zerou o alert()/confirm() — remova a linha de scripts/trinco-dialogos.json.`);
+      avisos.push(`${rel} [R19] zerou o alert()/confirm()/prompt() — remova a linha de scripts/trinco-dialogos.json.`);
     }
   }
 

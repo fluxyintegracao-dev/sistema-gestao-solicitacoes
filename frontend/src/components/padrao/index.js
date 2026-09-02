@@ -7,5 +7,6 @@ export { default as CamposComVazios } from './CamposComVazios';
 export { default as TabelaPadrao, CelulaDupla } from './TabelaPadrao';
 export { FormSecao, CampoForm } from './FormSecao';
 export { default as BarraFiltros, alternarValorFiltro } from './BarraFiltros';
+export { default as Paginacao } from './Paginacao';
 export { default as Avisos, useAvisos } from './Avisos';
 export { useConfirmacao } from './Confirmacao';

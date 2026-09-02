@@ -12,7 +12,19 @@ import { FiltroRapido } from '../lista-avancada/ListaAvancada';
  * um; com marcação o estado do filtro é legível de imediato e combinável.
  *
  * A tela guarda o estado: `ativos` = { dimensaoId: Set(valores) } e trata
- * `aoAlternar(dimensaoId, valor)`. Conjunto vazio = sem filtro (todas).
+ * `aoAlternar(dimensaoId, valor, opcoes)`. Conjunto vazio = sem filtro.
+ *
+ * ## `unico` na dimensão — quando o serviço só aceita UM valor (02/09)
+ *
+ * Achado na leva do RH/DP: telas mapeiam a dimensão para um parâmetro
+ * único (`empresa_grupo_id=1`). Com marcação múltipla, marcar dois valores
+ * fazia a tela mandar NENHUM — o usuário via duas etiquetas e a lista não
+ * estreitava. Capacidade aparente sem efeito: a mesma família da R15.
+ *
+ * Então a dimensão declara `unico: true`, e aí: a marca é REDONDA (a forma
+ * diz que só cabe uma), marcar outra substitui, e a etiqueta sempre reflete
+ * o que está filtrando de verdade. `aoAlternar` recebe `{ unico }` no
+ * terceiro argumento — repasse para `alternarValorFiltro`.
  *
  * ## `campos` — o recorte que NÃO é enumerável (R16b, 02/09)
  *
@@ -31,7 +43,7 @@ import { FiltroRapido } from '../lista-avancada/ListaAvancada';
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
   campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max }]
-  filtros = [],        // [{ id, rotulo, opcoes: [{ valor, rotulo }] }]
+  filtros = [],        // [{ id, rotulo, unico?, opcoes: [{ valor, rotulo }] }]
   ativos = {},         // { [id]: Set<string> }
   aoAlternar,
   aoLimpar
@@ -41,7 +53,7 @@ export default function BarraFiltros({
     const selecionados = ativos[dim.id] || new Set();
     (dim.opcoes || []).forEach((opcao) => {
       if (selecionados.has(String(opcao.valor))) {
-        etiquetas.push({ dimensao: dim.id, dimensaoRotulo: dim.rotulo, valor: String(opcao.valor), rotulo: opcao.rotulo });
+        etiquetas.push({ dimensao: dim.id, dimensaoRotulo: dim.rotulo, unico: Boolean(dim.unico), valor: String(opcao.valor), rotulo: opcao.rotulo });
       }
     });
   });
@@ -91,7 +103,7 @@ export default function BarraFiltros({
               key={dim.id}
               dim={dim}
               selecionados={ativos[dim.id] || new Set()}
-              onToggle={(valor) => aoAlternar(dim.id, valor)}
+              onToggle={(valor) => aoAlternar(dim.id, valor, { unico: Boolean(dim.unico) })}
             />
           ))}
         </div>
@@ -106,7 +118,7 @@ export default function BarraFiltros({
               {etiqueta.rotulo}
               <button
                 type="button"
-                onClick={() => aoAlternar(etiqueta.dimensao, etiqueta.valor)}
+                onClick={() => aoAlternar(etiqueta.dimensao, etiqueta.valor, { unico: Boolean(etiqueta.unico) })}
                 aria-label={`Remover filtro ${etiqueta.dimensaoRotulo} ${etiqueta.rotulo}`}
               >
                 <HiOutlineXMark aria-hidden="true" />
@@ -122,12 +134,24 @@ export default function BarraFiltros({
   );
 }
 
-/* Alterna um valor numa dimensão de filtro — utilitário para as telas. */
-export function alternarValorFiltro(ativos, dimensao, valor) {
+/*
+ * Alterna um valor numa dimensão de filtro — utilitário para as telas.
+ * `opcoes.unico`: dimensão de valor único (o serviço só aceita um) — marcar
+ * outro SUBSTITUI em vez de somar, e marcar o mesmo desmarca. Sem isso a
+ * tela mostrava duas etiquetas e mandava filtro nenhum.
+ */
+export function alternarValorFiltro(ativos, dimensao, valor, opcoes = {}) {
   const proximo = { ...ativos };
   const conjunto = new Set(proximo[dimensao] || []);
   const chave = String(valor);
-  if (conjunto.has(chave)) conjunto.delete(chave); else conjunto.add(chave);
+  if (conjunto.has(chave)) {
+    conjunto.delete(chave);
+  } else if (opcoes.unico) {
+    conjunto.clear();
+    conjunto.add(chave);
+  } else {
+    conjunto.add(chave);
+  }
   proximo[dimensao] = conjunto;
   return proximo;
 }

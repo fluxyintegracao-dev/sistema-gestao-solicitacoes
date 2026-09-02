@@ -45,7 +45,7 @@ function DistributionList({ title, subtitle, rows, labelGetter, valueGetter }) {
                 <span className="truncate text-[var(--c-text)]">{labelGetter(row)}</span>
                 <span className="font-semibold text-[var(--c-text)]">{value}</span>
               </div>
-              <div className="h-2 overflow-hidden rounded-full bg-[var(--c-bg-subtle)]">
+              <div className="h-2 overflow-hidden rounded-full bg-[var(--ui-border)]">
                 <div className="h-full rounded-full bg-[var(--c-primary)]" style={{ width: `${width}%` }} />
               </div>
             </div>

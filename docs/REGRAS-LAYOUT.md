@@ -338,16 +338,25 @@ automaticamente se sair do padrão.
 
 ## R19 — nada de caixa do navegador (02/09)
 
-- **O problema**: `window.alert()` e `window.confirm()` desenham uma caixa
-  do Chrome, não do sistema. Ela ignora tema, tipografia e tokens; bloqueia
+- **O problema**: `window.alert()`, `window.confirm()` e `window.prompt()`
+  desenham uma caixa do Chrome, não do sistema. Ela ignora tema, tipografia e tokens; bloqueia
   a página inteira; o harness não consegue medi-la (não existe no DOM); e
   ela some sem deixar rastro. Dá o mesmo peso a "salvo com sucesso" e a
   "estornar o fechamento".
 - **O que usar**: `Avisos` + `useAvisos` para aviso (faixa dentro da
   página, com o tom semântico e fechável; sucesso some sozinho em 6s) e
   `useConfirmacao` para confirmação (modal do sistema, rótulo dizendo o que
-  vai acontecer, destrutiva em vermelho suave e apartada). Ambos em
-  `components/padrao`.
+  vai acontecer, destrutiva em vermelho suave e apartada). Quando a
+  confirmação precisa de um TEXTO — justificativa de estorno, motivo de
+  cancelamento —, `useConfirmacao` recebe `campo: { rotulo, obrigatorio,
+  multilinha }` e devolve `{ ok, texto }`. Ambos em `components/padrao`.
+- **`prompt` entrou depois, no mesmo dia.** A primeira versão da regra só
+  bania `alert` e `confirm`; o estorno do RhDpFechamentos pedia a
+  justificativa em `window.prompt` e passava batido no check — a MESMA
+  caixa, pelos mesmos motivos. Regra tem de cobrir a família inteira, não
+  os dois casos que estavam à vista: o componente cresceu (R16b) e a regra
+  fechou o buraco no mesmo movimento. São 27 chamadas de `prompt` em 14
+  arquivos, agora dentro do trinco.
 - **Onde vale**: TODO o `frontend/src` — decisão do cliente em 02/09, ao ver
   que 51 chamadas num módulo só indicavam o mesmo em todos os outros.
 - **Onde NÃO vale**: nada. Não há exceção declarada; se aparecer um caso
@@ -358,14 +367,16 @@ automaticamente se sair do padrão.
   ruído deixa de ser lida (lição da R18). Então o passivo está congelado em
   `frontend/scripts/trinco-dialogos.json`, com a contagem de cada arquivo na
   data em que a regra nasceu:
-  - arquivo NOVO com `alert`/`confirm` → **FALHA**;
+  - arquivo NOVO com `alert`/`confirm`/`prompt` → **FALHA**;
   - arquivo do trinco cuja contagem SOBE → **FALHA**;
   - contagem que cai → passa, e o trinco aperta (aviso pedindo a atualização).
   O número só anda para baixo. Cada leva zera os arquivos que tocar; a leva
   do RH/DP tirou 51 dele.
-- **Verificação**: `validarLayout.mjs`, provado nos dois sentidos —
-  arquivo novo com `alert()` reprova, e arquivo do trinco que aumenta de 4
-  para 5 reprova nomeando os dois números.
+- **Verificação**: `validarLayout.mjs`, provado nos três sentidos — arquivo
+  novo com `alert()` reprova, arquivo novo com `prompt()` reprova, e arquivo
+  do trinco que aumenta de 4 para 5 reprova nomeando os dois números. Mais a
+  prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
+  página real reprova a tela em que qualquer caixa dispara.
 
 ## Disciplina de regras (02/09 — vale para toda regra nova e existente)
 

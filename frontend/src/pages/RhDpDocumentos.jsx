@@ -1,6 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CelulaDupla, TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  CelulaDupla,
+  PageHeader,
+  Pagina,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -11,6 +21,10 @@ import {
   substituirRhDocumento
 } from '../services/rhDp';
 import { canManageRhDpDocumentos } from '../utils/acessoProduto';
+
+// A lista sempre pediu 20 por página e nada na tela mudava esse número:
+// vira constante em vez de estado que ninguém escreve.
+const LIMITE_PAGINA = 20;
 
 function formatCpf(value) {
   const digits = String(value || '').replace(/\D+/g, '');
@@ -34,7 +48,7 @@ function validadeLabel(status) {
     case 'A_VENCER':
       return 'A vencer';
     case 'VALIDO':
-      return 'Valido';
+      return 'Válido';
     default:
       return 'Sem validade';
   }
@@ -43,40 +57,42 @@ function validadeLabel(status) {
 export default function RhDpDocumentos() {
   const { user } = useAuth();
   const podeEditar = canManageRhDpDocumentos(user);
+  // R3/R19: aviso e confirmação do sistema — nada de caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [carregando, setCarregando] = useState(false);
   const [substituindoId, setSubstituindoId] = useState(null);
   const [documentos, setDocumentos] = useState([]);
-  const [meta, setMeta] = useState({ page: 1, total_pages: 0, total: 0, limit: 20 });
+  const [meta, setMeta] = useState({ page: 1, total_pages: 0, total: 0, limit: LIMITE_PAGINA });
   const [empresas, setEmpresas] = useState([]);
   const [obras, setObras] = useState([]);
   const [tipos, setTipos] = useState([]);
-  const [filtros, setFiltros] = useState({
-    q: '',
-    empresa_grupo_id: '',
-    obra_id: '',
-    tipo_vinculo: '',
-    tipo_documento_id: '',
-    status: '',
-    validade_status: '',
-    incluir_historico: false,
-    page: 1,
-    limit: 20
-  });
+  const [busca, setBusca] = useState('');
+  // R12: cada recorte é um conjunto MARCÁVEL (vazio = todos). A API aceita
+  // um valor por recorte, então uma marca vira o parâmetro e nenhuma marca
+  // deixa o parâmetro de fora — exatamente o que o select fazia antes.
+  const [ativos, setAtivos] = useState({});
+  const [pagina, setPagina] = useState(1);
 
   useEffect(() => {
     carregarBase();
   }, []);
 
+  // Filtro marcado aplica na hora; a busca digitada espera 350ms para não
+  // martelar a API a cada tecla. Trocar QUALQUER recorte (ou a página)
+  // recarrega a lista — por isso o botão "Aplicar filtros" deixou de ter uso.
   useEffect(() => {
-    carregarDocumentos().catch((error) => {
-      console.error(error);
-      alert(error?.message || 'Erro ao carregar documentos RH/DP');
-    });
-  }, [filtros.page]);
+    const atraso = setTimeout(() => {
+      carregarDocumentos().catch((error) => {
+        console.error(error);
+        avisar.erro(error?.message || 'Erro ao carregar documentos RH/DP');
+      });
+    }, 350);
+    return () => clearTimeout(atraso);
+  }, [busca, ativos, pagina]);
 
   async function carregarBase() {
     try {
-      setCarregando(true);
       const [listaEmpresas, listaObras, listaTipos] = await Promise.all([
         getRhEmpresasGrupo({ ativo: true }),
         getObras(),
@@ -86,73 +102,54 @@ export default function RhDpDocumentos() {
       setEmpresas(Array.isArray(listaEmpresas) ? listaEmpresas : []);
       setObras(Array.isArray(listaObras) ? listaObras : []);
       setTipos(Array.isArray(listaTipos) ? listaTipos : []);
-      await carregarDocumentos();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar base documental RH/DP');
-    } finally {
-      setCarregando(false);
+      avisar.erro(error?.message || 'Erro ao carregar base documental RH/DP');
     }
+  }
+
+  function valorUnico(dimensao) {
+    const conjunto = ativos[dimensao];
+    if (!conjunto || conjunto.size !== 1) return undefined;
+    return conjunto.values().next().value;
   }
 
   async function carregarDocumentos() {
     setCarregando(true);
     try {
       const resposta = await getRhDocumentos({
-        q: filtros.q || undefined,
-        empresa_grupo_id: filtros.empresa_grupo_id || undefined,
-        obra_id: filtros.obra_id || undefined,
-        tipo_vinculo: filtros.tipo_vinculo || undefined,
-        tipo_documento_id: filtros.tipo_documento_id || undefined,
-        status: filtros.status || undefined,
-        validade_status: filtros.validade_status || undefined,
-        incluir_historico: filtros.incluir_historico ? true : undefined,
-        page: filtros.page,
-        limit: filtros.limit
+        q: busca || undefined,
+        empresa_grupo_id: valorUnico('empresa_grupo_id'),
+        obra_id: valorUnico('obra_id'),
+        tipo_vinculo: valorUnico('tipo_vinculo'),
+        tipo_documento_id: valorUnico('tipo_documento_id'),
+        status: valorUnico('status'),
+        validade_status: valorUnico('validade_status'),
+        incluir_historico: ativos.incluir_historico?.size ? true : undefined,
+        page: pagina,
+        limit: LIMITE_PAGINA
       });
 
       setDocumentos(Array.isArray(resposta?.data) ? resposta.data : []);
       setMeta({
-        page: Number(resposta?.meta?.page || filtros.page || 1),
+        page: Number(resposta?.meta?.page || pagina || 1),
         total_pages: Number(resposta?.meta?.total_pages || 0),
         total: Number(resposta?.meta?.total || 0),
-        limit: Number(resposta?.meta?.limit || filtros.limit || 20)
+        limit: Number(resposta?.meta?.limit || LIMITE_PAGINA)
       });
     } finally {
       setCarregando(false);
     }
   }
 
-  async function aplicarFiltros() {
-    setFiltros((prev) => ({ ...prev, page: 1 }));
-    try {
-      setCarregando(true);
-      const resposta = await getRhDocumentos({
-        q: filtros.q || undefined,
-        empresa_grupo_id: filtros.empresa_grupo_id || undefined,
-        obra_id: filtros.obra_id || undefined,
-        tipo_vinculo: filtros.tipo_vinculo || undefined,
-        tipo_documento_id: filtros.tipo_documento_id || undefined,
-        status: filtros.status || undefined,
-        validade_status: filtros.validade_status || undefined,
-        incluir_historico: filtros.incluir_historico ? true : undefined,
-        page: 1,
-        limit: filtros.limit
-      });
+  function alternarFiltro(dimensao, valor) {
+    setAtivos((atual) => alternarValorFiltro(atual, dimensao, valor));
+    setPagina(1);
+  }
 
-      setDocumentos(Array.isArray(resposta?.data) ? resposta.data : []);
-      setMeta({
-        page: Number(resposta?.meta?.page || 1),
-        total_pages: Number(resposta?.meta?.total_pages || 0),
-        total: Number(resposta?.meta?.total || 0),
-        limit: Number(resposta?.meta?.limit || filtros.limit || 20)
-      });
-    } catch (error) {
-      console.error(error);
-      alert(error?.message || 'Erro ao aplicar filtros dos documentos RH/DP');
-    } finally {
-      setCarregando(false);
-    }
+  function limparFiltros() {
+    setAtivos({});
+    setPagina(1);
   }
 
   async function abrirDocumento(id) {
@@ -163,16 +160,19 @@ export default function RhDpDocumentos() {
       }
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao abrir documento RH/DP');
+      avisar.erro(error?.message || 'Erro ao abrir documento RH/DP');
     }
   }
 
   async function onSelecionarSubstituicao(documento, file) {
     if (!file) return;
 
-    if (!window.confirm(`Substituir o documento "${documento.nome_original}"?`)) {
-      return;
-    }
+    const ok = await confirmar({
+      titulo: 'Substituir documento',
+      mensagem: `Substituir o documento "${documento.nome_original}"?`,
+      rotuloConfirmar: 'Substituir'
+    });
+    if (!ok) return;
 
     try {
       setSubstituindoId(documento.id);
@@ -184,131 +184,99 @@ export default function RhDpDocumentos() {
         file
       });
       await carregarDocumentos();
+      avisar.sucesso('Documento substituído.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao substituir documento RH/DP');
+      avisar.erro(error?.message || 'Erro ao substituir documento RH/DP');
     } finally {
       setSubstituindoId(null);
     }
   }
 
+  // R12: os oito campos da grade crua viraram um recorte marcável cada.
+  // Nenhum é contínuo (validade aqui é SITUAÇÃO — válido/a vencer/vencido —,
+  // não uma data), então a prop `campos` da BarraFiltros não tem uso nesta
+  // tela; ligá-la seria inventar um filtro que a tela nunca teve.
+  const dimensoes = useMemo(() => [
+    {
+      id: 'empresa_grupo_id',
+      rotulo: 'Empresa',
+      opcoes: empresas.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
+    },
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      opcoes: obras.map((item) => ({
+        valor: String(item.id),
+        rotulo: item.codigo ? `${item.codigo} - ${item.nome}` : item.nome
+      }))
+    },
+    {
+      id: 'tipo_vinculo',
+      rotulo: 'Vínculo',
+      opcoes: [
+        { valor: 'CLT', rotulo: 'CLT' },
+        { valor: 'NAO_CLT', rotulo: 'Não CLT' }
+      ]
+    },
+    {
+      id: 'tipo_documento_id',
+      rotulo: 'Tipo de documento',
+      opcoes: tipos.map((item) => ({ valor: String(item.id), rotulo: item.nome }))
+    },
+    {
+      id: 'status',
+      rotulo: 'Status',
+      opcoes: [
+        { valor: 'ENVIADO', rotulo: 'Enviado' },
+        { valor: 'CONFERIDO', rotulo: 'Conferido' },
+        { valor: 'REJEITADO', rotulo: 'Rejeitado' },
+        { valor: 'SUBSTITUIDO', rotulo: 'Substituído' }
+      ]
+    },
+    {
+      id: 'validade_status',
+      rotulo: 'Validade',
+      opcoes: [
+        { valor: 'VALIDO', rotulo: 'Válido' },
+        { valor: 'A_VENCER', rotulo: 'A vencer' },
+        { valor: 'VENCIDO', rotulo: 'Vencido' },
+        { valor: 'SEM_VALIDADE', rotulo: 'Sem validade' }
+      ]
+    },
+    {
+      id: 'incluir_historico',
+      rotulo: 'Histórico',
+      opcoes: [{ valor: 'sim', rotulo: 'Incluir histórico' }]
+    }
+  ], [empresas, obras, tipos]);
+
   const paginaAtual = Number(meta.page || 1);
   const totalPaginas = Number(meta.total_pages || 0);
 
   return (
-    <div className="page solicitacoes-page rhdp-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">RH/DP - Documentos</h1>
-            <p className="page-subtitle">
-              Painel geral de documentos por colaborador, com busca, validade, historico e acesso por link assinado.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/rh-dp" className="btn btn-outline">
-              Voltar ao RH/DP
-            </Link>
-            <Link to="/rh-dp/colaboradores" className="btn btn-outline">
-              Colaboradores
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina className="rhdp-page">
+      <PageHeader
+        titulo="Documentos"
+        contagem={carregando ? null : `${meta.total} documento(s)`}
+        descricao="Painel geral de documentos por colaborador, com busca, validade, histórico e acesso por link assinado."
+      />
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4 space-y-3">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <input
-            className="form-control"
-            placeholder="Buscar por colaborador, CPF, matricula, arquivo ou observacao"
-            value={filtros.q}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, q: e.target.value }))}
-          />
-          <select
-            className="form-control"
-            value={filtros.empresa_grupo_id}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
-          >
-            <option value="">Todas as empresas</option>
-            {empresas.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={filtros.obra_id}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, obra_id: e.target.value }))}
-          >
-            <option value="">Todas as obras</option>
-            {obras.map((item) => (
-              <option key={item.id} value={item.id}>{item.codigo ? `${item.codigo} - ${item.nome}` : item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={filtros.tipo_vinculo}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, tipo_vinculo: e.target.value }))}
-          >
-            <option value="">Todos os vinculos</option>
-            <option value="CLT">CLT</option>
-            <option value="NAO_CLT">Nao CLT</option>
-          </select>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <select
-            className="form-control"
-            value={filtros.tipo_documento_id}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, tipo_documento_id: e.target.value }))}
-          >
-            <option value="">Todos os tipos</option>
-            {tipos.map((item) => (
-              <option key={item.id} value={item.id}>{item.nome}</option>
-            ))}
-          </select>
-          <select
-            className="form-control"
-            value={filtros.status}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, status: e.target.value }))}
-          >
-            <option value="">Todos os status</option>
-            <option value="ENVIADO">Enviado</option>
-            <option value="CONFERIDO">Conferido</option>
-            <option value="REJEITADO">Rejeitado</option>
-            <option value="SUBSTITUIDO">Substituido</option>
-          </select>
-          <select
-            className="form-control"
-            value={filtros.validade_status}
-            onChange={(e) => setFiltros((prev) => ({ ...prev, validade_status: e.target.value }))}
-          >
-            <option value="">Todas as validades</option>
-            <option value="VALIDO">Valido</option>
-            <option value="A_VENCER">A vencer</option>
-            <option value="VENCIDO">Vencido</option>
-            <option value="SEM_VALIDADE">Sem validade</option>
-          </select>
-          <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
-            <input
-              type="checkbox"
-              checked={filtros.incluir_historico}
-              onChange={(e) => setFiltros((prev) => ({ ...prev, incluir_historico: e.target.checked }))}
-            />
-            Incluir historico
-          </label>
-        </div>
-
-        <div className="app-page-actions">
-          <button type="button" className="btn btn-outline" onClick={aplicarFiltros} disabled={carregando}>
-            Aplicar filtros
-          </button>
-          <span className="text-sm text-slate-500">
-            Total: {meta.total}
-          </span>
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <div className="card sol-surface-card">
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: (valor) => { setBusca(valor); setPagina(1); },
+            placeholder: 'Buscar por colaborador, CPF, matrícula, arquivo ou observação'
+          }}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={limparFiltros}
+        />
+
         <TabelaPadrao
           colunas={[
             {
@@ -331,7 +299,7 @@ export default function RhDpDocumentos() {
               render: (item) => (
                 <CelulaDupla
                   principal={item.tipoDocumento?.nome || '-'}
-                  sub={item.colaborador?.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.colaborador?.tipo_vinculo || '-'}
+                  sub={item.colaborador?.tipo_vinculo === 'NAO_CLT' ? 'Não CLT' : item.colaborador?.tipo_vinculo || '-'}
                 />
               )
             },
@@ -348,7 +316,7 @@ export default function RhDpDocumentos() {
               titulo: 'Status',
               tipo: 'status',
               render: (item) => (
-                <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Historico'} />
+                <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Histórico'} />
               )
             },
             {
@@ -397,29 +365,34 @@ export default function RhDpDocumentos() {
         />
       </div>
 
+      {/* Paginação de servidor: não existe componente de paginação em
+          components/padrao (nem em tela reformada), então o markup segue o
+          da tela — só a cor cinza fixa virou token. */}
       {totalPaginas > 0 && (
-        <div className="app-page-actions">
+        <div className="app-page-actions" role="navigation" aria-label="Paginação">
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => setFiltros((prev) => ({ ...prev, page: Math.max(1, paginaAtual - 1) }))}
+            onClick={() => setPagina(Math.max(1, paginaAtual - 1))}
             disabled={paginaAtual <= 1 || carregando}
           >
-            Pagina anterior
+            Página anterior
           </button>
-          <span className="text-sm text-slate-500">
-            Pagina {paginaAtual} de {Math.max(totalPaginas, 1)}
+          <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
+            Página {paginaAtual} de {Math.max(totalPaginas, 1)}
           </span>
           <button
             type="button"
             className="btn btn-outline"
-            onClick={() => setFiltros((prev) => ({ ...prev, page: Math.min(totalPaginas, paginaAtual + 1) }))}
+            onClick={() => setPagina(Math.min(totalPaginas, paginaAtual + 1))}
             disabled={paginaAtual >= totalPaginas || carregando}
           >
-            Proxima pagina
+            Próxima página
           </button>
         </div>
       )}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

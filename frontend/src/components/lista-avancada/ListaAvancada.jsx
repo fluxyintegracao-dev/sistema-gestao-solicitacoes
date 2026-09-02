@@ -1104,10 +1104,17 @@ export function FiltroRapido({ dim, selecionados, onToggle }) {
       {aberto && (
         <div className="la-rapido-pop" role="menu">
           {(dim.opcoes || []).length === 0 && <p className="la-vazio">Sem opções</p>}
+          {/* `dim.unico` (02/09): quando o serviço só aceita UM valor nesta
+              dimensão, a marcação é redonda e exclusiva. Com caixa quadrada
+              o usuário marcava dois, via duas etiquetas e a lista não
+              estreitava — capacidade aparente sem efeito, que é a mesma
+              família de defeito da R15. A forma do controle tem de dizer o
+              que ele aceita. */}
           {(dim.opcoes || []).map((opcao) => (
             <label key={String(opcao.valor)}>
               <input
-                type="checkbox"
+                type={dim.unico ? 'radio' : 'checkbox'}
+                name={dim.unico ? `filtro-${dim.id}` : undefined}
                 checked={selecionados.has(String(opcao.valor))}
                 onChange={() => onToggle(String(opcao.valor))}
               />
