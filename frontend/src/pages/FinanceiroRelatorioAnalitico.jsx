@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   HiOutlineArrowDownTray,
-  HiOutlineBars3,
   HiOutlineEye,
   HiOutlineMagnifyingGlass,
   HiOutlineXMark
@@ -12,11 +11,14 @@ import {
   getContasBancarias,
   getRelatorioAnaliticoFinanceiro
 } from '../services/financeiro';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 
-const STORAGE_KEY = 'fluxy.financeiro.relatorioAnalitico.columns';
+// Uma chave só para a tabela: a TabelaPadrao guarda nela a escolha de
+// colunas (visíveis + ordem) e as larguras. Substitui a chave antiga
+// "fluxy.financeiro.relatorioAnalitico.columns", que a tela mantinha à mão.
+const STORAGE_KEY = 'tabela:financeiro-relatorio-analitico';
 
 const DEFAULT_FILTERS = {
   tipo: '',
@@ -34,44 +36,6 @@ const DEFAULT_FILTERS = {
   limit: '500'
 };
 
-const COLUMN_DEFINITIONS = [
-  { id: 'titulo_codigo', label: 'Titulo', kind: 'text', sticky: true },
-  { id: 'tipo', label: 'Tipo', kind: 'text' },
-  { id: 'status_titulo', label: 'Status titulo', kind: 'status' },
-  { id: 'status_movimento', label: 'Status baixa', kind: 'status' },
-  { id: 'parceiro_nome', label: 'Parceiro', kind: 'text' },
-  { id: 'parceiro_cpf_cnpj', label: 'CPF/CNPJ', kind: 'text' },
-  { id: 'obra_nome', label: 'Obra', kind: 'text' },
-  { id: 'categoria_nome', label: 'Categoria', kind: 'text' },
-  { id: 'numero_documento', label: 'Documento', kind: 'text' },
-  { id: 'data_emissao', label: 'Emissao', kind: 'date' },
-  { id: 'data_vencimento', label: 'Vencimento', kind: 'date' },
-  { id: 'data_movimento', label: 'Data baixa', kind: 'date' },
-  { id: 'conta_bancaria_nome', label: 'Conta', kind: 'text' },
-  { id: 'valor_original', label: 'Valor original', kind: 'currency' },
-  { id: 'valor_saldo', label: 'Saldo', kind: 'currency' },
-  { id: 'valor_baixado', label: 'Valor baixado', kind: 'currency' },
-  { id: 'valor_movimento', label: 'Valor movimento', kind: 'currency' },
-  { id: 'juros', label: 'Juros', kind: 'currency' },
-  { id: 'multa', label: 'Multa', kind: 'currency' },
-  { id: 'desconto', label: 'Desconto', kind: 'currency' },
-  { id: 'valor_quitacao', label: 'Quitacao', kind: 'currency' },
-  { id: 'usuario_baixa', label: 'Usuario baixa', kind: 'text' },
-  { id: 'origem', label: 'Origem', kind: 'text' }
-];
-
-function getColumnWidth(column) {
-  if (column.id === 'titulo_codigo') return 122;
-  if (column.id === 'parceiro_nome') return 220;
-  if (column.id === 'obra_nome') return 200;
-  if (column.id === 'categoria_nome') return 190;
-  if (column.id === 'numero_documento') return 140;
-  if (column.kind === 'currency') return 142;
-  if (column.kind === 'date') return 122;
-  if (column.kind === 'status') return 128;
-  return 150;
-}
-
 function compact(params = {}) {
   return Object.fromEntries(
     Object.entries(params).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== '')
@@ -87,27 +51,6 @@ function formatDate(value) {
   const [year, month, day] = String(value).split('-');
   if (!year || !month || !day) return '-';
   return `${day}/${month}/${year}`;
-}
-
-function formatCell(row, column) {
-  const value = row[column.id];
-  if (column.kind === 'currency') return formatCurrency(value);
-  if (column.kind === 'date') return formatDate(value);
-  return value || '-';
-}
-
-function loadColumns() {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    const parsed = stored ? JSON.parse(stored) : null;
-    if (!Array.isArray(parsed)) return COLUMN_DEFINITIONS.map((item) => item.id);
-    const allowed = new Set(COLUMN_DEFINITIONS.map((item) => item.id));
-    const normalized = parsed.filter((id) => allowed.has(id));
-    const missing = COLUMN_DEFINITIONS.map((item) => item.id).filter((id) => !normalized.includes(id));
-    return [...normalized, ...missing];
-  } catch (error) {
-    return COLUMN_DEFINITIONS.map((item) => item.id);
-  }
 }
 
 function statusClass(value) {
@@ -127,6 +70,88 @@ function toCsvValue(value) {
   return text;
 }
 
+// Leitores de célula: o mesmo valor serve para a grade e para o CSV.
+const campoTexto = (id) => (row) => row[id] || '-';
+const campoData = (id) => (row) => formatDate(row[id]);
+const campoValor = (id) => (row) => formatCurrency(row[id]);
+
+/* COLUNAS DO RELATÓRIO — a escolha (quais e em que ordem) é do usuário,
+   pelo painel "Colunas" da TabelaPadrao. `texto` é o que vai para o CSV
+   quando a célula da grade é um elemento (link, pílula de status). */
+const COLUNAS = [
+  {
+    id: 'titulo_codigo',
+    titulo: 'Titulo',
+    // R17: o código do título é o que nomeia a linha do relatório.
+    tipo: 'identidade',
+    noCard: 'titulo',
+    texto: campoTexto('titulo_codigo'),
+    render: (row) => (
+      <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${row.titulo_id}`}>
+        {row.titulo_codigo || '-'}
+      </Link>
+    )
+  },
+  { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: campoTexto('tipo') },
+  {
+    id: 'status_titulo',
+    titulo: 'Status titulo',
+    tipo: 'status',
+    texto: campoTexto('status_titulo'),
+    render: (row) => <span className={statusClass(row.status_titulo)}>{row.status_titulo || '-'}</span>
+  },
+  {
+    id: 'status_movimento',
+    titulo: 'Status baixa',
+    tipo: 'status',
+    texto: campoTexto('status_movimento'),
+    render: (row) => <span className={statusClass(row.status_movimento)}>{row.status_movimento || '-'}</span>
+  },
+  { id: 'parceiro_nome', titulo: 'Parceiro', tipo: 'texto', render: campoTexto('parceiro_nome') },
+  { id: 'parceiro_cpf_cnpj', titulo: 'CPF/CNPJ', tipo: 'codigo', render: campoTexto('parceiro_cpf_cnpj') },
+  { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', render: campoTexto('obra_nome') },
+  { id: 'categoria_nome', titulo: 'Categoria', tipo: 'texto', render: campoTexto('categoria_nome') },
+  { id: 'numero_documento', titulo: 'Documento', tipo: 'codigo', render: campoTexto('numero_documento') },
+  { id: 'data_emissao', titulo: 'Emissao', tipo: 'data', render: campoData('data_emissao') },
+  { id: 'data_vencimento', titulo: 'Vencimento', tipo: 'data', render: campoData('data_vencimento') },
+  { id: 'data_movimento', titulo: 'Data baixa', tipo: 'data', render: campoData('data_movimento') },
+  { id: 'conta_bancaria_nome', titulo: 'Conta', tipo: 'texto', render: campoTexto('conta_bancaria_nome') },
+  { id: 'valor_original', titulo: 'Valor original', tipo: 'valor', render: campoValor('valor_original') },
+  { id: 'valor_saldo', titulo: 'Saldo', tipo: 'valor', render: campoValor('valor_saldo') },
+  { id: 'valor_baixado', titulo: 'Valor baixado', tipo: 'valor', render: campoValor('valor_baixado') },
+  { id: 'valor_movimento', titulo: 'Valor movimento', tipo: 'valor', render: campoValor('valor_movimento') },
+  { id: 'juros', titulo: 'Juros', tipo: 'valor', render: campoValor('juros') },
+  { id: 'multa', titulo: 'Multa', tipo: 'valor', render: campoValor('multa') },
+  { id: 'desconto', titulo: 'Desconto', tipo: 'valor', render: campoValor('desconto') },
+  { id: 'valor_quitacao', titulo: 'Quitacao', tipo: 'valor', render: campoValor('valor_quitacao') },
+  { id: 'usuario_baixa', titulo: 'Usuario baixa', tipo: 'texto', render: campoTexto('usuario_baixa') },
+  { id: 'origem', titulo: 'Origem', tipo: 'texto', render: campoTexto('origem') }
+];
+
+/* O CSV exporta EXATAMENTE o que está na grade — quais colunas e em que
+   ordem. Quem manda nisso agora é o painel da TabelaPadrao, que grava a
+   escolha em `<storageKey>:colunas`; o componente não devolve a escolha
+   para a tela, então a leitura acontece aqui, no clique (sempre o valor
+   mais recente, sem estado duplicado). Sem preferência salva, vale a
+   ordem declarada. */
+function colunasVisiveis() {
+  const ids = COLUNAS.map((coluna) => coluna.id);
+  let pref = null;
+  try {
+    pref = JSON.parse(localStorage.getItem(`${STORAGE_KEY}:colunas`) || 'null');
+  } catch (error) {
+    pref = null;
+  }
+  if (!pref) return COLUNAS;
+  const salva = Array.isArray(pref.ordem) ? pref.ordem.filter((id) => ids.includes(id)) : [];
+  const ordem = [...salva, ...ids.filter((id) => !salva.includes(id))];
+  const visiveis = Array.isArray(pref.visiveis) ? pref.visiveis : null;
+  const ocultas = Array.isArray(pref.ocultas) ? pref.ocultas : [];
+  return ordem
+    .filter((id) => (visiveis ? visiveis.includes(id) || !ocultas.includes(id) : true))
+    .map((id) => COLUNAS.find((coluna) => coluna.id === id));
+}
+
 export default function FinanceiroRelatorioAnalitico() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
@@ -135,9 +160,6 @@ export default function FinanceiroRelatorioAnalitico() {
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [contas, setContas] = useState([]);
-  const [columnOrder, setColumnOrder] = useState(loadColumns);
-  const [visibleColumns, setVisibleColumns] = useState(() => new Set(COLUMN_DEFINITIONS.map((item) => item.id)));
-  const [draggingColumn, setDraggingColumn] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(true);
   const [error, setError] = useState('');
@@ -169,10 +191,6 @@ export default function FinanceiroRelatorioAnalitico() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(columnOrder));
-  }, [columnOrder]);
-
-  useEffect(() => {
     let active = true;
     setLoading(true);
     setError('');
@@ -199,22 +217,6 @@ export default function FinanceiroRelatorioAnalitico() {
     };
   }, [appliedFilters]);
 
-  const columns = useMemo(() => {
-    const map = new Map(COLUMN_DEFINITIONS.map((item) => [item.id, item]));
-    return columnOrder.map((id) => map.get(id)).filter(Boolean).filter((column) => visibleColumns.has(column.id));
-  }, [columnOrder, visibleColumns]);
-  const tableColumns = useMemo(
-    () => [
-      ...columns.map((column) => ({
-        key: column.id,
-        width: getColumnWidth(column),
-        minWidth: column.kind === 'currency' ? 118 : 96
-      })),
-      { key: 'acoes', width: 84, minWidth: 72 }
-    ],
-    [columns]
-  );
-
   function setFilter(name, value) {
     setFilters((current) => ({
       ...current,
@@ -232,37 +234,13 @@ export default function FinanceiroRelatorioAnalitico() {
     setAppliedFilters(DEFAULT_FILTERS);
   }
 
-  function handleDrop(targetColumnId) {
-    if (!draggingColumn || draggingColumn === targetColumnId) {
-      setDraggingColumn(null);
-      return;
-    }
-
-    setColumnOrder((current) => {
-      const next = current.filter((id) => id !== draggingColumn);
-      const targetIndex = next.indexOf(targetColumnId);
-      next.splice(targetIndex >= 0 ? targetIndex : next.length, 0, draggingColumn);
-      return next;
-    });
-    setDraggingColumn(null);
-  }
-
-  function toggleColumn(columnId) {
-    setVisibleColumns((current) => {
-      const next = new Set(current);
-      if (next.has(columnId) && next.size > 1) {
-        next.delete(columnId);
-      } else {
-        next.add(columnId);
-      }
-      return next;
-    });
-  }
-
   function exportarCsv() {
-    const header = columns.map((column) => toCsvValue(column.label)).join(';');
+    const escolhidas = colunasVisiveis();
+    const header = escolhidas.map((column) => toCsvValue(column.titulo)).join(';');
     const rows = relatorio.linhas.map((row) => (
-      columns.map((column) => toCsvValue(formatCell(row, column))).join(';')
+      escolhidas
+        .map((column) => toCsvValue((column.texto || column.render)(row)))
+        .join(';')
     ));
     const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -278,7 +256,7 @@ export default function FinanceiroRelatorioAnalitico() {
       <div className="app-page-header-row">
         <div>
           <h1 className="page-title">Relatorio Analitico Financeiro</h1>
-          <p className="page-subtitle">Monte a visao por titulo, baixa, conta e parceiro. Arraste as colunas para reorganizar.</p>
+          <p className="page-subtitle">Monte a visao por titulo, baixa, conta e parceiro. Use o painel "Colunas" para escolher e reordenar os campos.</p>
         </div>
         <div className="app-page-actions">
           <button type="button" className="btn btn-outline btn-sm" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
@@ -390,103 +368,23 @@ export default function FinanceiroRelatorioAnalitico() {
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
 
       <section className="card sol-surface-card">
-        <div className="border-b border-[var(--c-border)] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[var(--c-text)]">Colunas</h2>
-          <p className="text-xs text-[var(--c-muted)]">Arraste os chips para mudar a ordem. Desmarque campos que nao quer na grade ou exportacao.</p>
-        </div>
-        <div className="flex flex-wrap gap-2 px-4 py-3">
-          {columnOrder.map((columnId) => {
-            const column = COLUMN_DEFINITIONS.find((item) => item.id === columnId);
-            if (!column) return null;
-            const active = visibleColumns.has(column.id);
-            return (
-              <button
-                key={column.id}
-                type="button"
-                draggable
-                onDragStart={() => setDraggingColumn(column.id)}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={() => handleDrop(column.id)}
-                onClick={() => toggleColumn(column.id)}
-                className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                  active
-                    ? 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
-                    : 'border-dashed border-[var(--c-border)] text-[var(--c-muted)]'
-                }`}
-                title="Clique para mostrar/ocultar. Arraste para reposicionar."
-              >
-                <HiOutlineBars3 className="h-3.5 w-3.5" />
-                {column.label}
-              </button>
-            );
-          })}
-        </div>
+        <TabelaPadrao
+          colunas={COLUNAS}
+          itens={relatorio.linhas}
+          carregando={loading}
+          colunasConfiguraveis
+          storageKey={STORAGE_KEY}
+          rotuloRolagem="Relatorio analitico financeiro"
+          vazio="Nenhuma linha encontrada."
+          larguraAcoes={120}
+          acoesLinha={(row) => (
+            <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${row.titulo_id}`} title="Abrir titulo">
+              <HiOutlineEye className="h-4 w-4" />
+            </Link>
+          )}
+        />
       </section>
 
-      <section className="card sol-surface-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <ResizableTable
-            className="w-full text-xs"
-            columns={tableColumns}
-            storageKey="fluxy.financeiro.relatorioAnalitico.columnWidths"
-          >
-            <thead>
-              <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
-                {columns.map((column) => (
-                  <ResizableTh
-                    key={column.id}
-                    columnKey={column.id}
-                    draggable
-                    onDragStart={() => setDraggingColumn(column.id)}
-                    onDragOver={(event) => event.preventDefault()}
-                    onDrop={() => handleDrop(column.id)}
-                    className="cursor-move px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
-                    title="Arraste para reposicionar"
-                  >
-                    {column.label}
-                  </ResizableTh>
-                ))}
-                <ResizableTh
-                  columnKey="acoes"
-                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
-                >
-                  Acoes
-                </ResizableTh>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {loading ? (
-                <tr><td colSpan={columns.length + 1} className="px-3 py-8 text-center text-[var(--c-muted)]">Carregando relatorio...</td></tr>
-              ) : null}
-              {!loading && relatorio.linhas.length === 0 ? (
-                <tr><td colSpan={columns.length + 1} className="px-3 py-8 text-center text-[var(--c-muted)]">Nenhuma linha encontrada.</td></tr>
-              ) : null}
-              {!loading && relatorio.linhas.map((row) => (
-                <tr key={row.id} className="align-top hover:bg-[var(--c-bg)]">
-                  {columns.map((column) => (
-                    <td key={`${row.id}-${column.id}`} className="px-3 py-2 whitespace-nowrap">
-                      {column.kind === 'status' ? (
-                        <span className={statusClass(row[column.id])}>{row[column.id] || '-'}</span>
-                      ) : column.id === 'titulo_codigo' ? (
-                        <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${row.titulo_id}`}>
-                          {formatCell(row, column)}
-                        </Link>
-                      ) : (
-                        formatCell(row, column)
-                      )}
-                    </td>
-                  ))}
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${row.titulo_id}`} title="Abrir titulo">
-                      <HiOutlineEye className="h-4 w-4" />
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
-      </section>
     </div>
   );
 }

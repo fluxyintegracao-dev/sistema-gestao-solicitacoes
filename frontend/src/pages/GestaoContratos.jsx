@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   HiArrowDownTray,
   HiArrowUpTray,
-  HiCheck,
   HiEye,
   HiPaperClip,
   HiPencilSquare,
@@ -36,33 +35,7 @@ import {
 } from '../services/contratos';
 import { listarApropriacoes } from '../services/apropriacoes';
 import { buscarParceiros } from '../services/parceiros';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { TabelaPadrao } from '../components/padrao';
-
-const CONTRATOS_TABLE_COLUMNS = [
-  { key: 'selecionar', width: 56, minWidth: 48 },
-  { key: 'contrato', width: 150, minWidth: 120 },
-  { key: 'obra', width: 220, minWidth: 170 },
-  { key: 'ref_contrato', width: 210, minWidth: 155 },
-  { key: 'descricao', width: 260, minWidth: 170 },
-  { key: 'credores', width: 235, minWidth: 160 },
-  { key: 'apropriacao', width: 310, minWidth: 210 },
-  { key: 'solicitado', width: 170, minWidth: 145 },
-  { key: 'pago', width: 145, minWidth: 125 },
-  { key: 'a_pagar', width: 165, minWidth: 140 },
-  { key: 'ajuste_solicitado', width: 175, minWidth: 145 },
-  { key: 'ajuste_pago', width: 150, minWidth: 130 },
-  { key: 'qtd_solicitacoes', width: 128, minWidth: 112 }
-];
-
-const CONTRATOS_SORT_LABELS = {
-  contrato: 'Contrato',
-  solicitado: 'Solicitado',
-  pago: 'Pago',
-  a_pagar: 'A pagar',
-  ajuste_solicitado: 'Ajuste Solicitado',
-  ajuste_pago: 'Ajuste Pago'
-};
 
 export default function GestaoContratos() {
   const { user } = useAuth();
@@ -125,10 +98,6 @@ export default function GestaoContratos() {
   const [resultadosCredor, setResultadosCredor] = useState([]);
   const [buscaCredorEdicao, setBuscaCredorEdicao] = useState('');
   const [resultadosCredorEdicao, setResultadosCredorEdicao] = useState([]);
-  const [ordenacaoContratos, setOrdenacaoContratos] = useState({
-    key: 'contrato',
-    direction: 'asc'
-  });
 
   const setorTokens = [
     String(user?.setor?.nome || '').toUpperCase(),
@@ -141,43 +110,18 @@ export default function GestaoContratos() {
   const podeEncerrarContratos = hasPermissao(user, 'contratos.geral.encerrar');
   const contratoSelecionado = contratos.find(item => String(item.id) === String(contratoSelecionadoId)) || null;
   const contratoEmEdicao = contratos.find(item => String(item.id) === String(editandoId)) || null;
-  const contratosTableColumns = useMemo(() => CONTRATOS_TABLE_COLUMNS, []);
+  // ORDEM INICIAL da lista: código A→Z. Do primeiro clique num título em
+  // diante quem ordena é a TabelaPadrao (asc → desc → volta a esta ordem),
+  // com os MESMOS campos de antes: contrato, solicitado, pago, a pagar,
+  // ajuste solicitado e ajuste pago.
   const contratosOrdenados = useMemo(() => {
     const lista = Array.isArray(contratos) ? [...contratos] : [];
-    const { key, direction } = ordenacaoContratos;
-    const multiplicador = direction === 'desc' ? -1 : 1;
-
-    function valorOrdenacao(contrato) {
-      switch (key) {
-        case 'solicitado':
-          return Number(contrato?.total_solicitado || 0);
-        case 'pago':
-          return Number(contrato?.total_pago || 0);
-        case 'a_pagar':
-          return Number(contrato?.total_a_pagar || 0);
-        case 'ajuste_solicitado':
-          return Number(contrato?.ajuste_solicitado || 0);
-        case 'ajuste_pago':
-          return Number(contrato?.ajuste_pago || 0);
-        case 'contrato':
-        default:
-          return String(contrato?.codigo || '');
-      }
-    }
-
-    return lista.sort((a, b) => {
-      const valorA = valorOrdenacao(a);
-      const valorB = valorOrdenacao(b);
-      if (typeof valorA === 'number' && typeof valorB === 'number') {
-        return (valorA - valorB) * multiplicador;
-      }
-      const comparacao = String(valorA).localeCompare(String(valorB), 'pt-BR', {
-        numeric: true,
-        sensitivity: 'base'
-      });
-      return comparacao * multiplicador;
-    });
-  }, [contratos, ordenacaoContratos]);
+    return lista.sort((a, b) => String(a?.codigo || '').localeCompare(
+      String(b?.codigo || ''),
+      'pt-BR',
+      { numeric: true, sensitivity: 'base' }
+    ));
+  }, [contratos]);
 
   useEffect(() => {
     if (podeAcessar) {
@@ -616,41 +560,6 @@ export default function GestaoContratos() {
       style: 'currency',
       currency: 'BRL'
     });
-  }
-
-  function alternarOrdenacaoContratos(key) {
-    setOrdenacaoContratos((atual) => {
-      if (atual.key !== key) {
-        return { key, direction: key === 'contrato' ? 'asc' : 'desc' };
-      }
-      return {
-        key,
-        direction: atual.direction === 'asc' ? 'desc' : 'asc'
-      };
-    });
-  }
-
-  function renderSortableHeader(columnKey, children, className = 'text-left p-3') {
-    const ativo = ordenacaoContratos.key === columnKey;
-    const direction = ativo ? ordenacaoContratos.direction : null;
-    const label = CONTRATOS_SORT_LABELS[columnKey] || children;
-
-    return (
-      <ResizableTh columnKey={columnKey} className={className}>
-        <button
-          type="button"
-          className={`contratos-sort-button ${ativo ? 'is-active' : ''}`}
-          onClick={() => alternarOrdenacaoContratos(columnKey)}
-          aria-label={`Ordenar por ${label}`}
-          aria-pressed={ativo}
-        >
-          <span>{children}</span>
-          <span className="contratos-sort-indicator" aria-hidden="true">
-            {ativo ? (direction === 'asc' ? '↑' : '↓') : '↕'}
-          </span>
-        </button>
-      </ResizableTh>
-    );
   }
 
   async function handleCriarContrato(e) {
@@ -1251,33 +1160,33 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
               { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => c.ref_contrato || '-' },
               { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => c.descricao || '-' },
               { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => resumoApropriacoesContrato(c) },
-              {
-                id: 'total_solicitado',
-                titulo: 'Solicitado',
-                tipo: 'valor',
-                render: c => Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL'
-                })
-              },
-              {
-                id: 'total_pago',
-                titulo: 'Pago',
-                tipo: 'valor',
-                render: c => Number(c.total_pago || 0).toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL'
-                })
-              },
-              {
-                id: 'total_a_pagar',
-                titulo: 'A pagar',
-                tipo: 'valor',
-                render: c => Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
-                  style: 'currency',
-                  currency: 'BRL'
-                })
-              }
+            {
+              id: 'total_solicitado',
+              titulo: 'Solicitado',
+              tipo: 'valor',
+              render: c => Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'total_pago',
+              titulo: 'Pago',
+              tipo: 'valor',
+              render: c => Number(c.total_pago || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'total_a_pagar',
+              titulo: 'A pagar',
+              tipo: 'valor',
+              render: c => Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            }
             ]}
             itens={contratos}
             getId={c => c.id}
@@ -1326,11 +1235,11 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
             <HiArrowUpTray className="w-4 h-4" />
             Importar apropriacoes
             <input
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={onSelecionarArquivoImportacao}
-              disabled={importandoContratos}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={onSelecionarArquivoImportacao}
+            disabled={importandoContratos}
             />
           </label>
 
@@ -1348,7 +1257,7 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           <div>
             <p className="sol-filtros-title">Novo contrato</p>
             <p className="sol-filtros-subtitle">
-              Cadastre contrato, valor e documentos vinculados a obra correta.
+            Cadastre contrato, valor e documentos vinculados a obra correta.
             </p>
           </div>
         </div>
@@ -1357,52 +1266,52 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           <div>
             <label className="grid gap-1 text-sm">Obra</label>
             <select
-              name="obra_id"
-              value={form.obra_id}
-              onChange={onChangeForm}
-              className="input w-full"
+            name="obra_id"
+            value={form.obra_id}
+            onChange={onChangeForm}
+            className="input w-full"
             >
-              <option value="">Selecione</option>
-              {obras.map(obra => (
-                <option key={obra.id} value={obra.id}>
-                  {obra.codigo} - {obra.nome}
-                </option>
-              ))}
+            <option value="">Selecione</option>
+            {obras.map(obra => (
+              <option key={obra.id} value={obra.id}>
+                {obra.codigo} - {obra.nome}
+              </option>
+            ))}
             </select>
           </div>
 
           <div>
             <label className="grid gap-1 text-sm">Código</label>
             <input
-              name="codigo"
-              value={form.codigo}
-              onChange={onChangeForm}
-              className="input w-full"
-              placeholder="Ex: CTR-001"
+            name="codigo"
+            value={form.codigo}
+            onChange={onChangeForm}
+            className="input w-full"
+            placeholder="Ex: CTR-001"
             />
           </div>
 
           <div>
             <label className="grid gap-1 text-sm">Ref. do Contrato</label>
             <input
-              name="ref_contrato"
-              value={form.ref_contrato}
-              onChange={onChangeForm}
-              className="input w-full"
+            name="ref_contrato"
+            value={form.ref_contrato}
+            onChange={onChangeForm}
+            className="input w-full"
             />
           </div>
 
           <div>
             <label className="grid gap-1 text-sm">Valor</label>
             <input
-              name="valor_total"
-              value={valorDisplay}
-              onChange={e => setValorDisplay(e.target.value)}
-              onBlur={() => {
-                const numero = parseMoeda(valorDisplay);
-                setValorDisplay(numero ? formatMoeda(numero) : '');
-              }}
-              className="input w-full"
+            name="valor_total"
+            value={valorDisplay}
+            onChange={e => setValorDisplay(e.target.value)}
+            onBlur={() => {
+              const numero = parseMoeda(valorDisplay);
+              setValorDisplay(numero ? formatMoeda(numero) : '');
+            }}
+            className="input w-full"
             />
           </div>
 
@@ -1454,22 +1363,22 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           <label className="grid gap-1 text-sm">Anexos do contrato</label>
           <div className="flex items-center gap-2 flex-wrap mt-1">
             <label className="btn btn-outline inline-flex items-center gap-2 cursor-pointer">
-              <HiPaperClip className="w-4 h-4" />
-              <span>Anexar arquivos</span>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={e => {
-                  adicionarArquivosNovoContrato(e.target.files);
-                  e.target.value = '';
-                }}
-              />
+            <HiPaperClip className="w-4 h-4" />
+            <span>Anexar arquivos</span>
+            <input
+              type="file"
+              multiple
+              className="hidden"
+              onChange={e => {
+                adicionarArquivosNovoContrato(e.target.files);
+                e.target.value = '';
+              }}
+            />
             </label>
             <span className="app-note">
-              {files.length > 0
-                ? `${files.length} arquivo(s) selecionado(s)`
-                : 'Nenhum arquivo selecionado'}
+            {files.length > 0
+              ? `${files.length} arquivo(s) selecionado(s)`
+              : 'Nenhum arquivo selecionado'}
             </span>
           </div>
           <PendingAttachmentsList
@@ -1483,11 +1392,11 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
 
           <div className="flex justify-start xl:justify-end">
             <button
-              type="submit"
-              disabled={salvando}
-              className="btn btn-primary w-full md:w-auto md:px-5"
+            type="submit"
+            disabled={salvando}
+            className="btn btn-primary w-full md:w-auto md:px-5"
             >
-              {salvando ? 'Salvando...' : 'Criar contrato'}
+            {salvando ? 'Salvando...' : 'Criar contrato'}
             </button>
           </div>
         </div>
@@ -1496,101 +1405,100 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
       {renderFiltros()}
 
       <div className="card sol-surface-card app-table-shell contratos-table-card">
-        <div className="table-wrapper contratos-table-wrapper">
-          <ResizableTable
-            className="table contratos-data-table"
-            columns={contratosTableColumns}
-            storageKey="fluxy.contratos.gestao.columnWidths"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="selecionar" className="text-left p-3 contratos-select-col">Sel.</ResizableTh>
-                {renderSortableHeader('contrato', 'Contrato')}
-                <ResizableTh columnKey="obra" className="text-left p-3">Obra</ResizableTh>
-                <ResizableTh columnKey="ref_contrato" className="text-left p-3">Ref. do Contrato</ResizableTh>
-                <ResizableTh columnKey="descricao" className="text-left p-3">Descrição</ResizableTh>
-                <ResizableTh columnKey="credores" className="text-left p-3">Credores</ResizableTh>
-                <ResizableTh columnKey="apropriacao" className="text-left p-3">Itens de Apropriação</ResizableTh>
-                {renderSortableHeader('solicitado', 'Solicitado', 'text-right p-3')}
-                {renderSortableHeader('pago', 'Pago', 'text-right p-3')}
-                {renderSortableHeader('a_pagar', 'A pagar', 'text-right p-3')}
-                {renderSortableHeader('ajuste_solicitado', 'Ajuste Solicitado', 'text-right p-3')}
-                {renderSortableHeader('ajuste_pago', 'Ajuste Pago', 'text-right p-3')}
-                <ResizableTh columnKey="qtd_solicitacoes" className="text-right p-3">Qtd. Solicitações</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {contratos.length === 0 && (
-                <tr>
-                  <td colSpan={contratosTableColumns.length} className="p-4 text-center text-gray-500">
-                    Nenhum contrato encontrado.
-                  </td>
-                </tr>
-              )}
-              {contratosOrdenados.map(c => {
-                const selecionado = String(contratoSelecionadoId) === String(c.id);
-                return (
-                  <tr
-                    key={c.id}
-                    className={`border-t contratos-row contratos-selectable-row ${selecionado ? 'is-selected' : ''}`}
-                    onClick={() => setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id))}
-                    tabIndex={0}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id));
-                      }
-                    }}
-                    aria-selected={selecionado}
-                  >
-                    <td className="p-3 contratos-select-cell" data-label="Selecionar">
-                      <span className="contratos-row-check" aria-hidden="true">
-                        {selecionado && <HiCheck />}
-                      </span>
-                    </td>
-                    <td className="p-3 font-medium contratos-primary-cell" data-label="Contrato">{c.codigo}</td>
-                    <td className="p-3" data-label="Obra">{c.obra?.nome || '-'}</td>
-                    <td className="p-3" data-label="Ref. do Contrato">{c.ref_contrato || '-'}</td>
-                    <td className="p-3 contratos-description-cell" data-label="Descrição">{c.descricao || '-'}</td>
-                    <td className="p-3 contratos-text-cell" data-label="Credores">{resumoCredoresContrato(c)}</td>
-                    <td className="p-3 contratos-text-cell" data-label="Itens de Apropriação">{resumoApropriacoesContrato(c)}</td>
-                    <td className="p-3 text-right" data-label="Solicitado">
-                      {Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </td>
-                    <td className="p-3 text-right" data-label="Pago">
-                      {Number(c.total_pago || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </td>
-                    <td className="p-3 text-right" data-label="A pagar">
-                      {Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </td>
-                    <td className="p-3 text-right" data-label="Ajuste Solicitado">
-                      {Number(c.ajuste_solicitado || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </td>
-                    <td className="p-3 text-right" data-label="Ajuste Pago">
-                      {Number(c.ajuste_pago || 0).toLocaleString('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL'
-                      })}
-                    </td>
-                    <td className="p-3 text-right" data-label="Qtd. Solicitações">{c.total_solicitacoes || 0}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+            id: 'contrato',
+            titulo: 'Contrato',
+            // R17: o codigo do contrato nomeia o registro desta lista.
+            tipo: 'identidade',
+            noCard: 'titulo',
+            ordenavel: true,
+            valorOrdenacao: c => String(c.codigo || ''),
+            render: c => c.codigo
+            },
+            { id: 'obra', titulo: 'Obra', tipo: 'texto', render: c => c.obra?.nome || '-' },
+            { id: 'ref_contrato', titulo: 'Ref. do Contrato', tipo: 'texto', render: c => c.ref_contrato || '-' },
+            { id: 'descricao', titulo: 'Descrição', tipo: 'texto', render: c => c.descricao || '-' },
+            { id: 'credores', titulo: 'Credores', tipo: 'texto', render: c => resumoCredoresContrato(c) },
+            { id: 'apropriacao', titulo: 'Itens de Apropriação', tipo: 'texto', render: c => resumoApropriacoesContrato(c) },
+            {
+              id: 'solicitado',
+              titulo: 'Solicitado',
+              tipo: 'valor',
+              ordenavel: true,
+              valorOrdenacao: c => Number(c.total_solicitado || 0),
+              render: c => Number(c.total_solicitado || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'pago',
+              titulo: 'Pago',
+              tipo: 'valor',
+              ordenavel: true,
+              valorOrdenacao: c => Number(c.total_pago || 0),
+              render: c => Number(c.total_pago || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'a_pagar',
+              titulo: 'A pagar',
+              tipo: 'valor',
+              ordenavel: true,
+              valorOrdenacao: c => Number(c.total_a_pagar || 0),
+              render: c => Number(c.total_a_pagar || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'ajuste_solicitado',
+              titulo: 'Ajuste Solicitado',
+              tipo: 'valor',
+              ordenavel: true,
+              valorOrdenacao: c => Number(c.ajuste_solicitado || 0),
+              render: c => Number(c.ajuste_solicitado || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'ajuste_pago',
+              titulo: 'Ajuste Pago',
+              tipo: 'valor',
+              ordenavel: true,
+              valorOrdenacao: c => Number(c.ajuste_pago || 0),
+              render: c => Number(c.ajuste_pago || 0).toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+              })
+            },
+            {
+              id: 'qtd_solicitacoes',
+              titulo: 'Qtd. Solicitações',
+              tipo: 'numero',
+              render: c => c.total_solicitacoes || 0
+            }
+          ]}
+          itens={contratosOrdenados}
+          getId={c => c.id}
+          storageKey="tabela:gestao-contratos:principal"
+          rotuloRolagem="Contratos"
+          vazio="Nenhum contrato encontrado."
+          aoClicarLinha={c => setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id))}
+          selecao={{
+            // Seleção de UM contrato: é ela que abre a barra de ações do
+            // rodapé. O contrato marcado desmarca no segundo clique, como
+            // a linha inteira sempre fez.
+            selecionados: contratoSelecionadoId === null ? [] : [contratoSelecionadoId],
+            aoAlternar: id => setContratoSelecionadoId(prev => (String(prev) === String(id) ? null : id)),
+            aoAlternarTodos: () => setContratoSelecionadoId(null)
+          }}
+        />
       </div>
 
       {contratoSelecionado && (

@@ -173,12 +173,29 @@ export function checksEstaticos({ tipo }) {
     });
     r.T1 = t1.length ? { estado: 'FALHOU', motivo: t1.slice(0, 3).join(' | ') } : { estado: 'PASSOU' };
 
-    /* T2 (parte estática): botão de alinhamento com tooltip presente.
-       A visibilidade do ícone no hover é medida pelo runner. */
-    const botoes = qa('.app-th-botao').filter(foraDeModal);
-    r.T2 = botoes.length && botoes.every((b) => (b.getAttribute('title') || '').toLowerCase().includes('alinhar'))
-      ? { estado: 'PASSOU' }
-      : { estado: 'FALHOU', motivo: botoes.length ? 'cabeçalho sem tooltip "Alinhar / redimensionar"' : 'tabela sem menu de alinhamento no cabeçalho' };
+    /* T2 (parte estática): cada cabeçalho tem o CONTROLE PRÓPRIO de
+       alinhamento, com tooltip. Desde a leva do componente (02/09) o clique
+       no título ORDENA (quando a coluna é ordenável) e o alinhamento vive
+       num botão dedicado (.app-th-alinhar) ancorado à direita — por isso o
+       check olha esse botão, não mais o título. A visibilidade no hover é
+       medida pelo runner. */
+    const alinhadores = qa('.app-th-alinhar').filter(foraDeModal);
+    const titulos = qa('.app-th-alinhavel').filter(foraDeModal);
+    if (!titulos.length) {
+      r.T2 = { estado: 'FALHOU', motivo: 'tabela sem cabeçalho de coluna do padrão (app-th-alinhavel)' };
+    } else if (alinhadores.length < titulos.length) {
+      r.T2 = { estado: 'FALHOU', motivo: `${titulos.length - alinhadores.length} coluna(s) sem o controle de alinhamento no cabeçalho` };
+    } else if (!alinhadores.every((b) => (b.getAttribute('title') || '').toLowerCase().includes('alinhar'))) {
+      r.T2 = { estado: 'FALHOU', motivo: 'controle de alinhamento sem tooltip "Alinhar / redimensionar"' };
+    } else {
+      // Sinal sem capacidade também é defeito (R15 ao contrário): título que
+      // vira botão precisa de fato ordenar.
+      const ordenaveis = qa('.app-th-botao--ordenavel').filter(foraDeModal);
+      const semIndicador = ordenaveis.filter((b) => !b.querySelector('.app-th-ordem'));
+      r.T2 = semIndicador.length
+        ? { estado: 'FALHOU', motivo: `${semIndicador.length} título ordenável sem indicador de ordem`, seletor: cssPath(semIndicador[0]) }
+        : { estado: 'PASSOU' };
+    }
 
     /* T4: a sobra do contêiner vai para as colunas de conteúdo */
     const t4 = [];

@@ -273,11 +273,11 @@ async function checarFaixa(page, resultado) {
 
 async function checarAffordanceAlinhamento(page, resultado) {
   if (resultado.T2?.estado !== 'PASSOU') return; // estático já reprovou/N-A
-  const th = page.locator('.resizable-th:has(.app-th-botao)').first();
+  const th = page.locator('.resizable-th:has(.app-th-alinhavel)').first();
   if (!(await th.count())) return;
   await th.hover().catch(() => {});
   await page.waitForTimeout(250);
-  const opacidade = await th.locator('.app-th-affordance').first()
+  const opacidade = await th.locator('.app-th-alinhar').first()
     .evaluate((el) => parseFloat(getComputedStyle(el).opacity)).catch(() => 0);
   if (opacidade < 0.5) {
     resultado.T2 = { estado: 'FALHOU', motivo: `affordance do alinhamento não aparece no hover (opacidade ${opacidade}) — R15` };

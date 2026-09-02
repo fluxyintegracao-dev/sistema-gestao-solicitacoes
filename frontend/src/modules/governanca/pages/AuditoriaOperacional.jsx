@@ -164,6 +164,11 @@ function FinancialIndicators({ data, canUsers }) {
               titulo: view === 'USUARIOS' ? 'Usuario / setor' : 'Setor',
               // R17: usuario (ou setor) é quem nomeia a linha do recorte.
               tipo: 'identidade',
+              // A tabela é larga (7 colunas de número): a coluna de
+              // identidade fica presa à esquerda para não se perder a
+              // referência de qual linha se está lendo na rolagem
+              // horizontal — era o `position: sticky` do markup antigo.
+              fixa: true,
               noCard: 'titulo',
               render: (item) => (
                 view === 'USUARIOS'

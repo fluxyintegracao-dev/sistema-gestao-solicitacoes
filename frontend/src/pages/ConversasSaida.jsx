@@ -6,6 +6,7 @@ import {
   getCaixaSaida
 } from '../services/conversasInternas';
 import { useAuth } from '../contexts/AuthContext';
+import { TabelaPadrao } from '../components/padrao';
 
 function formatarDataHora(valor) {
   if (!valor) return '-';
@@ -144,81 +145,72 @@ export default function ConversasSaida() {
           </button>
         </div>
 
-        <div className="table-wrapper">
-          <table className="table">
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    checked={itens.length > 0 && selecionadas.length === itens.length}
-                    onChange={(e) =>
-                      setSelecionadas(e.target.checked ? itens.map((item) => item.id) : [])
-                    }
-                  />
-                </th>
-                <th>Assunto</th>
-                <th>Destinatário</th>
-                <th>Status</th>
-                <th>Última mensagem</th>
-                <th>Anexos</th>
-                <th>Participantes</th>
-                <th>Atualizado em</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading && (
-                <tr>
-                  <td colSpan="9" align="center">Carregando...</td>
-                </tr>
-              )}
-              {!loading && itens.length === 0 && (
-                <tr>
-                  <td colSpan="9" align="center">Nenhuma conversa nesta aba.</td>
-                </tr>
-              )}
-              {!loading && itens.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selecionadas.includes(item.id)}
-                      onChange={() =>
-                        setSelecionadas((prev) => alternarSelecionado(prev, item.id))
-                      }
-                    />
-                  </td>
-                  <td>{item.assunto}</td>
-                  <td>{item.destinatario?.nome || '-'}</td>
-                  <td>{item.status}</td>
-                  <td>{item.ultima_mensagem?.mensagem || '-'}</td>
-                  <td>{item.anexos_total ?? 0}</td>
-                  <td>{item.participantes_total ?? 0}</td>
-                  <td>{formatarDataHora(item.updatedAt)}</td>
-                  <td>
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => navigate(`/conversas/${item.id}`, { state: { origemConversa: 'saida' } })}
-                      >
-                        Abrir chat
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-outline"
-                        onClick={() => arquivarOuDesarquivarIndividual(item.id)}
-                      >
-                        {arquivadas ? 'Desarquivar' : 'Arquivar'}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'assunto',
+              titulo: 'Assunto',
+              // R17: o assunto é o que nomeia a conversa na lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.assunto
+            },
+            {
+              id: 'destinatario',
+              titulo: 'Destinatário',
+              tipo: 'texto',
+              render: (item) => item.destinatario?.nome || '-'
+            },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status },
+            {
+              id: 'ultima_mensagem',
+              titulo: 'Última mensagem',
+              tipo: 'texto',
+              render: (item) => item.ultima_mensagem?.mensagem || '-'
+            },
+            { id: 'anexos', titulo: 'Anexos', tipo: 'numero', render: (item) => item.anexos_total ?? 0 },
+            {
+              id: 'participantes',
+              titulo: 'Participantes',
+              tipo: 'numero',
+              render: (item) => item.participantes_total ?? 0
+            },
+            {
+              id: 'atualizado_em',
+              titulo: 'Atualizado em',
+              tipo: 'data',
+              render: (item) => formatarDataHora(item.updatedAt)
+            }
+          ]}
+          itens={itens}
+          carregando={loading}
+          storageKey="tabela:conversas-saida"
+          rotuloRolagem="Conversas enviadas"
+          vazio="Nenhuma conversa nesta aba."
+          selecao={{
+            selecionados: selecionadas,
+            aoAlternar: (id) => setSelecionadas((prev) => alternarSelecionado(prev, id)),
+            aoAlternarTodos: (marcar, ids) => setSelecionadas(marcar ? ids : [])
+          }}
+          acoesLinha={(item) => (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => navigate(`/conversas/${item.id}`, { state: { origemConversa: 'saida' } })}
+              >
+                Abrir chat
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => arquivarOuDesarquivarIndividual(item.id)}
+              >
+                {arquivadas ? 'Desarquivar' : 'Arquivar'}
+              </button>
+            </>
+          )}
+        />
 
         <div className="mt-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div className="text-sm text-[var(--c-muted)]">

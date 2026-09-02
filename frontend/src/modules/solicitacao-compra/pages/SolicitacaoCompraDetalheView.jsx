@@ -28,8 +28,8 @@ import {
   sincronizarItemComRateios,
   validarRateiosItem
 } from '../utils/apropriacoes';
-import ItemCompraExpansivel from '../components/ItemCompraExpansivel';
-import { TabelaPadrao } from '../../../components/padrao';
+import ItemCompraDetalhe, { statusCatalogacao } from '../components/ItemCompraDetalhe';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -179,7 +179,10 @@ export default function SolicitacaoCompraDetalheView() {
   }, [obraIdSolicitacao]);
 
   const itensCombinados = useMemo(() => {
-    return combinarItensSolicitacaoCompra(solicitacao, apropriacoes);
+    // `posicao` guarda o "#" que a coluna de índice mostrava: a TabelaPadrao
+    // renderiza por item (sem índice), então a ordem vira dado da linha.
+    return combinarItensSolicitacaoCompra(solicitacao, apropriacoes)
+      .map((item, indice) => ({ ...item, posicao: indice + 1 }));
   }, [apropriacoes, solicitacao]);
 
   const resumoCotacao = useMemo(() => {
@@ -493,48 +496,89 @@ export default function SolicitacaoCompraDetalheView() {
             <h2 className="font-semibold">Itens</h2>
             <span className="text-sm text-[var(--c-muted)]">{itensCombinados.length} item(ns)</span>
           </div>
-          {itensCombinados.length > 0 ? (
-            <div className="compra-itens-tabela-shell" role="region" aria-label="Itens da solicitacao de compra" tabIndex={0}>
-              <table className="compra-itens-tabela">
-                <thead>
-                  <tr>
-                    <th scope="col" className="compra-item-column-index">#</th>
-                    <th scope="col">Origem</th>
-                    <th scope="col">Item</th>
-                    <th scope="col">Quantidade</th>
-                    <th scope="col">Apropriacao</th>
-                    <th scope="col">Necessario para</th>
-                    <th scope="col">Cadastro</th>
-                    <th scope="col" className="compra-item-column-action"><span className="sr-only">Detalhes</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itensCombinados.map((item, index) => {
-                    const loadingKey = `${item.item_tipo}-${item.id}`;
-                    return (
-                      <ItemCompraExpansivel
-                        key={loadingKey}
-                        item={item}
-                        index={index}
-                        solicitacaoId={id}
-                        podeEditarQuantidade={podeEditarQuantidadeItem}
-                        podeEditarApropriacao={podeEditarApropriacoesItem}
-                        podeCatalogar={podeCatalogarItensManuais}
-                        bloqueado={solicitacaoCompraCancelada}
-                        salvandoQuantidade={salvandoQuantidadeId === loadingKey}
-                        salvandoApropriacao={salvandoApropriacaoId === loadingKey}
-                        onEditarQuantidade={handleEditarQuantidade}
-                        onEditarApropriacao={abrirModalApropriacao}
-                        onCatalogado={carregar}
-                      />
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="compra-itens-empty">Nenhum item informado nesta solicitacao.</div>
-          )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'posicao',
+                titulo: '#',
+                tipo: 'numero',
+                render: (item) => (
+                  <span className="compra-item-index">{String(item.posicao).padStart(2, '0')}</span>
+                )
+              },
+              {
+                id: 'origem',
+                titulo: 'Origem',
+                tipo: 'badge',
+                render: (item) => (
+                  <span className={`compra-item-origin ${item.tipo === 'MANUAL' ? 'is-manual' : ''}`}>{item.tipo}</span>
+                )
+              },
+              {
+                id: 'item',
+                titulo: 'Item',
+                // R17: o nome do insumo é o que nomeia a linha.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={item.nome}
+                    sub={item.especificacao || 'Sem especificacao adicional'}
+                  />
+                )
+              },
+              {
+                id: 'quantidade',
+                titulo: 'Quantidade',
+                tipo: 'numero',
+                render: (item) => <CelulaDupla principal={item.quantidade} sub={item.unidade} />
+              },
+              {
+                id: 'apropriacao',
+                titulo: 'Apropriacao',
+                tipo: 'texto',
+                render: (item) => item.apropriacao
+              },
+              {
+                id: 'necessario_para',
+                titulo: 'Necessario para',
+                tipo: 'data',
+                render: (item) => item.necessario_para_formatado
+              },
+              {
+                id: 'cadastro',
+                titulo: 'Cadastro',
+                tipo: 'badge',
+                render: (item) => {
+                  const status = statusCatalogacao(item);
+                  return <span className={`compra-item-catalog-status ${status.className}`}>{status.label}</span>;
+                }
+              }
+            ]}
+            itens={itensCombinados}
+            getId={(item) => `${item.item_tipo}-${item.id}`}
+            storageKey="tabela:solicitacao-compra-detalhe:itens"
+            rotuloRolagem="Itens da solicitacao de compra"
+            vazio="Nenhum item informado nesta solicitacao."
+            linhaExpansivel={(item) => {
+              const loadingKey = `${item.item_tipo}-${item.id}`;
+              return (
+                <ItemCompraDetalhe
+                  item={item}
+                  solicitacaoId={id}
+                  podeEditarQuantidade={podeEditarQuantidadeItem}
+                  podeEditarApropriacao={podeEditarApropriacoesItem}
+                  podeCatalogar={podeCatalogarItensManuais}
+                  bloqueado={solicitacaoCompraCancelada}
+                  salvandoQuantidade={salvandoQuantidadeId === loadingKey}
+                  salvandoApropriacao={salvandoApropriacaoId === loadingKey}
+                  onEditarQuantidade={handleEditarQuantidade}
+                  onEditarApropriacao={abrirModalApropriacao}
+                  onCatalogado={carregar}
+                />
+              );
+            }}
+          />
         </div>
 
         <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
