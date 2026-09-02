@@ -222,8 +222,10 @@ async function checarColunaFixa(page, tela, rota) {
   // ("Geral") é um grid de métricas, não tabela.
   // Os rótulos reais são "Geral", "Por setor" e "Por usuario" — a tabela
   // só existe nas duas últimas (a visão Geral é um grid de métricas).
-  for (const rotulo of [/por setor/i, /por usuario|por usuário/i]) {
-    const aba = page.getByRole('button', { name: rotulo }).first();
+  // Seletor por CLASSE + texto: o getByRole não casava com estes botões, e
+  // insistir no que "deveria" funcionar já custou uma rodada.
+  for (const rotulo of ['Por setor', 'Por usuario']) {
+    const aba = page.locator('.ao-view-switch button', { hasText: rotulo }).first();
     if (await aba.count()) {
       await aba.click();
       await page.waitForTimeout(2000);
@@ -233,12 +235,21 @@ async function checarColunaFixa(page, tela, rota) {
   const medida = await page.evaluate(() => {
     const rolagem = document.querySelector('.app-tabela .resizable-table-scroll');
     const fixa = document.querySelector('.app-tabela td.celula-fixa');
+    // Estado vazio na tela = a base não tem registro neste recorte. Isso é
+    // SEM DADO, não capacidade ausente — rotular como falha seria mentira
+    // na direção oposta.
+    const vazio = document.querySelector('.empty-state');
+    if (!rolagem && vazio) return { semDado: vazio.innerText.replace(/\s+/g, ' ').trim().slice(0, 80) };
     if (!rolagem || !fixa) return { erro: !rolagem ? 'sem contêiner de rolagem' : 'nenhuma célula com coluna fixa' };
     const podeRolar = rolagem.scrollWidth - rolagem.clientWidth;
     const antes = fixa.getBoundingClientRect().left - rolagem.getBoundingClientRect().left;
     rolagem.scrollLeft = Math.min(300, podeRolar);
     return { podeRolar, antes, opaca: getComputedStyle(fixa).backgroundColor };
   });
+  if (medida.semDado) {
+    registrar('3. coluna fixa', tela, 'sem-dado', `a base de desenvolvimento não tem registro neste recorte ("${medida.semDado}")`);
+    return;
+  }
   if (medida.erro) {
     registrar('3. coluna fixa', tela, 'falhou', `${medida.erro} — a capacidade não chegou à tela`);
     return;
