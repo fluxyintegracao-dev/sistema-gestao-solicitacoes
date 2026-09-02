@@ -105,7 +105,6 @@ import {
   canViewProvisionamentosDashboard,
   canViewFinanceiroRelatorios,
   hasPermissao,
-  canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
@@ -448,15 +447,23 @@ export const NAV_MODULES = [
     icon: HiOutlineUsers,
     gate: (user) => canAccessRhDp(user),
     children: [
-      { id: 'rhdp-inicio', ordem: 10, label: 'Visão do Módulo', desc: 'Painel geral de RH e departamento pessoal.', icon: HiOutlineSquares2X2, to: '/rh-dp', can: (user) => canAccessRhDpDashboard(user) },
-      { id: 'rhdp-relatorios', ordem: 70, label: 'Relatórios', desc: 'Relatórios de RH/DP.', icon: HiOutlineChartBar, to: '/rh-dp/relatorios', can: (user) => canAccessRhDpDashboard(user) },
+      /*
+        D1 e D3 (decisões do cliente, 02/09):
+        - "Visão do Módulo" saiu: era um mural de cards que repetia este
+          mesmo menu. O hub do módulo (/hub/rhdp) já é o índice.
+        - Jornada e Apuração saíram: são o mesmo trabalho em sequência do
+          Pessoal e viraram abas de lá. As rotas antigas redirecionam para a
+          aba certa (App.jsx), então link salvo e favorito continuam valendo.
+        - Empresas do grupo nunca esteve aqui e agora existe uma vez só, em
+          Cadastros.
+        Pessoal é a porta do dia a dia; Colaboradores é o cadastro.
+      */
+      { id: 'rhdp-pessoal', ordem: 10, label: 'Pessoal', desc: 'Solicitações, colaboradores, jornada e apuração — o dia a dia do DP.', icon: HiOutlineUserGroup, to: '/rh-dp/pessoal', can: (user) => canViewRhDpColaboradores(user) },
       { id: 'rhdp-colaboradores', ordem: 20, label: 'Colaboradores', desc: 'Cadastro de colaboradores.', icon: HiOutlineUsers, to: '/rh-dp/colaboradores', can: (user) => canViewRhDpColaboradores(user) },
-      { id: 'rhdp-pessoal', ordem: 22, label: 'Pessoal', desc: 'Visão consolidada do pessoal com solicitações em aberto.', icon: HiOutlineUserGroup, to: '/rh-dp/pessoal', can: (user) => canViewRhDpColaboradores(user) },
-      { id: 'rhdp-jornada', ordem: 24, label: 'Jornada', desc: 'Jornada de trabalho dos colaboradores.', icon: HiOutlineCalendarDays, to: '/rh-dp/jornada', can: (user) => canViewRhDpColaboradores(user) },
-      { id: 'rhdp-documentos', ordem: 60, label: 'Documentos', desc: 'Documentos dos colaboradores.', icon: HiOutlineFolderOpen, to: '/rh-dp/documentos', can: (user) => canViewRhDpDocumentos(user) },
       { id: 'rhdp-importacoes', ordem: 50, label: 'Importações', desc: 'Importações de jornada e eventos.', icon: HiOutlineCloudArrowUp, to: '/rh-dp/importacoes', can: (user) => canExecuteRhDpImportacoes(user) },
-      { id: 'rhdp-apuracao', ordem: 30, label: 'Apuração', desc: 'Apuração de competências.', icon: HiOutlineDocumentText, to: '/rh-dp/apuracao', can: (user) => canViewRhDpApuracao(user) },
-      { id: 'rhdp-fechamentos', ordem: 40, label: 'Fechamentos', desc: 'Fechamentos que geram títulos financeiros.', icon: HiOutlineBanknotes, to: '/rh-dp/fechamentos', can: (user) => canViewRhDpObrigacoes(user) && hasEnabledModule(user, 'FINANCEIRO') }
+      { id: 'rhdp-documentos', ordem: 60, label: 'Documentos', desc: 'Documentos dos colaboradores.', icon: HiOutlineFolderOpen, to: '/rh-dp/documentos', can: (user) => canViewRhDpDocumentos(user) },
+      { id: 'rhdp-fechamentos', ordem: 40, label: 'Fechamentos', desc: 'Fechamentos que geram títulos financeiros.', icon: HiOutlineBanknotes, to: '/rh-dp/fechamentos', can: (user) => canViewRhDpObrigacoes(user) && hasEnabledModule(user, 'FINANCEIRO') },
+      { id: 'rhdp-relatorios', ordem: 70, label: 'Relatórios', desc: 'Relatórios de RH/DP.', icon: HiOutlineChartBar, to: '/rh-dp/relatorios', can: (user) => canAccessRhDpDashboard(user) }
     ]
   },
   {

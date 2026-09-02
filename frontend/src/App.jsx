@@ -40,7 +40,6 @@ import {
   canViewComercialEmpreendimentos,
   canViewProvisionamentos,
   canViewProvisionamentosDashboard,
-  canViewRhDpApuracao,
   canViewRhDpColaboradores,
   canViewRhDpDocumentos,
   canViewRhDpObrigacoes,
@@ -199,14 +198,10 @@ const ProvisionamentosFinanceiros = lazy(() => import('./modules/provisionamento
 const NovaProvisaoFinanceira = lazy(() => import('./modules/provisionamento-financeiro/pages/NovaProvisaoFinanceira'));
 const ProvisionamentoFinanceiroDetalhe = lazy(() => import('./modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe'));
 const GestaoCategoriasMacro = lazy(() => import('./modules/provisionamento-financeiro/pages/GestaoCategoriasMacro'));
-const RhDpInicio = lazy(() => import('./pages/RhDpInicio'));
-const RhDpEmpresas = lazy(() => import('./pages/RhDpEmpresas'));
 const RhDpColaboradores = lazy(() => import('./pages/RhDpColaboradores'));
 const RhDpPessoal = lazy(() => import('./pages/RhDpPessoal'));
-const RhDpJornada = lazy(() => import('./pages/RhDpJornada'));
 const RhDpDocumentos = lazy(() => import('./pages/RhDpDocumentos'));
 const RhDpImportacoes = lazy(() => import('./pages/RhDpImportacoes'));
-const RhDpApuracao = lazy(() => import('./pages/RhDpApuracao'));
 const RhDpFechamentos = lazy(() => import('./pages/RhDpFechamentos'));
 const RhDpRelatorioOperacional = lazy(() => import('./pages/RhDpRelatorioOperacional'));
 const SolicitacoesCompra = lazy(() => import('./modules/solicitacao-compra/pages/SolicitacoesCompra'));
@@ -304,6 +299,14 @@ function ConfiguracoesRoute({ children }) {
   const { user } = useAuth();
   if (!canAccessConfiguracoes(user)) {
     return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function EmpresasGrupoRoute({ children }) {
+  const { user } = useAuth();
+  if (!canManageConfiguracoesArea(user, 'cadastros') && !canAccessRhDpEmpresas(user)) {
+    return <Navigate to="/configuracoes" replace />;
   }
   return children;
 }
@@ -779,18 +782,10 @@ function RhDpDashboardRoute({ children }) {
   return children;
 }
 
-function RhDpEmpresasRoute({ children }) {
-  const { user } = useAuth();
-  if (!canAccessRhDpEmpresas(user)) {
-    return <Navigate to="/rh-dp" replace />;
-  }
-  return children;
-}
-
 function RhDpColaboradoresRoute({ children }) {
   const { user } = useAuth();
   if (!canViewRhDpColaboradores(user)) {
-    return <Navigate to="/rh-dp" replace />;
+    return <Navigate to="/hub/rhdp" replace />;
   }
   return children;
 }
@@ -798,7 +793,7 @@ function RhDpColaboradoresRoute({ children }) {
 function RhDpDocumentosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewRhDpDocumentos(user)) {
-    return <Navigate to="/rh-dp" replace />;
+    return <Navigate to="/hub/rhdp" replace />;
   }
   return children;
 }
@@ -806,15 +801,7 @@ function RhDpDocumentosRoute({ children }) {
 function RhDpImportacoesRoute({ children }) {
   const { user } = useAuth();
   if (!canExecuteRhDpImportacoes(user)) {
-    return <Navigate to="/rh-dp" replace />;
-  }
-  return children;
-}
-
-function RhDpApuracaoRoute({ children }) {
-  const { user } = useAuth();
-  if (!canViewRhDpApuracao(user)) {
-    return <Navigate to="/rh-dp" replace />;
+    return <Navigate to="/hub/rhdp" replace />;
   }
   return children;
 }
@@ -822,10 +809,10 @@ function RhDpApuracaoRoute({ children }) {
 function RhDpFinanceiroRoute({ children }) {
   const { user } = useAuth();
   if (!canViewRhDpObrigacoes(user)) {
-    return <Navigate to="/rh-dp" replace />;
+    return <Navigate to="/hub/rhdp" replace />;
   }
   if (!hasEnabledModule(user, 'FINANCEIRO')) {
-    return <Navigate to="/rh-dp" replace />;
+    return <Navigate to="/hub/rhdp" replace />;
   }
   return children;
 }
@@ -910,7 +897,13 @@ export default function App() {
         <Route path="configuracoes" element={<ConfiguracoesRoute><Configuracoes /></ConfiguracoesRoute>} />
         <Route path="configuracoes-suporte" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesSuporte /></ConfiguracoesAreaRoute>} />
         <Route path="configuracoes-visibilidade-ui" element={<ConfiguracoesAreaRoute area="aparencia"><ConfiguracoesVisibilidadeUi /></ConfiguracoesAreaRoute>} />
-        <Route path="empresas-grupo" element={<ConfiguracoesAreaRoute area="cadastros"><EmpresasGrupo /></ConfiguracoesAreaRoute>} />
+        {/*
+          D2 (02/09): com o RH/DP apontando para ca, quem tinha acesso APENAS
+          por rh_dp.empresas.gerenciar perderia a tela na unificacao. O guarda
+          soma as duas permissoes — redirecionar nao pode tirar acesso de
+          ninguem.
+        */}
+        <Route path="empresas-grupo" element={<EmpresasGrupoRoute><EmpresasGrupo /></EmpresasGrupoRoute>} />
         <Route path="tipos-sub-contrato" element={<ConfiguracoesAreaRoute area="cadastros"><TiposSubContrato /></ConfiguracoesAreaRoute>} />
         <Route path="status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><StatusSetor /></ConfiguracoesAreaRoute>} />
         <Route path="permissoes-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><PermissoesSetor /></ConfiguracoesAreaRoute>} />
@@ -995,16 +988,31 @@ export default function App() {
         <Route path="provisoes-financeiras/:id" element={<ProvisionamentosRoute><ProvisionamentoFinanceiroDetalhe /></ProvisionamentosRoute>} />
         <Route path="provisoes-financeiras/dashboard" element={<ProvisionamentosDashboardRoute><DashboardProvisionamentoFinanceiro /></ProvisionamentosDashboardRoute>} />
         <Route path="provisoes-financeiras/categorias" element={<ProvisionamentosCategoriasRoute><GestaoCategoriasMacro /></ProvisionamentosCategoriasRoute>} />
-        <Route path="rh-dp" element={<RhDpDashboardRoute><RhDpInicio /></RhDpDashboardRoute>} />
+        {/*
+          D3 (02/09): o RH/DP nao tem mais tela de "Inicio" propria — era um
+          mural de sete cards que repetia o menu. O hub do modulo (/hub/rhdp)
+          ja e o indice, e vale para todos os modulos. A rota antiga fica como
+          redirecionamento: link salvo, favorito e atalho continuam chegando.
+        */}
+        <Route path="rh-dp" element={<Navigate to="/hub/rhdp" replace />} />
         <Route path="rh-dp/relatorios" element={<RhDpDashboardRoute><ModuloRelatorios modulo="rhdp" /></RhDpDashboardRoute>} />
         <Route path="rh-dp/relatorios/operacional" element={<RhDpColaboradoresRoute><RhDpRelatorioOperacional /></RhDpColaboradoresRoute>} />
-        <Route path="rh-dp/empresas" element={<RhDpEmpresasRoute><RhDpEmpresas /></RhDpEmpresasRoute>} />
+        {/*
+          D2 (02/09): Empresas do grupo passa a existir uma vez so, em
+          Cadastros. Redirecionamento em vez de rota morta.
+        */}
+        <Route path="rh-dp/empresas" element={<Navigate to="/empresas-grupo" replace />} />
         <Route path="rh-dp/pessoal" element={<RhDpColaboradoresRoute><RhDpPessoal /></RhDpColaboradoresRoute>} />
-        <Route path="rh-dp/jornada" element={<RhDpColaboradoresRoute><RhDpJornada /></RhDpColaboradoresRoute>} />
+        {/*
+          D1 (02/09): Pessoal e a porta unica do dia a dia. Jornada e Apuracao
+          sao o mesmo trabalho em sequencia e viraram abas de la — as rotas
+          antigas levam a aba certa em vez de quebrar.
+        */}
+        <Route path="rh-dp/jornada" element={<Navigate to="/rh-dp/pessoal?aba=jornada" replace />} />
         <Route path="rh-dp/colaboradores" element={<RhDpColaboradoresRoute><RhDpColaboradores /></RhDpColaboradoresRoute>} />
         <Route path="rh-dp/documentos" element={<RhDpDocumentosRoute><RhDpDocumentos /></RhDpDocumentosRoute>} />
         <Route path="rh-dp/importacoes" element={<RhDpImportacoesRoute><RhDpImportacoes /></RhDpImportacoesRoute>} />
-        <Route path="rh-dp/apuracao" element={<RhDpApuracaoRoute><RhDpApuracao /></RhDpApuracaoRoute>} />
+        <Route path="rh-dp/apuracao" element={<Navigate to="/rh-dp/pessoal?aba=apuracao" replace />} />
         <Route path="rh-dp/fechamentos" element={<RhDpFinanceiroRoute><RhDpFechamentos /></RhDpFinanceiroRoute>} />
         <Route path="sst" element={<SstDashboardRoute><SstDashboard /></SstDashboardRoute>} />
         <Route path="sst/relatorios" element={<SstDashboardRoute><ModuloRelatorios modulo="sst" /></SstDashboardRoute>} />

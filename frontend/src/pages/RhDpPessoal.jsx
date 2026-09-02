@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   HiOutlineArrowPath,
   HiOutlineArrowsRightLeft,
@@ -28,7 +28,7 @@ import {
 import RhDpPessoalSolicitacoes from './RhDpPessoalSolicitacoes';
 import RhDpJornada from './RhDpJornada';
 import RhDpApuracao from './RhDpApuracao';
-import { hasAnyExplicitPermissao } from '../utils/acessoProduto';
+import { canViewRhDpApuracao, hasAnyExplicitPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
 
 /**
@@ -277,7 +277,29 @@ export default function RhDpPessoal() {
    * obra quanto da parte do DP". Quem abre esta tela abre para resolver o que esta parado — a lista
    * de colaboradores e consulta, e consulta pode esperar um clique.
    */
-  const [abaAtiva, setAbaAtiva] = useState('solicitacoes');
+  /*
+    D1 (02/09): Pessoal é a porta única do dia a dia, e a aba vive na URL.
+    Duas razões práticas: as rotas antigas /rh-dp/jornada e /rh-dp/apuracao
+    redirecionam para cá com ?aba=..., então favorito e link salvo continuam
+    chegando onde chegavam; e voltar pelo navegador volta para a aba de
+    onde a pessoa saiu, não para o começo.
+  */
+  const [parametros, setParametros] = useSearchParams();
+  const podeVerApuracao = canViewRhDpApuracao(user);
+  const abasDisponiveis = useMemo(
+    () => ['solicitacoes', 'colaboradores', 'jornada', ...(podeVerApuracao ? ['apuracao'] : [])],
+    [podeVerApuracao]
+  );
+  const abaDaUrl = parametros.get('aba');
+  const abaAtiva = abasDisponiveis.includes(abaDaUrl) ? abaDaUrl : 'solicitacoes';
+  const setAbaAtiva = useCallback((aba) => {
+    setParametros((atuais) => {
+      const proximos = new URLSearchParams(atuais);
+      if (aba === 'solicitacoes') proximos.delete('aba');
+      else proximos.set('aba', aba);
+      return proximos;
+    }, { replace: true });
+  }, [setParametros]);
 
   const [filtroObra, setFiltroObra] = useState('');
   const [busca, setBusca] = useState('');
@@ -720,15 +742,19 @@ export default function RhDpPessoal() {
         >
           Jornada
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={abaAtiva === 'apuracao'}
-          className={`rh-pessoal-aba${abaAtiva === 'apuracao' ? ' rh-pessoal-aba--ativa' : ''}`}
-          onClick={() => setAbaAtiva('apuracao')}
-        >
-          Apuracao
-        </button>
+        {/* A permissão que a rota /rh-dp/apuracao exigia continua valendo:
+            quem não podia ver a apuração não vê a aba. */}
+        {podeVerApuracao ? (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={abaAtiva === 'apuracao'}
+            className={`rh-pessoal-aba${abaAtiva === 'apuracao' ? ' rh-pessoal-aba--ativa' : ''}`}
+            onClick={() => setAbaAtiva('apuracao')}
+          >
+            Apuração
+          </button>
+        ) : null}
       </div>
 
       {abaAtiva === 'solicitacoes' ? (
@@ -787,7 +813,9 @@ export default function RhDpPessoal() {
               <button type="button" className="btn btn-primary" onClick={() => novoPedido('ADMISSAO')}>
                 Pedir admissao
               </button>
-              <Link to="/rh-dp/jornada" className="btn btn-outline">Enviar jornada</Link>
+              <button type="button" className="btn btn-outline" onClick={() => setAbaAtiva('jornada')}>
+                Enviar jornada
+              </button>
             </>
           ) : null}
         </div>
@@ -903,8 +931,8 @@ export default function RhDpPessoal() {
         Montadas so quando a aba esta ativa: cada uma carrega obras, empresas e a propria lista, e
         deixa-las montadas em segundo plano faria tres telas buscarem dados a cada visita.
       */}
-      {abaAtiva === 'jornada' ? <RhDpJornada comoAba /> : null}
-      {abaAtiva === 'apuracao' ? <RhDpApuracao comoAba /> : null}
+      {abaAtiva === 'jornada' ? <RhDpJornada /> : null}
+      {abaAtiva === 'apuracao' && podeVerApuracao ? <RhDpApuracao /> : null}
 
       {pedidosDoColaborador.id ? (
         <OverlayModal

@@ -1031,3 +1031,51 @@ fieldset.form-section {
   font-weight: 700;
   border-top: 2px solid var(--ui-border);
 }
+
+/* ============================================================
+   AVISO E CONFIRMAÇÃO DO SISTEMA (R3 da DoD, 02/09)
+   Substituem `window.alert()` e `window.confirm()`. Medidas só nos
+   degraus da escala (R10); cor só por token (M1).
+   ============================================================ */
+
+/* A pilha de avisos fica no fluxo, logo abaixo da faixa fixa — não
+   flutua sobre o conteúdo: aviso que tapa a tabela esconde justamente o
+   dado que a pessoa precisa conferir para entender o aviso. */
+.app-avisos {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-2);
+}
+
+.app-avisos:not(:last-child) {
+  margin-block-end: var(--esp-4);
+}
+
+.app-confirmacao {
+  display: flex;
+  flex-direction: column;
+  gap: var(--esp-3);
+  padding: var(--esp-6);
+}
+
+.app-confirmacao-titulo {
+  font-size: var(--fonte-bloco);
+  font-weight: 600;
+  line-height: var(--lh-titulo);
+  color: var(--c-text);
+}
+
+.app-confirmacao-texto {
+  font-size: var(--fonte-corpo);
+  line-height: var(--lh-corpo);
+  color: var(--c-muted);
+}
+
+/* Confirmar à direita, na posição em que o sistema inteiro põe a ação
+   primária; cancelar à esquerda. Alvo mínimo de 32px vem do .btn. */
+.app-confirmacao-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--esp-2);
+  margin-block-start: var(--esp-2);
+}

@@ -93,6 +93,16 @@ elemento e a medida que reprovou.
 - **R1** Cadastro raro abre em MODAL, não inline na tela.
 - **R2** Campos da mesma linha alinhados (mesma altura/baseline), largura
   por tipo de dado.
+- **R3** (novo, 02/09 — decisão do cliente) **Nenhum `alert()` ou
+  `confirm()` do navegador.** Aviso de erro/sucesso usa `Avisos`/`useAvisos`
+  (faixa dentro da página, tom semântico do sistema); confirmação usa
+  `useConfirmacao` (modal do sistema, com o rótulo dizendo o que vai
+  acontecer e a ação destrutiva em vermelho suave e apartada).
+  Motivo: a caixa do navegador ignora tema, tipografia e tokens, bloqueia a
+  página, não pode ser medida pelo harness e some sem deixar rastro no DOM.
+  Verificação: **R19** no validador estático, valendo para o sistema
+  inteiro, com o passivo herdado congelado em trinco (`scripts/trinco-dialogos.json`)
+  que só pode diminuir.
 
 ## ESTRUTURA E ACESSIBILIDADE
 

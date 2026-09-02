@@ -336,6 +336,37 @@ automaticamente se sair do padrão.
 - **Onde NÃO vale**: tela sem linha acionável (N/A registrado na matriz).
 - Verificação: item **A1** da DoD, cobrado pelo harness em toda tela.
 
+## R19 — nada de caixa do navegador (02/09)
+
+- **O problema**: `window.alert()` e `window.confirm()` desenham uma caixa
+  do Chrome, não do sistema. Ela ignora tema, tipografia e tokens; bloqueia
+  a página inteira; o harness não consegue medi-la (não existe no DOM); e
+  ela some sem deixar rastro. Dá o mesmo peso a "salvo com sucesso" e a
+  "estornar o fechamento".
+- **O que usar**: `Avisos` + `useAvisos` para aviso (faixa dentro da
+  página, com o tom semântico e fechável; sucesso some sozinho em 6s) e
+  `useConfirmacao` para confirmação (modal do sistema, rótulo dizendo o que
+  vai acontecer, destrutiva em vermelho suave e apartada). Ambos em
+  `components/padrao`.
+- **Onde vale**: TODO o `frontend/src` — decisão do cliente em 02/09, ao ver
+  que 51 chamadas num módulo só indicavam o mesmo em todos os outros.
+- **Onde NÃO vale**: nada. Não há exceção declarada; se aparecer um caso
+  que o componente não atende, o componente cresce (R16b), a regra não abre.
+- **O trinco** (por que a regra não reprova 857 arquivos hoje): a varredura
+  achou **857 chamadas em 122 arquivos**, passivo de anos que nenhuma leva
+  zera de uma vez, e reprovar tudo hoje pararia o build — regra que vira
+  ruído deixa de ser lida (lição da R18). Então o passivo está congelado em
+  `frontend/scripts/trinco-dialogos.json`, com a contagem de cada arquivo na
+  data em que a regra nasceu:
+  - arquivo NOVO com `alert`/`confirm` → **FALHA**;
+  - arquivo do trinco cuja contagem SOBE → **FALHA**;
+  - contagem que cai → passa, e o trinco aperta (aviso pedindo a atualização).
+  O número só anda para baixo. Cada leva zera os arquivos que tocar; a leva
+  do RH/DP tirou 51 dele.
+- **Verificação**: `validarLayout.mjs`, provado nos dois sentidos —
+  arquivo novo com `alert()` reprova, e arquivo do trinco que aumenta de 4
+  para 5 reprova nomeando os dois números.
+
 ## Disciplina de regras (02/09 — vale para toda regra nova e existente)
 
 1. **Escopo explícito obrigatório**: toda regra declara onde vale, onde NÃO

@@ -171,7 +171,105 @@ export function validarLayout() {
   falhas.push(...r17.falhas);
   avisos.push(...r17.avisos);
 
-  return { falhas, avisos, telas: manifesto.telas.length, arquivosTabela: r17.arquivos };
+  // R19 — nada de caixa do navegador. Vale para o SISTEMA INTEIRO desde já
+  // (decisão do cliente, 02/09), com trinco: o passivo herdado está
+  // congelado em lista datada e só pode diminuir.
+  const r19 = validarDialogosDoNavegador();
+  falhas.push(...r19.falhas);
+  avisos.push(...r19.avisos);
+
+  return {
+    falhas,
+    avisos,
+    telas: manifesto.telas.length,
+    arquivosTabela: r17.arquivos,
+    dialogosDoNavegador: r19.total,
+    dialogosNoTrinco: r19.noTrinco
+  };
+}
+
+/**
+ * R19 — `window.alert()` e `window.confirm()` NUNCA (decisão do cliente,
+ * 02/09). Aviso e confirmação usam o componente próprio do sistema
+ * (`Avisos`/`useAvisos` e `useConfirmacao`, em components/padrao).
+ *
+ * A caixa do navegador ignora tema, tipografia e tokens; bloqueia a página;
+ * o harness não consegue medi-la; e ela some sem deixar rastro no DOM.
+ *
+ * ## Por que TRINCO e não reprovação seca
+ *
+ * O levantamento do RH/DP achou 51 chamadas num módulo só. A varredura do
+ * sistema achou **857 em 122 arquivos** — passivo de anos, que nenhuma leva
+ * zera de uma vez. Reprovar tudo hoje pararia o build e a regra viraria
+ * ruído (e regra que vira ruído deixa de ser lida — R18 já ensinou).
+ *
+ * Então a regra vale para o sistema inteiro DESDE JÁ, com o passivo
+ * congelado em `scripts/trinco-dialogos.json`: a contagem de cada arquivo
+ * na data em que a regra nasceu. A partir daqui:
+ *   - arquivo NOVO com alert/confirm            → FALHA;
+ *   - arquivo do trinco que AUMENTA a contagem  → FALHA;
+ *   - arquivo do trinco que diminui             → passa, e o trinco aperta.
+ * O número só anda para baixo. Cada leva zera os arquivos que tocar.
+ */
+function validarDialogosDoNavegador() {
+  const falhas = [];
+  const avisos = [];
+  const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-dialogos.json');
+  const trinco = fs.existsSync(caminhoTrinco)
+    ? JSON.parse(fs.readFileSync(caminhoTrinco, 'utf8'))
+    : { arquivos: {} };
+  const herdado = trinco.arquivos || {};
+
+  // `alert(` precedido de ponto é método de objeto (`toast.alert`), não a
+  // caixa do navegador; `confirmar(`/`confirmacao` não são `confirm(`.
+  const padrao = /(^|[^.\w])(window\s*\.\s*)?(alert|confirm)\s*\(/g;
+  const contagens = {};
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      const codigo = fs.readFileSync(caminho, 'utf8');
+      const total = [...codigo.matchAll(padrao)].length;
+      if (total > 0) contagens[rel] = total;
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+
+  let total = 0;
+  let noTrinco = 0;
+  for (const [rel, quantidade] of Object.entries(contagens)) {
+    total += quantidade;
+    const limite = herdado[rel];
+    if (limite === undefined) {
+      falhas.push(`${rel} [R19] ${quantidade} chamada(s) de alert()/confirm() do navegador em arquivo NOVO para a regra — use Avisos/useAvisos (aviso) e useConfirmacao (confirmação) de components/padrao.`);
+      continue;
+    }
+    if (quantidade > limite) {
+      falhas.push(`${rel} [R19] alert()/confirm() do navegador AUMENTOU de ${limite} para ${quantidade} — o trinco só aperta: troque por Avisos/useConfirmacao.`);
+      continue;
+    }
+    noTrinco += quantidade;
+    if (quantidade < limite) {
+      avisos.push(`${rel} [R19] passivo herdado caiu de ${limite} para ${quantidade} chamada(s) — atualize scripts/trinco-dialogos.json para apertar o trinco.`);
+    }
+  }
+  // Arquivo que zerou e saiu da lista de contagens: o trinco tem de perder
+  // a linha, senão o passivo "some" sem ninguém ver que caiu.
+  for (const rel of Object.keys(herdado)) {
+    if (contagens[rel] === undefined) {
+      avisos.push(`${rel} [R19] zerou o alert()/confirm() — remova a linha de scripts/trinco-dialogos.json.`);
+    }
+  }
+
+  return { falhas, avisos, total, noTrinco };
 }
 
 /**
