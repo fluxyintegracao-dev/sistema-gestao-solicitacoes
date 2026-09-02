@@ -184,6 +184,8 @@
   padding: 0;
   margin: 0;
   width: 100%;
+  /* R2: o cabeçalho inteiro é alvo de clique — mesma altura mínima do .btn. */
+  min-height: var(--alvo-clique);
   display: flex;
   align-items: center;
   justify-content: space-between;

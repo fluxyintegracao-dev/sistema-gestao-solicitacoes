@@ -44,8 +44,9 @@ export function CelulaDupla({ principal, sub, title }) {
 const TIPOS_COLUNA = {
   texto:  { largura: 180, flexPadrao: true },        // conteúdo: recebe a sobra
   codigo: { largura: 130 },                          // OB-2024-0117
-  valor:  { largura: 150, alinhar: 'right', valor: true }, // R$ 9.999.999.999,99
-  numero: { largura: 110, alinhar: 'right', valor: true },
+  // R$ 9.999.999.999,99 no corpo de 14px tabular ≈ 184px com o respiro (R6/R7).
+  valor:  { largura: 190, alinhar: 'right', valor: true },
+  numero: { largura: 120, alinhar: 'right', valor: true },
   data:   { largura: 110 },                          // 22/08/2026
   status: { largura: 96 },
   badge:  { largura: 120 }
