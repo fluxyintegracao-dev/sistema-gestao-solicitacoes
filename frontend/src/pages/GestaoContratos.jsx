@@ -1491,13 +1491,15 @@ Titulos parcialmente pagos fechados pelo valor pago: ${ajustados}` : '')
           vazio="Nenhum contrato encontrado."
           aoClicarLinha={c => setContratoSelecionadoId(prev => (String(prev) === String(c.id) ? null : c.id))}
           selecao={{
-            // Seleção de UM contrato: é ela que abre a barra de ações do
-            // rodapé. O contrato marcado desmarca no segundo clique, como
-            // a linha inteira sempre fez.
+            // Seleção de UM contrato (`unica`): é ela que abre a barra de
+            // ações do rodapé. Sem a marca, o componente ofereceria
+            // "selecionar todos" — que aqui não significa nada.
+            unica: true,
             selecionados: contratoSelecionadoId === null ? [] : [contratoSelecionadoId],
             aoAlternar: id => setContratoSelecionadoId(prev => (String(prev) === String(id) ? null : id)),
             aoAlternarTodos: () => setContratoSelecionadoId(null)
           }}
+          linhaSelecionada={contrato => String(contrato.id) === String(contratoSelecionadoId)}
         />
       </div>
 

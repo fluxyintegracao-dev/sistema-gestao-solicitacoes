@@ -181,11 +181,21 @@ async function checarColunaFixa(page, tela, rota) {
   await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
   // A auditoria carrega a trilha sob demanda (mesma ideia da consulta de
-  // títulos): sem clicar em Atualizar, não há tabela para medir.
+  // títulos): sem clicar em Atualizar, não há dado.
   const atualizar = page.getByRole('button', { name: /atualizar/i }).first();
   if (await atualizar.count()) {
     await atualizar.click();
     await page.waitForTimeout(3000);
+  }
+  // E a TABELA só existe nas visões por Setores/Usuários — a visão padrão
+  // ("Geral") é um grid de métricas, não tabela.
+  for (const rotulo of [/setores/i, /usuarios|usuários/i]) {
+    const aba = page.getByRole('button', { name: rotulo }).first();
+    if (await aba.count()) {
+      await aba.click();
+      await page.waitForTimeout(2000);
+      if (await page.locator('.app-tabela .resizable-table-scroll').count()) break;
+    }
   }
   const medida = await page.evaluate(() => {
     const rolagem = document.querySelector('.app-tabela .resizable-table-scroll');
@@ -358,13 +368,23 @@ async function primeiraSolicitacaoCompra(page) {
   await page.goto(`${BASE}/solicitacoes-compra`, { waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
   // A linha NÃO navega por clique nesta tela: quem abre é o botão de ação
-  // da própria linha (verificado no preview).
-  const acao = page.locator('tbody tr.app-tabela-linha .app-actionbar button, tbody tr.app-tabela-linha .app-actionbar a').first();
-  if (await acao.count()) {
+  // da própria linha (verificado no preview). E nem toda solicitação TEM
+  // item — procura uma que tenha, senão a capacidade fica "sem dado" por
+  // motivo errado.
+  const total = await page.locator('tbody tr.app-tabela-linha').count();
+  for (let i = 0; i < Math.min(total, 6); i += 1) {
+    const acao = page.locator('tbody tr.app-tabela-linha').nth(i)
+      .locator('.app-actionbar button, .app-actionbar a').first();
+    if (!(await acao.count())) continue;
     await acao.click();
     await page.waitForTimeout(3000);
     const atual = new URL(page.url()).pathname;
-    if (/\/solicitacoes-compra\/\d+/.test(atual)) return atual;
+    if (/\/solicitacoes-compra\/\d+/.test(atual)) {
+      await esperarCarregar(page);
+      if (await page.locator('.app-tabela-expandir').count()) return atual;
+      await page.goBack();
+      await esperarCarregar(page);
+    }
   }
   return '/solicitacoes-compra';
 }
