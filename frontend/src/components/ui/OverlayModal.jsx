@@ -74,9 +74,18 @@ export default function OverlayModal({
         aria-modal="true"
         aria-label={rotulo}
       >
+        {/*
+          R18 (02/09): `overflow: clip`, NUNCA `hidden`. O painel precisa
+          recortar o conteúdo nos cantos arredondados, mas `hidden` cria um
+          contexto de rolagem e mata em silêncio qualquer `position: sticky`
+          lá dentro — cabeçalho grudado ou coluna fixa de tabela dentro de
+          modal simplesmente pararia de funcionar, sem erro nenhum. `clip`
+          recorta igual e não cria scrollport.
+        */}
         <div
-          className="card overflow-hidden"
+          className="card"
           style={{
+            overflow: 'clip',
             width: `min(100%, ${largura})`,
             maxHeight: 'min(88vh, 920px)',
             display: 'flex',

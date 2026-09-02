@@ -378,6 +378,32 @@ automaticamente se sair do padrão.
   prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
   página real reprova a tela em que qualquer caixa dispara.
 
+## R20 — tela que sai do menu declara o redirecionamento (02/09)
+
+- **O problema**: quando uma tela sai do menu por decisão do cliente, o
+  destino antigo continua vivo em favorito, link salvo, atalho e card de
+  hub. Sumir com a rota quebra todos eles em silêncio — a pessoa clica no
+  favorito e cai numa tela em branco.
+- **A regra**: toda rota retirada da navegação vira
+  `<Route path="X" element={<Navigate to="Y" replace />} />`. Redirecionar,
+  nunca apagar.
+- **Onde NÃO vale**: rota que nunca esteve na navegação e nunca teve
+  chegada nenhuma (código morto de verdade) — essa some mesmo.
+- **Verificação**: `validarNavegacao.mjs` lê os `<Navigate>` do próprio
+  `App.jsx` e trata o destino como PRESERVADO, imprimindo para onde ele vai.
+  Leitura automática de propósito: lista de exceção escrita à mão envelhece
+  e vira mentira; assim, apagar o redirecionamento faz o destino voltar a
+  acusar perda no mesmo instante. Provado nos dois sentidos.
+- **História, que é o motivo da regra existir**: a leva do RH/DP tirou
+  `/rh-dp` e `/rh-dp/apuracao` do menu (D1/D3) e o `validarNavegacao.mjs`
+  acusou os dois. Duas lições:
+  1. Um agente relatou que "já falhava antes da leva" — não falhava. A
+     verificação certa é rodar o check no commit anterior, não confiar no
+     relato.
+  2. **O check existia e não estava ligado a nenhum `npm run`.** Ninguém o
+     executava. Passou a rodar dentro do `test:responsive` — check que
+     ninguém executa não é check, é arquivo.
+
 ## Disciplina de regras (02/09 — vale para toda regra nova e existente)
 
 1. **Escopo explícito obrigatório**: toda regra declara onde vale, onde NÃO

@@ -80,6 +80,30 @@ function extrairRotasDoApp() {
   return [...rotas];
 }
 
+/**
+ * Destinos que continuam ALCANÇÁVEIS por redirecionamento (02/09).
+ *
+ * Quando uma tela sai do menu por decisão do cliente, o destino antigo não
+ * some: vira `<Route path="X" element={<Navigate to="Y" replace />} />`, para
+ * que favorito, link salvo e atalho continuem chegando. Isso NÃO é destino
+ * perdido — é destino preservado por outro caminho, e o check precisa saber
+ * ler a diferença.
+ *
+ * Leitura automática do próprio App.jsx, de propósito: lista de exceção
+ * escrita à mão envelhece e vira mentira. Aqui, se o redirecionamento for
+ * apagado um dia, o destino volta a acusar perda no mesmo instante.
+ */
+function extrairRedirecionamentos() {
+  const src = readFileSync(path.join(raiz, 'src/App.jsx'), 'utf8');
+  const mapa = new Map();
+  const padrao = /path="([^"]+)"\s+element=\{<Navigate\s+to="([^"]+)"/g;
+  for (const match of src.matchAll(padrao)) {
+    const de = match[1].startsWith('/') ? match[1] : `/${match[1]}`;
+    mapa.set(de, match[2]);
+  }
+  return mapa;
+}
+
 function rotaCasa(destino, rota) {
   const d = destino.split('#')[0].split('?')[0];
   if (d === rota) return true;
@@ -119,15 +143,20 @@ try {
   const alvos = new Set(destinos.map((d) => d.to.split('#')[0].split('?')[0]));
   alvos.add('/'); // hub principal substitui a raiz
   alvos.add('/dashboard'); // dashboard executivo movido de / para /dashboard
+  const redirecionamentos = extrairRedirecionamentos();
   for (const antigo of DESTINOS_ANTIGOS) {
     const chave = antigo.split('#')[0];
     const coberto = antigo === '/'
       ? alvos.has('/dashboard')
       : alvos.has(chave) || destinos.some((d) => d.to === antigo);
-    if (!coberto) {
-      falhas += 1;
-      console.error(`DESTINO PERDIDO da navegação antiga: ${antigo}`);
+    if (coberto) continue;
+    // Saiu do menu, mas o App.jsx redireciona: destino preservado.
+    if (redirecionamentos.has(chave)) {
+      console.log(`  destino fora do menu, preservado por redirecionamento: ${chave} → ${redirecionamentos.get(chave)}`);
+      continue;
     }
+    falhas += 1;
+    console.error(`DESTINO PERDIDO da navegação antiga: ${antigo} — se a saída do menu foi intencional, declare o redirecionamento em App.jsx (<Navigate to=...>) para não quebrar favorito e link salvo.`);
   }
 
   // 3) Catálogo de blocos: o backend valida a config do admin contra uma
