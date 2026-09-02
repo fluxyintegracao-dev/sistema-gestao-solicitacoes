@@ -200,10 +200,13 @@ export function checksEstaticos({ tipo }) {
         .filter(visivel).filter(foraDeModal)
         .filter((el) => !/R\$/.test(el.textContent));
       let pior = null;
+      const soTexto = (s) => String(s || '').replace(/\s+/g, '').toLowerCase();
       alvos.forEach((el) => {
         if (el.scrollWidth > el.clientWidth + 2) {
           const tooltip = el.closest('[title]');
-          const completo = tooltip && (tooltip.getAttribute('title') || '').includes(el.textContent.trim().slice(0, 20));
+          // Compara sem NENHUM espaço: textContent concatena nós sem
+          // separador e innerText insere espaços — não podem divergir aqui.
+          const completo = tooltip && soTexto(tooltip.getAttribute('title')).includes(soTexto(el.textContent).slice(0, 20));
           if (!completo && (!pior || el.textContent.length > pior.textContent.length)) pior = el;
         }
       });

@@ -170,7 +170,13 @@ const RESOLVEDORES = {
   async tituloDetalhe(page) {
     await page.goto(`${BASE}/financeiro/titulos`, { waitUntil: 'domcontentloaded' });
     await esperarCarregar(page);
-    await page.locator('a[href^="/financeiro/titulos/"]').first().waitFor({ timeout: 30000 });
+    // A consulta de títulos só carrega ao CONSULTAR (deliberado na tela).
+    const consultar = page.getByRole('button', { name: /consultar/i }).first();
+    if (await consultar.count()) {
+      await consultar.click();
+      await page.waitForTimeout(2500);
+    }
+    await page.locator('a[href^="/financeiro/titulos/"]:not([href*="novo"])').first().waitFor({ timeout: 30000 });
     const rota = await page.evaluate(() => {
       const links = Array.from(document.querySelectorAll('a[href^="/financeiro/titulos/"]'))
         .filter((a) => /^\/financeiro\/titulos\/\d+$/.test(a.getAttribute('href')));

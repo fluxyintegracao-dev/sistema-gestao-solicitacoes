@@ -361,7 +361,12 @@
 
 .app-stat--full { grid-column: 1 / -1; }
 
-/* Rótulo no piso da escala (12px) — abaixo disso é apertar os olhos. */
+/* Rótulo no piso da escala (12px) — abaixo disso é apertar os olhos.
+   M3: sobre o fundo rebaixado (--ui-surface-2) o --c-muted ficava a
+   4,50:1 cravado (reprovado); o token abaixo garante AA nos dois temas. */
+:root { --texto-apoio-aa: #475569; }
+.dark { --texto-apoio-aa: #a9b6cc; }
+
 .app-stat-label {
   display: block;
   font-size: var(--fonte-detalhe);
@@ -369,7 +374,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--c-muted);
+  color: var(--texto-apoio-aa);
 }
 
 .app-stat-valor {
@@ -399,7 +404,8 @@
   font-weight: 500;
 }
 
-/* Alternador "Ver todos os campos (N vazios)" — mesmo desenho do detalhe. */
+/* Alternador "Ver todos os campos (N vazios)" — mesmo desenho do detalhe.
+   R2/M1: é um botão — alvo mínimo de clique vale para ele também. */
 .app-campos-toggle {
   appearance: none;
   border: 0;
@@ -412,6 +418,9 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--alvo-clique);
 }
 
 /* ---- Menu "⋯" (ações raras/avançadas) ---------------------------------- */

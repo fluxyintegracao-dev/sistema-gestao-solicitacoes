@@ -718,9 +718,10 @@ export default function FinanceiroTituloDetalhe() {
             largura total; o codigo saiu daqui porque ja e o titulo da pagina
             (informacao aparece uma vez). Campos vazios ficam atras do
             alternador — nenhum dado deixou de existir. */}
+        {/* B3: a descrição do título mora na FAIXA (apoio do registro) —
+            repetir aqui era a mesma informação duas vezes na tela. */}
         <BlocoConteudo
           titulo="Dados do titulo"
-          descricao={titulo.descricao || 'Sem descricao'}
           variante="primario"
           cor="var(--module-financeiro)"
         >
