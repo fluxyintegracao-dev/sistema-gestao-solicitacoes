@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import {
   anexarNaRhSolicitacao,
@@ -45,6 +52,31 @@ const ROTULO_SITUACAO = {
   CANCELADA: 'Cancelada'
 };
 
+/**
+ * As opcoes do recorte de SITUACAO (R12).
+ *
+ * RASCUNHO continua na lista: um estado que a tela nao sabe filtrar e um estado que ninguem
+ * encontra — e rascunho esquecido e justamente o que precisa ser encontrado.
+ *
+ * A opcao "Todas" do antigo select NAO virou uma marca: na marcacao, nada marcado JA e "todas",
+ * e uma marca chamada "Todas" conviveria com as outras dizendo o contrario delas. Quem quer
+ * voltar para todas desmarca a que esta ativa, ou usa o "Limpar tudo" da propria faixa.
+ */
+const OPCOES_SITUACAO = [
+  { valor: 'RASCUNHO', rotulo: 'Rascunhos (faltam enviar)' },
+  { valor: 'ABERTA', rotulo: 'Aguardando decisao' },
+  { valor: 'REJEITADA', rotulo: 'Devolvidas para correcao' },
+  { valor: 'APROVADA', rotulo: 'Aprovadas' },
+  { valor: 'CANCELADA', rotulo: 'Canceladas' }
+];
+
+const SEM_FILTRO = { situacao: new Set(), tipo: new Set() };
+
+/** Dimensao de valor UNICO: o `ativos` guarda um conjunto, o servico recebe um valor. */
+function primeiroValor(conjunto) {
+  return Array.from(conjunto || [])[0] || '';
+}
+
 // Ver o comentario em RhDpPessoal.jsx: sem `columns` + `columnKey`, as colunas colapsam.
 function chipDoTipo(tipo) {
   if (tipo === 'ALTERACAO_SALARIAL') return 'rh-chip rh-chip--diretoria';
@@ -61,13 +93,20 @@ function chipDaSituacao(situacao) {
 }
 
 export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAprovarSalario, aoMudar }) {
+  const { avisos, avisar, fechar, limpar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
+
   const [solicitacoes, setSolicitacoes] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
 
-  const [filtroSituacao, setFiltroSituacao] = useState('ABERTA');
-  const [filtroTipo, setFiltroTipo] = useState('');
+  /*
+    R12: situacao e tipo sao recortes ENUMERAVEIS — marcacao com etiqueta removivel, e nao lista
+    suspensa. Ambos com `unico`, porque `listarRhSolicitacoes` recebe UM valor por recorte: com
+    marcacao multipla, marcar dois mandaria `undefined` e a lista nao estreitaria.
+  */
+  const [ativos, setAtivos] = useState(() => ({ situacao: new Set(['ABERTA']), tipo: new Set() }));
+  const filtroSituacao = useMemo(() => primeiroValor(ativos.situacao), [ativos]);
+  const filtroTipo = useMemo(() => primeiroValor(ativos.tipo), [ativos]);
 
   const [aberta, setAberta] = useState(null);
   const [anexos, setAnexos] = useState([]);
@@ -77,7 +116,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
 
   const carregar = useCallback(async () => {
     setCarregando(true);
-    setErro('');
+    limpar();
     try {
       const lista = await listarRhSolicitacoes({
         situacao: filtroSituacao || undefined,
@@ -85,11 +124,11 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
       });
       setSolicitacoes(Array.isArray(lista) ? lista : []);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel carregar as solicitacoes.');
+      avisar.erro(error.message || 'Nao foi possivel carregar as solicitacoes.');
     } finally {
       setCarregando(false);
     }
-  }, [filtroSituacao, filtroTipo]);
+  }, [filtroSituacao, filtroTipo, avisar, limpar]);
 
   useEffect(() => { carregar(); }, [carregar]);
 
@@ -99,8 +138,30 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
     return porTipo;
   }, [solicitacoes]);
 
+  const dimensoesFiltro = useMemo(() => [
+    { id: 'situacao', rotulo: 'Situacao', unico: true, opcoes: OPCOES_SITUACAO },
+    {
+      id: 'tipo',
+      rotulo: 'Tipo',
+      unico: true,
+      opcoes: Object.entries(ROTULO_TIPO).map(([valor, rotulo]) => ({ valor, rotulo }))
+    }
+  ], []);
+
+  /*
+    DEFEITO REAL, e nao de layout: o contador dizia
+    `ROTULO_SITUACAO[filtroSituacao].toLowerCase()`, mas RASCUNHO nao existe nesse mapa — escolher
+    "Rascunhos (faltam enviar)" estourava com TypeError e a aba inteira ficava em branco. O rotulo
+    agora cai para o da opcao marcada, que existe para todos os valores oferecidos.
+  */
+  const rotuloDoRecorte = useMemo(() => {
+    if (!filtroSituacao) return 'no filtro atual';
+    const daOpcao = OPCOES_SITUACAO.find((o) => o.valor === filtroSituacao);
+    return String(ROTULO_SITUACAO[filtroSituacao] || daOpcao?.rotulo || filtroSituacao).toLowerCase();
+  }, [filtroSituacao]);
+
   async function abrirDetalhe(solicitacao) {
-    setErro('');
+    limpar();
     setAberta(solicitacao);
     setAnexos([]);
     setConferencia(null);
@@ -116,45 +177,68 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         setTiposDocumento(Array.isArray(tipos) ? tipos : []);
       }
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel abrir a solicitacao.');
+      avisar.erro(error.message || 'Nao foi possivel abrir a solicitacao.');
     }
   }
 
+  /*
+    R3/R19: as duas caixas do navegador sairam daqui. O motivo da recusa e a observacao do
+    atestado eram `window.prompt`; agora sao o `campo` da confirmacao do sistema — mesmo passo
+    unico, mas dentro do DOM, com tema, tokens e rotulo dizendo o que acontece.
+  */
   async function decidirAnexo(anexo, aceito) {
-    setErro('');
-    setAviso('');
+    limpar();
+    let mensagem = '';
     try {
       if (!aceito) {
-        // eslint-disable-next-line no-alert
-        const motivo = window.prompt(
-          `Por que "${anexo.nome_original}" nao foi aceito? A obra precisa saber o que reenviar.`
-        );
-        if (!motivo || !motivo.trim()) return;
-        await validarAnexoRhSolicitacao(aberta.id, anexo.id, { aceito: false, motivo: motivo.trim() });
-        setAviso('Documento recusado. A obra ve o motivo e pode reenviar.');
+        const { ok, texto } = await confirmar({
+          titulo: 'Recusar documento',
+          mensagem: `"${anexo.nome_original}" volta recusado para a obra, que precisa saber o que reenviar.`,
+          rotuloConfirmar: 'Recusar documento',
+          rotuloCancelar: 'Voltar',
+          destrutiva: true,
+          campo: { rotulo: 'Motivo', obrigatorio: true, multilinha: true }
+        });
+        // Mesmo corte do fluxo antigo (`if (!motivo || !motivo.trim()) return;`): o campo
+        // obrigatorio ja trava o botao enquanto o texto estiver vazio ou so com espacos.
+        if (!ok) return;
+        await validarAnexoRhSolicitacao(aberta.id, anexo.id, { aceito: false, motivo: texto.trim() });
+        mensagem = 'Documento recusado. A obra ve o motivo e pode reenviar.';
       } else {
-        // eslint-disable-next-line no-alert
-        const observacao = window.prompt(
-          `Atestar que "${anexo.nome_original}" e valido e util.\n\nObservacao (opcional):`,
-          'Confere com o original.'
-        );
-        if (observacao === null) return;
-        await validarAnexoRhSolicitacao(aberta.id, anexo.id, { aceito: true, observacao });
-        setAviso('Documento atestado. Ele vai para a pasta quando a solicitacao for aprovada.');
+        const { ok, texto } = await confirmar({
+          titulo: 'Atestar documento',
+          mensagem: `Atestar que "${anexo.nome_original}" e valido e util.`,
+          rotuloConfirmar: 'Atestar',
+          campo: {
+            rotulo: 'Observacao (opcional)',
+            multilinha: true,
+            valorInicial: 'Confere com o original.'
+          }
+        });
+        if (!ok) return;
+        await validarAnexoRhSolicitacao(aberta.id, anexo.id, { aceito: true, observacao: texto });
+        mensagem = 'Documento atestado. Ele vai para a pasta quando a solicitacao for aprovada.';
       }
       await abrirDetalhe(aberta);
+      /*
+        O aviso vem DEPOIS de recarregar o detalhe, e nao antes.
+
+        Mesmo defeito ja encontrado na tela irma: `setAviso(...)` seguido de `abrirDetalhe()`,
+        que comeca limpando os avisos — a faixa verde era apagada no mesmo tique, antes de
+        qualquer pintura, e quem conferia o documento nao via retorno nenhum.
+      */
+      avisar.sucesso(mensagem);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel registrar a conferencia do documento.');
+      avisar.erro(error.message || 'Nao foi possivel registrar a conferencia do documento.');
     }
   }
 
   async function enviarDocumento(evento) {
     evento.preventDefault();
-    setErro('');
-    setAviso('');
+    limpar();
 
     if (!envio.arquivo) {
-      setErro('Escolha o arquivo antes de enviar.');
+      avisar.erro('Escolha o arquivo antes de enviar.');
       return;
     }
 
@@ -165,11 +249,12 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         { documento_tipo_id: envio.tipo || undefined },
         envio.arquivo
       );
-      setAviso('Documento enviado. Ele vai para a pasta depois que o DP atestar.');
       setEnvio({ tipo: '', arquivo: null, enviando: false });
       await abrirDetalhe(aberta);
+      // Depois do recarregamento, pelo mesmo motivo de `decidirAnexo`.
+      avisar.sucesso('Documento enviado. Ele vai para a pasta depois que o DP atestar.');
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel enviar o documento.');
+      avisar.erro(error.message || 'Nao foi possivel enviar o documento.');
       setEnvio((atual) => ({ ...atual, enviando: false }));
     }
   }
@@ -182,20 +267,21 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
    * "verifique os documentos" generico, que obrigaria a pessoa a caçar o que e.
    */
   async function enviarAoDp(solicitacao) {
-    setErro('');
-    setAviso('');
+    limpar();
     try {
       await enviarRhSolicitacao(solicitacao.id);
-      setAviso(`Solicitacao #${solicitacao.id} enviada. O Departamento Pessoal ja pode decidir.`);
+      // Depois de `carregar()`, que comeca limpando os avisos: emitir antes apagaria a
+      // confirmacao do envio antes de ela ser pintada.
       await carregar();
+      avisar.sucesso(`Solicitacao #${solicitacao.id} enviada. O Departamento Pessoal ja pode decidir.`);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel enviar a solicitacao.');
+      avisar.erro(error.message || 'Nao foi possivel enviar a solicitacao.');
     }
   }
 
   async function decidir(solicitacao, acao) {
-    setErro('');
-    setAviso('');
+    limpar();
+    let mensagem = '';
     try {
       if (acao === 'aprovar') {
         /**
@@ -207,7 +293,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         const conferido = await conferirDocumentacaoRhSolicitacao(solicitacao.id);
         const partes = [];
         if (conferido?.faltando?.length) {
-          partes.push(`Nunca chegaram: ${conferido.faltando.map((d) => d.nome).join(', ')}`);
+          partes.push(`Nunca chegaram: ${conferido.faltando.map((d) => d.nome).join(', ')}.`);
         }
         if (conferido?.anexosAguardando) {
           partes.push(
@@ -216,52 +302,90 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           );
         }
         if (partes.length) {
-          // eslint-disable-next-line no-alert
-          if (!window.confirm(`${partes.join('\n\n')}\n\nAprovar mesmo assim?`)) return;
+          /*
+            A mensagem vira UMA linha corrida porque a faixa da confirmacao e um paragrafo: a
+            quebra dupla que a caixa do navegador respeitava nao existe mais aqui, e cada parte
+            ja termina em ponto. O texto e o corte do fluxo (cancelar = nao aprova) sao os mesmos.
+          */
+          const { ok } = await confirmar({
+            titulo: 'Aprovar com pendencia',
+            mensagem: `${partes.join(' ')} Aprovar mesmo assim?`,
+            rotuloConfirmar: 'Aprovar mesmo assim',
+            rotuloCancelar: 'Voltar'
+          });
+          if (!ok) return;
         }
         await aprovarRhSolicitacao(solicitacao.id);
-        setAviso('Solicitacao aprovada.');
+        mensagem = 'Solicitacao aprovada.';
       }
 
       if (acao === 'devolver') {
-        // eslint-disable-next-line no-alert
-        const motivo = window.prompt('Por que esta sendo devolvida? Quem pediu precisa saber o que corrigir.');
-        if (!motivo || !motivo.trim()) return;
-        await rejeitarRhSolicitacao(solicitacao.id, motivo.trim());
-        setAviso('Solicitacao devolvida a quem abriu.');
+        // Devolver RECUSA o pedido de quem abriu: destrutiva, e o motivo e obrigatorio — era
+        // um `window.prompt` com o mesmo corte (`if (!motivo || !motivo.trim()) return;`).
+        const { ok, texto } = await confirmar({
+          titulo: 'Devolver para correcao',
+          mensagem: 'A solicitacao volta para quem abriu e sai da fila de decisao ate ser reenviada.',
+          rotuloConfirmar: 'Devolver',
+          rotuloCancelar: 'Voltar',
+          destrutiva: true,
+          campo: { rotulo: 'Motivo', obrigatorio: true, multilinha: true }
+        });
+        if (!ok) return;
+        await rejeitarRhSolicitacao(solicitacao.id, texto.trim());
+        mensagem = 'Solicitacao devolvida a quem abriu.';
       }
 
       if (acao === 'reenviar') {
         await reenviarRhSolicitacao(solicitacao.id, {});
-        setAviso('Solicitacao reenviada ao Departamento Pessoal.');
+        mensagem = 'Solicitacao reenviada ao Departamento Pessoal.';
       }
 
       if (acao === 'cancelar') {
-        // eslint-disable-next-line no-alert
-        const motivo = window.prompt('Motivo do cancelamento (opcional):') || '';
-        await cancelarRhSolicitacao(solicitacao.id, motivo);
-        setAviso('Solicitacao cancelada.');
+        /*
+          O motivo continua OPCIONAL, mas "voltar atras" agora aborta de verdade. No fluxo
+          antigo a caixa do navegador que pedia o motivo devolvia `null` ao ser fechada, e o
+          `|| ''` transformava isso em string vazia: a solicitacao era cancelada assim mesmo.
+          Nao havia como desistir depois de clicar no botao — acao destrutiva sem saida.
+        */
+        const { ok, texto } = await confirmar({
+          titulo: 'Cancelar solicitacao',
+          mensagem: `Cancelar a solicitacao #${solicitacao.id}? Ela sai da fila de decisao.`,
+          rotuloConfirmar: 'Cancelar solicitacao',
+          rotuloCancelar: 'Manter solicitacao',
+          destrutiva: true,
+          campo: { rotulo: 'Motivo (opcional)', multilinha: true }
+        });
+        if (!ok) return;
+        await cancelarRhSolicitacao(solicitacao.id, texto);
+        mensagem = 'Solicitacao cancelada.';
       }
 
       setAberta(null);
       await carregar();
       if (typeof aoMudar === 'function') aoMudar();
+      // Por ultimo: `carregar()` comeca limpando os avisos, entao a confirmacao emitida antes
+      // dele seria apagada no mesmo tique e a decisao pareceria nao ter acontecido.
+      avisar.sucesso(mensagem);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel concluir a acao.');
+      avisar.erro(error.message || 'Nao foi possivel concluir a acao.');
     }
   }
 
   return (
-    <div className="space-y-4">
-      {erro ? <div className="alert alert-danger">{erro}</div> : null}
-      {aviso ? <div className="alert alert-success">{aviso}</div> : null}
+    /*
+      SEM `Pagina` e SEM `PageHeader` aqui, de proposito: este arquivo e o CONTEUDO da aba
+      "Solicitacoes" do `RhDpPessoal`, e nao uma pagina — quem e dono do titulo e da faixa fixa
+      e ele. Duas faixas fixas empilhadas e exatamente o defeito que a R16 evita; mesma excecao
+      declarada que vale para `RhDpJornada` e `RhDpApuracao`. O `app-pagina` da o ritmo
+      vertical que o `space-y-4` dava na mao.
+    */
+    <div className="app-pagina">
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <div className="rh-pessoal-alertas">
         <div className="rh-pessoal-alerta">
           <div className="rh-pessoal-alerta-numero">{solicitacoes.length}</div>
-          <div className="rh-pessoal-alerta-texto">
-            {filtroSituacao ? ROTULO_SITUACAO[filtroSituacao].toLowerCase() : 'no filtro atual'}
-          </div>
+          <div className="rh-pessoal-alerta-texto">{rotuloDoRecorte}</div>
         </div>
         {Object.entries(contagem).map(([tipo, qtd]) => (
           <div className="rh-pessoal-alerta" key={tipo}>
@@ -271,35 +395,26 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         ))}
       </div>
 
-      <div className="sol-surface-card app-toolbar-card rounded-xl p-3 md:p-4">
-        <div className="rh-colaboradores-filter-grid">
-          <label className="form-field">
-          <span className="form-label">Situacao</span>
-          <select className="form-control" value={filtroSituacao} onChange={(e) => setFiltroSituacao(e.target.value)}>
-            {/* RASCUNHO na lista: um estado que a tela nao sabe filtrar e um estado que ninguem
-                encontra — e rascunho esquecido e justamente o que precisa ser encontrado. */}
-            <option value="RASCUNHO">Rascunhos (faltam enviar)</option>
-            <option value="ABERTA">Aguardando decisao</option>
-            <option value="REJEITADA">Devolvidas para correcao</option>
-            <option value="APROVADA">Aprovadas</option>
-            <option value="CANCELADA">Canceladas</option>
-            <option value="">Todas</option>
-          </select>
-          </label>
+      {/*
+        R12/R16: o cartao de filtros com grade de select saiu inteiro. Situacao e tipo tem lista
+        fechada de valores — sao ENUMERAVEIS e vao em `filtros`, com marcacao e etiqueta
+        removivel; nada aqui e continuo, entao `campos` nao tem uso nesta tela e fica de fora.
+        Nao ha busca textual: o servico nao aceita termo livre, e ligar uma caixa de busca que
+        nao estreita nada seria capacidade sem efeito (R15).
+      */}
+      <BarraFiltros
+        filtros={dimensoesFiltro}
+        ativos={ativos}
+        aoAlternar={(dimensao, valor, opcoes) => setAtivos(
+          (atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes)
+        )}
+        aoLimpar={() => setAtivos(SEM_FILTRO)}
+      />
 
-          <label className="form-field">
-            <span className="form-label">Tipo</span>
-            <select className="form-control" value={filtroTipo} onChange={(e) => setFiltroTipo(e.target.value)}>
-              <option value="">Todos os tipos</option>
-              {Object.entries(ROTULO_TIPO).map(([valor, rotulo]) => (
-                <option key={valor} value={valor}>{rotulo}</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
-            {carregando ? 'Carregando...' : 'Atualizar'}
-          </button>
-        </div>
+      <div className="app-actionbar">
+        <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
+          {carregando ? 'Carregando...' : 'Atualizar'}
+        </button>
       </div>
 
       <div className="card sol-surface-card">
@@ -435,10 +550,16 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         <div className="rh-modal-conteudo space-y-4">
           <div className="app-page-header-row">
             <div>
-              <h2 className="text-lg font-semibold">
+              <h2 className="app-bloco-titulo">
                 {ROTULO_TIPO[aberta.tipo] || aberta.tipo} · #{aberta.id}
               </h2>
-              <p className="page-subtitle">
+              {/*
+                R5: era `page-subtitle` solto. Como esta aba NAO e pagina, o texto nao tem
+                PageHeader para onde ir — entao usa a classe de apoio de BLOCO do padrao (a
+                mesma que o `BlocoConteudo` aplica em `descricao`), ancorada ao titulo a que
+                pertence. O texto e o mesmo.
+              */}
+              <p className="app-bloco-lead">
                 {aberta.colaborador?.nome || aberta.dados_json?.nome || 'Colaborador a admitir'}
                 {aberta.justificativa ? ` — ${aberta.justificativa}` : ''}
               </p>
@@ -507,7 +628,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
           ) : null}
 
           <div>
-            <h3 className="font-semibold mb-2">Documentos enviados pela obra</h3>
+            <h3 className="app-bloco-titulo mb-2">Documentos enviados pela obra</h3>
             {anexos.length === 0 ? (
               <p className="opacity-70">Nenhum documento anexado a esta solicitacao.</p>
             ) : (
@@ -556,7 +677,7 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
 
           {aberta.historicos?.length ? (
             <div>
-              <h3 className="font-semibold mb-2">Historico</h3>
+              <h3 className="app-bloco-titulo mb-2">Historico</h3>
               <ul className="rh-pessoal-historico">
                 {aberta.historicos.map((h) => (
                   <li key={h.id}>
@@ -569,6 +690,8 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         </div>
         </OverlayModal>
       ) : null}
+
+      {elementoConfirmacao}
     </div>
   );
 }
