@@ -11,7 +11,7 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessGestaoObras, canManageCadastroObras } from '../utils/acessoProduto';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function formatCurrency(value) {
@@ -324,33 +324,33 @@ export default function Obras() {
 
   return (
     <Pagina>
+      {/* C2 (02/09): toda tela usa a MESMA faixa — título 22px e o apoio
+          (contagem + descrição) em uma linha NA FAIXA, como em Empresas do
+          Grupo. Duas telas com dois padrões era o defeito. */}
       <PageHeader
         titulo="Gestão de Obras e Centros de Custo"
+        contagem={loading ? null : `${obras.length} cadastro(s)`}
+        descricao={gestaoObrasHabilitada
+          ? 'Obras reais com orçamento e centros de custo administrativos usados nas solicitações.'
+          : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
         acaoPrincipal={podeGerenciarCadastro
           ? { rotulo: 'Novo cadastro', onClick: abrirModalNovaObra }
           : null}
       />
 
-      {/* R5: contagem e apoio ancorados no bloco a que se referem — nada
-          de texto solto na faixa do topo. O aviso de plano também mora
-          aqui dentro. */}
       <BlocoConteudo
         titulo="Cadastros"
-        contagem={loading ? null : `${obras.length} cadastro(s)`}
-        descricao={gestaoObrasHabilitada
-          ? 'Obras reais com orçamento e centros de custo administrativos usados nas solicitações.'
-          : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Buscar por codigo, nome ou cidade"
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Buscar por codigo, nome ou cidade'
+          }}
+        />
         {!gestaoObrasHabilitada && (
           <p className="app-note">
             Gestão de obras desabilitada no plano — os cadastros seguem disponíveis para

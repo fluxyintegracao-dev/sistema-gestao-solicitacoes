@@ -198,10 +198,12 @@ export default function Setores() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): contagem e texto de apoio saem do PageHeader e ancoram
-          no bloco da lista (BlocoConteudo contagem/descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader; nada de apoio duplicado no bloco. */}
       <PageHeader
         titulo="Setores"
+        contagem={loading ? null : `${setores.length} setor(es)`}
+        descricao="Cadastro e manutencao de setores."
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
 
@@ -269,8 +271,6 @@ export default function Setores() {
 
       <BlocoConteudo
         titulo="Setores cadastrados"
-        contagem={loading ? undefined : `${setores.length} setor(es)`}
-        descricao="Cadastro e manutencao de setores."
         variante="primario"
         cor="var(--c-primary)"
       >

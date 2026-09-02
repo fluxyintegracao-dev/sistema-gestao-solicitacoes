@@ -123,9 +123,12 @@ export default function UsuariosAcessoFinanceiro() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Acesso ao financeiro por usuario"
+        contagem={`${selecionados.size} com acesso extra`}
+        descricao="Marque usuarios extras que devem acessar o modulo financeiro. Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -148,8 +151,6 @@ export default function UsuariosAcessoFinanceiro() {
 
       <BlocoConteudo
         titulo="Usuarios ativos"
-        contagem={`${selecionados.size} com acesso extra`}
-        descricao="Marque usuarios extras que devem acessar o modulo financeiro. Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras."
         variante="primario"
         cor="var(--module-financeiro)"
       >

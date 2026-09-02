@@ -5,7 +5,7 @@ import {
   salvarUsuariosPermissoesRhDp
 } from '../services/configuracoesSistema';
 import { RH_DP_PERMISSION_GROUPS, normalizeRhDpPermissionList } from '../constants/rhDpPermissions';
-import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, BarraFiltros } from '../components/padrao';
 
 function normalizePermissionMap(input) {
   const source = input && typeof input === 'object' ? input : {};
@@ -132,9 +132,12 @@ export default function UsuariosPermissoesRhDp() {
 
   return (
     <Pagina className="rhdp-page">
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Permissoes RH/DP por usuario"
+        contagem={`${Object.keys(selecionados).length} configurado(s)`}
+        descricao="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar matriz de permissoes',
           onClick: salvar,
@@ -156,20 +159,17 @@ export default function UsuariosPermissoesRhDp() {
 
       <BlocoConteudo
         titulo="Usuarios ativos"
-        contagem={`${Object.keys(selecionados).length} configurado(s)`}
-        descricao="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Nome, email, perfil ou setor"
-            aria-label="Buscar usuario"
-            value={filtro}
-            onChange={(event) => setFiltro(event.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: filtro,
+            aoMudar: setFiltro,
+            placeholder: 'Nome, email, perfil ou setor'
+          }}
+        />
         <div className="space-y-3">
           {usuariosFiltrados.map((usuario) => {
               const currentPermissions = normalizeRhDpPermissionList(selecionados[Number(usuario.id)] || []);

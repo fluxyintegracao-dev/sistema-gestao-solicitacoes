@@ -11,7 +11,8 @@ import {
   BlocoConteudo,
   TabelaPadrao,
   FormSecao,
-  CampoForm
+  CampoForm,
+  BarraFiltros
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
@@ -147,10 +148,12 @@ export default function ParceiroCategorias() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
-          da lista (BlocoConteudo descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Categorias de Parceiro"
+        contagem={loading ? null : `${categorias.length} categoria(s)`}
+        descricao="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
         acaoPrincipal={{ rotulo: 'Nova categoria', onClick: abrirNovaCategoria }}
       />
 
@@ -216,18 +219,17 @@ export default function ParceiroCategorias() {
 
       <BlocoConteudo
         titulo="Categorias cadastradas"
-        descricao="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Buscar categoria"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: filtro,
+            aoMudar: setFiltro,
+            placeholder: 'Buscar categoria'
+          }}
+        />
         <TabelaPadrao
           colunas={colunas}
           itens={categoriasFiltradas}

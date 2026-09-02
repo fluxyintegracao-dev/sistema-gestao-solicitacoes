@@ -15,7 +15,7 @@ automaticamente se sair do padrão.
 | Ação | o necessário para os botões, **máx 320px**; botões nunca quebram linha (`nowrap`) |
 | Status (badge) | **96px** fixos |
 | Data | **110px** |
-| Valor monetário | **150px**, alinhado à direita, `tabular-nums` |
+| Valor monetário | **190px** (cabe `R$ 9.999.999.999,99` no corpo 14px), alinhado à direita, `tabular-nums`; é também o **mínimo de arrasto** — valor NUNCA trunca (DoD T7) |
 | Conteúdo textual | **mín 160px**; TODA largura sobrante do card vai para elas |
 
 - A distribuição da sobra é AUTOMÁTICA: na `TabelaPadrao`, coluna com
@@ -41,11 +41,15 @@ automaticamente se sair do padrão.
   em `<input` de tela do manifesto (largura de campo vem de classe, não de
   número solto).
 
-## R4 — Respiro do topo
+## R4 — Respiro do topo (revisto 02/09 — vão transparente era defeito)
 
-- Token **`--respiro-topbar: 24px`** entre a barra fixa e o primeiro conteúdo
-  da página, aplicado no `.app-page-header` (margin-top). A auditoria runtime
-  mede o vão real e reprova < 24px.
+- No estado NORMAL (sem rolagem): vão de **24px** (`--respiro-topbar`) entre
+  a topbar e o primeiro conteúdo, como MARGEM do conteúdo (margin-top da
+  faixa) — nunca como folga no `top` do sticky.
+- Na ROLAGEM: a faixa fixa gruda **encostada** na topbar (top = base real da
+  topbar, sem folga) — folga aqui virava vão transparente com o conteúdo
+  rolando por trás. O harness reprova qualquer conteúdo visível entre a base
+  da topbar e o topo da faixa (DoD C1).
 
 ## R5 — Texto de apoio na FAIXA FIXA do topo (revisão final, 02/09)
 
@@ -128,13 +132,21 @@ automaticamente se sair do padrão.
   (`telas-reformadas.json`), com justificativa — o verificador rebaixa para
   AVISO e o aviso aparece em todo teste.
 
-## R11 — Navegação não é ação (02/09)
+## R11 — Navegação não é ação (02/09; ESCOPO corrigido em 02/09 após defeito)
 
-- O menu "⋯" (MenuMais) contém **apenas ações sobre o conteúdo da tela**
-  (exportar, importar, arquivar, resetar). **Nunca** navegação, "voltar"
-  ou "ir para" — isso pertence ao breadcrumb, ao menu e ao Ctrl+K. Menu
-  vazio não renderiza o botão (já é o comportamento do componente).
-- O verificador reprova item de `mais`/`itens` com `navigate(`/`to:`/`Link`.
+- **Onde vale**: menus de ações (MenuMais "⋯", barra de ações do PageHeader)
+  e botões "Voltar" REDUNDANTES em telas de LISTAGEM (onde menu, breadcrumb
+  e Ctrl+K já resolvem). Exemplo: "Ir para categorias" dentro do "⋯" de
+  Parceiros — sai.
+- **Onde NÃO vale**: em tela de DETALHE/REGISTRO, a **seta de voltar à
+  esquerda do cabeçalho é a affordance primária de retorno e FICA — sempre,
+  em todas**. Exemplo: a seta da gestão da obra (ObraGestao), do título
+  financeiro, do formulário de usuário. Removê-la por esta regra foi o
+  defeito de 02/09: generalização sem julgamento.
+- Padrão: prop `voltar` do `PageHeader` (ou botão `.app-voltar` em cabeçalho
+  custom).
+- O verificador reprova item de `mais`/`itens` com `navigate(`/`to:`/`Link` —
+  e o harness reprova tela de detalhe SEM a seta (DoD C3).
 
 ## R12 — Filtro é marcação, nunca lista suspensa (02/09)
 
@@ -179,6 +191,48 @@ automaticamente se sair do padrão.
   título** (esquerda/centro/direita); a escolha aplica a título E conteúdo
   e é salva por usuário e por lista (localStorage, como a largura). O
   alinhamento-check do roteiro de capturas prova aplicação e persistência.
+
+## R15 — Toda capacidade interativa precisa de affordance VISÍVEL (02/09)
+
+- **Capacidade sem sinal não existe para o usuário.** Toda interação
+  disponível precisa de pelo menos: cursor adequado + sinal visual ao passar
+  o mouse (ícone/realce) + tooltip curto nomeando a capacidade.
+- **Onde vale**: qualquer interação "escondida" — clique no cabeçalho de
+  coluna (alinhamento: ícone discreto no hover + tooltip
+  "Alinhar / redimensionar"), alça de redimensionar (linha visível no
+  hover, cursor col-resize), linha clicável (cursor pointer), bloco
+  recolhível (seta).
+- **Onde NÃO vale**: atalhos de teclado e gestos avançados podem viver só na
+  documentação/Ctrl+K — desde que exista caminho visível equivalente.
+  Exemplo: setas do teclado redimensionam coluna (avançado), mas a alça de
+  arrasto visível é o caminho primário.
+- Verificação: DoD T2 no harness (affordance do alinhamento visível).
+
+## R16 — Cada responsabilidade tem UM dono na tela (02/09)
+
+- **UMA busca, UM bloco de filtros, UM cabeçalho por contexto.** Quando um
+  componente padrão traz a responsabilidade embutida (ex.: `BarraFiltros`
+  traz a busca), a versão antiga da tela SAI no mesmo commit — coexistência
+  é defeito (caso real: duas caixas de busca em Empresas do Grupo).
+- **Onde vale**: qualquer duplicação de responsabilidade no mesmo contexto
+  visual — dois campos de busca, dois cabeçalhos, dois blocos de filtro.
+- **Onde NÃO vale**: contextos independentes na MESMA tela (ex.: busca da
+  lista principal + busca interna de um modal aberto) são donos diferentes;
+  cada contexto continua com no máximo um de cada.
+- Verificação automática: o harness reprova dois campos de busca / dois
+  blocos de filtro / dois cabeçalhos no mesmo contexto (DoD F1).
+
+## Disciplina de regras (02/09 — vale para toda regra nova e existente)
+
+1. **Escopo explícito obrigatório**: toda regra declara onde vale, onde NÃO
+   vale, e um exemplo de cada. Regra sem exceção declarada não é regra, é
+   armadilha (foi assim que a R11 comeu a seta de voltar).
+2. **Remover elemento visível exige aprovação do cliente**, a não ser que a
+   remoção esteja explicitamente autorizada na própria regra. Recolher e
+   reorganizar é livre; REMOVER não.
+3. **Defeito apontado que a DoD não cobre**: o item entra em
+   `docs/DEFINICAO-DE-PRONTO.md` ANTES da correção, e a matriz roda de novo
+   em todas as telas.
 
 ## Verificação
 

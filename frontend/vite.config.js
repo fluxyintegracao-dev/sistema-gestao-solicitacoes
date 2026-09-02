@@ -19,6 +19,14 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    // Marca de versão no bundle: o harness de QA visual (scripts/qa-preview)
+    // compara este SHA com o commit local antes de verificar — checar um
+    // build velho é o mesmo que não checar. A Vercel injeta o SHA no build.
+    define: {
+      __BUILD_SHA__: JSON.stringify(
+        env.VERCEL_GIT_COMMIT_SHA || env.GITHUB_SHA || ''
+      )
+    },
     server: {
       // Portas dedicadas ao Fluxy-V4 local para nao colidir com o projeto em C:\Fluxy,
       // que usa 5173/8000. strictPort evita subir silenciosamente em outra porta.

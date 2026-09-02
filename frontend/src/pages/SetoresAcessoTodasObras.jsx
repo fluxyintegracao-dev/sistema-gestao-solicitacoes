@@ -68,9 +68,12 @@ export default function SetoresAcessoTodasObras() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Setores com acesso em todas as obras"
+        contagem={`${totalMarcados} de ${setoresOrdenados.length} selecionados`}
+        descricao="Setores marcados podem visualizar e operar recursos protegidos por obra sem depender de vinculo manual em usuario x obra."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -80,8 +83,6 @@ export default function SetoresAcessoTodasObras() {
 
       <BlocoConteudo
         titulo="Setores habilitados"
-        contagem={`${totalMarcados} de ${setoresOrdenados.length} selecionados`}
-        descricao="Setores marcados podem visualizar e operar recursos protegidos por obra sem depender de vinculo manual em usuario x obra."
         variante="primario"
         cor="var(--c-primary)"
       >

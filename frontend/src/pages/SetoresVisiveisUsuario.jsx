@@ -117,9 +117,14 @@ export default function SetoresVisiveisUsuario() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Setores visiveis por usuario"
+        contagem={usuarioSelecionado
+          ? `${totalMarcados} de ${setoresOrdenados.length} selecionados`
+          : null}
+        descricao="Defina setores adicionais que cada usuario pode visualizar na lista e no detalhe. As acoes continuam obedecendo as permissoes e regras atuais do setor responsavel."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -129,10 +134,6 @@ export default function SetoresVisiveisUsuario() {
 
       <BlocoConteudo
         titulo="Setores visiveis"
-        contagem={usuarioSelecionado
-          ? `${totalMarcados} de ${setoresOrdenados.length} selecionados`
-          : null}
-        descricao="Defina setores adicionais que cada usuario pode visualizar na lista e no detalhe. As acoes continuam obedecendo as permissoes e regras atuais do setor responsavel."
         variante="primario"
         cor="var(--c-primary)"
       >

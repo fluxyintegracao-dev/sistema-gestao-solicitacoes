@@ -14,15 +14,31 @@ export default function Pagina({ className = '', children, ...props }) {
   const ref = useRef(null);
 
   useEffect(() => {
+    // A faixa gruda ENCOSTADA na topbar: top = base REAL da topbar, sem
+    // folga — folga aqui virava um vão transparente com o conteúdo da
+    // lista rolando por trás (defeito de 02/09). O respiro visual do
+    // estado normal pertence à margem do conteúdo, não ao espaço entre
+    // as duas barras fixas.
+    let raf = null;
     const medir = () => {
-      const topbar = document.querySelector('.topbar-shell');
+      raf = null;
+      // A topbar REAL do shell é .fx-topbar (.topbar-shell era um seletor
+      // morto — medir elemento inexistente caía no fallback de 96px e
+      // criava o vão transparente; defeito de 02/09).
+      const topbar = document.querySelector('.fx-topbar, .topbar-shell');
       if (!topbar || !ref.current) return;
-      const base = topbar.getBoundingClientRect().height + 16 + 8; /* top:1rem + vão */
+      const base = topbar.getBoundingClientRect().bottom;
       ref.current.style.setProperty('--pos-cabecalho-fixo', `${Math.round(base)}px`);
     };
+    const agendar = () => { if (raf == null) raf = requestAnimationFrame(medir); };
     medir();
-    window.addEventListener('resize', medir);
-    return () => window.removeEventListener('resize', medir);
+    window.addEventListener('resize', agendar);
+    window.addEventListener('scroll', agendar, { passive: true });
+    return () => {
+      if (raf != null) cancelAnimationFrame(raf);
+      window.removeEventListener('resize', agendar);
+      window.removeEventListener('scroll', agendar);
+    };
   }, []);
 
   const classes = ['page', 'solicitacoes-page', 'app-pagina', className]

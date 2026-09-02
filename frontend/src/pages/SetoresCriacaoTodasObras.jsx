@@ -67,9 +67,12 @@ export default function SetoresCriacaoTodasObras() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Setores com criação em todas as obras"
+        contagem={`${totalMarcados} de ${setoresOrdenados.length} selecionados`}
+        descricao="Setores marcados podem criar solicitação em qualquer obra na tela de Nova Solicitação. A visibilidade das solicitações continua seguindo as regras atuais."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -79,8 +82,6 @@ export default function SetoresCriacaoTodasObras() {
 
       <BlocoConteudo
         titulo="Setores habilitados"
-        contagem={`${totalMarcados} de ${setoresOrdenados.length} selecionados`}
-        descricao="Setores marcados podem criar solicitação em qualquer obra na tela de Nova Solicitação. A visibilidade das solicitações continua seguindo as regras atuais."
         variante="primario"
         cor="var(--c-primary)"
       >

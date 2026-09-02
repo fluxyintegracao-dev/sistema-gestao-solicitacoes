@@ -3,7 +3,7 @@ import {
   getUsuariosAcessoPrioridadeDiretoria,
   salvarUsuariosAcessoPrioridadeDiretoria
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 const MODO_NENHUM = 'NENHUM';
@@ -265,9 +265,12 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Acesso a Prioridade Diretoria"
+        contagem={`${totalConfigurados} configurado(s)`}
+        descricao="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,
@@ -287,20 +290,17 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
 
       <BlocoConteudo
         titulo="Usuarios"
-        contagem={`${totalConfigurados} configurado(s)`}
-        descricao="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Nome, email, perfil ou setor"
-            aria-label="Buscar usuario"
-            value={busca}
-            onChange={(event) => setBusca(event.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Nome, email, perfil ou setor'
+          }}
+        />
         <TabelaPadrao
           colunas={colunas}
           itens={usuariosFiltrados}

@@ -17,7 +17,8 @@ import {
   TabelaPadrao,
   CelulaDupla,
   FormSecao,
-  CampoForm
+  CampoForm,
+  BarraFiltros
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
@@ -400,10 +401,12 @@ export default function Parceiros() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
-          da lista (BlocoConteudo descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Cadastro de Pessoas"
+        contagem={loading ? null : `${parceiros.length} pessoa(s)`}
+        descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitacoes, financeiro, comercial e cotacoes."
         acaoPrincipal={{ rotulo: 'Nova pessoa', onClick: abrirNovaPessoa }}
         mais={[
           { rotulo: 'Baixar modelo de importacao', onClick: handleBaixarModelo },
@@ -661,18 +664,17 @@ export default function Parceiros() {
 
       <BlocoConteudo
         titulo="Pessoas cadastradas"
-        descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitacoes, financeiro, comercial e cotacoes."
         variante={formAtivo ? 'neutro' : 'primario'}
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Buscar pessoa"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: filtro,
+            aoMudar: setFiltro,
+            placeholder: 'Buscar pessoa'
+          }}
+        />
         {loading ? (
           <div className="app-empty-card">Carregando parceiros...</div>
         ) : (

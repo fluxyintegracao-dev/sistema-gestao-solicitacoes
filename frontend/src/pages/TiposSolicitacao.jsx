@@ -311,10 +311,12 @@ export default function TiposSolicitacao() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
-          da lista (BlocoConteudo descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Tipos (Macro)"
+        contagem={`${tiposFiltrados.length} tipo(s)`}
+        descricao="Cadastro dos tipos macro utilizados nas solicitacoes."
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
@@ -393,7 +395,6 @@ export default function TiposSolicitacao() {
 
       <BlocoConteudo
         titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
-        descricao="Cadastro dos tipos macro utilizados nas solicitacoes."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

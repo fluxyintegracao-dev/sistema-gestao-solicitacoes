@@ -60,12 +60,18 @@
 }
 
 /* R4 — respiro entre a barra fixa e o primeiro conteúdo. */
-/* R13 — CABEÇALHO FIXO (02/09): título, contagem/apoio e ações permanecem
-   visíveis na rolagem, presos logo abaixo da topbar, numa superfície
-   própria (o apoio não flutua sobre o fundo). Ao rolar, compacta
-   (título menor), mas NUNCA some. --pos-cabecalho-fixo é calculada pelo
-   PageHeader a partir da altura real da topbar. */
+/* R13 — CABEÇALHO FIXO (revisto 02/09, defeito do vão transparente):
+   a faixa gruda ENCOSTADA na topbar — top = base real da topbar (medida
+   pelo Pagina), SEM folga. Folga aqui virava um vão transparente com o
+   conteúdo da lista rolando por trás, entre as duas barras. O respiro
+   visual do estado normal (sem rolagem) pertence à MARGEM do conteúdo
+   (margin-top abaixo), nunca ao espaço entre as duas barras fixas.
+   A superfície é OPACA (--ui-surface é cor sólida) — nenhum pixel
+   transparente por onde o conteúdo passe. Ao rolar, compacta (título
+   menor, apoio na mesma linha), mas NUNCA some. */
 .layout-main .app-page-header {
+  /* Respiro do estado normal (R4: 24px topbar → conteúdo) — MARGEM do
+     conteúdo, nunca folga no `top` do sticky. */
   margin-top: var(--respiro-topbar);
   position: sticky;
   top: var(--pos-cabecalho-fixo, 96px);
@@ -82,7 +88,9 @@
   transition: font-size 0.15s ease;
 }
 
-/* Compacto (rolagem): paddings e título encolhem; as ações ficam. */
+/* Compacto (rolagem): UMA linha só — título e apoio lado a lado, paddings
+   mínimos. A faixa compacta não tem vazio vertical para exibir uma linha
+   de texto; as ações ficam intactas. */
 .layout-main .app-page-header--compacto {
   padding: var(--esp-2) var(--esp-4);
 }
@@ -91,8 +99,17 @@
   font-size: var(--fonte-corpo);
 }
 
+.layout-main .app-page-header--compacto .app-page-header-row > div:first-of-type {
+  display: flex;
+  align-items: baseline;
+  gap: var(--esp-3);
+  min-width: 0;
+}
+
 .layout-main .app-page-header--compacto .app-page-lead {
   font-size: var(--fonte-corpo);
+  margin: 0;
+  flex: 1 1 auto;
 }
 
 /* R5 (02/09, revisto de novo): o apoio mora na FAIXA FIXA, com escala de
@@ -115,9 +132,19 @@
   font-weight: 700;
 }
 
-.app-page-header-row > div:first-child {
+/* first-of-TYPE, não first-child: com a seta de voltar (C3) o primeiro
+   filho da linha passa a ser o botão/Link — o contêiner do título segue
+   sendo o primeiro <div>. */
+.app-page-header-row > div:first-of-type {
   min-width: 0;
   flex: 1 1 auto;
+}
+
+/* C3 — seta de voltar à esquerda do cabeçalho de tela de DETALHE/REGISTRO:
+   affordance primária de retorno, sempre presente nessas telas. */
+.app-page-header .app-voltar {
+  flex-shrink: 0;
+  align-self: flex-start;
 }
 
 /* R5 — texto de apoio DENTRO do bloco, ancorado ao título dele (regra do
@@ -164,9 +191,34 @@
   flex: 1 1 100%;
 }
 
+/* Vão entre a linha de filtros e o que vem depois (a tabela): um degrau da
+   escala, igual em toda tela — nem colado, nem espaço sobrando. */
+.app-filtros:not(:last-child) {
+  margin-block-end: var(--esp-4);
+}
+
 .app-filtros .app-filtros-busca {
   max-width: none;
   width: 100%;
+}
+
+/* R16 — cada responsabilidade tem UM dono: a cápsula .la-busca é a única
+   caixa da busca. O reset do input interno era prefixado por .la-root e só
+   valia DENTRO da ListaAvancada; na BarraFiltros (fora dela) o input
+   mantinha o estilo global de campo e virava uma SEGUNDA caixa dentro da
+   cápsula — a "busca duplicada" de Empresas do Grupo (02/09). */
+.app-filtros .la-busca input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  min-height: 0;
+  padding: 0;
+  font-size: var(--fonte-corpo);
+  color: var(--input-text);
+  min-width: 0;
 }
 
 /* Painel lateral padrão (formulário/apoio ao lado da lista): a medida mora
@@ -529,6 +581,33 @@
   width: 100%;
   min-height: var(--alvo-clique);
   text-align: inherit;
+}
+
+/* R15 — capacidade sem sinal não existe para o usuário: o menu de
+   alinhamento ganha affordance VISÍVEL. Ícone discreto ao lado do título,
+   revelado no hover do cabeçalho (e sempre visível com o menu aberto);
+   o tooltip "Alinhar / redimensionar" nomeia as duas capacidades.
+   display inline + vertical-align preservam o alinhamento do título
+   (esquerda/centro/direita) definido pela coluna. */
+.app-th-affordance {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-left: var(--esp-1);
+  width: 14px;
+  height: 14px;
+  color: var(--c-muted);
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.resizable-th:hover .app-th-affordance,
+.app-th-botao:focus-visible .app-th-affordance,
+.app-th-alinhavel--aberto .app-th-affordance {
+  opacity: 1;
+}
+
+.app-th-botao:hover {
+  color: var(--c-text);
 }
 
 .app-th-menu {

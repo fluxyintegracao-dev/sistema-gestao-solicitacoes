@@ -662,9 +662,12 @@ export default function FinanceiroTituloDetalhe() {
   return (
     <>
       <Pagina>
-        {/* R11: o "Voltar" saiu — o breadcrumb do topo já resolve. */}
+        {/* C3 (R11 revisto, 02/09): tela de DETALHE tem a seta de voltar à
+            esquerda SEMPRE — a R11 só remove "Voltar" redundante de LISTAGEM. */}
         <PageHeader
           titulo={`Titulo ${titulo.codigo || `#${titulo.id}`}`}
+          descricao={titulo.descricao || undefined}
+          voltar={{ to: '/financeiro/titulos', title: 'Voltar para títulos' }}
           acaoPrincipal={{
             rotulo: 'Registrar baixa',
             desabilitada: !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase()),

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, BarraFiltros } from '../components/padrao';
 import {
   getObraTipoApropriacao,
   getApropriacoesDaObra,
@@ -161,7 +161,15 @@ export default function ObraTipoApropriacao() {
 
   return (
     <Pagina>
-      <PageHeader titulo="Apropriacao padrao por obra" />
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
+      <PageHeader
+        titulo="Apropriacao padrao por obra"
+        contagem={totalVinculos - totalPendentes
+          ? `${totalVinculos - totalPendentes} de ${totalVinculos} vinculos definidos`
+          : null}
+        descricao="Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra."
+      />
 
       {padroesNovaObra.length > 0 && (
         <BlocoConteudo titulo="Novas obras recebem automaticamente" variante="secundario" recolhivel>
@@ -176,29 +184,24 @@ export default function ObraTipoApropriacao() {
       )}
 
       <div className="app-bloco app-bloco--primario space-y-4" style={{ '--bloco-cor': 'var(--c-primary)' }}>
-        {/* R5: o apoio ancora no bloco a que se refere. */}
-        <p className="app-bloco-lead">
-          {totalVinculos - totalPendentes ? <strong>{totalVinculos - totalPendentes} de {totalVinculos} vinculos definidos</strong> : null}
-          {totalVinculos - totalPendentes ? ' · ' : ''}
-          Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra.
-        </p>
-        <div className="flex gap-2 flex-wrap items-center">
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros).
+            O filtro por marcação "Somente obras com pendencia" já existia e
+            segue com o mesmo estado/handler. */}
+        <BarraFiltros
+          busca={{
+            valor: filtro,
+            aoMudar: setFiltro,
+            placeholder: 'Filtrar obra por nome ou codigo'
+          }}
+        />
+        <label className="flex items-center gap-2 text-sm">
           <input
-            type="text"
-            className="input app-busca"
-            placeholder="Filtrar obra por nome ou codigo"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
+            type="checkbox"
+            checked={somentePendentes}
+            onChange={(e) => setSomentePendentes(e.target.checked)}
           />
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={somentePendentes}
-              onChange={(e) => setSomentePendentes(e.target.checked)}
-            />
-            <span>Somente obras com pendencia</span>
-          </label>
-        </div>
+          <span>Somente obras com pendencia</span>
+        </label>
 
         {erro && <div className="app-alert app-alert--error">{erro}</div>}
 

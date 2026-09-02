@@ -127,16 +127,20 @@ export default function UsuarioNovo() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C3: tela de REGISTRO (formulário de um usuário) leva a seta de
+          voltar à esquerda — affordance primária de retorno à listagem. */}
       <PageHeader
         titulo={editando ? 'Editar usuario' : 'Novo usuario'}
+        descricao="Dados de acesso, perfil, permissoes e obras vinculadas."
+        voltar={{ to: '/usuarios', title: 'Voltar para usuários' }}
       />
 
       <form onSubmit={salvar} className="space-y-3">
+        {/* B3: o apoio da TELA mora na faixa; repetir aqui seria a mesma
+            informação duas vezes. */}
         <BlocoConteudo
           variante="primario"
           cor="var(--sem-info)"
-          descricao="Dados de acesso, perfil, permissoes e obras vinculadas."
         >
           <div className="space-y-4">
             <FormSecao legenda="Identificacao e acesso" colunas={2}>

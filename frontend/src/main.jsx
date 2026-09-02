@@ -19,6 +19,11 @@ import './styles/responsive-system.css';
 applyNativeDocumentAttributes();
 installFetchSecurityDefaults();
 
+// Marca de versão legível pelo harness de QA (window.__FLUXY_BUILD__): o SHA
+// do commit que gerou este bundle, injetado pelo vite.config (define).
+// eslint-disable-next-line no-undef
+window.__FLUXY_BUILD__ = typeof __BUILD_SHA__ !== 'undefined' ? __BUILD_SHA__ : '';
+
 function AppShell() {
   const location = useLocation();
 

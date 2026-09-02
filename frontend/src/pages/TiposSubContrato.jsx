@@ -302,10 +302,12 @@ export default function TiposSubContrato() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
-          da lista (BlocoConteudo descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Subtipos"
+        contagem={`${tiposFiltrados.length} subtipo(s)`}
+        descricao="Cadastro dos subtipos vinculados ao tipo e ao contexto operacional do setor."
         acaoPrincipal={{ rotulo: 'Novo subtipo', onClick: abrirNovoSubtipo }}
       />
 
@@ -370,7 +372,6 @@ export default function TiposSubContrato() {
 
       <BlocoConteudo
         titulo="Subtipos cadastrados"
-        descricao="Cadastro dos subtipos vinculados ao tipo e ao contexto operacional do setor."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

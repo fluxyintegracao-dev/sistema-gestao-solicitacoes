@@ -189,10 +189,12 @@ export default function Usuarios() {
 
   return (
     <Pagina>
-      {/* R5 (02/09): contagem e texto de apoio saem do PageHeader e ancoram
-          no bloco da lista (BlocoConteudo contagem/descricao). */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader; nada de apoio duplicado no bloco. */}
       <PageHeader
         titulo="Usuarios"
+        contagem={loading ? null : `${usuarios.length} usuario(s)`}
+        descricao="Cadastro, importacao e gestao operacional de usuarios."
         acaoPrincipal={{ rotulo: 'Novo usuario', onClick: () => navigate('/usuarios/novo') }}
         mais={[
           { rotulo: 'Baixar modelo CSV', onClick: baixarModeloImportacaoUsuarios },
@@ -233,8 +235,6 @@ export default function Usuarios() {
       <BlocoConteudo
         variante="primario"
         cor="var(--c-primary)"
-        contagem={loading ? null : `${usuarios.length} usuario(s)`}
-        descricao="Cadastro, importacao e gestao operacional de usuarios."
       >
         <TabelaPadrao
           colunas={colunas}

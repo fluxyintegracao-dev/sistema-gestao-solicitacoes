@@ -18,6 +18,9 @@ dist/
 build/
 coverage/
 .next/
+
+# Saída do harness de QA visual (capturas e relatórios por rodada)
+frontend/scripts/qa-preview/saida/
 out/
 backend/dist/
 backend/public/

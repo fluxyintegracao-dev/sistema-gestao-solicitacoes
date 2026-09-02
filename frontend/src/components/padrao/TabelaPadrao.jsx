@@ -83,6 +83,10 @@ function normalizarColuna(coluna) {
   return {
     ...coluna,
     largura: coluna.largura ?? base.largura,
+    // T7: coluna de dinheiro/número não encolhe abaixo do pior caso — nem
+    // por arrasto do usuário, nem por distribuição. Valor truncado com
+    // reticências é defeito sempre; texto longo trunca, dinheiro não.
+    minWidth: coluna.minWidth ?? (base.valor ? base.largura : undefined),
     alinhar: coluna.alinhar ?? base.alinhar,
     flex: coluna.flex ?? (base.flexPadrao || undefined),
     __valor: base.valor || undefined,
@@ -99,20 +103,38 @@ function lerAlinhamentos(chave) {
   }
 }
 
-/* Menu do cabeçalho: o usuário escolhe o alinhamento da coluna (R14). */
+/* Menu do cabeçalho: o usuário escolhe o alinhamento da coluna (R14).
+   R15 (02/09): capacidade sem sinal não existe — o cabeçalho carrega
+   affordance VISÍVEL: cursor, ícone discreto no hover e tooltip nomeando
+   as duas capacidades ("Alinhar / redimensionar"). */
+function IconeAlinhar() {
+  return (
+    <svg className="app-th-affordance" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+      <path d="M1.5 3h11M1.5 7h7M1.5 11h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function TituloComAlinhamento({ coluna, alinhamento, aoAlinhar }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef(null);
   useFecharAoSair(ref, aberto, () => setAberto(false));
   return (
-    <span className="app-th-alinhavel" ref={ref} style={{ textAlign: alinhamento }}>
+    <span
+      className={`app-th-alinhavel${aberto ? ' app-th-alinhavel--aberto' : ''}`}
+      ref={ref}
+      style={{ textAlign: alinhamento }}
+    >
       <button
         type="button"
         className="app-th-botao"
-        title="Clique para alinhar a coluna"
+        title="Alinhar / redimensionar"
+        aria-haspopup="menu"
+        aria-expanded={aberto}
         onClick={() => setAberto((atual) => !atual)}
       >
         {coluna.titulo}
+        <IconeAlinhar />
       </button>
       {aberto && (
         <span className="app-mais-menu app-th-menu" role="menu">

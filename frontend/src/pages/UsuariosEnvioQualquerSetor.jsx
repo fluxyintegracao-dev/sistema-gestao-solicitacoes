@@ -3,7 +3,7 @@ import {
   getUsuariosEnvioQualquerSetor,
   salvarUsuariosEnvioQualquerSetor
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function normalizarTexto(valor) {
@@ -145,9 +145,12 @@ export default function UsuariosEnvioQualquerSetor() {
 
   return (
     <Pagina>
-      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
+      {/* C2: apoio na faixa (decisão 02/09) — contagem + descrição em uma
+          linha no próprio PageHeader. */}
       <PageHeader
         titulo="Envio livre entre setores"
+        contagem={`${selecionados.size} marcado(s)`}
+        descricao="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -161,20 +164,17 @@ export default function UsuariosEnvioQualquerSetor() {
 
       <BlocoConteudo
         titulo="Usuarios"
-        contagem={`${selecionados.size} marcado(s)`}
-        descricao="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <input
-            className="input input-sm app-busca"
-            placeholder="Nome, email, perfil ou setor"
-            aria-label="Buscar usuario"
-            value={busca}
-            onChange={event => setBusca(event.target.value)}
-          />
-        )}
       >
+        {/* F1: UMA busca, ocupando a largura da faixa (padrão BarraFiltros). */}
+        <BarraFiltros
+          busca={{
+            valor: busca,
+            aoMudar: setBusca,
+            placeholder: 'Nome, email, perfil ou setor'
+          }}
+        />
         <TabelaPadrao
           colunas={colunas}
           itens={usuariosFiltrados}
