@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { criarRhEmpresaGrupo, atualizarRhEmpresaGrupo, getRhEmpresasGrupo } from '../services/rhDp';
 import { canAccessRhDpEmpresas } from '../utils/acessoProduto';
@@ -148,44 +149,54 @@ export default function RhDpEmpresas() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr,0.9fr]">
-        <div className="card sol-surface-card app-table-shell">
-          <div className="table-wrapper">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Codigo</th>
-                  <th>Nome</th>
-                  <th>Razao social</th>
-                  <th>CNPJ</th>
-                  <th>Ativa</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {empresas.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.codigo || '-'}</td>
-                    <td>{item.nome}</td>
-                    <td>{item.razao_social || '-'}</td>
-                    <td>{formatDocumento(item.cnpj)}</td>
-                    <td>{item.ativo ? 'Sim' : 'Nao'}</td>
-                    <td>
-                      <button type="button" className="btn btn-outline" onClick={() => selecionarEmpresa(item)}>
-                        {podeEditar ? 'Editar' : 'Ver'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!empresas.length && (
-                  <tr>
-                    <td colSpan="6" align="center">
-                      {carregando ? 'Carregando...' : 'Nenhuma empresa do grupo cadastrada'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="card sol-surface-card">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'codigo',
+                titulo: 'Codigo',
+                tipo: 'codigo',
+                render: (item) => item.codigo || '-'
+              },
+              {
+                id: 'nome',
+                titulo: 'Nome',
+                // R17: o NOME da empresa é o que identifica o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.nome
+              },
+              {
+                id: 'razao_social',
+                titulo: 'Razao social',
+                tipo: 'texto',
+                render: (item) => item.razao_social || '-'
+              },
+              {
+                id: 'cnpj',
+                titulo: 'CNPJ',
+                tipo: 'codigo',
+                render: (item) => formatDocumento(item.cnpj)
+              },
+              {
+                id: 'ativa',
+                titulo: 'Ativa',
+                tipo: 'status',
+                render: (item) => (item.ativo ? 'Sim' : 'Nao')
+              }
+            ]}
+            itens={empresas}
+            storageKey="tabela:rh-dp-empresas"
+            rotuloRolagem="Empresas do grupo"
+            carregando={carregando}
+            vazio="Nenhuma empresa do grupo cadastrada"
+            acoesLinha={(item) => (
+              <button type="button" className="btn btn-outline" onClick={() => selecionarEmpresa(item)}>
+                {podeEditar ? 'Editar' : 'Ver'}
+              </button>
+            )}
+            larguraAcoes={120}
+          />
         </div>
 
         <form className="sol-surface-card rounded-xl p-4 space-y-4" onSubmit={salvar}>

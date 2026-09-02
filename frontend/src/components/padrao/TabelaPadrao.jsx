@@ -177,7 +177,12 @@ export default function TabelaPadrao({
   carregando = false,
   vazio = 'Nenhum registro encontrado',
   rotuloRolagem,
-  larguraAcoes = 240
+  larguraAcoes = 240,
+  // R17: declaração EXPLÍCITA de que esta tabela não tem coluna de
+  // identidade (raro — ex.: tabela puramente numérica). Sem uma coluna
+  // `tipo: 'identidade'` e sem esta marca, o validador estático reprova.
+  // eslint-disable-next-line no-unused-vars
+  semIdentidade = false
 }) {
   const ehMovel = useEhMovel();
   const shellRef = useRef(null);

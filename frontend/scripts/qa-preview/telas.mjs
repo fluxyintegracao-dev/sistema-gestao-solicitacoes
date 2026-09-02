@@ -49,7 +49,10 @@ export const TELAS = [
     id: 'financeiro-titulo-detalhe',
     arquivo: 'src/pages/FinanceiroTituloDetalhe.jsx',
     resolver: 'tituloDetalhe',
-    tipo: 'detalhe'
+    tipo: 'detalhe',
+    naoAplica: {
+      C6: '"Abrir solicitação" é link para outra rota na barra de ações — item 5 da lista de decisões (DECISOES-PENDENTES-QA.md), aguardando o cliente; exceção registrada até lá'
+    }
   },
   {
     id: 'obras',

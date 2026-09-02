@@ -238,7 +238,7 @@ export default function TiposSolicitacao() {
     {
       id: 'nome',
       titulo: 'Nome',
-      tipo: 'texto',
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (

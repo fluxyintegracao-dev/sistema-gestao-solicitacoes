@@ -125,16 +125,25 @@ export function checksEstaticos({ tipo }) {
     r.C5 = { estado: 'FALHOU', motivo: 'faixa ausente' };
   }
 
-  /* ---- C6: navegação disfarçada de ação (rotulos "Voltar"/"Ir para" fora
-     da seta; itens de menu ⋯ com navegação são pegos pelo validador
-     estático) ---- */
+  /* ---- C6: navegação disfarçada de ação (distinção do cliente, 02/09):
+     BOTÃO que executa ação na tela (Novo, Editar, Desativar, Gerar…) NUNCA
+     é navegação — botão sem href não reprova. Navegação é LINK cujo
+     destino é OUTRA ROTA: um <a href> na barra de ações/menu ⋯ apontando
+     para fora da subárvore da rota atual. Link para sub-rota do próprio
+     registro (ex.: /titulos/9/editar dentro de /titulos/9) é ação. ---- */
   {
-    const suspeitos = qa('.app-actionbar .btn, .app-mais-item')
+    const rotaAtual = location.pathname.replace(/\/$/, '');
+    const suspeitos = qa('.app-actionbar a[href], .app-mais-menu a[href]')
       .filter(visivel)
       .filter((el) => !el.classList.contains('app-voltar'))
-      .filter((el) => /^(voltar|ir para\b)/i.test(el.textContent.trim()));
+      .filter((el) => {
+        const destino = new URL(el.getAttribute('href'), location.origin).pathname.replace(/\/$/, '');
+        if (destino === rotaAtual) return false;               // mesma rota
+        if (destino.startsWith(`${rotaAtual}/`)) return false; // sub-rota do registro (editar, novo…)
+        return true;                                           // OUTRA rota = navegação
+      });
     r.C6 = suspeitos.length
-      ? { estado: 'FALHOU', motivo: `navegação como ação: "${suspeitos[0].textContent.trim()}"`, seletor: cssPath(suspeitos[0]) }
+      ? { estado: 'FALHOU', motivo: `link de navegação como ação: "${suspeitos[0].textContent.trim()}" → ${suspeitos[0].getAttribute('href')}`, seletor: cssPath(suspeitos[0]) }
       : { estado: 'PASSOU' };
   }
 

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineXMark } from 'react-icons/hi2';
 import { confirmarBaixaFinanceiraComposta, previewBaixaFinanceiraComposta } from '../../services/financeiro';
+import { TabelaPadrao } from '../padrao';
 import ChequePagamentoFields from './ChequePagamentoFields';
 
 function round(value) { return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100; }
@@ -227,7 +228,62 @@ export default function BaixaCompostaModal({
               <label className="form-control"><span>Valor da fonte *</span><input className="input" type="number" min="0.01" step="0.01" value={component.valor} readOnly={Boolean(component.cheque_terceiro_id)} onChange={(e) => updateComponent(index, 'valor', e.target.value)} /></label>
               {type !== 'CHEQUE' ? <label className="form-control"><span>Documento</span><input className="input" value={component.documento_referencia} onChange={(e) => updateComponent(index, 'documento_referencia', e.target.value)} /></label> : null}
               {temRateioIntercompany ? <label className="form-control xl:col-span-2"><span>Natureza entre empresas *</span><select className="select" value={component.natureza_intercompany_baixa} onChange={(e) => updateComponent(index, 'natureza_intercompany_baixa', e.target.value)}>{NATUREZAS_INTERCOMPANY.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label> : null}
-            </div>{type === 'CHEQUE' && !component.cheque_terceiro_id ? <ChequePagamentoFields className="mt-4" compact value={component} onChange={(field, value) => updateComponent(index, field, value)} description="Informe o cheque emitido pela empresa desta fonte. Os dados ficam individualizados neste componente da baixa." /> : null}<div className="finance-operation-table-shell mt-4"><table className="table min-w-[720px]"><thead><tr><th>Título</th><th>Vencimento</th><th className="text-right">Saldo</th><th className="w-52">Valor nesta fonte</th></tr></thead><tbody>{titulos.map((titulo) => <tr key={titulo.id}><td><strong>{titulo.codigo}</strong><small className="block text-[var(--c-muted)]">{titulo.descricao}</small></td><td>{String(titulo.data_vencimento || '').split('-').reverse().join('/')}</td><td className="text-right">{money(titulo.valor_saldo)}</td><td><input className="input input-sm text-right" type="number" min="0" step="0.01" value={component.alocacoes?.[titulo.id] || ''} onChange={(e) => updateAllocation(index, titulo.id, e.target.value)} /></td></tr>)}</tbody><tfoot><tr><th colSpan="3">Distribuído na fonte</th><th className={Math.abs(round(componentAllocated) - round(component.valor)) < 0.01 ? 'text-[var(--status-approved-text)]' : 'text-[var(--status-rejected-text)]'}>{money(componentAllocated)} / {money(component.valor)}</th></tr></tfoot></table></div></section>;
+            </div>{type === 'CHEQUE' && !component.cheque_terceiro_id ? <ChequePagamentoFields className="mt-4" compact value={component} onChange={(field, value) => updateComponent(index, field, value)} description="Informe o cheque emitido pela empresa desta fonte. Os dados ficam individualizados neste componente da baixa." /> : null}<div className="mt-4">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'titulo',
+                    titulo: 'Título',
+                    // R17: o código do título NOMEIA o registro rateado.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (titulo) => (
+                      <div>
+                        <strong>{titulo.codigo}</strong>
+                        <small className="block text-[var(--c-muted)]">{titulo.descricao}</small>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'vencimento',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: (titulo) => String(titulo.data_vencimento || '').split('-').reverse().join('/')
+                  },
+                  {
+                    id: 'saldo',
+                    titulo: 'Saldo',
+                    tipo: 'valor',
+                    render: (titulo) => money(titulo.valor_saldo)
+                  },
+                  {
+                    id: 'valor_fonte',
+                    titulo: 'Valor nesta fonte',
+                    tipo: 'valor',
+                    render: (titulo) => (
+                      <input
+                        className="input input-sm text-right"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={component.alocacoes?.[titulo.id] || ''}
+                        onChange={(e) => updateAllocation(index, titulo.id, e.target.value)}
+                      />
+                    )
+                  }
+                ]}
+                itens={titulos}
+                storageKey="tabela:baixa-composta:alocacoes"
+                rotuloRolagem={`Rateio da fonte ${index + 1}`}
+                vazio="Nenhum título selecionado."
+              />
+              {/* Total do <tfoot> antigo: TabelaPadrao não tem rodapé — vira
+                  resumo apartado abaixo da tabela, mesma conta e mesma cor. */}
+              <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border px-3 py-2" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
+                <span className="text-sm font-semibold text-[var(--c-text)]">Distribuído na fonte</span>
+                <strong className={Math.abs(round(componentAllocated) - round(component.valor)) < 0.01 ? 'text-[var(--status-approved-text)]' : 'text-[var(--status-rejected-text)]'}>{money(componentAllocated)} / {money(component.valor)}</strong>
+              </div>
+            </div></section>;
           })}</div>
           <button type="button" className="btn btn-outline mt-3" onClick={() => { setComponents((rows) => [...rows, newComponent(formas, titulos[0]?.empresa_id || '')]); setPreview(null); }}><HiOutlinePlus /> Adicionar fonte</button>
 

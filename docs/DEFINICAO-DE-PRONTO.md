@@ -112,3 +112,33 @@ elemento e a medida que reprovou.
 
 Narrativa de "gate passou" sem matriz, captura de mock e "implementado no
 componente" NÃO são evidência.
+
+## Por que o preview real — casos registrados (02/09)
+
+Três defeitos desta rodada eram **código "correto" que não produzia o
+elemento (ou o sinal) no DOM** — a classe de defeito que NENHUMA validação
+em mock/código pega, e que o harness contra o preview real existe para
+pegar:
+
+1. **Seta de voltar removida por regra.** A R11 (sem escopo declarado) foi
+   aplicada ao pé da letra e o código ficou "conforme a regra" — mas o DOM
+   da tela de detalhe perdeu a affordance primária de retorno. Nenhum teste
+   de código reprova a AUSÊNCIA de um elemento que a regra mandou remover;
+   só a DoD (C3) medida na tela real reprova.
+2. **Menu de alinhamento invisível.** A capacidade existia, publicada e
+   funcional — e clicar no cabeçalho não tinha NENHUM sinal (cursor, ícone,
+   tooltip). "Implementado e testado" era verdade; "existe para o usuário"
+   era falso. Virou a R15: capacidade sem sinal não existe. Só um check que
+   passa o mouse no DOM real (T2) enxerga isso.
+3. **Seletor morto de topbar.** O `Pagina` media `.topbar-shell` — um
+   seletor que NÃO EXISTE no DOM real (a topbar é `.fx-topbar`) — e caía
+   num fallback que criava o vão transparente. No mock, com o shell
+   simplificado, a medida nunca era exercitada de verdade; o código lia
+   como certo e o defeito só existia no ambiente real. O mesmo vale para a
+   faixa que nascia compactada (sentinela com margem fixa): só rolagem numa
+   janela real, com a topbar real, revela.
+
+Moral operacional: **mock valida lógica; só o preview publicado valida
+EXISTÊNCIA e SINAL** — elemento presente, affordance visível, medida feita
+sobre o DOM que o usuário vê. Por isso a matriz só aceita verificação no
+preview.

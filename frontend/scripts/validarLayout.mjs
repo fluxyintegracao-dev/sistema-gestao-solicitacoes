@@ -1,6 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const babelParser = require('@babel/parser');
 
 // VERIFICADOR DE LAYOUT (parte estática) — docs/REGRAS-LAYOUT.md.
 // Roda dentro do test:responsive sobre as telas do manifesto
@@ -155,7 +159,134 @@ export function validarLayout() {
     }
   }
 
-  return { falhas, avisos, telas: manifesto.telas.length };
+  // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
+  // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a
+  // lacuna reprova ANTES de chegar ao preview.
+  const r17 = validarDeclaracaoColunas();
+  falhas.push(...r17.falhas);
+  avisos.push(...r17.avisos);
+
+  return { falhas, avisos, telas: manifesto.telas.length, arquivosTabela: r17.arquivos };
+}
+
+/**
+ * R17 — TODA tabela declara o que cada coluna É:
+ * 1. Toda coluna de TabelaPadrao tem `tipo` (a medida/alinhamento vêm dele).
+ * 2. Coluna cujo render formata dinheiro (formatCurrency/currency/R$) é
+ *    obrigatoriamente `tipo: 'valor'` — é o que garante o T7 (valor nunca
+ *    trunca) em tela que ainda nem chegou ao preview.
+ * 3. Toda tabela declara sua coluna de IDENTIDADE (`tipo: 'identidade'`).
+ *    Tabela que genuinamente não tem identidade declara `semIdentidade` na
+ *    própria `<TabelaPadrao>` — ausência silenciosa reprova.
+ */
+function validarDeclaracaoColunas() {
+  const falhas = [];
+  const avisos = [];
+  const arquivos = [];
+
+  const listarJsx = (dir) => {
+    const saida = [];
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (item.name === 'node_modules') continue;
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) saida.push(...listarJsx(caminho));
+      else if (item.name.endsWith('.jsx')) saida.push(caminho);
+    }
+    return saida;
+  };
+
+  const raizSrc = path.join(frontendRoot, 'src');
+  const componente = path.join('components', 'padrao', 'TabelaPadrao.jsx');
+
+  for (const arquivo of listarJsx(raizSrc)) {
+    if (arquivo.endsWith(componente)) continue; // o próprio componente
+    const codigo = fs.readFileSync(arquivo, 'utf8');
+    if (!/\bTabelaPadrao\b/.test(codigo)) continue;
+    const rel = path.relative(frontendRoot, arquivo);
+    arquivos.push(rel);
+
+    let ast;
+    try {
+      ast = babelParser.parse(codigo, { sourceType: 'module', plugins: ['jsx'] });
+    } catch (erro) {
+      falhas.push(`${rel}: [R17] arquivo usa TabelaPadrao mas não parseia (${String(erro.message).slice(0, 80)}).`);
+      continue;
+    }
+
+    // Caminhada simples pela AST (sem dependência de traverse).
+    const todos = [];
+    (function anda(no) {
+      if (!no || typeof no.type !== 'string') return;
+      todos.push(no);
+      for (const chave of Object.keys(no)) {
+        const filho = no[chave];
+        if (Array.isArray(filho)) filho.forEach(anda);
+        else if (filho && typeof filho.type === 'string') anda(filho);
+      }
+    }(ast.program));
+
+    const nomeProp = (p) => (p.key?.name || p.key?.value);
+    const ehColuna = (no) => no.type === 'ObjectExpression'
+      && no.properties.some((p) => nomeProp(p) === 'titulo')
+      && no.properties.some((p) => nomeProp(p) === 'render');
+
+    const declaracoes = new Map(); // nome da variável -> ArrayExpression
+    todos.forEach((no) => {
+      if (no.type === 'VariableDeclarator' && no.id?.type === 'Identifier'
+        && no.init?.type === 'ArrayExpression') {
+        declaracoes.set(no.id.name, no.init);
+      }
+    });
+
+    // 1 e 2 — por coluna, onde quer que ela esteja declarada.
+    const colunas = todos.filter(ehColuna);
+    colunas.forEach((col) => {
+      const linha = col.loc.start.line;
+      const tipoProp = col.properties.find((p) => nomeProp(p) === 'tipo');
+      if (!tipoProp) {
+        falhas.push(`${rel}:${linha} [R17] coluna de TabelaPadrao sem \`tipo\` — declare o papel (identidade|texto|codigo|valor|numero|data|status|badge); sem isso a coluna não tem medida nem alinhamento definidos.`);
+        return;
+      }
+      const renderProp = col.properties.find((p) => nomeProp(p) === 'render');
+      const fonteRender = renderProp ? codigo.slice(renderProp.start, renderProp.end) : '';
+      const monetaria = /formatCurrency|formatarMoeda|currency|R\$/.test(fonteRender);
+      const tipoValor = tipoProp.value?.type === 'StringLiteral' ? tipoProp.value.value : null;
+      if (monetaria && tipoValor !== 'valor') {
+        falhas.push(`${rel}:${linha} [R17] coluna monetária (render formata dinheiro) com tipo '${tipoValor ?? '?'}' — coluna de dinheiro é \`tipo: 'valor'\` (largura de pior caso, direita, tabular; T7).`);
+      }
+    });
+
+    const temIdentidade = (arr) => arr.elements?.some((el) => {
+      if (!el) return false;
+      const alvo = el.type === 'ObjectExpression' ? el
+        : (el.type === 'ConditionalExpression' ? el.consequent : null);
+      return alvo?.type === 'ObjectExpression'
+        && alvo.properties.some((p) => nomeProp(p) === 'tipo'
+          && p.value?.type === 'StringLiteral' && p.value.value === 'identidade');
+    });
+
+    // 3 — por USO de <TabelaPadrao>: identidade declarada ou semIdentidade.
+    todos.forEach((no) => {
+      if (no.type !== 'JSXOpeningElement' || no.name?.name !== 'TabelaPadrao') return;
+      const linha = no.loc.start.line;
+      const attr = (nome) => no.attributes.find((a) => a.type === 'JSXAttribute' && a.name?.name === nome);
+      if (attr('semIdentidade')) return;
+      const colunasAttr = attr('colunas');
+      const expr = colunasAttr?.value?.expression;
+      let arr = null;
+      if (expr?.type === 'ArrayExpression') arr = expr;
+      else if (expr?.type === 'Identifier') arr = declaracoes.get(expr.name) || null;
+      if (!arr) {
+        avisos.push(`${rel}:${linha} [R17] colunas de TabelaPadrao montadas dinamicamente — o validador não consegue provar a coluna de identidade; garanta \`tipo: 'identidade'\` (ou declare \`semIdentidade\`).`);
+        return;
+      }
+      if (!temIdentidade(arr)) {
+        falhas.push(`${rel}:${linha} [R17] TabelaPadrao sem coluna de IDENTIDADE — declare \`tipo: 'identidade'\` na coluna que nomeia o registro, ou \`semIdentidade\` na tabela se ela genuinamente não tem (a ausência precisa ser declarada, nunca silenciosa).`);
+      }
+    });
+  }
+
+  return { falhas, avisos, arquivos };
 }
 
 // Execução direta: node scripts/validarLayout.mjs

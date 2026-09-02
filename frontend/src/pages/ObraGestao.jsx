@@ -396,8 +396,9 @@ export default function ObraGestao() {
                   colunas={[
                     {
                       id: 'item',
+                      // R17: código + descrição SÃO a identidade do item macro.
+                      tipo: 'identidade',
                       titulo: 'Descricao do item macro',
-                      tipo: 'texto',
                       noCard: 'titulo',
                       render: (item) => (
                         <div>
@@ -675,6 +676,9 @@ export default function ObraGestao() {
                 itens={data.arquivos.itens}
                 storageKey="tabela:obra-gestao:arquivos"
                 rotuloRolagem="Arquivos da obra"
+                // R17: a identidade aqui é NOME DE ARQUIVO — exibi-lo em
+                // maiúsculas distorceria caixa/extensão; ausência declarada.
+                semIdentidade
                 acoesLinha={(item) => (
                   <button type="button" className="btn btn-outline" onClick={() => abrirArquivo(item)}>
                     Abrir

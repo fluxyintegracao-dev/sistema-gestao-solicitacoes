@@ -240,7 +240,7 @@ export default function TiposSubContrato() {
     {
       id: 'subtipo',
       titulo: 'Subtipo',
-      tipo: 'texto',
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (

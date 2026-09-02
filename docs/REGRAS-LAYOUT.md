@@ -222,6 +222,26 @@ automaticamente se sair do padrão.
 - Verificação automática: o harness reprova dois campos de busca / dois
   blocos de filtro / dois cabeçalhos no mesmo contexto (DoD F1).
 
+## R17 — Toda tabela DECLARA suas colunas (02/09, decisão do cliente)
+
+- **Onde vale**: todo arquivo que usa `TabelaPadrao` — manifesto ou não. O
+  verificador estático (`validarLayout.mjs`, por AST) reprova ANTES de a
+  tela chegar ao preview:
+  1. coluna sem `tipo` (sem papel = sem medida nem alinhamento);
+  2. coluna cujo `render` formata dinheiro sem `tipo: 'valor'` (é o que
+     garante o T7 — valor nunca trunca — em tela que nem estreou);
+  3. tabela sem coluna `tipo: 'identidade'` E sem a marca `semIdentidade`
+     na `<TabelaPadrao>` — a ausência de identidade precisa ser DECLARADA,
+     nunca silenciosa. Exemplo legítimo de `semIdentidade`: tabela de
+     arquivos (nome de arquivo preserva caixa/extensão).
+- **Onde NÃO vale**: tabelas fora do componente padrão (exceções
+  registradas, ex.: pivô do ObraTipoApropriacao) — cobertas pelos seus
+  próprios registros no manifesto.
+- Motivo (defeito de 02/09): telas com coluna de identidade não declarada
+  passavam no componente e falhavam T5/T6/T7 só no preview — a lacuna
+  agora reprova na origem e some da matriz e da próxima leva ao mesmo
+  tempo.
+
 ## Disciplina de regras (02/09 — vale para toda regra nova e existente)
 
 1. **Escopo explícito obrigatório**: toda regra declara onde vale, onde NÃO

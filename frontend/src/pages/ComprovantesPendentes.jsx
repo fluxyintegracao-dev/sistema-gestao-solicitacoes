@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import PreviewAnexoModal from './SolicitacaoDetalhe/PreviewAnexoModal';
+import { TabelaPadrao } from '../components/padrao';
 import { fileUrl } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { canDeleteComprovante } from '../utils/acessoProduto';
@@ -147,107 +148,115 @@ export default function ComprovantesPendentes() {
         )}
       </div>
 
-      <div className="card overflow-x-auto p-0">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-100 dark:bg-[rgba(255,255,255,0.04)]">
-            <tr>
-              <th className="text-left p-3 text-[var(--c-text)]">Visualizacao</th>
-              <th className="text-left p-3 text-[var(--c-text)]">Obra</th>
-              <th className="text-right p-3 text-[var(--c-text)]">Valor</th>
-              <th className="text-left p-3 text-[var(--c-text)]">Vincular a solicitacao</th>
-              <th className="text-left p-3 text-[var(--c-text)]">Arquivo</th>
-              <th className="text-right p-3 text-[var(--c-text)]">Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td colSpan="6" className="p-4 text-center text-muted">
-                  Carregando...
-                </td>
-              </tr>
-            )}
-            {!loading && pendentes.length === 0 && (
-              <tr>
-                <td colSpan="6" className="p-4 text-center text-muted">
-                  Nenhum comprovante pendente.
-                </td>
-              </tr>
-            )}
-            {!loading && pendentes.map(item => (
-              <tr key={item.id} className="border-t border-[var(--c-border)]">
-                <td className="p-3 text-[var(--c-text)]">{item.nome_original}</td>
-                <td className="p-3 text-[var(--c-text)]">
-                  {item.obra?.codigo ? `${item.obra.codigo} - ${item.obra.nome}` : item.obra?.nome || '-'}
-                </td>
-                <td className="p-3 text-right text-[var(--c-text)]">
-                  {item.valor
-                    ? Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                    : '-'}
-                </td>
-                <td className="p-3">
-                  <select
-                    className="input"
-                    value={selecionadas[item.id] || ''}
-                    onChange={e =>
-                      setSelecionadas(prev => ({ ...prev, [item.id]: e.target.value }))
+      <div className="card">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'arquivo',
+              titulo: 'Visualizacao',
+              tipo: 'texto',
+              noCard: 'titulo',
+              render: (item) => item.nome_original
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (item) => (
+                item.obra?.codigo ? `${item.obra.codigo} - ${item.obra.nome}` : item.obra?.nome || '-'
+              )
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (item) => (
+                item.valor
+                  ? Number(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                  : '-'
+              )
+            },
+            {
+              id: 'vincular',
+              titulo: 'Vincular a solicitacao',
+              tipo: 'texto',
+              render: (item) => (
+                <select
+                  className="input"
+                  value={selecionadas[item.id] || ''}
+                  onChange={e =>
+                    setSelecionadas(prev => ({ ...prev, [item.id]: e.target.value }))
+                  }
+                >
+                  <option value="">Selecione</option>
+                  {solicitacoes.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.codigo} - {s.obra?.codigo ? `${s.obra.codigo} - ` : ''}{s.obra?.nome || ''} {s.descricao ? `| ${s.descricao}` : ''}
+                    </option>
+                  ))}
+                </select>
+              )
+            },
+            {
+              id: 'arquivo_acoes',
+              titulo: 'Arquivo',
+              tipo: 'texto',
+              render: (item) => (
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() =>
+                      setPreview({
+                        nome: item.nome_original,
+                        caminho: item.caminho_arquivo
+                      })
                     }
                   >
-                    <option value="">Selecione</option>
-                    {solicitacoes.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.codigo} - {s.obra?.codigo ? `${s.obra.codigo} - ` : ''}{s.obra?.nome || ''} {s.descricao ? `| ${s.descricao}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="p-3">
-                  <div className="flex gap-2">
-                    <button
-                      className="btn btn-outline"
-                      type="button"
-                      onClick={() =>
-                        setPreview({
-                          nome: item.nome_original,
-                          caminho: item.caminho_arquivo
-                        })
-                      }
-                    >
-                      Visualizar
-                    </button>
-                    <button
-                      className="btn btn-outline"
-                      type="button"
-                      onClick={() => baixarArquivo(item)}
-                    >
-                      Download
-                    </button>
-                  </div>
-                </td>
-                <td className="p-3 text-right">
-                  <div className="flex justify-end gap-2">
-                    <button
-                      className="btn btn-primary"
-                      onClick={() => handleVincular(item.id)}
-                      disabled={vinculando[item.id]}
-                    >
-                      {vinculando[item.id] ? 'Vinculando...' : 'Vincular'}
-                    </button>
-                    {podeExcluirComprovante && (
-                      <button
-                        className="btn btn-danger"
-                        type="button"
-                        onClick={() => handleExcluir(item.id)}
-                      >
-                        Excluir
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    Visualizar
+                  </button>
+                  <button
+                    className="btn btn-outline"
+                    type="button"
+                    onClick={() => baixarArquivo(item)}
+                  >
+                    Download
+                  </button>
+                </div>
+              )
+            }
+          ]}
+          itens={pendentes}
+          carregando={loading}
+          vazio="Nenhum comprovante pendente."
+          storageKey="tabela:comprovantes-pendentes"
+          rotuloRolagem="Comprovantes pendentes"
+          // R17: a identidade deste registro é o NOME DO ARQUIVO do
+          // comprovante — exibi-lo em maiúsculas distorceria caixa e
+          // extensão; a ausência de coluna 'identidade' fica declarada.
+          semIdentidade
+          acoesLinha={(item) => (
+            <>
+              <button
+                className="btn btn-primary"
+                onClick={() => handleVincular(item.id)}
+                disabled={vinculando[item.id]}
+              >
+                {vinculando[item.id] ? 'Vinculando...' : 'Vincular'}
+              </button>
+              {podeExcluirComprovante && (
+                <button
+                  className="btn btn-danger"
+                  type="button"
+                  onClick={() => handleExcluir(item.id)}
+                >
+                  Excluir
+                </button>
+              )}
+            </>
+          )}
+          larguraAcoes={240}
+        />
       </div>
 
       {preview && (

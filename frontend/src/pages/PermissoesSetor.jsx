@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getSetorPermissoes, salvarSetorPermissao } from '../services/setorPermissoes';
 
 export default function PermissoesSetor() {
@@ -55,49 +56,58 @@ export default function PermissoesSetor() {
     <div className="page solicitacoes-page">
       <h1 className="page-title">Permissoes por Setor</h1>
 
-      <div className="card overflow-x-auto">
-        <table className="table">
-          <thead>
-            <tr>
-              <th className="p-3 text-left">Setor</th>
-              <th className="p-3 text-center">Usuario pode assumir</th>
-              <th className="p-3 text-center">Usuario pode atribuir</th>
-              <th className="p-3 text-left">Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map(item => (
-              <tr key={item.setor_id} className="border-t">
-                <td className="p-3">
-                  {item.nome || item.codigo || item.setor_id}
-                </td>
-                <td className="p-3 text-center">
-                  <input
-                    type="checkbox"
-                    checked={!!item.usuario_pode_assumir}
-                    onChange={e => atualizarLocal(item.setor_id, 'usuario_pode_assumir', e.target.checked)}
-                  />
-                </td>
-                <td className="p-3 text-center">
-                  <input
-                    type="checkbox"
-                    checked={!!item.usuario_pode_atribuir}
-                    onChange={e => atualizarLocal(item.setor_id, 'usuario_pode_atribuir', e.target.checked)}
-                  />
-                </td>
-                <td className="p-3">
-                  <button
-                    onClick={() => salvar(item)}
-                    disabled={salvando === item.setor_id}
-                    className="text-blue-600"
-                  >
-                    {salvando === item.setor_id ? 'Salvando...' : 'Salvar'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="card">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'setor',
+              titulo: 'Setor',
+              // R17: o setor é o registro desta lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: item => item.nome || item.codigo || item.setor_id
+            },
+            {
+              id: 'pode_assumir',
+              titulo: 'Usuario pode assumir',
+              tipo: 'status',
+              render: item => (
+                <input
+                  type="checkbox"
+                  checked={!!item.usuario_pode_assumir}
+                  onChange={e => atualizarLocal(item.setor_id, 'usuario_pode_assumir', e.target.checked)}
+                />
+              )
+            },
+            {
+              id: 'pode_atribuir',
+              titulo: 'Usuario pode atribuir',
+              tipo: 'status',
+              render: item => (
+                <input
+                  type="checkbox"
+                  checked={!!item.usuario_pode_atribuir}
+                  onChange={e => atualizarLocal(item.setor_id, 'usuario_pode_atribuir', e.target.checked)}
+                />
+              )
+            }
+          ]}
+          itens={lista}
+          getId={item => item.setor_id}
+          storageKey="tabela:permissoes-setor"
+          rotuloRolagem="Permissoes por setor"
+          vazio="Nenhum setor encontrado"
+          acoesLinha={item => (
+            <button
+              onClick={() => salvar(item)}
+              disabled={salvando === item.setor_id}
+              className="text-blue-600"
+            >
+              {salvando === item.setor_id ? 'Salvando...' : 'Salvar'}
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
     </div>
   );
