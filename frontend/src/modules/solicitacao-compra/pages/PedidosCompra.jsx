@@ -5,6 +5,7 @@ import { listarPedidosCompra } from '../../../services/compras';
 import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
+import StatusBadge from '../../../components/StatusBadge';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -17,18 +18,13 @@ function formatStatusLabel(value, statusMap) {
   return statusMap[String(value || '').toUpperCase()]?.nome || String(value || '-').replace(/_/g, ' ').toUpperCase();
 }
 
-function statusClass(status, statusMap) {
+// Família semântica da etiqueta: status que bloqueia edição = neutro
+// (encerrado), ABERTO = em andamento (info), demais = concluído.
+function statusKind(status, statusMap) {
   const config = statusMap[String(status || '').toUpperCase()];
-
-  if (config?.bloqueia_edicao) {
-    return 'app-status-pill bg-slate-100 text-slate-700';
-  }
-
-  if (String(status || '').toUpperCase() === 'ABERTO') {
-    return 'app-status-pill bg-blue-100 text-blue-700';
-  }
-
-  return 'app-status-pill bg-emerald-100 text-emerald-700';
+  if (config?.bloqueia_edicao) return 'neutral';
+  if (String(status || '').toUpperCase() === 'ABERTO') return 'info';
+  return 'success';
 }
 
 const STATUS_PEDIDOS_FALLBACK = [
@@ -265,9 +261,7 @@ export default function PedidosCompra() {
                         ) : null}
                       </td>
                       <td>
-                        <span className={statusClass(pedido.status, statusMap)}>
-                          {formatStatusLabel(pedido.status, statusMap)}
-                        </span>
+                        <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
                       </td>
                       <td>
                         <button
@@ -301,9 +295,7 @@ export default function PedidosCompra() {
                       <strong>{codigoPedido}</strong>
                       <span>{pedido.fornecedor?.nome || '-'}</span>
                     </div>
-                    <span className={statusClass(pedido.status, statusMap)}>
-                      {formatStatusLabel(pedido.status, statusMap)}
-                    </span>
+                    <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
                   </div>
                   <div className="compras-mobile-record-grid">
                     <div className="compras-mobile-field"><span>Obra</span><strong>{pedido.obra?.nome || '-'}</strong></div>

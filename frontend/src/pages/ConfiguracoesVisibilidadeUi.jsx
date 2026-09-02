@@ -30,7 +30,7 @@ function ComponentToggle({ component, checked, onChange }) {
         <span className="mt-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
           {typeLabel(component.type)}
         </span>
-        <span className="mt-1 block font-mono text-[10px] text-slate-400">{component.key}</span>
+        <span className="mt-1 block font-mono text-[10px] text-slate-500">{component.key}</span>
       </span>
       <input
         type="checkbox"

@@ -14,9 +14,9 @@ export const TEMA_PADRAO = {
     primary: '#3b5bdb',
     primary600: '#2f4ac0',
     secondary: '#7c3aed',
-    warning: '#d97706',
-    danger: '#e03131',
-    success: '#0ca678'
+    warning: '#9a5b06',
+    danger: '#b32020',
+    success: '#116149'
   },
   buttons: {
     primaryBg: '#3b5bdb',
@@ -33,11 +33,11 @@ export const TEMA_PADRAO = {
     ghostText: '#64748b',
     ghostHoverBg: '#eef2f7',
     ghostHoverText: '#0f1c2e',
-    successBg: '#0ca678',
+    successBg: '#116149',
     successText: '#ffffff',
-    dangerBg: '#e03131',
+    dangerBg: '#b32020',
     dangerText: '#ffffff',
-    warningBg: '#d97706',
+    warningBg: '#9a5b06',
     warningText: '#ffffff'
   },
   cards: {
@@ -56,28 +56,37 @@ export const TEMA_PADRAO = {
     heading: '#0f1c2e',
     body: '#0f1c2e',
     muted: '#64748b',
-    subtle: '#94a3b8',
+    subtle: '#74808f',
     link: '#2563eb',
     inverse: '#ffffff'
   },
   numbers: {
     default: '#0f1c2e',
-    positive: '#0ca678',
-    negative: '#e03131',
-    warning: '#d97706',
-    info: '#3b5bdb',
+    positive: '#116149',
+    negative: '#b32020',
+    warning: '#9a5b06',
+    info: '#22447f',
     muted: '#64748b'
   },
   moduleAccents: {
-    solicitacoes: '#3b5bdb',
-    compras: '#7c3aed',
-    financeiro: '#2454ff',
-    rhdp: '#2563eb',
-    sst: '#0f766e',
-    fiscal: '#0f766e',
-    comercial: '#7c3aed',
-    contratos: '#cc7600',
-    crm: '#0ca678'
+    painel: '#2d5c8f',
+    solicitacoes: '#3a5f9e',
+    comunicacao: '#256f7a',
+    biblioteca: '#1d6f66',
+    treinamento: '#4a5da8',
+    provisionamento: '#37607d',
+    sst: '#1f5170',
+    compras: '#8a5a12',
+    financeiro: '#146152',
+    fiscal: '#3f6a5a',
+    contratos: '#7a5a2e',
+    rhdp: '#4d6b33',
+    crm: '#5b4a91',
+    comercial: '#6b4f8f',
+    cadastros: '#4f5a68',
+    administracao: '#3f4650',
+    configuracoes: '#59626e',
+    conta: '#5b6472'
   },
   actions: {
     ver: '#2563eb',
@@ -88,30 +97,30 @@ export const TEMA_PADRAO = {
   },
   status: {
     global: {
-      PENDENTE: '#64748b',
-      EM_ANALISE: '#0ea5e9',
-      AGUARDANDO_AJUSTE: '#f59e0b',
-      TITULO_CADASTRADO: '#2563eb',
-      'PAGAMENTO PARCIAL': '#004c9f',
-      'PARCIALMENTE PAGO': '#004c9f',
-      APROVADA: '#16a34a',
-      PAGA: '#16a34a',
-      REJEITADA: '#dc2626',
-      CONCLUIDA: '#059669'
+      PENDENTE: '#9a5b06',
+      EM_ANALISE: '#22447f',
+      AGUARDANDO_AJUSTE: '#9a5b06',
+      TITULO_CADASTRADO: '#22447f',
+      'PAGAMENTO PARCIAL': '#9a5b06',
+      'PARCIALMENTE PAGO': '#9a5b06',
+      APROVADA: '#116149',
+      PAGA: '#116149',
+      REJEITADA: '#b32020',
+      CONCLUIDA: '#116149'
     },
     setores: {}
   },
   statusBadges: {
-    pending: { bg: '#fff7ed', text: '#92400e', border: '#fed7aa' },
-    approved: { bg: '#ecfdf5', text: '#065f46', border: '#a7f3d0' },
-    rejected: { bg: '#fef2f2', text: '#991b1b', border: '#fecaca' },
-    paid: { bg: '#eff6ff', text: '#1e40af', border: '#bfdbfe' },
-    overdue: { bg: '#fff1f2', text: '#9f1239', border: '#fecdd3' },
-    analysis: { bg: '#f5f3ff', text: '#5b21b6', border: '#ddd6fe' },
-    archived: { bg: '#f8fafc', text: '#475569', border: '#cbd5e1' },
-    intercompany: { bg: '#ecfeff', text: '#155e75', border: '#a5f3fc' },
-    dreYes: { bg: '#f0fdf4', text: '#14532d', border: '#bbf7d0' },
-    dreNo: { bg: '#fafafa', text: '#525252', border: '#e5e5e5' }
+    pending: { bg: '#f7f2eb', text: '#9a5b06', border: '#e6d6c1' },
+    approved: { bg: '#ecf2f0', text: '#116149', border: '#c4d8d2' },
+    rejected: { bg: '#fdeceb', text: '#b32020', border: '#f3c9c7' },
+    paid: { bg: '#edf0f5', text: '#22447f', border: '#c8d0df' },
+    overdue: { bg: '#fdeceb', text: '#b32020', border: '#f3c9c7' },
+    analysis: { bg: '#edf0f5', text: '#22447f', border: '#c8d0df' },
+    archived: { bg: '#f2f3f4', text: '#5b6472', border: '#d6d8dc' },
+    intercompany: { bg: '#edf0f5', text: '#22447f', border: '#c8d0df' },
+    dreYes: { bg: '#ecf2f0', text: '#116149', border: '#c4d8d2' },
+    dreNo: { bg: '#f2f3f4', text: '#5b6472', border: '#d6d8dc' }
   }
 };
 
@@ -134,15 +143,13 @@ function mergeTema(base, override) {
   return output;
 }
 
-function setCssVar(root, name, value) {
-  if (value) {
-    root.style.setProperty(name, value);
-  }
-}
-
-function aplicarTemaCss(tema) {
-  if (typeof document === 'undefined' || !tema?.palette) return;
-  const root = document.documentElement;
+// Coleta todas as variaveis CSS derivadas de um tema (sem aplicar).
+function coletarTemaVars(tema) {
+  const vars = {};
+  const setCssVar = (_root, name, value) => {
+    if (value) vars[name] = value;
+  };
+  const root = null;
   const { palette, buttons, cards, text, numbers, statusBadges, moduleAccents } = tema;
 
   setCssVar(root, '--c-bg', palette.bg);
@@ -240,6 +247,29 @@ function aplicarTemaCss(tema) {
   setCssVar(root, '--fiscal-accent', moduleAccents?.fiscal);
   setCssVar(root, '--rhdp-accent', moduleAccents?.rhdp);
   setCssVar(root, '--sst-accent', moduleAccents?.sst);
+  return vars;
+}
+
+let TEMA_PADRAO_VARS = null;
+
+// Aplica apenas o que DIFERE do tema padrao. Os valores padrao vivem no
+// CSS (:root e .dark em index.css/design-tokens.css); definir tudo inline
+// aqui sobrescreveria os tokens do modo escuro, ja que estilo inline no
+// <html> vence a classe .dark.
+function aplicarTemaCss(tema) {
+  if (typeof document === 'undefined' || !tema?.palette) return;
+  if (!TEMA_PADRAO_VARS) TEMA_PADRAO_VARS = coletarTemaVars(TEMA_PADRAO);
+  const root = document.documentElement;
+  const vars = coletarTemaVars(tema);
+  const nomes = new Set([...Object.keys(TEMA_PADRAO_VARS), ...Object.keys(vars)]);
+  nomes.forEach((nome) => {
+    const valor = vars[nome];
+    if (!valor || valor === TEMA_PADRAO_VARS[nome]) {
+      root.style.removeProperty(nome);
+    } else {
+      root.style.setProperty(nome, valor);
+    }
+  });
 }
 
 export function ThemeProvider({ children }) {

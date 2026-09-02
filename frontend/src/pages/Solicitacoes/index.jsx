@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   HiDocumentArrowDown,
   HiViewColumns,
@@ -28,12 +28,21 @@ import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 import { parseDateSmart } from '../../utils/dateLocal';
 import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } from '../../utils/setor';
 import { hasEnabledModule } from '../../utils/acessoProduto';
+import ListaAvancada from '../../components/lista-avancada/ListaAvancada';
+import StatusBadge from '../../components/StatusBadge';
+import {
+  formatarMaiusculas,
+  formatarDescricao,
+  vencimentoHumano,
+  urgenciaVencimento
+} from '../../utils/formatarTexto';
 import {
   arquivarSolicitacoesEmMassa,
   deleteSolicitacao,
   desarquivarSolicitacao,
   enviarSolicitacoesParaSetorEmMassa,
   getSolicitacaoResumoLista,
+  getContadoresSolicitacoes,
   getObrasVisiveisSolicitacoes,
   getStatusVisiveisSolicitacoes
 } from '../../services/solicitacoes';
@@ -120,8 +129,51 @@ function obterErrosFiltrosData(filtros) {
   return erros;
 }
 
+const ROTULOS_VISAO_PENDENCIA = {
+  'paradas-no-setor': 'solicitações paradas no seu setor',
+  'aprovacoes-diretoria': 'aprovações aguardando você',
+  'devolucoes-recebidas': 'devoluções recebidas no seu setor',
+  'contratos-aguardando-aprovacao': 'contratos aguardando aprovação no seu setor'
+};
+
+// ----- Agrupamentos derivados (rótulo por item + ordem dos grupos) ----
+function mesDeVencimento(dataVencimento) {
+  const texto = String(dataVencimento || '').slice(0, 7); // yyyy-mm
+  if (!/^\d{4}-\d{2}$/.test(texto)) return '(sem vencimento)';
+  return `${texto.slice(5, 7)}/${texto.slice(0, 4)}`;
+}
+
+function compararMesVencimento(a, b) {
+  const chave = (rotulo) => (/^\d{2}\/\d{4}$/.test(rotulo) ? `${rotulo.slice(3)}${rotulo.slice(0, 2)}` : '999999');
+  return chave(a).localeCompare(chave(b));
+}
+
+const FAIXAS_VALOR = [
+  { ate: 1000, rotulo: 'até R$ 1 mil' },
+  { ate: 10000, rotulo: 'R$ 1 a 10 mil' },
+  { ate: 50000, rotulo: 'R$ 10 a 50 mil' },
+  { ate: 200000, rotulo: 'R$ 50 a 200 mil' },
+  { ate: Infinity, rotulo: 'acima de R$ 200 mil' }
+];
+
+function faixaDeValor(valor) {
+  const numero = Number(valor);
+  if (!Number.isFinite(numero) || numero <= 0) return '(sem valor)';
+  return FAIXAS_VALOR.find((faixa) => numero <= faixa.ate).rotulo;
+}
+
+function compararFaixaValor(a, b) {
+  const ordem = FAIXAS_VALOR.map((faixa) => faixa.rotulo);
+  const indice = (rotulo) => {
+    const i = ordem.indexOf(rotulo);
+    return i < 0 ? ordem.length : i;
+  };
+  return indice(a) - indice(b);
+}
+
 export default function Solicitacoes({ arquivadas = false }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const DEFAULT_VISIBLE_COLUMNS = [
     'data',
     'codigo',
@@ -182,6 +234,39 @@ export default function Solicitacoes({ arquivadas = false }) {
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
 
+  // Filtro por ids vindo da faixa de pendências do Hub (?ids=1,2,3):
+  // leva o usuário direto às solicitações citadas no contador.
+  const [filtroIdsUrl, setFiltroIdsUrl] = useState([]);
+  // Visão nomeada vinda dos cartões de pendência do Hub (?visao=...):
+  // o backend aplica o MESMO recorte SQL do contador — o número do
+  // cartão e esta lista sempre batem.
+  const [filtroVisaoUrl, setFiltroVisaoUrl] = useState('');
+
+  // Estado de consulta vindo da ListaAvancada (visão, filtros rápidos,
+  // busca única, ordenação). A página continua dona dos DADOS.
+  const listaRef = useRef(null);
+  // DEGRADAÇÃO (onda 3 do porte): o rework do SolicitacaoController
+  // (pacote B3 da proposta — busca única `q`, ordenação server-side,
+  // visões nomeadas e /solicitacoes/contadores) ainda não existe neste
+  // backend. Enquanto isso: busca e ordenação rodam no cliente sobre a
+  // janela carregada, e só as visões cujos parâmetros o controller atual
+  // entende ficam visíveis. Religar trocando a constante.
+  const B3_DISPONIVEL = true;
+  const consultaListaRef = useRef({ visao: null, filtros: {}, busca: '', ordenacao: { campo: 'createdAt', direcao: 'desc' } });
+  const [versaoConsulta, setVersaoConsulta] = useState(0);
+  const acumularProximaRef = useRef(false);
+  // ?q= e ?obra_ids= chegam da busca universal (Ctrl+K) e das ações
+  // rápidas de obra: a lista abre já filtrada. Lidos uma vez, no mount.
+  const [buscaUrlInicial] = useState(() => (
+    new URLSearchParams(window.location.search).get('q') || ''
+  ));
+  const [filtrosUrlIniciais] = useState(() => {
+    const csv = String(new URLSearchParams(window.location.search).get('obra_ids') || '').trim();
+    if (!csv) return null;
+    return { obra: csv.split(',').map((v) => v.trim()).filter(Boolean) };
+  });
+  const pularDebounceRef = useRef(false);
+
   const [filtros, setFiltros] = useState({
     codigo: '',
     descricao: '',
@@ -220,12 +305,17 @@ export default function Solicitacoes({ arquivadas = false }) {
       setLoading(false);
       return undefined;
     }
+    // O debounce protege a digitação nos filtros; troca de página (rolagem
+    // infinita/paginação) busca na hora — senão o cleanup cancela a busca
+    // da página anterior quando a seguinte é pedida.
+    const atraso = pularDebounceRef.current ? 0 : FILTER_DEBOUNCE_MS;
+    pularDebounceRef.current = false;
     const timeout = setTimeout(() => {
       carregar();
-    }, FILTER_DEBOUNCE_MS);
+    }, atraso);
 
     return () => clearTimeout(timeout);
-  }, [filtros, arquivadas, paginaAtual, limitePorPagina, filtrosDataValidos]);
+  }, [filtros, arquivadas, paginaAtual, limitePorPagina, filtrosDataValidos, filtroIdsUrl, filtroVisaoUrl, versaoConsulta]);
 
   useEffect(() => {
     try {
@@ -247,6 +337,61 @@ export default function Solicitacoes({ arquivadas = false }) {
       setFiltrosStoragePronto(true);
     }
   }, [filtrosStorageKey]);
+
+  // Parâmetros de URL (links das pendências do Hub e busca global)
+  // sobrepõem os filtros salvos: ?area=, ?status=, ?codigo=,
+  // ?data_vencimento_inicio=, ?data_vencimento_fim= e ?ids=1,2,3.
+  useEffect(() => {
+    if (!filtrosStoragePronto) return;
+    const params = new URLSearchParams(location.search);
+    if ([...params.keys()].length === 0) return;
+
+    const visaoParam = String(params.get('visao') || '').trim().toLowerCase();
+    if (visaoParam) {
+      // O recorte do cartão substitui qualquer filtro salvo: a lista
+      // abre mostrando EXATAMENTE o conjunto contado.
+      setFiltroVisaoUrl(visaoParam);
+      setFiltros({
+        codigo: '',
+        descricao: '',
+        numero_sienge: '',
+        obra_ids: '',
+        area: '',
+        tipo_solicitacao_id: '',
+        status: '',
+        valor_min: '',
+        valor_max: '',
+        data_registro: '',
+        data_vencimento: '',
+        data_vencimento_inicio: '',
+        data_vencimento_fim: '',
+        responsavel: ''
+      });
+    } else {
+      setFiltroVisaoUrl('');
+    }
+
+    const chavesSuportadas = ['area', 'status', 'codigo', 'data_vencimento_inicio', 'data_vencimento_fim'];
+    const sobrescritas = {};
+    for (const chave of chavesSuportadas) {
+      const valor = params.get(chave);
+      if (valor !== null) sobrescritas[chave] = valor;
+    }
+    if (!visaoParam && Object.keys(sobrescritas).length > 0) {
+      setFiltros((prev) => ({ ...prev, ...sobrescritas }));
+    }
+
+    const idsParam = params.get('ids');
+    if (idsParam !== null) {
+      const ids = idsParam
+        .split(',')
+        .map((valor) => Number(valor))
+        .filter((valor) => Number.isInteger(valor) && valor > 0);
+      setFiltroIdsUrl(ids);
+    } else {
+      setFiltroIdsUrl([]);
+    }
+  }, [filtrosStoragePronto, location.search]);
 
   useEffect(() => {
     if (!filtrosStoragePronto) return;
@@ -448,6 +593,10 @@ export default function Solicitacoes({ arquivadas = false }) {
 
   function solicitacaoAtendeFiltros(item) {
     if (!item) return false;
+
+    if (filtroIdsUrl.length > 0 && !filtroIdsUrl.includes(Number(item.id))) {
+      return false;
+    }
 
     const codigo = String(item?.codigo || '');
     const descricao = String(item?.descricao || '');
@@ -689,6 +838,51 @@ export default function Solicitacoes({ arquivadas = false }) {
     await carregarEmSegundoPlano();
   }
 
+  // Mapeia o estado de consulta da ListaAvancada (visão, filtros rápidos,
+  // busca única e ordenação) para os parâmetros da API — SOMANDO aos
+  // filtros avançados existentes, sem substituir nenhum deles.
+  function aplicarConsultaListaNosParams(paramsObj) {
+    const consulta = consultaListaRef.current || {};
+
+    Object.entries(consulta.visao?.params || {}).forEach(([chave, valor]) => {
+      if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
+        paramsObj[chave] = String(valor);
+      }
+    });
+
+    const rapidos = consulta.filtros || {};
+    const somarCsv = (chave, valores) => {
+      const lista = [paramsObj[chave], ...(valores || [])]
+        .map((v) => String(v || '').trim())
+        .filter(Boolean);
+      if (lista.length > 0) paramsObj[chave] = Array.from(new Set(lista)).join(',');
+    };
+    somarCsv('status', rapidos.status);
+    somarCsv('tipo_solicitacao_id', rapidos.tipo);
+    somarCsv('obra_ids', rapidos.obra);
+
+    // Sem o B3, `q`/`ordenar`/`direcao` seriam ignorados em silêncio pelo
+    // backend — pior que não enviar: a tela fingiria filtrar. A busca e a
+    // ordenação acontecem no cliente (ver itensExibidos).
+    if (B3_DISPONIVEL && consulta.busca) paramsObj.q = consulta.busca;
+
+    const MAPA_ORDENACAO = {
+      data: 'createdAt',
+      codigo: 'codigo',
+      descricao: 'descricao',
+      valor: 'valor',
+      status: 'status_global',
+      vencimento: 'data_vencimento',
+      setor: 'area_responsavel',
+      numero_sienge: 'numero_sienge'
+    };
+    const ordenacao = consulta.ordenacao || {};
+    if (B3_DISPONIVEL && ordenacao.campo && MAPA_ORDENACAO[ordenacao.campo]) {
+      paramsObj.ordenar = MAPA_ORDENACAO[ordenacao.campo];
+      paramsObj.direcao = ordenacao.direcao === 'asc' ? 'asc' : 'desc';
+    }
+  }
+
   async function carregar({ silent = false } = {}) {
     if (!filtrosDataValidos) {
       if (!silent) setLoading(false);
@@ -700,6 +894,9 @@ export default function Solicitacoes({ arquivadas = false }) {
         setLoading(true);
       }
 
+      const acumular = acumularProximaRef.current;
+      acumularProximaRef.current = false;
+
       const paramsObj = {};
       Object.entries(filtros).forEach(([chave, valor]) => {
         if (valor !== undefined && valor !== null && String(valor).trim() !== '') {
@@ -709,8 +906,22 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (arquivadas) {
         paramsObj.arquivadas = '1';
       }
-      paramsObj.page = String(paginaAtual);
-      paramsObj.limit = String(limitePorPagina);
+      if (filtroIdsUrl.length > 0) {
+        paramsObj.ids = filtroIdsUrl.join(',');
+      }
+      if (filtroVisaoUrl) {
+        paramsObj.visao = filtroVisaoUrl;
+      }
+      aplicarConsultaListaNosParams(paramsObj);
+
+      // Recarga silenciosa com rolagem infinita em andamento: rebusca a
+      // janela inteira já carregada (páginas 1..atual) numa consulta só,
+      // para não truncar a lista acumulada.
+      const janelaCompleta = silent && !acumular && paginaAtual > 1;
+      paramsObj.page = janelaCompleta ? '1' : String(paginaAtual);
+      paramsObj.limit = janelaCompleta
+        ? String(paginaAtual * Number(limitePorPagina || 25))
+        : String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
 
@@ -728,24 +939,32 @@ export default function Solicitacoes({ arquivadas = false }) {
         : Array.isArray(data?.items)
           ? data.items
           : [];
-      setSolicitacoes(lista);
+      if (acumular) {
+        setSolicitacoes((prev) => {
+          const vistos = new Set(prev.map((item) => Number(item.id)));
+          return [...prev, ...lista.filter((item) => !vistos.has(Number(item.id)))];
+        });
+      } else {
+        setSolicitacoes(lista);
+      }
       setObrasOptions(prev => {
         if (prev.length > 0) return prev;
         return extrairOpcoesObras(lista);
       });
+      const totalRegistros = Number(data?.meta?.total || lista.length);
+      const limiteBase = Number(limitePorPagina || 25);
       setMetaPaginacao({
-        page: Number(data?.meta?.page || paginaAtual),
-        limit: Number(data?.meta?.limit || limitePorPagina),
-        total: Number(data?.meta?.total || lista.length),
-        total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
+        page: paginaAtual,
+        limit: limiteBase,
+        total: totalRegistros,
+        total_pages: Math.max(Math.ceil(totalRegistros / limiteBase), lista.length > 0 ? 1 : 0)
       });
-
-      setSelecionadasIds((prev) => prev.filter((idSelecionado) => (
-        lista.some((item) => Number(item.id) === Number(idSelecionado))
-      )));
+      if (silent) {
+        listaRef.current?.refreshContadores?.();
+      }
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar solicitações');
+      if (!silent) alert('Erro ao carregar solicitações');
     } finally {
       setLoading(false);
     }
@@ -764,8 +983,21 @@ export default function Solicitacoes({ arquivadas = false }) {
       if (arquivadas) {
         paramsObj.arquivadas = '1';
       }
-      paramsObj.page = String(paginaAtual);
-      paramsObj.limit = String(limitePorPagina);
+      if (filtroIdsUrl.length > 0) {
+        paramsObj.ids = filtroIdsUrl.join(',');
+      }
+      if (filtroVisaoUrl) {
+        paramsObj.visao = filtroVisaoUrl;
+      }
+      aplicarConsultaListaNosParams(paramsObj);
+
+      // Janela completa: com rolagem infinita, o refresh de fundo rebusca
+      // tudo que está carregado (páginas 1..atual) para não truncar.
+      const janelaCompleta = paginaAtual > 1;
+      paramsObj.page = janelaCompleta ? '1' : String(paginaAtual);
+      paramsObj.limit = janelaCompleta
+        ? String(paginaAtual * Number(limitePorPagina || 25))
+        : String(limitePorPagina);
 
       const params = new URLSearchParams(paramsObj).toString();
       const res = await fetch(`${API_URL}/solicitacoes?${params}`, {
@@ -788,15 +1020,14 @@ export default function Solicitacoes({ arquivadas = false }) {
         if (prev.length > 0) return prev;
         return extrairOpcoesObras(lista);
       });
+      const totalRegistros = Number(data?.meta?.total || lista.length);
+      const limiteBase = Number(limitePorPagina || 25);
       setMetaPaginacao({
-        page: Number(data?.meta?.page || paginaAtual),
-        limit: Number(data?.meta?.limit || limitePorPagina),
-        total: Number(data?.meta?.total || lista.length),
-        total_pages: Number(data?.meta?.total_pages || (lista.length > 0 ? 1 : 0))
+        page: paginaAtual,
+        limit: limiteBase,
+        total: totalRegistros,
+        total_pages: Math.max(Math.ceil(totalRegistros / limiteBase), lista.length > 0 ? 1 : 0)
       });
-      setSelecionadasIds((prev) => prev.filter((idSelecionado) => (
-        lista.some((item) => Number(item.id) === Number(idSelecionado))
-      )));
     } catch (error) {
       console.error(error);
     }
@@ -1102,6 +1333,7 @@ export default function Solicitacoes({ arquivadas = false }) {
         }
       });
       if (arquivadas) paramsObj.arquivadas = '1';
+      if (filtroVisaoUrl) paramsObj.visao = filtroVisaoUrl;
       paramsObj.page = String(pagina);
       paramsObj.limit = String(EXPORT_PAGE_SIZE);
 
@@ -1350,7 +1582,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     return isUsuario ? (!!permissaoUsuario?.usuario_pode_atribuir || isSetorFinanceiro) : true;
   }, [selecionadaUnica, isSetorObra, permissaoUsuario, user?.perfil, isSetorFinanceiro]);
   const podeAtribuirMassa = useMemo(() => {
-    if (selecionadasIds.length <= 1) return false;
+    if (selecionadasIds.length === 0) return false;
     if (isSetorObra) return false;
     const modo = String(permissaoUsuario?.modo_recebimento || 'TODOS_VISIVEIS').toUpperCase();
     if (modo !== 'TODOS_VISIVEIS') return false;
@@ -1368,7 +1600,7 @@ export default function Solicitacoes({ arquivadas = false }) {
     );
   }, [selecionadaUnica, isSetorObra, isSuperadmin, podeEnviarQualquerSetor, user]);
   const podeEnviarMassa = useMemo(() => {
-    if (selecionadasIds.length <= 1 || isSetorObra) return false;
+    if (selecionadasIds.length === 0 || isSetorObra) return false;
     if (isSuperadmin || podeEnviarQualquerSetor) return true;
     return selecionadasIds.every(idSelecionado => {
       const solicitacao = solicitacoes.find(item => Number(item.id) === Number(idSelecionado));
@@ -1501,8 +1733,8 @@ export default function Solicitacoes({ arquivadas = false }) {
       alert('Selecione um usuário.');
       return;
     }
-    if (selecionadasIds.length <= 1) {
-      alert('Selecione mais de uma solicitação.');
+    if (selecionadasIds.length === 0) {
+      alert('Selecione ao menos uma solicitação.');
       return;
     }
 
@@ -1552,6 +1784,318 @@ export default function Solicitacoes({ arquivadas = false }) {
       setProcessandoMassa(false);
     }
   }
+
+  // ==================================================================
+  // Integração com a ListaAvancada (a página segue dona dos dados)
+  // ==================================================================
+  function handleQueryChangeLista(consulta) {
+    consultaListaRef.current = consulta;
+    acumularProximaRef.current = false;
+    if (paginaAtual !== 1) setPaginaAtual(1);
+    setVersaoConsulta((v) => v + 1);
+  }
+
+  function handlePageRequestLista(novaPagina, { acumular = false } = {}) {
+    acumularProximaRef.current = acumular;
+    pularDebounceRef.current = true;
+    setPaginaAtual(novaPagina);
+  }
+
+  // Busca e ordenação no CLIENTE enquanto o B3 não existe: agem sobre a
+  // janela já carregada (páginas buscadas), não sobre o banco inteiro.
+  // `versaoConsulta` muda a cada interação com a barra da lista, então o
+  // memo relê o ref na hora certa.
+  const normalizarBuscaLocal = (valor) => String(valor ?? '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+  const itensExibidos = useMemo(() => {
+    if (B3_DISPONIVEL) return solicitacoes;
+    const consulta = consultaListaRef.current || {};
+    let lista = solicitacoes;
+
+    const termo = normalizarBuscaLocal(consulta.busca).trim();
+    if (termo) {
+      lista = lista.filter((item) => normalizarBuscaLocal([
+        item.codigo,
+        item.descricao,
+        item.obra?.nome,
+        item.parceiro?.nome,
+        item.favorecido?.nome,
+        item.status_global,
+        item.area_responsavel,
+        item.numero_sienge,
+        item.valor_exibicao ?? item.valor
+      ].filter((campo) => campo !== null && campo !== undefined).join(' ')).includes(termo));
+    }
+
+    const ordenacao = consulta.ordenacao || {};
+    const EXTRATORES = {
+      data: (i) => i.createdAt || '',
+      codigo: (i) => String(i.codigo || ''),
+      descricao: (i) => String(i.descricao || ''),
+      valor: (i) => Number(i.valor_exibicao ?? i.valor ?? 0),
+      status: (i) => String(i.status_global || ''),
+      vencimento: (i) => i.data_vencimento || '',
+      setor: (i) => String(i.area_responsavel || ''),
+      numero_sienge: (i) => String(i.numero_sienge || '')
+    };
+    const extrator = EXTRATORES[ordenacao.campo];
+    if (extrator) {
+      const direcao = ordenacao.direcao === 'asc' ? 1 : -1;
+      lista = [...lista].sort((a, b) => {
+        const va = extrator(a);
+        const vb = extrator(b);
+        if (va < vb) return -1 * direcao;
+        if (va > vb) return 1 * direcao;
+        return 0;
+      });
+    }
+    return lista;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [B3_DISPONIVEL, solicitacoes, versaoConsulta]);
+
+  const filtrosAvancadosAtivos = useMemo(() => (
+    Object.values(filtros).filter((valor) => String(valor ?? '').trim() !== '').length
+  ), [filtros]);
+
+  const hojeISO = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+  const visoesLista = useMemo(() => {
+    if (arquivadas) return [];
+    const isoMais = (dias) => {
+      const d = new Date();
+      d.setDate(d.getDate() + dias);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+    const setorUsuario = user?.setor?.codigo || user?.area || '';
+    return [
+      // "Minhas pendências" e "Fila do setor" usam parâmetros que só o B3
+      // conhece (`minhas`, `sem_responsavel`); sem ele o backend as
+      // ignoraria e as visões mentiriam. Ficam fora até o pacote entrar.
+      ...(B3_DISPONIVEL ? [{ id: 'minhas', rotulo: 'Minhas pendências', params: { minhas: '1' } }] : []),
+      // "Fila do setor" (sem responsável definido) em vez de "Do meu setor":
+      // para quem é o único do setor, "do meu setor" seria idêntico a
+      // "Todas" — a fila sem dono é o recorte acionável.
+      ...(B3_DISPONIVEL && setorUsuario ? [{ id: 'fila_setor', rotulo: 'Fila do setor', params: { sem_responsavel: '1', area: setorUsuario } }] : []),
+      { id: 'vencendo', rotulo: 'Vencendo', tom: 'warning', params: { data_vencimento_inicio: hojeISO, data_vencimento_fim: isoMais(7) } },
+      { id: 'atrasadas', rotulo: 'Atrasadas', tom: 'danger', params: { data_vencimento_fim: isoMais(-1) } },
+      { id: 'todas', rotulo: 'Todas', params: {} }
+    ];
+  }, [arquivadas, user?.setor?.codigo, user?.area, hojeISO, B3_DISPONIVEL]);
+
+  const filtrosRapidosLista = useMemo(() => ([
+    {
+      id: 'status',
+      rotulo: 'Status',
+      opcoes: statusOptions.map((opcao) => ({ valor: String(opcao.value), rotulo: opcao.label }))
+    },
+    {
+      id: 'tipo',
+      rotulo: 'Tipo',
+      opcoes: (tiposSolicitacao || []).map((tipo) => ({ valor: String(tipo.id), rotulo: tipo.nome }))
+    },
+    {
+      id: 'obra',
+      rotulo: 'Obra',
+      opcoes: obrasOptions.map((opcao) => ({ valor: String(opcao.value), rotulo: opcao.label }))
+    }
+  ]), [statusOptions, tiposSolicitacao, obrasOptions]);
+
+  const colunasLista = useMemo(() => {
+    const todas = [
+      {
+        id: 'codigo',
+        titulo: 'Código',
+        principal: true,
+        ordenavel: true,
+        larguraPadrao: 130,
+        render: (item) => formatarMaiusculas(item.codigo || `#${item.id}`)
+      },
+      {
+        id: 'obra',
+        titulo: 'Obra',
+        larguraPadrao: 180,
+        render: (item) => formatarMaiusculas(item.obra?.nome || '-')
+      },
+      {
+        id: 'descricao',
+        titulo: 'Descrição',
+        ordenavel: true,
+        larguraPadrao: 300,
+        render: (item) => formatarDescricao(item.descricao || '') || '-'
+      },
+      {
+        id: 'valor',
+        titulo: 'Valor',
+        ordenavel: true,
+        larguraPadrao: 130,
+        render: (item) => moeda(item.valor_exibicao ?? item.valor)
+      },
+      {
+        id: 'status',
+        titulo: 'Status',
+        ordenavel: true,
+        larguraPadrao: 170,
+        render: (item) => (
+          <StatusBadge
+            status={item.status_global}
+            setor={item.setor_status_atual || item.area_responsavel}
+          />
+        ),
+        tituloCelula: (item) => item.status_global || ''
+      },
+      {
+        id: 'vencimento',
+        titulo: 'Vencimento',
+        ordenavel: true,
+        larguraPadrao: 130,
+        render: (item) => (item.data_vencimento ? vencimentoHumano(item.data_vencimento) : '-'),
+        tituloCelula: (item) => (item.data_vencimento ? dataCurta(item.data_vencimento) : '')
+      },
+      // ---- opcionais (seletor de colunas; escolha salva por usuário) ----
+      {
+        id: 'numero_sienge',
+        titulo: 'Nº pedido',
+        padrao: false,
+        ordenavel: true,
+        larguraPadrao: 110,
+        render: (item) => item.numero_sienge || item.numero_pedido || '-'
+      },
+      ...(moduloContratosHabilitado ? [
+        {
+          id: 'contrato',
+          titulo: 'Contrato',
+          padrao: false,
+          larguraPadrao: 130,
+          render: (item) => item.contrato?.codigo || item.codigo_contrato || '-'
+        },
+        {
+          id: 'ref_contrato',
+          titulo: 'Ref. do contrato',
+          padrao: false,
+          larguraPadrao: 140,
+          render: (item) => item.contrato?.ref_contrato || item.ref_contrato || '-'
+        }
+      ] : []),
+      {
+        id: 'tipo',
+        titulo: 'Tipo',
+        padrao: false,
+        larguraPadrao: 160,
+        render: (item) => item.tipo?.nome || '-'
+      },
+      {
+        id: 'setor',
+        titulo: 'Setor',
+        padrao: false,
+        ordenavel: true,
+        larguraPadrao: 130,
+        render: (item) => item.area_responsavel || '-'
+      },
+      {
+        id: 'responsavel',
+        titulo: 'Responsável',
+        padrao: false,
+        larguraPadrao: 150,
+        render: (item) => item.responsavel || '-'
+      },
+      {
+        id: 'data',
+        titulo: 'Registro',
+        padrao: false,
+        ordenavel: true,
+        larguraPadrao: 110,
+        render: (item) => dataCurta(item.createdAt)
+      }
+    ];
+    return todas;
+  }, [moduloContratosHabilitado]);
+
+  const renderCardSolicitacao = (item) => (
+    <div className="sol-card-compacto">
+      <div className="sol-card-compacto-topo">
+        <span className="sol-card-compacto-codigo">{formatarMaiusculas(item.codigo || `#${item.id}`)}</span>
+        <StatusBadge
+          status={item.status_global}
+          setor={item.setor_status_atual || item.area_responsavel}
+        />
+      </div>
+      <div className="sol-card-compacto-meio">
+        <span className="sol-card-compacto-obra">{formatarMaiusculas(item.obra?.nome || '-')}</span>
+        <span className="sol-card-compacto-descricao" title={formatarDescricao(item.descricao || '')}>
+          {formatarDescricao(item.descricao || '') || '-'}
+        </span>
+      </div>
+      <div className="sol-card-compacto-base">
+        <span className="sol-card-compacto-valor">{moeda(item.valor_exibicao ?? item.valor)}</span>
+        <span className="sol-card-compacto-venc">
+          {item.data_vencimento ? vencimentoHumano(item.data_vencimento) : 'Sem vencimento'}
+        </span>
+      </div>
+    </div>
+  );
+
+  // Com 1 selecionada o rótulo fica no singular, sem número; com 2 ou
+  // mais mantém a contagem ("Enviar 3 para outro setor").
+  const acoesLoteLista = arquivadas
+    ? [
+      {
+        id: 'desarquivar',
+        rotulo: (n) => (n === 1 ? 'Desarquivar' : `Desarquivar ${n}`),
+        desabilitada: () => processandoMassa,
+        executar: () => desarquivarEmMassa()
+      },
+      {
+        id: 'exportar',
+        rotulo: (n) => (n === 1 ? 'Exportar' : `Exportar ${n}`),
+        desabilitada: () => processandoMassa || exportando || !filtrosDataValidos,
+        executar: () => exportarSolicitacoesExcel()
+      }
+    ]
+    : [
+      {
+        id: 'assumir',
+        rotulo: () => 'Assumir',
+        visivel: (itens) => itens.length === 1 && podeAssumirUnica,
+        desabilitada: () => processandoMassa,
+        executar: () => assumirSelecionada()
+      },
+      {
+        id: 'enviar',
+        rotulo: (n) => (n === 1 ? 'Enviar para outro setor' : `Enviar ${n} para outro setor`),
+        visivel: () => podeEnviarMassa,
+        desabilitada: () => processandoMassa,
+        executar: () => setModalEnvioMassa(true)
+      },
+      {
+        id: 'exportar',
+        rotulo: (n) => (n === 1 ? 'Exportar' : `Exportar ${n}`),
+        desabilitada: () => processandoMassa || exportando || !filtrosDataValidos,
+        executar: () => exportarSolicitacoesExcel()
+      },
+      {
+        id: 'arquivar',
+        rotulo: (n) => (n === 1 ? 'Arquivar' : `Arquivar ${n}`),
+        desabilitada: () => processandoMassa,
+        executar: () => arquivarEmMassa()
+      },
+      {
+        id: 'atribuir',
+        rotulo: (n) => (n === 1 ? 'Atribuir responsável' : `Atribuir responsável a ${n}`),
+        visivel: () => podeAtribuirMassa,
+        desabilitada: () => processandoMassa,
+        executar: () => abrirModalAtribuirMassa()
+      },
+      ...(podeSolicitarPrioridadeFinanceiro ? [{
+        id: 'prioridade',
+        rotulo: (n) => (n === 1 ? 'Prioridade financeira' : `Prioridade financeira para ${n}`),
+        desabilitada: () => processandoMassa,
+        executar: () => solicitarPrioridadeFinanceiroSelecionadas()
+      }] : [])
+    ];
 
   return (
     <div className="solicitacoes-page px-0 py-1 md:py-2">
@@ -1676,372 +2220,111 @@ export default function Solicitacoes({ arquivadas = false }) {
         </div>
       ), document.body)}
 
-      <Filtros
-        filtros={filtros}
-        setFiltros={setFiltros}
-        obrasOptions={obrasOptions}
-        responsaveisOptions={responsaveisOptions}
-        setores={setoresLista}
-        tiposSolicitacao={tiposSolicitacao}
-        statusOptions={statusOptions}
-        mostrarFiltroResponsavel={isSetorFinanceiro}
-        mostrarSomaValor={mostrarSomaValor}
-        somaValorFiltrado={somaValorFiltrado}
-        errosDatas={errosFiltrosData}
-      />
-
-      {!arquivadas && (
-        <div className="acoes-massa-solicitacoes solicitacoes-toolbar sol-surface-card relative p-3 md:p-4 rounded-xl mb-4 flex flex-col xl:flex-row xl:items-center gap-3">
-          <div className="text-sm text-gray-600 dark:text-slate-300">
-            Selecionadas: <strong>{selecionadasIds.length}</strong>
-          </div>
-          <div className="flex flex-wrap gap-2 xl:ml-auto">
-            <button
-              type="button"
-              className="btn btn-outline inline-flex items-center gap-2"
-              onClick={exportarSolicitacoesExcel}
-              disabled={processandoMassa || exportando || !filtrosDataValidos}
-              title={selecionadasIds.length > 0 ? 'Exportar selecionadas para Excel (.csv)' : 'Exportar todas as solicitações filtradas (.csv)'}
-              aria-label="Exportar solicitações para Excel"
-            >
-              <HiDocumentArrowDown className="w-4 h-4" />
-              <span className="hidden sm:inline">{exportando ? 'Exportando...' : 'Exportar'}</span>
-            </button>
-            <button
-              ref={botaoColunasRef}
-              type="button"
-              className="btn btn-outline inline-flex items-center gap-2"
-              onClick={alternarSeletorColunas}
-              title="Selecionar colunas"
-              aria-label="Selecionar colunas"
-            >
-              <HiViewColumns className="w-4 h-4" />
-              <span className="hidden sm:inline">Colunas</span>
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={arquivarEmMassa}
-              disabled={processandoMassa || selecionadasIds.length === 0}
-            >
-              Arquivar em massa
-            </button>
-            <button
-              type="button"
-              className="btn btn-outline"
-              onClick={() => setModalEnvioMassa(true)}
-              disabled={processandoMassa || selecionadasIds.length === 0 || !podeEnviarMassa}
-            >
-              Enviar em massa
-            </button>
-            {podeSolicitarPrioridadeFinanceiro && (
-              <button
-                type="button"
-                className="btn btn-outline inline-flex items-center gap-2"
-                onClick={solicitarPrioridadeFinanceiroSelecionadas}
-                disabled={processandoMassa || selecionadasIds.length === 0}
-                title="Enviar lote de prioridade para aprovacao da Diretoria Administrativa"
-              >
-                <HiOutlineBanknotes className="w-4 h-4" />
-                <span className="hidden sm:inline">Prioridade financeiro</span>
-              </button>
-            )}
-          </div>
-
-          {mostrarSeletorColunas && typeof document !== 'undefined' && createPortal((
-            <div
-              ref={seletorColunasRef}
-              className="sol-floating-panel fixed z-[1000] w-[320px] max-w-[calc(100vw-2rem)] max-h-[min(70vh,420px)] overflow-hidden p-3"
-              style={{
-                left: `${seletorColunasPosition.left}px`,
-                top: `${seletorColunasPosition.top}px`
-              }}
-            >
-              <div className="sol-floating-panel-header mb-2">
-                <p className="text-sm font-medium">Colunas visíveis</p>
-                <button
-                  type="button"
-                  className="sol-floating-panel-link"
-                  onClick={() => setColunasVisiveis(opcoesColunas.map(c => c.id))}
-                >
-                  Mostrar todas
-                </button>
-              </div>
-              <div className="sol-floating-panel-grid sol-floating-panel-scroll">
-                {opcoesColunas.map(col => {
-                  const obrigatoria = ['codigo', 'status', 'acoes'].includes(col.id);
-                  const marcada = colunasVisiveis.includes(col.id);
-                  return (
-                    <label key={col.id} className={`sol-floating-panel-option ${obrigatoria ? 'is-disabled' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={marcada}
-                        disabled={obrigatoria}
-                        onChange={() => toggleColuna(col.id)}
-                      />
-                      <span className={obrigatoria ? 'sol-floating-panel-option-subtle' : ''}>{col.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </div>
-          ), document.body)}
-        </div>
-      )}
-
-      {loading && <p className="mt-6 text-sm md:text-base text-[var(--c-muted)]">Carregando...</p>}
-
-      {!loading && solicitacoes.length === 0 && (
-        <p className="mt-6">
-          {arquivadas ? 'Nenhuma solicitação arquivada.' : 'Nenhuma solicitação encontrada.'}
-        </p>
-      )}
-
-      {!loading && solicitacoes.length > 0 && (
-        <>
-          <TabelaSolicitacoes
-            solicitacoes={solicitacoes}
-            onAtualizar={handleAtualizarLista}
-            setoresMap={setoresMap}
-            permissaoUsuario={permissaoUsuario}
-            mostrarArquivadas={arquivadas}
-            visibleColumns={colunasVisiveis}
-            selecionadasIds={selecionadasIds}
-            onToggleSelecionada={toggleSelecionada}
-            onToggleSelecionarTodas={toggleSelecionarTodas}
-          />
-
-          <div className="sol-surface-card mt-4 p-3 md:p-4 rounded-xl flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-            <div className="text-sm text-gray-600 dark:text-slate-300">
-              {totalSolicitacoes > 0
-                ? `Exibindo ${paginaInicial}-${paginaFinal} de ${totalSolicitacoes} solicitações`
-                : 'Nenhuma solicitação encontrada'}
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300">
-                <span>Por página</span>
-                <select
-                  className="input !w-auto min-w-[88px]"
-                  value={limitePorPagina}
-                  onChange={(event) => {
-                    const valor = event.target.value;
-                    setLimitePorPagina(Number(valor) || 25);
-                  }}
-                >
-                  {PAGE_SIZE_OPTIONS.map((opcao) => (
-                    <option key={opcao} value={opcao}>{opcao}</option>
-                  ))}
-                </select>
-              </label>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setPaginaAtual((prev) => Math.max(1, prev - 1))}
-                  disabled={paginaAtual <= 1}
-                >
-                  Anterior
-                </button>
-                <span className="text-sm text-gray-700 dark:text-slate-200 min-w-[96px] text-center">
-                  {`Página ${paginaAtual} de ${Math.max(totalPaginas, 1)}`}
-                </span>
-                <button
-                  type="button"
-                  className="btn btn-outline"
-                  onClick={() => setPaginaAtual((prev) => Math.min(Math.max(totalPaginas, 1), prev + 1))}
-                  disabled={totalPaginas === 0 || paginaAtual >= totalPaginas}
-                >
-                  Próxima
-                </button>
-              </div>
-            </div>
-          </div>
-        </>
-      )}
-
-      {selecionadasIds.length > 0 && (
-        <div className="solicitacoes-massa-modal fixed left-1/2 -translate-x-1/2 bottom-4 z-40 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 shadow-xl rounded-2xl px-3 py-2 flex items-center gap-2">
-          <span className="solicitacoes-massa-contador text-sm font-medium text-gray-700 dark:text-slate-200 px-2">
-            {selecionadasIds.length} selecionada(s)
+      {filtroIdsUrl.length > 0 && (
+        <div className="sol-surface-card rounded-xl mb-3 p-3 flex items-center gap-3" role="status">
+          <span className="fx-badge fx-badge--warning">
+            Mostrando {filtroIdsUrl.length} pendência(s) vinda(s) do Início
           </span>
-
-          {selecionadaUnica && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={() => navigate(`/solicitacoes/${selecionadaUnica.id}`)}
-              title="Ver solicitação"
-              aria-label="Ver solicitação"
-            >
-              <HiOutlineEye className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && selecionadaUnica && podeAssumirUnica && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={assumirSelecionada}
-              disabled={processandoMassa}
-              title="Assumir solicitação"
-              aria-label="Assumir solicitação"
-            >
-              <HiOutlineHandRaised className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && selecionadaUnica && podeAtribuirUnica && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={() => setModalAtribuir(true)}
-              disabled={processandoMassa}
-              title="Atribuir responsável"
-              aria-label="Atribuir responsável"
-            >
-              <HiOutlineUserPlus className="w-4 h-4" />
-            </button>
-          )}
-
           <button
             type="button"
-            className="btn btn-outline solicitacoes-massa-acao"
-            onClick={exportarSolicitacoesExcel}
-            disabled={processandoMassa || exportando || !filtrosDataValidos}
-            title={exportando ? 'Exportando solicitações' : 'Exportar selecionadas'}
-            aria-label={exportando ? 'Exportando solicitações' : 'Exportar selecionadas'}
-            aria-busy={exportando}
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              setFiltroIdsUrl([]);
+              navigate(location.pathname, { replace: true });
+            }}
           >
-            <HiDocumentArrowDown className="w-4 h-4" />
-          </button>
-
-          {!arquivadas && podeSolicitarPrioridadeFinanceiro && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={solicitarPrioridadeFinanceiroSelecionadas}
-              disabled={processandoMassa}
-              title="Solicitar prioridade financeira"
-              aria-label="Solicitar prioridade financeira"
-            >
-              <HiOutlineBanknotes className="w-4 h-4" />
-            </button>
-          )}
-
-          {arquivadas ? (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={desarquivarEmMassa}
-              disabled={processandoMassa}
-              title="Desarquivar selecionadas"
-              aria-label="Desarquivar selecionadas"
-            >
-              <HiOutlineFolderOpen className="w-4 h-4" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={arquivarEmMassa}
-              disabled={processandoMassa}
-              title="Arquivar selecionadas"
-              aria-label="Arquivar selecionadas"
-            >
-              <HiOutlineFolderOpen className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && selecionadaUnica && podeEnviarUnica && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={() => setModalEnviarUnitario(true)}
-              disabled={processandoMassa}
-              title="Enviar para outro setor"
-              aria-label="Enviar para outro setor"
-            >
-              <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && selecionadasIds.length > 1 && podeEnviarMassa && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={() => setModalEnvioMassa(true)}
-              disabled={processandoMassa}
-              title="Enviar selecionadas para outro setor"
-              aria-label="Enviar selecionadas para outro setor"
-            >
-              <HiOutlineArrowRightOnRectangle className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && podeAtribuirMassa && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao"
-              onClick={abrirModalAtribuirMassa}
-              disabled={processandoMassa}
-              title="Atribuir responsável em massa"
-              aria-label="Atribuir responsável em massa"
-            >
-              <HiOutlineUserGroup className="w-4 h-4" />
-            </button>
-          )}
-
-          {!arquivadas && selecionadaUnica && podeExcluirUnica && (
-            <button
-              type="button"
-              className="btn btn-outline solicitacoes-massa-acao solicitacoes-massa-acao--perigo"
-              onClick={excluirSelecionada}
-              disabled={processandoMassa}
-              title="Excluir solicitação"
-              aria-label="Excluir solicitação"
-            >
-              <HiOutlineTrash className="w-4 h-4" />
-            </button>
-          )}
-
-          <button
-            type="button"
-            className="btn btn-outline solicitacoes-massa-acao"
-            onClick={() => setSelecionadasIds([])}
-            disabled={processandoMassa}
-            title="Limpar seleção"
-            aria-label="Limpar seleção"
-          >
-            <HiOutlineXMark className="w-4 h-4" />
+            Limpar este filtro
           </button>
         </div>
       )}
 
-      {!arquivadas && modalAtribuir && selecionadaUnica && (
-        <ModalAtribuirResponsavel
-          solicitacaoId={selecionadaUnica.id}
-          obraId={selecionadaUnica.obra_id}
-          isSetorObraSolicitacao={isSetorObraSolicitacaoUnica}
-          isUsuarioSetorObra={isSetorObra}
-          exigirPrazoCompra={exigePrazoCompraDelegacaoUnica}
-          onClose={() => setModalAtribuir(false)}
-          onSucesso={() => {
-            void handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
-          }}
-        />
+      {filtroVisaoUrl && (
+        <div className="sol-surface-card rounded-xl mb-3 p-3 flex items-center gap-3" role="status">
+          <span className="fx-badge fx-badge--warning">
+            Mostrando: {ROTULOS_VISAO_PENDENCIA[filtroVisaoUrl] || filtroVisaoUrl} — o mesmo
+            conjunto contado no cartão do Início{metaPaginacao?.total != null ? ` (${metaPaginacao.total})` : ''}
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => {
+              setFiltroVisaoUrl('');
+              navigate(location.pathname, { replace: true });
+            }}
+          >
+            Limpar este filtro
+          </button>
+        </div>
       )}
 
-      {!arquivadas && modalEnviarUnitario && selecionadaUnica && (
-        <ModalEnviarSetor
-          solicitacaoId={selecionadaUnica.id}
-          onClose={() => setModalEnviarUnitario(false)}
-          onSucesso={() => {
-            void handleAtualizarLista({ type: 'refresh_item', id: selecionadaUnica.id });
-          }}
-        />
-      )}
+      <ListaAvancada
+        ref={listaRef}
+        id={arquivadas ? 'solicitacoes-arquivadas' : 'solicitacoes'}
+        buscaInicial={buscaUrlInicial}
+        filtrosIniciais={filtrosUrlIniciais}
+        itens={itensExibidos}
+        total={Number(metaPaginacao?.total || 0)}
+        totalPaginas={Number(metaPaginacao?.total_pages || 0)}
+        pagina={paginaAtual}
+        carregando={loading}
+        onQueryChange={handleQueryChangeLista}
+        onPageRequest={handlePageRequestLista}
+        fetchContadores={arquivadas || !B3_DISPONIVEL ? null : getContadoresSolicitacoes}
+        visoes={visoesLista}
+        visaoInicial="todas"
+        filtrosRapidos={filtrosRapidosLista}
+        filtrosAvancadosAtivos={filtrosAvancadosAtivos}
+        filtrosAvancados={() => (
+          <Filtros
+            filtros={filtros}
+            setFiltros={setFiltros}
+            obrasOptions={obrasOptions}
+            responsaveisOptions={responsaveisOptions}
+            setores={setoresLista}
+            tiposSolicitacao={tiposSolicitacao}
+            statusOptions={statusOptions}
+            mostrarFiltroResponsavel={isSetorFinanceiro}
+            mostrarSomaValor={mostrarSomaValor}
+            somaValorFiltrado={somaValorFiltrado}
+            errosDatas={errosFiltrosData}
+          />
+        )}
+        busca={{
+          placeholder: 'Buscar por código, obra, descrição ou fornecedor…',
+          // Enquanto o B3 não existe a busca roda no cliente — o usuário
+          // precisa saber que ela não varre o banco inteiro.
+          aviso: B3_DISPONIVEL ? '' : 'A busca considera apenas os registros já carregados na tela.'
+        }}
+        colunas={colunasLista}
+        agrupamentos={[
+          { id: 'obra', rotulo: 'obra', valor: (item) => formatarMaiusculas(item.obra?.nome || '(sem obra)') },
+          { id: 'tipo', rotulo: 'tipo', valor: (item) => item.tipo?.nome || '(sem tipo)' },
+          { id: 'setor', rotulo: 'setor', valor: (item) => item.area_responsavel || '(sem setor)' },
+          { id: 'status', rotulo: 'status', valor: (item) => item.status_global || '(sem status)' },
+          { id: 'responsavel', rotulo: 'responsável', valor: (item) => item.responsavel || '(sem responsável)' },
+          { id: 'parceiro', rotulo: 'fornecedor/parceiro', valor: (item) => item.parceiro?.nome || '(sem parceiro)' },
+          { id: 'vencimento_mes', rotulo: 'mês de vencimento', valor: (item) => mesDeVencimento(item.data_vencimento), ordenarGrupos: compararMesVencimento },
+          { id: 'criador', rotulo: 'criador', valor: (item) => item.criador?.nome || '(sem criador)' },
+          {
+            id: 'apropriacao',
+            rotulo: 'apropriação',
+            valor: (item) => (item.apropriacao
+              ? [item.apropriacao.codigo, item.apropriacao.descricao].filter(Boolean).join(' — ')
+              : '(sem apropriação)')
+          },
+          {
+            id: 'contrato',
+            rotulo: 'contrato vinculado',
+            valor: (item) => item.contrato?.codigo || item.codigo_contrato || '(sem contrato)'
+          },
+          { id: 'faixa_valor', rotulo: 'faixa de valor', valor: (item) => faixaDeValor(item.valor_exibicao ?? item.valor), ordenarGrupos: compararFaixaValor }
+        ]}
+        renderCard={renderCardSolicitacao}
+        urgencia={(item) => urgenciaVencimento(item.data_vencimento)}
+        acoesLote={acoesLoteLista}
+        aoAbrirItem={(item) => navigate(`/solicitacoes/${item.id}`)}
+        onSelecaoChange={(ids) => setSelecionadasIds(ids.map(Number))}
+      />
 
       {modalAtribuirMassa && !arquivadas && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-3">

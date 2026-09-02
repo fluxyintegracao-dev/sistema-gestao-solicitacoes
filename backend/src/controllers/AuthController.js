@@ -43,6 +43,7 @@ const {
 const {
   calcularEstadoGuardUsuario
 } = require('../modules/custosRecebiveis/services/obrigacaoService');
+const { obterTelaInicialValidada } = require('../services/telaInicialService');
 
 const SETOR_ATTRIBUTES = [
   'id',
@@ -108,7 +109,7 @@ async function buildSessionUser(user) {
     };
   }
 
-  return {
+  const sessionUser = {
     id: user.id,
     nome: user.nome,
     email: user.email,
@@ -131,6 +132,13 @@ async function buildSessionUser(user) {
     mfa_setup_pending: mfaRequiredByPolicy && !mfaEnabled,
     custos_recebiveis_pendencia: custosRecebiveisPendencia
   };
+
+  // Tela inicial escolhida pelo usuário, validada no backend contra as
+  // permissões ATUAIS (mesma fonte única do frontend). Inválida = null
+  // (o login cai na Home) e a preferência já foi limpa pelo serviço.
+  sessionUser.tela_inicial = await obterTelaInicialValidada(sessionUser);
+
+  return sessionUser;
 }
 
 function buildAuthPayload(user) {
@@ -171,6 +179,11 @@ async function issueAuthenticatedSession(req, res, user, options = {}) {
 }
 
 module.exports = {
+  // Reutilizado pelo TelaInicialController: monta o MESMO objeto de
+  // sessão que o frontend recebe, para validar permissão de tela com
+  // entradas idênticas às da fonte única.
+  buildSessionUser,
+
   async login(req, res) {
     try {
       const emailNormalizado = String(req.body?.email || '').trim().toLowerCase();

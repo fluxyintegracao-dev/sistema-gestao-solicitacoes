@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   disableMfaRequest,
@@ -6,6 +6,7 @@ import {
   startMfaSetupRequest
 } from '../services/auth';
 import { alterarSenhaAtual } from '../services/usuarios';
+import { definirTelaInicial, getTelaInicial, limparTelaInicial } from '../services/telaInicial';
 import Alert from '../components/ui/Alert';
 
 function StatusBadge({ enabled }) {
@@ -42,6 +43,59 @@ export default function Perfil() {
   const mfaEnabled = Boolean(user?.mfa_totp_enabled);
   const mfaRequiredByPolicy = Boolean(user?.mfa_required_by_policy);
   const mfaSetupPending = Boolean(user?.mfa_setup_pending);
+
+  // ----- Tela inicial (onde o login entra) -----
+  const [telasDisponiveis, setTelasDisponiveis] = useState([]);
+  const [telaInicialEscolhida, setTelaInicialEscolhida] = useState('');
+  const [telaInicialSalvando, setTelaInicialSalvando] = useState(false);
+  const [telaInicialMensagem, setTelaInicialMensagem] = useState('');
+  const [telaInicialErro, setTelaInicialErro] = useState('');
+
+  useEffect(() => {
+    let ativo = true;
+    getTelaInicial()
+      .then((data) => {
+        if (!ativo) return;
+        setTelasDisponiveis(Array.isArray(data?.telas) ? data.telas : []);
+        setTelaInicialEscolhida(data?.tela_inicial?.id || '');
+      })
+      .catch(() => {
+        // sem catálogo (falha de rede): a seção fica só com a Home
+        if (ativo) setTelasDisponiveis([]);
+      });
+    return () => { ativo = false; };
+  }, []);
+
+  const telasPorModulo = useMemo(() => {
+    const grupos = new Map();
+    for (const tela of telasDisponiveis) {
+      const chave = tela.moduleLabel || 'Outros';
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave).push(tela);
+    }
+    return Array.from(grupos.entries());
+  }, [telasDisponiveis]);
+
+  async function salvarTelaInicialPerfil() {
+    setTelaInicialMensagem('');
+    setTelaInicialErro('');
+    try {
+      setTelaInicialSalvando(true);
+      if (!telaInicialEscolhida) {
+        await limparTelaInicial();
+        updateUser({ tela_inicial: null });
+        setTelaInicialMensagem('Você voltará a entrar na Home.');
+      } else {
+        const data = await definirTelaInicial(telaInicialEscolhida);
+        updateUser({ tela_inicial: data?.tela_inicial || null });
+        setTelaInicialMensagem(`Você passará a entrar em "${data?.tela_inicial?.label}".`);
+      }
+    } catch (error) {
+      setTelaInicialErro(error?.message || 'Erro ao salvar tela inicial');
+    } finally {
+      setTelaInicialSalvando(false);
+    }
+  }
 
   async function salvarSenha() {
     setMensagem('');
@@ -188,6 +242,59 @@ export default function Perfil() {
             {mfaRequiredByPolicy ? 'Obrigatorio pela politica atual' : 'Protecao complementar da conta'}
           </p>
         </div>
+      </div>
+
+      <div className="card space-y-4">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--c-text)]">Tela inicial</h2>
+          <p className="mt-1 text-sm text-[var(--c-muted)]">
+            Em qual tela você quer entrar ao abrir o sistema. Também dá para
+            marcar direto na tela, pela casinha ao lado da estrela de atalho.
+            Vale em qualquer navegador e no celular.
+          </p>
+        </div>
+
+        {telaInicialMensagem ? (
+          <Alert type="success" message={telaInicialMensagem} onClose={() => setTelaInicialMensagem('')} />
+        ) : null}
+        {telaInicialErro ? (
+          <Alert type="error" message={telaInicialErro} onClose={() => setTelaInicialErro('')} />
+        ) : null}
+
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[260px] flex-1">
+            <label className="block text-sm mb-1" style={{ color: 'var(--c-muted)' }}>
+              Entrar em
+            </label>
+            <select
+              className="input"
+              value={telaInicialEscolhida}
+              onChange={(e) => setTelaInicialEscolhida(e.target.value)}
+              disabled={telaInicialSalvando}
+            >
+              <option value="">Home (padrão)</option>
+              {telasPorModulo.map(([moduloLabel, telas]) => (
+                <optgroup key={moduloLabel} label={moduloLabel}>
+                  {telas.map((tela) => (
+                    <option key={tela.id} value={tela.id}>{tela.label}</option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={salvarTelaInicialPerfil}
+            disabled={telaInicialSalvando || (telaInicialEscolhida === (user?.tela_inicial?.id || ''))}
+          >
+            {telaInicialSalvando ? 'Salvando…' : 'Salvar tela inicial'}
+          </button>
+        </div>
+        <p className="text-xs text-[var(--c-muted)]">
+          Se você perder o acesso à tela escolhida, o sistema volta a abrir na
+          Home automaticamente.
+        </p>
       </div>
 
       <div className="card space-y-6">

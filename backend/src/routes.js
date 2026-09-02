@@ -363,7 +363,15 @@ const CargoController = require('./controllers/CargoController');
 const SetorController = require('./controllers/SetorController');
 const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
+const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
+const BuscaController = require('./controllers/BuscaController');
+const TelaInicialController = require('./controllers/TelaInicialController');
+const AtalhoSetorController = require('./controllers/AtalhoSetorController');
+const DetalheLayoutController = require('./controllers/DetalheLayoutController');
+const AcaoPrincipalSetorController = require('./controllers/AcaoPrincipalSetorController');
 const DashboardController = require('./controllers/DashboardController');
+const DashboardPendenciasController = require('./controllers/DashboardPendenciasController');
+const HomeBlocosController = require('./controllers/HomeBlocosController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
 const InstalacaoController = require('./controllers/InstalacaoController');
@@ -1532,6 +1540,9 @@ router.get('/solicitacoes/apropriacao-padrao', ObraTipoApropriacaoController.res
 router.get('/solicitacoes/despesa-eventual/saldo', SolicitacaoController.saldoDespesaEventual);
 router.get('/solicitacoes/filtros/status', SolicitacaoController.statusVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
+// Contadores das visoes da lista — MESMO escopo da listagem (pacote B3).
+// Registrada antes de /solicitacoes/:id para nao casar como id.
+router.get('/solicitacoes/contadores', SolicitacaoController.contadores);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
 router.get('/solicitacoes/relatorios/operacional', allowSolicitacoesRelatorioOperacional, RelatorioSolicitacoesController.operacional);
 router.get('/solicitacoes/:id/resumo-lista', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.resumoLista);
@@ -2252,6 +2263,50 @@ router.get('/configuracoes/tipos-compartilhados-setor', ConfiguracaoSistemaContr
 router.patch('/configuracoes/tipos-compartilhados-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateTiposCompartilhadosSetor);
 router.get('/configuracoes/automacao-status-setor', ConfiguracaoSistemaController.getAutomacaoStatusSetor);
 router.patch('/configuracoes/automacao-status-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
+
+// Preferencias e filtros salvos das listas (ListaAvancada) — sempre do
+// proprio usuario autenticado; nao ha como ler ou escrever registro de
+// outra pessoa (pacote B1 de docs/PROPOSTA-BACKEND.md).
+router.get('/listas/:lista/preferencias', ListaPreferenciasController.getPreferencias);
+router.put('/listas/:lista/preferencias', ListaPreferenciasController.putPreferencias);
+router.get('/listas/:lista/filtros', ListaPreferenciasController.listarFiltros);
+router.post('/listas/:lista/filtros', ListaPreferenciasController.salvarFiltro);
+router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirFiltro);
+
+// Busca universal (Ctrl+K): grupos gateados pela permissao da tela
+// correspondente; grupo sem permissao nem e consultado (pacote B2).
+router.get('/busca', BuscaController.index);
+
+// Blocos opcionais da Home (pacote B6): dados sob demanda, um bloco por
+// chamada, cada um gateado pelas permissoes e escopos da tela de origem.
+router.get('/home/blocos/:bloco', HomeBlocosController.show);
+
+// Pendencias do usuario no Hub (pacote B3): consultas nomeadas, gateadas
+// pelas permissoes das telas de destino; contador e lista compartilham o
+// mesmo recorte (pendenciasVisoes + escopo da listagem). Somente leitura.
+router.get('/dashboard/pendencias', DashboardPendenciasController.index);
+
+// Tela inicial escolhida pelo usuario (pacote B5) — validada no backend
+// contra a fonte unica de navegacao compilada (mesmas regras do
+// frontend); fail-closed: sem permissao/rota, limpa e cai na Home.
+router.get('/me/tela-inicial', TelaInicialController.get);
+router.put('/me/tela-inicial', TelaInicialController.put);
+router.delete('/me/tela-inicial', TelaInicialController.delete);
+
+// Configuracao por setor (pacote B4): leitura aberta a autenticados
+// (metadado de interface); escrita gateada pelo MESMO gate de
+// configuracoes dos demais vinculos de status — nenhuma permissao nova.
+router.get('/configuracoes/atalhos-setor', AtalhoSetorController.index);
+router.post('/configuracoes/atalhos-setor', allowConfiguracoesStatusVinculos, AtalhoSetorController.store);
+router.put('/configuracoes/atalhos-setor/:id', allowConfiguracoesStatusVinculos, AtalhoSetorController.update);
+router.delete('/configuracoes/atalhos-setor/:id', allowConfiguracoesStatusVinculos, AtalhoSetorController.destroy);
+router.get('/configuracoes/detalhe-layout', DetalheLayoutController.index);
+router.put('/configuracoes/detalhe-layout/:setor', allowConfiguracoesStatusVinculos, DetalheLayoutController.upsert);
+router.delete('/configuracoes/detalhe-layout/:setor', allowConfiguracoesStatusVinculos, DetalheLayoutController.destroy);
+router.get('/configuracoes/acoes-principais', AcaoPrincipalSetorController.index);
+router.post('/configuracoes/acoes-principais', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.store);
+router.put('/configuracoes/acoes-principais/:id', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.update);
+router.delete('/configuracoes/acoes-principais/:id', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.destroy);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-acesso-todas-obras', ConfiguracaoSistemaController.getSetoresAcessoTodasObras);

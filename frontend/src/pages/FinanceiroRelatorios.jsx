@@ -1365,7 +1365,7 @@ function ReportListItem({ report, active, onClick }) {
       }`}
       onClick={onClick}
     >
-      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
         {report.group}
       </span>
       <span className="block text-sm font-semibold text-slate-950">{report.title}</span>
@@ -1529,7 +1529,7 @@ export default function FinanceiroRelatorios() {
         <section className="financeiro-relatorios-content min-w-0">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
                 {selectedReport.group}
               </span>
               <h2 className="text-lg font-semibold text-slate-950">{selectedReport.title}</h2>

@@ -165,7 +165,10 @@ export default function Obras() {
   const [empresasGrupo, setEmpresasGrupo] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [busca, setBusca] = useState('');
+  // ?q= da busca universal abre a lista já filtrada.
+  const [busca, setBusca] = useState(() => (
+    new URLSearchParams(window.location.search).get('q') || ''
+  ));
   const [modalAberto, setModalAberto] = useState(false);
   const [form, setForm] = useState(initialFormState());
 

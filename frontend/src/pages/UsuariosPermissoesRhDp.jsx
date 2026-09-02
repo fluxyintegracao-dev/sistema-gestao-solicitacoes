@@ -196,7 +196,7 @@ export default function UsuariosPermissoesRhDp() {
                               <span className="flex flex-col gap-1">
                                 <span className="font-medium text-slate-900">{permissionLabel}</span>
                                 <span className="text-slate-500">{permissionDescription}</span>
-                                <span className="text-xs text-slate-400">{permissionKey}</span>
+                                <span className="text-xs text-slate-500">{permissionKey}</span>
                               </span>
                             </label>
                           );

@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import {
   HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowDownTray,
@@ -15,6 +15,7 @@ import {
   HiOutlineXMark
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
+import StatusBadge from '../components/StatusBadge';
 import {
   baixarTituloFinanceiro,
   baixarTitulosFinanceirosEmMassaParcelado,
@@ -867,6 +868,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
   });
   const [appliedFilters, setAppliedFilters] = useState(null);
+  const location = useLocation();
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -998,6 +1000,69 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     setError('');
     setSelectedTituloIds([]);
   }, [filterStorageKey, fixedTipo]);
+
+  // Links das pendências do Hub chegam com a tela já filtrada:
+  // ?vencidos=1 (vencimento até ontem) ou ?vencendo_ate=AAAA-MM-DD
+  // (vencimento entre hoje e a data limite). Títulos em aberto.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const vencidos = params.get('vencidos') === '1';
+    const vencendoAte = params.get('vencendo_ate');
+    // ?q= chega da busca universal (Ctrl+K): abre a lista já filtrada.
+    const buscaUrl = String(params.get('q') || '').trim();
+    const temParamsDiretos = ['status', 'obra_id', 'vencimento_inicial', 'vencimento_final']
+      .some((chave) => params.get(chave) !== null);
+    if (!vencidos && !vencendoAte && !buscaUrl && !temParamsDiretos) return;
+
+    const hoje = new Date();
+    const isoLocal = (date) => {
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    };
+
+    // 'EM_ABERTO' = previsão+aberto+parcial — o MESMO conjunto de
+    // status que os contadores de pendência somam (o backend expande).
+    const sobrescritas = {};
+    if (buscaUrl) {
+      // Busca por código (Para resolver agora / Ctrl+K): acha o título
+      // em qualquer status.
+      sobrescritas.q = buscaUrl;
+      sobrescritas.status = '';
+    }
+    if (vencidos) {
+      const ontem = new Date(hoje);
+      ontem.setDate(ontem.getDate() - 1);
+      sobrescritas.status = 'EM_ABERTO';
+      sobrescritas.vencimento_final = isoLocal(ontem);
+      sobrescritas.vencimento_inicial = '';
+    } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(vencendoAte || ''))) {
+      sobrescritas.status = 'EM_ABERTO';
+      sobrescritas.vencimento_inicial = isoLocal(hoje);
+      sobrescritas.vencimento_final = vencendoAte;
+    }
+
+    // Parâmetros diretos (resumo por obra do Hub): mesmo recorte da soma.
+    for (const chave of ['status', 'obra_id', 'vencimento_inicial', 'vencimento_final']) {
+      const valor = params.get(chave);
+      if (valor !== null) sobrescritas[chave] = valor;
+    }
+    if (Object.keys(sobrescritas).length === 0) return;
+
+    setVisibleFilterIds((atuais) => Array.from(new Set([
+      ...atuais, 'status', 'vencimento_inicial', 'vencimento_final',
+      ...(sobrescritas.obra_id ? ['obra_id'] : []),
+      ...(buscaUrl ? ['q'] : [])
+    ])));
+    // Os links do Hub SUBSTITUEM os filtros salvos (não se misturam a
+    // eles): a lista abre mostrando exatamente o conjunto contado.
+    const proximos = normalizeFilters(sobrescritas, fixedTipo);
+    setDraftFilters(proximos);
+    setAppliedFilters(proximos);
+    setPagination((current) => ({ ...current, page: 1 }));
+    // roda apenas em resposta à mudança da URL
+  }, [location.search, fixedTipo]);
 
   useEffect(() => {
     if (!appliedFilters) {
@@ -1383,7 +1448,11 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       case 'Status':
         return (
           <td className="px-3 py-2 whitespace-nowrap">
-            <span className={statusClass(titulo.status)}>{titulo.status}</span>
+            {isOverdue(titulo) ? (
+              <StatusBadge status={`${titulo.status} · VENCIDO`} kind="danger" />
+            ) : (
+              <StatusBadge status={titulo.status} />
+            )}
           </td>
         );
       case 'Tipo':
@@ -2144,6 +2213,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               onChange={(event) => setFilter('status', event.target.value)}
             >
               <option value="">Todos</option>
+              <option value="EM_ABERTO">Em aberto (previsão + aberto + parcial)</option>
               <option value="PREVISAO">Previsao</option>
               <option value="ABERTO">Aberto</option>
               <option value="PARCIAL">Parcial</option>

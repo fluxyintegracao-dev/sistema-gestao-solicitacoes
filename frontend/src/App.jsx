@@ -75,6 +75,8 @@ import {
 } from './modules/sst/constants/sstResources';
 import { canAccessCustosRecebiveis } from './modules/custosRecebiveis/utils/access';
 
+const HomeHub = lazy(() => import('./navigation/HomeHub'));
+const ModuleHub = lazy(() => import('./navigation/ModuleHub'));
 const Login = lazy(() => import('./pages/Login'));
 const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
 const DefinirSenha = lazy(() => import('./pages/DefinirSenha'));
@@ -179,6 +181,9 @@ const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
 const ConfiguracoesNotificacoesSistema = lazy(() => import('./pages/ConfiguracoesNotificacoesSistema'));
 const ConfiguracoesContratoAlertasEFormas = lazy(() => import('./pages/ConfiguracoesContratoAlertasEFormas'));
 const CartoesRecarga = lazy(() => import('./pages/CartoesRecarga'));
+const ConfiguracoesAcoesPrincipais = lazy(() => import('./pages/ConfiguracoesAcoesPrincipais'));
+const ConfiguracoesAtalhosSetor = lazy(() => import('./pages/ConfiguracoesAtalhosSetor'));
+const ConfiguracoesDetalheLayout = lazy(() => import('./pages/ConfiguracoesDetalheLayout'));
 const Parceiros = lazy(() => import('./pages/Parceiros'));
 const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
 const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
@@ -330,7 +335,7 @@ function CustosRecebiveisRoute({ children }) {
 function DashboardRoute() {
   const { user } = useAuth();
   if (!canAccessDashboard(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return <Dashboard />;
 }
@@ -362,7 +367,7 @@ function ModuloComprasRoute({ children }) {
 function CompraSolicitacoesRoute({ children }) {
   const { user } = useAuth();
   if (!canViewCompraSolicitacoes(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -370,7 +375,7 @@ function CompraSolicitacoesRoute({ children }) {
 function CompraSolicitacaoCreateRoute({ children }) {
   const { user } = useAuth();
   if (!canCreateCompraSolicitacao(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -378,7 +383,7 @@ function CompraSolicitacaoCreateRoute({ children }) {
 function CompraSolicitacaoCreateFlowRoute({ children }) {
   const { user } = useAuth();
   if (!canCreateCompraSolicitacao(user) && !canViewCompraSolicitacoes(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -402,7 +407,7 @@ function ComprasPedidosRoute({ children }) {
 function ComprasDelegacaoRoute({ children }) {
   const { user } = useAuth();
   if (!canViewComprasDelegacao(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -410,7 +415,7 @@ function ComprasDelegacaoRoute({ children }) {
 function ComprasFornecedoresRoute({ children }) {
   const { user } = useAuth();
   if (!canViewComprasFornecedores(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -418,7 +423,7 @@ function ComprasFornecedoresRoute({ children }) {
 function ComprasRelatoriosRoute({ children }) {
   const { user } = useAuth();
   if (!canViewComprasRelatorios(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -426,7 +431,7 @@ function ComprasRelatoriosRoute({ children }) {
 function ComprasConfiguracoesRoute({ children }) {
   const { user } = useAuth();
   if (!canManageComprasConfiguracoes(user)) {
-    return <Navigate to="/solicitacoes" replace />;
+    return <Navigate to="/" replace />;
   }
   return children;
 }
@@ -870,7 +875,11 @@ export default function App() {
           </PrivateRoute>
         )}
       >
-        <Route index element={<DashboardRoute />} />
+        {/* Hub Principal (nível 1) e hubs de módulo (nível 2). O
+            Dashboard executivo, antes na raiz, vive agora em /dashboard. */}
+        <Route index element={<HomeHub />} />
+        <Route path="hub/:moduleId" element={<ModuleHub />} />
+        <Route path="dashboard" element={<DashboardRoute />} />
 
         <Route path="solicitacoes" element={<Solicitacoes />} />
         <Route path="solicitacoes/relatorios" element={<SolicitacoesRelatoriosRoute><ModuloRelatorios modulo="solicitacoes" /></SolicitacoesRelatoriosRoute>} />
@@ -919,6 +928,9 @@ export default function App() {
         <Route path="nova-solicitacao-automacao-destino" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoAutomacaoDestinoConfig /></ConfiguracoesAreaRoute>} />
         <Route path="tipos-compartilhados-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposCompartilhadosSetor /></ConfiguracoesAreaRoute>} />
         <Route path="automacao-status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><AutomacaoStatusSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-acoes-principais" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesAcoesPrincipais /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-atalhos-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesAtalhosSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-detalhe-layout" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesDetalheLayout /></ConfiguracoesAreaRoute>} />
         <Route path="setores-criacao-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresCriacaoTodasObras /></ConfiguracoesAreaRoute>} />
         <Route path="setores-acesso-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresAcessoTodasObras /></ConfiguracoesAreaRoute>} />
         <Route path="usuarios-envio-qualquer-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosEnvioQualquerSetor /></ConfiguracoesAreaRoute>} />

@@ -2198,7 +2198,11 @@ async function listarTitulos(req, filters = {}) {
     where.tipo = filters.tipo;
   }
   if (filters.status) {
-    where.status = filters.status;
+    // 'EM_ABERTO' é o composto usado pelos cartões de pendência do Hub:
+    // o MESMO conjunto de status que os contadores somam.
+    where.status = String(filters.status).trim().toUpperCase() === 'EM_ABERTO'
+      ? { [Op.in]: ['PREVISAO', 'ABERTO', 'PARCIAL'] }
+      : filters.status;
   }
   if (filters.codigo) {
     where[Op.and] = [

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PreviewAnexoModal from './PreviewAnexoModal';
 import { API_URL, authHeaders, fileUrl } from '../../services/api';
 
@@ -6,17 +6,39 @@ export default function Timeline({
   historicos,
   canRemoveAnexo = false,
   canRemoveComentario = false,
-  onAnexoRemovido
+  onAnexoRemovido,
+  // Preferência do usuário: 'asc' (mais antigos primeiro, rolagem no fim
+  // — padrão) ou 'desc' (mais recentes primeiro).
+  ordem = 'asc'
 }) {
   const [preview, setPreview] = useState(null);
+  const listaRef = useRef(null);
   const acoesOcultas = new Set([
     'PENDENCIA_FINANCEIRA_MARCADA',
     'PENDENCIA_FINANCEIRA_REGULARIZADA',
     'COMENTARIO_REMOVIDO'
   ]);
-  const historicosVisiveis = Array.isArray(historicos)
-    ? historicos.filter((h) => !acoesOcultas.has(String(h?.acao || '').trim().toUpperCase()))
-    : [];
+  // Ordem CRONOLÓGICA, como conversa: mais antigo em cima, mais recente
+  // embaixo — a rolagem começa posicionada no fim (o mais novo).
+  const historicosVisiveis = (Array.isArray(historicos) ? historicos : [])
+    .filter((h) => !acoesOcultas.has(String(h?.acao || '').trim().toUpperCase()))
+    .slice()
+    .sort((a, b) => {
+      const dataA = new Date(a?.createdAt || 0).getTime();
+      const dataB = new Date(b?.createdAt || 0).getTime();
+      const cmp = dataA !== dataB
+        ? dataA - dataB
+        : Number(a?.id || 0) - Number(b?.id || 0);
+      return ordem === 'desc' ? -cmp : cmp;
+    });
+
+  const totalVisiveis = historicosVisiveis.length;
+  useEffect(() => {
+    const el = listaRef.current;
+    if (!el) return;
+    // asc = conversa: rolagem começa no fim (mais recente).
+    el.scrollTop = ordem === 'desc' ? 0 : el.scrollHeight;
+  }, [totalVisiveis, ordem]);
 
   function normalizarUrlArquivo(url) {
     const valor = String(url || '');
@@ -200,7 +222,7 @@ export default function Timeline({
     <div className="sol-detail-card">
       <h2 className="sol-detail-card-title">Historico</h2>
 
-      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1" ref={listaRef}>
         {historicosVisiveis.map(h => {
           let meta = null;
           try {

@@ -1,0 +1,1986 @@
+/* =====================================================================
+   DESIGN TOKENS — sistema de cores sóbrio (ver docs/DESIGN-SYSTEM.md)
+   ---------------------------------------------------------------------
+   Camada única de tokens semânticos, de identidade de módulo e de
+   status. Nenhum componente deve usar cor solta: sempre var(--...).
+   Todos os pares texto/fundo abaixo foram validados WCAG AA
+   (>= 4.5:1 texto normal, >= 3:1 ícones e texto grande) nos dois temas.
+   ===================================================================== */
+
+:root {
+  /* --- Semânticas (claro) — o significado NUNCA muda de tela para tela.
+     danger  = erro, falha, bloqueio, exclusão, vencido
+     warning = atenção, pendência, aguardando ação, prazo próximo
+     success = sucesso, aprovado, pago, concluído
+     info    = informação, ação primária neutra, em andamento
+     neutral = inativo, cancelado, arquivado */
+  --sem-danger: #b32020;
+  --sem-danger-bg: #fdeceb;
+  --sem-danger-border: #f3c9c7;
+  --sem-warning: #9a5b06;
+  --sem-warning-bg: #f7f2eb;
+  --sem-warning-border: #e6d6c1;
+  --sem-success: #116149;
+  --sem-success-bg: #ecf2f0;
+  --sem-success-border: #c4d8d2;
+  --sem-info: #22447f;
+  --sem-info-bg: #edf0f5;
+  --sem-info-border: #c8d0df;
+  --sem-neutral: #5b6472;
+  --sem-neutral-bg: #f2f3f4;
+  --sem-neutral-border: #d6d8dc;
+
+  /* --- Identidade por módulo (claro) — usada APENAS no ícone.
+     Card permanece neutro (superfície e borda padrão do sistema).
+     Famílias: operação (azuis), dinheiro (terrosos/verdes),
+     relacionamento (roxos), estrutura (ardósia). Sem tons avermelhados:
+     vermelho é exclusivo de erro. */
+  --module-painel: #2d5c8f;
+  --module-solicitacoes: #3a5f9e;
+  --module-comunicacao: #256f7a;
+  --module-biblioteca: #1d6f66;
+  --module-treinamento: #4a5da8;
+  --module-provisionamento: #37607d;
+  --module-sst: #1f5170;
+  --module-compras: #8a5a12;
+  --module-financeiro: #146152;
+  --module-custos-recebiveis: #2f6b57;
+  --module-fiscal: #3f6a5a;
+  --module-contratos: #7a5a2e;
+  --module-rhdp: #4d6b33;
+  --module-crm: #5b4a91;
+  --module-comercial: #6b4f8f;
+  --module-cadastros: #4f5a68;
+  --module-administracao: #3f4650;
+  --module-configuracoes: #59626e;
+  --module-conta: #5b6472;
+}
+
+.dark {
+  /* --- Semânticas (escuro) — derivadas dos tons claros, clareadas até
+     atingir AA sobre a superfície escura (#152136). */
+  --sem-danger: #ce6e6e;
+  --sem-danger-bg: #2d2133;
+  --sem-danger-border: #51212e;
+  --sem-warning: #bd945d;
+  --sem-warning-bg: #292a2f;
+  --sem-warning-border: #483724;
+  --sem-success: #649889;
+  --sem-success-bg: #142b39;
+  --sem-success-border: #13393d;
+  --sem-info: #788db1;
+  --sem-info-bg: #172641;
+  --sem-info-border: #1a2e52;
+  --sem-neutral: #949aa3;
+  --sem-neutral-bg: #202b3f;
+  --sem-neutral-border: #303a4d;
+
+  /* --- Identidade por módulo (escuro) — >= 3:1 sobre superfície escura */
+  --module-painel: #6c8db1;
+  --module-solicitacoes: #758fbb;
+  --module-comunicacao: #669aa2;
+  --module-biblioteca: #619a94;
+  --module-treinamento: #808ec2;
+  --module-provisionamento: #7390a4;
+  --module-sst: #62859b;
+  --module-compras: #ad8c59;
+  --module-financeiro: #5b9086;
+  --module-custos-recebiveis: #6f9b8c;
+  --module-fiscal: #79978c;
+  --module-contratos: #a28c6d;
+  --module-rhdp: #829770;
+  --module-crm: #8c80b2;
+  --module-comercial: #9784b1;
+  --module-cadastros: #848c95;
+  --module-administracao: #797e85;
+  --module-configuracoes: #8b919a;
+  --module-conta: #8c939c;
+}
+
+/* =====================================================================
+   ETIQUETA DE STATUS (pílula suave) — formato único em todas as listas.
+   Fundo suave da família + texto na cor semântica escura + ícone.
+   Nunca cor sólida em etiqueta de lista.
+   ===================================================================== */
+.fx-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sem-neutral-border);
+  background: var(--sem-neutral-bg);
+  color: var(--sem-neutral);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.fx-badge > svg {
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+.fx-badge--danger {
+  background: var(--sem-danger-bg);
+  border-color: var(--sem-danger-border);
+  color: var(--sem-danger);
+}
+
+.fx-badge--warning {
+  background: var(--sem-warning-bg);
+  border-color: var(--sem-warning-border);
+  color: var(--sem-warning);
+}
+
+.fx-badge--success {
+  background: var(--sem-success-bg);
+  border-color: var(--sem-success-border);
+  color: var(--sem-success);
+}
+
+.fx-badge--info {
+  background: var(--sem-info-bg);
+  border-color: var(--sem-info-border);
+  color: var(--sem-info);
+}
+
+.fx-badge--neutral {
+  background: var(--sem-neutral-bg);
+  border-color: var(--sem-neutral-border);
+  color: var(--sem-neutral);
+}
+
+/* =====================================================================
+   HUBS DE NAVEGAÇÃO (nível 1 e nível 2)
+   ===================================================================== */
+.hub-page {
+  /* Aproveita a largura da tela: o conteúdo cresce até 1520px. */
+  padding: 16px clamp(14px, 3vw, 32px) 32px;
+  max-width: 1520px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.hub-header {
+  margin: 2px 0 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hub-header-acoes {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-top: 4px;
+}
+
+/* Blocos personalizáveis da Home (mesmo motor do detalhe) */
+.hub-bloco {
+  min-width: 0;
+}
+
+.hub-bloco > nav {
+  margin: 0 0 14px;
+}
+
+.hub-bloco .sol-detail-bloco-recolhido {
+  margin: 0 0 14px;
+}
+
+.hub-personalizar-toolbar {
+  margin: 0 0 14px;
+}
+
+/* Largura "Normal" = meia largura em telas largas; abaixo disso a
+   coluna única volta (largura não se aplica no mobile). */
+.hub-blocos-colunas {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0 14px;
+  align-items: start;
+}
+
+@media (min-width: 1024px) {
+  .hub-blocos-colunas {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.hub-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--app-heading-color);
+  margin: 0;
+}
+
+.hub-subtitle {
+  font-size: 14px;
+  color: var(--app-muted-color);
+  margin: 4px 0 0;
+}
+
+.hub-grid {
+  display: grid;
+  /* NO MÁXIMO 4 colunas em telas grandes; 3, 2 e 1 conforme estreita.
+     Vale igual no modo normal e no de personalização — ocultar um card
+     reorganiza os demais mantendo as 4 colunas. */
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1279px) {
+  .hub-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 1023px) {
+  .hub-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 480px) {
+  .hub-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Card NEUTRO: mesma superfície do sistema, borda padrão.
+   A cor de identidade aparece apenas no ícone. */
+.hub-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  min-height: 76px; /* alvo de toque confortável (>= 44px com folga) */
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  text-align: left;
+  text-decoration: none;
+  color: var(--card-text);
+  box-shadow: var(--ui-shadow-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  cursor: pointer;
+}
+
+.hub-card:hover {
+  border-color: var(--ui-border-strong);
+  box-shadow: var(--ui-shadow-md);
+  transform: translateY(-1px);
+}
+
+.hub-card:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.hub-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 11px;
+  background: var(--ui-surface-soft);
+  color: var(--hub-accent, var(--sem-neutral));
+}
+
+.hub-card-icon > svg {
+  width: 22px;
+  height: 22px;
+}
+
+.hub-card-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.hub-card-label {
+  display: block;
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--card-text);
+  margin: 2px 0 3px;
+}
+
+.hub-card-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--card-muted);
+}
+
+/* Contador discreto de pendências no card (neutro ou atenção,
+   nunca a cor de identidade do módulo). */
+.hub-card-count {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: var(--sem-warning-bg);
+  border: 1px solid var(--sem-warning-border);
+  color: var(--sem-warning);
+}
+
+.hub-card-count--neutral {
+  background: var(--sem-neutral-bg);
+  border-color: var(--sem-neutral-border);
+  color: var(--sem-neutral);
+}
+
+/* --- Faixa "Suas pendências" ------------------------------------- */
+.hub-pendencias {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-pendencias-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--app-muted-color);
+}
+
+.hub-pendencias-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hub-pendencia-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 11px;
+  border: 1px solid var(--sem-warning-border);
+  background: var(--sem-warning-bg);
+  color: var(--sem-warning);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.hub-pendencia-item:hover {
+  filter: brightness(0.97);
+  transform: translateY(-1px);
+}
+
+.hub-pendencia-item:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.hub-pendencia-item--danger {
+  border-color: var(--sem-danger-border);
+  background: var(--sem-danger-bg);
+  color: var(--sem-danger);
+}
+
+.hub-pendencia-item > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.hub-pendencia-count {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =====================================================================
+   TOPBAR: breadcrumb + Início + busca global
+   ===================================================================== */
+.fx-topbar {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px clamp(14px, 3vw, 28px);
+  padding-top: calc(10px + var(--safe-area-top));
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.fx-topbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.fx-home-btn,
+.fx-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--btn-outline-border);
+  background: var(--btn-outline-bg);
+  color: var(--btn-outline-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fx-home-btn:hover,
+.fx-search-btn:hover {
+  background: var(--btn-outline-hover);
+}
+
+.fx-home-btn:focus-visible,
+.fx-search-btn:focus-visible,
+.fx-breadcrumb a:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.fx-search-kbd {
+  font-size: 10.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--ui-border-strong);
+  background: var(--ui-surface-soft);
+  color: var(--app-muted-color);
+}
+
+.fx-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-size: 13px;
+  color: var(--app-muted-color);
+}
+
+.fx-breadcrumb::-webkit-scrollbar {
+  display: none;
+}
+
+.fx-breadcrumb a {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 8px;
+  min-height: 36px;
+  border-radius: 8px;
+  color: var(--app-muted-color);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fx-breadcrumb a:hover {
+  background: var(--ui-surface-soft);
+  color: var(--app-body-color);
+}
+
+.fx-breadcrumb-current {
+  padding: 6px 8px;
+  font-weight: 700;
+  color: var(--app-heading-color);
+  white-space: nowrap;
+}
+
+.fx-breadcrumb-sep {
+  color: var(--app-subtle-color);
+  flex-shrink: 0;
+}
+
+.fx-topbar-tray {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* =====================================================================
+   BUSCA GLOBAL (Ctrl+K)
+   ===================================================================== */
+.fx-cmdk-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: var(--modal-overlay);
+}
+
+.fx-cmdk {
+  width: 100%;
+  max-width: 560px;
+  background: var(--modal-bg);
+  border: 1px solid var(--modal-border);
+  border-radius: 14px;
+  box-shadow: var(--modal-shadow);
+  overflow: hidden;
+}
+
+.fx-cmdk-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--ui-border);
+  color: var(--app-muted-color);
+}
+
+.fx-cmdk-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 15px;
+  color: var(--app-body-color);
+}
+
+.fx-cmdk-list {
+  max-height: 46vh;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.fx-cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--app-body-color);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.fx-cmdk-item[aria-selected='true'],
+.fx-cmdk-item:hover {
+  background: var(--ui-surface-soft);
+}
+
+.fx-cmdk-item > svg,
+.fx-cmdk-item .fx-cmdk-item-main > svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--fx-cmdk-accent, var(--sem-neutral));
+}
+
+.fx-cmdk-item-module {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--app-muted-color);
+  white-space: nowrap;
+}
+
+.fx-cmdk-empty {
+  padding: 22px 16px;
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--app-muted-color);
+}
+
+.fx-cmdk-hint {
+  display: flex;
+  gap: 14px;
+  padding: 9px 16px;
+  border-top: 1px solid var(--ui-border);
+  font-size: 11.5px;
+  color: var(--app-subtle-color);
+}
+
+/* =====================================================================
+   PENDÊNCIAS COMO CARTÕES (Home) — número em destaque + tarja lateral
+   ===================================================================== */
+.hub-pendencias-list--cartoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.hub-pendencia-cartao {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 68px;
+  padding: 10px 14px 10px 18px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  text-decoration: none;
+  overflow: hidden;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+/* Tarja de urgência lateral: âmbar por padrão, vermelha no danger. */
+.hub-pendencia-cartao::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--sem-warning);
+}
+
+.hub-pendencia-cartao--danger::before {
+  background: var(--sem-danger);
+}
+
+.hub-pendencia-cartao:hover {
+  filter: brightness(0.98);
+  transform: translateY(-1px);
+}
+
+.hub-pendencia-cartao:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+}
+
+.hub-pendencia-cartao-numero {
+  font-size: 24px;
+  line-height: 1.1;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--sem-warning);
+}
+
+.hub-pendencia-cartao--danger .hub-pendencia-cartao-numero {
+  color: var(--sem-danger);
+}
+
+.hub-pendencia-cartao-rotulo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--app-muted-color);
+}
+
+.hub-pendencia-cartao-rotulo > svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.hub-card-count--danger {
+  background: var(--sem-danger-bg);
+  border-color: var(--sem-danger-border);
+  color: var(--sem-danger);
+}
+
+.hub-subtitle--papel {
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* =====================================================================
+   ATALHOS — barra do topo (estrela, fileira de ícones, painel »)
+   ===================================================================== */
+.fx-atalhos-area {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  overflow: visible;
+}
+
+.fx-fixar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--app-muted-color);
+  cursor: pointer;
+}
+
+.fx-fixar-btn:hover {
+  background: var(--ui-surface-soft);
+}
+
+.fx-fixar-btn--ativo {
+  color: var(--sem-warning);
+}
+
+/* Botão "minha tela inicial" — mora ao lado da estrela mas não compete
+   com ela: contorno mais apagado quando inativo e, quando ativo, casa
+   preenchida na cor primária (a estrela ativa é âmbar). */
+.fx-inicial-btn {
+  opacity: 0.72;
+}
+
+.fx-inicial-btn:hover,
+.fx-inicial-btn--ativo {
+  opacity: 1;
+}
+
+.fx-inicial-btn--ativo {
+  color: var(--c-primary);
+}
+
+.fx-inicial-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.fx-atalhos-divisor {
+  width: 1px;
+  height: 22px;
+  flex-shrink: 0;
+  background: var(--ui-border);
+  margin: 0 4px;
+}
+
+.fx-atalhos-fileira {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.fx-atalho-icone {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  color: var(--atalho-cor);
+  text-decoration: none;
+}
+
+.fx-atalho-icone:hover {
+  background: var(--ui-surface-soft);
+}
+
+.fx-atalho-icone > svg {
+  width: 18px;
+  height: 18px;
+}
+
+.fx-atalho-cadeado {
+  position: absolute;
+  right: 1px;
+  bottom: 1px;
+  width: 10px;
+  height: 10px;
+  color: var(--app-muted-color);
+}
+
+.fx-atalhos-mais-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.fx-atalhos-mais {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--ui-border);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  color: var(--app-muted-color);
+  cursor: pointer;
+}
+
+.fx-atalhos-mais:hover {
+  background: var(--ui-surface-soft);
+}
+
+.fx-atalhos-painel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--z-dropdown, 50);
+  min-width: 240px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-md, 0 8px 24px rgba(15, 23, 42, 0.12));
+}
+
+.fx-atalhos-painel ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fx-atalhos-painel-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text-color, var(--c-text));
+  text-decoration: none;
+}
+
+.fx-atalhos-painel-item:hover {
+  background: var(--ui-surface-soft);
+}
+
+.fx-atalhos-painel-item > svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--atalho-cor);
+}
+
+.fx-atalho-cadeado-lista {
+  margin-left: auto;
+  width: 13px;
+  height: 13px;
+  color: var(--app-muted-color);
+}
+
+.fx-atalhos-painel-gerenciar {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--ui-border);
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-primary);
+  text-decoration: none;
+}
+
+@media (max-width: 767px) {
+  .fx-atalhos-fileira,
+  .fx-atalhos-divisor {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   ATALHOS — seção "Seus atalhos" da Home
+   ===================================================================== */
+.hub-atalhos {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-atalhos-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.hub-atalhos-vertodos {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-primary);
+  cursor: pointer;
+}
+
+.hub-atalhos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Card de atalho: menor que o card de módulo; identidade só no ícone. */
+.hub-atalho-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--card-border);
+  border-radius: 11px;
+  background: var(--ui-surface);
+  min-height: 52px;
+}
+
+.hub-atalho-card[draggable='true'] {
+  cursor: grab;
+}
+
+.hub-atalho-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 8px 30px 8px 10px;
+  text-decoration: none;
+  color: var(--app-text-color, var(--c-text));
+}
+
+.hub-atalho-icone {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--atalho-cor) 12%, transparent);
+  color: var(--atalho-cor);
+}
+
+.hub-atalho-icone > svg {
+  width: 17px;
+  height: 17px;
+}
+
+.hub-atalho-rotulo {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.hub-atalho-remover,
+.hub-atalho-cadeado {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--app-muted-color);
+  cursor: pointer;
+}
+
+.hub-atalho-cadeado {
+  cursor: default;
+}
+
+.hub-atalho-remover:hover {
+  background: var(--sem-danger-bg);
+  color: var(--sem-danger);
+}
+
+.hub-atalho-remover > svg,
+.hub-atalho-cadeado > svg {
+  width: 13px;
+  height: 13px;
+}
+
+.hub-atalho-card--adicionar {
+  border-style: dashed;
+  background: transparent;
+}
+
+.hub-atalho-adicionar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 50px;
+  border: none;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--app-muted-color);
+  cursor: pointer;
+}
+
+.hub-atalho-adicionar > svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Modal "Adicionar atalho" */
+.hub-atalhos-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal, 100);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 10vh 16px 16px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.hub-atalhos-modal {
+  width: min(560px, 100%);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-md, 0 16px 40px rgba(15, 23, 42, 0.2));
+}
+
+.hub-atalhos-modal-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--ui-border);
+}
+
+.hub-atalhos-modal-topo .hub-atalho-remover {
+  position: static;
+  width: 28px;
+  height: 28px;
+}
+
+.hub-atalhos-modal-busca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  color: var(--app-muted-color);
+}
+
+.hub-atalhos-modal-busca > svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.hub-atalhos-modal-busca input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--app-text-color, var(--c-text));
+}
+
+.hub-atalhos-modal-lista {
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.hub-atalhos-modal-vazio {
+  padding: 14px 10px;
+  font-size: 13px;
+  color: var(--app-muted-color);
+}
+
+.hub-atalhos-modal-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--app-text-color, var(--c-text));
+  cursor: pointer;
+}
+
+.hub-atalhos-modal-item:hover {
+  background: var(--ui-surface-soft);
+}
+
+.hub-atalhos-modal-item > svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--atalho-cor);
+}
+
+.hub-atalhos-modal-item-rotulo {
+  flex: 1;
+  min-width: 0;
+}
+
+.hub-atalhos-modal-item-modulo {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--app-muted-color);
+  white-space: nowrap;
+}
+
+/* =====================================================================
+   BUSCA UNIVERSAL — grupos, destaque e ações rápidas
+   ===================================================================== */
+.fx-cmdk-grupo-titulo {
+  margin: 8px 6px 3px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--app-muted-color);
+}
+
+.fx-cmdk-grupo ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fx-cmdk-item-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.fx-cmdk-item-titulo {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fx-cmdk-item mark,
+.fx-cmdk-vertodos mark {
+  background: color-mix(in srgb, var(--sem-warning) 28%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+
+.fx-cmdk-item--ativo {
+  background: var(--ui-surface-soft);
+}
+
+.fx-cmdk-item-acoes {
+  display: inline-flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.fx-cmdk-acao {
+  border: 1px solid var(--ui-border);
+  border-radius: 999px;
+  background: var(--ui-surface);
+  padding: 3px 9px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--c-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.fx-cmdk-acao:hover {
+  border-color: var(--c-primary);
+}
+
+.fx-cmdk-vertodos {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 7px 10px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--c-primary);
+  cursor: pointer;
+  text-align: left;
+}
+
+.fx-cmdk-vertodos > svg {
+  width: 14px;
+  height: 14px;
+}
+
+.fx-cmdk-buscando {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid var(--ui-border);
+  border-top-color: var(--c-primary);
+  border-radius: 50%;
+  animation: fx-cmdk-spin 0.7s linear infinite;
+}
+
+@keyframes fx-cmdk-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Selo de estado fora do fluxo ativo (arquivada/cancelada) na busca */
+.fx-cmdk-selo {
+  flex-shrink: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--sem-neutral-border);
+  background: var(--sem-neutral-bg);
+  color: var(--sem-neutral);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* =====================================================================
+   MARCA NA BARRA DO TOPO — CSC + Fluxy, âncora do canto superior
+   esquerdo. Discreta, sem sombras nem efeitos (D9); clique = Início.
+   ===================================================================== */
+.fx-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  text-decoration: none;
+  padding: 2px 2px 2px 0;
+}
+
+/* Seletor composto: `responsive-system.css` tem
+   `.layout-main :where(img, ...) { height: auto }` com a MESMA
+   especificidade de uma classe simples, e a ordem de injeção das
+   folhas varia no dev — duas classes garantem a vitória sempre. */
+.fx-brand .fx-brand-csc {
+  height: 26px;
+  width: auto;
+  display: block;
+}
+
+.fx-brand .fx-brand-fluxy {
+  height: 22px;
+  width: auto;
+  display: block;
+}
+
+.fx-brand-nome {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--app-heading-color);
+  line-height: 1;
+}
+
+.fx-brand-divisor {
+  width: 1px;
+  height: 24px;
+  flex-shrink: 0;
+  background: var(--ui-border);
+  margin: 0 6px 0 2px;
+}
+
+@media (max-width: 767px) {
+  /* No mobile fica só o símbolo do Fluxy. */
+  .fx-brand .fx-brand-csc,
+  .fx-brand .fx-brand-nome {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   HOME — "Para resolver agora": o trabalho em si, em lista compacta
+   ===================================================================== */
+.hub-resolver {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-resolver-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hub-resolver-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) 1fr auto;
+  gap: 4px 14px;
+  align-items: center;
+  min-height: 44px;
+  padding: 7px 12px 7px 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  text-decoration: none;
+  color: var(--card-text);
+  overflow: hidden;
+}
+
+/* Tarja de urgência lateral — a mesma linguagem das listas. */
+.hub-resolver-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+}
+
+.hub-resolver-item--danger::before { background: var(--sem-danger); }
+.hub-resolver-item--warning::before { background: var(--sem-warning); }
+
+.hub-resolver-item:hover {
+  border-color: var(--c-primary);
+}
+
+.hub-resolver-id {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.hub-resolver-id strong {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.hub-resolver-contexto {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--app-muted-color);
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-resolver-oque {
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--card-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-resolver-fim {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.hub-resolver-valor {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-resolver-prazo {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sem-warning);
+  white-space: nowrap;
+}
+
+.hub-resolver-prazo--danger {
+  color: var(--sem-danger);
+}
+
+@media (max-width: 640px) {
+  /* Mobile: identificação em cima, prazo/valor embaixo — sem esmagar. */
+  .hub-resolver-item {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    padding: 8px 10px 8px 14px;
+  }
+  .hub-resolver-oque {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .hub-resolver-fim {
+    justify-content: space-between;
+  }
+}
+
+/* =====================================================================
+   HOME — faixa gerencial "A pagar no mês, por obra" (telas largas)
+   ===================================================================== */
+.hub-obras-resumo {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-obras-resumo-lista {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.hub-obras-resumo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  background: var(--ui-surface);
+  text-decoration: none;
+  color: var(--card-text);
+}
+
+.hub-obras-resumo-item:hover {
+  border-color: var(--c-primary);
+}
+
+.hub-obras-resumo-nome {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-obras-resumo-total {
+  font-size: 17px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.hub-obras-resumo-qtd {
+  font-size: 11.5px;
+  color: var(--app-muted-color);
+}
+
+@media (max-width: 1279px) {
+  /* Faixa opcional: só quando sobra espaço em telas largas. */
+  .hub-obras-resumo {
+    display: none;
+  }
+}
+
+/* =====================================================================
+   HOME — blocos opcionais (carregamento sob demanda)
+   ===================================================================== */
+.hub-extra {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-extra-estado {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--app-muted-color);
+}
+
+.hub-extra-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hub-extra-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  text-decoration: none;
+  color: var(--app-text-color);
+  font-size: 13px;
+}
+
+.hub-extra-item:hover {
+  background: var(--ui-surface-soft);
+  border-color: var(--ui-border);
+}
+
+.hub-extra-item-id {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-width: 84px;
+}
+
+.hub-extra-item-id strong {
+  font-size: 12.5px;
+  color: var(--app-heading-color);
+}
+
+.hub-extra-item-contexto {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--app-muted-color);
+}
+
+.hub-extra-item-texto {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hub-extra-item-fim {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--app-muted-color);
+}
+
+.hub-extra-valor {
+  font-weight: 700;
+  color: var(--app-heading-color);
+}
+
+.hub-extra-valor--danger {
+  color: var(--sem-danger);
+}
+
+.hub-extra-selo {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--sem-success-border, var(--ui-border));
+  background: var(--sem-success-bg, var(--ui-surface-soft));
+  color: var(--sem-success, var(--app-muted-color));
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.hub-extra-ponto {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 999px;
+  background: var(--c-primary);
+  vertical-align: middle;
+}
+
+/* Barras proporcionais de contas a pagar por período */
+.hub-grafico {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hub-grafico-linha {
+  display: grid;
+  grid-template-columns: 64px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 12.5px;
+  color: var(--app-text-color);
+}
+
+.hub-grafico-linha:hover {
+  background: var(--ui-surface-soft);
+}
+
+.hub-grafico-rotulo {
+  color: var(--app-muted-color);
+  font-weight: 600;
+}
+
+.hub-grafico-trilha {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--ui-surface-soft);
+  overflow: hidden;
+}
+
+.hub-grafico-barra {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--c-primary);
+  opacity: 0.75;
+}
+
+.hub-grafico-barra--danger {
+  background: var(--sem-danger);
+}
+
+.hub-grafico-valor {
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--app-heading-color);
+}
+
+/* Calendário de vencimentos da semana */
+.hub-calendario {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.hub-calendario-dia {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  text-decoration: none;
+  color: var(--app-muted-color);
+  min-width: 0;
+}
+
+.hub-calendario-dia--tem {
+  border-color: var(--sem-warning-border, var(--sem-warning));
+  background: var(--sem-warning-bg, transparent);
+  color: var(--app-text-color);
+}
+
+.hub-calendario-dia:hover {
+  border-color: var(--c-primary);
+}
+
+.hub-calendario-semana {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.hub-calendario-numero {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--app-heading-color);
+}
+
+.hub-calendario-qtd {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hub-calendario-total {
+  font-size: 9.5px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Gasto do mês vs mês anterior */
+.hub-gasto {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+
+.hub-gasto-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hub-gasto-rotulo {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-muted-color);
+  font-weight: 700;
+}
+
+.hub-gasto-valor {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--app-heading-color);
+}
+
+.hub-gasto-valor--anterior {
+  color: var(--app-muted-color);
+  font-weight: 700;
+}
+
+.hub-gasto-qtd {
+  font-size: 11.5px;
+  color: var(--app-muted-color);
+}
+
+.hub-gasto-variacao {
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 800;
+}
+
+.hub-gasto-variacao--alta {
+  background: var(--sem-danger-bg, transparent);
+  color: var(--sem-danger);
+}
+
+.hub-gasto-variacao--baixa {
+  background: var(--sem-success-bg, transparent);
+  color: var(--sem-success, var(--app-text-color));
+}
+
+/* Compras pendentes */
+.hub-compras-contadores {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.hub-compras-contador {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  font-size: 12.5px;
+  color: var(--app-text-color);
+  text-decoration: none;
+}
+
+.hub-compras-contador:hover {
+  border-color: var(--c-primary);
+}
+
+.hub-compras-contador strong {
+  color: var(--app-heading-color);
+}
+
+/* Indicadores executivos compactos */
+.hub-indicadores {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+
+.hub-indicador {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--ui-border);
+  text-decoration: none;
+}
+
+.hub-indicador:hover {
+  border-color: var(--c-primary);
+}
+
+.hub-indicador-rotulo {
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-muted-color);
+  font-weight: 700;
+}
+
+.hub-indicador-valor {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--app-heading-color);
+}
+
+/* Módulos personalizáveis (cards ocultáveis/reordenáveis) */
+.hub-modulos-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 8px;
+}
+
+.hub-modulo-card-editavel {
+  position: relative;
+  cursor: grab;
+}
+
+.hub-modulo-card-editavel > a {
+  pointer-events: none;
+}
+
+.hub-modulo-remover {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid var(--ui-border);
+  background: var(--card-bg);
+  color: var(--app-muted-color);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.hub-modulo-remover:hover {
+  color: var(--sem-danger);
+  border-color: var(--sem-danger);
+}
+
+/* Catálogo "Adicionar bloco" agrupado */
+.hub-adicionar-pop {
+  min-width: 300px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.hub-adicionar-grupo {
+  display: flex;
+  flex-direction: column;
+}
+
+.hub-adicionar-grupo + .hub-adicionar-grupo {
+  margin-top: 6px;
+  border-top: 1px solid var(--ui-border);
+  padding-top: 6px;
+}
+
+.hub-adicionar-grupo-titulo {
+  padding: 4px 10px 2px;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--app-muted-color);
+}
+
+/* Toast único do "módulo continua no Ctrl+K" */
+.hub-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: min(92vw, 520px);
+  padding: 11px 16px;
+  border-radius: 12px;
+  background: var(--app-heading-color);
+  color: var(--ui-surface);
+  font-size: 13px;
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.25);
+}
+
+.hub-toast button {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.hub-toast button:hover {
+  opacity: 1;
+}

@@ -8,13 +8,18 @@ import Header from './Header';
 import ApropriacoesDoContrato from './ApropriacoesDoContrato';
 import AditivosDoContrato from './AditivosDoContrato';
 import Timeline from './Timeline';
-import Comentarios from './Comentarios';
+import Conversa from './Conversa';
 import FinanceiroCard from './FinanceiroCard';
 import AcoesContrato from './AcoesContrato';
 import RetornoSolicitacaoBar from './RetornoSolicitacaoBar';
 import RecargaCartaoDetalhe from './RecargaCartaoDetalhe';
 import { getContratoParcelas } from '../../services/contratos';
 import ModalAlterarStatus from './ModalAlterarStatus';
+import { getAcoesPrincipais, resolverAcaoPrincipal } from '../../services/acoesPrincipais';
+import { resolverLayoutDetalhe, rotuloBloco } from './blocosDetalhe';
+import { getDetalheLayouts } from '../../services/detalheLayout';
+import { getListaPreferencias, salvarListaPreferencias } from '../../services/listasPreferencias';
+import { tokenSetorDe } from '../../services/atalhos';
 import ModalEnviarSetor from '../Solicitacoes/ModalEnviarSetor';
 import ApropriacaoAutocomplete from '../../components/ui/ApropriacaoAutocomplete';
 import TratamentoItemManual from '../../modules/solicitacao-compra/components/TratamentoItemManual';
@@ -156,6 +161,36 @@ export default function SolicitacaoDetalhe() {
   const podeAlterarStatusQualquerSetor =
     hasConfiguredAreaPermissions(user) &&
     hasPermissao(user, 'solicitacoes.acoes.alterar_status_qualquer_setor');
+  useEffect(() => {
+    let ativo = true;
+    getAcoesPrincipais()
+      .then((lista) => {
+        if (ativo) setMapeamentosAcaoPrincipal(lista);
+      })
+      .catch(() => {});
+    // Layout configurável do detalhe: camada do setor (admin) + camada do
+    // usuário (banco). Falha em qualquer uma = layout atual, nada quebra.
+    const setorUsuario = tokenSetorDe(user);
+    if (setorUsuario) {
+      getDetalheLayouts(setorUsuario)
+        .then((linhas) => {
+          if (ativo) setLayoutSetor(linhas[0]?.config || null);
+        })
+        .catch(() => {});
+    }
+    getListaPreferencias('detalhe-solicitacao')
+      .then((prefs) => {
+        const temAlgo = prefs && (
+          Array.isArray(prefs.ordem) || Array.isArray(prefs.recolhidos)
+          || Array.isArray(prefs.removidos) || prefs.larguras || prefs.historico_ordem
+        );
+        if (ativo && temAlgo) setPrefsLayoutUsuario(prefs);
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, []);
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
   const moduloComprasHabilitado = hasEnabledModule(user, 'COMPRAS');
   const podeEditarApropriacoes = moduloComprasHabilitado && canEditarApropriacoesSolicitacao(user);
@@ -171,6 +206,29 @@ export default function SolicitacaoDetalhe() {
   const [loading, setLoading] = useState(true);
   const [modalStatus, setModalStatus] = useState(false);
   const [statusDependenciasVersao, setStatusDependenciasVersao] = useState(0);
+  // Mapeamento configurável setor+estado → ação em destaque (Configurações
+  // → Ação principal por setor). Vazio/indisponível = layout atual.
+  const [mapeamentosAcaoPrincipal, setMapeamentosAcaoPrincipal] = useState([]);
+  // Camadas do layout configurável do detalhe (usuário → setor → padrão).
+  const [layoutSetor, setLayoutSetor] = useState(null);
+  const [prefsLayoutUsuario, setPrefsLayoutUsuario] = useState(null);
+  const [personalizando, setPersonalizando] = useState(false);
+  const [adicionarBlocoAberto, setAdicionarBlocoAberto] = useState(false);
+  const dragBlocoRef = useRef(null);
+  // Abaixo de 768px o detalhe vira ABAS, com a ação principal fixa no topo.
+  const [isMobileDetalhe, setIsMobileDetalhe] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches
+  ));
+  const [abaMobile, setAbaMobile] = useState('detalhes');
+  useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const listener = (event) => setIsMobileDetalhe(event.matches);
+    media.addEventListener('change', listener);
+    return () => media.removeEventListener('change', listener);
+  }, []);
+  // Auditoria de prazo/documentos é de uso raro: colapsada num botão e
+  // abaixo de Financeiro/Pagamentos/Histórico.
+  const [auditoriaAberta, setAuditoriaAberta] = useState(false);
   const [modalEnviarSetor, setModalEnviarSetor] = useState(false);
   const [pendenciaFinanceira, setPendenciaFinanceira] = useState({
     marcar: false,
@@ -711,6 +769,423 @@ export default function SolicitacaoDetalhe() {
 
   const atualizadoEm = new Date(solicitacao.updatedAt || solicitacao.createdAt).toLocaleString('pt-BR');
 
+  // Ação principal por setor+estado — compartilhada pelo cabeçalho e pela
+  // barra fixa do mobile. Catálogo restrito a handlers que JÁ existem.
+  const rolarAte = (idAlvo) => () => {
+    document.getElementById(idAlvo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const catalogoAcoes = {
+    alterar_status: { rotulo: 'Alterar status', disponivel: podeAlterarStatus, executar: () => setModalStatus(true) },
+    enviar_setor: { rotulo: 'Enviar para outro setor', disponivel: podeEnviarSetor, executar: () => setModalEnviarSetor(true) },
+    aprovar_diretoria: { rotulo: 'Aprovar e enviar', disponivel: podeAprovarDiretoria, executar: aprovarDiretoria },
+    gerar_titulo: { rotulo: 'Gerar conta', disponivel: isFinanceiro && podeAcessarModuloFinanceiro, executar: rolarAte('sol-detail-financeiro') },
+    // O card Pagamentos saiu do detalhe (a função vive no card Financeiro);
+    // "informar_pagamento" leva ao mesmo destino para mapeamentos antigos.
+    informar_pagamento: { rotulo: 'Informar pagamento', disponivel: isFinanceiro && podeAcessarModuloFinanceiro, executar: rolarAte('sol-detail-financeiro') },
+    registrar_medicao: { rotulo: 'Registrar medição', disponivel: solicitacaoEhContrato, executar: rolarAte('sol-detail-contrato-acoes') }
+  };
+  const acaoPrincipalResolvida = (() => {
+    const mapeada = resolverAcaoPrincipal(
+      mapeamentosAcaoPrincipal,
+      solicitacao.area_responsavel,
+      solicitacao.status_global
+    );
+    if (!mapeada) return null;
+    const acao = catalogoAcoes[mapeada.acao];
+    if (!acao || !acao.disponivel) return null;
+    return { acao: mapeada.acao, rotulo: mapeada.rotulo || acao.rotulo, executar: acao.executar };
+  })();
+
+  // ----- LAYOUT CONFIGURÁVEL: resolução usuário → setor → padrão --------
+  const {
+    ordem: ordemBlocos,
+    ocultos: blocosOcultos,
+    recolhidos: blocosRecolhidos,
+    larguras: largurasBlocos,
+    historicoOrdem
+  } = resolverLayoutDetalhe({ configSetor: layoutSetor, prefsUsuario: prefsLayoutUsuario });
+
+  const temCamadaUsuario = (novo) => Boolean(
+    novo && (
+      novo.ordem?.length || novo.recolhidos?.length || novo.removidos?.length
+      || Object.keys(novo.larguras || {}).length || novo.historico_ordem === 'desc'
+    )
+  );
+  const persistirLayoutUsuario = (novo) => {
+    setPrefsLayoutUsuario(temCamadaUsuario(novo) ? novo : null);
+    salvarListaPreferencias('detalhe-solicitacao', novo || {}).catch(() => {});
+  };
+  // Sempre grava a camada completa — mudar uma coisa não perde as outras.
+  const camadaAtual = () => ({
+    ordem: prefsLayoutUsuario?.ordem?.length ? ordemBlocos : [],
+    recolhidos: Array.from(blocosRecolhidos),
+    removidos: Array.from(blocosOcultos),
+    larguras: { ...largurasBlocos },
+    historico_ordem: historicoOrdem
+  });
+  const moverBloco = (origemId, alvoId) => {
+    if (!origemId || !alvoId || origemId === alvoId) return;
+    const ordem = ordemBlocos.slice();
+    const de = ordem.indexOf(origemId);
+    const para = ordem.indexOf(alvoId);
+    if (de < 0 || para < 0) return;
+    ordem.splice(para, 0, ordem.splice(de, 1)[0]);
+    persistirLayoutUsuario({ ...camadaAtual(), ordem });
+  };
+  const alternarBlocoRecolhido = (blocoId) => {
+    const recolhidos = new Set(blocosRecolhidos);
+    if (recolhidos.has(blocoId)) recolhidos.delete(blocoId);
+    else recolhidos.add(blocoId);
+    persistirLayoutUsuario({ ...camadaAtual(), recolhidos: Array.from(recolhidos) });
+  };
+  const removerBloco = (blocoId) => {
+    const removidos = new Set(blocosOcultos);
+    removidos.add(blocoId);
+    persistirLayoutUsuario({ ...camadaAtual(), removidos: Array.from(removidos) });
+  };
+  const readicionarBloco = (blocoId) => {
+    const removidos = new Set(blocosOcultos);
+    removidos.delete(blocoId);
+    persistirLayoutUsuario({ ...camadaAtual(), removidos: Array.from(removidos) });
+  };
+  const definirLarguraBloco = (blocoId, largura) => {
+    const larguras = { ...largurasBlocos };
+    if (largura === 'total') larguras[blocoId] = 'total';
+    else delete larguras[blocoId];
+    persistirLayoutUsuario({ ...camadaAtual(), larguras });
+  };
+  const definirOrdemHistorico = (ordem) => {
+    persistirLayoutUsuario({ ...camadaAtual(), historico_ordem: ordem === 'desc' ? 'desc' : 'asc' });
+  };
+  const restaurarPadraoSetor = () => {
+    persistirLayoutUsuario(null);
+  };
+
+  const aoRecarregarSilencioso = () => {
+    registrarMutacaoLocal(id);
+    void carregar({ silent: true });
+  };
+
+  // Cada bloco: condições de permissão/tipo continuam decidindo se PODE
+  // aparecer; a configuração decide onde e se aparece quando pode.
+  const conteudoBlocos = {
+    apropriacoes: podeEditarApropriacoesSolicitacaoNormal ? (
+      <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes da solicitacao</h2>
+          <p className="text-sm text-[var(--c-muted)]">
+            Ajuste a apropriacao principal ou o rateio do contrato com motivo e auditoria.
+          </p>
+        </div>
+        <button type="button" className="btn btn-outline btn-sm" onClick={abrirModalApropriacoes}>
+          Editar apropriacoes
+        </button>
+      </div>
+    ) : null,
+
+    itens_compra_direta: podeGerenciarItensCompraDireta ? (
+      <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--c-text)]">Itens da compra direta</h2>
+          <p className="text-sm text-[var(--c-muted)]">
+            {podeCatalogarItensManuaisCompra
+              ? 'Trate os itens manuais para reutiliza-los em novas compras, mantendo o registro original.'
+              : 'Ajuste as apropriacoes item por item, com motivo e auditoria.'}
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          onClick={abrirModalCompraDireta}
+          disabled={carregandoCompraDireta}
+        >
+          {carregandoCompraDireta ? 'Carregando itens...' : 'Gerenciar itens'}
+        </button>
+      </div>
+    ) : null,
+
+    rateio_contrato: solicitacaoEhContrato ? (
+      <ApropriacoesDoContrato
+        contrato={contratoDoFluxo}
+        podeEditar={podeInteragirSolicitacao && podeEditarApropriacoes}
+        onMudou={aoRecarregarSilencioso}
+      />
+    ) : null,
+
+    // ITEM 26 (23/08): os termos aditivos, com Aprovar, Rejeitar e Cancelar. Fica ANTES da barra
+    // de acoes do contrato porque um aditivo pendente e uma decisao que trava o contrato: quem
+    // abre a tela precisa ver que ha algo esperando por ele. O card se oculta sozinho quando o
+    // contrato nao tem aditivo, que e a maioria.
+    aditivos_contrato: solicitacaoEhContrato ? (
+      <AditivosDoContrato
+        contrato={contratoSomenteLeitura}
+        onMudou={aoRecarregarSilencioso}
+      />
+    ) : null,
+
+    acoes_contrato: (solicitacaoEhContrato || falhaContrato) ? (
+      <>
+        {falhaContrato && (
+          <div className="app-alert app-alert--warning" data-testid="falha-contrato">
+            {falhaContrato} As previsoes de parcela e as acoes do contrato dependem deste acesso.
+          </div>
+        )}
+        <div id="sol-detail-contrato-acoes">
+          <AcoesContrato contrato={contratoSomenteLeitura} onMudou={aoRecarregarSilencioso} />
+        </div>
+      </>
+    ) : null,
+
+    aprovacao_diretoria: podeAprovarDiretoria ? (
+      <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold text-[var(--c-text)]">Aprovacao por diretoria</h2>
+          <p className="text-sm text-[var(--c-muted)]">
+            Ao aprovar, a solicitacao segue para {solicitacao.setor_destino_aprovacao || solicitacao.setor_destino_pos_aprovacao || 'a area responsavel'}.
+          </p>
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={aprovarDiretoria}>
+          Aprovar e enviar
+        </button>
+      </div>
+    ) : null,
+
+    historico: (
+      <Timeline
+        ordem={historicoOrdem}
+        historicos={solicitacao.historicos || []}
+        canRemoveAnexo={podeInteragirSolicitacao && canDeleteSolicitacaoAnexo(user)}
+        canRemoveComentario={podeInteragirSolicitacao && String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN'}
+        onAnexoRemovido={aoRecarregarSilencioso}
+      />
+    ),
+
+    financeiro: isFinanceiro ? (
+      <div id="sol-detail-financeiro">
+        <FinanceiroCard
+          key={`financeiro-${id}-${statusDependenciasVersao}`}
+          solicitacao={solicitacao}
+          podeAcessarModuloFinanceiro={podeAcessarModuloFinanceiro}
+          podeVisualizarTitulos={isFinanceiro}
+          somenteLeitura={isSetorObra}
+          onSolicitacaoAtualizada={() => {
+            registrarMutacaoLocal(id);
+            return carregar({ silent: true });
+          }}
+          onTituloCriado={aoRecarregarSilencioso}
+        />
+      </div>
+    ) : null,
+
+    // Comentar e anexar num ato só (dá para anexar sem escrever).
+    conversa: (
+      <Conversa
+        solicitacaoId={id}
+        podeInteragir={podeInteragirSolicitacao}
+        motivoBloqueio={contextoInteracao?.motivo_bloqueio}
+        onSucesso={aoRecarregarSilencioso}
+      />
+    ),
+
+    auditoria: podeMarcarPendenciaFinanceira ? (
+      !auditoriaAberta ? (
+        <button
+          type="button"
+          className="btn btn-outline btn-sm self-start"
+          onClick={() => setAuditoriaAberta(true)}
+        >
+          Registrar pendência de auditoria
+        </button>
+      ) : (
+        <div className="space-y-2">
+          <div className="card space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-[var(--c-text)]">Auditoria de prazo e documentos</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                Registre solicitacoes enviadas fora do prazo ou sem nota/boleto para medir regularizacao por usuario.
+              </p>
+            </div>
+
+            <label className="flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
+              <input
+                type="checkbox"
+                checked={pendenciaFinanceira.marcar}
+                onChange={(event) => setPendenciaFinanceira((prev) => ({
+                  ...prev,
+                  marcar: event.target.checked
+                }))}
+              />
+              Marcar pendencia para auditoria
+            </label>
+
+            <div className="grid md:grid-cols-2 gap-3">
+              <label className="block text-sm text-[var(--c-muted)]">
+                Tipo
+                <select
+                  className="input mt-1"
+                  value={pendenciaFinanceira.tipo}
+                  onChange={(event) => setPendenciaFinanceira((prev) => ({
+                    ...prev,
+                    tipo: event.target.value
+                  }))}
+                  disabled={!pendenciaFinanceira.marcar}
+                >
+                  <option value="FORA_DO_PRAZO">Enviada fora do prazo</option>
+                  <option value="SEM_NOTA">Sem nota ate o vencimento</option>
+                  <option value="SEM_BOLETO">Sem boleto ate o vencimento</option>
+                  <option value="SEM_NOTA_E_BOLETO">Sem nota e boleto</option>
+                  <option value="OUTRO">Outro</option>
+                </select>
+              </label>
+
+              <label className="block text-sm text-[var(--c-muted)]">
+                Observacao
+                <textarea
+                  className="input mt-1 min-h-[88px]"
+                  value={pendenciaFinanceira.observacao}
+                  onChange={(event) => setPendenciaFinanceira((prev) => ({
+                    ...prev,
+                    observacao: event.target.value
+                  }))}
+                  placeholder="Ex.: nota enviada apos vencimento, boleto ausente, prazo regularizado..."
+                />
+              </label>
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={salvarPendenciaFinanceira}
+                disabled={salvandoPendenciaFinanceira}
+              >
+                {salvandoPendenciaFinanceira ? 'Salvando...' : 'Salvar auditoria'}
+              </button>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setAuditoriaAberta(false)}>
+              Recolher auditoria
+            </button>
+          </div>
+        </div>
+      )
+    ) : null
+  };
+
+  const blocosVisiveis = ordemBlocos
+    .filter((blocoId) => !blocosOcultos.has(blocoId))
+    .map((blocoId) => ({ id: blocoId, conteudo: conteudoBlocos[blocoId] }))
+    .filter((bloco) => bloco.conteudo);
+
+  const ABA_DO_BLOCO = {
+    apropriacoes: 'detalhes',
+    itens_compra_direta: 'detalhes',
+    rateio_contrato: 'detalhes',
+    aditivos_contrato: 'detalhes',
+    acoes_contrato: 'detalhes',
+    aprovacao_diretoria: 'detalhes',
+    conversa: 'conversa',
+    financeiro: 'financeiro',
+    auditoria: 'financeiro',
+    historico: 'historico'
+  };
+  const ABAS_MOBILE = [
+    { id: 'detalhes', rotulo: 'Detalhes' },
+    { id: 'conversa', rotulo: 'Conversa' },
+    { id: 'financeiro', rotulo: 'Financeiro' },
+    { id: 'historico', rotulo: 'Histórico' }
+  ];
+
+  const renderizarBloco = (bloco) => {
+    const recolhido = blocosRecolhidos.has(bloco.id);
+    return (
+      <section
+        key={bloco.id}
+        className="sol-detail-bloco"
+        draggable={personalizando && !isMobileDetalhe}
+        onDragStart={() => { dragBlocoRef.current = bloco.id; }}
+        onDragOver={(event) => { if (personalizando) event.preventDefault(); }}
+        onDrop={() => {
+          if (!personalizando) return;
+          moverBloco(dragBlocoRef.current, bloco.id);
+          dragBlocoRef.current = null;
+        }}
+      >
+        {personalizando && (
+          <div className="sol-detail-bloco-toolbar">
+            <span className="sol-detail-bloco-arrastar" aria-hidden="true">⋮⋮</span>
+            <span className="sol-detail-bloco-nome">{rotuloBloco(bloco.id)}</span>
+            {!isMobileDetalhe && (
+              <label className="sol-detail-bloco-largura">
+                <select
+                  value={largurasBlocos[bloco.id] === 'total' ? 'total' : 'normal'}
+                  onChange={(event) => definirLarguraBloco(bloco.id, event.target.value)}
+                  aria-label={`Largura do bloco ${rotuloBloco(bloco.id)}`}
+                >
+                  <option value="normal">Normal</option>
+                  <option value="total">Largura total</option>
+                </select>
+              </label>
+            )}
+            <button type="button" className="la-link" onClick={() => alternarBlocoRecolhido(bloco.id)}>
+              {recolhido ? 'Mostrar' : 'Recolher'}
+            </button>
+            <button
+              type="button"
+              className="sol-detail-bloco-remover"
+              onClick={() => removerBloco(bloco.id)}
+              title={`Remover ${rotuloBloco(bloco.id)} do seu layout`}
+              aria-label={`Remover ${rotuloBloco(bloco.id)} do seu layout`}
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {recolhido ? (
+          !personalizando && (
+            <button
+              type="button"
+              className="sol-detail-bloco-recolhido"
+              onClick={() => alternarBlocoRecolhido(bloco.id)}
+            >
+              {rotuloBloco(bloco.id)} — mostrar
+            </button>
+          )
+        ) : bloco.conteudo}
+      </section>
+    );
+  };
+
+  // Blocos removíveis/readicionáveis: o catálogo do "Adicionar bloco" só
+  // oferece o que a permissão e o tipo JÁ permitem nesta solicitação —
+  // adicionar/remover nunca muda o que o usuário PODE ver.
+  const blocosDisponiveisParaAdicionar = ordemBlocos
+    .filter((blocoId) => blocosOcultos.has(blocoId))
+    .map((blocoId) => ({ id: blocoId, conteudo: conteudoBlocos[blocoId] }))
+    .filter((bloco) => bloco.conteudo);
+
+  // Segmentos para a grade: bloco de LARGURA TOTAL quebra a linha e
+  // ocupa tudo; os demais fluem em 2 colunas dentro do segmento.
+  const segmentosBlocos = (() => {
+    const segmentos = [];
+    let corrente = null;
+    for (const bloco of blocosVisiveis) {
+      if (largurasBlocos[bloco.id] === 'total') {
+        segmentos.push({ tipo: 'total', blocos: [bloco] });
+        corrente = null;
+      } else {
+        if (!corrente) {
+          corrente = { tipo: 'colunas', blocos: [] };
+          segmentos.push(corrente);
+        }
+        corrente.blocos.push(bloco);
+      }
+    }
+    return segmentos;
+  })();
+
+
   return (
     <div className="sol-detail-page max-w-6xl mx-auto space-y-6">
       <div className="sol-detail-nav">
@@ -741,6 +1216,7 @@ export default function SolicitacaoDetalhe() {
         mostrarAlterarStatus={podeAlterarStatus}
         mostrarEnviarSetor={podeEnviarSetor}
         mostrarContratoInfo={moduloContratosHabilitado}
+        acaoPrincipal={acaoPrincipalResolvida}
       />
 
       <RetornoSolicitacaoBar
@@ -756,213 +1232,129 @@ export default function SolicitacaoDetalhe() {
         />
       )}
 
-      {podeEditarApropriacoesSolicitacaoNormal && (
-        <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--c-text)]">Apropriacoes da solicitacao</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Ajuste a apropriacao principal ou o rateio do contrato com motivo e auditoria.
-            </p>
-          </div>
-          <button type="button" className="btn btn-outline btn-sm" onClick={abrirModalApropriacoes}>
-            Editar apropriacoes
-          </button>
+      {/* Barra fixa do mobile: a ação principal sempre visível. */}
+      {isMobileDetalhe && (acaoPrincipalResolvida || podeAlterarStatus) && (
+        <div className="sol-detail-acao-fixa">
+          {acaoPrincipalResolvida ? (
+            <button type="button" className="btn btn-primary w-full" onClick={acaoPrincipalResolvida.executar}>
+              {acaoPrincipalResolvida.rotulo}
+            </button>
+          ) : (
+            <button type="button" className="btn btn-primary w-full" onClick={() => setModalStatus(true)}>
+              Alterar status
+            </button>
+          )}
         </div>
       )}
 
-      {podeGerenciarItensCompraDireta && (
-        <div className="card flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--c-text)]">Itens da compra direta</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              {podeCatalogarItensManuaisCompra
-                ? 'Trate os itens manuais para reutiliza-los em novas compras, mantendo o registro original.'
-                : 'Ajuste as apropriacoes item por item, com motivo e auditoria.'}
-            </p>
-          </div>
+      {/* Personalização do layout (desktop): arrastar blocos, recolher,
+          restaurar o padrão do setor. */}
+      {!isMobileDetalhe && (
+        <div className="sol-detail-blocos-toolbar">
           <button
             type="button"
-            className="btn btn-outline btn-sm"
-            onClick={abrirModalCompraDireta}
-            disabled={carregandoCompraDireta}
+            className={`btn btn-outline btn-sm ${personalizando ? 'sol-detail-personalizando' : ''}`}
+            onClick={() => {
+              setPersonalizando((atual) => !atual);
+              setAdicionarBlocoAberto(false);
+            }}
+            aria-pressed={personalizando}
           >
-            {carregandoCompraDireta ? 'Carregando itens...' : 'Gerenciar itens'}
+            {personalizando ? 'Concluir personalização' : 'Personalizar layout'}
           </button>
-        </div>
-      )}
-
-      {/* O rateio do contrato, no lugar do card de apropriacoes da solicitacao. */}
-      {solicitacaoEhContrato && (
-        <ApropriacoesDoContrato
-          contrato={contratoDoFluxo}
-          podeEditar={podeInteragirSolicitacao && podeEditarApropriacoes}
-          onMudou={() => {
-            registrarMutacaoLocal(id);
-            void carregar({ silent: true });
-          }}
-        />
-      )}
-
-      {/* Sem o contrato nao ha barra de acoes nem previsoes. Dizer o motivo no lugar delas. */}
-      {falhaContrato && (
-        <div className="app-alert app-alert--warning" data-testid="falha-contrato">
-          {falhaContrato} As previsoes de parcela e as acoes do contrato dependem deste acesso.
-        </div>
-      )}
-
-      {/* ITEM 26 (23/08): os termos aditivos, com Aprovar, Rejeitar e Cancelar. Fica ANTES da barra
-          de acoes do contrato porque um aditivo pendente e uma decisao que trava o contrato: quem
-          abre a tela precisa ver que ha algo esperando por ele. O card se oculta sozinho quando o
-          contrato nao tem aditivo, que e a maioria. */}
-      {solicitacaoEhContrato && (
-        <AditivosDoContrato
-          contrato={contratoSomenteLeitura}
-          onMudou={() => {
-            registrarMutacaoLocal(id);
-            void carregar({ silent: true });
-          }}
-        />
-      )}
-
-      {/* PI-16: as acoes do contrato (aprovar com categoria, Juridico, rejeitar, cancelar). */}
-      <AcoesContrato
-        contrato={contratoSomenteLeitura}
-        onMudou={() => {
-          registrarMutacaoLocal(id);
-          void carregar({ silent: true });
-        }}
-      />
-
-      {podeAprovarDiretoria && (
-        <div className="card flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-[var(--c-text)]">Aprovacao por diretoria</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Ao aprovar, a solicitacao segue para {solicitacao.setor_destino_aprovacao || solicitacao.setor_destino_pos_aprovacao || 'a area responsavel'}.
-            </p>
-          </div>
-          <button type="button" className="btn btn-primary btn-sm" onClick={aprovarDiretoria}>
-            Aprovar e enviar
-          </button>
-        </div>
-      )}
-
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* ITEM 19 (23/08): o comentario subiu para CIMA do Historico, na mesma coluna.
-            Ele ficava do outro lado da tela do lugar onde o resultado dele aparece — escrevia-se a
-            direita e lia-se a esquerda. E os anexos, que eram um card proprio, entraram dentro
-            dele: comentar e anexar viram um ato so. */}
-        <div className="space-y-6">
-          <Comentarios
-            solicitacaoId={id}
-            podeInteragir={podeInteragirSolicitacao}
-            motivoBloqueio={contextoInteracao?.motivo_bloqueio}
-            onSucesso={() => {
-              registrarMutacaoLocal(id);
-              void carregar({ silent: true });
-            }}
-          />
-
-          <Timeline
-            historicos={solicitacao.historicos || []}
-            canRemoveAnexo={podeInteragirSolicitacao && canDeleteSolicitacaoAnexo(user)}
-            canRemoveComentario={podeInteragirSolicitacao && String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN'}
-            onAnexoRemovido={() => {
-              registrarMutacaoLocal(id);
-              void carregar({ silent: true });
-            }}
-          />
-        </div>
-
-        <div className="space-y-6">
-          {podeMarcarPendenciaFinanceira && (
-            <div className="card space-y-4">
-              <div>
-                <h2 className="text-base font-semibold text-[var(--c-text)]">Auditoria de prazo e documentos</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Registre solicitacoes enviadas fora do prazo ou sem nota/boleto para medir regularizacao por usuario.
-                </p>
-              </div>
-
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
-                <input
-                  type="checkbox"
-                  checked={pendenciaFinanceira.marcar}
-                  onChange={(event) => setPendenciaFinanceira((prev) => ({
-                    ...prev,
-                    marcar: event.target.checked
-                  }))}
-                />
-                Marcar pendencia para auditoria
-              </label>
-
-              <div className="grid md:grid-cols-2 gap-3">
-                <label className="block text-sm text-[var(--c-muted)]">
-                  Tipo
-                  <select
-                    className="input mt-1"
-                    value={pendenciaFinanceira.tipo}
-                    onChange={(event) => setPendenciaFinanceira((prev) => ({
-                      ...prev,
-                      tipo: event.target.value
-                    }))}
-                    disabled={!pendenciaFinanceira.marcar}
-                  >
-                    <option value="FORA_DO_PRAZO">Enviada fora do prazo</option>
-                    <option value="SEM_NOTA">Sem nota ate o vencimento</option>
-                    <option value="SEM_BOLETO">Sem boleto ate o vencimento</option>
-                    <option value="SEM_NOTA_E_BOLETO">Sem nota e boleto</option>
-                    <option value="OUTRO">Outro</option>
-                  </select>
-                </label>
-
-                <label className="block text-sm text-[var(--c-muted)]">
-                  Observacao
-                  <textarea
-                    className="input mt-1 min-h-[88px]"
-                    value={pendenciaFinanceira.observacao}
-                    onChange={(event) => setPendenciaFinanceira((prev) => ({
-                      ...prev,
-                      observacao: event.target.value
-                    }))}
-                    placeholder="Ex.: nota enviada apos vencimento, boleto ausente, prazo regularizado..."
-                  />
-                </label>
-              </div>
-
-              <div className="flex justify-end">
+          {personalizando && (
+            <>
+              <div className="sol-detail-adicionar-wrap">
                 <button
                   type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={salvarPendenciaFinanceira}
-                  disabled={salvandoPendenciaFinanceira}
+                  className="btn btn-outline btn-sm"
+                  onClick={() => setAdicionarBlocoAberto((aberto) => !aberto)}
+                  aria-expanded={adicionarBlocoAberto}
+                  disabled={blocosDisponiveisParaAdicionar.length === 0}
                 >
-                  {salvandoPendenciaFinanceira ? 'Salvando...' : 'Salvar auditoria'}
+                  Adicionar bloco{blocosDisponiveisParaAdicionar.length > 0 ? ` (${blocosDisponiveisParaAdicionar.length})` : ''}
                 </button>
+                {adicionarBlocoAberto && blocosDisponiveisParaAdicionar.length > 0 && (
+                  <div className="sol-detail-adicionar-pop" role="menu" aria-label="Blocos disponíveis">
+                    {blocosDisponiveisParaAdicionar.map((bloco) => (
+                      <button
+                        key={bloco.id}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          readicionarBloco(bloco.id);
+                          setAdicionarBlocoAberto(false);
+                        }}
+                      >
+                        {rotuloBloco(bloco.id)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+              <label className="sol-detail-historico-ordem">
+                Histórico:
+                <select
+                  value={historicoOrdem}
+                  onChange={(event) => definirOrdemHistorico(event.target.value)}
+                  aria-label="Ordem do histórico"
+                >
+                  <option value="asc">mais antigos primeiro</option>
+                  <option value="desc">mais recentes primeiro</option>
+                </select>
+              </label>
+              <button type="button" className="btn btn-outline btn-sm" onClick={restaurarPadraoSetor}>
+                Restaurar padrão do setor
+              </button>
+              <span className="text-sm text-[var(--c-muted)]">
+                Arraste para reordenar; largura, recolher e "×" em cada bloco. Salvo automaticamente.
+                No celular valem a ordem e os blocos mantidos — largura é só do desktop.
+              </span>
+            </>
           )}
-
-          {isFinanceiro && (
-            <FinanceiroCard
-              key={`financeiro-${id}-${statusDependenciasVersao}`}
-              solicitacao={solicitacao}
-              podeAcessarModuloFinanceiro={podeAcessarModuloFinanceiro}
-              podeVisualizarTitulos={isFinanceiro}
-              somenteLeitura={isSetorObra}
-              onSolicitacaoAtualizada={() => {
-                registrarMutacaoLocal(id);
-                return carregar({ silent: true });
-              }}
-              onTituloCriado={() => {
-                registrarMutacaoLocal(id);
-                void carregar({ silent: true });
-              }}
-            />
-          )}
-
         </div>
-      </div>
+      )}
+
+      {isMobileDetalhe ? (
+        <>
+          <div className="sol-detail-abas" role="tablist" aria-label="Seções do detalhe">
+            {ABAS_MOBILE.map((aba) => (
+              <button
+                key={aba.id}
+                type="button"
+                role="tab"
+                aria-selected={abaMobile === aba.id}
+                className={`sol-detail-aba ${abaMobile === aba.id ? 'ativa' : ''}`}
+                onClick={() => setAbaMobile(aba.id)}
+              >
+                {aba.rotulo}
+              </button>
+            ))}
+          </div>
+          <div className="sol-detail-blocos sol-detail-blocos--mobile">
+            {blocosVisiveis
+              .filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile)
+              .map(renderizarBloco)}
+            {blocosVisiveis.filter((bloco) => ABA_DO_BLOCO[bloco.id] === abaMobile).length === 0 && (
+              <p className="text-sm text-[var(--c-muted)]">Nada nesta aba para esta solicitação.</p>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="sol-detail-arranjo">
+          {segmentosBlocos.map((segmento, indice) => (
+            segmento.tipo === 'total' ? (
+              <div key={`seg-${indice}`} className="sol-detail-segmento-total">
+                {segmento.blocos.map(renderizarBloco)}
+              </div>
+            ) : (
+              <div key={`seg-${indice}`} className="sol-detail-blocos">
+                {segmento.blocos.map(renderizarBloco)}
+              </div>
+            )
+          ))}
+        </div>
+      )}
 
       <ModalAlterarStatus
         aberto={modalStatus}

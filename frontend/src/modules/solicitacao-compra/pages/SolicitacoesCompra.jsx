@@ -89,7 +89,11 @@ export default function SolicitacoesCompra() {
   const [inativando, setInativando] = useState(false);
   const [encaminhando, setEncaminhando] = useState(false);
   const [obraId, setObraId] = useState('');
-  const [status, setStatus] = useState('');
+  // ?status= chega do cartão de pendências do Hub: a tela abre já
+  // filtrada no MESMO status que o cartão contou.
+  const [status, setStatus] = useState(() => (
+    String(new URLSearchParams(window.location.search).get('status') || '').trim().toUpperCase()
+  ));
   const [busca, setBusca] = useState('');
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [selecionadas, setSelecionadas] = useState([]);
@@ -364,6 +368,7 @@ export default function SolicitacoesCompra() {
               <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
                 <option value="">Todos</option>
                 <option value="ENVIADO">Enviado</option>
+                <option value="LIBERADO_PARA_COMPRA">Liberado para compra</option>
                 <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
                 <option value="ENCERRADO">Encerrado</option>
               </select>
