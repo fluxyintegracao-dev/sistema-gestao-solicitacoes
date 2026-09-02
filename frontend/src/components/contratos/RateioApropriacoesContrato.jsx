@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { HiPlus, HiTrash } from 'react-icons/hi2';
+import { TabelaPadrao } from '../padrao';
 import ApropriacaoAutocomplete from '../ui/ApropriacaoAutocomplete';
 
 /**
@@ -95,91 +96,105 @@ export default function RateioApropriacoesContrato({
 
   return (
     <div className="space-y-2" data-testid="rateio-apropriacoes">
-      <div className="overflow-visible">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--c-border)] text-left text-xs uppercase tracking-[0.06em] text-[var(--c-muted)]">
-              <th className="px-2 py-2" style={{ minWidth: 240 }}>Apropriacao</th>
-              <th className="px-2 py-2" style={{ width: 140 }}>Rateio %</th>
-              <th className="px-2 py-2" style={{ width: 160 }}>Rateio R$</th>
-              <th className="px-2 py-2" style={{ width: 96 }}>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  data-testid="add-apropriacao"
-                  title="Acrescentar apropriacao"
-                  aria-label="Acrescentar apropriacao"
-                  disabled={desabilitado}
-                  onClick={() => onChange([...linhas, { apropriacao_id: '', percentual: '', valor: '' }])}
-                >
-                  <HiPlus className="w-4 h-4" />
-                </button>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.map((linha, i) => (
-              <tr key={`rateio-${i}`} className="border-b border-[var(--c-border)] last:border-0">
-                <td className="px-2 py-2 align-top">
-                  <ApropriacaoAutocomplete
-                    value={linha.apropriacao_id}
-                    options={apropriacoes}
-                    onChange={(id) => alterar(i, 'apropriacao_id', id)}
-                    disabled={desabilitado}
-                    inputClassName="input input-sm w-full"
-                    disabledPlaceholder="Selecione a obra primeiro"
-                  />
-                </td>
-                <td className="px-2 py-2 align-top">
-                  <input
-                    className="input input-sm"
-                    name={`rateio_percentual_${i}`}
-                    inputMode="decimal"
-                    placeholder="0,0000"
-                    value={linha.percentual ?? ''}
-                    onChange={(e) => alterar(i, 'percentual', e.target.value)}
-                    disabled={desabilitado}
-                  />
-                </td>
-                <td className="px-2 py-2 align-top">
-                  {/* Moeda brasileira por DIGITOS, igual ao campo Valor e as parcelas. */}
-                  <input
-                    className="input input-sm"
-                    name={`rateio_valor_${i}`}
-                    inputMode="numeric"
-                    // Placeholder proprio: "R$ 0,00" e o do campo Valor da solicitacao, e dois
-                    // campos com o mesmo placeholder viram um seletor ambiguo (foi o que quebrou
-                    // a suite 01 — o valor do contrato foi digitado nesta coluna).
-                    placeholder="Rateio em R$"
-                    value={linha.valor === '' || linha.valor === null || linha.valor === undefined
-                      ? ''
-                      : formatarMoeda(numeroDoCampo(linha.valor) || 0)}
-                    onChange={(e) => {
-                      const digitos = String(e.target.value).replace(/\D/g, '');
-                      alterar(i, 'valor', digitos ? comVirgula(Number(digitos) / 100, 2) : '');
-                    }}
-                    disabled={desabilitado || !total}
-                  />
-                </td>
-                <td className="px-2 py-2 align-top text-right">
-                  {linhas.length > 1 && (
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      title="Remover apropriacao"
-                      aria-label="Remover apropriacao"
-                      onClick={() => onChange(linhas.filter((_, x) => x !== i))}
-                      disabled={desabilitado}
-                    >
-                      <HiTrash className="w-4 h-4" />
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* O "+" morava no <th> da ultima coluna; no cabecalho da TabelaPadrao o
+          proprio titulo e um botao (alinhamento), entao a acao de acrescentar
+          linha passa a viver logo acima da tabela — mesma acao, mesmo rotulo. */}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          className="btn btn-outline btn-sm"
+          data-testid="add-apropriacao"
+          title="Acrescentar apropriacao"
+          aria-label="Acrescentar apropriacao"
+          disabled={desabilitado}
+          onClick={() => onChange([...linhas, { apropriacao_id: '', percentual: '', valor: '' }])}
+        >
+          <HiPlus className="w-4 h-4" />
+        </button>
       </div>
+
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'apropriacao',
+            titulo: 'Apropriacao',
+            // R17: a apropriacao nomeia a linha do rateio.
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (linha) => (
+              <ApropriacaoAutocomplete
+                value={linha.apropriacao_id}
+                options={apropriacoes}
+                onChange={(id) => alterar(linhas.indexOf(linha), 'apropriacao_id', id)}
+                disabled={desabilitado}
+                inputClassName="input input-sm w-full"
+                disabledPlaceholder="Selecione a obra primeiro"
+              />
+            )
+          },
+          {
+            id: 'percentual',
+            titulo: 'Rateio %',
+            tipo: 'numero',
+            render: (linha) => (
+              <input
+                className="input input-sm"
+                name={`rateio_percentual_${linhas.indexOf(linha)}`}
+                inputMode="decimal"
+                placeholder="0,0000"
+                value={linha.percentual ?? ''}
+                onChange={(e) => alterar(linhas.indexOf(linha), 'percentual', e.target.value)}
+                disabled={desabilitado}
+              />
+            )
+          },
+          {
+            id: 'valor',
+            titulo: 'Rateio R$',
+            tipo: 'valor',
+            /* Moeda brasileira por DIGITOS, igual ao campo Valor e as parcelas. */
+            render: (linha) => (
+              <input
+                className="input input-sm"
+                name={`rateio_valor_${linhas.indexOf(linha)}`}
+                inputMode="numeric"
+                // Placeholder proprio: "R$ 0,00" e o do campo Valor da solicitacao, e dois
+                // campos com o mesmo placeholder viram um seletor ambiguo (foi o que quebrou
+                // a suite 01 — o valor do contrato foi digitado nesta coluna).
+                placeholder="Rateio em R$"
+                value={linha.valor === '' || linha.valor === null || linha.valor === undefined
+                  ? ''
+                  : formatarMoeda(numeroDoCampo(linha.valor) || 0)}
+                onChange={(e) => {
+                  const digitos = String(e.target.value).replace(/\D/g, '');
+                  alterar(linhas.indexOf(linha), 'valor', digitos ? comVirgula(Number(digitos) / 100, 2) : '');
+                }}
+                disabled={desabilitado || !total}
+              />
+            )
+          }
+        ]}
+        itens={linhas}
+        getId={(linha) => `rateio-${linhas.indexOf(linha)}`}
+        storageKey="tabela:contrato-rateio-apropriacoes"
+        rotuloRolagem="Rateio entre apropriacoes"
+        vazio="Nenhuma apropriacao no rateio"
+        acoesLinha={(linha) => (
+          linhas.length > 1 ? (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              title="Remover apropriacao"
+              aria-label="Remover apropriacao"
+              onClick={() => onChange(linhas.filter((_, x) => x !== linhas.indexOf(linha)))}
+              disabled={desabilitado}
+            >
+              <HiTrash className="w-4 h-4" />
+            </button>
+          ) : null
+        )}
+        larguraAcoes={120}
+      />
 
       <p className="text-xs" style={{ color: fechado ? 'var(--c-muted)' : 'var(--c-danger, #b91c1c)' }}>
         Soma: {comVirgula(soma, 4)}% de 100%

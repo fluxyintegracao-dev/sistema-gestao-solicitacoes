@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioFornecedoresCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,31 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const TABLE_COLUMNS = [
-  { key: 'fornecedor', width: 220, minWidth: 160 },
-  { key: 'cotacoes', width: 82, minWidth: 76 },
-  { key: 'resposta', width: 118, minWidth: 92 },
-  { key: 'sem_resposta', width: 118, minWidth: 100 },
-  { key: 'visualizacao', width: 118, minWidth: 100 },
-  { key: 'prazo', width: 104, minWidth: 84 },
-  { key: 'itens_respondidos', width: 128, minWidth: 104 },
-  { key: 'itens_vencedores', width: 128, minWidth: 104 },
-  { key: 'valor_cotado', width: 136, minWidth: 112 },
-  { key: 'valor_vencedor', width: 136, minWidth: 112 },
-  { key: 'ultima_cotacao', width: 118, minWidth: 104 },
-  { key: 'sinal', width: 132, minWidth: 112 }
-];
-
-const RISCO_COLUMNS = [
-  { key: 'fornecedor', width: 260, minWidth: 180 },
-  { key: 'taxa_resposta', width: 128, minWidth: 104 },
-  { key: 'sem_resposta', width: 128, minWidth: 104 },
-  { key: 'cotacoes', width: 104, minWidth: 86 },
-  { key: 'visualizacao', width: 128, minWidth: 104 },
-  { key: 'ultima_cotacao', width: 128, minWidth: 104 },
-  { key: 'sinal', width: 150, minWidth: 122 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -311,62 +286,47 @@ export default function ComprasRelatorioFornecedores() {
             <p>Ranking gerado apenas por cotacoes enviadas e respostas registradas. Fornecedores com menos de 2 participacoes ficam fora desta lista.</p>
           </div>
         </div>
-        <div className="sol-table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={RISCO_COLUMNS}
-            storageKey="fluxy.compras.relatorioFornecedores.riscoColumnWidths"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                <ResizableTh columnKey="taxa_resposta" className="text-right">Taxa resposta</ResizableTh>
-                <ResizableTh columnKey="sem_resposta" className="text-right">Sem resposta</ResizableTh>
-                <ResizableTh columnKey="cotacoes" className="text-right">Cotacoes</ResizableTh>
-                <ResizableTh columnKey="visualizacao" className="text-right">Visualizacao</ResizableTh>
-                <ResizableTh columnKey="ultima_cotacao" className="text-right">Ultima cotacao</ResizableTh>
-                <ResizableTh columnKey="sinal">Sinal</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="text-center text-[var(--c-muted)] py-6">
-                    Carregando ranking...
-                  </td>
-                </tr>
-              ) : fornecedoresBaixaResposta.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="text-center text-[var(--c-muted)] py-6">
-                    Nenhum fornecedor com baixa resposta para os filtros selecionados.
-                  </td>
-                </tr>
-              ) : (
-                fornecedoresBaixaResposta.map((item) => {
-                  const badge = respostaBadge(item);
-                  return (
-                    <tr key={`risco-${item.fornecedor.id || item.fornecedor.nome}`}>
-                      <td>
-                        <strong>{item.fornecedor.nome}</strong>
-                        <div className="text-xs text-[var(--c-muted)]">
-                          {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
-                            .filter(Boolean)
-                            .join(' - ') || 'Sem dados complementares'}
-                        </div>
-                      </td>
-                      <td className="text-right"><strong>{formatPercent(item.taxa_resposta)}</strong></td>
-                      <td className="text-right">{Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right">{Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right">{formatPercent(item.taxa_visualizacao)}</td>
-                      <td className="text-right tabular-nums">{formatDate(item.ultima_cotacao)}</td>
-                      <td><span className={badge.className}>{badge.label}</span></td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              // R17: o fornecedor NOMEIA a linha do ranking.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <div>
+                  <strong>{item.fornecedor.nome}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
+                      .filter(Boolean)
+                      .join(' - ') || 'Sem dados complementares'}
+                  </div>
+                </div>
+              )
+            },
+            { id: 'taxa_resposta', titulo: 'Taxa resposta', tipo: 'numero', render: (item) => <strong>{formatPercent(item.taxa_resposta)}</strong> },
+            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR') },
+            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR') },
+            { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+            { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+            {
+              id: 'sinal',
+              titulo: 'Sinal',
+              tipo: 'badge',
+              render: (item) => {
+                const badge = respostaBadge(item);
+                return <span className={badge.className}>{badge.label}</span>;
+              }
+            }
+          ]}
+          itens={fornecedoresBaixaResposta}
+          getId={(item) => `risco-${item.fornecedor.id || item.fornecedor.nome}`}
+          carregando={loading}
+          storageKey="tabela:compras-fornecedores:baixa-resposta"
+          rotuloRolagem="Fornecedores com menor taxa de resposta"
+          vazio="Nenhum fornecedor com baixa resposta para os filtros selecionados."
+        />
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
@@ -376,78 +336,65 @@ export default function ComprasRelatorioFornecedores() {
             <p>Participacao completa em cotacoes, respostas, itens e valores por fornecedor.</p>
           </div>
         </div>
-        <div className="sol-table-wrapper compras-fornecedores-table-shell">
-          <ResizableTable
-            className="sol-table compras-fornecedores-table"
-            columns={TABLE_COLUMNS}
-            storageKey="fluxy.compras.relatorioFornecedores.columnWidths"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                <ResizableTh columnKey="cotacoes" className="text-right">Cotacoes</ResizableTh>
-                <ResizableTh columnKey="resposta" className="text-right">Resposta</ResizableTh>
-                <ResizableTh columnKey="sem_resposta" className="text-right">Sem resposta</ResizableTh>
-                <ResizableTh columnKey="visualizacao" className="text-right">Visualizacao</ResizableTh>
-                <ResizableTh columnKey="prazo" className="text-right">Prazo medio</ResizableTh>
-                <ResizableTh columnKey="itens_respondidos" className="text-right">Itens respondidos</ResizableTh>
-                <ResizableTh columnKey="itens_vencedores" className="text-right">Itens vencedores</ResizableTh>
-                <ResizableTh columnKey="valor_cotado" className="text-right">Valor cotado</ResizableTh>
-                <ResizableTh columnKey="valor_vencedor" className="text-right">Valor vencedor</ResizableTh>
-                <ResizableTh columnKey="ultima_cotacao" className="text-right">Ultima cotacao</ResizableTh>
-                <ResizableTh columnKey="sinal">Sinal</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={12} className="text-center text-[var(--c-muted)] py-6">
-                    Carregando fornecedores...
-                  </td>
-                </tr>
-              ) : fornecedores.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="text-center text-[var(--c-muted)] py-6">
-                    Nenhum fornecedor encontrado para os filtros selecionados.
-                  </td>
-                </tr>
-              ) : (
-                fornecedores.map((item) => {
-                  const badge = respostaBadge(item);
-                  return (
-                    <tr key={item.fornecedor.id || item.fornecedor.nome}>
-                      <td>
-                        <strong>{item.fornecedor.nome}</strong>
-                        <div className="text-xs text-[var(--c-muted)]">
-                          {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
-                            .filter(Boolean)
-                            .join(' - ') || 'Sem dados complementares'}
-                        </div>
-                      </td>
-                      <td className="text-right">{Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right">
-                        <strong>{formatPercent(item.taxa_resposta)}</strong>
-                        <div className="text-xs text-[var(--c-muted)]">
-                          {Number(item.cotacoes_respondidas || 0).toLocaleString('pt-BR')} de{' '}
-                          {Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}
-                        </div>
-                      </td>
-                      <td className="text-right">{Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right">{formatPercent(item.taxa_visualizacao)}</td>
-                      <td className="text-right">{formatHours(item.prazo_medio_resposta_horas)}</td>
-                      <td className="text-right">{Number(item.itens_respondidos || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right">{Number(item.itens_vencedores || 0).toLocaleString('pt-BR')}</td>
-                      <td className="text-right tabular-nums">{formatMoney(item.valor_cotado)}</td>
-                      <td className="text-right tabular-nums">{formatMoney(item.valor_vencedor)}</td>
-                      <td className="text-right tabular-nums">{formatDate(item.ultima_cotacao)}</td>
-                      <td><span className={badge.className}>{badge.label}</span></td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              // R17: o fornecedor NOMEIA o registro desta base analitica.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <div>
+                  <strong>{item.fornecedor.nome}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {[item.fornecedor.cnpj, item.fornecedor.cidade, item.fornecedor.estado]
+                      .filter(Boolean)
+                      .join(' - ') || 'Sem dados complementares'}
+                  </div>
+                </div>
+              )
+            },
+            { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR') },
+            {
+              id: 'resposta',
+              titulo: 'Resposta',
+              tipo: 'numero',
+              render: (item) => (
+                <div>
+                  <strong>{formatPercent(item.taxa_resposta)}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {Number(item.cotacoes_respondidas || 0).toLocaleString('pt-BR')} de{' '}
+                    {Number(item.cotacoes_enviadas || 0).toLocaleString('pt-BR')}
+                  </div>
+                </div>
+              )
+            },
+            { id: 'sem_resposta', titulo: 'Sem resposta', tipo: 'numero', render: (item) => Number(item.cotacoes_sem_resposta || 0).toLocaleString('pt-BR') },
+            { id: 'visualizacao', titulo: 'Visualizacao', tipo: 'numero', render: (item) => formatPercent(item.taxa_visualizacao) },
+            { id: 'prazo', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatHours(item.prazo_medio_resposta_horas) },
+            { id: 'itens_respondidos', titulo: 'Itens respondidos', tipo: 'numero', render: (item) => Number(item.itens_respondidos || 0).toLocaleString('pt-BR') },
+            { id: 'itens_vencedores', titulo: 'Itens vencedores', tipo: 'numero', render: (item) => Number(item.itens_vencedores || 0).toLocaleString('pt-BR') },
+            { id: 'valor_cotado', titulo: 'Valor cotado', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_cotado)}</span> },
+            { id: 'valor_vencedor', titulo: 'Valor vencedor', tipo: 'valor', render: (item) => <span className="tabular-nums">{formatMoney(item.valor_vencedor)}</span> },
+            { id: 'ultima_cotacao', titulo: 'Ultima cotacao', tipo: 'data', render: (item) => <span className="tabular-nums">{formatDate(item.ultima_cotacao)}</span> },
+            {
+              id: 'sinal',
+              titulo: 'Sinal',
+              tipo: 'badge',
+              render: (item) => {
+                const badge = respostaBadge(item);
+                return <span className={badge.className}>{badge.label}</span>;
+              }
+            }
+          ]}
+          itens={fornecedores}
+          getId={(item) => item.fornecedor.id || item.fornecedor.nome}
+          carregando={loading}
+          storageKey="tabela:compras-fornecedores:base-analitica"
+          rotuloRolagem="Base analitica de fornecedores"
+          vazio="Nenhum fornecedor encontrado para os filtros selecionados."
+        />
       </div>
     </div>
   );

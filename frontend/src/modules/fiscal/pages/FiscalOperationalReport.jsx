@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import { getFiscalOperationalReport } from '../services/fiscalApi';
 
 const DEFAULT_FILTERS = {
@@ -30,21 +30,6 @@ const SOURCE_OPTIONS = [
   ['sefaz_distribution', 'SEFAZ'],
   ['manual_upload', 'Upload manual'],
   ['batch_import', 'Importacao em lote']
-];
-
-const SIMPLE_COLUMNS = [
-  { key: 'label', width: 260, minWidth: 160 },
-  { key: 'total', width: 110, minWidth: 90 }
-];
-
-const DOCUMENT_COLUMNS = [
-  { key: 'documento', width: 150, minWidth: 110 },
-  { key: 'fornecedor', width: 260, minWidth: 180 },
-  { key: 'empresa', width: 240, minWidth: 160 },
-  { key: 'emissao', width: 120, minWidth: 100 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'status', width: 160, minWidth: 120 },
-  { key: 'pendencias', width: 320, minWidth: 220 }
 ];
 
 function readFilters(searchParams) {
@@ -129,27 +114,36 @@ function SimpleTable({ title, rows, labelKey, labelFormatter, storageKey }) {
           {formatNumber(rows.length)} linhas
         </span>
       </div>
-      <div className="sol-table-wrapper">
-        <ResizableTable className="sol-table" columns={SIMPLE_COLUMNS} storageKey={storageKey}>
-          <thead>
-            <tr>
-              <ResizableTh columnKey="label">Descricao</ResizableTh>
-              <ResizableTh columnKey="total" className="text-right">Total</ResizableTh>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length ? rows.map((item) => (
-              <tr key={item[labelKey]}>
-                <td className="font-semibold text-slate-900">{labelFormatter ? labelFormatter(item[labelKey]) : item[labelKey]}</td>
-                <td className="text-right">{formatNumber(item.total)}</td>
-              </tr>
-            )) : (
-              <tr><td colSpan={2}>Sem dados no periodo.</td></tr>
-            )}
-          </tbody>
-        </ResizableTable>
-      </div>
-    </section>
+      {/* semIdentidade: cada linha e um AGREGADO do periodo (rotulo do
+          agrupamento + contagem), nao um registro nomeavel — o rotulo e a
+          chave do grupo (status, origem, severidade...), nao um nome. */}
+      <TabelaPadrao
+        semIdentidade
+        colunas={[
+          {
+            id: 'label',
+            titulo: 'Descricao',
+            tipo: 'texto',
+            noCard: 'titulo',
+            render: (item) => (
+              <span className="font-semibold text-slate-900">
+                {labelFormatter ? labelFormatter(item[labelKey]) : item[labelKey]}
+              </span>
+            )
+          },
+          {
+            id: 'total',
+            titulo: 'Total',
+            tipo: 'numero',
+            render: (item) => formatNumber(item.total)
+          }
+        ]}
+        itens={rows}
+        getId={(item) => item[labelKey]}
+        storageKey={storageKey}
+        rotuloRolagem={title}
+        vazio="Sem dados no periodo."
+      />    </section>
   );
 }
 
@@ -332,12 +326,12 @@ export default function FiscalOperationalReport() {
       </section>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <SimpleTable title="Documentos por status" rows={agrupamentos.por_status || []} labelKey="status" labelFormatter={statusLabel} storageKey="fluxy.fiscal.operacional.status.columns" />
-        <SimpleTable title="Documentos por empresa fiscal" rows={agrupamentos.por_empresa || []} labelKey="empresa" storageKey="fluxy.fiscal.operacional.empresas.columns" />
-        <SimpleTable title="Documentos por fornecedor" rows={agrupamentos.por_fornecedor || []} labelKey="fornecedor" storageKey="fluxy.fiscal.operacional.fornecedores.columns" />
-        <SimpleTable title="Divergencias por tipo" rows={agrupamentos.divergencias_por_tipo || []} labelKey="tipo" storageKey="fluxy.fiscal.operacional.divergenciasTipo.columns" />
-        <SimpleTable title="Divergencias por severidade" rows={agrupamentos.divergencias_por_severidade || []} labelKey="severidade" storageKey="fluxy.fiscal.operacional.divergenciasSeveridade.columns" />
-        <SimpleTable title="Documentos por origem" rows={agrupamentos.por_origem || []} labelKey="origem" labelFormatter={sourceLabel} storageKey="fluxy.fiscal.operacional.origens.columns" />
+        <SimpleTable title="Documentos por status" rows={agrupamentos.por_status || []} labelKey="status" labelFormatter={statusLabel} storageKey="tabela:relatorio-operacional-fiscal:por-status" />
+        <SimpleTable title="Documentos por empresa fiscal" rows={agrupamentos.por_empresa || []} labelKey="empresa" storageKey="tabela:relatorio-operacional-fiscal:por-empresa" />
+        <SimpleTable title="Documentos por fornecedor" rows={agrupamentos.por_fornecedor || []} labelKey="fornecedor" storageKey="tabela:relatorio-operacional-fiscal:por-fornecedor" />
+        <SimpleTable title="Divergencias por tipo" rows={agrupamentos.divergencias_por_tipo || []} labelKey="tipo" storageKey="tabela:relatorio-operacional-fiscal:divergencias-por-tipo" />
+        <SimpleTable title="Divergencias por severidade" rows={agrupamentos.divergencias_por_severidade || []} labelKey="severidade" storageKey="tabela:relatorio-operacional-fiscal:divergencias-por-severidade" />
+        <SimpleTable title="Documentos por origem" rows={agrupamentos.por_origem || []} labelKey="origem" labelFormatter={sourceLabel} storageKey="tabela:relatorio-operacional-fiscal:por-origem" />
       </div>
 
       <section className="sol-surface-card rounded-lg p-4">
@@ -350,46 +344,67 @@ export default function FiscalOperationalReport() {
             {formatNumber(documents.length)} itens
           </span>
         </div>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={DOCUMENT_COLUMNS} storageKey="fluxy.fiscal.operacional.documentosCriticos.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="documento">Documento</ResizableTh>
-                <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                <ResizableTh columnKey="empresa">Empresa fiscal</ResizableTh>
-                <ResizableTh columnKey="emissao">Emissao</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-                <ResizableTh columnKey="pendencias">Pendencias</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7}>Carregando...</td></tr>
-              ) : documents.length === 0 ? (
-                <tr><td colSpan={7}>Sem documentos pendentes no periodo.</td></tr>
-              ) : documents.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <Link className="font-semibold text-blue-700 hover:underline" to={`/fiscal/documentos/${item.id}`}>
-                      {item.document_number || `#${item.id}`}
-                    </Link>
-                  </td>
-                  <td>
-                    <div className="font-semibold text-slate-900">{item.issuer_name || item.issuer_cnpj || '-'}</div>
-                    {item.issuer_cnpj ? <div className="text-xs text-slate-500">{item.issuer_cnpj}</div> : null}
-                  </td>
-                  <td>{item.company_name || '-'}</td>
-                  <td>{formatDate(item.emission_date)}</td>
-                  <td className="text-right">{formatMoney(item.total_value)}</td>
-                  <td>{statusLabel(item.document_status)}</td>
-                  <td><RiskTags item={item} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
-      </section>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'documento',
+              titulo: 'Documento',
+              tipo: 'codigo',
+              noCard: 'titulo',
+              render: (item) => (
+                <Link className="font-semibold text-blue-700 hover:underline" to={`/fiscal/documentos/${item.id}`}>
+                  {item.document_number || `#${item.id}`}
+                </Link>
+              )
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              tipo: 'identidade',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.issuer_name || item.issuer_cnpj || '-'}
+                  sub={item.issuer_cnpj || ''}
+                />
+              )
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa fiscal',
+              tipo: 'texto',
+              render: (item) => item.company_name || '-'
+            },
+            {
+              id: 'emissao',
+              titulo: 'Emissao',
+              tipo: 'data',
+              render: (item) => formatDate(item.emission_date)
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (item) => formatMoney(item.total_value)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => statusLabel(item.document_status)
+            },
+            {
+              id: 'pendencias',
+              titulo: 'Pendencias',
+              tipo: 'texto',
+              render: (item) => <RiskTags item={item} />
+            }
+          ]}
+          itens={documents}
+          carregando={loading}
+          vazio="Sem documentos pendentes no periodo."
+          storageKey="tabela:relatorio-operacional-fiscal:documentos-criticos"
+          rotuloRolagem="Documentos que exigem acao"
+        />      </section>
     </div>
   );
 }

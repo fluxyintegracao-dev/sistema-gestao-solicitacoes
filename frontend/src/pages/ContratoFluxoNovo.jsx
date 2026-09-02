@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { getContratoObraCategorias, getApropriacoesDaObra } from '../services/configuracoesSistema';
 import { criarContratoFluxoNovo, aprovarContratoFluxoNovo, rejeitarContratoFluxoNovo } from '../services/contratos';
@@ -237,23 +238,47 @@ export default function ContratoFluxoNovo() {
         )}
 
         {parcelas.length > 0 && (
-          <table className="table">
-            <thead><tr><th>#</th><th>Valor</th><th>Vencimento</th><th>Status</th></tr></thead>
-            <tbody>
-              {parcelas.map((p) => (
-                <tr key={p.numero}>
-                  <td>{p.numero}</td>
-                  <td>
-                    <input className="input" type="number" step="0.01" style={{ width: 120 }}
-                      value={p.valor}
-                      onChange={(e) => editarParcela(p.numero, e.target.value)} />
-                  </td>
-                  <td>{p.vencimento}</td>
-                  <td>Previsao</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'numero',
+                titulo: '#',
+                tipo: 'codigo',
+                noCard: 'titulo',
+                render: (p) => p.numero
+              },
+              {
+                id: 'valor',
+                titulo: 'Valor',
+                tipo: 'valor',
+                render: (p) => (
+                  <input className="input" type="number" step="0.01"
+                    value={p.valor}
+                    onChange={(e) => editarParcela(p.numero, e.target.value)} />
+                )
+              },
+              {
+                id: 'vencimento',
+                titulo: 'Vencimento',
+                tipo: 'data',
+                render: (p) => p.vencimento
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: () => 'Previsao'
+              }
+            ]}
+            itens={parcelas}
+            getId={(p) => p.numero}
+            storageKey="tabela:contrato-fluxo-novo:parcelas"
+            rotuloRolagem="Previa de parcelas"
+            vazio="Nenhuma parcela prevista"
+            /* R17: previa de parcelas — numero, valor, vencimento e status; nao
+               ha nome de registro a exibir, a parcela e identificada pelo numero. */
+            semIdentidade
+          />
         )}
 
         <div className="flex justify-end">

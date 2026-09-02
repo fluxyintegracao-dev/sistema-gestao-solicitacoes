@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioPendenciasCotacoesCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,33 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const COTACAO_COLUMNS = [
-  { key: 'cotacao', width: 130, minWidth: 100 },
-  { key: 'titulo', width: 240, minWidth: 170 },
-  { key: 'obra', width: 220, minWidth: 150 },
-  { key: 'status', width: 120, minWidth: 95 },
-  { key: 'fornecedores', width: 150, minWidth: 120 },
-  { key: 'respostas', width: 130, minWidth: 105 },
-  { key: 'pendencias', width: 180, minWidth: 140 },
-  { key: 'criada', width: 120, minWidth: 100 }
-];
-
-const VENCIDO_COLUMNS = [
-  { key: 'cotacao', width: 130, minWidth: 100 },
-  { key: 'fornecedor', width: 240, minWidth: 170 },
-  { key: 'obra', width: 220, minWidth: 150 },
-  { key: 'enviado', width: 120, minWidth: 100 },
-  { key: 'visualizado', width: 120, minWidth: 100 },
-  { key: 'prazo', width: 120, minWidth: 100 }
-];
-
-const OBRA_COLUMNS = [
-  { key: 'obra', width: 260, minWidth: 170 },
-  { key: 'cotacoes', width: 110, minWidth: 90 },
-  { key: 'sem_minimo', width: 130, minWidth: 105 },
-  { key: 'vencidas', width: 130, minWidth: 105 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -281,126 +254,108 @@ export default function ComprasRelatorioPendenciasCotacoes() {
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Cotacoes com pendencias</h2>
         <p className="page-subtitle mb-3">Top 100 cotacoes priorizadas por prazo vencido e falta de respostas minimas.</p>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={COTACAO_COLUMNS} storageKey="fluxy.compras.pendenciasCotacoes.cotacoes.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="cotacao">Cotacao</ResizableTh>
-                <ResizableTh columnKey="titulo">Titulo</ResizableTh>
-                <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-                <ResizableTh columnKey="fornecedores" className="text-right">Enviados</ResizableTh>
-                <ResizableTh columnKey="respostas" className="text-right">Respostas</ResizableTh>
-                <ResizableTh columnKey="pendencias">Pendencias</ResizableTh>
-                <ResizableTh columnKey="criada">Criada em</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8}>Carregando...</td></tr>
-              ) : cotacoes.length === 0 ? (
-                <tr><td colSpan={8}>Sem cotacoes com fornecedores nos filtros.</td></tr>
-              ) : (
-                cotacoes.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.id}`}>
-                        SC #{item.id}
-                      </Link>
-                    </td>
-                    <td className="font-semibold text-slate-900">{item.titulo || '-'}</td>
-                    <td>{item.obra?.nome || '-'}</td>
-                    <td>{item.status || '-'}</td>
-                    <td className="text-right">{formatNumber(item.fornecedores_enviados)}</td>
-                    <td className="text-right">{formatNumber(item.fornecedores_respondidos)} / {formatNumber(item.minimo_cotacoes)}</td>
-                    <td>
-                      <div className="flex flex-wrap gap-2">
-                        <PendenciaBadge active={item.sem_minimo}>Sem minimo</PendenciaBadge>
-                        <PendenciaBadge active={item.prazo_vencido} tone="red">Prazo vencido</PendenciaBadge>
-                      </div>
-                    </td>
-                    <td>{formatDate(item.criada_em)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'cotacao',
+              titulo: 'Cotacao',
+              // R17: a cotacao (SC) NOMEIA o registro.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.id}`}>
+                  SC #{item.id}
+                </Link>
+              )
+            },
+            { id: 'titulo', titulo: 'Titulo', tipo: 'texto', render: (item) => <span className="font-semibold text-slate-900">{item.titulo || '-'}</span> },
+            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status || '-' },
+            { id: 'fornecedores', titulo: 'Enviados', tipo: 'numero', render: (item) => formatNumber(item.fornecedores_enviados) },
+            { id: 'respostas', titulo: 'Respostas', tipo: 'numero', render: (item) => `${formatNumber(item.fornecedores_respondidos)} / ${formatNumber(item.minimo_cotacoes)}` },
+            {
+              id: 'pendencias',
+              titulo: 'Pendencias',
+              tipo: 'badge',
+              render: (item) => (
+                <div className="flex flex-wrap gap-2">
+                  <PendenciaBadge active={item.sem_minimo}>Sem minimo</PendenciaBadge>
+                  <PendenciaBadge active={item.prazo_vencido} tone="red">Prazo vencido</PendenciaBadge>
+                </div>
+              )
+            },
+            { id: 'criada', titulo: 'Criada em', tipo: 'data', render: (item) => formatDate(item.criada_em) }
+          ]}
+          itens={cotacoes}
+          carregando={loading}
+          storageKey="tabela:compras-pendencias-cotacoes:cotacoes"
+          rotuloRolagem="Cotacoes com pendencias"
+          vazio="Sem cotacoes com fornecedores nos filtros."
+        />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Fornecedores vencidos sem resposta</h2>
           <p className="page-subtitle mb-3">Fornecedores com prazo de resposta anterior a hoje e sem resposta registrada.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={VENCIDO_COLUMNS} storageKey="fluxy.compras.pendenciasCotacoes.vencidos.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="cotacao">Cotacao</ResizableTh>
-                  <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="enviado">Enviado</ResizableTh>
-                  <ResizableTh columnKey="visualizado">Visualizado</ResizableTh>
-                  <ResizableTh columnKey="prazo">Prazo</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={6}>Carregando...</td></tr>
-                ) : fornecedoresVencidos.length === 0 ? (
-                  <tr><td colSpan={6}>Sem fornecedores vencidos sem resposta.</td></tr>
-                ) : (
-                  fornecedoresVencidos.map((item, index) => (
-                    <tr key={`${item.cotacao_id}-${item.fornecedor_id || index}`}>
-                      <td>
-                        <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.cotacao_id}`}>
-                          SC #{item.cotacao_id}
-                        </Link>
-                      </td>
-                      <td className="font-semibold text-slate-900">{item.fornecedor_nome}</td>
-                      <td>{item.obra?.nome || '-'}</td>
-                      <td>{formatDate(item.enviado_em)}</td>
-                      <td>{formatDate(item.visualizado_em)}</td>
-                      <td className="font-semibold text-red-700">{formatDate(item.prazo_resposta)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'cotacao',
+                titulo: 'Cotacao',
+                tipo: 'codigo',
+                render: (item) => (
+                  <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.cotacao_id}`}>
+                    SC #{item.cotacao_id}
+                  </Link>
+                )
+              },
+              {
+                id: 'fornecedor',
+                titulo: 'Fornecedor',
+                // R17: o fornecedor NOMEIA a pendencia listada.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.fornecedor_nome
+              },
+              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+              { id: 'enviado', titulo: 'Enviado', tipo: 'data', render: (item) => formatDate(item.enviado_em) },
+              { id: 'visualizado', titulo: 'Visualizado', tipo: 'data', render: (item) => formatDate(item.visualizado_em) },
+              { id: 'prazo', titulo: 'Prazo', tipo: 'data', render: (item) => <span className="font-semibold text-red-700">{formatDate(item.prazo_resposta)}</span> }
+            ]}
+            itens={fornecedoresVencidos}
+            getId={(item) => `${item.cotacao_id}-${item.fornecedor_id || item.fornecedor_nome}`}
+            carregando={loading}
+            storageKey="tabela:compras-pendencias-cotacoes:fornecedores-vencidos"
+            rotuloRolagem="Fornecedores vencidos sem resposta"
+            vazio="Sem fornecedores vencidos sem resposta."
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Pendencias por obra/centro</h2>
           <p className="page-subtitle mb-3">Onde estao concentradas cotacoes sem minimo e com prazo vencido.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={OBRA_COLUMNS} storageKey="fluxy.compras.pendenciasCotacoes.obras.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="cotacoes" className="text-right">Cotacoes</ResizableTh>
-                  <ResizableTh columnKey="sem_minimo" className="text-right">Sem minimo</ResizableTh>
-                  <ResizableTh columnKey="vencidas" className="text-right">Vencidas</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4}>Carregando...</td></tr>
-                ) : obrasResumo.length === 0 ? (
-                  <tr><td colSpan={4}>Sem pendencias por obra/centro.</td></tr>
-                ) : (
-                  obrasResumo.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.obra_nome}</td>
-                      <td className="text-right">{formatNumber(item.cotacoes)}</td>
-                      <td className="text-right">{formatNumber(item.sem_minimo)}</td>
-                      <td className="text-right">{formatNumber(item.vencidas)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra/Centro',
+                // R17: a obra/centro NOMEIA a linha deste resumo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.obra_nome
+              },
+              { id: 'cotacoes', titulo: 'Cotacoes', tipo: 'numero', render: (item) => formatNumber(item.cotacoes) },
+              { id: 'sem_minimo', titulo: 'Sem minimo', tipo: 'numero', render: (item) => formatNumber(item.sem_minimo) },
+              { id: 'vencidas', titulo: 'Vencidas', tipo: 'numero', render: (item) => formatNumber(item.vencidas) }
+            ]}
+            itens={obrasResumo}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-pendencias-cotacoes:obras"
+            rotuloRolagem="Pendencias por obra/centro"
+            vazio="Sem pendencias por obra/centro."
+          />
         </div>
       </div>
     </div>
