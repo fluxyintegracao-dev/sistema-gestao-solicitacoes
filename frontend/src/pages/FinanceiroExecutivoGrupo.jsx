@@ -213,11 +213,6 @@ export default function FinanceiroExecutivoGrupo() {
               Painel executivo com DRE, caixa, movimentos entre empresas e obras em uma unica leitura.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar para relatorios
-            </Link>
-          </div>
         </div>
       </div>
 

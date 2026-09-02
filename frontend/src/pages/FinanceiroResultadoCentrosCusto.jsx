@@ -94,9 +94,6 @@ export default function FinanceiroResultadoCentrosCusto() {
             <h1 className="page-title">Resultado por Centro de Custo</h1>
             <p className="page-subtitle">Visao financeira dos cadastros administrativos que nao sao obras.</p>
           </div>
-          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">
-            Voltar para relatorios
-          </Link>
         </div>
       </div>
 

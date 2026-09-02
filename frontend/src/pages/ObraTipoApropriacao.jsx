@@ -161,10 +161,7 @@ export default function ObraTipoApropriacao() {
 
   return (
     <Pagina>
-      <PageHeader
-        titulo="Apropriacao padrao por obra"
-        subtitulo="Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra."
-      />
+      <PageHeader titulo="Apropriacao padrao por obra" />
 
       {padroesNovaObra.length > 0 && (
         <BlocoConteudo titulo="Novas obras recebem automaticamente" variante="secundario" recolhivel>
@@ -179,6 +176,12 @@ export default function ObraTipoApropriacao() {
       )}
 
       <div className="app-bloco app-bloco--primario space-y-4" style={{ '--bloco-cor': 'var(--c-primary)' }}>
+        {/* R5: o apoio ancora no bloco a que se refere. */}
+        <p className="app-bloco-lead">
+          {totalVinculos - totalPendentes ? <strong>{totalVinculos - totalPendentes} de {totalVinculos} vinculos definidos</strong> : null}
+          {totalVinculos - totalPendentes ? ' · ' : ''}
+          Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra.
+        </p>
         <div className="flex gap-2 flex-wrap items-center">
           <input
             type="text"
@@ -195,9 +198,6 @@ export default function ObraTipoApropriacao() {
             />
             <span>Somente obras com pendencia</span>
           </label>
-          <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
-            {totalVinculos - totalPendentes} de {totalVinculos} vinculos definidos
-          </span>
         </div>
 
         {erro && <div className="app-alert app-alert--error">{erro}</div>}

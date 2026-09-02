@@ -123,6 +123,37 @@ export function validarLayout() {
         apontaMedida(i, `tamanho de fonte fora da escala ("text-${fonteFora[1]}") — papéis: text-xs (detalhe 12), text-sm (corpo 14), text-lg (título de bloco 18), título de página no Pagina/PageHeader (22).`);
       }
     });
+
+    const linhaDe = (indice) => codigo.slice(0, indice).split('\n').length;
+
+    // R5 (02/09) — texto de apoio NÃO mora no PageHeader: ancora no
+    // BlocoConteudo a que se refere (props contagem/descricao). Nada de
+    // texto solto na faixa entre a topbar e o primeiro bloco.
+    for (const bloco of codigo.matchAll(/<PageHeader\b[\s\S]*?>/g)) {
+      const prop = bloco[0].match(/\b(subtitulo|contagem)=/);
+      if (prop) {
+        aponta(linhaDe(bloco.index) - 1, 'R5', `${prop[1]} no PageHeader — o texto de apoio vive DENTRO do bloco de conteúdo (BlocoConteudo contagem/descricao), nunca solto na faixa do topo.`);
+      }
+    }
+
+    // R11 (02/09) — o menu "⋯" contém APENAS ações sobre o conteúdo da
+    // tela. Navegação (voltar, ir para) pertence ao breadcrumb/menu/Ctrl+K.
+    for (const bloco of codigo.matchAll(/\b(?:mais|itens)=\{\[[\s\S]*?\]\}/g)) {
+      if (/navigate\(|\bto:\s|window\.location|<Link\b/.test(bloco[0])) {
+        aponta(linhaDe(bloco.index) - 1, 'R11', 'item de menu de ações que NAVEGA (navigate/to/Link) — navegação não é ação: apague o item; breadcrumb, menu e Ctrl+K resolvem.');
+      }
+    }
+
+    // R12 (02/09) — filtro de lista nunca é select de escolha única: use a
+    // BarraFiltros (botão + marcação, múltipla seleção, etiquetas visíveis).
+    // Select de FORMULÁRIO (entrada de dado) e seletor de CONTEXTO (qual
+    // registro editar) continuam legítimos — a heurística mira selects
+    // cujo estado/aria fala em filtro/situação.
+    for (const sel of codigo.matchAll(/<select[\s\S]{0,260}?>/g)) {
+      if (/filtr|situacao|situação/i.test(sel[0])) {
+        aponta(linhaDe(sel.index) - 1, 'R12', 'select usado como FILTRO — filtros são marcáveis (BarraFiltros: busca larga em cima, botões de marcação, etiquetas removíveis), nunca lista suspensa de escolha única.');
+      }
+    }
   }
 
   return { falhas, avisos, telas: manifesto.telas.length };

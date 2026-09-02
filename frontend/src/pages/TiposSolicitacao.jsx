@@ -311,9 +311,10 @@ export default function TiposSolicitacao() {
 
   return (
     <Pagina>
+      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
+          da lista (BlocoConteudo descricao). */}
       <PageHeader
         titulo="Tipos (Macro)"
-        subtitulo="Cadastro dos tipos macro utilizados nas solicitacoes."
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
@@ -392,9 +393,12 @@ export default function TiposSolicitacao() {
 
       <BlocoConteudo
         titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
+        descricao="Cadastro dos tipos macro utilizados nas solicitacoes."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(
+          // R12: este select é seletor de CONTEXTO (define o setor listado
+          // E a qual setor novos tipos são vinculados) — não é filtro.
           <label className="app-busca flex items-center gap-2 text-sm font-normal">
             <span className="text-[var(--c-muted)]">Setor</span>
             <select

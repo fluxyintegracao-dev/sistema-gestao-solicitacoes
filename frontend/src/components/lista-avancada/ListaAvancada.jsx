@@ -1080,7 +1080,10 @@ const ListaAvancada = forwardRef(function ListaAvancada({
   );
 });
 
-function FiltroRapido({ dim, selecionados, onToggle }) {
+// Exportado: a barra de filtros padrão (BarraFiltros, componentes padrão)
+// reaproveita ESTE botão de marcação — o padrão das Solicitações vale para
+// filtro de qualquer tela; nada de recriar o componente.
+export function FiltroRapido({ dim, selecionados, onToggle }) {
   const [aberto, setAberto] = useState(false);
   const wrapRef = useRef(null);
   const fechar = useCallback(() => setAberto(false), []);

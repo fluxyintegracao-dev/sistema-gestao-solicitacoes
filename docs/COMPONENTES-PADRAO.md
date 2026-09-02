@@ -74,6 +74,22 @@ rota, mesmos handlers — reorganização pura.
 - **`.app-painel-lateral`**: painel de apoio ao lado da lista (mín. 320px em
   tela larga) — a medida mora na classe, não na tela.
 
+## Regras de 02/09 (segunda rodada) já nos componentes
+
+- **`BlocoConteudo` com `contagem`/`descricao`**: o texto de apoio ancora no
+  bloco a que se refere (`.app-bloco-lead`); o `PageHeader` não renderiza
+  mais texto — só o h1 de acessibilidade e as ações (R5 revisto).
+- **Comparações**: `.serie-prevista`/`.serie-realizada` e
+  `.texto-previsto`/`.texto-realizado` — previsto azul, realizado vermelho
+  (R8 revisto).
+- **`tipo: 'identidade'`** na coluna de TabelaPadrao: nome/razão/obra/
+  empresa/parceiro exibidos SEMPRE em maiúsculas (só exibição).
+- **Redimensionar coluna é Excel**: arrasto muda SÓ a coluna arrastada; a
+  regra `width: 100%` que esticava a tabela foi removida (o card enche via
+  coluna flex medida no mount) e o drag-check do roteiro de capturas prova.
+- **Menu "⋯" sem navegação** (R11) e **`BarraFiltros`** no lugar de select
+  de filtro (R12) — busca larga em cima, marcação múltipla, etiquetas.
+
 ## Tokens e utilitários novos
 
 - `--ui-surface-2` (`#f7f9fc` claro / `#182642` escuro): branco rebaixado de

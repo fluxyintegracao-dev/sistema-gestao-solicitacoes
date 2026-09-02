@@ -341,7 +341,8 @@ export default function Parceiros() {
     {
       id: 'pessoa',
       titulo: 'Pessoa',
-      tipo: 'texto',
+      // Nome de parceiro é identificação: exibido em maiúsculas (só exibição).
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (p) => <CelulaDupla principal={p.nome} sub={p.municipio || null} />
     },
@@ -399,9 +400,10 @@ export default function Parceiros() {
 
   return (
     <Pagina>
+      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
+          da lista (BlocoConteudo descricao). */}
       <PageHeader
         titulo="Cadastro de Pessoas"
-        subtitulo="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitacoes, financeiro, comercial e cotacoes."
         acaoPrincipal={{ rotulo: 'Nova pessoa', onClick: abrirNovaPessoa }}
         mais={[
           { rotulo: 'Baixar modelo de importacao', onClick: handleBaixarModelo },
@@ -659,6 +661,7 @@ export default function Parceiros() {
 
       <BlocoConteudo
         titulo="Pessoas cadastradas"
+        descricao="Cadastro mestre de clientes, credores, fornecedores e corretores usado nas solicitacoes, financeiro, comercial e cotacoes."
         variante={formAtivo ? 'neutro' : 'primario'}
         cor="var(--c-primary)"
         acoes={(

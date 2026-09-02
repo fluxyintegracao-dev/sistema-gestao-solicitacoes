@@ -203,11 +203,6 @@ export default function FinanceiroFluxoConsolidado() {
               Visao prevista e realizada por empresa, com eliminacao explicita de movimentos entre empresas.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar para relatorios
-            </Link>
-          </div>
         </div>
       </div>
 

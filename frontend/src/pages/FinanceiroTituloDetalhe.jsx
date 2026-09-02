@@ -658,19 +658,13 @@ export default function FinanceiroTituloDetalhe() {
     return <p className="text-sm text-[var(--c-muted)]">Titulo financeiro nao encontrado.</p>;
   }
 
-  const tituloListPath = titulo.tipo === 'PAGAR' ? '/financeiro/contas-a-pagar' : '/financeiro/contas-a-receber';
-  const tituloListLabel = titulo.tipo === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
 
   return (
     <>
       <Pagina>
-        <Link className="btn btn-outline btn-sm mb-1 self-start" to={tituloListPath}>
-          ← Voltar para {tituloListLabel}
-        </Link>
-
+        {/* R11: o "Voltar" saiu — o breadcrumb do topo já resolve. */}
         <PageHeader
           titulo={`Titulo ${titulo.codigo || `#${titulo.id}`}`}
-          subtitulo={titulo.descricao || 'Sem descricao'}
           acaoPrincipal={{
             rotulo: 'Registrar baixa',
             desabilitada: !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase()),
@@ -721,7 +715,12 @@ export default function FinanceiroTituloDetalhe() {
             largura total; o codigo saiu daqui porque ja e o titulo da pagina
             (informacao aparece uma vez). Campos vazios ficam atras do
             alternador — nenhum dado deixou de existir. */}
-        <BlocoConteudo titulo="Dados do titulo" variante="primario" cor="var(--module-financeiro)">
+        <BlocoConteudo
+          titulo="Dados do titulo"
+          descricao={titulo.descricao || 'Sem descricao'}
+          variante="primario"
+          cor="var(--module-financeiro)"
+        >
           <CamposComVazios
             colunas={4}
             campos={[

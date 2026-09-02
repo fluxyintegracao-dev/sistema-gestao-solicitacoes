@@ -126,7 +126,8 @@ export default function Setores() {
     {
       id: 'nome',
       titulo: 'Nome',
-      tipo: 'texto',
+      // Nome de setor é identificação: exibido em maiúsculas (só exibição).
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (s) => (
         editId === s.id ? (
@@ -197,10 +198,10 @@ export default function Setores() {
 
   return (
     <Pagina>
+      {/* R5 (02/09): contagem e texto de apoio saem do PageHeader e ancoram
+          no bloco da lista (BlocoConteudo contagem/descricao). */}
       <PageHeader
         titulo="Setores"
-        contagem={loading ? undefined : `${setores.length} setor(es)`}
-        subtitulo="Cadastro e manutencao de setores."
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
 
@@ -268,6 +269,8 @@ export default function Setores() {
 
       <BlocoConteudo
         titulo="Setores cadastrados"
+        contagem={loading ? undefined : `${setores.length} setor(es)`}
+        descricao="Cadastro e manutencao de setores."
         variante="primario"
         cor="var(--c-primary)"
       >

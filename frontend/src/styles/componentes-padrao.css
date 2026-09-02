@@ -64,8 +64,10 @@
   margin-top: var(--respiro-topbar);
 }
 
-/* R5 — texto de apoio ancorado: contagem forte + apoio muted, sob o título. */
-.app-page-lead {
+/* R5 — texto de apoio DENTRO do bloco, ancorado ao título dele (regra do
+   cliente, 02/09): contagem forte + apoio muted. Texto solto na faixa entre
+   a topbar e o primeiro bloco é reprovado pela auditoria. */
+.app-bloco-lead {
   margin: var(--esp-1) 0 0;
   font-size: var(--fonte-corpo);
   font-weight: 500;
@@ -74,14 +76,41 @@
   line-height: var(--lh-corpo);
 }
 
-.app-page-lead strong {
+.app-bloco-lead strong {
   color: var(--c-text);
   font-weight: 700;
 }
 
-/* R8 — série neutra de comparação (par da saturada --c-primary). */
-.barra-serie-neutra {
-  background: var(--ui-border-strong);
+/* R8 — comparação é SEMÂNTICA, não tom sobre tom (regra do cliente, 02/09):
+   ORÇADO/PREVISTO = azul; REALIZADO/EXECUTADO/PAGO = vermelho. Vale para
+   toda comparação do sistema: barras, gráficos, KPIs, tabelas. */
+:root {
+  --comp-previsto: var(--c-primary);
+  --comp-realizado: #c2333b;
+}
+
+.dark {
+  --comp-realizado: #e05b62;
+}
+
+.serie-prevista { background: var(--comp-previsto); }
+.serie-realizada { background: var(--comp-realizado); }
+.texto-previsto { color: var(--comp-previsto); }
+.texto-realizado { color: var(--comp-realizado); }
+
+/* Faixa de filtros padrão (o padrão das Solicitações em qualquer tela):
+   busca única em cima OCUPANDO A LARGURA, linha de filtros marcáveis
+   abaixo, etiquetas removíveis dos ativos. Nada de select de filtro. */
+.app-filtros {
+  display: grid;
+  gap: var(--esp-2);
+  min-width: 0;
+  flex: 1 1 100%;
+}
+
+.app-filtros .app-filtros-busca {
+  max-width: none;
+  width: 100%;
 }
 
 /* Painel lateral padrão (formulário/apoio ao lado da lista): a medida mora
@@ -388,12 +417,11 @@
 /* Linha com respiro (decisão do cliente, 02/09): corpo 14px, altura de linha
    1.5 e vão vertical de um degrau — o sistema é usado o dia inteiro; entre
    caber mais linhas e ler melhor, vence a leitura. */
-/* O ResizableTable fixa width inline na soma das colunas; aqui a tabela
-   ocupa o card inteiro (sem espaço morto à direita) e o min-width inline
-   segue garantindo rolagem em viewport estreita. Escopo .app-tabela só. */
-.app-tabela .resizable-table {
-  width: 100% !important;
-}
+/* NUNCA esticar a tabela para 100%: o ResizableTable fixa a largura na SOMA
+   das colunas, e é isso que faz o arrasto agir SÓ na coluna arrastada
+   (Excel). Um width:100% aqui redistribui a sobra por todas as colunas e
+   quebra o redimensionamento (defeito de 02/09, corrigido). O card inteiro
+   é ocupado porque a TabelaPadrao entrega a sobra à coluna flex na medição. */
 
 /* Ações da linha ficam numa linha só — a coluna é dimensionada para elas
    (larguraAcoes); empilhar botões é o que deixava a linha altíssima. */
@@ -423,6 +451,14 @@
 .app-tabela td.celula-valor {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* Coluna de IDENTIFICAÇÃO (nome, razão social, obra, empresa, parceiro):
+   exibição SEMPRE em maiúsculas, independente de como foi digitado — só
+   exibição, o dado gravado não muda (regra do cliente, 02/09). */
+.app-tabela td.celula-identidade,
+.app-tabela-card .celula-identidade {
+  text-transform: uppercase;
 }
 
 .app-tabela-linha { cursor: default; }

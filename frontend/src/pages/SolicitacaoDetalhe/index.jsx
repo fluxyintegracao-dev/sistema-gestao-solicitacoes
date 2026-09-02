@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { HiOutlineArrowLeft, HiChevronRight } from 'react-icons/hi2';
+import { HiChevronRight } from 'react-icons/hi2';
 import { useAuth } from '../../contexts/AuthContext';
 import { useLiveUpdateSubscription } from '../../contexts/LiveUpdatesContext';
 
@@ -55,7 +55,6 @@ import {
   hasEnabledModule,
   hasPermissao
 } from '../../utils/acessoProduto';
-import { useSafeNavigateBack } from '../../utils/navigation';
 
 function parseNumeroLocal(valor) {
   if (valor === null || valor === undefined || valor === '') return 0;
@@ -142,7 +141,6 @@ function mapearItemManualCompraDireta(item) {
 export default function SolicitacaoDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const navigateBack = useSafeNavigateBack('/solicitacoes');
   const { user } = useAuth();
 
   const setorTokens = [
@@ -1189,15 +1187,6 @@ export default function SolicitacaoDetalhe() {
   return (
     <div className="sol-detail-page max-w-6xl mx-auto space-y-6">
       <div className="sol-detail-nav">
-        <button
-          onClick={() => navigateBack('/solicitacoes')}
-          className="sol-detail-back-btn"
-          type="button"
-        >
-          <HiOutlineArrowLeft className="sol-detail-back-icon" />
-          <span>Voltar para solicitacoes</span>
-        </button>
-
         <div className="sol-detail-nav-right">
           <div className="sol-detail-breadcrumb">
             <span>Solicitacoes</span>

@@ -394,8 +394,7 @@ export default function FiscalDocumentDetail() {
   if (error && !documento) {
     return (
       <div className="space-y-4">
-        <Link className="text-sm font-semibold text-blue-600" to="/fiscal/documentos">Voltar para documentos fiscais</Link>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>
       </div>
     );
   }
@@ -408,7 +407,6 @@ export default function FiscalDocumentDetail() {
     <div className="fiscal-page space-y-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Link className="text-sm font-semibold text-blue-600" to="/fiscal/documentos">Voltar para documentos fiscais</Link>
           <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Documento fiscal</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-950 dark:text-white">
             NF-e {documento?.document_number || documento?.access_key}

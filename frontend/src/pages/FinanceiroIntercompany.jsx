@@ -226,11 +226,6 @@ export default function FinanceiroIntercompany() {
               Transferencias, aportes, reembolsos e rateios entre empresas do grupo.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar para relatorios
-            </Link>
-          </div>
         </div>
       </div>
 

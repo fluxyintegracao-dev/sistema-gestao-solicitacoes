@@ -16,9 +16,14 @@ function Seta() {
  * variante="secundario": branco rebaixado (--ui-surface-2), recua sozinho.
  * recolhivel: histórico/auditoria/raros nascem recolhidos (recolhidoPadrao),
  *   mas o usuário sabe que existem — o título fica sempre à vista.
+ * contagem/descricao: o texto de apoio vive AQUI, ancorado ao título do
+ *   bloco a que se refere — nunca solto na faixa entre a topbar e o
+ *   primeiro bloco (regra do cliente, 02/09).
  */
 export default function BlocoConteudo({
   titulo,
+  contagem,
+  descricao,
   variante = 'neutro',
   cor,
   acoes,
@@ -66,6 +71,13 @@ export default function BlocoConteudo({
         </button>
       ) : titulo ? (
         <div className="app-bloco-head">{cabecalho}</div>
+      ) : null}
+      {(contagem || descricao) ? (
+        <p className="app-bloco-lead">
+          {contagem ? <strong>{contagem}</strong> : null}
+          {contagem && descricao ? ' · ' : ''}
+          {descricao}
+        </p>
       ) : null}
       {!recolhido && <div className="app-bloco-corpo">{children}</div>}
     </section>

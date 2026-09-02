@@ -47,13 +47,18 @@ automaticamente se sair do padrão.
   da página, aplicado no `.app-page-header` (margin-top). A auditoria runtime
   mede o vão real e reprova < 24px.
 
-## R5 — Texto de apoio ancorado
+## R5 — Texto de apoio DENTRO do bloco (revisto em 02/09)
 
-- O texto de apoio NUNCA é um parágrafo solto: entra no `PageHeader` via
-  props **`contagem`** (número/resumo, renderizado em `<strong>` com cor de
-  texto) e **`subtitulo`** (peso 500, 0.9rem, `--c-muted`, máx 78ch),
-  empilhados sob o título com margem definida (4px). `page-subtitle` fora do
-  PageHeader em tela do manifesto é REPROVADO pelo verificador estático.
+- Texto de apoio e contagem vivem **DENTRO do bloco de conteúdo a que se
+  referem**, ancorados ao título do bloco: props **`contagem`** e
+  **`descricao`** do `BlocoConteudo` (`.app-bloco-lead`: contagem em
+  `<strong>`, apoio muted, máx 78ch). **Nada de texto solto na faixa entre
+  a topbar e o primeiro bloco** — se um texto não pertence a nenhum bloco,
+  ele não deveria existir na tela.
+- O `PageHeader` NÃO renderiza mais subtítulo/contagem (só o h1 de
+  acessibilidade e as ações). `subtitulo=`/`contagem=` no PageHeader e
+  `page-subtitle` solto são REPROVADOS pelo verificador; a auditoria
+  runtime reprova parágrafo visível na faixa do topo.
 
 ## R6 — Campo monetário dimensionado pelo pior caso
 
@@ -70,11 +75,16 @@ automaticamente se sair do padrão.
 - Em linha de tabela editável: coluna de valor com largura FIXA da coluna
   (150–200px), texto longo fica com a sobra (R1).
 
-## R8 — Contraste em comparações
+## R8 — Comparação é SEMÂNTICA: previsto azul × realizado vermelho (revisto em 02/09)
 
-- Séries comparadas (orçado × executado etc.): **uma neutra + uma saturada**
-  — neutra = `--ui-border-strong` (cinza), destaque = `--c-primary`. NUNCA
-  dois tons da mesma família. Vale para barras, linhas e legendas.
+- Em TODA comparação do sistema (barras, gráficos, KPIs, tabelas
+  comparativas): **ORÇADO/PREVISTO = azul** (`--comp-previsto`, =
+  `--c-primary`) e **REALIZADO/EXECUTADO/PAGO = vermelho**
+  (`--comp-realizado`). Nunca dois tons da mesma família, nunca cinza ×
+  azul: a distinção é de significado, não de intensidade.
+- Classes utilitárias: `.serie-prevista`/`.serie-realizada` (fundos de
+  barra) e `.texto-previsto`/`.texto-realizado` (números e legendas — a
+  legenda carrega a MESMA cor da série).
 
 ## R9 — Cadastro raro abre em MODAL
 
@@ -110,6 +120,30 @@ automaticamente se sair do padrão.
 - Exceção só com REGISTRO: `excecoes_medidas` no manifesto
   (`telas-reformadas.json`), com justificativa — o verificador rebaixa para
   AVISO e o aviso aparece em todo teste.
+
+## R11 — Navegação não é ação (02/09)
+
+- O menu "⋯" (MenuMais) contém **apenas ações sobre o conteúdo da tela**
+  (exportar, importar, arquivar, resetar). **Nunca** navegação, "voltar"
+  ou "ir para" — isso pertence ao breadcrumb, ao menu e ao Ctrl+K. Menu
+  vazio não renderiza o botão (já é o comportamento do componente).
+- O verificador reprova item de `mais`/`itens` com `navigate(`/`to:`/`Link`.
+
+## R12 — Filtro é marcação, nunca lista suspensa (02/09)
+
+- **Nenhum filtro de lista é select de escolha única.** Todo filtro é botão
+  com menu de MARCAÇÃO (checkbox, múltipla seleção) e os valores escolhidos
+  ficam visíveis como etiquetas removíveis — o padrão da barra de filtros
+  das Solicitações. Motivo: com select o estado do filtro é invisível; com
+  marcação ele é legível de imediato e combinável.
+- A faixa de filtros de toda tela segue a estrutura das Solicitações:
+  **busca única em cima ocupando a largura** e, abaixo, a linha de filtros
+  marcáveis. Nada de campo de busca solto ao lado de select.
+- Componente: **`BarraFiltros`** (componentes padrão), que REAPROVEITA o
+  `FiltroRapido` da ListaAvancada — não recriar.
+- Select de FORMULÁRIO (entrada de dado) e seletor de CONTEXTO (escolher
+  QUAL registro/conjunto se edita, quando novos registros herdam a escolha)
+  continuam legítimos.
 
 ## Verificação
 

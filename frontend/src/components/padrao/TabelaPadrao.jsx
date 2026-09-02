@@ -43,6 +43,9 @@ export function CelulaDupla({ principal, sub, title }) {
 // Medidas por papel da coluna — pior caso real de cada dado (R1/R6/R7).
 const TIPOS_COLUNA = {
   texto:  { largura: 180, flexPadrao: true },        // conteúdo: recebe a sobra
+  // Identificação (nome, razão social, obra, empresa, parceiro): como texto,
+  // mas exibida SEMPRE em maiúsculas — só exibição, o dado não muda.
+  identidade: { largura: 180, flexPadrao: true, identidade: true },
   codigo: { largura: 130 },                          // OB-2024-0117
   // R$ 9.999.999.999,99 no corpo de 14px tabular ≈ 184px com o respiro (R6/R7).
   valor:  { largura: 190, alinhar: 'right', valor: true },
@@ -60,8 +63,17 @@ function normalizarColuna(coluna) {
     largura: coluna.largura ?? base.largura,
     alinhar: coluna.alinhar ?? base.alinhar,
     flex: coluna.flex ?? (base.flexPadrao || undefined),
-    __valor: base.valor || undefined
+    __valor: base.valor || undefined,
+    __identidade: base.identidade || undefined
   };
+}
+
+function classeCelula(coluna) {
+  const classes = [
+    coluna.__valor && 'celula-valor',
+    coluna.__identidade && 'celula-identidade'
+  ].filter(Boolean).join(' ');
+  return classes || undefined;
 }
 export default function TabelaPadrao({
   colunas = [],
@@ -141,12 +153,14 @@ export default function TabelaPadrao({
               className={`app-tabela-card${tom ? ` tarja tarja--${tom}` : ''}`}
               onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
             >
-              <div className="app-celula-dupla-principal">{colunaTitulo.render(item)}</div>
+              <div className={`app-celula-dupla-principal${colunaTitulo.__identidade ? ' celula-identidade' : ''}`}>
+                {colunaTitulo.render(item)}
+              </div>
               <dl style={{ margin: 0, display: 'contents' }}>
                 {demais.map((coluna) => (
                   <div className="app-tabela-card-par" key={coluna.id}>
                     <dt>{coluna.titulo}</dt>
-                    <dd>{coluna.render(item)}</dd>
+                    <dd className={coluna.__identidade ? 'celula-identidade' : undefined}>{coluna.render(item)}</dd>
                   </div>
                 ))}
               </dl>
@@ -204,7 +218,7 @@ export default function TabelaPadrao({
                 {colunasBase.map((coluna) => (
                   <td
                     key={coluna.id}
-                    className={coluna.__valor ? 'celula-valor' : undefined}
+                    className={classeCelula(coluna)}
                     style={coluna.alinhar ? { textAlign: coluna.alinhar } : undefined}
                   >
                     {coluna.render(item)}

@@ -130,7 +130,8 @@ export default function ParceiroCategorias() {
     {
       id: 'nome',
       titulo: 'Categoria',
-      tipo: 'texto',
+      // Nome de categoria é identificação: exibido em maiúsculas (só exibição).
+      tipo: 'identidade',
       noCard: 'titulo',
       // O "ID {id}" saiu da vista (aparecia sob o nome); o dado continua
       // disponível no title (tooltip) da célula.
@@ -146,9 +147,10 @@ export default function ParceiroCategorias() {
 
   return (
     <Pagina>
+      {/* R5 (02/09): o texto de apoio saiu do PageHeader e ancora no bloco
+          da lista (BlocoConteudo descricao). */}
       <PageHeader
         titulo="Categorias de Parceiro"
-        subtitulo="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
         acaoPrincipal={{ rotulo: 'Nova categoria', onClick: abrirNovaCategoria }}
       />
 
@@ -214,6 +216,7 @@ export default function ParceiroCategorias() {
 
       <BlocoConteudo
         titulo="Categorias cadastradas"
+        descricao="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

@@ -549,11 +549,6 @@ export default function FinanceiroDre() {
               Resultado por competencia da Holding, empresas, obras e centros de custo.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar para relatorios
-            </Link>
-          </div>
         </div>
       </div>
 

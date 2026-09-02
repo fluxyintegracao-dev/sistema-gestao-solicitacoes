@@ -329,17 +329,17 @@ export default function ObraGestao() {
                     <div className="mb-2 flex items-center justify-between gap-4 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                       <span className="min-w-0 flex-1 truncate" title={item.descricao}>{item.descricao}</span>
                       <div className="flex shrink-0 items-center gap-3 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
-                        <span>Pago {formatCurrency(item.pago)}</span>
-                        <span>Orcado {formatCurrency(item.valor_orcado)}</span>
-                        <span className="font-bold obra-accent-blue">{percent(item.percentual_execucao)}</span>
+                        <span className="texto-realizado font-semibold">Pago {formatCurrency(item.pago)}</span>
+                        <span className="texto-previsto font-semibold">Orcado {formatCurrency(item.valor_orcado)}</span>
+                        <span className="font-bold texto-realizado">{percent(item.percentual_execucao)}</span>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="h-2 overflow-hidden rounded-full obra-bar-track">
-                        <div className="h-full rounded-full barra-serie-neutra" style={{ width: widthOrcado }} />
+                        <div className="h-full rounded-full serie-prevista" style={{ width: widthOrcado }} />
                       </div>
                       <div className="h-2 overflow-hidden rounded-full obra-bar-track">
-                        <div className="h-full rounded-full" style={{ width: widthPago, background: 'var(--c-primary)' }} />
+                        <div className="h-full rounded-full serie-realizada" style={{ width: widthPago }} />
                       </div>
                     </div>
                   </div>

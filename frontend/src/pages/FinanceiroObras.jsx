@@ -426,7 +426,6 @@ export default function FinanceiroObras() {
             <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
               <HiOutlineArrowDownTray /> Exportar CSV
             </button>
-            <Link to="/financeiro/relatorios" className="btn btn-outline">Voltar para relatorios</Link>
           </div>
         </div>
       </div>

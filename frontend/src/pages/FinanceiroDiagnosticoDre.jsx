@@ -194,7 +194,6 @@ export default function FinanceiroDiagnosticoDre() {
             </p>
           </div>
           <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">Voltar para relatorios</Link>
             <button type="button" className="btn btn-primary" onClick={carregar} disabled={loading}>
               {loading ? 'Atualizando...' : 'Atualizar'}
             </button>

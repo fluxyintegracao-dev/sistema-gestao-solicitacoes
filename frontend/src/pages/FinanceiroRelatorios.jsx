@@ -1446,11 +1446,6 @@ export default function FinanceiroRelatorios() {
               <h1 className="text-xl font-semibold md:text-2xl">{selectedReport.title}</h1>
               <p className="page-subtitle">{selectedReport.description}</p>
             </div>
-            <div className="app-page-actions">
-              <Link to="/financeiro/relatorios" className="btn btn-outline">
-                Voltar para relatorios
-              </Link>
-            </div>
           </div>
         </div>
 

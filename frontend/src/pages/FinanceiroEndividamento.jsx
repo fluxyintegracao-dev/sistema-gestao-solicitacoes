@@ -196,11 +196,6 @@ export default function FinanceiroEndividamento() {
               Titulos a pagar em aberto classificados explicitamente como endividamento.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/relatorios" className="btn btn-outline">
-              Voltar para relatorios
-            </Link>
-          </div>
         </div>
       </div>
 

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { atualizarEmpresaGrupo, criarEmpresaGrupo, getEmpresasGrupo } from '../services/empresasGrupo';
 import {
   Pagina,
@@ -8,7 +7,9 @@ import {
   TabelaPadrao,
   CelulaDupla,
   FormSecao,
-  CampoForm
+  CampoForm,
+  BarraFiltros,
+  alternarValorFiltro
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import OverlayModal from '../components/ui/OverlayModal';
@@ -56,23 +57,28 @@ function labelTipoGerencial(value) {
 }
 
 export default function EmpresasGrupo() {
-  const navigate = useNavigate();
   const [empresas, setEmpresas] = useState([]);
-  const [filtros, setFiltros] = useState({ q: '', ativo: '' });
+  // R12: filtro por MARCAÇÃO — situacao é um conjunto (vazio = todas);
+  // com exatamente uma marca, vira o parametro ativo=true/false da API.
+  const [filtros, setFiltros] = useState({ q: '', situacao: new Set() });
   const [form, setForm] = useState(null); // null = painel de formulario fechado
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
 
+  // Filtro marcado aplica na hora (padrão Solicitações); a busca digitada
+  // espera 350ms para não martelar a API a cada tecla.
   useEffect(() => {
-    carregar();
-  }, []);
+    const atraso = setTimeout(carregar, 350);
+    return () => clearTimeout(atraso);
+  }, [filtros]);
 
   async function carregar() {
     try {
       setCarregando(true);
+      const ativo = filtros.situacao.size === 1 ? filtros.situacao.values().next().value : undefined;
       const data = await getEmpresasGrupo({
         q: filtros.q || undefined,
-      ativo: filtros.ativo === '' ? undefined : filtros.ativo
+        ativo
       });
       setEmpresas(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -154,7 +160,7 @@ export default function EmpresasGrupo() {
     {
       id: 'empresa',
       titulo: 'Empresa',
-      tipo: 'texto',
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (item) => (
         <CelulaDupla principal={item.nome} sub={item.codigo ? `Cód. ${item.codigo}` : null} />
@@ -164,7 +170,8 @@ export default function EmpresasGrupo() {
       id: 'razao_cnpj',
       titulo: 'Razão social / CNPJ',
       // CNPJ formatado (18 chars) não cabe nos 130px do tipo 'codigo'.
-      tipo: 'texto',
+      tipo: 'identidade',
+      flex: false,
       render: (item) => (
         <CelulaDupla
           principal={item.razao_social || '-'}
@@ -206,13 +213,11 @@ export default function EmpresasGrupo() {
 
   return (
     <Pagina>
+      {/* R11: "Voltar para Configurações" saiu do menu de ações —
+          navegação pertence ao breadcrumb, não ao "⋯". */}
       <PageHeader
         titulo="Empresas do Grupo"
-        subtitulo="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
         acaoPrincipal={{ rotulo: 'Nova empresa', onClick: abrirNovaEmpresa }}
-        mais={[
-          { rotulo: 'Voltar para Configurações', onClick: () => navigate('/configuracoes') }
-        ]}
       />
 
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro de uso esporádico abre em
@@ -378,32 +383,32 @@ export default function EmpresasGrupo() {
 
       <BlocoConteudo
         titulo="Empresas cadastradas"
+        contagem={carregando ? null : `${empresas.length} empresa(s)`}
+        descricao="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
         variante="primario"
         cor="var(--c-primary)"
-        acoes={(
-          <>
-            <input
-              className="input input-sm app-busca"
-              placeholder="Buscar nome, código ou CNPJ"
-              value={filtros.q}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, q: event.target.value }))}
-            />
-            <select
-              className="input input-sm"
-              aria-label="Filtrar por situação"
-              value={filtros.ativo}
-              onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}
-            >
-              <option value="">Todas</option>
-              <option value="true">Ativas</option>
-              <option value="false">Inativas</option>
-            </select>
-            <button type="button" className="btn btn-outline btn-sm" onClick={carregar} disabled={carregando}>
-              Aplicar filtros
-            </button>
-          </>
-        )}
       >
+        {/* R12: busca larga em cima + filtro por marcação com etiquetas —
+            o padrão das Solicitações; o filtro aplica ao marcar. */}
+        <BarraFiltros
+          busca={{
+            valor: filtros.q,
+            aoMudar: (valor) => setFiltros((prev) => ({ ...prev, q: valor })),
+            placeholder: 'Buscar nome, código ou CNPJ'
+          }}
+          filtros={[{
+            id: 'situacao',
+            rotulo: 'Situação',
+            opcoes: [
+              { valor: 'true', rotulo: 'Ativas' },
+              { valor: 'false', rotulo: 'Inativas' }
+            ]
+          }]}
+          ativos={{ situacao: filtros.situacao }}
+          aoAlternar={(dim, valor) => setFiltros((prev) => ({ ...alternarValorFiltro(prev, dim, valor), q: prev.q }))}
+          aoLimpar={() => setFiltros((prev) => ({ ...prev, situacao: new Set() }))}
+        />
+
         <TabelaPadrao
           colunas={colunas}
           itens={empresas}

@@ -111,7 +111,6 @@ export default function FiscalDivergences() {
             Visao centralizada das divergencias registradas nos documentos fiscais. Esta tela ainda nao altera pedidos, recebimentos ou financeiro.
           </p>
         </div>
-        <Link className="btn-secondary" to="/fiscal/documentos">Voltar para documentos</Link>
       </div>
 
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}

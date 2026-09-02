@@ -34,11 +34,15 @@ function BotaoAcao({ acao, classe }) {
  * suave e APARTADA (margin-left auto); ações raras no MenuMais.
  * Links para telas irmãs NÃO entram aqui: menu lateral e Ctrl+K já resolvem
  * (decisão do cliente, 02/09 — remover a navegação duplicada dos cabeçalhos).
+ * TEXTO DE APOIO NÃO MORA AQUI (regra do cliente, 02/09): contagem e
+ * descrição ancoram no BlocoConteudo a que se referem — nada de texto solto
+ * na faixa entre a topbar e o primeiro bloco. O h1 fica para acessibilidade
+ * (o shell o oculta porque o topo já mostra a seção).
+ * As ações do menu "⋯" agem sobre o CONTEÚDO da tela; navegação nunca entra
+ * (breadcrumb, menu e Ctrl+K resolvem).
  */
 export default function PageHeader({
   titulo,
-  subtitulo,
-  contagem,
   acaoPrincipal,
   secundarias = [],
   destrutiva,
@@ -50,15 +54,6 @@ export default function PageHeader({
       <div className="app-page-header-row">
         <div>
           <h1 className="page-title">{titulo}</h1>
-          {/* R5: texto de apoio ancorado — contagem em strong, apoio muted,
-              sempre aqui dentro (parágrafo solto na página é reprovado). */}
-          {(contagem || subtitulo) ? (
-            <p className="app-page-lead">
-              {contagem ? <strong>{contagem}</strong> : null}
-              {contagem && subtitulo ? ' · ' : ''}
-              {subtitulo}
-            </p>
-          ) : null}
         </div>
         <div className="app-actionbar">
           {secundarias.filter(Boolean).map((acao) => (

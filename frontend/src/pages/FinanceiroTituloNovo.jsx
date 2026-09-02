@@ -1395,9 +1395,6 @@ export default function FinanceiroTituloNovo() {
               Cadastre contas manuais que nao nasceram de uma solicitacao ou contrato de venda.
             </p>
           </div>
-          <div className="app-page-actions">
-            <Link to={tituloListPath} className="btn btn-outline">Voltar para {tituloListLabel}</Link>
-          </div>
         </div>
       </div>
 

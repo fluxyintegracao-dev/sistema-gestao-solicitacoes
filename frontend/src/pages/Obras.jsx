@@ -326,24 +326,20 @@ export default function Obras() {
     <Pagina>
       <PageHeader
         titulo="Gestão de Obras e Centros de Custo"
-        contagem={loading ? null : `${obras.length} cadastro(s)`}
-        subtitulo={gestaoObrasHabilitada
-          ? 'Obras reais com orçamento e centros de custo administrativos usados nas solicitações.'
-          : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
         acaoPrincipal={podeGerenciarCadastro
           ? { rotulo: 'Novo cadastro', onClick: abrirModalNovaObra }
           : null}
       />
 
-      {!gestaoObrasHabilitada && (
-        <p className="app-note">
-          Gestão de obras desabilitada no plano — os cadastros seguem disponíveis para
-          solicitações, títulos e configurações básicas.
-        </p>
-      )}
-
+      {/* R5: contagem e apoio ancorados no bloco a que se referem — nada
+          de texto solto na faixa do topo. O aviso de plano também mora
+          aqui dentro. */}
       <BlocoConteudo
         titulo="Cadastros"
+        contagem={loading ? null : `${obras.length} cadastro(s)`}
+        descricao={gestaoObrasHabilitada
+          ? 'Obras reais com orçamento e centros de custo administrativos usados nas solicitações.'
+          : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
         variante="primario"
         cor="var(--c-primary)"
         acoes={(
@@ -355,12 +351,18 @@ export default function Obras() {
           />
         )}
       >
+        {!gestaoObrasHabilitada && (
+          <p className="app-note">
+            Gestão de obras desabilitada no plano — os cadastros seguem disponíveis para
+            solicitações, títulos e configurações básicas.
+          </p>
+        )}
         <TabelaPadrao
           colunas={[
             {
               id: 'obra',
               titulo: 'Obra / Centro de custo',
-              tipo: 'texto',
+              tipo: 'identidade',
               noCard: 'titulo',
               render: (obra) => (
                 <CelulaDupla
@@ -372,7 +374,7 @@ export default function Obras() {
             {
               id: 'empresa',
               titulo: 'Empresa / Tipo',
-              tipo: 'texto',
+              tipo: 'identidade',
               flex: false,
               render: (obra) => (
                 <CelulaDupla

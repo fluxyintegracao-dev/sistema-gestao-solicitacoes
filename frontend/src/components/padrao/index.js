@@ -6,3 +6,4 @@ export { default as StatGrid, StatTile } from './StatGrid';
 export { default as CamposComVazios } from './CamposComVazios';
 export { default as TabelaPadrao, CelulaDupla } from './TabelaPadrao';
 export { FormSecao, CampoForm } from './FormSecao';
+export { default as BarraFiltros, alternarValorFiltro } from './BarraFiltros';

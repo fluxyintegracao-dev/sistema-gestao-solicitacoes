@@ -156,14 +156,18 @@ export default function Usuarios() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      tipo: 'texto',
+      // Nome de usuário é identificação: exibido em maiúsculas (só exibição).
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (u) => <CelulaDupla principal={u.nome} sub={u.email} />
     },
     {
       id: 'setor',
       titulo: 'Setor',
-      tipo: 'texto',
+      // Nome de setor é identidade; flex: false para a sobra continuar na
+      // coluna principal (Usuario).
+      tipo: 'identidade',
+      flex: false,
       render: (u) => u.setor?.nome || '-'
     },
     {
@@ -185,10 +189,10 @@ export default function Usuarios() {
 
   return (
     <Pagina>
+      {/* R5 (02/09): contagem e texto de apoio saem do PageHeader e ancoram
+          no bloco da lista (BlocoConteudo contagem/descricao). */}
       <PageHeader
         titulo="Usuarios"
-        contagem={loading ? null : `${usuarios.length} usuario(s)`}
-        subtitulo="Cadastro, importacao e gestao operacional de usuarios."
         acaoPrincipal={{ rotulo: 'Novo usuario', onClick: () => navigate('/usuarios/novo') }}
         mais={[
           { rotulo: 'Baixar modelo CSV', onClick: baixarModeloImportacaoUsuarios },
@@ -226,7 +230,12 @@ export default function Usuarios() {
         </p>
       </BlocoConteudo>
 
-      <BlocoConteudo variante="primario" cor="var(--c-primary)">
+      <BlocoConteudo
+        variante="primario"
+        cor="var(--c-primary)"
+        contagem={loading ? null : `${usuarios.length} usuario(s)`}
+        descricao="Cadastro, importacao e gestao operacional de usuarios."
+      >
         <TabelaPadrao
           colunas={colunas}
           itens={usuarios}
