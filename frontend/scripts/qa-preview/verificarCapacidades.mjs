@@ -150,6 +150,12 @@ async function checarOrdenacao(page, tela, rota) {
 async function checarSelecao(page, tela, rota) {
   await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
+  // Telas de consulta sob demanda só carregam ao Consultar.
+  const consultar = page.getByRole('button', { name: /^consultar$/i }).first();
+  if (await consultar.count()) {
+    await consultar.click();
+    await page.waitForTimeout(3500);
+  }
   const todos = page.locator('.app-tabela thead th.celula-selecao input[type="checkbox"]').first();
   if (!(await todos.count())) {
     const temTabela = await page.locator('.app-tabela .resizable-table').count();
@@ -176,6 +182,31 @@ async function checarSelecao(page, tela, rota) {
       : `antes=${antes}, depois=${depois}, elegíveis=${habilitados}, após desmarcar=${limpo}`);
 }
 
+/* Seleção ÚNICA (`selecao.unica`): não existe "todos" por desenho — marcar
+   uma linha desmarca a anterior. Testar "todos" aqui seria cobrar do
+   componente algo que ele deliberadamente não oferece. */
+async function checarSelecaoUnica(page, tela, rota) {
+  await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
+  await esperarCarregar(page);
+  const marcas = page.locator('.app-tabela tbody td.celula-selecao input');
+  if ((await marcas.count()) < 2) {
+    registrar('2b. seleção única', tela, 'sem-dado', 'menos de 2 linhas para provar a exclusividade');
+    return;
+  }
+  const temTodos = await page.locator('.app-tabela thead th.celula-selecao input').count();
+  await marcas.nth(0).click();
+  await page.waitForTimeout(500);
+  const apos1 = await page.locator('.app-tabela tbody td.celula-selecao input:checked').count();
+  await marcas.nth(1).click();
+  await page.waitForTimeout(500);
+  const apos2 = await page.locator('.app-tabela tbody td.celula-selecao input:checked').count();
+  const segundaMarcada = await marcas.nth(1).isChecked();
+  const ok = temTodos === 0 && apos1 === 1 && apos2 === 1 && segundaMarcada;
+  registrar('2b. seleção única', tela, ok ? 'ok' : 'falhou',
+    ok ? 'marca uma por vez, sem "todos" no cabeçalho (por desenho)'
+      : `"todos" no cabeçalho: ${temTodos} (esperado 0); marcadas após 1º clique: ${apos1}, após 2º: ${apos2}`);
+}
+
 /* ----------------------------------------------------- 3. COLUNA FIXA --- */
 async function checarColunaFixa(page, tela, rota) {
   await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
@@ -189,7 +220,9 @@ async function checarColunaFixa(page, tela, rota) {
   }
   // E a TABELA só existe nas visões por Setores/Usuários — a visão padrão
   // ("Geral") é um grid de métricas, não tabela.
-  for (const rotulo of [/setores/i, /usuarios|usuários/i]) {
+  // Os rótulos reais são "Geral", "Por setor" e "Por usuario" — a tabela
+  // só existe nas duas últimas (a visão Geral é um grid de métricas).
+  for (const rotulo of [/por setor/i, /por usuario|por usuário/i]) {
     const aba = page.getByRole('button', { name: rotulo }).first();
     if (await aba.count()) {
       await aba.click();
@@ -336,9 +369,11 @@ async function main() {
     console.log('[capacidades] login ok\n');
 
     await checarOrdenacao(page, 'gestao-contratos', '/gestao-contratos');
-    // A seleção é provada onde HÁ dado real: /gestao-contratos tem 311
-    // linhas; /conversas/entrada está vazia nesta base.
-    await checarSelecao(page, 'gestao-contratos', '/gestao-contratos');
+    // Seleção EM LOTE prova-se onde há dado e o modo é múltiplo:
+    // /financeiro/titulos (25 por página). /gestao-contratos é seleção
+    // ÚNICA — tem teste próprio. /conversas/entrada segue sem dado.
+    await checarSelecao(page, 'financeiro-titulos', '/financeiro/titulos');
+    await checarSelecaoUnica(page, 'gestao-contratos', '/gestao-contratos');
     await checarSelecao(page, 'conversas-entrada', '/conversas/entrada');
     await checarColunaFixa(page, 'auditoria-operacional', '/governanca/auditoria-operacional');
     await checarExpansivel(page, 'solicitacao-compra-detalhe', await primeiraSolicitacaoCompra(page));
