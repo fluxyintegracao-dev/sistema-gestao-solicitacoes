@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   getDashboardProvisionamentoFinanceiro,
   getProvisionamentoFinanceiroContexto,
@@ -17,25 +17,6 @@ const DEFAULT_FILTERS = {
   data_inicial: '',
   data_final: ''
 };
-
-const GROUP_COLUMNS = [
-  { key: 'label', width: 260, minWidth: 170 },
-  { key: 'quantidade', width: 110, minWidth: 90 },
-  { key: 'valor', width: 160, minWidth: 120 },
-  { key: 'participacao', width: 130, minWidth: 110 }
-];
-
-const ITEM_COLUMNS = [
-  { key: 'codigo', width: 130, minWidth: 110 },
-  { key: 'data', width: 125, minWidth: 110 },
-  { key: 'obra', width: 260, minWidth: 180 },
-  { key: 'categoria', width: 220, minWidth: 160 },
-  { key: 'descricao', width: 320, minWidth: 220 },
-  { key: 'credor', width: 220, minWidth: 160 },
-  { key: 'status', width: 120, minWidth: 100 },
-  { key: 'prioridade', width: 120, minWidth: 100 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
 
 function formatarData(valor) {
   if (!valor) return '-';
@@ -110,36 +91,42 @@ function GroupTable({ title, rows, total, storageKey, labelResolver }) {
         <h2 className="text-base font-semibold text-slate-950">{title}</h2>
         <span className="text-xs text-slate-500">{rows.length} linha(s)</span>
       </div>
-      <div className="table-wrapper">
-        <ResizableTable className="sol-table" columns={GROUP_COLUMNS} storageKey={storageKey}>
-          <thead>
-            <tr>
-              <ResizableTh columnKey="label">Descricao</ResizableTh>
-              <ResizableTh columnKey="quantidade" className="text-right">Qtd.</ResizableTh>
-              <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-              <ResizableTh columnKey="participacao" className="text-right">Participacao</ResizableTh>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan="4" className="px-3 py-6 text-center text-sm text-slate-500">Sem dados para os filtros.</td>
-              </tr>
-            )}
-            {rows.map((row, index) => {
-              const value = Number(row.total_valor || 0);
-              return (
-                <tr key={`${labelResolver(row)}-${index}`}>
-                  <td className="px-3 py-2 font-semibold text-slate-900">{labelResolver(row)}</td>
-                  <td className="px-3 py-2 text-right">{Number(row.quantidade || 0).toLocaleString('pt-BR')}</td>
-                  <td className="px-3 py-2 text-right">{formatarMoedaBRL(value)}</td>
-                  <td className="px-3 py-2 text-right">{percentual(value, total)}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </ResizableTable>
-      </div>
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'label',
+            titulo: 'Descricao',
+            // R17: o rotulo NOMEIA a linha do agrupamento (obra, categoria,
+            // status ou semana conforme o bloco).
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (row) => labelResolver(row)
+          },
+          {
+            id: 'quantidade',
+            titulo: 'Qtd.',
+            tipo: 'numero',
+            render: (row) => Number(row.quantidade || 0).toLocaleString('pt-BR')
+          },
+          {
+            id: 'valor',
+            titulo: 'Valor',
+            tipo: 'valor',
+            render: (row) => formatarMoedaBRL(Number(row.total_valor || 0))
+          },
+          {
+            id: 'participacao',
+            titulo: 'Participacao',
+            tipo: 'numero',
+            render: (row) => percentual(Number(row.total_valor || 0), total)
+          }
+        ]}
+        itens={rows}
+        getId={(row) => labelResolver(row)}
+        storageKey={storageKey}
+        rotuloRolagem={title}
+        vazio="Sem dados para os filtros."
+      />
     </section>
   );
 }
@@ -351,28 +338,28 @@ export default function ProvisionamentoRelatorioOperacional() {
           title="Por obra/centro"
           rows={dashboard?.graficos?.por_obra || []}
           total={totalPeriodo}
-          storageKey="fluxy.provisionamento.operacional.obras.columns"
+          storageKey="tabela:provisionamento-relatorio-operacional:por-obra"
           labelResolver={(row) => formatarObra(row.obra)}
         />
         <GroupTable
           title="Por categoria macro"
           rows={dashboard?.graficos?.por_categoria || []}
           total={totalPeriodo}
-          storageKey="fluxy.provisionamento.operacional.categorias.columns"
+          storageKey="tabela:provisionamento-relatorio-operacional:por-categoria"
           labelResolver={(row) => row.categoria?.nome || 'Sem categoria'}
         />
         <GroupTable
           title="Pipeline por status"
           rows={dashboard?.graficos?.pipeline_status || []}
           total={totalPeriodo}
-          storageKey="fluxy.provisionamento.operacional.status.columns"
+          storageKey="tabela:provisionamento-relatorio-operacional:pipeline-status"
           labelResolver={(row) => formatarStatus(row.status)}
         />
         <GroupTable
           title="Curva semanal"
           rows={dashboard?.graficos?.curva_semanal || []}
           total={totalPeriodo}
-          storageKey="fluxy.provisionamento.operacional.semanas.columns"
+          storageKey="tabela:provisionamento-relatorio-operacional:curva-semanal"
           labelResolver={(row) => row.semana_label || row.semana_inicio}
         />
       </div>
@@ -386,49 +373,40 @@ export default function ProvisionamentoRelatorioOperacional() {
           <span className="text-xs text-slate-500">{lista.length} item(ns)</span>
         </div>
 
-        <div className="table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={ITEM_COLUMNS}
-            storageKey="fluxy.provisionamento.operacional.analitico.columns"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="codigo">Codigo</ResizableTh>
-                <ResizableTh columnKey="data">Data prevista</ResizableTh>
-                <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                <ResizableTh columnKey="descricao">Descricao</ResizableTh>
-                <ResizableTh columnKey="credor">Credor</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-                <ResizableTh columnKey="prioridade">Prioridade</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.length === 0 && (
-                <tr>
-                  <td colSpan="9" className="px-3 py-6 text-center text-sm text-slate-500">Nenhum provisionamento encontrado.</td>
-                </tr>
-              )}
-              {lista.map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2 font-semibold text-blue-700">
-                    <Link to={`/provisoes-financeiras/${item.id}`}>{item.codigo}</Link>
-                  </td>
-                  <td className="px-3 py-2">{formatarData(item.data_prevista_desembolso)}</td>
-                  <td className="px-3 py-2">{formatarObra(item.obra)}</td>
-                  <td className="px-3 py-2">{item.categoriaMacro?.nome || '-'}</td>
-                  <td className="px-3 py-2">{item.descricao || '-'}</td>
-                  <td className="px-3 py-2">{item.fornecedor_texto || '-'}</td>
-                  <td className="px-3 py-2">{formatarStatus(item.status)}</td>
-                  <td className="px-3 py-2">{formatarPrioridade(item.prioridade)}</td>
-                  <td className="px-3 py-2 text-right">{formatarMoedaBRL(item.valor_previsto)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'codigo',
+              titulo: 'Codigo',
+              // R17: o codigo NOMEIA o provisionamento da linha.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <Link className="font-semibold text-blue-700" to={`/provisoes-financeiras/${item.id}`}>
+                  {item.codigo}
+                </Link>
+              )
+            },
+            {
+              id: 'data',
+              titulo: 'Data prevista',
+              tipo: 'data',
+              render: (item) => formatarData(item.data_prevista_desembolso)
+            },
+            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => formatarObra(item.obra) },
+            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoriaMacro?.nome || '-' },
+            { id: 'descricao', titulo: 'Descricao', tipo: 'texto', render: (item) => item.descricao || '-' },
+            { id: 'credor', titulo: 'Credor', tipo: 'texto', render: (item) => item.fornecedor_texto || '-' },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => formatarStatus(item.status) },
+            { id: 'prioridade', titulo: 'Prioridade', tipo: 'badge', render: (item) => formatarPrioridade(item.prioridade) },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatarMoedaBRL(item.valor_previsto) }
+          ]}
+          itens={lista}
+          getId={(item) => item.id}
+          storageKey="tabela:provisionamento-relatorio-operacional:analitico"
+          rotuloRolagem="Analitico do recorte"
+          vazio="Nenhum provisionamento encontrado."
+        />
       </section>
     </div>
   );

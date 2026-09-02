@@ -30,6 +30,7 @@ import { isGeoSetor, solicitacaoEstaNoSetorDoUsuario, userHasSetorCapability } f
 import { hasEnabledModule } from '../../utils/acessoProduto';
 import ListaAvancada from '../../components/lista-avancada/ListaAvancada';
 import StatusBadge from '../../components/StatusBadge';
+import { TabelaPadrao, CelulaDupla } from '../../components/padrao';
 import {
   formatarMaiusculas,
   formatarDescricao,
@@ -2168,44 +2169,67 @@ export default function Solicitacoes({ arquivadas = false }) {
                     .reduce((total, item) => total + Number(item.valor_prioridade || item.valor_saldo || 0), 0))}</strong>
                 </span>
               </div>
-              <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
-                <table className="min-w-full text-sm">
-                  <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
-                    <tr>
-                      <th className="w-10 px-3 py-3"></th>
-                      <th className="px-3 py-3">Titulo</th>
-                      <th className="px-3 py-3">Solicitacao</th>
-                      <th className="px-3 py-3">Obra</th>
-                      <th className="px-3 py-3">Vencimento</th>
-                      <th className="px-3 py-3 text-right">Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
-                    {titulosPrioridade.map((titulo) => (
-                      <tr key={titulo.id} className="hover:bg-slate-50 dark:hover:bg-slate-900">
-                        <td className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={titulosPrioridadeSelecionados.has(String(titulo.id))}
-                            onChange={() => alternarTituloPrioridade(titulo.id)}
-                          />
-                        </td>
-                        <td className="px-3 py-3">
-                          <p className="font-semibold text-slate-900 dark:text-slate-50">{titulo.codigo || `#${titulo.id}`}</p>
-                          <p className="text-xs text-slate-500">{titulo.parceiro?.nome || titulo.descricao || '-'}</p>
-                        </td>
-                        <td className="px-3 py-3">
-                          <p className="font-medium">{titulo.solicitacao?.codigo || '-'}</p>
-                          <p className="text-xs text-slate-500">{titulo.solicitacao?.descricao || ''}</p>
-                        </td>
-                        <td className="px-3 py-3">{titulo.obra?.nome || '-'}</td>
-                        <td className="px-3 py-3">{dataCurta(titulo.data_vencimento)}</td>
-                        <td className="px-3 py-3 text-right font-semibold">{moeda(titulo.valor_prioridade || titulo.valor_saldo)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'selecionar',
+                    titulo: 'Selecionar',
+                    tipo: 'status',
+                    render: (titulo) => (
+                      <input
+                        type="checkbox"
+                        checked={titulosPrioridadeSelecionados.has(String(titulo.id))}
+                        onChange={() => alternarTituloPrioridade(titulo.id)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'titulo',
+                    titulo: 'Titulo',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (titulo) => (
+                      <CelulaDupla
+                        principal={titulo.codigo || `#${titulo.id}`}
+                        sub={titulo.parceiro?.nome || titulo.descricao || '-'}
+                      />
+                    )
+                  },
+                  {
+                    id: 'solicitacao',
+                    titulo: 'Solicitacao',
+                    tipo: 'texto',
+                    render: (titulo) => (
+                      <CelulaDupla
+                        principal={titulo.solicitacao?.codigo || '-'}
+                        sub={titulo.solicitacao?.descricao || ''}
+                      />
+                    )
+                  },
+                  {
+                    id: 'obra',
+                    titulo: 'Obra',
+                    tipo: 'texto',
+                    render: (titulo) => titulo.obra?.nome || '-'
+                  },
+                  {
+                    id: 'vencimento',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: (titulo) => dataCurta(titulo.data_vencimento)
+                  },
+                  {
+                    id: 'saldo',
+                    titulo: 'Saldo',
+                    tipo: 'valor',
+                    render: (titulo) => <span className="font-semibold">{moeda(titulo.valor_prioridade || titulo.valor_saldo)}</span>
+                  }
+                ]}
+                itens={titulosPrioridade}
+                vazio="Nenhum titulo aberto para as solicitacoes selecionadas."
+                storageKey="tabela:solicitacoes:lote-prioridade"
+                rotuloRolagem="Titulos para prioridade"
+              />
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 dark:border-slate-800 sm:flex-row sm:justify-end">

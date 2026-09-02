@@ -239,8 +239,47 @@ function validarDeclaracaoColunas() {
     });
 
     // 1 e 2 — por coluna, onde quer que ela esteja declarada.
-    const colunas = todos.filter(ehColuna);
-    colunas.forEach((col) => {
+    // As colunas verificadas são SOMENTE as que chegam a uma <TabelaPadrao>.
+    // O arquivo pode declarar colunas de OUTROS componentes com contrato
+    // próprio — a ListaAvancada usa `larguraPadrao`/`ordenavel`/`principal`
+    // e não tem `tipo`. Exigir `tipo` delas seria reprovar código correto
+    // (falso positivo corrigido em 02/09).
+    const resolverArray = (expr) => {
+      if (!expr) return null;
+      if (expr.type === 'ArrayExpression') return expr;
+      if (expr.type === 'Identifier') return declaracoes.get(expr.name) || null;
+      return null;
+    };
+
+    const usosTabelaPadrao = todos.filter(
+      (no) => no.type === 'JSXOpeningElement' && no.name?.name === 'TabelaPadrao'
+    );
+
+    const colunasDaTabela = [];
+    usosTabelaPadrao.forEach((no) => {
+      const attr = no.attributes.find(
+        (a) => a.type === 'JSXAttribute' && a.name?.name === 'colunas'
+      );
+      const arr = resolverArray(attr?.value?.expression);
+      if (!arr) return;
+      arr.elements.forEach((el) => {
+        if (!el) return;
+        const alvos = el.type === 'ObjectExpression' ? [el]
+          : el.type === 'ConditionalExpression' ? [el.consequent, el.alternate]
+          : el.type === 'SpreadElement' && el.argument?.type === 'ConditionalExpression'
+            ? [el.argument.consequent, el.argument.alternate]
+            : [];
+        alvos.forEach((alvo) => {
+          if (alvo?.type === 'ArrayExpression') {
+            alvo.elements.forEach((sub) => { if (ehColuna(sub)) colunasDaTabela.push(sub); });
+          } else if (ehColuna(alvo)) {
+            colunasDaTabela.push(alvo);
+          }
+        });
+      });
+    });
+
+    colunasDaTabela.forEach((col) => {
       const linha = col.loc.start.line;
       const tipoProp = col.properties.find((p) => nomeProp(p) === 'tipo');
       if (!tipoProp) {

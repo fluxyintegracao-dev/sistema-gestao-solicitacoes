@@ -814,69 +814,52 @@ export default function SolicitacoesRelatorioOperacional() {
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Tempos por etapa</h2>
           <p className="page-subtitle mb-3">Medias calculadas apenas quando a etapa possui data real registrada.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={TEMPO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.tempos.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="etapa">Etapa</ResizableTh>
-                  <ResizableTh columnKey="amostras" className="text-right">Amostras</ResizableTh>
-                  <ResizableTh columnKey="media" className="text-right">Media</ResizableTh>
-                  <ResizableTh columnKey="maior" className="text-right">Maior</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={4}>Carregando tempos...</EmptyRow>
-                ) : temposEtapas.length === 0 ? (
-                  <EmptyRow colSpan={4}>Sem etapas com datas suficientes no periodo.</EmptyRow>
-                ) : (
-                  temposEtapas.map((item) => (
-                    <tr key={item.key}>
-                      <td>{item.label}</td>
-                      <td className="text-right">{formatNumber(item.amostras)}</td>
-                      <td className="text-right">{formatDays(item.media_dias)}</td>
-                      <td className="text-right">{formatDays(item.maior_dias)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'etapa',
+                titulo: 'Etapa',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.label
+              },
+              { id: 'amostras', titulo: 'Amostras', tipo: 'numero', render: (item) => formatNumber(item.amostras) },
+              { id: 'media', titulo: 'Media', tipo: 'numero', render: (item) => formatDays(item.media_dias) },
+              { id: 'maior', titulo: 'Maior', tipo: 'numero', render: (item) => formatDays(item.maior_dias) }
+            ]}
+            itens={temposEtapas}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem etapas com datas suficientes no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:tempos-etapas"
+            rotuloRolagem="Tempos por etapa"
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Aging por setor atual</h2>
           <p className="page-subtitle mb-3">Solicitacoes abertas agrupadas pelo setor em que estao paradas agora.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={AGING_SETOR_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.agingSetor.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="setor">Setor</ResizableTh>
-                  <ResizableTh columnKey="abertas" className="text-right">Abertas</ResizableTh>
-                  <ResizableTh columnKey="media" className="text-right">Media parada</ResizableTh>
-                  <ResizableTh columnKey="maior" className="text-right">Maior parada</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor aberto</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={5}>Carregando aging...</EmptyRow>
-                ) : agingSetor.length === 0 ? (
-                  <EmptyRow colSpan={5}>Sem solicitacoes abertas nos filtros selecionados.</EmptyRow>
-                ) : (
-                  agingSetor.map((item) => (
-                    <tr key={item.key}>
-                      <td>{formatLabel(item.setor || item.key)}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatDays(item.media_dias_parada)}</td>
-                      <td className="text-right">{formatDays(item.maior_dias_parada)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_aberto)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'setor',
+                titulo: 'Setor',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => formatLabel(item.setor || item.key)
+              },
+              { id: 'abertas', titulo: 'Abertas', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'media', titulo: 'Media parada', tipo: 'numero', render: (item) => formatDays(item.media_dias_parada) },
+              { id: 'maior', titulo: 'Maior parada', tipo: 'numero', render: (item) => formatDays(item.maior_dias_parada) },
+              { id: 'valor', titulo: 'Valor aberto', tipo: 'valor', render: (item) => formatCurrency(item.valor_aberto) }
+            ]}
+            itens={agingSetor}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem solicitacoes abertas nos filtros selecionados."
+            storageKey="tabela:solicitacoes-relatorio-operacional:aging-setor"
+            rotuloRolagem="Aging por setor atual"
+          />
         </div>
       </div>
 
@@ -892,124 +875,115 @@ export default function SolicitacoesRelatorioOperacional() {
         <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Leitura:</strong> a pendencia fica aberta ate ser regularizada no detalhe da solicitacao. O tempo medio mede o prazo entre a marcacao e a regularizacao.
         </div>
-        <div className="sol-table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={PENDENCIAS_FINANCEIRAS_COLUMNS}
-            storageKey="fluxy.solicitacoes.relatorio.pendenciasFinanceiras.columns"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="usuario">Usuario criador</ResizableTh>
-                <ResizableTh columnKey="marcadas" className="text-right">Marcadas</ResizableTh>
-                <ResizableTh columnKey="abertas" className="text-right">Abertas</ResizableTh>
-                <ResizableTh columnKey="regularizadas" className="text-right">Regularizadas</ResizableTh>
-                <ResizableTh columnKey="media" className="text-right">Prazo medio</ResizableTh>
-                <ResizableTh columnKey="maior" className="text-right">Maior prazo</ResizableTh>
-                <ResizableTh columnKey="tipos">Tipos de pendencia</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <EmptyRow colSpan={7}>Carregando pendencias...</EmptyRow>
-              ) : pendenciasFinanceirasCriador.length === 0 ? (
-                <EmptyRow colSpan={7}>Sem pendencias financeiras marcadas no periodo.</EmptyRow>
-              ) : (
-                pendenciasFinanceirasCriador.map((item) => (
-                  <tr key={item.key}>
-                    <td>{item.usuario_nome || 'Sem criador'}</td>
-                    <td className="text-right font-bold">{formatNumber(item.total_marcadas)}</td>
-                    <td className="text-right">
-                      <span className={Number(item.abertas || 0) > 0 ? 'text-amber-700 font-bold' : 'text-[var(--c-muted)]'}>
-                        {formatNumber(item.abertas)}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'usuario',
+              titulo: 'Usuario criador',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.usuario_nome || 'Sem criador'
+            },
+            {
+              id: 'marcadas',
+              titulo: 'Marcadas',
+              tipo: 'numero',
+              render: (item) => <strong>{formatNumber(item.total_marcadas)}</strong>
+            },
+            {
+              id: 'abertas',
+              titulo: 'Abertas',
+              tipo: 'numero',
+              render: (item) => (
+                <span className={Number(item.abertas || 0) > 0 ? 'text-amber-700 font-bold' : 'text-[var(--c-muted)]'}>
+                  {formatNumber(item.abertas)}
+                </span>
+              )
+            },
+            {
+              id: 'regularizadas',
+              titulo: 'Regularizadas',
+              tipo: 'numero',
+              render: (item) => <span className="text-emerald-700 font-bold">{formatNumber(item.regularizadas)}</span>
+            },
+            { id: 'media', titulo: 'Prazo medio', tipo: 'numero', render: (item) => formatDays(item.media_dias_regularizacao) },
+            { id: 'maior', titulo: 'Maior prazo', tipo: 'numero', render: (item) => formatDays(item.maior_dias_regularizacao) },
+            {
+              id: 'tipos',
+              titulo: 'Tipos de pendencia',
+              tipo: 'texto',
+              render: (item) => (
+                Array.isArray(item.tipos) && item.tipos.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {item.tipos.map((tipo) => (
+                      <span
+                        key={`${item.key}-${tipo.tipo}`}
+                        className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
+                      >
+                        {formatLabel(tipo.tipo)}: {formatNumber(tipo.total)}
                       </span>
-                    </td>
-                    <td className="text-right text-emerald-700 font-bold">{formatNumber(item.regularizadas)}</td>
-                    <td className="text-right">{formatDays(item.media_dias_regularizacao)}</td>
-                    <td className="text-right">{formatDays(item.maior_dias_regularizacao)}</td>
-                    <td>
-                      {Array.isArray(item.tipos) && item.tipos.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {item.tipos.map((tipo) => (
-                            <span
-                              key={`${item.key}-${tipo.tipo}`}
-                              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
-                            >
-                              {formatLabel(tipo.tipo)}: {formatNumber(tipo.total)}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[var(--c-muted)]">Sem tipo informado</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span className="text-[var(--c-muted)]">Sem tipo informado</span>
+                )
+              )
+            }
+          ]}
+          itens={pendenciasFinanceirasCriador}
+          getId={(item) => item.key}
+          carregando={loading}
+          vazio="Sem pendencias financeiras marcadas no periodo."
+          storageKey="tabela:solicitacoes-relatorio-operacional:pendencias-financeiras"
+          rotuloRolagem="Pendencias financeiras por usuario"
+        />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por status</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={STATUS_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.status.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
-                ) : porStatus.length === 0 ? (
-                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porStatus.map((item) => (
-                    <tr key={item.key}>
-                      <td>{formatLabel(item.status || item.key)}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => formatLabel(item.status || item.key)
+              },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porStatus}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-status"
+            rotuloRolagem="Por status"
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por setor atual</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={SETOR_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.setor.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="setor">Setor</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
-                ) : porSetor.length === 0 ? (
-                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porSetor.map((item) => (
-                    <tr key={item.key}>
-                      <td>{formatLabel(item.setor || item.key)}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'setor',
+                titulo: 'Setor',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => formatLabel(item.setor || item.key)
+              },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porSetor}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-setor"
+            rotuloRolagem="Por setor atual"
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
