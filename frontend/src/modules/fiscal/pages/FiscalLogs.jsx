@@ -332,7 +332,7 @@ export default function FiscalLogs() {
                       </button>
                     ) : null}
                     {!log.raw_request_storage_key && !log.raw_response_storage_key ? (
-                      <span className="text-xs text-slate-400">-</span>
+                      <span className="text-xs text-slate-500">-</span>
                     ) : null}
                   </div>
                 </td>

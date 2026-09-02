@@ -124,7 +124,7 @@ function DiagnosticoItem({ item }) {
         </div>
         <div className="text-right">
           <span className="block text-2xl font-semibold text-slate-950">{item.total}</span>
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">pendencias</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">pendencias</span>
         </div>
       </div>
 
@@ -135,7 +135,7 @@ function DiagnosticoItem({ item }) {
 
         {item.exemplos?.length ? (
           <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Exemplos</p>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Exemplos</p>
             <ul className="space-y-2">
               {item.exemplos.map((example, index) => (
                 <ExampleLine key={`${item.codigo}-${example.id || index}`} item={example} />

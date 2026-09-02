@@ -273,7 +273,11 @@ export default function RhDpColaboradores() {
   const [tiposDocumento, setTiposDocumento] = useState([]);
   const [documentos, setDocumentos] = useState([]);
   const [resumoDocumentos, setResumoDocumentos] = useState(null);
-  const [filtros, setFiltros] = useState(RH_COLABORADORES_FILTROS_INICIAIS);
+  // ?q= da busca universal abre a lista já filtrada pelo nome/CPF.
+  const [filtros, setFiltros] = useState(() => ({
+    ...RH_COLABORADORES_FILTROS_INICIAIS,
+    q: new URLSearchParams(window.location.search).get('q') || ''
+  }));
   const [filtrosDocumentos, setFiltrosDocumentos] = useState({
     q: '',
     tipo_documento_id: '',

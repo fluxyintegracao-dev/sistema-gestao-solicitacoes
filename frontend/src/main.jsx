@@ -9,6 +9,7 @@ import AppErrorBoundary from './components/AppErrorBoundary';
 import { applyNativeDocumentAttributes } from './mobile/runtime';
 import { installFetchSecurityDefaults } from './services/api';
 import './index.css';
+import './styles/design-tokens.css';
 import './modules/solicitacao-compra/compras-responsive.css';
 import './styles/responsive-system.css';
 

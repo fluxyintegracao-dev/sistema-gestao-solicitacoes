@@ -1,0 +1,290 @@
+# Migração da reforma para o repositório oficial
+
+Inventário e plano de porte do trabalho feito neste repositório
+(`savioleal12-debug/FLUXY`) para o repositório oficial do projeto
+(`jrvjunior93-dev/sistema-gestao-solicitacoes`).
+
+Última atualização: **2026-09-01**
+
+---
+
+## Contexto e regras
+
+| Item | Valor |
+|---|---|
+| Origem | Este repositório nasceu de um commit inicial órfão (`fc5d84d`, snapshot do sistema). **Não compartilha histórico** com o oficial — o porte é por cópia de arquivos, nunca por merge/cherry-pick. |
+| Destino | `jrvjunior93-dev/sistema-gestao-solicitacoes`, branch de trabalho `refactor/frontend` (criada de `dev-v2`) |
+| PRs | Somente para `dev-v2` |
+| Base do inventário | `git diff fc5d84d..ed7643f` (commit inicial → main atual): 22 commits, 12 entregas (PRs #1–#11 + commits diretos iniciais) |
+
+**Regras do responsável (fonte de verdade — ver o guia oficial em
+`docs/GUIA_REFATORACAO_FRONTEND_COLABORADOR_E_HOMOLOGACAO.md` quando anexado):**
+
+1. Trabalhar **apenas em `frontend/`**.
+2. **Não alterar** backend, permissões, endpoints ou regras de negócio sem alinhamento prévio.
+3. **Nenhuma migration.**
+4. Preservar o comportamento dos fluxos existentes.
+5. Validar com `npm --prefix frontend run test:responsive` e
+   `npm --prefix frontend run build` **antes de cada push**.
+
+Consequência direta das regras 1–3: **tudo do grupo B e do grupo C abaixo só entra no
+oficial depois de alinhamento explícito com o responsável** (é para isso que existe
+`docs/PROPOSTA-BACKEND.md`). O que pode começar já é o grupo A.
+
+---
+
+## GRUPO A — Frontend puro
+
+Arquivos em `frontend/` que funcionam contra o backend oficial **sem nenhuma mudança de
+backend**. É o material da primeira leva de PRs para `dev-v2`.
+
+### A1. Design system e base visual
+
+| Arquivo | O que entrega |
+|---|---|
+| `frontend/src/styles/design-tokens.css` | Tokens de cor sóbrios (claro/escuro), tipografia, espaçamento, grid de módulos em no máximo 4 colunas (`.hub-grid`), contraste AA |
+| `frontend/src/index.css` | Regra global de campos de texto rebaixada com `:where()` (um fundo, uma borda, raio 10px, foco discreto sem glow), largura útil 1520px, marca CSC+Fluxy no topo, acabamento geral |
+| `frontend/src/components/StatusBadge.jsx` | Etiqueta de status padronizada com ícone e tom semântico, usada em todas as listas |
+| `frontend/src/hooks/useFecharAoSair.js` | Hook compartilhado: qualquer menu suspenso fecha com clique fora e Esc |
+| `frontend/src/utils/formatarTexto.js` | Helpers de formatação de texto |
+| `docs/DESIGN-SYSTEM.md` | Documentação dos tokens e padrões |
+
+### A2. Navegação por cards (casca)
+
+| Arquivo | O que entrega |
+|---|---|
+| `frontend/src/navigation/navigationConfig.jsx` | **Fonte única de navegação**: todas as telas, hubs, permissões (`can`), ordem explícita e ações fixáveis num só lugar |
+| `frontend/src/navigation/ModuleHub.jsx`, `NavCard.jsx` | Hubs por módulo com cards |
+| `frontend/src/layout/Layout.jsx` | Layout sem sidebar: topo com marca, breadcrumb, barra de atalhos |
+| `frontend/src/utils/navigation.js`, `App.jsx`, `main.jsx` | Roteamento a partir da fonte única |
+| `frontend/scripts/validarNavegacao.mjs` | Validação de build: nenhum link morto na fonte única |
+| `frontend/src/pages/Login/index.jsx` | Login revisado com a marca (a parte do redirect por tela inicial é grupo B) |
+
+⚠️ **Condição de porte**: `HomeHub`, `ModuleHub` e `CommandPalette` consomem endpoints do
+grupo C (`/dashboard/pendencias`, `/busca`, `/home/blocos/:bloco`). Para entrar na onda de
+frontend puro, esses consumos precisam **degradar em silêncio** (sem contadores, Ctrl+K só
+com telas e ações, Home só com módulos). Verificar/ajustar essa degradação é parte da onda 2
+— hoje o código assume os endpoints presentes.
+
+### A3. Barra da lista e apresentação do ListaAvancada
+
+O visual do componente (barra em 3 níveis com hierarquia por forma, busca em camada única,
+alternador Páginas ⇄ Rolagem, modo tabela⇄cards, agrupamento client-side) é frontend puro.
+A **persistência** de preferências e os contadores por visão são grupo B.
+
+| Arquivo | O que entrega |
+|---|---|
+| `frontend/src/components/lista-avancada/lista-avancada.css` | Barra em 3 níveis (busca → visões-pílula → filtros), estados, mobile com painéis |
+| `frontend/src/components/lista-avancada/ListaAvancada.jsx` | Componente reutilizável de lista (ver dependências no grupo B) |
+| `docs/LISTA-AVANCADA.md` | Contrato "dados controlados" para plugar novas listas |
+
+### A4. Páginas ajustadas só na apresentação
+
+Modificadas para breadcrumb, cabeçalho padronizado, etiquetas de status e alertas com ícone
+— nenhuma mudança de dados:
+
+`FiscalCompanies`, `FiscalDivergences`, `FiscalDocuments`, `FiscalLogs`,
+`FiscalOperationalReport`, `PedidosCompra`, `FinanceiroConciliacao`,
+`FinanceiroDiagnosticoDre`, `FinanceiroRelatorios`, `GestaoContratos`, `Obras`, `Parceiros`,
+`RhDpApuracao`, `RhDpColaboradores`, `RhDpFechamentos`, `UsuariosPermissoesRhDp`,
+`ConfiguracoesVisibilidadeUi`, `ThemeContext` (ajuste de tema).
+
+### A5. Detalhe da solicitação — parte visual
+
+| Arquivo | O que entrega |
+|---|---|
+| `SolicitacaoDetalhe/Conversa.jsx` | Conversa única (funde os antigos `Anexos.jsx` + `Comentarios.jsx`, removidos) |
+| `SolicitacaoDetalhe/Header.jsx`, `Timeline.jsx`, `FinanceiroCard.jsx` | Cabeçalho com ação em destaque, campos vazios ocultos com alternador, auditoria colapsada, abas no mobile |
+| `frontend/src/utils/layoutBlocos.js` | Motor de layout em blocos (usuário → setor → padrão) — puro em si; as camadas usuário e setor persistem via grupo B |
+| `SolicitacaoDetalhe/blocosDetalhe.js`, `navigation/blocosHome.js` | Catálogos de blocos (definições e permissões `can` reusadas da fonte única) |
+
+### A6. Detalhes que parecem B mas são A
+
+- `SolicitacoesCompra.jsx`: o seed de filtro por `?status=` na URL usa o filtro que a tela
+  já tinha — puro. (O cartão da Home que **gera** esse link é grupo B.)
+- `Perfil.jsx`: os ajustes visuais são puros; o card "Tela inicial" é grupo B.
+
+---
+
+## GRUPO B — Frontend dependente de backend novo
+
+Arquivos de frontend que **só funcionam por inteiro** com endpoints/tabelas do grupo C.
+Portar sem o backend correspondente = tela quebrada ou recurso morto.
+
+| Arquivo(s) | O que entrega | Depende exatamente de |
+|---|---|---|
+| `ListaAvancada.jsx` (persistência) + `services/listasPreferencias.js` | Colunas, larguras, modo, paginação, agrupamento e filtros nomeados salvos **por usuário e por lista, no banco** (sobrevive a troca de máquina) | `GET/PUT /listas/:lista/preferencias`, `GET/POST/DELETE /listas/:lista/filtros` → tabelas `usuario_lista_preferencias` e `usuario_lista_filtros` (migration `202608300050`) |
+| `pages/Solicitacoes/index.jsx` + `services/solicitacoes.js` | Lista de Solicitações no ListaAvancada: busca única server-side, visões com contadores, ordenação, filtros combinados, banner "Mostrando: …" | Rework do `SolicitacaoController` (params `q`, `visao`, ordenação, filtros múltiplos; escopo compartilhado) + `GET /solicitacoes/contadores` + serviço `pendenciasVisoes` |
+| `navigation/HomeHub.jsx` (pendências) + `services/pendencias.js` | Faixa "Para resolver agora" e cartões de pendência com números reais; cada cartão abre **exatamente o conjunto contado** (`?visao=`) | `GET /dashboard/pendencias` + `pendenciasVisoes.js` + param `visao` nas listas + status composto `EM_ABERTO` no `tituloFinanceiroService` |
+| `navigation/BlocosHomeExtras.jsx` | 12 blocos opcionais da Home (Trabalho/Financeiro/Obras e Compras/Institucional) com carga sob demanda | `GET /home/blocos/:bloco` (`HomeBlocosController`, gates das telas de origem) |
+| `HomeHub.jsx` / `SolicitacaoDetalhe/index.jsx` (personalização) | Reordenar/ocultar/recolher blocos, largura, módulos ocultáveis, "Adicionar bloco/módulo" — persistente | Os mesmos endpoints `/listas/:lista/preferencias` (camada usuário) + `/configuracoes/detalhe-layout` com coluna `tela` (camada setor; migrations `202608301400` e `202608312100`) |
+| `navigation/CommandPalette.jsx` (grupos de registros) + `services/busca.js` | Ctrl+K encontra solicitações, contratos, títulos, obras e parceiros com as **mesmas permissões das telas** | `GET /busca` (`BuscaController` + `buscaFlexivel` + `normalizarTexto`) + índices da migration `202608311000` |
+| `navigation/AtalhosContext.jsx`, `AtalhosTopbar.jsx`, `SeusAtalhos.jsx` | Atalhos fixáveis (estrela), barra do topo, padrão por setor | `/listas` (prefs do usuário) + `GET/POST/PUT/DELETE /configuracoes/atalhos-setor` (tabela `setor_atalhos_padrao`) |
+| `Perfil.jsx` (card Tela inicial), `Login/index.jsx` (redirect), `AtalhosTopbar.jsx` (casinha) + `services/telaInicial.js`, `services/auth.js` | Usuário escolhe a tela em que o login cai; validação **no backend**; fallback silencioso para a Home | `GET/PUT/DELETE /me/tela-inicial` + `telaInicialService` + `tela_inicial` no session user (`AuthController`) + fonte única compilada (`backend/src/generated/navegacaoFonteUnica.cjs`, gerada por `frontend/scripts/gerarCatalogoNavegacaoBackend.mjs` no `prebuild`) |
+| `SolicitacaoDetalhe` (ação principal) + `services/acoesPrincipais.js`, `pages/ConfiguracoesAcoesPrincipais.jsx` | Botão de ação principal por setor+estado no detalhe | `/configuracoes/acoes-principais` (tabela `acoes_principais_setor`) |
+| `pages/ConfiguracoesAtalhosSetor.jsx`, `ConfiguracoesDetalheLayout.jsx` | Telas de admin dos padrões por setor | Os CRUDs correspondentes do grupo C |
+| `FinanceiroTitulos.jsx` (efeito de URL) | Abrir a lista de títulos a partir dos cartões (status composto, obra, mês) sem herdar filtros salvos | `EM_ABERTO` no `tituloFinanceiroService` + links gerados pelo `DashboardPendenciasController` |
+| `frontend/package.json` (`prebuild`/`gerar:navegacao`) | Compila a fonte única para o backend validar tela inicial | Só faz sentido junto com o pacote tela-inicial |
+
+---
+
+## GRUPO C — Backend e banco
+
+Tudo aqui **fere as regras 1–3 do responsável** se for portado sem alinhamento. Nada de
+regra de negócio existente foi alterado: são adições, mais as correções de bug marcadas.
+
+### C1. Migrations (4 — todas aditivas, idempotentes, no padrão `schemaUtils` do projeto)
+
+| Migration | Cria |
+|---|---|
+| `202608300050_lista_preferencias_filtros_acoes.js` | Tabelas `usuario_lista_preferencias`, `usuario_lista_filtros`, `acoes_principais_setor` |
+| `202608301400_atalhos_setor_layout_detalhe.js` | Tabelas `setor_atalhos_padrao`, `setor_detalhe_layout` |
+| `202608311000_indices_busca.js` | Índices `idx_obras_nome`, `idx_parceiros_nome`, `idx_parceiros_cpf_cnpj` |
+| `202608312100_setor_layout_tela.js` | Coluna `setor_detalhe_layout.tela` + índice `(tela, setor)` |
+
+Nenhuma tabela existente é alterada; nenhuma coluna existente muda de tipo ou semântica.
+A preferência de tela inicial **não** criou coluna em `users` — reusa
+`usuario_lista_preferencias` com a chave `tela-inicial`.
+
+### C2. Endpoints, controllers e services novos
+
+| Item | Rotas | O que entrega |
+|---|---|---|
+| `ListaPreferenciasController` | `GET/PUT /listas/:lista/preferencias`, `GET/POST/DELETE /listas/:lista/filtros` | Preferências e filtros nomeados, sempre do próprio usuário autenticado |
+| `DashboardPendenciasController` + `services/pendenciasVisoes.js` | `GET /dashboard/pendencias` | Contadores de pendência com COUNT real e links `?visao=`; o serviço é o **recorte SQL único** usado por contador e lista |
+| `BuscaController` + `utils/buscaFlexivel.js`, `utils/normalizarTexto.js` | `GET /busca` | Busca universal por grupos, cada grupo com a MESMA regra de visibilidade da tela correspondente; LIMIT em toda consulta |
+| `HomeBlocosController` | `GET /home/blocos/:bloco` | Dados sob demanda dos blocos opcionais da Home, gateados pelo `authorizationService` das telas de origem |
+| `TelaInicialController` + `services/telaInicialService.js` + `generated/navegacaoFonteUnica.cjs` | `GET/PUT/DELETE /me/tela-inicial` | Tela inicial validada no backend contra a fonte única compilada (fail-closed: sem permissão/rota → limpa e cai na Home) |
+| `AcaoPrincipalSetorController` + model | `/configuracoes/acoes-principais` (CRUD) | Ação principal por setor+estado no detalhe (escrita gateada por `allowConfiguracoesStatusVinculos`) |
+| `AtalhoSetorController` + model | `/configuracoes/atalhos-setor` (CRUD) | Atalhos padrão por setor |
+| `DetalheLayoutController` + model | `/configuracoes/detalhe-layout` (CRUD, param `tela`) | Layout padrão do detalhe e da Home por setor |
+| `SolicitacaoController` (rework grande) | `GET /solicitacoes` (params novos), `GET /solicitacoes/contadores` | Escopo de visibilidade compartilhado (`montarEscopoVisibilidadeLista`), busca única `q`, param `visao` (400 para visão desconhecida; **nunca amplia** o escopo), contadores por visão |
+| `AuthController` (ajuste) | — | `buildSessionUser` + `tela_inicial` no payload da sessão |
+| `models/index.js`, `routes.js` | — | Registro dos 5 models e das rotas novas |
+| `backend/scripts/valida-pendencias.js` | — | QA: compara cartão×lista via controllers reais (última execução: 7/7 cartões batem, incluindo cenário com 70 aprovações) |
+
+### C3. CORREÇÕES DE BUG — interessam ao responsável independentemente da reforma
+
+| # | Correção | Arquivo | Bug |
+|---|---|---|---|
+| 1 | **`tableName` explícito em `Comprovante` e `Obra`** | `backend/src/models/Comprovante.js`, `Obra.js` | Sem ele o Sequelize pluraliza para `Comprovantes`/`Obras` e **quebra em MySQL Linux com `lower_case_table_names=0`** (tabela não encontrada). Pré-existente; qualquer deploy em Linux case-sensitive esbarra nisso. |
+| 2 | **Handlers globais de processo** | `backend/server.js` | Um `unhandledRejection` (ex.: falha de banco disparada por uma tela) **derrubava o servidor inteiro**. Agora loga com stack e segue; falha durante o boot continua encerrando o processo. |
+| 3 | **Status composto `EM_ABERTO`** | `backend/src/services/tituloFinanceiroService.js` | Cartão somava PREVISAO+ABERTO+PARCIAL mas o link abria a lista só com ABERTO — números divergentes. Extensão aditiva do filtro `status` (`EM_ABERTO` → `Op.in` dos três). |
+| 4 | **Contador com teto de 61 / links errados** | `DashboardPendenciasController` + `pendenciasVisoes.js` | Contador vinha de `findAll` com `limit 61` e acima disso caía num link genérico por área ("61 aprovações" abria lista com 3.590 registros). Corrigido com COUNT sem teto + visões nomeadas: **cartão e lista usam literalmente o mesmo recorte SQL**. (Bug e correção dentro da reforma — o padrão importa para qualquer porte das pendências.) |
+| 5 | **Busca que perdia registros (janelas paginadas)** | `BuscaController` | A regra mista de visibilidade de Solicitações descarta linhas DEPOIS do SQL; uma amostra única das mais recentes escondia registros antigos visíveis. Corrigido lendo em janelas de 30 (teto 120). (Dentro da reforma — padrão relevante para qualquer busca com filtro pós-SQL.) |
+
+### C4. Exclusivo de desenvolvimento — NÃO portar para o oficial (ou portar só com alinhamento explícito)
+
+| Item | Motivo |
+|---|---|
+| `DevQuickLoginController` + rotas + `env.devQuickLogin` + tela "Entrar como" no Login | **Bypass de autenticação de teste.** Fail-closed (404 fora de `NODE_ENV=development` + `DEV_QUICK_LOGIN=true`), mas não há razão para existir no oficial sem decisão do responsável. Ver `docs/DEV-QUICK-LOGIN.md`. |
+| CORS para IP privado (`isPrivateNetworkOrigin` em `app.js`) | Só age com `NODE_ENV=development` (teste em celular na rede local). Inofensivo, porém desnecessário no oficial. |
+| `outputs/**` (capturas), `backend/scripts/valida-pendencias.js`, docs do ambiente local | Material de entrega/QA deste repositório. Levar só o que o responsável quiser como evidência. |
+
+---
+
+## PLANO DE PORTE — ondas
+
+Princípios: começar pelo que não depende de nada; nunca portar tela cuja funcionalidade
+morre sem backend; toda onda termina com `npm --prefix frontend run test:responsive` +
+`npm --prefix frontend run build` limpos **antes do push** e um PR pequeno para `dev-v2`.
+
+### Onda 0 — Preparação (sem código de produto)
+
+- Criar/atualizar `refactor/frontend` a partir de `dev-v2` no oficial.
+- Confirmar baseline: versões de React/Vite/Tailwind, scripts do `package.json`
+  (`test:responsive` e `build` existem lá?), estrutura de `frontend/src`.
+  O porte é **cópia arquivo a arquivo do diff**, nunca a pasta inteira por cima —
+  o snapshot daqui pode estar defasado em relação ao oficial.
+- Levar `docs/MIGRACAO-PARA-OFICIAL.md` (este) e `docs/PROPOSTA-BACKEND.md` para o
+  alinhamento. **Nada de backend nesta onda.**
+
+**Validação:** build e test:responsive do oficial intactos antes de qualquer mudança
+(estabelece a régua).
+
+### Onda 1 — Fundação visual (grupo A1 + A4)
+
+- Entra: `design-tokens.css`, regra global de campos do `index.css`, `StatusBadge`,
+  `useFecharAoSair`, `formatarTexto`, marca/topo/largura, login (visual), páginas do A4.
+- Pré-requisito: nenhum.
+- **Validação:** test:responsive + build; percorrer os fluxos críticos existentes
+  (login, dashboard, lista e detalhe de solicitação, financeiro) confirmando que só o
+  visual mudou; conferir tema claro/escuro.
+
+### Onda 2 — Navegação por cards com degradação (A2 + A5 + parte de A3)
+
+- Entra: fonte única, hubs, breadcrumb, Layout, Ctrl+K **só telas/ações**, Home **só
+  módulos** (sem pendências/blocos), detalhe visual (Conversa, Header, Timeline, campos
+  vazios), catálogos de blocos com os defaults.
+- Pré-requisito: **ajustar a degradação** — consumo de `/dashboard/pendencias`, `/busca`
+  e `/home/blocos/:bloco` precisa falhar em silêncio (esconder a seção) enquanto o
+  backend não existir no oficial. Personalização persiste em memória/desligada nesta onda
+  (sem `/listas`), ou fica atrás de flag.
+- **Validação:** test:responsive + build + `validarNavegacao.mjs` (nenhum link morto);
+  navegar todos os hubs com perfis de permissões diferentes; confirmar que nenhuma rota
+  antiga sumiu.
+
+### Onda 3 — ListaAvancada em Solicitações (A3 + parte de B, modo degradado)
+
+- Entra: componente ListaAvancada + página Solicitações.
+- Pré-requisito: decisão de alinhamento sobre preferências. Duas rotas:
+  - **(recomendada)** aprovar antes o pacote backend B1 (preferências) — é o mais barato
+    do grupo C: 1 migration de tabelas novas, CRUD restrito ao próprio usuário, zero
+    regra de negócio;
+  - ou fallback temporário em `localStorage` (perde-se ao trocar de máquina; trocar
+    depois pelo banco).
+  Busca única/ordenação server-side e contadores por visão exigem o rework do
+  `SolicitacaoController` (pacote B3) — sem ele, operar com busca/ordenação client-side
+  da página ou adiar esses recursos.
+- **Validação:** test:responsive + build; conferir contra a lista antiga: mesmos
+  registros, mesmas permissões, mesmas ações (qualquer divergência é bug); testar lote
+  com 1 e com N selecionadas.
+
+### Onda 4 — Pacotes de backend (após alinhamento, na ordem de risco crescente)
+
+Cada pacote = 1 PR próprio para `dev-v2`, com o frontend correspondente junto ou logo
+depois.
+
+| Pacote | Conteúdo | Risco | Antes precisa de |
+|---|---|---|---|
+| **B0 — Correções de bug** | `tableName` (C3.1), handlers globais (C3.2) | Baixíssimo; independentes de tudo | Só o OK do responsável |
+| **B1 — Preferências** | Migration `202608300050` (parcial: 2 tabelas de usuário) + `ListaPreferenciasController` + rotas | Baixo: tabelas novas, CRUD do próprio usuário | OK do responsável (fura a regra "nenhuma migration") |
+| **B2 — Busca universal** | `BuscaController` + utils + migration de índices | Baixo/médio: só leitura, mas toca escopos de 4 telas — revisar com o responsável grupo a grupo | B0 recomendado |
+| **B3 — Solicitações (params) + pendências** | Rework `SolicitacaoController`, `pendenciasVisoes`, `DashboardPendenciasController`, `EM_ABERTO` (C3.3), param `visao` | Médio: mexe no controller mais usado do sistema (aditivo, mas grande). Validar com `valida-pendencias.js` em staging | B1 (contadores de visão aparecem na lista) |
+| **B4 — Configuração por setor** | Tabelas `setor_atalhos_padrao`, `setor_detalhe_layout` (+coluna `tela`), `acoes_principais_setor` + 3 CRUDs + telas de admin | Baixo: tabelas novas, escrita gateada pelo gate de config existente | B1 |
+| **B5 — Tela inicial** | `TelaInicialController` + service + fonte única compilada + `prebuild` + ajuste `AuthController` | Baixo: valida e cai na Home em qualquer dúvida | B1 (usa a mesma tabela) e onda 2 (fonte única) |
+| **B6 — Blocos da Home** | `HomeBlocosController` | Baixo/médio: só leitura, reusa gates existentes; revisar consulta a consulta | Onda 2; B3 para os blocos de pendência |
+
+- **Validação por pacote:** subir em `dev-v2` (PM2 `backend-dev`), rodar migrations no
+  boot e conferir idempotência (segunda subida não aplica nada), percorrer os fluxos
+  críticos, e no B3 rodar `valida-pendencias.js` contra o banco de staging
+  (cartão×lista tem de bater 100%).
+
+### Onda 5 — Frontend completo por cima dos pacotes
+
+À medida que cada pacote entra, ligar no frontend o que estava degradado: pendências e
+"Para resolver agora", Ctrl+K com registros, personalização persistente da Home/detalhe,
+atalhos com padrão por setor, tela inicial no Perfil, blocos opcionais. Cada ativação com
+test:responsive + build + conferência funcional da tela afetada.
+
+### O que NUNCA vai (sem decisão explícita do responsável)
+
+`DevQuickLoginController` e rotas, `DEV_QUICK_LOGIN` em `env.js`, tela "Entrar como",
+CORS de IP privado, `outputs/**`, docs do ambiente local deste repositório.
+
+---
+
+## Riscos e observações
+
+1. **Snapshot defasado**: o commit inicial daqui é um retrato; o oficial pode ter andado.
+   Todo arquivo "M" do inventário precisa de diff de 3 vias na hora do porte (base do
+   snapshot × nosso × oficial atual), nunca cópia cega.
+2. **A regra "nenhuma migration" é o único conflito estrutural** com o grupo B/C: 6
+   tabelas novas, 1 coluna nova (em tabela nossa) e 3 índices. Tudo aditivo e idempotente,
+   no padrão `schemaUtils` que o projeto já usa. É a decisão central do alinhamento —
+   `docs/PROPOSTA-BACKEND.md` existe para essa conversa.
+3. **Nenhuma permissão nova foi criada** em todo o trabalho: cada recurso reusa os gates
+   existentes (`authorizationService`, `allowConfiguracoesStatusVinculos`, escopos das
+   telas de origem).
+4. As capturas de cada entrega estão em `outputs/capturas-*/` neste repositório e servem
+   de evidência visual no alinhamento.

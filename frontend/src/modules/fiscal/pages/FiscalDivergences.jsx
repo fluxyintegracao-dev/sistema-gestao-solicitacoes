@@ -188,7 +188,7 @@ export default function FiscalDivergences() {
                     <div className="mt-1 text-xs text-slate-500">
                       {formatDate(document.emission_date)} - {formatMoney(document.total_value)}
                     </div>
-                    <div className="mt-1 text-xs text-slate-400">{company.razao_social || '-'}</div>
+                    <div className="mt-1 text-xs text-slate-500">{company.razao_social || '-'}</div>
                   </td>
                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
                     <div className="font-medium text-slate-950 dark:text-white">{document.issuer_name || '-'}</div>

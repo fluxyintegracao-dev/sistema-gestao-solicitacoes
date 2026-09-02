@@ -356,7 +356,7 @@ export default function RhDpFechamentos() {
                   <p className="text-sm text-slate-500">
                     Recorte: {detalhe.apuracao?.obra?.nome || 'todas as obras'} | {detalhe.apuracao?.tipo_vinculo || 'todos os vinculos'}
                   </p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-slate-500">
                     Fechado em {formatDate(detalhe.data_fechamento)} com vencimento em {formatDate(detalhe.data_vencimento)}
                   </p>
                 </div>

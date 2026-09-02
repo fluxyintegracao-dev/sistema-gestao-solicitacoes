@@ -377,7 +377,7 @@ export default function FiscalCompanies() {
                   <div>
                     <p className="font-medium text-slate-950 dark:text-white">{certificate.certificate_alias}</p>
                     <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{certificate.company?.razao_social || 'Empresa nao vinculada'}</p>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-400">{certificate.storage_type} - {certificate.validation_status || 'pending'}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">{certificate.storage_type} - {certificate.validation_status || 'pending'}</p>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs font-semibold ${certificate.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                     {certificate.is_active ? 'Ativo' : 'Inativo'}

@@ -68,10 +68,17 @@ export default function GestaoContratos() {
   const [contratos, setContratos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [obras, setObras] = useState([]);
-  const [filtros, setFiltros] = useState({
-    obra_id: '',
-    codigo: '',
-    ref: ''
+  // ?obra_id= / ?codigo= / ?ref= / ?q= chegam da busca universal (Ctrl+K)
+  // e das ações rápidas de obra: a lista abre já filtrada. Um ?q= com
+  // dígitos vira filtro de código; sem dígitos, de referência.
+  const [filtros, setFiltros] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = String(params.get('q') || '').trim();
+    return {
+      obra_id: params.get('obra_id') || '',
+      codigo: params.get('codigo') || (q && /\d/.test(q) ? q : ''),
+      ref: params.get('ref') || (q && !/\d/.test(q) ? q : '')
+    };
   });
   const [form, setForm] = useState({
     obra_id: '',

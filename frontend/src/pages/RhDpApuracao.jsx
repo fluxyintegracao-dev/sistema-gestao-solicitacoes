@@ -622,7 +622,7 @@ export default function RhDpApuracao({ comoAba = false }) {
               <p className="text-sm text-slate-500">
                 Recorte: empresa do cadastro do colaborador | {detalhe.tipo_vinculo || 'todos os vinculos'} | base {detalhe.dias_base || 30} dias | {detalhe.total_colaboradores || 0} colaborador(es)
               </p>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500">
                 Criada em {formatDateTime(detalhe.createdAt)} por {detalhe.criadoPor?.nome || 'sistema'}
               </p>
             </div>

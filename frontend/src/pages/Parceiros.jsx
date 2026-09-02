@@ -109,7 +109,10 @@ export default function Parceiros() {
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [parceiroForm, setParceiroForm] = useState(defaultParceiroForm());
-  const [filtro, setFiltro] = useState('');
+  // ?q= da busca universal abre a lista já filtrada.
+  const [filtro, setFiltro] = useState(() => (
+    new URLSearchParams(window.location.search).get('q') || ''
+  ));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [importing, setImporting] = useState(false);

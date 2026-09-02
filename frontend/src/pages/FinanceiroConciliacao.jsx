@@ -992,7 +992,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
             <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
-                className="text-[10px] text-slate-400 hover:text-amber-600 underline underline-offset-2 leading-tight"
+                className="text-[10px] text-slate-500 hover:text-amber-600 underline underline-offset-2 leading-tight"
                 disabled={isIgnorando || isRemovendo}
                 onClick={() => onIgnorar(item.id)}
               >
@@ -1000,7 +1000,7 @@ function ItemConciliacao({ item, associacaoPreparada = null, processingId, selec
               </button>
               <button
                 type="button"
-                className="text-[10px] text-slate-400 hover:text-rose-600 underline underline-offset-2 leading-tight"
+                className="text-[10px] text-slate-500 hover:text-rose-600 underline underline-offset-2 leading-tight"
                 disabled={isIgnorando || isRemovendo}
                 onClick={() => onRemover(item.id)}
               >
