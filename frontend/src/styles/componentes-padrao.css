@@ -1017,3 +1017,17 @@ fieldset.form-section {
   outline: 2px solid var(--c-primary);
   outline-offset: -2px;
 }
+
+/* Ênfase de linha declarada pela tela (`classeLinha`) — subtotal e total de
+   demonstrativo, por exemplo. Não usa aria-selected: linha de subtotal não
+   está "selecionada", e dizer isso ao leitor de tela seria mentira. */
+.app-tabela .app-tabela-linha--subtotal > td {
+  background: var(--ui-surface-2);
+  font-weight: 600;
+}
+
+.app-tabela .app-tabela-linha--total > td {
+  background: var(--ui-surface-2);
+  font-weight: 700;
+  border-top: 2px solid var(--ui-border);
+}

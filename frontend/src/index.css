@@ -2109,7 +2109,7 @@ a:hover {
 .solicitacoes-table-shell {
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  overflow: clip; /* R18: clip, não hidden — hidden cria scrollport e mata o sticky da faixa fixa e da coluna fixa desta tabela */
 }
 
 .solicitacoes-table-scroll {
@@ -4256,7 +4256,7 @@ a:hover {
 }
 
 .cotacao-publica-table-shell {
-  overflow: hidden;
+  overflow: clip; /* R18: clip, não hidden — hidden cria scrollport e mata o sticky da faixa fixa e da coluna fixa desta tabela */
 }
 
 .cotacao-publica-table {

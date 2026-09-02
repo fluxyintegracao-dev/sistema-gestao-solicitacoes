@@ -729,7 +729,7 @@ export default function FinanceiroDre() {
                 itens={relatorio?.linhas || []}
                 getId={(linha) => String(linha.linha_key || `${linha.grupo}-${linha.subgrupo || ''}`)}
                 key={chaveFiltros}
-              storageKey="tabela:financeiro-dre:linhas-gerenciais"
+                storageKey="tabela:financeiro-dre:linhas-gerenciais"
                 rotuloRolagem="Linhas gerenciais da DRE"
                 vazio="Nenhum titulo encontrado."
                 rotuloDetalhe={(linha) => [linha.grupo, linha.subgrupo].filter(Boolean).join(' / ')}
@@ -801,7 +801,7 @@ export default function FinanceiroDre() {
                 itens={relatorio?.empresas || []}
                 getId={(empresa) => String(empresa.empresa_id || 'sem-empresa')}
                 key={chaveFiltros}
-              storageKey="tabela:financeiro-dre:empresas-resultado"
+                storageKey="tabela:financeiro-dre:empresas-resultado"
                 rotuloRolagem="Resultado por empresa"
                 vazio="Nenhuma empresa com movimento."
                 rotuloDetalhe={(empresa) => empresa.empresa_nome}

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import TabelaPadrao from '../../../components/padrao/TabelaPadrao';
 import {
   obterCotacaoPublica,
   responderCotacaoPublica,
@@ -802,156 +803,206 @@ export default function CotacaoFornecedorPublica() {
         </p>
 
         {/* Tabela */}
-        <div className="sol-surface-card rounded-lg solicitacoes-table-shell solicitacoes-table-compact cotacao-publica-table-shell">
-          <div className="solicitacoes-table-scroll scrollbar-thin" style={{ scrollbarGutter: 'stable both-edges' }}>
-            <table className="table-fixed solicitacoes-table cotacao-publica-table" style={{ width: '100%', minWidth: freteModo === 'POR_ITEM' ? '1540px' : '1436px', fontSize: '11px' }}>
-              <colgroup>
-                <col style={{ width: '220px' }} />
-                <col style={{ width: '88px' }} />
-                <col style={{ width: '88px' }} />
-                <col style={{ width: '112px' }} />
-                <col style={{ width: '112px' }} />
-                <col style={{ width: '118px' }} />
-                <col style={{ width: '104px' }} />
-                {freteModo === 'POR_ITEM' ? <col style={{ width: '104px' }} /> : null}
-                <col style={{ width: '104px' }} />
-                <col style={{ width: '104px' }} />
-                <col style={{ width: '118px' }} />
-                <col style={{ width: 'auto' }} />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Descricao</th>
-                  <th>Qtd./Un.</th>
-                  <th>Necessario</th>
-                  <th>Preco unit.</th>
-                  <th>Qtd. disponivel</th>
-                  <th>Valor total</th>
-                  <th>IPI</th>
-                  <th>ICMS</th>
-                  <th>ST</th>
-                  {freteModo === 'POR_ITEM' ? <th>Frete</th> : null}
-                  <th>Qtd. min.</th>
-                  <th>Observacao</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {itens.map((item, index) => (
-                    <tr
-                      key={`${item.item_tipo}-${item.item_referencia_id}`}
-                      className="cotacao-publica-table-row"
-                    >
-                      <td>
-                        <div className="cotacao-publica-cell-description">
-                          <strong>{item.nome}</strong>
-                          {item.especificacao ? (
-                            <span className="mt-1 block whitespace-normal text-[10px] font-medium leading-snug text-[var(--sol-text-soft)]">
-                              {item.especificacao}
-                            </span>
-                          ) : null}
-                        </div>
-                      </td>
-                      <td>
-                        <span className="cotacao-publica-cell-muted">
-                          {item.quantidade} {item.unidade}
-                        </span>
-                      </td>
-                      <td>
-                        <span className="cotacao-publica-cell-muted">{formatarData(item.necessario_para)}</span>
-                      </td>
-                      <td>
-                        <CurrencyInput
-                          className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                          value={item.preco}
-                          disabled={formularioBloqueado}
-                          casasDecimais={10}
-                          preservarEscala
-                          onChange={(val) => atualizarItem(index, 'preco', val)}
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                          inputMode="decimal"
-                          value={item.quantidade_disponivel}
-                          disabled={formularioBloqueado}
-                          onChange={(e) => atualizarItem(index, 'quantidade_disponivel', sanitizarDecimalInput(e.target.value, 3))}
-                          placeholder="0"
-                        />
-                      </td>
-                      <td className="font-semibold text-[var(--c-fg)]">
-                        {formatarMoeda(calcularTotalItemCotacao(item, freteModo === 'POR_ITEM'))}
-                      </td>
-                      {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
-                        <td key={campo}>
-                          <CurrencyInput
-                            className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
-                            value={item[campo]}
-                            disabled={formularioBloqueado}
-                            onChange={(valor) => atualizarItem(index, campo, valor)}
-                            zeroComoVazio
-                          />
-                        </td>
-                      ))}
-                      {freteModo === 'POR_ITEM' ? (
-                        <td>
-                          <CurrencyInput className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]" value={item.frete_valor} disabled={formularioBloqueado} onChange={(valor) => atualizarItem(index, 'frete_valor', valor)} zeroComoVazio />
-                        </td>
+        {/* R18: os antigos shells (.solicitacoes-table-shell /
+            .cotacao-publica-table-shell) trazem `overflow: hidden`, que cria
+            contexto de rolagem e mata o sticky do cabecalho. A TabelaPadrao
+            ja traz o proprio shell com area de rolagem rotulada. */}
+        <div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'descricao',
+                titulo: 'Descricao',
+                // R17: o nome do insumo e quem nomeia a linha da cotacao.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div className="cotacao-publica-cell-description">
+                    <strong>{item.nome}</strong>
+                    {item.especificacao ? (
+                      <span className="mt-1 block whitespace-normal text-[10px] font-medium leading-snug text-[var(--sol-text-soft)]">
+                        {item.especificacao}
+                      </span>
+                    ) : null}
+                  </div>
+                )
+              },
+              {
+                id: 'quantidade',
+                titulo: 'Qtd./Un.',
+                tipo: 'numero',
+                render: (item) => (
+                  <span className="cotacao-publica-cell-muted">{item.quantidade} {item.unidade}</span>
+                )
+              },
+              {
+                id: 'necessario_para',
+                titulo: 'Necessario',
+                tipo: 'data',
+                render: (item) => (
+                  <span className="cotacao-publica-cell-muted">{formatarData(item.necessario_para)}</span>
+                )
+              },
+              {
+                id: 'preco',
+                titulo: 'Preco unit.',
+                tipo: 'valor',
+                render: (item) => (
+                  <CurrencyInput
+                    className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
+                    value={item.preco}
+                    disabled={formularioBloqueado}
+                    casasDecimais={10}
+                    preservarEscala
+                    onChange={(val) => atualizarItem(item.__indice, 'preco', val)}
+                  />
+                )
+              },
+              {
+                id: 'quantidade_disponivel',
+                titulo: 'Qtd. disponivel',
+                tipo: 'numero',
+                render: (item) => (
+                  <input
+                    className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
+                    inputMode="decimal"
+                    value={item.quantidade_disponivel}
+                    disabled={formularioBloqueado}
+                    aria-label={`Quantidade disponivel de ${item.nome}`}
+                    onChange={(e) => atualizarItem(item.__indice, 'quantidade_disponivel', sanitizarDecimalInput(e.target.value, 3))}
+                    placeholder="0"
+                  />
+                )
+              },
+              {
+                id: 'valor_total',
+                titulo: 'Valor total',
+                tipo: 'valor',
+                render: (item) => (
+                  <span className="font-semibold text-[var(--c-fg)]">
+                    {formatarMoeda(calcularTotalItemCotacao(item, freteModo === 'POR_ITEM'))}
+                  </span>
+                )
+              },
+              {
+                id: 'ipi_valor',
+                titulo: 'IPI',
+                tipo: 'valor',
+                render: (item) => (
+                  <CurrencyInput
+                    className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                    value={item.ipi_valor}
+                    disabled={formularioBloqueado}
+                    onChange={(valor) => atualizarItem(item.__indice, 'ipi_valor', valor)}
+                    zeroComoVazio
+                  />
+                )
+              },
+              {
+                id: 'icms_valor',
+                titulo: 'ICMS',
+                tipo: 'valor',
+                render: (item) => (
+                  <CurrencyInput
+                    className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                    value={item.icms_valor}
+                    disabled={formularioBloqueado}
+                    onChange={(valor) => atualizarItem(item.__indice, 'icms_valor', valor)}
+                    zeroComoVazio
+                  />
+                )
+              },
+              {
+                id: 'st_valor',
+                titulo: 'ST',
+                tipo: 'valor',
+                render: (item) => (
+                  <CurrencyInput
+                    className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                    value={item.st_valor}
+                    disabled={formularioBloqueado}
+                    onChange={(valor) => atualizarItem(item.__indice, 'st_valor', valor)}
+                    zeroComoVazio
+                  />
+                )
+              },
+              ...(freteModo === 'POR_ITEM' ? [
+                {
+                  id: 'frete_valor',
+                  titulo: 'Frete',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <CurrencyInput
+                      className="input cotacao-publica-table-input h-6 px-1.5 text-[11px]"
+                      value={item.frete_valor}
+                      disabled={formularioBloqueado}
+                      onChange={(valor) => atualizarItem(item.__indice, 'frete_valor', valor)}
+                      zeroComoVazio
+                    />
+                  )
+                }
+              ] : []),
+              {
+                id: 'quantidade_minima_item',
+                titulo: 'Qtd. min.',
+                tipo: 'numero',
+                render: (item) => (
+                  <input
+                    className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
+                    type="number"
+                    lang="pt-BR"
+                    min="0"
+                    step="1"
+                    inputMode="decimal"
+                    value={item.quantidade_minima_item}
+                    disabled={formularioBloqueado}
+                    aria-label={`Quantidade minima de ${item.nome}`}
+                    onChange={(e) => atualizarItem(item.__indice, 'quantidade_minima_item', e.target.value)}
+                    placeholder="Opcional"
+                  />
+                )
+              },
+              {
+                id: 'observacao',
+                titulo: 'Observacao',
+                tipo: 'texto',
+                render: (item) => (
+                  <div className="flex min-w-0 items-start gap-2">
+                    <AttachmentPreview item={item} />
+                    <div className="min-w-0 flex-1">
+                      {item.link_produto ? (
+                        <a
+                          href={item.link_produto}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mb-1 block truncate text-[10px] font-medium text-sky-700 hover:underline"
+                          title={item.link_produto}
+                        >
+                          Link do produto
+                        </a>
                       ) : null}
-                      <td>
-                        <input
-                          className="input cotacao-publica-table-input h-6 text-[11px] px-1.5"
-                          type="number"
-                          lang="pt-BR"
-                          min="0"
-                          step="1"
-                          inputMode="decimal"
-                          value={item.quantidade_minima_item}
-                          disabled={formularioBloqueado}
-                          onChange={(e) => atualizarItem(index, 'quantidade_minima_item', e.target.value)}
-                          placeholder="Opcional"
-                        />
-                      </td>
-                      <td>
-                        <div className="flex min-w-0 items-start gap-2">
-                          <AttachmentPreview item={item} />
-                          <div className="min-w-0 flex-1">
-                            {item.link_produto ? (
-                              <a
-                                href={item.link_produto}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mb-1 block truncate text-[10px] font-medium text-sky-700 hover:underline"
-                                title={item.link_produto}
-                              >
-                                Link do produto
-                              </a>
-                            ) : null}
-                            <textarea
-                              className="input cotacao-publica-table-textarea text-xs"
-                              value={item.observacao}
-                              disabled={formularioBloqueado}
-                              onChange={(e) => atualizarItem(index, 'observacao', e.target.value)}
-                              placeholder="Marca, condicoes ou restricoes"
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                ))}
-
-                {itens.length === 0 && (
-                  <tr>
-                    <td colSpan={freteModo === 'POR_ITEM' ? 12 : 11} className="cotacao-publica-table-empty text-xs">
-                      Nenhum item disponivel para resposta.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                      <textarea
+                        className="input cotacao-publica-table-textarea text-xs"
+                        value={item.observacao}
+                        disabled={formularioBloqueado}
+                        aria-label={`Observacao de ${item.nome}`}
+                        onChange={(e) => atualizarItem(item.__indice, 'observacao', e.target.value)}
+                        placeholder="Marca, condicoes ou restricoes"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+                )
+              }
+            ]}
+            // `__indice` carrega a posicao no formulario: `atualizarItem`
+            // trabalha por indice, nao por id do item.
+            itens={itens.map((item, index) => ({ ...item, __indice: index }))}
+            getId={(item) => `${item.item_tipo}-${item.item_referencia_id}`}
+            storageKey="tabela:cotacao-fornecedor-publica:itens"
+            rotuloRolagem="Itens da cotacao"
+            vazio="Nenhum item disponivel para resposta."
+          />
         </div>
 
         <div className="mt-3 grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-xs sm:grid-cols-3 lg:grid-cols-6">

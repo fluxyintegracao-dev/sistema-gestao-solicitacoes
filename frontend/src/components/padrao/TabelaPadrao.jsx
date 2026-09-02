@@ -343,7 +343,7 @@ export default function TabelaPadrao({
   // eslint-disable-next-line no-unused-vars
   semIdentidade = false,
   // --- capacidades opcionais (ver cabeçalho do arquivo) ---
-  selecao,              // { selecionados:Set|Array, aoAlternar(id,item), aoAlternarTodos(marcar,ids), elegivel?(item), unica? }
+  selecao,              // { selecionados:Set|Array, aoAlternar(id,item), aoAlternarTodos(marcar,ids), elegivel?(item), unica?, semTodos? }
   linhaExpansivel,      // (item) => ReactNode | null
   rotuloDetalhe,        // (item) => string — nomeia o detalhe para leitor de tela
   agruparPor,           // { chave(item), titulo(chave, itens) }
@@ -351,6 +351,7 @@ export default function TabelaPadrao({
   aoMudarColunas,       // (idsVisiveis[]) => void — a tela precisa saber (ex.: exportar CSV só do que está à vista)
   aoOrdenar,            // (coluna, direcao|null) => void — LISTA PAGINADA NO SERVIDOR: a tela reconsulta; o componente NÃO ordena local
   linhaSelecionada,     // (item) => boolean — realce e aria-selected da linha
+  classeLinha,          // (item) => string|null — ênfase da tela (subtotal, total…) sem mentir com aria-selected
   acoesTabela           // ReactNode extra na barra acima da tabela
 }) {
   const ehMovel = useEhMovel();
@@ -688,7 +689,8 @@ export default function TabelaPadrao({
       'app-tabela-linha',
       aoClicarLinha && 'app-tabela-linha--clicavel',
       (linhaSelecionada || selecao) && marcada && 'app-tabela-linha--selecionada',
-      tom && `app-tabela-linha--${tom}`
+      tom && `app-tabela-linha--${tom}`,
+      classeLinha?.(item)
     ].filter(Boolean).join(' ');
     return [
       <tr
@@ -796,7 +798,7 @@ export default function TabelaPadrao({
       >
         <thead>
           <tr>
-            {selecao && !selecao.unica ? (
+            {selecao && !selecao.unica && !selecao.semTodos ? (
               <th className="resizable-th celula-selecao">
                 <input
                   type="checkbox"
@@ -813,8 +815,11 @@ export default function TabelaPadrao({
                 />
               </th>
             ) : selecao ? (
-              // Seleção ÚNICA: não existe "todos" — o cabeçalho só rotula.
-              <th className="resizable-th celula-selecao" aria-label="Selecionada" />
+              // Sem "todos": ou a seleção é ÚNICA, ou marcar tudo violaria
+              // um invariante da tela (ex.: a soma não pode passar do valor
+              // do lançamento, na conciliação). Nesses casos o cabeçalho só
+              // rotula — melhor que oferecer um "todos" que mente.
+              <th className="resizable-th celula-selecao" aria-label={selecao.unica ? 'Selecionada' : 'Marcar'} />
             ) : null}
             {linhaExpansivel ? <th className="resizable-th celula-expandir" aria-label="Detalhe" /> : null}
             {colunasComFlex.map((coluna) => (

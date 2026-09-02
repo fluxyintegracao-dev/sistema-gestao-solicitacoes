@@ -360,7 +360,6 @@ function AssociacaoManualTabela({
   totalSelecionado = 0,
   valorEsperado = 0,
   onToggleSelecionado,
-  onMarcarTodos
 }) {
   const idDe = (it) => Number(it.movimento_financeiro_id || 0);
 
@@ -452,7 +451,13 @@ function AssociacaoManualTabela({
         aoAlternar: (id) => onToggleSelecionado(id),
         // "Todos" nao pode ser literal aqui: marca, em ordem, o que ainda
         // cabe no valor do extrato (a soma nunca pode ultrapassar).
-        aoAlternarTodos: (marcar) => onMarcarTodos(marcar),
+        // `semTodos`: marcar tudo violaria o invariante desta tela — a soma
+        // dos movimentos não pode passar do valor do lançamento. Antes o
+        // componente exigia um "todos", e a tela foi obrigada a inventar um
+        // "marca o que ainda cabe" que ninguém pediu. Sem o botão, o
+        // invariante fica com quem é dono dele.
+        semTodos: true,
+        aoAlternarTodos: () => {},
         elegivel: (it) => !processandoLinha(it) && !ultrapassa(it)
       }}
     />
@@ -2105,25 +2110,6 @@ export default function FinanceiroConciliacao() {
   // lote — e aqui "todos" nao pode ser literal: a soma dos movimentos nao
   // pode ultrapassar o valor do lancamento do extrato. Marca-se, na ordem da
   // lista, tudo o que ainda couber; desmarcar limpa a selecao inteira.
-  function marcarTodosMovimentosAssociacaoManual(marcar) {
-    setAssociacaoModal((current) => {
-      if (!marcar) return { ...current, error: '', selecionados: [] };
-      const itens = Array.isArray(current.dados?.itens) ? current.dados.itens : [];
-      const valorEsperado = Math.abs(Number(current.item?.valor || 0));
-      let total = 0;
-      const escolhidos = [];
-      itens.forEach((item) => {
-        const id = Number(item.movimento_financeiro_id || 0);
-        if (!id) return;
-        const proximo = total + valorAbsolutoMovimentoAssociacao(item);
-        if (proximo > valorEsperado + 0.01) return;
-        total = proximo;
-        escolhidos.push(id);
-      });
-      return { ...current, error: '', selecionados: escolhidos };
-    });
-  }
-
   function toggleMovimentoAssociacaoManual(movimentoId) {
     const id = Number(movimentoId || 0);
     if (!id) return;
@@ -3169,7 +3155,6 @@ export default function FinanceiroConciliacao() {
                 totalSelecionado={associacaoResumo.totalSelecionado}
                 valorEsperado={associacaoResumo.valorEsperado}
                 onToggleSelecionado={toggleMovimentoAssociacaoManual}
-                onMarcarTodos={marcarTodosMovimentosAssociacaoManual}
               />
             </div>
             <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between">

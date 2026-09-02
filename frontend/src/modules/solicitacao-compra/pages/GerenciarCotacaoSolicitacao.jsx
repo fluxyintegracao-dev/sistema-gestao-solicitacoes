@@ -536,27 +536,17 @@ function ModalRespostaInternaCotacao({
             )}
           </div>
 
-          <div className="compras-responsive-table mt-4 rounded-lg border border-[var(--c-border)]">
-            <table className={`table ${form.frete_modo === 'POR_ITEM' ? 'min-w-[1460px]' : 'min-w-[1340px]'} text-xs`}>
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Qtd. solic.</th>
-                  <th>Preco unit.</th>
-                  <th>{form.nova_oferta_saldo ? 'Qtd. desta oferta' : 'Qtd. disponivel'}</th>
-                  <th>Valor total</th>
-                  <th>IPI</th>
-                  <th>ICMS</th>
-                  <th>ST</th>
-                  {form.frete_modo === 'POR_ITEM' ? <th>Frete</th> : null}
-                  <th>Qtd. min.</th>
-                  <th>Observacao</th>
-                </tr>
-              </thead>
-              <tbody>
-                {form.itens.map((item, index) => (
-                  <tr key={buildItemKey(item)}>
-                    <td className="min-w-[210px]">
+          <div className="mt-4">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'item',
+                  titulo: 'Item',
+                  // R17: o nome do insumo nomeia a linha da resposta.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => (
+                    <div className="min-w-0">
                       <div className="font-semibold text-[var(--c-text)]">{item.nome}</div>
                       <div className="text-[var(--c-muted)]">{formatNumeroCompra(parseNumeroCompraDigitado(item.quantidade_solicitada))} {item.unidade}</div>
                       {form.nova_oferta_saldo ? (
@@ -564,34 +554,160 @@ function ModalRespostaInternaCotacao({
                           Ja comprado deste fornecedor: {formatNumeroCompra(item.quantidade_ja_comprada_fornecedor)} · Saldo da solicitacao: {formatNumeroCompra(item.saldo_solicitacao)}
                         </div>
                       ) : null}
-                    </td>
-                    <td>
+                    </div>
+                  )
+                },
+                {
+                  id: 'quantidade_solicitada',
+                  titulo: 'Qtd. solic.',
+                  tipo: 'numero',
+                  render: (item) => (
+                    <input
+                      className="input w-full"
+                      inputMode="decimal"
+                      value={item.quantidade_solicitada}
+                      disabled={solicitacaoEncerrada}
+                      aria-label={`Quantidade solicitada de ${item.nome}`}
+                      title={solicitacaoEncerrada ? 'A quantidade solicitada nao pode ser alterada durante a reabertura por disponibilidade.' : ''}
+                      onChange={(e) => onChangeItem(item.__indice, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
+                    />
+                  )
+                },
+                {
+                  id: 'preco',
+                  titulo: 'Preco unit.',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <input
+                      className="input w-full text-right"
+                      inputMode="decimal"
+                      value={item.preco}
+                      aria-label={`Preco unitario de ${item.nome}`}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => onChangeItem(item.__indice, 'preco', formatarMoedaCotacaoInput(e.target.value))}
+                    />
+                  )
+                },
+                {
+                  id: 'quantidade_disponivel',
+                  titulo: form.nova_oferta_saldo ? 'Qtd. desta oferta' : 'Qtd. disponivel',
+                  tipo: 'numero',
+                  render: (item) => (
+                    <input
+                      className="input w-full"
+                      inputMode="decimal"
+                      value={item.quantidade_disponivel}
+                      aria-label={`Quantidade disponivel de ${item.nome}`}
+                      onChange={(e) => onChangeItem(item.__indice, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))}
+                    />
+                  )
+                },
+                {
+                  id: 'valor_total',
+                  titulo: 'Valor total',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <span className="font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item, form.frete_modo === 'POR_ITEM'))}</span>
+                  )
+                },
+                {
+                  id: 'ipi_valor',
+                  titulo: 'IPI',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <input
+                      className="input w-full text-right"
+                      inputMode="decimal"
+                      value={item.ipi_valor}
+                      aria-label={`IPI de ${item.nome}`}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => onChangeItem(item.__indice, 'ipi_valor', formatarMoedaCotacaoInput(e.target.value, 2))}
+                    />
+                  )
+                },
+                {
+                  id: 'icms_valor',
+                  titulo: 'ICMS',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <input
+                      className="input w-full text-right"
+                      inputMode="decimal"
+                      value={item.icms_valor}
+                      aria-label={`ICMS de ${item.nome}`}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => onChangeItem(item.__indice, 'icms_valor', formatarMoedaCotacaoInput(e.target.value, 2))}
+                    />
+                  )
+                },
+                {
+                  id: 'st_valor',
+                  titulo: 'ST',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <input
+                      className="input w-full text-right"
+                      inputMode="decimal"
+                      value={item.st_valor}
+                      aria-label={`ST de ${item.nome}`}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => onChangeItem(item.__indice, 'st_valor', formatarMoedaCotacaoInput(e.target.value, 2))}
+                    />
+                  )
+                },
+                ...(form.frete_modo === 'POR_ITEM' ? [
+                  {
+                    id: 'frete_valor',
+                    titulo: 'Frete',
+                    tipo: 'valor',
+                    render: (item) => (
                       <input
-                        className="input min-w-[105px]"
+                        className="input w-full text-right"
                         inputMode="decimal"
-                        value={item.quantidade_solicitada}
-                        disabled={solicitacaoEncerrada}
-                        title={solicitacaoEncerrada ? 'A quantidade solicitada nao pode ser alterada durante a reabertura por disponibilidade.' : ''}
-                        onChange={(e) => onChangeItem(index, 'quantidade_solicitada', sanitizeNumeroCompraInput(e.target.value))}
+                        value={item.frete_valor}
+                        aria-label={`Frete de ${item.nome}`}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => onChangeItem(item.__indice, 'frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))}
                       />
-                    </td>
-                    <td><input className="input min-w-[140px]" inputMode="decimal" value={item.preco} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'preco', formatarMoedaCotacaoInput(e.target.value))} /></td>
-                    <td><input className="input min-w-[115px]" inputMode="decimal" value={item.quantidade_disponivel} onChange={(e) => onChangeItem(index, 'quantidade_disponivel', sanitizeNumeroCompraInput(e.target.value))} /></td>
-                    <td className="min-w-[120px] font-semibold">{fmtMoeda(calcularTotalRespostaInternaItem(item, form.frete_modo === 'POR_ITEM'))}</td>
-                    {['ipi_valor', 'icms_valor', 'st_valor'].map((campo) => (
-                      <td key={campo}>
-                        <input className="input min-w-[110px]" inputMode="decimal" value={item[campo]} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, campo, formatarMoedaCotacaoInput(e.target.value, 2))} />
-                      </td>
-                    ))}
-                    {form.frete_modo === 'POR_ITEM' ? (
-                      <td><input className="input min-w-[110px]" inputMode="decimal" value={item.frete_valor} onFocus={(e) => e.target.select()} onChange={(e) => onChangeItem(index, 'frete_valor', formatarMoedaCotacaoInput(e.target.value, 2))} /></td>
-                    ) : null}
-                    <td><input className="input min-w-[100px]" inputMode="decimal" value={item.quantidade_minima_item} onChange={(e) => onChangeItem(index, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))} /></td>
-                    <td><input className="input min-w-[190px]" value={item.observacao} onChange={(e) => onChangeItem(index, 'observacao', e.target.value)} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    )
+                  }
+                ] : []),
+                {
+                  id: 'quantidade_minima_item',
+                  titulo: 'Qtd. min.',
+                  tipo: 'numero',
+                  render: (item) => (
+                    <input
+                      className="input w-full"
+                      inputMode="decimal"
+                      value={item.quantidade_minima_item}
+                      aria-label={`Quantidade minima de ${item.nome}`}
+                      onChange={(e) => onChangeItem(item.__indice, 'quantidade_minima_item', sanitizeNumeroCompraInput(e.target.value))}
+                    />
+                  )
+                },
+                {
+                  id: 'observacao',
+                  titulo: 'Observacao',
+                  tipo: 'texto',
+                  render: (item) => (
+                    <input
+                      className="input w-full"
+                      value={item.observacao}
+                      aria-label={`Observacao de ${item.nome}`}
+                      onChange={(e) => onChangeItem(item.__indice, 'observacao', e.target.value)}
+                    />
+                  )
+                }
+              ]}
+              // `__indice` carrega a posicao no formulario: `onChangeItem`
+              // trabalha por indice e o item da resposta nao tem id proprio.
+              itens={form.itens.map((item, index) => ({ ...item, __indice: index }))}
+              getId={(item) => buildItemKey(item)}
+              storageKey="tabela:gerenciar-cotacao:resposta-interna"
+              rotuloRolagem="Itens da resposta do fornecedor"
+              vazio="Nenhum item nesta cotacao."
+            />
           </div>
           <div className="mt-3 grid gap-2 rounded-lg border border-[var(--c-border)] bg-slate-50/80 p-3 text-xs sm:grid-cols-3 lg:grid-cols-6">
             <div><span className="block text-[var(--c-muted)]">Mercadorias</span><strong>{fmtMoeda(valorMercadorias)}</strong></div>
