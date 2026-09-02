@@ -8,30 +8,68 @@
 // Cenário inclui 70 aprovações (mais que o antigo teto de 61) para
 // provar que o bug "61 → lista do setor inteiro" morreu.
 // =====================================================================
-// Este script GRAVA dados de cenário no banco apontado (setores, usuários,
-// solicitações, títulos…). A trava abaixo é obrigatória de propósito: só
-// rode contra base descartável ou staging, NUNCA produção.
-if (String(process.env.ALLOW_DEV_TEST_WRITES || '').toLowerCase() !== 'true') {
-  console.error(
-    'valida-pendencias: recusado. Este script grava dados de cenário no banco apontado.\n' +
-    'Exporte ALLOW_DEV_TEST_WRITES=true para confirmar que o banco é descartável/staging.'
-  );
+const path = require('path');
+const BACKEND = path.resolve(__dirname, '..');
+
+// A autorização precisa vir do comando atual. Mesmo que alguém grave a chave
+// por engano no .env, ela não habilita escritas silenciosamente.
+const escritaAutorizadaNoComando =
+  String(process.env.ALLOW_DEV_TEST_WRITES || '').trim().toLowerCase() === 'true';
+
+require('dotenv').config({ path: path.join(BACKEND, '.env'), quiet: true });
+
+function abortarProtecao(mensagem) {
+  console.error(`valida-pendencias: recusado. ${mensagem}`);
   process.exit(1);
 }
 
-// Conexão vem do ambiente (o .env do backend-dev serve). Os defaults
-// abaixo só cobrem uma base local descartável de validação — em staging,
-// exporte DB_* antes de rodar. NUNCA aponte para produção.
-process.env.DB_HOST = process.env.DB_HOST || '127.0.0.1';
-process.env.DB_PORT = process.env.DB_PORT || '3306';
-process.env.DB_USER = process.env.DB_USER || 'fluxy';
-process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'fluxy123';
-process.env.DB_NAME = process.env.DB_NAME || 'fluxy_valida_pend';
-process.env.NODE_ENV = process.env.NODE_ENV || 'development';
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'valida-pendencias-secret';
+if (!escritaAutorizadaNoComando) {
+  abortarProtecao(
+    'este script grava dados de cenário. Informe ALLOW_DEV_TEST_WRITES=true no comando atual.'
+  );
+}
 
-const path = require('path');
-const BACKEND = path.resolve(__dirname, '..');
+const variaveisObrigatorias = [
+  'DB_HOST',
+  'DB_PORT',
+  'DB_USER',
+  'DB_PASSWORD',
+  'DB_NAME',
+  'JWT_SECRET'
+];
+const ausentes = variaveisObrigatorias.filter((nome) => !String(process.env[nome] || '').trim());
+if (ausentes.length > 0) {
+  abortarProtecao(`variáveis obrigatórias ausentes: ${ausentes.join(', ')}.`);
+}
+
+// NODE_ENV identifica o modo do Node, não o ambiente de dados: o backend-dev
+// pode executar otimizado. A barreira contra produção é o fingerprint exato
+// do host + banco, configurado somente no .env da EC2 dev.
+const hostPermitido = String(process.env.DEV_TEST_ALLOWED_DB_HOST || '').trim();
+const bancoPermitido = String(process.env.DEV_TEST_ALLOWED_DB_NAME || '').trim();
+if (!hostPermitido || !bancoPermitido) {
+  abortarProtecao(
+    'configure DEV_TEST_ALLOWED_DB_HOST e DEV_TEST_ALLOWED_DB_NAME exclusivamente no ambiente dev.'
+  );
+}
+if (String(process.env.DB_HOST).trim() !== hostPermitido ||
+    String(process.env.DB_NAME).trim() !== bancoPermitido) {
+  abortarProtecao('DB_HOST/DB_NAME não correspondem ao fingerprint autorizado do banco dev.');
+}
+
+// Cada execução recebe um namespace próprio. Isso permite repetir o QA no
+// banco compartilhado de desenvolvimento sem colidir com códigos, e-mails ou
+// documentos criados por execuções anteriores.
+const runIdInformado = String(process.env.DEV_TEST_RUN_ID || 'QA').replace(/[^a-z0-9]/gi, '');
+const runIdGerado = `${Date.now().toString(36)}${process.pid.toString(36)}`;
+const QA_RUN_ID = `${runIdInformado}${runIdGerado}`.slice(-12).toUpperCase();
+const qaCodigo = (prefixo, sufixo = '') =>
+  [prefixo, QA_RUN_ID, sufixo].filter(Boolean).join('-');
+
+console.log(
+  `valida-pendencias: execução ${QA_RUN_ID} autorizada em ` +
+  `${process.env.DB_HOST}/${process.env.DB_NAME}.`
+);
 
 async function main() {
   // O script NÃO roda migrations (decisão do responsável, 02/09): o schema
@@ -47,28 +85,48 @@ async function main() {
   } = db;
 
   // ----- SEED ----------------------------------------------------------
-  const setorFin = await Setor.create({ nome: 'Financeiro', codigo: 'FINANCEIRO', eh_setor_financeiro: true });
-  const setorEng = await Setor.create({ nome: 'Engenharia', codigo: 'ENGENHARIA', eh_setor_obra: true });
+  const setorFin = await Setor.create({
+    nome: `Financeiro QA ${QA_RUN_ID}`,
+    codigo: qaCodigo('QAFIN'),
+    eh_setor_financeiro: true
+  });
+  const setorEng = await Setor.create({
+    nome: `Engenharia QA ${QA_RUN_ID}`,
+    codigo: qaCodigo('QAENG'),
+    eh_setor_obra: true
+  });
 
   const usuarioFin = await User.create({
-    nome: 'Valida Financeiro', email: 'valida.fin@test.dev',
+    nome: `Valida Financeiro ${QA_RUN_ID}`,
+    email: `valida.fin.${QA_RUN_ID.toLowerCase()}@test.dev`,
     senha: 'x'.repeat(60), perfil: 'FINANCEIRO', ativo: true, setor_id: setorFin.id
   });
   const outroUsuario = await User.create({
-    nome: 'Valida Eng', email: 'valida.eng@test.dev',
+    nome: `Valida Eng ${QA_RUN_ID}`,
+    email: `valida.eng.${QA_RUN_ID.toLowerCase()}@test.dev`,
     senha: 'x'.repeat(60), perfil: 'SETOR', ativo: true, setor_id: setorEng.id
   });
 
-  const obra = await Obra.create({ nome: 'OBRA VALIDA', codigo: 'OB-001' });
-  const tipo = await TipoSolicitacao.create({ nome: 'Pagamento', codigo_interno: 'PAG' });
-  const parceiro = await Parceiro.create({ nome: 'FORNECEDOR VALIDA LTDA', tipo_pessoa: 'J', cpf_cnpj: '00.000.000/0001-00' });
+  const obra = await Obra.create({
+    nome: `OBRA VALIDA QA ${QA_RUN_ID}`,
+    codigo: qaCodigo('QAOBRA')
+  });
+  const tipo = await TipoSolicitacao.create({
+    nome: `Pagamento QA ${QA_RUN_ID}`,
+    codigo_interno: qaCodigo('QAPAG')
+  });
+  const parceiro = await Parceiro.create({
+    nome: `FORNECEDOR VALIDA QA ${QA_RUN_ID}`,
+    tipo_pessoa: 'J',
+    cpf_cnpj: `99${String(Date.now()).slice(-12)}`
+  });
 
   const criarSol = (props) => Solicitacao.create({
     obra_id: obra.id,
     tipo_solicitacao_id: tipo.id,
-    descricao: props.descricao || 'validação',
+    descricao: props.descricao || `validação QA ${QA_RUN_ID}`,
     status_global: 'PENDENTE',
-    area_responsavel: 'FINANCEIRO',
+    area_responsavel: setorFin.codigo,
     criado_por: props.criado_por || outroUsuario.id,
     valor: 100,
     cancelada: false,
@@ -78,66 +136,78 @@ async function main() {
   // 70 aprovações de diretoria pendentes no setor (mais que o teto antigo de 61)
   for (let i = 0; i < 70; i += 1) {
     await criarSol({
-      codigo: `SOL-A${String(i).padStart(3, '0')}`,
+      codigo: qaCodigo('SOL', `A${String(i).padStart(3, '0')}`),
       fluxo_aprovacao_diretoria: true,
       aprovada_diretoria_em: null,
-      descricao: `aprovação ${i}`
+      descricao: `aprovação QA ${QA_RUN_ID} ${i}`
     });
   }
   // 25 paradas comuns no setor (sem fluxo de diretoria)
   for (let i = 0; i < 25; i += 1) {
-    await criarSol({ codigo: `SOL-P${String(i).padStart(3, '0')}`, descricao: `parada ${i}` });
+    await criarSol({
+      codigo: qaCodigo('SOL', `P${String(i).padStart(3, '0')}`),
+      descricao: `parada QA ${QA_RUN_ID} ${i}`
+    });
   }
   // 3 devoluções: criadas pelo usuárioFin, no setor dele, com ENVIADA_SETOR
   for (let i = 0; i < 3; i += 1) {
     const dev = await criarSol({
-      codigo: `SOL-D${String(i).padStart(2, '0')}`,
+      codigo: qaCodigo('SOL', `D${String(i).padStart(2, '0')}`),
       criado_por: usuarioFin.id,
-      descricao: `devolução ${i}`
+      descricao: `devolução QA ${QA_RUN_ID} ${i}`
     });
     await Historico.create({
-      solicitacao_id: dev.id, acao: 'ENVIADA_SETOR', setor: 'ENGENHARIA',
+      solicitacao_id: dev.id, acao: 'ENVIADA_SETOR', setor: setorEng.codigo,
       usuario_responsavel_id: usuarioFin.id
     });
   }
   // 2 contratos aguardando aprovação, com solicitação-mãe no setor
   for (let i = 0; i < 2; i += 1) {
-    const mae = await criarSol({ codigo: `SOL-C${String(i).padStart(2, '0')}`, descricao: `contrato ${i}` });
+    const mae = await criarSol({
+      codigo: qaCodigo('SOL', `C${String(i).padStart(2, '0')}`),
+      descricao: `contrato QA ${QA_RUN_ID} ${i}`
+    });
     await Contrato.create({
-      obra_id: obra.id, codigo: `CT-${i}`, descricao: `contrato ${i}`,
+      obra_id: obra.id,
+      codigo: qaCodigo('CT', String(i)),
+      descricao: `contrato QA ${QA_RUN_ID} ${i}`,
       valor_total: 1000, ativo: true, fluxo_novo: true,
       status_contrato: 'AGUARDANDO_APROVACAO', solicitacao_id: mae.id
     });
   }
   // 1 parada arquivada pelo usuário (deve sair do cartão E da lista)
-  const arquivada = await criarSol({ codigo: 'SOL-ARQ', descricao: 'arquivada' });
+  const arquivada = await criarSol({
+    codigo: qaCodigo('SOL', 'ARQ'),
+    descricao: `arquivada QA ${QA_RUN_ID}`
+  });
   await SolicitacaoVisibilidadeUsuario.create({
     usuario_id: usuarioFin.id, solicitacao_id: arquivada.id, oculto: true
   });
   // 1 cancelada (fora de tudo)
-  await criarSol({ codigo: 'SOL-CANC', cancelada: true });
+  await criarSol({ codigo: qaCodigo('SOL', 'CANC'), cancelada: true });
 
   // Títulos: 4 vencidos PAGAR (PREVISAO/ABERTO/PARCIAL contam; QUITADO não),
   // 2 vencendo em 7d, 1 RECEBER vencido
   const criarTitulo = (props) => TituloFinanceiro.create({
     obra_id: obra.id, parceiro_id: parceiro.id, tipo: 'PAGAR',
-    descricao: 'título validação', valor: 500, valor_original: 500, valor_saldo: 500,
+    descricao: `título validação QA ${QA_RUN_ID}`,
+    valor: 500, valor_original: 500, valor_saldo: 500,
     status: 'ABERTO', data_vencimento: '2026-08-01', codigo: props.codigo,
     ...props
   });
-  await criarTitulo({ codigo: 'TIT-V1', status: 'ABERTO', data_vencimento: '2026-08-01' });
-  await criarTitulo({ codigo: 'TIT-V2', status: 'PREVISAO', data_vencimento: '2026-08-10' });
-  await criarTitulo({ codigo: 'TIT-V3', status: 'PARCIAL', data_vencimento: '2026-08-20' });
-  await criarTitulo({ codigo: 'TIT-V4', status: 'ABERTO', data_vencimento: '2026-08-30' });
-  await criarTitulo({ codigo: 'TIT-Q', status: 'QUITADO', data_vencimento: '2026-08-15', valor_saldo: 0 });
-  await criarTitulo({ codigo: 'TIT-F1', status: 'ABERTO', data_vencimento: '2026-09-02' });
-  await criarTitulo({ codigo: 'TIT-F2', status: 'PREVISAO', data_vencimento: '2026-09-05' });
-  await criarTitulo({ codigo: 'TIT-R1', tipo: 'RECEBER', status: 'ABERTO', data_vencimento: '2026-08-05' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'V1'), status: 'ABERTO', data_vencimento: '2026-08-01' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'V2'), status: 'PREVISAO', data_vencimento: '2026-08-10' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'V3'), status: 'PARCIAL', data_vencimento: '2026-08-20' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'V4'), status: 'ABERTO', data_vencimento: '2026-08-30' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'Q'), status: 'QUITADO', data_vencimento: '2026-08-15', valor_saldo: 0 });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'F1'), status: 'ABERTO', data_vencimento: '2026-09-02' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'F2'), status: 'PREVISAO', data_vencimento: '2026-09-05' });
+  await criarTitulo({ codigo: qaCodigo('TIT', 'R1'), tipo: 'RECEBER', status: 'ABERTO', data_vencimento: '2026-08-05' });
 
   // Compras: 2 liberadas + 1 encerrada
-  await SolicitacaoCompra.create({ titulo: 'Compra 1', obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'LIBERADO_PARA_COMPRA', origem: 'AVULSA' });
-  await SolicitacaoCompra.create({ titulo: 'Compra 2', obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'LIBERADO_PARA_COMPRA', origem: 'AVULSA' });
-  await SolicitacaoCompra.create({ titulo: 'Compra 3', obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'ENCERRADO', origem: 'AVULSA' });
+  await SolicitacaoCompra.create({ titulo: `Compra QA ${QA_RUN_ID} 1`, obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'LIBERADO_PARA_COMPRA', origem: 'AVULSA' });
+  await SolicitacaoCompra.create({ titulo: `Compra QA ${QA_RUN_ID} 2`, obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'LIBERADO_PARA_COMPRA', origem: 'AVULSA' });
+  await SolicitacaoCompra.create({ titulo: `Compra QA ${QA_RUN_ID} 3`, obra_id: obra.id, solicitante_id: usuarioFin.id, status: 'ENCERRADO', origem: 'AVULSA' });
 
   // ----- usuário do req (mesmo shape do buildSessionUser p/ estes casos)
   const u = await User.findByPk(usuarioFin.id, { include: [{ model: Setor, as: 'setor' }] });

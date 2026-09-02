@@ -308,6 +308,9 @@ CORS de IP privado, `outputs/**`, docs do ambiente local deste repositório.
    migrations do passo 2**: o script não roda migrations, ele confere e aborta
    se houver pendente. `ALLOW_DEV_TEST_WRITES=true` é **obrigatório** (ele
    grava dados de cenário no banco apontado; sem a variável, recusa rodar).
+   O host e o nome do banco também precisam coincidir com o fingerprint
+   `DEV_TEST_ALLOWED_DB_HOST` + `DEV_TEST_ALLOWED_DB_NAME` configurado somente
+   no `.env` da EC2 dev.
    *Conferir:* 100% dos cartões batem com as listas — qualquer divergência é
    bug a corrigir no recorte da visão, nunca no escopo da lista.
 5. **Testar o preview** (`refactor-dev.jrfluxy.com.br`) seguindo o
@@ -347,17 +350,25 @@ por nome):
 >
 > ```bash
 > cd backend
-> # usa o .env do backend-dev (exportar DB_* se preciso); NUNCA produção.
-> # ALLOW_DEV_TEST_WRITES=true é OBRIGATÓRIO: o script grava dados de
-> # cenário no banco apontado e recusa rodar sem essa confirmação.
+> # Configurar uma única vez no .env da EC2 dev, usando os MESMOS valores
+> # já existentes em DB_HOST e DB_NAME. Nunca cadastrar estas chaves em produção:
+> # DEV_TEST_ALLOWED_DB_HOST=<host exato do banco dev>
+> # DEV_TEST_ALLOWED_DB_NAME=<nome exato do banco dev>
+>
+> # A autorização de escrita é transitória e deve existir somente no comando.
 > ALLOW_DEV_TEST_WRITES=true node scripts/valida-pendencias.js
 > ```
 >
 > O script sobe os controllers REAIS contra o banco, monta o cenário (inclui 70
 > aprovações — acima do antigo teto de 61) e compara o total de CADA cartão de
 > /dashboard/pendencias com o meta.total da lista aberta pelo link do próprio
-> cartão. Critério de aceite: **100% dos cartões batem**. Se algum divergir,
+> cartão. Cada execução usa um namespace QA próprio para não colidir com os
+> registros anteriores. Critério de aceite: **100% dos cartões batem**. Se algum divergir,
 > ajusta-se o recorte da visão (pendenciasVisoes), nunca o escopo da lista.
+>
+> O script e as fixtures são exclusivos de desenvolvimento/homologação. As
+> migrations estruturais podem seguir no processo de promoção depois da
+> validação; o script não deve ser executado nem incluído no runtime de produção.
 >
 > **Artefato do B5 — atenção no deploy do frontend:** o build do frontend
 > ganhou um `prebuild` (`npm run gerar:navegacao`) que compila a fonte única de

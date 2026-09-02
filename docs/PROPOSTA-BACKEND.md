@@ -54,20 +54,13 @@ Interessa ao projeto mesmo que nada da reforma visual seja aprovado.
 
 ### 1b. Handlers globais de processo (`server.js`) — ajustado pelo responsável (02/09)
 
-**Bug:** um `unhandledRejection` — por exemplo, uma falha de banco disparada por uma
-única tela — **derruba o processo Node inteiro**, tirando o sistema do ar para todos até
-o PM2 reerguer.
+**Bug:** erros que escapam do tratamento normal podem encerrar o processo sem um log
+claro ou deixá-lo em estado indefinido.
 
-**Correção (comportamento final, decidido pelo responsável):** os dois handlers logam
-com stack, mas o destino difere de propósito:
-
-- `unhandledRejection` (erro **assíncrono**): loga e **segue** — o processo continua
-  íntegro e uma falha de uma tela não pode tirar o sistema do ar para todos;
-- `uncaughtException` (erro **síncrono** não capturado): loga e **encerra**
-  (`process.exit(1)`) — depois de um uncaughtException o processo fica em estado
-  indefinido, então deixar o PM2 subir um processo limpo é mais seguro que mantê-lo
-  de pé. (A proposta original mantinha o processo vivo nos dois casos; este item foi
-  ajustado a pedido do responsável.)
+**Correção final:** `unhandledRejection` e `uncaughtException` registram a stack e
+encerram com `process.exit(1)`, permitindo que o PM2 suba uma instância limpa. Uma
+rejeição esperada de tela deve ser capturada pelo controller/middleware; ao alcançar o
+handler global, ela já não pode ser classificada com segurança como falha isolada.
 
 Falha durante o **boot** continua encerrando o processo (comportamento correto).
 **Impacto de não ter:** quedas intermitentes do backend em produção com causa difícil de

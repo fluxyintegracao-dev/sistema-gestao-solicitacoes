@@ -138,5 +138,6 @@ Com qualquer perfil (repetir com um segundo usuário para provar o isolamento):
 - [ ] Nenhuma chamada para `api.jrfluxy.com.br` (produção) no DevTools
 - [ ] Nenhum erro de CORS/403 por origem
 - [ ] Anexos abrem pelo ambiente dev
-- [ ] `valida-pendencias.js` rodado em staging com 100% dos cartões batendo
+- [ ] `valida-pendencias.js` rodado exclusivamente no banco dev autorizado,
+      com `ALLOW_DEV_TEST_WRITES=true` e 100% dos cartões batendo
 - [ ] Segunda execução de `npm run migrate` não aplica nada
