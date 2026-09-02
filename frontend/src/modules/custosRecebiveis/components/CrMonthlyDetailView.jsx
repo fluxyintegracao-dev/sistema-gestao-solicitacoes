@@ -7,6 +7,7 @@ import {
   HiOutlinePencilSquare,
   HiOutlineScale
 } from 'react-icons/hi2';
+import { TabelaPadrao } from '../../../components/padrao';
 import { obterPlanejamentoCompetencia } from '../services/custosRecebiveis';
 import CrComparativoView from './CrComparativoView';
 import CrRealizadoView from './CrRealizadoView';
@@ -52,6 +53,18 @@ function groupRows(rows = [], macros = []) {
   ));
 }
 
+function quantidadeOrcada(row) {
+  return Number(row.quantidade_base ?? row.item?.quantidade_orcada ?? 0);
+}
+
+function quantidadeAprovadaAnterior(row) {
+  return Number(row.item?.quantidade_aprovada_anterior || 0);
+}
+
+function quantidadeAtual(row, approved) {
+  return Number(approved ? row.quantidade_medida : row.quantidade_prevista || 0);
+}
+
 function EmptyDetail({ children }) {
   return <div className="cr-empty-state cr-month-read-empty">{children}</div>;
 }
@@ -66,22 +79,42 @@ function CostDetail({ data }) {
         return (
           <section className="cr-month-read-group" key={group.codigo}>
             <header><strong>{group.codigo} · {group.descricao}</strong><span>{currency.format(total)}</span></header>
-            <div className="cr-table-shell">
-              <table>
-                <thead><tr><th>Descrição do serviço</th><th>Unid.</th><th className="text-right">Quantidade</th><th className="text-right">Valor unitário</th><th className="text-right">Total</th></tr></thead>
-                <tbody>
-                  {group.rows.map((row) => (
-                    <tr key={row.id || row.chave_local}>
-                      <td><strong>{row.descricao}</strong></td>
-                      <td>{row.unidade || '-'}</td>
-                      <td className="text-right">{decimal.format(Number(row.quantidade || 0))}</td>
-                      <td className="text-right">{currency.format(Number(row.custo_unitario || 0))}</td>
-                      <td className="text-right"><strong>{currency.format(Number(row.valor_previsto || 0))}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'descricao',
+                  titulo: 'Descrição do serviço',
+                  // R17: o serviço NOMEIA a linha do custo planejado.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (row) => <strong>{row.descricao}</strong>
+                },
+                { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.unidade || '-' },
+                {
+                  id: 'quantidade',
+                  titulo: 'Quantidade',
+                  tipo: 'numero',
+                  render: (row) => decimal.format(Number(row.quantidade || 0))
+                },
+                {
+                  id: 'custo_unitario',
+                  titulo: 'Valor unitário',
+                  tipo: 'valor',
+                  render: (row) => currency.format(Number(row.custo_unitario || 0))
+                },
+                {
+                  id: 'valor_previsto',
+                  titulo: 'Total',
+                  tipo: 'valor',
+                  render: (row) => <strong>{currency.format(Number(row.valor_previsto || 0))}</strong>
+                }
+              ]}
+              itens={group.rows}
+              getId={(row) => row.id || row.chave_local}
+              storageKey={`tabela:custos-recebiveis-mes-custos:${group.codigo}`}
+              rotuloRolagem={`Custos planejados de ${group.codigo}`}
+              vazio="Nenhum custo planejado neste grupo."
+            />
           </section>
         );
       })}
@@ -110,39 +143,59 @@ function MeasurementDetail({ data, approved = false }) {
         return (
           <section className="cr-month-read-group" key={group.codigo}>
             <header><strong>{group.codigo} · {group.descricao}</strong><span>{currency.format(total)}</span></header>
-            <div className="cr-table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Etapa / serviço</th>
-                    <th>Unid.</th>
-                    <th className="text-right">Qtd. orçada</th>
-                    <th className="text-right">Qtd. aprovada anteriormente</th>
-                    <th className="text-right">{approved ? 'Qtd. aprovada' : 'Qtd. prevista'}</th>
-                    <th className="text-right">{approved ? 'Valor aprovado' : 'Valor previsto'}</th>
-                    <th className="text-right">Saldo a medir</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.rows.map((row, index) => {
-                    const budgeted = Number(row.quantidade_base ?? row.item?.quantidade_orcada ?? 0);
-                    const previousApproved = Number(row.item?.quantidade_aprovada_anterior || 0);
-                    const current = Number(approved ? row.quantidade_medida : row.quantidade_prevista || 0);
-                    return (
-                      <tr key={`${group.codigo}-${row.plano_item_id || row.previsao_custo_id || index}`}>
-                        <td><strong>{row.descricao}</strong></td>
-                        <td>{row.unidade || '-'}</td>
-                        <td className="text-right">{decimal.format(budgeted)}</td>
-                        <td className="text-right">{decimal.format(previousApproved)}</td>
-                        <td className="text-right">{decimal.format(current)}</td>
-                        <td className="text-right"><strong>{currency.format(Number(approved ? row.valor_medido : row.valor_previsto || 0))}</strong></td>
-                        <td className="text-right">{decimal.format(Math.max(0, budgeted - previousApproved - current))}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'descricao',
+                  titulo: 'Etapa / serviço',
+                  // R17: o serviço medido NOMEIA a linha.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (row) => <strong>{row.descricao}</strong>
+                },
+                { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.unidade || '-' },
+                {
+                  id: 'quantidade_orcada',
+                  titulo: 'Qtd. orçada',
+                  tipo: 'numero',
+                  render: (row) => decimal.format(quantidadeOrcada(row))
+                },
+                {
+                  id: 'quantidade_aprovada_anterior',
+                  titulo: 'Qtd. aprovada anteriormente',
+                  tipo: 'numero',
+                  render: (row) => decimal.format(quantidadeAprovadaAnterior(row))
+                },
+                {
+                  id: 'quantidade_atual',
+                  titulo: approved ? 'Qtd. aprovada' : 'Qtd. prevista',
+                  tipo: 'numero',
+                  render: (row) => decimal.format(quantidadeAtual(row, approved))
+                },
+                {
+                  id: 'valor',
+                  titulo: approved ? 'Valor aprovado' : 'Valor previsto',
+                  tipo: 'valor',
+                  render: (row) => (
+                    <strong>{currency.format(Number(approved ? row.valor_medido : row.valor_previsto || 0))}</strong>
+                  )
+                },
+                {
+                  id: 'saldo',
+                  titulo: 'Saldo a medir',
+                  tipo: 'numero',
+                  render: (row) => decimal.format(Math.max(
+                    0,
+                    quantidadeOrcada(row) - quantidadeAprovadaAnterior(row) - quantidadeAtual(row, approved)
+                  ))
+                }
+              ]}
+              itens={group.rows}
+              getId={(row) => `${group.codigo}-${row.plano_item_id || row.previsao_custo_id || row.id || row.descricao}`}
+              storageKey={`tabela:custos-recebiveis-mes-medicao-${approved ? 'aprovada' : 'prevista'}:${group.codigo}`}
+              rotuloRolagem={`Medição de ${group.codigo}`}
+              vazio="Nenhuma medição neste grupo."
+            />
           </section>
         );
       })}
@@ -154,21 +207,43 @@ function PrivateReceiptsDetail({ data }) {
   const rows = Array.isArray(data.recebiveis) ? data.recebiveis : [];
   if (!rows.length) return <EmptyDetail>Nenhum recebível financeiro vence neste período.</EmptyDetail>;
   return (
-    <div className="cr-table-shell">
-      <table>
-        <thead><tr><th>Origem contratual</th><th>Vencimento</th><th>Status</th><th className="text-right">Valor previsto</th></tr></thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key || row.id}>
-              <td><strong>{row.descricao || row.origem || '-'}</strong></td>
-              <td>{row.data_prevista ? new Date(`${String(row.data_prevista).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR') : '-'}</td>
-              <td>{String(row.status_financeiro || 'PREVISTO').replaceAll('_', ' ')}</td>
-              <td className="text-right"><strong>{currency.format(Number(row.valor_previsto || 0))}</strong></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <TabelaPadrao
+      colunas={[
+        {
+          id: 'origem',
+          titulo: 'Origem contratual',
+          // R17: a origem contratual NOMEIA o recebível da linha.
+          tipo: 'identidade',
+          noCard: 'titulo',
+          render: (row) => <strong>{row.descricao || row.origem || '-'}</strong>
+        },
+        {
+          id: 'vencimento',
+          titulo: 'Vencimento',
+          tipo: 'data',
+          render: (row) => (row.data_prevista
+            ? new Date(`${String(row.data_prevista).slice(0, 10)}T12:00:00`).toLocaleDateString('pt-BR')
+            : '-')
+        },
+        {
+          id: 'status',
+          titulo: 'Status',
+          tipo: 'status',
+          render: (row) => String(row.status_financeiro || 'PREVISTO').replaceAll('_', ' ')
+        },
+        {
+          id: 'valor_previsto',
+          titulo: 'Valor previsto',
+          tipo: 'valor',
+          render: (row) => <strong>{currency.format(Number(row.valor_previsto || 0))}</strong>
+        }
+      ]}
+      itens={rows}
+      getId={(row) => row.key || row.id}
+      storageKey="tabela:custos-recebiveis-mes:recebiveis"
+      rotuloRolagem="Recebíveis do período"
+      vazio="Nenhum recebível financeiro vence neste período."
+    />
   );
 }
 

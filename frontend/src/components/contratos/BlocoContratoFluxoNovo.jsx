@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { formatCurrencyBRL as formatarMoedaBR } from '../../utils/formatters';
 import { HiPaperClip, HiTrash } from 'react-icons/hi2';
+import { TabelaPadrao } from '../padrao';
 import { getOpcoesFormularioContrato } from '../../services/contratos';
 
 /**
@@ -688,54 +689,74 @@ export default function BlocoContratoFluxoNovo({
       )}
 
       {parcelas.length > 0 && (
-        <table className="table">
-          <thead><tr><th>#</th><th>Valor</th><th>Vencimento</th><th /></tr></thead>
-          <tbody>
-            {parcelas.map((p) => (
-              <tr key={p.numero}>
-                <td>{p.numero}</td>
-                <td>
-                  {/* sem `min` nativo de proposito: com ele o navegador barra o submit com a
-                      mensagem dele, em vez da mensagem do sistema (a queixa do B2). O minimo
-                      e cobrado no onBlur e no submit. */}
-                  {/* Moeda brasileira, por DIGITOS (pedido do cliente, 19/08): cada tecla empurra
-                      os centavos, como no campo Valor da solicitacao. E a mesma conversao que o
-                      backend usa — converter por `toFixed` arredondaria o binario e ja divergiu do
-                      DECIMAL do MySQL antes (F2 da auditoria). O valor guardado segue sendo numero
-                      cru; a mascara e so o que se ve. */}
-                  <input className="input" type="text" inputMode="numeric" style={{ width: 150 }}
-                    value={p.valor === '' || p.valor === null || p.valor === undefined
-                      ? ''
-                      : formatarMoedaBR(Number(p.valor))}
-                    onChange={(e) => {
-                      const digitos = String(e.target.value).replace(/\D/g, '');
-                      editarParcela(p.numero, digitos ? String(Number(digitos) / 100) : '0');
-                    }}
-                    onBlur={(e) => {
-                      // Cobra o minimo so quando o campo e concluido, nunca no meio da digitacao.
-                      const cent = paraCentavosContrato(String(e.target.value).replace(/\D/g, '') / 100);
-                      setErroLocal(Number.isFinite(cent) && cent > 0 ? '' : 'A parcela deve ser de no minimo R$ 0,01.');
-                    }} />
-                </td>
-                <td>
-                  {/* Editavel linha a linha: sem o campo de "1o vencimento" gerando tudo, a data de
-                      cada parcela e escolha de quem monta o contrato. */}
-                  <input className="input" type="date" style={{ width: 160 }}
-                    value={p.vencimento || ''}
-                    onChange={(e) => editarVencimento(p.numero, e.target.value)} />
-                </td>
-                <td>
-                  <button type="button" className="btn btn-outline btn-sm"
-                    data-testid={`remover-parcela-${p.numero}`}
-                    aria-label={`Remover parcela ${p.numero}`}
-                    onClick={() => removerParcela(p.numero)}>
-                    <HiTrash className="w-4 h-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'numero',
+              titulo: '#',
+              tipo: 'codigo',
+              noCard: 'titulo',
+              render: (p) => p.numero
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              /* sem `min` nativo de proposito: com ele o navegador barra o submit com a
+                 mensagem dele, em vez da mensagem do sistema (a queixa do B2). O minimo
+                 e cobrado no onBlur e no submit. */
+              /* Moeda brasileira, por DIGITOS (pedido do cliente, 19/08): cada tecla empurra
+                 os centavos, como no campo Valor da solicitacao. E a mesma conversao que o
+                 backend usa — converter por `toFixed` arredondaria o binario e ja divergiu do
+                 DECIMAL do MySQL antes (F2 da auditoria). O valor guardado segue sendo numero
+                 cru; a mascara e so o que se ve. */
+              render: (p) => (
+                <input className="input" type="text" inputMode="numeric"
+                  value={p.valor === '' || p.valor === null || p.valor === undefined
+                    ? ''
+                    : formatarMoedaBR(Number(p.valor))}
+                  onChange={(e) => {
+                    const digitos = String(e.target.value).replace(/\D/g, '');
+                    editarParcela(p.numero, digitos ? String(Number(digitos) / 100) : '0');
+                  }}
+                  onBlur={(e) => {
+                    // Cobra o minimo so quando o campo e concluido, nunca no meio da digitacao.
+                    const cent = paraCentavosContrato(String(e.target.value).replace(/\D/g, '') / 100);
+                    setErroLocal(Number.isFinite(cent) && cent > 0 ? '' : 'A parcela deve ser de no minimo R$ 0,01.');
+                  }} />
+              )
+            },
+            {
+              id: 'vencimento',
+              titulo: 'Vencimento',
+              tipo: 'data',
+              /* Editavel linha a linha: sem o campo de "1o vencimento" gerando tudo, a data de
+                 cada parcela e escolha de quem monta o contrato. */
+              render: (p) => (
+                <input className="input" type="date"
+                  value={p.vencimento || ''}
+                  onChange={(e) => editarVencimento(p.numero, e.target.value)} />
+              )
+            }
+          ]}
+          itens={parcelas}
+          getId={(p) => p.numero}
+          storageKey="tabela:contrato-fluxo-novo-bloco:parcelas"
+          rotuloRolagem="Parcelas do contrato"
+          vazio="Nenhuma parcela ainda."
+          acoesLinha={(p) => (
+            <button type="button" className="btn btn-outline btn-sm"
+              data-testid={`remover-parcela-${p.numero}`}
+              aria-label={`Remover parcela ${p.numero}`}
+              onClick={() => removerParcela(p.numero)}>
+              <HiTrash className="w-4 h-4" />
+            </button>
+          )}
+          larguraAcoes={120}
+          /* R17: linha de parcela — numero, valor e vencimento; nao ha nome de
+             registro, a parcela e identificada pelo numero. */
+          semIdentidade
+        />
       )}
     </div>
   );

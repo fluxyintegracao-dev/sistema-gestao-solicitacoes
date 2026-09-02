@@ -17,9 +17,33 @@ import {
   uploadDocumentoSst
 } from '../services/sst';
 import { isSstResourceVisible, SST_RESOURCES } from '../constants/sstResources';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function getValue(row, path) {
   return String(path).split('.').reduce((acc, key) => acc?.[key], row) ?? '';
+}
+
+// R17 — esta tela é genérica: uma rota por recurso SST, com as colunas vindo
+// do catálogo (constants/sstResources) como caminhos de campo. O papel de
+// cada coluna é derivado AQUI, no ponto de uso, para que nenhuma coluna
+// chegue à tabela sem `tipo` (a medida e o alinhamento saem dele).
+const REGRAS_TIPO_COLUNA = [
+  [/(^|\.)(createdAt|updatedAt|calculado_em|sampled_at|expires_at|last_hit_at|entrega_em)$/i, 'data'],
+  [/(data|validade|vigencia)/i, 'data'],
+  [/(^|\.)(status|ativo|apto|resultado|cat_emitida)$/i, 'status'],
+  [/(severidade|criticidade|gravidade|prioridade|nivel|confianca)/i, 'badge'],
+  [/(^|\.)(codigo|protocolo|recibo|ca|crm|cache_key|entidade_id|workflow_id)$/i, 'codigo'],
+  [/(_ms$|_count$|_jobs$|attempts|score|peso|percentual|ordem|valor|intensidade)/i, 'numero']
+];
+
+// A coluna que NOMEIA o registro do recurso (R17). Recursos de log e
+// telemetria (createdAt/acao/status/mensagem) não têm nenhuma — nesse caso a
+// tabela declara `semIdentidade`.
+const PADRAO_IDENTIDADE = /(^|\.)(nome|titulo|razao_social|nome_exame|epi_nome|responsavel|medico_responsavel|job_type|queue_name|metric_name|cache_key|automacao|integracao)$/i;
+
+function tipoDaColuna(caminho) {
+  const regra = REGRAS_TIPO_COLUNA.find(([padrao]) => padrao.test(caminho));
+  return regra ? regra[1] : 'texto';
 }
 
 function emptyForm(fields) {
@@ -130,6 +154,17 @@ export default function SstCrudPage() {
   }, []);
 
   const columns = useMemo(() => config.columns || [], [config.columns]);
+  const indiceIdentidade = useMemo(
+    () => columns.findIndex((coluna) => PADRAO_IDENTIDADE.test(coluna)),
+    [columns]
+  );
+  const colunasTabela = useMemo(() => columns.map((coluna, indice) => ({
+    id: coluna,
+    titulo: coluna,
+    tipo: indice === indiceIdentidade ? 'identidade' : tipoDaColuna(coluna),
+    noCard: indice === indiceIdentidade ? 'titulo' : undefined,
+    render: (row) => String(getValue(row, coluna) || '-')
+  })), [columns, indiceIdentidade]);
 
   if (!isSstResourceVisible(resource)) {
     return <Navigate to="/sst" replace />;
@@ -434,69 +469,59 @@ export default function SstCrudPage() {
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Registros</h2>
             <span className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--c-muted)]">{loading ? 'Carregando' : `${rows.length} item(ns)`}</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
-              <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-                <tr>
-                  {columns.map((column) => <th key={column} className="px-4 py-3">{column}</th>)}
-                  <th className="px-4 py-3">Acoes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--c-border)]">
-                {rows.map((row) => (
-                  <tr key={row.id} className="align-top">
-                    {columns.map((column) => (
-                      <td key={column} className="px-4 py-3 font-medium text-[var(--c-text)]">{String(getValue(row, column) || '-')}</td>
-                    ))}
-                    <td className="whitespace-nowrap px-4 py-3">
-                      {resource === 'documentos' && row.arquivo_url ? (
-                        <button type="button" onClick={() => openDocument(row)} className="mr-3 text-sm font-semibold text-sky-700">Abrir</button>
-                      ) : null}
-                      {resource === 'documentos' && canManage ? (
-                        <button
-                          type="button"
-                          onClick={() => analyzeDocument(row)}
-                          disabled={rowActionId === `ia-${row.id}`}
-                          className="mr-3 text-sm font-semibold text-indigo-700 disabled:opacity-60"
-                        >
-                          {rowActionId === `ia-${row.id}` ? 'Analisando...' : 'Analisar IA'}
-                        </button>
-                      ) : null}
-                      {resource === 'documentos_ia' && canManage ? (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => approveIa(row)}
-                            disabled={rowActionId === `aprovar-${row.id}`}
-                            className="mr-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
-                          >
-                            Aprovar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => rejectIa(row)}
-                            disabled={rowActionId === `rejeitar-${row.id}`}
-                            className="mr-3 text-sm font-semibold text-rose-700 disabled:opacity-60"
-                          >
-                            Rejeitar
-                          </button>
-                        </>
-                      ) : null}
-                      {canManage ? (
-                        <button type="button" onClick={() => startEdit(row)} className="text-sm font-semibold text-[var(--c-text)]">Editar</button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-                {!rows.length && !loading ? (
-                  <tr>
-                    <td className="px-4 py-8 text-center text-sm text-[var(--c-muted)]" colSpan={columns.length + 1}>
-                      Nenhum registro encontrado.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <div className="p-2">
+            <TabelaPadrao
+              colunas={colunasTabela}
+              itens={rows}
+              carregando={loading}
+              vazio="Nenhum registro encontrado."
+              storageKey={`tabela:sst-crud:${resource}`}
+              rotuloRolagem={config.title}
+              larguraAcoes={280}
+              // Recursos de log/telemetria (createdAt, acao, status, mensagem)
+              // não têm coluna que nomeie o registro — a ausência é declarada.
+              {...(indiceIdentidade < 0 ? { semIdentidade: true } : null)}
+              acoesLinha={(row) => (
+                <>
+                  {resource === 'documentos' && row.arquivo_url ? (
+                    <button type="button" onClick={() => openDocument(row)} className="mr-3 text-sm font-semibold text-sky-700">Abrir</button>
+                  ) : null}
+                  {resource === 'documentos' && canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => analyzeDocument(row)}
+                      disabled={rowActionId === `ia-${row.id}`}
+                      className="mr-3 text-sm font-semibold text-indigo-700 disabled:opacity-60"
+                    >
+                      {rowActionId === `ia-${row.id}` ? 'Analisando...' : 'Analisar IA'}
+                    </button>
+                  ) : null}
+                  {resource === 'documentos_ia' && canManage ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => approveIa(row)}
+                        disabled={rowActionId === `aprovar-${row.id}`}
+                        className="mr-3 text-sm font-semibold text-emerald-700 disabled:opacity-60"
+                      >
+                        Aprovar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => rejectIa(row)}
+                        disabled={rowActionId === `rejeitar-${row.id}`}
+                        className="mr-3 text-sm font-semibold text-rose-700 disabled:opacity-60"
+                      >
+                        Rejeitar
+                      </button>
+                    </>
+                  ) : null}
+                  {canManage ? (
+                    <button type="button" onClick={() => startEdit(row)} className="text-sm font-semibold text-[var(--c-text)]">Editar</button>
+                  ) : null}
+                </>
+              )}
+            />
           </div>
         </section>
       ) : null}
