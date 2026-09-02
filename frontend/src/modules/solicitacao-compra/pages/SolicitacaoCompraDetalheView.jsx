@@ -29,6 +29,7 @@ import {
   validarRateiosItem
 } from '../utils/apropriacoes';
 import ItemCompraExpansivel from '../components/ItemCompraExpansivel';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -757,36 +758,53 @@ export default function SolicitacaoCompraDetalheView() {
             <h2 className="font-semibold">Fornecedores vinculados</h2>
             <span className="text-sm text-[var(--c-muted)]">{solicitacao.fornecedores.length} cotacao(oes)</span>
           </div>
-          <div className="app-table-shell compras-responsive-table">
-            <table className="table min-w-[760px]">
-              <thead>
-                <tr>
-                  <th>Fornecedor</th>
-                  <th>Status</th>
-                  <th>Enviado em</th>
-                  <th>Respondido em</th>
-                  <th>Prazo</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {solicitacao.fornecedores.map((cotacao) => (
-                  <tr key={cotacao.id}>
-                    <td className="font-medium">{cotacao.fornecedor?.nome || '-'}</td>
-                    <td><span className={statusCotacaoClass(cotacao.status)}>{formatarStatus(cotacao.status)}</span></td>
-                    <td>{formatarData(cotacao.enviado_em)}</td>
-                    <td>{formatarData(cotacao.respondido_em)}</td>
-                    <td>{formatarData(cotacao.prazo_resposta)}</td>
-                    <td className="text-right">
-                      <button type="button" className="btn btn-xs btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>
-                        Gerenciar
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'fornecedor',
+                titulo: 'Fornecedor',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (cotacao) => cotacao.fornecedor?.nome || '-'
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (cotacao) => (
+                  <span className={statusCotacaoClass(cotacao.status)}>{formatarStatus(cotacao.status)}</span>
+                )
+              },
+              {
+                id: 'enviado_em',
+                titulo: 'Enviado em',
+                tipo: 'data',
+                render: (cotacao) => formatarData(cotacao.enviado_em)
+              },
+              {
+                id: 'respondido_em',
+                titulo: 'Respondido em',
+                tipo: 'data',
+                render: (cotacao) => formatarData(cotacao.respondido_em)
+              },
+              {
+                id: 'prazo',
+                titulo: 'Prazo',
+                tipo: 'data',
+                render: (cotacao) => formatarData(cotacao.prazo_resposta)
+              }
+            ]}
+            itens={solicitacao.fornecedores}
+            vazio="Nenhum fornecedor vinculado."
+            storageKey="tabela:solicitacao-compra-detalhe:fornecedores"
+            rotuloRolagem="Fornecedores vinculados"
+            acoesLinha={() => (
+              <button type="button" className="btn btn-outline" onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}>
+                Gerenciar
+              </button>
+            )}
+            larguraAcoes={160}
+          />
         </div>
       )}
     </div>

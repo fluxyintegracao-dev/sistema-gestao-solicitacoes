@@ -44,6 +44,7 @@ import {
   canSendPagamentosBanco,
   canSyncPagamentosBanco
 } from '../utils/acessoProduto';
+import { TabelaPadrao } from '../components/padrao';
 
 const TABS = [
   { id: 'titulos', label: 'Titulos elegiveis' },
@@ -1015,65 +1016,84 @@ export default function FinanceiroPagamentos() {
                 {titulos.length === 0 ? (
                   <div className="app-empty-card">Busque titulos a pagar para montar o primeiro lote.</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="text-xs uppercase text-[var(--c-muted)]">
-                        <tr>
-                          <th className="px-3 py-2">
+                  <>
+                    {/* O "selecionar todos" morava no <th>; o cabeçalho da
+                        TabelaPadrao é o menu de alinhamento/medida, então o
+                        controle sobe para cima da tabela com a MESMA lógica
+                        e agora com rótulo visível. */}
+                    <label className="mb-3 flex items-center gap-2 text-sm text-[var(--c-muted)]">
+                      <input
+                        type="checkbox"
+                        aria-label="Selecionar todos os titulos elegiveis"
+                        checked={allSelectableTitulosSelected}
+                        disabled={!selectableTitulosIds.length}
+                        onChange={toggleTodosTitulosElegiveis}
+                      />
+                      Selecionar todos os titulos elegiveis
+                    </label>
+                    <TabelaPadrao
+                      colunas={[
+                        {
+                          id: 'selecao',
+                          titulo: 'Sel.',
+                          // Seleção em lote: coluna de marcação com render próprio.
+                          tipo: 'status',
+                          render: (titulo) => (
                             <input
                               type="checkbox"
-                              aria-label="Selecionar todos os titulos elegiveis"
-                              checked={allSelectableTitulosSelected}
-                              disabled={!selectableTitulosIds.length}
-                              onChange={toggleTodosTitulosElegiveis}
+                              checked={selectedIds.map(String).includes(String(titulo.id))}
+                              disabled={!(titulo.elegivel_pagamento && getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0)}
+                              onChange={() => toggleTitulo(titulo.id)}
+                              aria-label={`Selecionar titulo ${getTituloCodigo(titulo)}`}
                             />
-                          </th>
-                          <th className="px-3 py-2">Titulo</th>
-                          <th className="px-3 py-2">Credor</th>
-                          <th className="px-3 py-2">Favorecido PIX</th>
-                          <th className="px-3 py-2">Vencimento</th>
-                          <th className="px-3 py-2 text-right">Saldo</th>
-                          <th className="px-3 py-2">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {titulos.map((titulo) => {
-                          const accountPendencies = getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount);
-                          const canSelectTitulo = titulo.elegivel_pagamento && accountPendencies.length === 0;
-                          return (
-                          <tr key={titulo.id} className={canSelectTitulo ? '' : 'bg-amber-50/50'}>
-                            <td className="px-3 py-3">
-                              <input
-                                type="checkbox"
-                                checked={selectedIds.map(String).includes(String(titulo.id))}
-                                disabled={!canSelectTitulo}
-                                onChange={() => toggleTitulo(titulo.id)}
-                              />
-                            </td>
-                            <td className="px-3 py-3">
+                          )
+                        },
+                        {
+                          id: 'titulo',
+                          titulo: 'Titulo',
+                          tipo: 'codigo',
+                          render: (titulo) => (
+                            <div>
                               <Link to={`/financeiro/titulos/${titulo.id}`} className="font-medium text-[var(--c-primary)]">
                                 {getTituloCodigo(titulo)}
                               </Link>
                               <div className="text-xs text-[var(--c-muted)]">{titulo.numero_documento || 'Sem documento'}</div>
                               <div className="text-xs text-[var(--c-muted)]">{getTituloEmpresaLabel(titulo)}</div>
-                            </td>
-                            <td className="px-3 py-3">{titulo.parceiro?.nome || '-'}</td>
-                            <td className="px-3 py-3">{getBeneficiaryLabel(titulo)}</td>
-                            <td className="px-3 py-3">{formatDate(titulo.data_vencimento)}</td>
-                            <td className="px-3 py-3 text-right font-medium">{formatCurrency(titulo.valor_saldo)}</td>
-                            <td className="px-3 py-3">
-                              {canSelectTitulo ? (
-                                <span className="app-status-pill bg-emerald-100 text-emerald-700">ELEGIVEL</span>
-                              ) : (
-                                <span className="text-xs text-amber-700">{[...(titulo.pendencias_pagamento || []), ...accountPendencies].join(' ')}</span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
+                            </div>
+                          )
+                        },
+                        {
+                          id: 'credor',
+                          titulo: 'Credor',
+                          // R17: o credor NOMEIA o titulo a pagar.
+                          tipo: 'identidade',
+                          noCard: 'titulo',
+                          render: (titulo) => titulo.parceiro?.nome || '-'
+                        },
+                        { id: 'favorecido', titulo: 'Favorecido PIX', tipo: 'texto', render: (titulo) => getBeneficiaryLabel(titulo) },
+                        { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (titulo) => formatDate(titulo.data_vencimento) },
+                        { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo) },
+                        {
+                          id: 'status',
+                          titulo: 'Status',
+                          tipo: 'status',
+                          render: (titulo) => {
+                            const pendencias = getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount);
+                            return titulo.elegivel_pagamento && pendencias.length === 0
+                              ? <span className="app-status-pill bg-emerald-100 text-emerald-700">ELEGIVEL</span>
+                              : <span className="text-xs text-amber-700">{[...(titulo.pendencias_pagamento || []), ...pendencias].join(' ')}</span>;
+                          }
+                        }
+                      ]}
+                      itens={titulos}
+                      // A linha destacada em âmbar do markup antigo: título com
+                      // pendência vira tarja de atenção da própria tabela.
+                      urgencia={(titulo) => (titulo.elegivel_pagamento && getTituloPaymentAccountPendencies(titulo, selectedPaymentAccount).length === 0 ? null : 'warning')}
+                      vazio="Busque titulos a pagar para montar o primeiro lote."
+                      storageKey="tabela:financeiro-pagamentos:titulos"
+                      rotuloRolagem="Titulos a pagar elegiveis"
+                    />
+                  </>
                 )}
               </div>
             </section>
@@ -1255,52 +1275,48 @@ export default function FinanceiroPagamentos() {
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-left text-sm">
-                        <thead className="text-xs uppercase text-[var(--c-muted)]">
-                          <tr>
-                            <th className="px-3 py-2">Item</th>
-                            <th className="px-3 py-2">Titulo</th>
-                            <th className="px-3 py-2">Favorecido</th>
-                            <th className="px-3 py-2 text-right">Valor</th>
-                            <th className="px-3 py-2">Status</th>
-                            {canAudit && <th className="px-3 py-2 text-right">Comprovante</th>}
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                          {(selectedBatch.items || []).map((item) => (
-                            <tr key={item.id}>
-                              <td className="px-3 py-3">{item.sequencia}</td>
-                              <td className="px-3 py-3">{getTituloCodigo(item.intent?.titulo)}</td>
-                              <td className="px-3 py-3">
-                                {item.intent?.beneficiary?.nome || '-'}
-                                <div className="text-xs text-[var(--c-muted)]">{item.intent?.beneficiary?.pix_chave || '-'}</div>
-                              </td>
-                              <td className="px-3 py-3 text-right font-medium">{formatCurrency(item.valor)}</td>
-                              <td className="px-3 py-3"><span className={statusClass(item.status)}>{item.status}</span></td>
-                              {canAudit && (
-                                <td className="px-3 py-3 text-right">
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline"
-                                    onClick={() => handleGerarComprovanteItem(item)}
-                                    disabled={!canGeneratePaymentReceipt(item) || receiptLoading === String(item.id)}
-                                    title={canGeneratePaymentReceipt(item) ? 'Gerar ou abrir comprovante do pagamento' : 'Disponivel apos confirmacao do banco'}
-                                  >
-                                    <HiOutlineDocumentArrowDown className="h-4 w-4" />
-                                    {receiptLoading === String(item.id)
-                                      ? 'Gerando...'
-                                      : item.comprovante_pdf_url
-                                        ? 'Abrir'
-                                        : 'Gerar'}
-                                  </button>
-                                </td>
-                              )}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <TabelaPadrao
+                      colunas={[
+                        { id: 'item', titulo: 'Item', tipo: 'numero', render: (item) => item.sequencia },
+                        { id: 'titulo', titulo: 'Titulo', tipo: 'codigo', render: (item) => getTituloCodigo(item.intent?.titulo) },
+                        {
+                          id: 'favorecido',
+                          titulo: 'Favorecido',
+                          // R17: o favorecido NOMEIA o item de pagamento.
+                          tipo: 'identidade',
+                          noCard: 'titulo',
+                          render: (item) => (
+                            <div>
+                              {item.intent?.beneficiary?.nome || '-'}
+                              <div className="text-xs text-[var(--c-muted)]">{item.intent?.beneficiary?.pix_chave || '-'}</div>
+                            </div>
+                          )
+                        },
+                        { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor) },
+                        { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => <span className={statusClass(item.status)}>{item.status}</span> }
+                      ]}
+                      itens={selectedBatch.items || []}
+                      vazio="Nenhum item neste lote."
+                      storageKey="tabela:financeiro-pagamentos:itens-do-lote"
+                      rotuloRolagem="Itens do lote de pagamento"
+                      larguraAcoes={180}
+                      acoesLinha={canAudit ? (item) => (
+                        <button
+                          type="button"
+                          className="btn btn-outline"
+                          onClick={() => handleGerarComprovanteItem(item)}
+                          disabled={!canGeneratePaymentReceipt(item) || receiptLoading === String(item.id)}
+                          title={canGeneratePaymentReceipt(item) ? 'Gerar ou abrir comprovante do pagamento' : 'Disponivel apos confirmacao do banco'}
+                        >
+                          <HiOutlineDocumentArrowDown className="h-4 w-4" />
+                          {receiptLoading === String(item.id)
+                            ? 'Gerando...'
+                            : item.comprovante_pdf_url
+                              ? 'Abrir'
+                              : 'Gerar'}
+                        </button>
+                      ) : undefined}
+                    />
                   </div>
                 )}
               </div>
@@ -1429,47 +1445,65 @@ export default function FinanceiroPagamentos() {
                 {paymentEvents.length === 0 ? (
                   <div className="app-empty-card">Nenhum evento tecnico encontrado para os filtros atuais.</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="text-xs uppercase text-[var(--c-muted)]">
-                        <tr>
-                          <th className="px-3 py-2">Recebido</th>
-                          <th className="px-3 py-2">Evento</th>
-                          <th className="px-3 py-2">Provider</th>
-                          <th className="px-3 py-2">Referencia</th>
-                          <th className="px-3 py-2">Status</th>
-                          <th className="px-3 py-2">Resumo</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {paymentEvents.map((event) => (
-                          <tr key={event.id}>
-                            <td className="px-3 py-3 whitespace-nowrap">{formatDateTime(event.received_at)}</td>
-                            <td className="px-3 py-3">
-                              <span className="font-medium text-[var(--c-text)]">{event.event_type}</span>
-                              <div className="text-xs text-[var(--c-muted)]">Evento #{event.id}</div>
-                            </td>
-                            <td className="px-3 py-3">
-                              {event.provider?.codigo || `Provider #${event.provider_id}`}
-                              <div className="text-xs text-[var(--c-muted)]">{event.provider?.ambiente || '-'}</div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <div className="font-medium text-[var(--c-text)]">{event.provider_event_id || '-'}</div>
-                              <div className="text-xs text-[var(--c-muted)]">
-                                {event.batch ? `Lote ${event.batch.codigo}` : event.payment_batch_id ? `Lote #${event.payment_batch_id}` : 'Sem lote'}
-                                {event.intent ? ` - Intent #${event.intent.id}` : event.payment_intent_id ? ` - Intent #${event.payment_intent_id}` : ''}
-                              </div>
-                            </td>
-                            <td className="px-3 py-3">
-                              <span className={statusClass(event.processing_status)}>{event.processing_status}</span>
-                              {event.processing_error && <div className="mt-1 text-xs text-rose-700">{event.processing_error}</div>}
-                            </td>
-                            <td className="px-3 py-3 max-w-xl text-[var(--c-muted)]">{getEventPayloadSummary(event)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  <TabelaPadrao
+                    colunas={[
+                      { id: 'recebido', titulo: 'Recebido', tipo: 'data', render: (event) => formatDateTime(event.received_at) },
+                      {
+                        id: 'evento',
+                        titulo: 'Evento',
+                        // R17: o tipo do evento NOMEIA o registro tecnico.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (event) => (
+                          <div>
+                            <span className="font-medium text-[var(--c-text)]">{event.event_type}</span>
+                            <div className="text-xs text-[var(--c-muted)]">Evento #{event.id}</div>
+                          </div>
+                        )
+                      },
+                      {
+                        id: 'provider',
+                        titulo: 'Provider',
+                        tipo: 'texto',
+                        render: (event) => (
+                          <div>
+                            {event.provider?.codigo || `Provider #${event.provider_id}`}
+                            <div className="text-xs text-[var(--c-muted)]">{event.provider?.ambiente || '-'}</div>
+                          </div>
+                        )
+                      },
+                      {
+                        id: 'referencia',
+                        titulo: 'Referencia',
+                        tipo: 'codigo',
+                        render: (event) => (
+                          <div>
+                            <div className="font-medium text-[var(--c-text)]">{event.provider_event_id || '-'}</div>
+                            <div className="text-xs text-[var(--c-muted)]">
+                              {event.batch ? `Lote ${event.batch.codigo}` : event.payment_batch_id ? `Lote #${event.payment_batch_id}` : 'Sem lote'}
+                              {event.intent ? ` - Intent #${event.intent.id}` : event.payment_intent_id ? ` - Intent #${event.payment_intent_id}` : ''}
+                            </div>
+                          </div>
+                        )
+                      },
+                      {
+                        id: 'status',
+                        titulo: 'Status',
+                        tipo: 'status',
+                        render: (event) => (
+                          <div>
+                            <span className={statusClass(event.processing_status)}>{event.processing_status}</span>
+                            {event.processing_error && <div className="mt-1 text-xs text-rose-700">{event.processing_error}</div>}
+                          </div>
+                        )
+                      },
+                      { id: 'resumo', titulo: 'Resumo', tipo: 'texto', render: (event) => <span className="text-[var(--c-muted)]">{getEventPayloadSummary(event)}</span> }
+                    ]}
+                    itens={paymentEvents}
+                    vazio="Nenhum evento tecnico encontrado para os filtros atuais."
+                    storageKey="tabela:financeiro-pagamentos:eventos"
+                    rotuloRolagem="Eventos tecnicos de pagamento"
+                  />
                 )}
               </div>
             </section>

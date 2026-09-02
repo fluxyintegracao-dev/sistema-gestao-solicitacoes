@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { criarSolicitacaoCompra, criarSolicitacaoCompraDireta, obterUrlAssinadaCompra } from '../../../services/compras';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { TabelaPadrao } from '../../../components/padrao';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao, montarTextoResumoApropriacao } from '../utils/apropriacoes';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -125,6 +126,16 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
 
   const itensResumo = useMemo(() => draft?.resumo?.itens || [], [draft]);
   const totalItens = itensResumo.length;
+  // A tabela recebe a ordem e a chave da linha já resolvidas (o render de
+  // coluna enxerga só o item, não o índice).
+  const itensRevisao = useMemo(
+    () => itensResumo.map((item, index) => ({
+      ...item,
+      __ordem: String(index + 1).padStart(2, '0'),
+      __chave: `${item.manual ? 'manual' : item.insumo_id}-${index}`
+    })),
+    [itensResumo]
+  );
 
   const estatisticas = useMemo(() => {
     return itensResumo.reduce(
@@ -533,101 +544,120 @@ export default function RevisarSolicitacaoCompra({ modoCompraDireta = false }) {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-[var(--c-border)]">
-            <div className="overflow-x-auto">
-              <table className="min-w-[980px] w-full text-left text-sm">
-                <thead className="bg-slate-100 text-[11px] uppercase tracking-[0.16em] text-[var(--c-muted)]">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Item</th>
-                    <th className="px-4 py-3 font-semibold">Quantidade</th>
-                    {modoCompraDireta && <th className="px-4 py-3 font-semibold">Valor</th>}
-                    <th className="px-4 py-3 font-semibold">Apropriacao</th>
-                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Necessario para</th>}
-                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Especificacao</th>}
-                    {!modoCompraDireta && <th className="px-4 py-3 font-semibold">Acessos</th>}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--c-border)]">
-                  {itensResumo.map((item, index) => (
-                    <tr key={`${item.manual ? 'manual' : item.insumo_id}-${index}`} className="align-top">
-                      <td className="px-4 py-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
-                            {String(index + 1).padStart(2, '0')}
-                          </span>
-                          {item.manual && (
-                            <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
-                              Manual
-                            </span>
-                          )}
-                        </div>
-                        <div className="mt-2 max-w-[240px] font-semibold text-[var(--c-text)]">{item.insumo_nome}</div>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-[var(--c-text)]">
-                        {item.quantidade} {item.unidade_sigla || '-'}
-                      </td>
-                      {modoCompraDireta && (
-                        <td className="px-4 py-4 whitespace-nowrap text-[var(--c-text)]">
-                          <div>{formatarMoeda(item.valor_unitario)} un.</div>
-                          <div className="mt-1 font-semibold">{formatarMoeda(item.valor_total)}</div>
-                        </td>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'ordem',
+                titulo: '#',
+                tipo: 'codigo',
+                render: (item) => (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
+                      {item.__ordem}
+                    </span>
+                    {item.manual && (
+                      <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">
+                        Manual
+                      </span>
+                    )}
+                  </div>
+                )
+              },
+              {
+                id: 'item',
+                titulo: 'Item',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.insumo_nome
+              },
+              {
+                id: 'quantidade',
+                titulo: 'Quantidade',
+                tipo: 'numero',
+                render: (item) => `${item.quantidade} ${item.unidade_sigla || '-'}`
+              },
+              ...(modoCompraDireta ? [{
+                id: 'valor',
+                titulo: 'Valor',
+                tipo: 'valor',
+                render: (item) => (
+                  <>
+                    <div>{formatarMoeda(item.valor_unitario)} un.</div>
+                    <div className="mt-1 font-semibold">{formatarMoeda(item.valor_total)}</div>
+                  </>
+                )
+              }] : []),
+              {
+                id: 'apropriacao',
+                titulo: 'Apropriacao',
+                tipo: 'texto',
+                render: (item) => (
+                  <span className="text-[var(--c-muted)]">{montarTextoResumoApropriacao(item)}</span>
+                )
+              },
+              ...(modoCompraDireta ? [] : [
+                {
+                  id: 'necessario_para',
+                  titulo: 'Necessario para',
+                  tipo: 'data',
+                  render: (item) => formatarData(item.necessario_para)
+                },
+                {
+                  id: 'especificacao',
+                  titulo: 'Especificacao',
+                  tipo: 'texto',
+                  render: (item) => (
+                    <div className="whitespace-pre-wrap text-[var(--c-text)]">
+                      {textoOuPadrao(item.especificacao)}
+                    </div>
+                  )
+                },
+                {
+                  id: 'acessos',
+                  titulo: 'Acessos',
+                  tipo: 'texto',
+                  render: (item) => (
+                    <div className="flex flex-wrap gap-2">
+                      {item.link_produto ? (
+                        <a
+                          href={item.link_produto}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
+                        >
+                          Abrir link
+                        </a>
+                      ) : (
+                        <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                          Sem link
+                        </span>
                       )}
-                      <td className="px-4 py-4 max-w-[220px] text-[var(--c-muted)]">
-                        {montarTextoResumoApropriacao(item)}
-                      </td>
-                      {!modoCompraDireta && (
-                        <td className="px-4 py-4 whitespace-nowrap font-semibold text-[var(--c-text)]">
-                          {formatarData(item.necessario_para)}
-                        </td>
-                      )}
-                      {!modoCompraDireta && (
-                        <td className="px-4 py-4">
-                          <div className="max-w-[320px] whitespace-pre-wrap text-[var(--c-text)]">
-                            {textoOuPadrao(item.especificacao)}
-                          </div>
-                        </td>
-                      )}
-                      {!modoCompraDireta && (
-                        <td className="px-4 py-4">
-                          <div className="flex min-w-[180px] flex-wrap gap-2">
-                          {item.link_produto ? (
-                            <a
-                              href={item.link_produto}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex rounded-lg border border-[var(--c-border)] px-3 py-2 text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
-                            >
-                              Abrir link
-                            </a>
-                          ) : (
-                            <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
-                              Sem link
-                            </span>
-                          )}
 
-                          {item.arquivo_url ? (
-                            <button
-                              type="button"
-                              className="inline-flex max-w-[180px] rounded-lg border border-[var(--c-border)] px-3 py-2 text-left text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
-                              onClick={() => handleAbrirArquivo(item)}
-                              title={item.arquivo_nome_original || 'Abrir arquivo'}
-                            >
-                              <span className="truncate">{item.arquivo_nome_original || 'Abrir arquivo'}</span>
-                            </button>
-                          ) : (
-                            <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
-                              Sem arquivo
-                            </span>
-                          )}
-                          </div>
-                        </td>
+                      {item.arquivo_url ? (
+                        <button
+                          type="button"
+                          className="inline-flex rounded-lg border border-[var(--c-border)] px-3 py-2 text-left text-xs font-semibold text-[var(--c-text)] transition hover:border-[var(--c-primary)] hover:text-[var(--c-primary)]"
+                          onClick={() => handleAbrirArquivo(item)}
+                          title={item.arquivo_nome_original || 'Abrir arquivo'}
+                        >
+                          <span className="truncate">{item.arquivo_nome_original || 'Abrir arquivo'}</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex rounded-lg border border-dashed border-[var(--c-border)] px-3 py-2 text-xs text-[var(--c-muted)]">
+                          Sem arquivo
+                        </span>
                       )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+                    </div>
+                  )
+                }
+              ])
+            ]}
+            itens={itensRevisao}
+            getId={(item) => item.__chave}
+            vazio="Nenhum item revisado."
+            storageKey="tabela:revisar-solicitacao-compra:itens"
+            rotuloRolagem="Itens revisados"
+          />
         </div>
       </div>
 

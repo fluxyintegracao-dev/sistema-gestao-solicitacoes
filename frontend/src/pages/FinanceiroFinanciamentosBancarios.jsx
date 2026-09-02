@@ -5,7 +5,7 @@ import {
   HiOutlineDocumentPlus,
   HiOutlineReceiptRefund
 } from 'react-icons/hi2';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import {
@@ -37,28 +37,6 @@ const EMPTY_FORM = {
   valor_tarifas: '',
   observacoes: ''
 };
-
-const FINANCIAMENTOS_COLUMNS = [
-  { key: 'codigo', width: 118, minWidth: 96 },
-  { key: 'contrato', width: 210, minWidth: 150 },
-  { key: 'conta', width: 210, minWidth: 150 },
-  { key: 'empresa', width: 180, minWidth: 130 },
-  { key: 'parcelas', width: 108, minWidth: 90 },
-  { key: 'total', width: 136, minWidth: 112 },
-  { key: 'status', width: 112, minWidth: 90 },
-  { key: 'acao', width: 148, minWidth: 124 }
-];
-
-const PARCELAS_COLUMNS = [
-  { key: 'numero', width: 70, minWidth: 64 },
-  { key: 'vencimento', width: 112, minWidth: 96 },
-  { key: 'principal', width: 128, minWidth: 108 },
-  { key: 'juros', width: 116, minWidth: 100 },
-  { key: 'encargos', width: 116, minWidth: 100 },
-  { key: 'total', width: 132, minWidth: 108 },
-  { key: 'titulo', width: 132, minWidth: 108 },
-  { key: 'acoes', width: 110, minWidth: 96 }
-];
 
 function roundCurrency(value) {
   return Math.round((Number(value || 0) + Number.EPSILON) * 100) / 100;
@@ -461,63 +439,66 @@ export default function FinanceiroFinanciamentosBancarios() {
             <h2 className="text-lg font-semibold text-[var(--c-text)]">Contratos cadastrados</h2>
             <p className="text-sm text-[var(--c-muted)]">A conta bancária representa onde o crédito foi tomado.</p>
           </div>
-          <div className="table-wrapper">
-            <ResizableTable
-              className="table"
-              columns={FINANCIAMENTOS_COLUMNS}
-              storageKey="fluxy.financeiro.financiamentos-bancarios.columnWidths"
-            >
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="codigo">Código</ResizableTh>
-                  <ResizableTh columnKey="contrato">Contrato</ResizableTh>
-                  <ResizableTh columnKey="conta">Conta do crédito</ResizableTh>
-                  <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                  <ResizableTh columnKey="parcelas" className="text-right">Parcelas</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Total</ResizableTh>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="acao">Acoes</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Carregando financiamentos...</td></tr>
-                ) : financiamentos.length === 0 ? (
-                  <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Nenhum financiamento cadastrado.</td></tr>
-                ) : (
-                  financiamentos.map((item) => (
-                    <tr key={item.id} className={Number(selected?.id) === Number(item.id) ? 'bg-blue-50/60 dark:bg-blue-950/20' : ''}>
-                      <td className="font-semibold">{item.codigo || `#${item.id}`}</td>
-                      <td>
-                        <div className="font-semibold text-[var(--c-text)]">{item.numero_contrato}</div>
-                        <div className="text-xs text-[var(--c-muted)]">{item.instituicaoFinanceira?.nome || '-'}</div>
-                      </td>
-                      <td>
-                        <div>{item.contaBancaria?.nome || '-'}</div>
-                        <div className="text-xs text-[var(--c-muted)]">{item.contaBancaria?.banco || ''}</div>
-                      </td>
-                      <td>{item.empresa?.nome || '-'}</td>
-                      <td className="text-right">{item.quantidade_parcelas}</td>
-                      <td className="text-right font-semibold">{formatCurrency(item.valor_total)}</td>
-                      <td><StatusBadge status={item.status} /></td>
-                      <td>
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" className="btn btn-outline btn-xs" onClick={() => setSelectedId(item.id)}>
-                            Ver
-                          </button>
-                          {!item.titulos_gerados_em ? (
-                            <button type="button" className="btn btn-primary btn-xs" disabled={saving} onClick={() => handleGerarTitulos(item.id)}>
-                              Gerar títulos
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'codigo',
+                titulo: 'Código',
+                tipo: 'codigo',
+                render: (item) => (
+                  <span className={Number(selected?.id) === Number(item.id) ? 'font-semibold text-[var(--c-primary)]' : 'font-semibold'}>
+                    {item.codigo || `#${item.id}`}
+                  </span>
+                )
+              },
+              {
+                id: 'contrato',
+                titulo: 'Contrato',
+                // R17: o contrato (e sua instituição) NOMEIA o financiamento.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div>
+                    <div className="font-semibold text-[var(--c-text)]">{item.numero_contrato}</div>
+                    <div className="text-xs text-[var(--c-muted)]">{item.instituicaoFinanceira?.nome || '-'}</div>
+                  </div>
+                )
+              },
+              {
+                id: 'conta',
+                titulo: 'Conta do crédito',
+                tipo: 'texto',
+                render: (item) => (
+                  <div>
+                    <div>{item.contaBancaria?.nome || '-'}</div>
+                    <div className="text-xs text-[var(--c-muted)]">{item.contaBancaria?.banco || ''}</div>
+                  </div>
+                )
+              },
+              { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa?.nome || '-' },
+              { id: 'parcelas', titulo: 'Parcelas', tipo: 'numero', render: (item) => item.quantidade_parcelas },
+              { id: 'total', titulo: 'Total', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => <StatusBadge status={item.status} /> }
+            ]}
+            itens={financiamentos}
+            carregando={loading}
+            vazio="Nenhum financiamento cadastrado."
+            storageKey="tabela:financiamentos-bancarios:contratos"
+            rotuloRolagem="Contratos de financiamento cadastrados"
+            larguraAcoes={220}
+            acoesLinha={(item) => (
+              <>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setSelectedId(item.id)}>
+                  Ver
+                </button>
+                {!item.titulos_gerados_em ? (
+                  <button type="button" className="btn btn-primary btn-sm" disabled={saving} onClick={() => handleGerarTitulos(item.id)}>
+                    Gerar títulos
+                  </button>
+                ) : null}
+              </>
+            )}
+          />
         </section>
 
         <section className="card sol-surface-card">
@@ -658,64 +639,48 @@ export default function FinanceiroFinanciamentosBancarios() {
             ) : null}
           </div>
         </div>
-        <div className="table-wrapper">
-          <ResizableTable
-            className="table"
-            columns={PARCELAS_COLUMNS}
-            storageKey="fluxy.financeiro.financiamentos-bancarios.parcelas.columnWidths"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="numero">#</ResizableTh>
-                <ResizableTh columnKey="vencimento">Vencimento</ResizableTh>
-                <ResizableTh columnKey="principal" className="text-right">Amortização</ResizableTh>
-                <ResizableTh columnKey="juros" className="text-right">Juros</ResizableTh>
-                <ResizableTh columnKey="encargos" className="text-right">Encargos</ResizableTh>
-                <ResizableTh columnKey="total" className="text-right">Parcela</ResizableTh>
-                <ResizableTh columnKey="titulo">Titulo</ResizableTh>
-                <ResizableTh columnKey="acoes">Ações</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {!selected ? (
-                <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Selecione um financiamento para ver as parcelas.</td></tr>
-              ) : selectedParcelas.length === 0 ? (
-                <tr><td colSpan={8} className="text-center text-[var(--c-muted)]">Nenhuma parcela encontrada.</td></tr>
+        <TabelaPadrao
+          // Sem coluna de IDENTIDADE por natureza: a parcela não tem nome
+          // próprio — o contrato que a nomeia já está no título da seção e
+          // as linhas são posições numeradas (número, datas e valores).
+          semIdentidade
+          colunas={[
+            { id: 'numero', titulo: '#', tipo: 'numero', noCard: 'titulo', render: (parcela) => parcela.numero_parcela },
+            { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (parcela) => formatDate(parcela.data_vencimento) },
+            { id: 'principal', titulo: 'Amortização', tipo: 'valor', render: (parcela) => formatCurrency(parcela.valor_principal) },
+            { id: 'juros', titulo: 'Juros', tipo: 'valor', render: (parcela) => formatCurrency(parcela.valor_juros) },
+            { id: 'encargos', titulo: 'Encargos', tipo: 'valor', render: (parcela) => formatCurrency(Number(parcela.valor_iof || 0) + Number(parcela.valor_tarifa || 0)) },
+            { id: 'total', titulo: 'Parcela', tipo: 'valor', render: (parcela) => <span className="font-semibold">{formatCurrency(parcela.valor_parcela)}</span> },
+            {
+              id: 'titulo',
+              titulo: 'Titulo',
+              tipo: 'codigo',
+              render: (parcela) => (parcela.tituloFinanceiro ? (
+                <Link to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`} className="text-blue-700 underline">
+                  {parcela.tituloFinanceiro.codigo || `#${parcela.tituloFinanceiro.id}`}
+                </Link>
               ) : (
-                selectedParcelas.map((parcela) => (
-                  <tr key={parcela.id}>
-                    <td>{parcela.numero_parcela}</td>
-                    <td>{formatDate(parcela.data_vencimento)}</td>
-                    <td className="text-right">{formatCurrency(parcela.valor_principal)}</td>
-                    <td className="text-right">{formatCurrency(parcela.valor_juros)}</td>
-                    <td className="text-right">{formatCurrency(Number(parcela.valor_iof || 0) + Number(parcela.valor_tarifa || 0))}</td>
-                    <td className="text-right font-semibold">{formatCurrency(parcela.valor_parcela)}</td>
-                    <td>
-                      {parcela.tituloFinanceiro ? (
-                        <Link to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`} className="text-blue-700 underline">
-                          {parcela.tituloFinanceiro.codigo || `#${parcela.tituloFinanceiro.id}`}
-                        </Link>
-                      ) : (
-                        <span className="text-[var(--c-muted)]">Pendente</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-xs"
-                        onClick={() => abrirEdicaoParcela(parcela)}
-                        disabled={!parcelaPodeSerEditada(parcela) || saving}
-                        title={parcelaPodeSerEditada(parcela) ? 'Editar amortização e juros' : 'Parcela com título baixado'}
-                      >
-                        Editar
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+                <span className="text-[var(--c-muted)]">Pendente</span>
+              ))
+            }
+          ]}
+          itens={selected ? selectedParcelas : []}
+          vazio={selected ? 'Nenhuma parcela encontrada.' : 'Selecione um financiamento para ver as parcelas.'}
+          storageKey="tabela:financiamentos-bancarios:parcelas"
+          rotuloRolagem="Parcelas do financiamento"
+          larguraAcoes={140}
+          acoesLinha={(parcela) => (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => abrirEdicaoParcela(parcela)}
+              disabled={!parcelaPodeSerEditada(parcela) || saving}
+              title={parcelaPodeSerEditada(parcela) ? 'Editar amortização e juros' : 'Parcela com título baixado'}
+            >
+              Editar
+            </button>
+          )}
+        />
       </section>
 
       {editingParcela ? (
