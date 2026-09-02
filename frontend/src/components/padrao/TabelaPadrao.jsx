@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import EmptyState from '../ui/EmptyState';
@@ -33,19 +33,35 @@ export function CelulaDupla({ principal, sub, title }) {
  * colunas viram cards — nunca dois códigos para o mesmo dado.
  *
  * colunas: [{ id, titulo, render(item), tipo?, alinhar?,
- *             noCard? ('titulo' destaca no card; false omite do card) }]
+ *             noCard? ('titulo' destaca no card; false omite do card),
+ *             ordenavel?, valorOrdenacao?(item), fixa?, opcional? }]
  * A LARGURA é decisão do componente, não da tela: cada `tipo` já carrega a
  * medida das regras (docs/REGRAS-LAYOUT.md R1/R6/R7) — a tela só declara o
  * que a coluna É. `largura`/`minWidth` seguem aceitos apenas para exceção
  * registrada no manifesto (validarLayout reprova sem registro).
  * urgencia(item): 'danger' | 'warning' | null → tarja lateral.
+ *
+ * CAPACIDADES OPCIONAIS (leva do componente, 02/09 — decisão do cliente
+ * de estender o padrão em vez de manter 20 exceções permanentes). Todas
+ * são opt-in: tabela que não as declara se comporta exatamente como antes.
+ *   1. ORDENAÇÃO      — coluna com `ordenavel`: clique no título ordena
+ *                       (asc → desc → sem ordem). O menu de alinhamento sai
+ *                       do título e vira ícone próprio (ver R14/R15 abaixo).
+ *   2. COLUNAS DO USUÁRIO — `colunasConfiguraveis`: painel para mostrar,
+ *                       esconder e reordenar; escolha salva por lista.
+ *   3. SELEÇÃO EM LOTE — `selecao`: coluna de marcação com "todos" no
+ *                       cabeçalho.
+ *   4. LINHA EXPANSÍVEL / AGRUPADORA — `linhaExpansivel(item)` e
+ *                       `agruparPor`.
+ *   5. COLUNA FIXA    — coluna com `fixa`: gruda à esquerda na rolagem
+ *                       horizontal (tabela larga não perde a referência).
  */
 
 // Medidas por papel da coluna — pior caso real de cada dado (R1/R6/R7).
 // R14 (02/09): título e conteúdo da coluna compartilham o MESMO
 // alinhamento, definido pelo tipo — e o usuário pode trocar (esquerda/
-// centro/direita) clicando no cabeçalho; a escolha vale para os dois e é
-// salva por usuário e por lista, como largura.
+// centro/direita); a escolha vale para os dois e é salva por usuário e por
+// lista, como largura.
 const ALINHAMENTO_POR_TIPO = {
   texto: 'left',
   identidade: 'left',
@@ -94,19 +110,26 @@ function normalizarColuna(coluna) {
   };
 }
 
-function lerAlinhamentos(chave) {
-  if (!chave || typeof window === 'undefined') return {};
+function lerJson(chave, padrao) {
+  if (!chave || typeof window === 'undefined') return padrao;
   try {
-    return JSON.parse(window.localStorage.getItem(chave) || '{}');
+    const cru = window.localStorage.getItem(chave);
+    return cru ? JSON.parse(cru) : padrao;
   } catch {
-    return {};
+    return padrao;
   }
 }
 
-/* Menu do cabeçalho: o usuário escolhe o alinhamento da coluna (R14).
-   R15 (02/09): capacidade sem sinal não existe — o cabeçalho carrega
-   affordance VISÍVEL: cursor, ícone discreto no hover e tooltip nomeando
-   as duas capacidades ("Alinhar / redimensionar"). */
+function gravarJson(chave, valor) {
+  if (!chave || typeof window === 'undefined') return;
+  try { window.localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* sem storage */ }
+}
+
+/* ---------------------------------------------------------------- ícones */
+
+/* R15: capacidade sem sinal não existe — o cabeçalho carrega affordance
+   VISÍVEL: cursor, ícone discreto no hover e tooltip nomeando a
+   capacidade. */
 function IconeAlinhar() {
   return (
     <svg className="app-th-affordance" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -115,27 +138,77 @@ function IconeAlinhar() {
   );
 }
 
-function TituloComAlinhamento({ coluna, alinhamento, aoAlinhar }) {
+function IconeOrdem({ direcao }) {
+  return (
+    <svg className={`app-th-ordem${direcao ? ' app-th-ordem--ativa' : ''}`} viewBox="0 0 10 14" fill="none" aria-hidden="true">
+      <path d="M5 1.5L8 5H2L5 1.5Z" fill="currentColor" opacity={direcao === 'desc' ? 0.25 : 1} />
+      <path d="M5 12.5L2 9h6l-3 3.5Z" fill="currentColor" opacity={direcao === 'asc' ? 0.25 : 1} />
+    </svg>
+  );
+}
+
+function IconeSeta({ aberta }) {
+  return (
+    <svg
+      className={`app-tabela-expandir-seta${aberta ? ' app-tabela-expandir-seta--aberta' : ''}`}
+      viewBox="0 0 16 16" fill="none" aria-hidden="true"
+    >
+      <path d="M6 3.5L10.5 8L6 12.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/**
+ * CABEÇALHO DE COLUNA.
+ *
+ * Desenho da coexistência ordenação × alinhamento (decisão do cliente,
+ * 02/09): o CLIQUE NO TÍTULO ORDENA, e o menu de alinhamento vira um ícone
+ * próprio, ancorado à direita e revelado no hover/foco (a affordance da
+ * R15). Os dois não cabem lado a lado: numa coluna de status (96px, 72px
+ * úteis) o título com o indicador de ordem já ocupa ~54px e o alvo mínimo
+ * de clique do ícone é 32px (R2). Por isso o ícone é ancorado sobre a borda
+ * direita, com fundo próprio, e o título trunca atrás dele — o mesmo
+ * arranjo de Excel e Planilhas. Coluna sem `ordenavel` mantém o título como
+ * texto (nada de affordance que não faz nada).
+ */
+function CabecalhoColuna({ coluna, alinhamento, aoAlinhar, ordem, aoOrdenar }) {
   const [aberto, setAberto] = useState(false);
   const ref = useRef(null);
   useFecharAoSair(ref, aberto, () => setAberto(false));
+  const direcao = ordem?.coluna === coluna.id ? ordem.direcao : null;
+
   return (
     <span
       className={`app-th-alinhavel${aberto ? ' app-th-alinhavel--aberto' : ''}`}
       ref={ref}
       style={{ textAlign: alinhamento }}
     >
+      {coluna.ordenavel ? (
+        <button
+          type="button"
+          className="app-th-botao app-th-botao--ordenavel"
+          title={`Ordenar por ${coluna.titulo}`}
+          onClick={() => aoOrdenar(coluna.id)}
+        >
+          {coluna.titulo}
+          <IconeOrdem direcao={direcao} />
+        </button>
+      ) : (
+        <span className="app-th-botao app-th-botao--estatico">{coluna.titulo}</span>
+      )}
+
       <button
         type="button"
-        className="app-th-botao"
+        className="app-th-alinhar"
         title="Alinhar / redimensionar"
+        aria-label={`Alinhar coluna ${coluna.titulo}`}
         aria-haspopup="menu"
         aria-expanded={aberto}
-        onClick={() => setAberto((atual) => !atual)}
+        onClick={(evento) => { evento.stopPropagation(); setAberto((atual) => !atual); }}
       >
-        {coluna.titulo}
         <IconeAlinhar />
       </button>
+
       {aberto && (
         <span className="app-mais-menu app-th-menu" role="menu">
           {OPCOES_ALINHAMENTO.map(([valor, rotulo]) => (
@@ -159,13 +232,96 @@ function TituloComAlinhamento({ coluna, alinhamento, aoAlinhar }) {
   );
 }
 
+/** Painel "Colunas": mostrar/esconder e reordenar, salvo por lista. */
+function PainelColunas({ colunas, visiveis, ordem, aoAlternar, aoMover, aoRestaurar }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+  useFecharAoSair(ref, aberto, () => setAberto(false));
+  const ordenadas = ordem.map((id) => colunas.find((c) => c.id === id)).filter(Boolean);
+
+  return (
+    <span className="app-mais-wrap app-colunas-wrap" ref={ref}>
+      <button
+        type="button"
+        className="btn btn-outline btn-sm"
+        aria-haspopup="menu"
+        aria-expanded={aberto}
+        onClick={() => setAberto((atual) => !atual)}
+      >
+        Colunas
+      </button>
+      {aberto && (
+        <span className="app-mais-menu app-colunas-menu" role="menu">
+          {ordenadas.map((coluna, indice) => {
+            const travada = coluna.sempreVisivel || coluna.__identidade;
+            return (
+              <span className="app-colunas-item" key={coluna.id}>
+                <label className="app-colunas-rotulo">
+                  <input
+                    type="checkbox"
+                    checked={visiveis.includes(coluna.id)}
+                    disabled={travada}
+                    onChange={() => aoAlternar(coluna.id)}
+                  />
+                  <span>{coluna.titulo}</span>
+                </label>
+                <span className="app-colunas-mover">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    title="Mover para cima"
+                    aria-label={`Mover ${coluna.titulo} para cima`}
+                    disabled={indice === 0}
+                    onClick={() => aoMover(coluna.id, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    title="Mover para baixo"
+                    aria-label={`Mover ${coluna.titulo} para baixo`}
+                    disabled={indice === ordenadas.length - 1}
+                    onClick={() => aoMover(coluna.id, 1)}
+                  >
+                    ↓
+                  </button>
+                </span>
+              </span>
+            );
+          })}
+          <button type="button" className="app-mais-item" onClick={aoRestaurar}>
+            Restaurar padrão
+          </button>
+        </span>
+      )}
+    </span>
+  );
+}
+
 function classeCelula(coluna) {
   const classes = [
     coluna.__valor && 'celula-valor',
-    coluna.__identidade && 'celula-identidade'
+    coluna.__identidade && 'celula-identidade',
+    coluna.fixa && 'celula-fixa'
   ].filter(Boolean).join(' ');
   return classes || undefined;
 }
+
+/* Comparação para ordenação: número e data comparam como número; o resto
+   como texto pt-BR. Vazio vai SEMPRE para o fim, nas duas direções — o que
+   não tem valor não disputa o topo da lista. */
+function compararValores(a, b) {
+  const vazioA = a === null || a === undefined || a === '';
+  const vazioB = b === null || b === undefined || b === '';
+  if (vazioA && vazioB) return 0;
+  if (vazioA) return 1;
+  if (vazioB) return -1;
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  if (a instanceof Date && b instanceof Date) return a.getTime() - b.getTime();
+  return String(a).localeCompare(String(b), 'pt-BR', { numeric: true, sensitivity: 'base' });
+}
+
 export default function TabelaPadrao({
   colunas = [],
   itens = [],
@@ -179,27 +335,94 @@ export default function TabelaPadrao({
   rotuloRolagem,
   larguraAcoes = 240,
   // R17: declaração EXPLÍCITA de que esta tabela não tem coluna de
-  // identidade (raro — ex.: tabela puramente numérica). Sem uma coluna
+  // identidade (raro — ex.: série temporal). Sem uma coluna
   // `tipo: 'identidade'` e sem esta marca, o validador estático reprova.
   // eslint-disable-next-line no-unused-vars
-  semIdentidade = false
+  semIdentidade = false,
+  // --- capacidades opcionais (ver cabeçalho do arquivo) ---
+  selecao,              // { selecionados:Set|Array, aoAlternar(id,item), aoAlternarTodos(marcar,ids), elegivel?(item) }
+  linhaExpansivel,      // (item) => ReactNode | null
+  agruparPor,           // { chave(item), titulo(chave, itens) }
+  colunasConfiguraveis = false,
+  acoesTabela           // ReactNode extra na barra acima da tabela
 }) {
   const ehMovel = useEhMovel();
   const shellRef = useRef(null);
   const [larguraDisponivel, setLarguraDisponivel] = useState(null);
+  const [expandidas, setExpandidas] = useState(() => new Set());
 
   // A tela declara o papel (`tipo`); a medida vem da tabela de tipos.
-  const colunasBase = colunas.map(normalizarColuna);
+  const colunasDeclaradas = colunas.map(normalizarColuna);
 
-  // R14 — alinhamento escolhido pelo usuário, salvo por lista (como largura).
+  /* ---- Colunas escolhidas pelo usuário (visibilidade + ordem) --------- */
+  const chaveColunas = storageKey ? `${storageKey}:colunas` : null;
+  const idsPadrao = colunasDeclaradas.map((c) => c.id);
+  const [prefColunas, setPrefColunas] = useState(
+    () => lerJson(chaveColunas, null)
+  );
+
+  // Colunas novas/removidas pela tela não podem sumir nem sobrar por causa
+  // de preferência antiga: a ordem salva é reconciliada com a declarada.
+  const ordemColunas = useMemo(() => {
+    const salva = (prefColunas?.ordem || []).filter((id) => idsPadrao.includes(id));
+    const faltando = idsPadrao.filter((id) => !salva.includes(id));
+    return [...salva, ...faltando];
+  }, [prefColunas, idsPadrao.join('|')]);
+
+  const visiveisColunas = useMemo(() => {
+    if (!prefColunas?.visiveis) return idsPadrao;
+    const salvas = prefColunas.visiveis.filter((id) => idsPadrao.includes(id));
+    const novas = idsPadrao.filter((id) => !(prefColunas.visiveis || []).includes(id)
+      && !(prefColunas.ocultas || []).includes(id));
+    return [...salvas, ...novas];
+  }, [prefColunas, idsPadrao.join('|')]);
+
+  const salvarPrefColunas = (proxima) => {
+    setPrefColunas(proxima);
+    gravarJson(chaveColunas, proxima);
+  };
+
+  const alternarColuna = (id) => {
+    const visiveis = visiveisColunas.includes(id)
+      ? visiveisColunas.filter((x) => x !== id)
+      : [...visiveisColunas, id];
+    salvarPrefColunas({
+      ordem: ordemColunas,
+      visiveis,
+      ocultas: idsPadrao.filter((x) => !visiveis.includes(x))
+    });
+  };
+
+  const moverColuna = (id, passo) => {
+    const atual = [...ordemColunas];
+    const de = atual.indexOf(id);
+    const para = de + passo;
+    if (de < 0 || para < 0 || para >= atual.length) return;
+    [atual[de], atual[para]] = [atual[para], atual[de]];
+    salvarPrefColunas({ ordem: atual, visiveis: visiveisColunas, ocultas: prefColunas?.ocultas || [] });
+  };
+
+  const restaurarColunas = () => {
+    setPrefColunas(null);
+    if (chaveColunas && typeof window !== 'undefined') {
+      try { window.localStorage.removeItem(chaveColunas); } catch { /* sem storage */ }
+    }
+  };
+
+  const colunasBase = useMemo(() => {
+    if (!colunasConfiguraveis) return colunasDeclaradas;
+    return ordemColunas
+      .map((id) => colunasDeclaradas.find((c) => c.id === id))
+      .filter((c) => c && visiveisColunas.includes(c.id));
+  }, [colunasConfiguraveis, ordemColunas, visiveisColunas, colunas]);
+
+  /* ---- R14 — alinhamento escolhido pelo usuário, salvo por lista ------ */
   const chaveAlinhar = storageKey ? `${storageKey}:alinhar` : null;
-  const [alinhamentos, setAlinhamentos] = useState(() => lerAlinhamentos(chaveAlinhar));
+  const [alinhamentos, setAlinhamentos] = useState(() => lerJson(chaveAlinhar, {}));
   const definirAlinhamento = (colunaId, valor) => {
     setAlinhamentos((atuais) => {
       const proximos = { ...atuais, [colunaId]: valor };
-      if (chaveAlinhar) {
-        try { window.localStorage.setItem(chaveAlinhar, JSON.stringify(proximos)); } catch { /* sem storage */ }
-      }
+      gravarJson(chaveAlinhar, proximos);
       return proximos;
     });
   };
@@ -208,9 +431,48 @@ export default function TabelaPadrao({
     || ALINHAMENTO_POR_TIPO[coluna.tipo]
     || 'left';
 
-  // R1 (docs/REGRAS-LAYOUT.md): ação no máximo 320px; a sobra do card vai
-  // SEMPRE para a coluna de conteúdo (flex) — medida uma vez no mount.
+  /* ---- Ordenação (clique no título) ----------------------------------- */
+  const [ordem, setOrdem] = useState(null); // { coluna, direcao } | null
+  const alternarOrdem = (colunaId) => {
+    setOrdem((atual) => {
+      if (!atual || atual.coluna !== colunaId) return { coluna: colunaId, direcao: 'asc' };
+      if (atual.direcao === 'asc') return { coluna: colunaId, direcao: 'desc' };
+      return null; // terceiro clique volta à ordem original da tela
+    });
+  };
+
+  const itensOrdenados = useMemo(() => {
+    if (!ordem) return itens;
+    const coluna = colunasBase.find((c) => c.id === ordem.coluna);
+    if (!coluna) return itens;
+    const valorDe = coluna.valorOrdenacao || ((item) => item?.[coluna.id]);
+    const fator = ordem.direcao === 'desc' ? -1 : 1;
+    // Cópia: ordenar não pode mutar o array da tela.
+    return [...itens].sort((a, b) => fator * compararValores(valorDe(a), valorDe(b)));
+  }, [itens, ordem, colunasBase]);
+
+  /* ---- Seleção em lote ------------------------------------------------ */
+  const selecionados = useMemo(() => {
+    if (!selecao) return new Set();
+    return selecao.selecionados instanceof Set
+      ? selecao.selecionados
+      : new Set(selecao.selecionados || []);
+  }, [selecao]);
+
+  const idsElegiveis = useMemo(() => {
+    if (!selecao) return [];
+    return itensOrdenados
+      .filter((item) => (selecao.elegivel ? selecao.elegivel(item) : true))
+      .map((item) => getId(item));
+  }, [selecao, itensOrdenados]);
+
+  const todosMarcados = idsElegiveis.length > 0
+    && idsElegiveis.every((id) => selecionados.has(id));
+
+  /* ---- R1: ação no máximo 320px; a sobra vai para a coluna de conteúdo */
   const larguraAcoesEfetiva = Math.min(larguraAcoes, 320);
+  const LARGURA_SELECAO = 44;
+  const LARGURA_EXPANDIR = 44;
 
   useEffect(() => {
     if (!shellRef.current) return undefined;
@@ -230,8 +492,7 @@ export default function TabelaPadrao({
   }, [carregando, ehMovel, itens.length]);
 
   // T6: célula que trunca ganha tooltip com o texto COMPLETO — cortar com
-  // reticências sem caminho para ler o resto é reprovado pela DoD. Roda
-  // depois do layout, sobre o DOM real (mede o corte de fato).
+  // reticências sem caminho para ler o resto é reprovado pela DoD.
   useEffect(() => {
     const el = shellRef.current;
     if (!el) return;
@@ -256,7 +517,9 @@ export default function TabelaPadrao({
     if (i !== indiceFlex || !larguraDisponivel) return coluna;
     const fixas = colunasBase.reduce(
       (soma, c, j) => (j === indiceFlex ? soma : soma + Number(c.largura || 140)),
-      acoesLinha ? larguraAcoesEfetiva : 0
+      (acoesLinha ? larguraAcoesEfetiva : 0)
+        + (selecao ? LARGURA_SELECAO : 0)
+        + (linhaExpansivel ? LARGURA_EXPANDIR : 0)
     );
     const piso = Math.max(Number(coluna.minWidth || 160), 160);
     // Folga de 12px: bordas e arredondamentos nunca podem cortar a última
@@ -282,14 +545,28 @@ export default function TabelaPadrao({
     const demais = colunasBase.filter((c) => c !== colunaTitulo && c.noCard !== false);
     return (
       <div className="app-tabela-cards">
-        {itens.map((item) => {
+        {itensOrdenados.map((item) => {
           const tom = urgencia?.(item);
+          const id = getId(item);
+          const detalhe = linhaExpansivel?.(item);
+          const aberta = expandidas.has(id);
           return (
             <div
-              key={getId(item)}
+              key={id}
               className={`app-tabela-card${tom ? ` tarja tarja--${tom}` : ''}`}
               onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
             >
+              {selecao ? (
+                <label className="app-tabela-card-selecao" onClick={(e) => e.stopPropagation()}>
+                  <input
+                    type="checkbox"
+                    checked={selecionados.has(id)}
+                    disabled={selecao.elegivel ? !selecao.elegivel(item) : false}
+                    onChange={() => selecao.aoAlternar(id, item)}
+                  />
+                  <span>Selecionar</span>
+                </label>
+              ) : null}
               <div className={`app-celula-dupla-principal${colunaTitulo.__identidade ? ' celula-identidade' : ''}`}>
                 {colunaTitulo.render(item)}
               </div>
@@ -301,6 +578,23 @@ export default function TabelaPadrao({
                   </div>
                 ))}
               </dl>
+              {detalhe ? (
+                <div onClick={(e) => e.stopPropagation()}>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    aria-expanded={aberta}
+                    onClick={() => setExpandidas((atual) => {
+                      const proximo = new Set(atual);
+                      if (proximo.has(id)) proximo.delete(id); else proximo.add(id);
+                      return proximo;
+                    })}
+                  >
+                    {aberta ? 'Ocultar detalhe' : 'Ver detalhe'}
+                  </button>
+                  {aberta ? <div className="app-tabela-card-detalhe">{detalhe}</div> : null}
+                </div>
+              ) : null}
               {acoesLinha ? (
                 <div className="app-tabela-card-acoes" onClick={(e) => e.stopPropagation()}>
                   {acoesLinha(item)}
@@ -313,14 +607,118 @@ export default function TabelaPadrao({
     );
   }
 
-  const colunasTabela = acoesLinha
-    ? [...colunasComFlex, { id: '__acoes', titulo: 'Ações', largura: larguraAcoesEfetiva, minWidth: 120 }]
-    : colunasComFlex;
+  /* ---- Colunas efetivas da tabela (marcação, expansão, conteúdo, ações) */
+  const colunasTabela = [
+    ...(selecao ? [{ id: '__selecao', titulo: 'Sel.', largura: LARGURA_SELECAO, minWidth: LARGURA_SELECAO }] : []),
+    ...(linhaExpansivel ? [{ id: '__expandir', titulo: '', largura: LARGURA_EXPANDIR, minWidth: LARGURA_EXPANDIR }] : []),
+    ...colunasComFlex,
+    ...(acoesLinha ? [{ id: '__acoes', titulo: 'Ações', largura: larguraAcoesEfetiva, minWidth: 120 }] : [])
+  ];
+
+  const totalColunas = colunasTabela.length;
+
+  /* ---- Agrupamento: linhas de grupo intercaladas ---------------------- */
+  const blocos = agruparPor
+    ? Array.from(
+      itensOrdenados.reduce((mapa, item) => {
+        const chave = agruparPor.chave(item);
+        if (!mapa.has(chave)) mapa.set(chave, []);
+        mapa.get(chave).push(item);
+        return mapa;
+      }, new Map())
+    ).map(([chave, lista]) => ({ chave, itens: lista }))
+    : [{ chave: null, itens: itensOrdenados }];
+
+  const renderLinha = (item) => {
+    const tom = urgencia?.(item);
+    const id = getId(item);
+    const detalhe = linhaExpansivel?.(item);
+    const aberta = expandidas.has(id);
+    const classes = [
+      'app-tabela-linha',
+      aoClicarLinha && 'app-tabela-linha--clicavel',
+      tom && `app-tabela-linha--${tom}`
+    ].filter(Boolean).join(' ');
+    return [
+      <tr
+        key={id}
+        className={classes}
+        onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
+      >
+        {selecao ? (
+          <td className="celula-selecao" onClick={(e) => e.stopPropagation()}>
+            <input
+              type="checkbox"
+              checked={selecionados.has(id)}
+              disabled={selecao.elegivel ? !selecao.elegivel(item) : false}
+              aria-label={`Selecionar linha ${id}`}
+              onChange={() => selecao.aoAlternar(id, item)}
+            />
+          </td>
+        ) : null}
+        {linhaExpansivel ? (
+          <td className="celula-expandir" onClick={(e) => e.stopPropagation()}>
+            {detalhe ? (
+              <button
+                type="button"
+                className="app-tabela-expandir"
+                aria-expanded={aberta}
+                aria-label={aberta ? 'Ocultar detalhe' : 'Ver detalhe'}
+                title={aberta ? 'Ocultar detalhe' : 'Ver detalhe'}
+                onClick={() => setExpandidas((atual) => {
+                  const proximo = new Set(atual);
+                  if (proximo.has(id)) proximo.delete(id); else proximo.add(id);
+                  return proximo;
+                })}
+              >
+                <IconeSeta aberta={aberta} />
+              </button>
+            ) : null}
+          </td>
+        ) : null}
+        {colunasBase.map((coluna) => (
+          <td
+            key={coluna.id}
+            className={classeCelula(coluna)}
+            style={{ textAlign: alinhamentoDe(coluna) }}
+          >
+            {coluna.render(item)}
+          </td>
+        ))}
+        {acoesLinha ? (
+          <td onClick={(e) => e.stopPropagation()}>
+            <div className="app-actionbar">{acoesLinha(item)}</div>
+          </td>
+        ) : null}
+      </tr>,
+      detalhe && aberta ? (
+        <tr key={`${id}:detalhe`} className="app-tabela-detalhe">
+          <td colSpan={totalColunas}>{detalhe}</td>
+        </tr>
+      ) : null
+    ];
+  };
 
   return (
     <div className="app-table-shell app-tabela" ref={shellRef}>
+      {(colunasConfiguraveis || acoesTabela) ? (
+        <div className="app-tabela-barra">
+          {acoesTabela}
+          {colunasConfiguraveis ? (
+            <PainelColunas
+              colunas={colunasDeclaradas}
+              visiveis={visiveisColunas}
+              ordem={ordemColunas}
+              aoAlternar={alternarColuna}
+              aoMover={moverColuna}
+              aoRestaurar={restaurarColunas}
+            />
+          ) : null}
+        </div>
+      ) : null}
+
       <ResizableTable
-        key={`medida:${larguraDisponivel ?? 'auto'}`}
+        key={`medida:${larguraDisponivel ?? 'auto'}:${colunasTabela.map((c) => c.id).join(',')}`}
         columns={colunasTabela.map((c) => ({
           id: c.id,
           width: c.largura,
@@ -333,54 +731,67 @@ export default function TabelaPadrao({
       >
         <thead>
           <tr>
-            {colunasTabela.map((coluna) => (
-              <ResizableTh key={coluna.id} columnKey={coluna.id}>
-                {coluna.id === '__acoes' ? (
-                  coluna.titulo
-                ) : (
-                  <TituloComAlinhamento
-                    coluna={coluna}
-                    alinhamento={alinhamentoDe(coluna)}
-                    aoAlinhar={definirAlinhamento}
-                  />
-                )}
+            {selecao ? (
+              <th className="resizable-th celula-selecao">
+                <input
+                  type="checkbox"
+                  checked={todosMarcados}
+                  ref={(el) => {
+                    if (el) {
+                      el.indeterminate = !todosMarcados
+                        && idsElegiveis.some((id) => selecionados.has(id));
+                    }
+                  }}
+                  aria-label={todosMarcados ? 'Desmarcar todos' : 'Selecionar todos'}
+                  title={todosMarcados ? 'Desmarcar todos' : 'Selecionar todos'}
+                  onChange={() => selecao.aoAlternarTodos(!todosMarcados, idsElegiveis)}
+                />
+              </th>
+            ) : null}
+            {linhaExpansivel ? <th className="resizable-th celula-expandir" aria-label="Detalhe" /> : null}
+            {colunasComFlex.map((coluna) => (
+              <ResizableTh
+                key={coluna.id}
+                columnKey={coluna.id}
+                className={coluna.fixa ? 'celula-fixa' : undefined}
+                aria-sort={ordem?.coluna === coluna.id
+                  ? (ordem.direcao === 'asc' ? 'ascending' : 'descending')
+                  : undefined}
+              >
+                <CabecalhoColuna
+                  coluna={coluna}
+                  alinhamento={alinhamentoDe(coluna)}
+                  aoAlinhar={definirAlinhamento}
+                  ordem={ordem}
+                  aoOrdenar={alternarOrdem}
+                />
               </ResizableTh>
             ))}
+            {acoesLinha ? (
+              <ResizableTh columnKey="__acoes">Ações</ResizableTh>
+            ) : null}
           </tr>
         </thead>
         <tbody>
-          {itens.map((item) => {
-            const tom = urgencia?.(item);
-            const classes = [
-              'app-tabela-linha',
-              aoClicarLinha && 'app-tabela-linha--clicavel',
-              tom && `app-tabela-linha--${tom}`
-            ].filter(Boolean).join(' ');
-            return (
-              <tr
-                key={getId(item)}
-                className={classes}
-                onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
-              >
-                {colunasBase.map((coluna) => (
-                  <td
-                    key={coluna.id}
-                    className={classeCelula(coluna)}
-                    style={{ textAlign: alinhamentoDe(coluna) }}
-                  >
-                    {coluna.render(item)}
+          {blocos.map((bloco) => (
+            <Fragmento key={bloco.chave ?? '__unico'}>
+              {agruparPor && bloco.chave !== null ? (
+                <tr className="app-tabela-grupo">
+                  <td colSpan={totalColunas}>
+                    {agruparPor.titulo ? agruparPor.titulo(bloco.chave, bloco.itens) : bloco.chave}
                   </td>
-                ))}
-                {acoesLinha ? (
-                  <td onClick={(e) => e.stopPropagation()}>
-                    <div className="app-actionbar">{acoesLinha(item)}</div>
-                  </td>
-                ) : null}
-              </tr>
-            );
-          })}
+                </tr>
+              ) : null}
+              {bloco.itens.map((item) => renderLinha(item))}
+            </Fragmento>
+          ))}
         </tbody>
       </ResizableTable>
     </div>
   );
+}
+
+/* Fragmento nomeado: `key` num React.Fragment exige a forma longa. */
+function Fragmento({ children }) {
+  return <>{children}</>;
 }

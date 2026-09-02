@@ -566,12 +566,20 @@
   text-align: inherit;
 }
 
-/* R14 — título de coluna clicável: escolhe o alinhamento (esq/centro/dir),
-   aplicado a título E conteúdo, salvo por usuário e por lista. */
+/* R14/R15 — CABEÇALHO DE COLUNA: ordenar × alinhar (desenho de 02/09).
+   O CLIQUE NO TÍTULO ORDENA (coluna com `ordenavel`); o menu de alinhamento
+   vira um ÍCONE PRÓPRIO ancorado à direita, revelado no hover/foco.
+   Por que ancorado e não lado a lado: numa coluna de status (96px, ~72px
+   úteis) o título com indicador de ordem já ocupa ~54px e o alvo mínimo do
+   ícone é 32px (R2) — não cabem em linha. Ancorado sobre a borda direita,
+   com fundo próprio, o título trunca atrás dele; é o arranjo do Excel e do
+   Planilhas. */
 .app-th-alinhavel {
   display: block;
   position: relative;
   min-width: 0;
+  /* espaço para o ícone de alinhamento não cobrir o título em repouso */
+  padding-right: var(--esp-4);
 }
 
 .app-th-botao {
@@ -584,39 +592,92 @@
   letter-spacing: inherit;
   text-transform: inherit;
   color: inherit;
-  cursor: pointer;
-  /* R2: o título inteiro é o alvo do clique de alinhamento. */
   display: block;
   width: 100%;
   min-height: var(--alvo-clique);
   text-align: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* R15 — capacidade sem sinal não existe para o usuário: o menu de
-   alinhamento ganha affordance VISÍVEL. Ícone discreto ao lado do título,
-   revelado no hover do cabeçalho (e sempre visível com o menu aberto);
-   o tooltip "Alinhar / redimensionar" nomeia as duas capacidades.
-   display inline + vertical-align preservam o alinhamento do título
-   (esquerda/centro/direita) definido pela coluna. */
-.app-th-affordance {
+/* Coluna sem ordenação: o título é TEXTO — nada de cursor ou realce que
+   prometa uma ação que não existe (R15 ao contrário: sinal sem capacidade
+   também é defeito). */
+.app-th-botao--estatico {
+  cursor: default;
+}
+
+.app-th-botao--ordenavel {
+  cursor: pointer;
+}
+
+.app-th-botao--ordenavel:hover {
+  color: var(--c-text);
+}
+
+/* Indicador de ordem: as duas setas em repouso (mostra que a coluna
+   ordena), a seta ativa cheia e a outra apagada quando há ordenação. */
+.app-th-ordem {
   display: inline-block;
   vertical-align: -2px;
   margin-left: var(--esp-1);
-  width: 14px;
+  width: 10px;
   height: 14px;
   color: var(--c-muted);
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, color 0.12s ease;
 }
 
-.resizable-th:hover .app-th-affordance,
-.app-th-botao:focus-visible .app-th-affordance,
-.app-th-alinhavel--aberto .app-th-affordance {
+.resizable-th:hover .app-th-ordem {
+  opacity: 0.8;
+}
+
+.app-th-ordem--ativa {
   opacity: 1;
+  color: var(--c-primary);
 }
 
-.app-th-botao:hover {
+/* R15 — o menu de alinhamento tem affordance VISÍVEL: ícone próprio,
+   revelado no hover/foco do cabeçalho e sempre visível com o menu aberto.
+   Fica à esquerda da alça de redimensionamento (que ocupa a borda). */
+.app-th-alinhar {
+  appearance: none;
+  border: 0;
+  background: var(--ui-surface);
+  border-radius: var(--raio-1);
+  padding: 0;
+  position: absolute;
+  top: 50%;
+  right: -2px;
+  transform: translateY(-50%);
+  width: var(--alvo-clique);
+  height: var(--alvo-clique);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-muted);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 2;
+}
+
+.resizable-th:hover .app-th-alinhar,
+.app-th-alinhar:focus-visible,
+.app-th-alinhavel--aberto .app-th-alinhar {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.app-th-alinhar:hover {
   color: var(--c-text);
+}
+
+.app-th-affordance {
+  width: 14px;
+  height: 14px;
 }
 
 .app-th-menu {
@@ -783,4 +844,162 @@ fieldset.form-section {
   .form-grid--4 { grid-template-columns: minmax(0, 1fr); }
   .form-campo--span2 { grid-column: auto; }
   .app-actionbar-apartada { margin-left: 0; }
+}
+
+
+/* ============================================================
+   CAPACIDADES DA LEVA DO COMPONENTE (02/09) — seleção em lote,
+   linha expansível/agrupadora, coluna fixa e painel de colunas.
+   ============================================================ */
+
+/* Coluna de marcação e de expansão: estreitas, centradas, sem alça. */
+.app-tabela th.celula-selecao,
+.app-tabela td.celula-selecao,
+.app-tabela th.celula-expandir,
+.app-tabela td.celula-expandir {
+  text-align: center;
+  padding-left: var(--esp-2);
+  padding-right: var(--esp-2);
+}
+
+.app-tabela td.celula-selecao input,
+.app-tabela th.celula-selecao input {
+  /* R2: alvo de toque do checkbox (o input em si é menor que o alvo). */
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.app-tabela-expandir {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  min-width: var(--alvo-clique);
+  min-height: var(--alvo-clique);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.app-tabela-expandir:hover { color: var(--c-text); }
+
+.app-tabela-expandir-seta {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.15s ease;
+}
+
+.app-tabela-expandir-seta--aberta { transform: rotate(90deg); }
+
+/* Linha de detalhe: superfície rebaixada, ocupando a largura da tabela. */
+.app-tabela .app-tabela-detalhe > td {
+  background: var(--ui-surface-2);
+  padding: var(--esp-3) var(--esp-4);
+  border-top: 0;
+}
+
+/* Linha de grupo: cabeçalho de bloco dentro do corpo da tabela. */
+.app-tabela .app-tabela-grupo > td {
+  background: var(--ui-surface-2);
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-text);
+  padding: var(--esp-2) var(--esp-4);
+}
+
+/* COLUNA FIXA: gruda à esquerda na rolagem horizontal. Precisa de fundo
+   OPACO (senão o conteúdo rola por baixo) e de uma borda que marque o
+   limite do que está preso — em tabela larga é o que diz de qual linha se
+   está lendo o número. */
+.app-tabela th.celula-fixa,
+.app-tabela td.celula-fixa {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: var(--ui-surface);
+  box-shadow: 1px 0 0 var(--ui-border);
+}
+
+.app-tabela thead th.celula-fixa { z-index: 4; }
+
+.app-tabela .app-tabela-linha:hover td.celula-fixa {
+  background: var(--ui-surface-2);
+}
+
+/* Barra acima da tabela: painel de colunas e ações da tabela inteira. */
+.app-tabela-barra {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--esp-2);
+  margin-bottom: var(--esp-3);
+}
+
+.app-colunas-wrap { position: relative; }
+
+.app-colunas-menu {
+  min-width: 260px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: var(--esp-2);
+  gap: var(--esp-1);
+}
+
+.app-colunas-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--esp-2);
+  padding: var(--esp-1) var(--esp-2);
+  border-radius: var(--raio-1);
+}
+
+.app-colunas-item:hover { background: var(--ui-surface-2); }
+
+.app-colunas-rotulo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  font-size: var(--fonte-corpo);
+  min-height: var(--alvo-clique);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.app-colunas-rotulo span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-colunas-rotulo input:disabled { cursor: not-allowed; }
+
+.app-colunas-mover {
+  display: inline-flex;
+  gap: var(--esp-1);
+  flex-shrink: 0;
+}
+
+/* Mobile: marcação e detalhe dentro do card, com as mesmas colunas. */
+.app-tabela-card-selecao {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  min-height: var(--alvo-clique);
+  font-size: var(--fonte-detalhe);
+  color: var(--c-muted);
+  cursor: pointer;
+}
+
+.app-tabela-card-detalhe {
+  margin-top: var(--esp-2);
+  padding-top: var(--esp-2);
+  border-top: 1px solid var(--ui-border);
 }

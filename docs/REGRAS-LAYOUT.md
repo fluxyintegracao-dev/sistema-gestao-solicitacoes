@@ -192,6 +192,23 @@ automaticamente se sair do padrão.
   e é salva por usuário e por lista (localStorage, como a largura). O
   alinhamento-check do roteiro de capturas prova aplicação e persistência.
 
+## R14b — Ordenar × alinhar no mesmo cabeçalho (02/09, leva do componente)
+
+- **O clique no título ORDENA** (coluna com `ordenavel`); o menu de
+  alinhamento vira **ícone próprio**, ancorado à direita do cabeçalho e
+  revelado no hover/foco (a affordance da R15).
+- **Por que ancorado e não lado a lado**: numa coluna de status (96px,
+  ~72px úteis) o título com o indicador de ordem já ocupa ~54px e o alvo
+  mínimo do ícone é 32px (R2) — não cabem em linha. Ancorado sobre a borda
+  direita, com fundo próprio, o título trunca atrás dele. É o arranjo do
+  Excel e do Planilhas.
+- **Coluna sem `ordenavel` não vira botão**: o título fica texto, sem
+  cursor nem realce. Sinal sem capacidade é o mesmo defeito da R15 ao
+  contrário.
+- Ordenação é **opt-in por coluna**: ligar em todas de uma vez mudaria o
+  comportamento de 108 telas em silêncio. Ciclo de três estados —
+  crescente, decrescente, e de volta à ordem que a tela definiu.
+
 ## R15 — Toda capacidade interativa precisa de affordance VISÍVEL (02/09)
 
 - **Capacidade sem sinal não existe para o usuário.** Toda interação
@@ -221,6 +238,27 @@ automaticamente se sair do padrão.
   cada contexto continua com no máximo um de cada.
 - Verificação automática: o harness reprova dois campos de busca / dois
   blocos de filtro / dois cabeçalhos no mesmo contexto (DoD F1).
+
+## R16b — O padrão cobre o caso, ou o caso vira exceção declarada (02/09)
+
+- **Regra com vinte exceções não é regra** (decisão do cliente). Quando um
+  conjunto de telas não cabe no componente padrão, a resposta é ESTENDER o
+  componente — não acumular exceção.
+- As cinco capacidades que a leva de 02/09 trouxe para a `TabelaPadrao`,
+  todas **opt-in** (tabela que não as declara se comporta como antes):
+  1. **Ordenação** no cabeçalho (`ordenavel` + `valorOrdenacao` na coluna);
+  2. **Colunas escolhidas pelo usuário** (`colunasConfiguraveis`): mostrar,
+     esconder e reordenar, salvo por lista — a coluna de identidade não
+     pode ser escondida;
+  3. **Seleção em lote** (`selecao`) com "todos" no cabeçalho, incluindo o
+     estado indeterminado;
+  4. **Linha expansível** (`linhaExpansivel`) e **agrupadora**
+     (`agruparPor`);
+  5. **Coluna fixa** (`fixa` na coluna): gruda à esquerda na rolagem
+     horizontal, com fundo opaco e borda de limite — em tabela larga é o
+     que diz de qual linha se está lendo o número.
+- Exceção que sobra depois disso precisa de motivo técnico verificado no
+  código e registro no manifesto — nunca "não deu".
 
 ## R17 — Toda tabela DECLARA suas colunas (02/09, decisão do cliente)
 
