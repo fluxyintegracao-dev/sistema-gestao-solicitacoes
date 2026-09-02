@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import {
   getObrasVisiveisSolicitacoes,
   obterRelatorioSolicitacoesOperacional
@@ -13,37 +14,6 @@ const DEFAULT_FILTERS = {
   obra_id: ''
 };
 
-const STATUS_COLUMNS = [
-  { key: 'status', width: 180, minWidth: 130 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
-const SETOR_COLUMNS = [
-  { key: 'setor', width: 190, minWidth: 130 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
-const OBRA_COLUMNS = [
-  { key: 'obra', width: 240, minWidth: 160 },
-  { key: 'tipo', width: 132, minWidth: 100 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
-const TIPO_COLUMNS = [
-  { key: 'tipo', width: 230, minWidth: 150 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
-const USUARIO_COLUMNS = [
-  { key: 'usuario', width: 230, minWidth: 150 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
 const ACERTIVIDADE_COLUMNS = [
   { key: 'usuario', width: 240, minWidth: 160 },
   { key: 'criadas', width: 96, minWidth: 80 },
@@ -51,42 +21,6 @@ const ACERTIVIDADE_COLUMNS = [
   { key: 'ocorrencias', width: 150, minWidth: 120 },
   { key: 'acertividade', width: 135, minWidth: 110 },
   { key: 'setores', width: 340, minWidth: 240 }
-];
-
-const PENDENCIAS_FINANCEIRAS_COLUMNS = [
-  { key: 'usuario', width: 240, minWidth: 160 },
-  { key: 'marcadas', width: 125, minWidth: 100 },
-  { key: 'abertas', width: 115, minWidth: 92 },
-  { key: 'regularizadas', width: 140, minWidth: 112 },
-  { key: 'media', width: 145, minWidth: 115 },
-  { key: 'maior', width: 145, minWidth: 115 },
-  { key: 'tipos', width: 340, minWidth: 240 }
-];
-
-const TEMPO_COLUMNS = [
-  { key: 'etapa', width: 260, minWidth: 180 },
-  { key: 'amostras', width: 110, minWidth: 90 },
-  { key: 'media', width: 120, minWidth: 100 },
-  { key: 'maior', width: 120, minWidth: 100 }
-];
-
-const AGING_SETOR_COLUMNS = [
-  { key: 'setor', width: 210, minWidth: 140 },
-  { key: 'abertas', width: 100, minWidth: 80 },
-  { key: 'media', width: 130, minWidth: 100 },
-  { key: 'maior', width: 130, minWidth: 100 },
-  { key: 'valor', width: 140, minWidth: 110 }
-];
-
-const GARGALO_COLUMNS = [
-  { key: 'codigo', width: 130, minWidth: 100 },
-  { key: 'setor', width: 150, minWidth: 110 },
-  { key: 'status', width: 150, minWidth: 110 },
-  { key: 'responsavel', width: 170, minWidth: 120 },
-  { key: 'obra', width: 210, minWidth: 140 },
-  { key: 'tipo', width: 180, minWidth: 120 },
-  { key: 'dias', width: 112, minWidth: 92 },
-  { key: 'valor', width: 130, minWidth: 100 }
 ];
 
 function readFilters(searchParams) {
@@ -988,37 +922,31 @@ export default function SolicitacoesRelatorioOperacional() {
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por obra/centro</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={OBRA_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.obra.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="obra">Obra / Centro</ResizableTh>
-                  <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={4}>Carregando...</EmptyRow>
-                ) : porObra.length === 0 ? (
-                  <EmptyRow colSpan={4}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porObra.map((item) => (
-                    <tr key={item.key}>
-                      <td>
-                        <strong>{item.obra_nome || 'Sem obra/centro'}</strong>
-                        {item.obra_codigo ? <div className="text-xs text-[var(--c-muted)]">{item.obra_codigo}</div> : null}
-                      </td>
-                      <td>{formatLabel(item.tipo_centro_custo)}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra / Centro',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={item.obra_nome || 'Sem obra/centro'}
+                    sub={item.obra_codigo || ''}
+                  />
+                )
+              },
+              { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => formatLabel(item.tipo_centro_custo) },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porObra}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-obra"
+            rotuloRolagem="Por obra/centro"
+          />
         </div>
       </div>
 
@@ -1151,92 +1079,71 @@ export default function SolicitacoesRelatorioOperacional() {
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por tipo</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={TIPO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.tipo.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
-                ) : porTipo.length === 0 ? (
-                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porTipo.map((item) => (
-                    <tr key={item.key}>
-                      <td>{item.tipo_nome || 'Sem tipo'}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.tipo_nome || 'Sem tipo'
+              },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porTipo}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-tipo"
+            rotuloRolagem="Por tipo"
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por responsavel atual</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={USUARIO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.responsavel.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="usuario">Responsavel</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
-                ) : porResponsavel.length === 0 ? (
-                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porResponsavel.map((item) => (
-                    <tr key={item.key}>
-                      <td>{item.usuario_nome || 'Sem responsavel'}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'usuario',
+                titulo: 'Responsavel',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.usuario_nome || 'Sem responsavel'
+              },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porResponsavel}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-responsavel"
+            rotuloRolagem="Por responsavel atual"
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por criador</h2>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={USUARIO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.criador.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="usuario">Criador</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Qtd.</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <EmptyRow colSpan={3}>Carregando...</EmptyRow>
-                ) : porCriador.length === 0 ? (
-                  <EmptyRow colSpan={3}>Sem dados no periodo.</EmptyRow>
-                ) : (
-                  porCriador.map((item) => (
-                    <tr key={item.key}>
-                      <td>{item.usuario_nome || 'Sem criador'}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right">{formatCurrency(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'usuario',
+                titulo: 'Criador',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.usuario_nome || 'Sem criador'
+              },
+              { id: 'total', titulo: 'Qtd.', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={porCriador}
+            getId={(item) => item.key}
+            carregando={loading}
+            vazio="Sem dados no periodo."
+            storageKey="tabela:solicitacoes-relatorio-operacional:por-criador"
+            rotuloRolagem="Por criador"
+          />
         </div>
       </div>
 
@@ -1247,50 +1154,46 @@ export default function SolicitacoesRelatorioOperacional() {
             <p className="page-subtitle">Solicitacoes abertas ha pelo menos 3 dias sem nova movimentacao registrada.</p>
           </div>
         </div>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={GARGALO_COLUMNS} storageKey="fluxy.solicitacoes.relatorio.gargalos.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="codigo">Solicitacao</ResizableTh>
-                <ResizableTh columnKey="setor">Setor</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-                <ResizableTh columnKey="responsavel">Responsavel</ResizableTh>
-                <ResizableTh columnKey="obra">Obra / Centro</ResizableTh>
-                <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                <ResizableTh columnKey="dias" className="text-right">Parada</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <EmptyRow colSpan={8}>Carregando gargalos...</EmptyRow>
-              ) : gargalos.length === 0 ? (
-                <EmptyRow colSpan={8}>Nenhum gargalo encontrado nos filtros selecionados.</EmptyRow>
-              ) : (
-                gargalos.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <Link to={`/solicitacoes/${item.id}`} className="font-bold text-[var(--c-primary)] hover:underline">
-                        {item.codigo || `#${item.id}`}
-                      </Link>
-                      <div className="text-xs text-[var(--c-muted)]">Criada em {formatDate(item.criada_em)}</div>
-                    </td>
-                    <td>{formatLabel(item.setor)}</td>
-                    <td>{formatLabel(item.status)}</td>
-                    <td>{item.responsavel_nome || '-'}</td>
-                    <td>{item.obra_nome || '-'}</td>
-                    <td>{item.tipo_nome || '-'}</td>
-                    <td className="text-right">
-                      <strong>{formatNumber(item.dias_parada, 1)} dia(s)</strong>
-                      <div className="text-xs text-[var(--c-muted)]">Ultima: {formatDate(item.ultima_movimentacao_em)}</div>
-                    </td>
-                    <td className="text-right">{formatCurrency(item.valor)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'codigo',
+              titulo: 'Solicitacao',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <div>
+                  <Link to={`/solicitacoes/${item.id}`} className="font-bold text-[var(--c-primary)] hover:underline">
+                    {item.codigo || `#${item.id}`}
+                  </Link>
+                  <div className="text-xs text-[var(--c-muted)]">Criada em {formatDate(item.criada_em)}</div>
+                </div>
+              )
+            },
+            { id: 'setor', titulo: 'Setor', tipo: 'texto', render: (item) => formatLabel(item.setor) },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => formatLabel(item.status) },
+            { id: 'responsavel', titulo: 'Responsavel', tipo: 'texto', render: (item) => item.responsavel_nome || '-' },
+            { id: 'obra', titulo: 'Obra / Centro', tipo: 'texto', render: (item) => item.obra_nome || '-' },
+            { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (item) => item.tipo_nome || '-' },
+            {
+              id: 'dias',
+              titulo: 'Parada',
+              tipo: 'numero',
+              render: (item) => (
+                <div>
+                  <strong>{formatNumber(item.dias_parada, 1)} dia(s)</strong>
+                  <div className="text-xs text-[var(--c-muted)]">Ultima: {formatDate(item.ultima_movimentacao_em)}</div>
+                </div>
+              )
+            },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor) }
+          ]}
+          itens={gargalos}
+          carregando={loading}
+          vazio="Nenhum gargalo encontrado nos filtros selecionados."
+          storageKey="tabela:solicitacoes-relatorio-operacional:gargalos"
+          rotuloRolagem="Gargalos operacionais"
+        />
       </div>
     </div>
   );

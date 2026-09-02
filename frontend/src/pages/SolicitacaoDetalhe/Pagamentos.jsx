@@ -4,6 +4,7 @@ import {
   getContasBancarias,
   getTitulosFinanceirosPorSolicitacao
 } from '../../services/financeiro';
+import { TabelaPadrao } from '../../components/padrao';
 
 function formatarMoeda(valor) {
   const numero = Number(valor);
@@ -427,36 +428,45 @@ export default function Pagamentos({ solicitacao, podeInformarPagamento = false,
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto p-4">
-              <div className="overflow-x-auto rounded-xl border border-[var(--c-border)]">
-                <table className="w-full text-sm">
-                  <thead className="bg-[var(--c-bg)] text-left text-xs uppercase tracking-wide text-[var(--c-muted)]">
-                    <tr>
-                      <th className="px-4 py-3">Data</th>
-                      <th className="px-4 py-3">Valor</th>
-                      <th className="px-4 py-3">Registrado por</th>
-                      <th className="px-4 py-3">Observacao</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--c-border)]">
-                    {pagamentos.map(pagamento => (
-                      <tr key={pagamento.id}>
-                        <td className="px-4 py-3 whitespace-nowrap text-[var(--c-text)]">
-                          {formatarData(pagamento.data_pagamento)}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap font-semibold text-[var(--c-text)]">
-                          {formatarMoeda(pagamento.valor)}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--c-muted)]">
-                          {pagamento.criadoPor?.nome || 'Usuario'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-pre-wrap text-[var(--c-muted)]">
-                          {pagamento.observacao || '-'}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'data',
+                    titulo: 'Data',
+                    tipo: 'data',
+                    noCard: 'titulo',
+                    render: (pagamento) => formatarData(pagamento.data_pagamento)
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (pagamento) => <span className="font-semibold">{formatarMoeda(pagamento.valor)}</span>
+                  },
+                  {
+                    id: 'registrado_por',
+                    titulo: 'Registrado por',
+                    tipo: 'texto',
+                    render: (pagamento) => pagamento.criadoPor?.nome || 'Usuario'
+                  },
+                  {
+                    id: 'observacao',
+                    titulo: 'Observacao',
+                    tipo: 'texto',
+                    render: (pagamento) => (
+                      <span className="whitespace-pre-wrap">{pagamento.observacao || '-'}</span>
+                    )
+                  }
+                ]}
+                itens={pagamentos}
+                vazio="Nenhum pagamento registrado."
+                storageKey="tabela:solicitacao-detalhe-pagamentos"
+                rotuloRolagem="Pagamentos registrados"
+                // R17: o pagamento e uma serie temporal (data + valor lancados
+                // no caixa) — nenhuma coluna NOMEIA o registro: "Registrado
+                // por" nomeia o usuario, nao o pagamento.
+                semIdentidade
+              />
             </div>
           </div>
         </div>

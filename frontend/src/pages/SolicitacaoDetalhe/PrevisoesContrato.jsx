@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HiEye } from 'react-icons/hi2';
 import { getContratoParcelas } from '../../services/contratos';
+import { TabelaPadrao } from '../../components/padrao';
 
 /**
  * As PREVISOES do contrato dentro do card do Financeiro (PI-16).
@@ -103,75 +104,95 @@ export default function PrevisoesContrato({
         </p>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="border-b border-[var(--c-border)] text-left text-xs uppercase tracking-[0.06em] text-[var(--c-muted)]">
-              <th className="px-2 py-2">#</th>
-              <th className="px-2 py-2">Vencimento</th>
-              <th className="px-2 py-2">Valor</th>
-              <th className="px-2 py-2">Situacao</th>
-              <th className="px-2 py-2">Medicao</th>
-              <th className="px-2 py-2 text-right"><span className="sr-only">Titulo</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            {parcelas.map((p) => (
-              <tr key={p.id} className="border-b border-[var(--c-border)] last:border-0">
-                <td className="px-2 py-2 align-top">{p.numero}</td>
-                <td className="px-2 py-2 align-top">{data(p.vencimento)}</td>
-                <td className="px-2 py-2 align-top">
-                  {moeda(p.valor)}
-                  {/* Previsto x atual: a medicao reduz a parcela e joga a diferenca na ultima.
-                      Mostrar os dois evita a pergunta "por que mudou?" (PI-5). */}
-                  {p.valor_previsto !== null && Number(p.valor_previsto) !== Number(p.valor) && (
-                    <span className="block text-xs text-[var(--c-muted)]">previsto {moeda(p.valor_previsto)}</span>
-                  )}
-                </td>
-                <td className="px-2 py-2 align-top" data-testid={`situacao-parcela-${p.numero}`}>
-                  {rotuloSituacao(p.situacao || p.status)}
-                </td>
-                <td className="px-2 py-2 align-top">
-                  {p.medicao ? (
-                    somenteLeitura && !permitirAbrirMedicaoSomenteLeitura ? (
-                      <span className="text-sm text-[var(--c-text)]">Medicao {p.medicao.numero}</span>
-                    ) : (
-                      // O botao por titulo que o cliente pediu: abre os anexos e comentarios
-                      // DAQUELA medicao. Com uma solicitacao por contrato, sem isto os documentos
-                      // de todas as medicoes viram uma pilha unica sem dono.
-                      <button
-                        type="button"
-                        className="btn btn-outline btn-sm"
-                        data-testid={`abrir-medicao-${p.medicao.numero}`}
-                        onClick={() => onAbrirMedicao?.(p.medicao)}
-                      >
-                        Medicao {p.medicao.numero}
-                      </button>
-                    )
-                  ) : (
-                    <span className="text-xs text-[var(--c-muted)]">-</span>
-                  )}
-                </td>
-                <td className="px-2 py-2 text-right align-top">
-                  {p.titulo_financeiro_id ? (
-                    <Link
-                      to={`/financeiro/titulos/${p.titulo_financeiro_id}`}
-                      className="btn btn-outline btn-sm !px-2"
-                      title={`Ver titulo da parcela ${p.numero}`}
-                      aria-label={`Ver titulo financeiro da parcela ${p.numero}`}
-                      data-testid={`ver-titulo-parcela-${p.numero}`}
-                    >
-                      <HiEye className="h-4 w-4" aria-hidden="true" />
-                    </Link>
-                  ) : (
-                    <span className="text-xs text-[var(--c-muted)]">-</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'numero',
+            titulo: '#',
+            tipo: 'identidade',
+            noCard: 'titulo',
+            // A sobra da largura vai para a coluna de medicao, que carrega o
+            // botao: o numero da parcela nao cresce com o espaco disponivel.
+            flex: false,
+            render: (p) => p.numero
+          },
+          {
+            id: 'vencimento',
+            titulo: 'Vencimento',
+            tipo: 'data',
+            render: (p) => data(p.vencimento)
+          },
+          {
+            id: 'valor',
+            titulo: 'Valor',
+            tipo: 'valor',
+            render: (p) => (
+              <>
+                {moeda(p.valor)}
+                {/* Previsto x atual: a medicao reduz a parcela e joga a diferenca na ultima.
+                    Mostrar os dois evita a pergunta "por que mudou?" (PI-5). */}
+                {p.valor_previsto !== null && Number(p.valor_previsto) !== Number(p.valor) && (
+                  <span className="block text-xs text-[var(--c-muted)]">previsto {moeda(p.valor_previsto)}</span>
+                )}
+              </>
+            )
+          },
+          {
+            id: 'situacao',
+            titulo: 'Situacao',
+            tipo: 'status',
+            render: (p) => (
+              <span data-testid={`situacao-parcela-${p.numero}`}>{rotuloSituacao(p.situacao || p.status)}</span>
+            )
+          },
+          {
+            id: 'medicao',
+            titulo: 'Medicao',
+            tipo: 'texto',
+            render: (p) => (
+              p.medicao ? (
+                somenteLeitura && !permitirAbrirMedicaoSomenteLeitura ? (
+                  <span className="text-sm text-[var(--c-text)]">Medicao {p.medicao.numero}</span>
+                ) : (
+                  // O botao por titulo que o cliente pediu: abre os anexos e comentarios
+                  // DAQUELA medicao. Com uma solicitacao por contrato, sem isto os documentos
+                  // de todas as medicoes viram uma pilha unica sem dono.
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    data-testid={`abrir-medicao-${p.medicao.numero}`}
+                    onClick={() => onAbrirMedicao?.(p.medicao)}
+                  >
+                    Medicao {p.medicao.numero}
+                  </button>
+                )
+              ) : (
+                <span className="text-xs text-[var(--c-muted)]">-</span>
+              )
+            )
+          }
+        ]}
+        itens={parcelas}
+        vazio="Nenhuma parcela prevista para este contrato."
+        storageKey="tabela:solicitacao-detalhe-previsoes-contrato"
+        rotuloRolagem="Parcelas do contrato"
+        larguraAcoes={140}
+        acoesLinha={(p) => (
+          p.titulo_financeiro_id ? (
+            <Link
+              to={`/financeiro/titulos/${p.titulo_financeiro_id}`}
+              className="btn btn-outline btn-sm !px-2"
+              title={`Ver titulo da parcela ${p.numero}`}
+              aria-label={`Ver titulo financeiro da parcela ${p.numero}`}
+              data-testid={`ver-titulo-parcela-${p.numero}`}
+            >
+              <HiEye className="h-4 w-4" aria-hidden="true" />
+            </Link>
+          ) : (
+            <span className="text-xs text-[var(--c-muted)]">-</span>
+          )
+        )}
+      />
 
       {/* ITEM 17 (23/08): o bloco de apropriacoes do contrato saiu daqui.
 

@@ -4,6 +4,7 @@ import { listarApropriacoes } from '../../services/apropriacoes';
 import OverlayModal from '../../components/ui/OverlayModal';
 import { nomeApropriacao, percentualApropriacao } from '../../utils/apropriacao';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../../components/contratos/RateioApropriacoesContrato';
+import { TabelaPadrao } from '../../components/padrao';
 
 /**
  * O rateio de apropriacoes DO CONTRATO, dentro da solicitacao que e dona dele (PI-16).
@@ -110,30 +111,34 @@ export default function ApropriacoesDoContrato({ contrato, podeEditar, onMudou }
         )}
       </div>
 
-      {lista.length === 0 ? (
-        <p className="text-sm text-[var(--c-muted)]">Nenhuma apropriacao cadastrada para este contrato.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-[var(--c-border)] text-left text-xs uppercase tracking-[0.06em] text-[var(--c-muted)]">
-                <th className="px-2 py-2">Apropriacao</th>
-                <th className="px-2 py-2" style={{ width: 120 }}>Rateio %</th>
-                <th className="px-2 py-2" style={{ width: 160 }}>Rateio R$</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lista.map((a) => (
-                <tr key={a.apropriacao_id} className="border-b border-[var(--c-border)] last:border-0">
-                  <td className="px-2 py-2">{nomeApropriacao(a)}</td>
-                  <td className="px-2 py-2">{percentualApropriacao(a.percentual)}%</td>
-                  <td className="px-2 py-2">{moeda((valorTotal * Number(a.percentual || 0)) / 100)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'apropriacao',
+            titulo: 'Apropriacao',
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (a) => nomeApropriacao(a)
+          },
+          {
+            id: 'percentual',
+            titulo: 'Rateio %',
+            tipo: 'numero',
+            render: (a) => `${percentualApropriacao(a.percentual)}%`
+          },
+          {
+            id: 'valor',
+            titulo: 'Rateio R$',
+            tipo: 'valor',
+            render: (a) => moeda((valorTotal * Number(a.percentual || 0)) / 100)
+          }
+        ]}
+        itens={lista}
+        getId={(a) => a.apropriacao_id}
+        vazio="Nenhuma apropriacao cadastrada para este contrato."
+        storageKey="tabela:solicitacao-detalhe-apropriacoes-contrato"
+        rotuloRolagem="Apropriacoes do contrato"
+      />
 
       <OverlayModal aberto={aberto} rotulo="Editar apropriacoes do contrato">
         <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
