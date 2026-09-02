@@ -14,6 +14,8 @@ import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import { PageHeader, BlocoConteudo, StatGrid, StatTile, CamposComVazios } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
@@ -105,14 +107,6 @@ function labelTipoIntercompany(value) {
   return TIPOS_INTERCOMPANY_LABEL[String(value || '').toUpperCase()] || value || '-';
 }
 
-function statusClass(status) {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'PREVISAO') return 'bg-sky-100 text-sky-700';
-  if (normalized === 'QUITADO') return 'bg-emerald-100 text-emerald-700';
-  if (normalized === 'PARCIAL') return 'bg-amber-100 text-amber-700';
-  if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'bg-rose-100 text-rose-700';
-  return 'bg-slate-100 text-slate-700';
-}
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -670,259 +664,143 @@ export default function FinanceiroTituloDetalhe() {
   return (
     <>
       <div className="page solicitacoes-page">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div>
-            <Link className="btn btn-outline mb-3" to={tituloListPath}>
-              Voltar para {tituloListLabel}
-            </Link>
-            <h1 className="page-title">Titulo {titulo.codigo || `#${titulo.id}`}</h1>
-            <p className="text-sm text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</p>
-          </div>
+        <Link className="btn btn-outline btn-sm mb-1 self-start" to={tituloListPath}>
+          ← Voltar para {tituloListLabel}
+        </Link>
 
-          <div className="flex flex-wrap gap-2">
-            {titulo.solicitacao?.id && (
-              <Link className="btn btn-outline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
-                Abrir solicitacao
-              </Link>
-            )}
-            {podeEditarTitulo && (
-              <Link className="btn btn-outline" to={`/financeiro/titulos/${titulo.id}/editar`}>
-                Editar titulo
-              </Link>
-            )}
-            {!podeEditarTitulo && (
-              <button
-                type="button"
-                className="btn btn-outline opacity-60"
-                disabled
-                title="Somente titulos em aberto, sem baixa e sem pagamento em massa vinculado podem ser editados"
-              >
-                Editar titulo
-              </button>
-            )}
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setError('');
-                setCorrigindoMovimentoId(null);
-                setBaixaForm(buildBaixaForm(titulo, contasBancarias));
-                setModalBaixaOpen(true);
-              }}
-              disabled={!['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase())}
-            >
-              Registrar baixa
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          titulo={`Titulo ${titulo.codigo || `#${titulo.id}`}`}
+          subtitulo={titulo.descricao || 'Sem descricao'}
+          acaoPrincipal={{
+            rotulo: 'Registrar baixa',
+            desabilitada: !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase()),
+            onClick: () => {
+              setError('');
+              setCorrigindoMovimentoId(null);
+              setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+              setModalBaixaOpen(true);
+            }
+          }}
+          secundarias={[
+            titulo.solicitacao?.id && {
+              rotulo: 'Abrir solicitacao',
+              to: `/solicitacoes/${titulo.solicitacao.id}`
+            },
+            podeEditarTitulo
+              ? { rotulo: 'Editar titulo', to: `/financeiro/titulos/${titulo.id}/editar` }
+              : {
+                rotulo: 'Editar titulo',
+                desabilitada: true,
+                title: 'Somente titulos em aberto, sem baixa e sem pagamento em massa vinculado podem ser editados',
+                onClick: () => {}
+              }
+          ].filter(Boolean)}
+        />
 
         {error && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="app-alert app-alert--error">
             {error}
           </div>
         )}
 
-        <div className="grid gap-3 md:grid-cols-4">
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Tipo</div>
-            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{titulo.tipo}</div>
-          </div>
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Status</div>
-            <div className="mt-2">
-              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(titulo.status)}`}>
-                {titulo.status}
-              </span>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Valor original</div>
-            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_original)}</div>
-          </div>
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Saldo</div>
-            <div className="mt-2 text-lg font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_saldo)}</div>
-          </div>
-        </div>
+        {/* Pergunta central da tela: "quanto falta deste titulo e o que fazer
+            com ele?" — os quatro numeros que decidem vem primeiro. */}
+        <StatGrid colunas={4}>
+          <StatTile label="Tipo" valor={titulo.tipo} />
+          <StatTile label="Status" valor={<StatusBadge status={titulo.status} />} />
+          <StatTile label="Valor original" valor={formatCurrency(titulo.valor_original)} />
+          <StatTile
+            label="Saldo"
+            valor={formatCurrency(titulo.valor_saldo)}
+            tom={Number(titulo.valor_saldo) > 0 ? 'warning' : 'success'}
+          />
+        </StatGrid>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-3">
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Dados do titulo</h2>
-            <div className="grid gap-3 text-sm md:grid-cols-2">
-              <div>
-                <div className="text-[var(--c-muted)]">Codigo</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.codigo || `#${titulo.id}`}</div>
+        {/* "Dados do titulo" + "Resumo operacional" eram dois blocos 50/50
+            disputando atencao (15 campos vs 4). Viraram UM bloco principal em
+            largura total; o codigo saiu daqui porque ja e o titulo da pagina
+            (informacao aparece uma vez). Campos vazios ficam atras do
+            alternador — nenhum dado deixou de existir. */}
+        <BlocoConteudo titulo="Dados do titulo" variante="primario" cor="var(--module-financeiro)">
+          <CamposComVazios
+            colunas={4}
+            campos={[
+              { label: 'Parceiro', valor: titulo.parceiro?.nome, span: 2 },
+              { label: 'Obra', valor: titulo.obra?.nome, span: 2 },
+              { label: 'Vencimento', valor: formatDate(titulo.data_vencimento) === '-' ? null : formatDate(titulo.data_vencimento) },
+              { label: 'Emissao', valor: formatDate(titulo.data_emissao) === '-' ? null : formatDate(titulo.data_emissao) },
+              { label: 'Valor baixado', valor: Number(titulo.valor_baixado) > 0 ? formatCurrency(titulo.valor_baixado) : null },
+              { label: 'Quitacao', valor: formatDate(titulo.data_quitacao) === '-' ? null : formatDate(titulo.data_quitacao) },
+              { label: 'Categoria', valor: titulo.categoriaFinanceira?.nome },
+              {
+                label: 'Solicitacao',
+                valor: titulo.solicitacao?.id ? (
+                  <Link className="text-[var(--c-primary)] hover:underline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
+                    {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
+                  </Link>
+                ) : null
+              },
+              { label: 'Criado por', valor: titulo.criadoPor?.nome },
+              { label: 'Baixas ativas', valor: movimentosAtivosCount > 0 ? String(movimentosAtivosCount) : null },
+              {
+                label: cartoesUtilizados.length > 1 ? 'Cartoes utilizados' : 'Cartao utilizado',
+                contexto: tituloRelacionadoACartao,
+                valor: cartoesUtilizados.length > 0
+                  ? cartoesUtilizados.map((cartao) => getCartaoLabel(cartao)).join(' · ')
+                  : null
+              },
+              { label: 'Entre Empresas', valor: titulo.intercompany ? 'Sim' : null },
+              { label: 'Origem', contexto: Boolean(titulo.intercompany), valor: titulo.empresaOrigem?.nome },
+              { label: 'Destino', contexto: Boolean(titulo.intercompany), valor: titulo.empresaDestino?.nome },
+              { label: 'Tipo intercompany', contexto: Boolean(titulo.intercompany), valor: labelTipoIntercompany(titulo.tipo_intercompany) },
+              {
+                label: 'Consolidado',
+                contexto: Boolean(titulo.intercompany),
+                valor: titulo.elimina_consolidado ? 'Elimina no consolidado' : 'Mantem no consolidado'
+              }
+            ]}
+          />
+
+          {podeVerMovimentosFinanceiros && fontesFinanceirasAtivas.length > 0 && (
+            <div className="mt-3 border-t border-[var(--c-border)] pt-3">
+              <div className="mb-2 text-sm font-medium text-[var(--c-text)]">
+                {fontesFinanceirasAtivas.length > 1 ? 'Fontes das baixas' : 'Fonte da baixa'}
               </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Parceiro</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Obra</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.obra?.nome || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Vencimento</div>
-                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_vencimento)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Emissao</div>
-                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_emissao)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Valor baixado</div>
-                <div className="font-medium text-[var(--c-text)]">{formatCurrency(titulo.valor_baixado)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Categoria</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
-              </div>
-              {tituloRelacionadoACartao && (
-                <div>
-                  <div className="text-[var(--c-muted)]">
-                    {cartoesUtilizados.length > 1 ? 'Cartoes utilizados' : 'Cartao utilizado'}
-                  </div>
-                  {cartoesUtilizados.length > 0 ? (
-                    <div className="space-y-1 font-medium text-[var(--c-text)]">
-                      {cartoesUtilizados.map((cartao) => (
-                        <div key={cartao.id}>{getCartaoLabel(cartao)}</div>
-                      ))}
+              <div className="grid gap-2 md:grid-cols-3">
+                {fontesFinanceirasAtivas.map((fonte) => (
+                  <div
+                    key={`${fonte.empresa_nome}-${fonte.conta_bancaria_nome}`}
+                    className="rounded-lg bg-[var(--ui-surface-2)] px-3 py-2"
+                  >
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {titulo.tipo === 'PAGAR' ? 'Empresa pagadora' : 'Empresa recebedora'}
                     </div>
-                  ) : (
-                    <div className="font-medium text-amber-700">Nao informado</div>
-                  )}
-                </div>
-              )}
-              <div>
-                <div className="text-[var(--c-muted)]">Entre Empresas</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.intercompany ? 'Sim' : 'Nao'}</div>
-              </div>
-              {titulo.intercompany && (
-                <>
-                  <div>
-                    <div className="text-[var(--c-muted)]">Origem</div>
-                    <div className="font-medium text-[var(--c-text)]">{titulo.empresaOrigem?.nome || '-'}</div>
+                    <div className="text-sm font-medium text-[var(--c-text)]">{fonte.empresa_nome}</div>
+                    <div className="mt-1 text-xs text-[var(--c-muted)]">Conta bancaria</div>
+                    <div className="text-sm font-medium text-[var(--c-text)]">{fonte.conta_bancaria_nome}</div>
                   </div>
-                  <div>
-                    <div className="text-[var(--c-muted)]">Destino</div>
-                    <div className="font-medium text-[var(--c-text)]">{titulo.empresaDestino?.nome || '-'}</div>
-                  </div>
-                  <div>
-                    <div className="text-[var(--c-muted)]">Tipo</div>
-                    <div className="font-medium text-[var(--c-text)]">{labelTipoIntercompany(titulo.tipo_intercompany)}</div>
-                  </div>
-                  <div>
-                    <div className="text-[var(--c-muted)]">Consolidado</div>
-                    <div className="font-medium text-[var(--c-text)]">
-                      {titulo.elimina_consolidado ? 'Elimina no consolidado' : 'Mantem no consolidado'}
-                    </div>
-                  </div>
-                </>
-              )}
-              {podeVerMovimentosFinanceiros && fontesFinanceirasAtivas.length > 0 && (
-                <div className="md:col-span-2 border-t border-[var(--c-border)] pt-3">
-                  <div className="mb-2 font-medium text-[var(--c-text)]">
-                    {fontesFinanceirasAtivas.length > 1 ? 'Fontes das baixas' : 'Fonte da baixa'}
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2">
-                    {fontesFinanceirasAtivas.map((fonte) => (
-                      <div
-                        key={`${fonte.empresa_nome}-${fonte.conta_bancaria_nome}`}
-                        className="rounded-lg bg-[var(--c-bg)] px-3 py-2"
-                      >
-                        <div className="text-xs text-[var(--c-muted)]">
-                          {titulo.tipo === 'PAGAR' ? 'Empresa pagadora' : 'Empresa recebedora'}
-                        </div>
-                        <div className="font-medium text-[var(--c-text)]">{fonte.empresa_nome}</div>
-                        <div className="mt-1 text-xs text-[var(--c-muted)]">Conta bancaria</div>
-                        <div className="font-medium text-[var(--c-text)]">{fonte.conta_bancaria_nome}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-3">
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo operacional</h2>
-            <div className="grid gap-3 text-sm md:grid-cols-2">
-              <div>
-                <div className="text-[var(--c-muted)]">Solicitacao</div>
-                <div className="font-medium text-[var(--c-text)]">
-                  {titulo.solicitacao?.id ? (
-                    <Link className="text-blue-600 hover:underline" to={`/solicitacoes/${titulo.solicitacao.id}`}>
-                      {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
-                    </Link>
-                  ) : '-'}
-                </div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Criado por</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.criadoPor?.nome || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Baixas ativas</div>
-                <div className="font-medium text-[var(--c-text)]">{movimentosAtivosCount}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Quitacao</div>
-                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.data_quitacao)}</div>
+                ))}
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </BlocoConteudo>
 
+        {/* O bloco tinha os MESMOS oito campos duas vezes: grid somente-leitura
+            + formulario logo abaixo (inicializado do proprio titulo). Ficou so
+            a versao editavel — e o break-all letra a letra saiu junto. */}
         {titulo.tipo === 'RECEBER' && (
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Cobranca externa</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Use esta area para complementar o titulo com os dados do boleto emitido diretamente no banco.
-                </p>
-              </div>
-              {titulo.forma_cobranca && (
-                <span className="inline-flex rounded-full bg-sky-100 px-2.5 py-1 text-xs font-semibold text-sky-700">
-                  {titulo.forma_cobranca} {titulo.status_cobranca && titulo.status_cobranca !== 'NAO_APLICAVEL' ? `- ${titulo.status_cobranca}` : ''}
-                </span>
-              )}
-            </div>
-
-            <div className="grid gap-3 text-sm md:grid-cols-4">
-              <div>
-                <div className="text-[var(--c-muted)]">Forma</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.forma_cobranca || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Status da cobranca</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.status_cobranca || 'NAO_APLICAVEL'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Codigo do banco</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Emitido em</div>
-                <div className="font-medium text-[var(--c-text)]">{formatDate(titulo.boleto_emitido_em)}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Nosso numero</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.nosso_numero || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Identificador externo</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.identificador_externo || '-'}</div>
-              </div>
-              <div className="md:col-span-2">
-                <div className="text-[var(--c-muted)]">Linha digitavel</div>
-                <div className="font-medium break-all text-[var(--c-text)]">{titulo.linha_digitavel || '-'}</div>
-              </div>
-              <div className="md:col-span-2">
-                <div className="text-[var(--c-muted)]">Codigo de barras</div>
-                <div className="font-medium break-all text-[var(--c-text)]">{titulo.codigo_barras || '-'}</div>
-              </div>
-            </div>
+          <BlocoConteudo
+            titulo="Cobranca externa"
+            variante="secundario"
+            recolhivel
+            recolhidoPadrao={!titulo.forma_cobranca}
+            acoes={titulo.forma_cobranca ? (
+              <StatusBadge status={`${titulo.forma_cobranca}${titulo.status_cobranca && titulo.status_cobranca !== 'NAO_APLICAVEL' ? ` - ${titulo.status_cobranca}` : ''}`} />
+            ) : null}
+          >
+            <p className="app-note mb-3">
+              Use esta area para complementar o titulo com os dados do boleto emitido diretamente no banco.
+            </p>
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
@@ -1022,39 +900,22 @@ export default function FinanceiroTituloDetalhe() {
                 </button>
               </div>
             </form>
-          </div>
+          </BlocoConteudo>
         )}
 
         {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && (
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Boleto para pagamento</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  A linha digitavel ou codigo de barras habilita este titulo para remessa Caixa CNAB240 em Bancos Enterprise.
-                </p>
-              </div>
-              {(titulo.linha_digitavel || titulo.codigo_barras) && (
-                <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                  Pronto para remessa
-                </span>
-              )}
-            </div>
-
-            <div className="grid gap-3 text-sm md:grid-cols-4">
-              <div>
-                <div className="text-[var(--c-muted)]">Codigo do banco</div>
-                <div className="font-medium text-[var(--c-text)]">{titulo.banco_cobranca || '-'}</div>
-              </div>
-              <div className="md:col-span-2">
-                <div className="text-[var(--c-muted)]">Linha digitavel</div>
-                <div className="font-medium break-all text-[var(--c-text)]">{titulo.linha_digitavel || '-'}</div>
-              </div>
-              <div>
-                <div className="text-[var(--c-muted)]">Codigo de barras</div>
-                <div className="font-medium break-all text-[var(--c-text)]">{titulo.codigo_barras || '-'}</div>
-              </div>
-            </div>
+          <BlocoConteudo
+            titulo="Boleto para pagamento"
+            variante="secundario"
+            recolhivel
+            recolhidoPadrao={!titulo.linha_digitavel && !titulo.codigo_barras}
+            acoes={(titulo.linha_digitavel || titulo.codigo_barras) ? (
+              <StatusBadge status="Pronto para remessa" />
+            ) : null}
+          >
+            <p className="app-note mb-3">
+              A linha digitavel ou codigo de barras habilita este titulo para remessa Caixa CNAB240 em Bancos Enterprise.
+            </p>
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
@@ -1094,20 +955,18 @@ export default function FinanceiroTituloDetalhe() {
                 </button>
               </div>
             </form>
-          </div>
+          </BlocoConteudo>
         )}
 
         {String(titulo.tipo || '').toUpperCase() === 'PAGAR' && podeVerPagamentosBancarios && (
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-            <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Pagamentos bancarios</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  Status bancario separado do status financeiro do titulo.
-                </p>
-              </div>
-              <Link to="/financeiro/pagamentos" className="btn btn-outline">Abrir pagamentos</Link>
-            </div>
+          <BlocoConteudo
+            titulo="Pagamentos bancarios"
+            variante="secundario"
+            recolhivel
+            recolhidoPadrao={!Array.isArray(titulo.paymentIntents) || titulo.paymentIntents.length === 0}
+            acoes={<Link to="/financeiro/pagamentos" className="btn btn-outline btn-sm">Abrir pagamentos</Link>}
+          >
+            <p className="app-note mb-3">Status bancario separado do status financeiro do titulo.</p>
 
             {!Array.isArray(titulo.paymentIntents) || titulo.paymentIntents.length === 0 ? (
               <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
@@ -1154,13 +1013,11 @@ export default function FinanceiroTituloDetalhe() {
                 })}
               </div>
             )}
-          </div>
+          </BlocoConteudo>
         )}
 
         {podeVerMovimentosFinanceiros && (
-        <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-          <h2 className="text-lg font-semibold text-[var(--c-text)]">Movimentos financeiros</h2>
-
+        <BlocoConteudo titulo="Movimentos financeiros" variante="secundario">
           {!Array.isArray(titulo.movimentos) || titulo.movimentos.length === 0 ? (
             <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
               Nenhum movimento registrado neste titulo.
@@ -1234,14 +1091,12 @@ export default function FinanceiroTituloDetalhe() {
                     </div>
 
                     <div className="flex flex-col items-start gap-2 md:items-end">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(movimento.status)}`}>
-                        {movimento.status}
-                      </span>
+                      <StatusBadge status={movimento.status} />
                       {String(movimento.status || '').toUpperCase() === 'ATIVO' && (
-                        <div className="flex flex-wrap gap-2 md:justify-end">
+                        <div className="app-actionbar md:justify-end">
                           <button
                             type="button"
-                            className="btn btn-outline"
+                            className="btn btn-outline btn-sm"
                             disabled={estornandoId === movimento.id || savingBaixa}
                             onClick={() => handleCorrigirBaixa(movimento)}
                           >
@@ -1249,16 +1104,18 @@ export default function FinanceiroTituloDetalhe() {
                               ? 'Preparando...'
                               : 'Corrigir baixa'}
                           </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            disabled={estornandoId === movimento.id || savingBaixa}
-                            onClick={() => handleEstornar(movimento.id)}
-                          >
-                            {estornandoId === movimento.id && corrigindoMovimentoId !== movimento.id
-                              ? 'Estornando...'
-                              : 'Estornar'}
-                          </button>
+                          <span className="app-actionbar-apartada">
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-sm btn-perigo-suave"
+                              disabled={estornandoId === movimento.id || savingBaixa}
+                              onClick={() => handleEstornar(movimento.id)}
+                            >
+                              {estornandoId === movimento.id && corrigindoMovimentoId !== movimento.id
+                                ? 'Estornando...'
+                                : 'Estornar'}
+                            </button>
+                          </span>
                         </div>
                       )}
                     </div>
@@ -1267,17 +1124,19 @@ export default function FinanceiroTituloDetalhe() {
               ))}
             </div>
           )}
-        </div>
+        </BlocoConteudo>
         )}
 
+        {/* Historico por ultimo e recolhido por padrao (regra 1 da organizacao:
+            dado que gera acao primeiro, registro depois). */}
         {podeVerAuditoriaFinanceira && (
-        <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4 space-y-4">
-          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-            <h2 className="text-lg font-semibold text-[var(--c-text)]">Auditoria financeira</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Criacao, baixas e estornos ficam rastreados no backend.
-            </p>
-          </div>
+        <BlocoConteudo
+          titulo="Auditoria financeira"
+          variante="secundario"
+          recolhivel
+          recolhidoPadrao
+        >
+          <p className="app-note mb-3">Criacao, baixas e estornos ficam rastreados no backend.</p>
 
           {auditoria.length === 0 ? (
             <div className="rounded-xl bg-[var(--c-bg)] px-3 py-4 text-sm text-[var(--c-muted)]">
@@ -1349,7 +1208,7 @@ export default function FinanceiroTituloDetalhe() {
               })}
             </div>
           )}
-        </div>
+        </BlocoConteudo>
         )}
       </div>
 

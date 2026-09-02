@@ -1,0 +1,438 @@
+/* ============================================================================
+   COMPONENTES PADRÃO (Leva 0 da reforma das telas restantes)
+   ----------------------------------------------------------------------------
+   Regras que este CSS carrega (docs/COMPONENTES-PADRAO.md):
+   - fundo da página é o canvas acinzentado; bloco principal é BRANCO com barra
+     de cor à esquerda; bloco secundário usa --ui-surface-2 e recua sozinho;
+   - um único primário sólido por bloco; secundários em contorno; destrutivo
+     em vermelho suave e APARTADO dos demais;
+   - tarja de urgência é UM utilitário (.tarja--*) — a receita que existia
+     copiada em ListaAvancada (linha e card) e no cartão da Home.
+   Só tokens (--c-*, --sem-*, --ui-*); nenhuma cor à mão.
+   ========================================================================== */
+
+/* ---- Tarja lateral de urgência/estado (aplicável a linha, card, bloco) ---- */
+.tarja {
+  position: relative;
+}
+
+.tarja::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 999px;
+  background: var(--tarja-cor, transparent);
+}
+
+.tarja--danger { --tarja-cor: var(--sem-danger); }
+.tarja--warning { --tarja-cor: var(--sem-warning); }
+.tarja--info { --tarja-cor: var(--sem-info); }
+.tarja--success { --tarja-cor: var(--sem-success); }
+
+/* ---- BlocoConteudo: o card padrão de conteúdo -------------------------- */
+.app-bloco {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 14px;
+  box-shadow: var(--ui-shadow-sm);
+  padding: 0.9rem 1rem;
+  min-width: 0;
+}
+
+/* Principal: barra de cor à esquerda (semântica ou do módulo). Um por tela. */
+.app-bloco--primario {
+  border-left: 4px solid var(--bloco-cor, var(--c-primary));
+  padding-left: calc(1rem - 3px);
+}
+
+/* Secundário: branco rebaixado, sem sombra — recua sem pedir licença. */
+.app-bloco--secundario {
+  background: var(--ui-surface-2);
+  box-shadow: none;
+}
+
+.app-bloco-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.app-bloco-titulo {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--c-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.app-bloco-acoes {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.app-bloco-corpo {
+  margin-top: 0.7rem;
+  min-width: 0;
+}
+
+.app-bloco--sem-titulo .app-bloco-corpo {
+  margin-top: 0;
+}
+
+/* Recolhível: o cabeçalho inteiro é o alvo do clique, com affordance mínima. */
+.app-bloco-recolher {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.app-bloco-recolher-seta {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  color: var(--c-muted);
+  transition: transform 0.15s ease;
+}
+
+.app-bloco--recolhido .app-bloco-recolher-seta {
+  transform: rotate(-90deg);
+}
+
+/* ---- StatGrid / StatTile: o ladrilho de dado único --------------------- */
+.app-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--stat-colunas, 4), minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.app-stat {
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  background: var(--ui-surface-2);
+  padding: 0.55rem 0.7rem;
+  min-width: 0;
+}
+
+.app-stat--full { grid-column: 1 / -1; }
+
+.app-stat-label {
+  display: block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.app-stat-valor {
+  display: block;
+  margin-top: 0.18rem;
+  font-size: 0.91rem;
+  font-weight: 600;
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
+
+.app-stat-sub {
+  display: block;
+  margin-top: 0.1rem;
+  font-size: 0.72rem;
+  color: var(--c-muted);
+}
+
+.app-stat--danger .app-stat-valor { color: var(--sem-danger); }
+.app-stat--warning .app-stat-valor { color: var(--sem-warning); }
+.app-stat--success .app-stat-valor { color: var(--sem-success); }
+
+.app-stat--vazio .app-stat-valor {
+  color: var(--c-muted);
+  font-weight: 500;
+}
+
+/* Alternador "Ver todos os campos (N vazios)" — mesmo desenho do detalhe. */
+.app-campos-toggle {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin-top: 0.55rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--c-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* ---- Menu "⋯" (ações raras/avançadas) ---------------------------------- */
+.app-mais-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.app-mais-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: var(--z-dropdown);
+  min-width: 220px;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  box-shadow: var(--ui-shadow-lg);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-mais-item {
+  appearance: none;
+  border: 0;
+  background: none;
+  border-radius: 8px;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.84rem;
+  font-weight: 500;
+  color: var(--c-text);
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-mais-item:hover { background: var(--ui-surface-soft); }
+
+.app-mais-item:disabled {
+  color: var(--c-muted);
+  cursor: not-allowed;
+}
+
+/* Destrutivo apartado: separador antes, cor de perigo. */
+.app-mais-item--perigosa {
+  color: var(--sem-danger);
+  border-top: 1px solid var(--ui-border);
+  border-radius: 0 0 8px 8px;
+  margin-top: 0.25rem;
+  padding-top: 0.6rem;
+}
+
+.app-mais-item--perigosa:hover { background: var(--sem-danger-bg); }
+
+/* ---- Barra de ações: destrutivo sempre apartado ------------------------ */
+.app-actionbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-actionbar-apartada {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+/* Vermelho suave para destrutivos visíveis (não o btn-danger cheio). */
+.btn-perigo-suave {
+  border-color: var(--sem-danger-border);
+  color: var(--sem-danger);
+  background: var(--sem-danger-bg);
+}
+
+.btn-perigo-suave:hover {
+  border-color: var(--sem-danger);
+  background: var(--sem-danger-bg);
+}
+
+/* ---- Célula composta: dois dados relacionados numa coluna só ----------- */
+.app-celula-dupla {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.app-celula-dupla-principal {
+  font-weight: 600;
+  color: var(--c-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-celula-dupla-sub {
+  font-size: 0.74rem;
+  color: var(--c-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- TabelaPadrao ------------------------------------------------------ */
+/* Linha de altura média: mais que a densa do financeiro, menos que a folgada
+   das telas antigas — equilíbrio entre densidade e leitura pedido no padrão. */
+/* O ResizableTable fixa width inline na soma das colunas; aqui a tabela
+   ocupa o card inteiro (sem espaço morto à direita) e o min-width inline
+   segue garantindo rolagem em viewport estreita. Escopo .app-tabela só. */
+.app-tabela .resizable-table {
+  width: 100% !important;
+}
+
+/* Ações da linha ficam numa linha só — a coluna é dimensionada para elas
+   (larguraAcoes); empilhar botões é o que deixava a linha altíssima. */
+.app-tabela td .app-actionbar {
+  flex-wrap: nowrap;
+}
+
+.app-tabela .resizable-table td {
+  padding: 0.5rem 0.65rem;
+  font-size: 0.84rem;
+  vertical-align: middle;
+}
+
+.app-tabela .resizable-table th {
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+.app-tabela-linha { cursor: default; }
+.app-tabela-linha--clicavel { cursor: pointer; }
+.app-tabela-linha--clicavel:hover td { background: var(--ui-surface-soft); }
+
+/* Tarja de urgência na linha: primeira célula carrega a barra. */
+.app-tabela-linha--danger td:first-child,
+.app-tabela-linha--warning td:first-child {
+  position: relative;
+}
+
+.app-tabela-linha--danger td:first-child::before,
+.app-tabela-linha--warning td:first-child::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 4px;
+  border-radius: 999px;
+}
+
+.app-tabela-linha--danger td:first-child::before { background: var(--sem-danger); }
+.app-tabela-linha--warning td:first-child::before { background: var(--sem-warning); }
+
+/* Cards do mobile: mesmo dado, outra forma — nunca dois markups na tela. */
+.app-tabela-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.app-tabela-card {
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: 12px;
+  padding: 0.7rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.app-tabela-card.tarja--danger,
+.app-tabela-card.tarja--warning {
+  padding-left: calc(0.8rem + 4px);
+}
+
+.app-tabela-card-par {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.82rem;
+  min-width: 0;
+}
+
+.app-tabela-card-par dt {
+  color: var(--c-muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.app-tabela-card-par dd {
+  margin: 0;
+  text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-tabela-card-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+}
+
+/* ---- Formulário: grid disciplinado sobre .form-* já existentes --------- */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--form-colunas, 2), minmax(0, 1fr));
+  gap: 0.75rem 0.9rem;
+}
+
+.form-grid--3 { --form-colunas: 3; }
+.form-grid--4 { --form-colunas: 4; }
+
+.form-campo--span2 { grid-column: span 2; }
+.form-campo--linha { grid-column: 1 / -1; }
+
+fieldset.form-section {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-inline-size: 0;
+}
+
+.form-section-legenda {
+  padding: 0;
+  margin-bottom: 0.15rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--c-muted);
+}
+
+/* ---- Responsivo -------------------------------------------------------- */
+@media (max-width: 1023px) {
+  .app-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-grid,
+  .form-grid--3,
+  .form-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 767px) {
+  .app-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .form-grid,
+  .form-grid--3,
+  .form-grid--4 { grid-template-columns: minmax(0, 1fr); }
+  .form-campo--span2 { grid-column: auto; }
+  .app-actionbar-apartada { margin-left: 0; }
+}
