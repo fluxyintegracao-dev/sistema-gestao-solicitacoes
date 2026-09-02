@@ -127,13 +127,17 @@ export default function UsuarioNovo() {
 
   return (
     <Pagina>
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo={editando ? 'Editar usuario' : 'Novo usuario'}
-        subtitulo="Dados de acesso, perfil, permissoes e obras vinculadas."
       />
 
       <form onSubmit={salvar} className="space-y-3">
-        <BlocoConteudo variante="primario" cor="var(--sem-info)">
+        <BlocoConteudo
+          variante="primario"
+          cor="var(--sem-info)"
+          descricao="Dados de acesso, perfil, permissoes e obras vinculadas."
+        >
           <div className="space-y-4">
             <FormSecao legenda="Identificacao e acesso" colunas={2}>
               <CampoForm label="Nome" obrigatorio>

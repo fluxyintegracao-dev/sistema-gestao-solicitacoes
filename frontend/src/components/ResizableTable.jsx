@@ -49,6 +49,10 @@ export function ResizableTable({
   );
   const [widths, setWidths] = useState(() => getInitialWidths(normalizedColumns, storageKey));
   const resizingRef = useRef(null);
+  // Persistir SÓ depois de um redimensionamento real do usuário: gravar os
+  // defaults no mount congelava a tabela nas larguras iniciais e engolia a
+  // distribuição de sobra da TabelaPadrao (defeito de 02/09).
+  const usuarioRedimensionouRef = useRef(false);
 
   useEffect(() => {
     setWidths((current) => {
@@ -69,7 +73,7 @@ export function ResizableTable({
   }, [normalizedColumns]);
 
   useEffect(() => {
-    if (!storageKey || typeof window === 'undefined') {
+    if (!storageKey || typeof window === 'undefined' || !usuarioRedimensionouRef.current) {
       return;
     }
     window.localStorage.setItem(storageKey, JSON.stringify(widths));
@@ -109,6 +113,7 @@ export function ResizableTable({
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget?.setPointerCapture?.(event.pointerId);
+    usuarioRedimensionouRef.current = true;
     resizingRef.current = {
       key: columnKey,
       startX: event.clientX,
@@ -121,6 +126,7 @@ export function ResizableTable({
   function nudgeWidth(columnKey, delta) {
     const column = normalizedColumns.find((item) => getColumnKey(item) === columnKey);
     const minWidth = Number(column?.minWidth || minColumnWidth);
+    usuarioRedimensionouRef.current = true;
     setWidths((current) => ({
       ...current,
       [columnKey]: Math.max(minWidth, Number(current[columnKey] || column?.width || 140) + delta)

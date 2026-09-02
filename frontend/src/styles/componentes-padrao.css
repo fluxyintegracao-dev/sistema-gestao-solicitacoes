@@ -461,6 +461,13 @@
   text-transform: uppercase;
 }
 
+/* A sublinha da célula (e-mail, código, cidade) é dado secundário — não é
+   a identificação: fica como foi gravada. */
+.app-tabela td.celula-identidade .app-celula-dupla-sub,
+.app-tabela-card .celula-identidade .app-celula-dupla-sub {
+  text-transform: none;
+}
+
 .app-tabela-linha { cursor: default; }
 .app-tabela-linha--clicavel { cursor: pointer; }
 .app-tabela-linha--clicavel:hover td { background: var(--ui-surface-soft); }

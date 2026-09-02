@@ -136,9 +136,9 @@ export default function TiposSolicitacaoPorSetor() {
 
   return (
     <Pagina>
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Tipos de Solicitação por Setor"
-        subtitulo="Defina quais tipos ficam habilitados para cada setor e como cada tipo é recebido."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuração',
           onClick: salvar,
@@ -147,7 +147,9 @@ export default function TiposSolicitacaoPorSetor() {
       />
 
       <BlocoConteudo
-        titulo={`Tipos habilitados (${tiposSelecionados.size} de ${tipos.length})`}
+        titulo="Tipos habilitados"
+        contagem={`${tiposSelecionados.size} de ${tipos.length}`}
+        descricao="Defina quais tipos ficam habilitados para cada setor e como cada tipo é recebido."
         variante="primario"
         cor="var(--c-primary)"
       >

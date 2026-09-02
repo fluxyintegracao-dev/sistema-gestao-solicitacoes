@@ -132,9 +132,9 @@ export default function UsuariosPermissoesRhDp() {
 
   return (
     <Pagina className="rhdp-page">
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Permissoes RH/DP por usuario"
-        subtitulo="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar matriz de permissoes',
           onClick: salvar,
@@ -155,7 +155,9 @@ export default function UsuariosPermissoesRhDp() {
       </BlocoConteudo>
 
       <BlocoConteudo
-        titulo={`Usuarios ativos (${Object.keys(selecionados).length} configurado(s))`}
+        titulo="Usuarios ativos"
+        contagem={`${Object.keys(selecionados).length} configurado(s)`}
+        descricao="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

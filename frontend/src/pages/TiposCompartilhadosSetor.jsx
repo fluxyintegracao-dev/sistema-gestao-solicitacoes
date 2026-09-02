@@ -104,9 +104,9 @@ export default function TiposCompartilhadosSetor() {
 
   return (
     <Pagina className="max-w-6xl mx-auto">
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Tipos Compartilhados entre Setores"
-        subtitulo="Permite que outros setores enxerguem tipos especificos sem alterar a area responsavel da solicitacao."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,
@@ -116,6 +116,7 @@ export default function TiposCompartilhadosSetor() {
 
       <BlocoConteudo
         titulo="Compartilhamento por tipo"
+        descricao="Permite que outros setores enxerguem tipos especificos sem alterar a area responsavel da solicitacao."
         variante="primario"
         cor="var(--c-primary)"
       >

@@ -256,10 +256,12 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 30px;
+  /* R2: alvo de clique mínimo (32px) — valia para .btn, vale aqui também. */
+  height: 32px;
+  min-width: var(--alvo-clique, 32px);
   padding: 0 10px;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   background: var(--ui-surface-soft);
   color: var(--app-body-color);
   font-size: 12.5px;

@@ -69,9 +69,9 @@ export default function AreasObra() {
 
   return (
     <Pagina>
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Areas visiveis para OBRA"
-        subtitulo="Marque quais areas os usuarios do setor OBRA podem selecionar na tela de Nova Solicitacao."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -80,7 +80,9 @@ export default function AreasObra() {
       />
 
       <BlocoConteudo
-        titulo={`Areas selecionaveis (${totalMarcadas} de ${setoresOrdenados.length} selecionadas)`}
+        titulo="Areas selecionaveis"
+        contagem={`${totalMarcadas} de ${setoresOrdenados.length} selecionadas`}
+        descricao="Marque quais areas os usuarios do setor OBRA podem selecionar na tela de Nova Solicitacao."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

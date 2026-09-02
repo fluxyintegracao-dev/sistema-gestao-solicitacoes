@@ -119,7 +119,7 @@ export default function UsuariosEnvioQualquerSetor() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      tipo: 'texto',
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
     },
@@ -145,9 +145,9 @@ export default function UsuariosEnvioQualquerSetor() {
 
   return (
     <Pagina>
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Envio livre entre setores"
-        subtitulo="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar',
           onClick: salvar,
@@ -160,7 +160,9 @@ export default function UsuariosEnvioQualquerSetor() {
       />
 
       <BlocoConteudo
-        titulo={`Usuarios (${selecionados.size} marcado(s))`}
+        titulo="Usuarios"
+        contagem={`${selecionados.size} marcado(s)`}
+        descricao="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

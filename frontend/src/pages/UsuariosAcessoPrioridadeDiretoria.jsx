@@ -178,7 +178,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      tipo: 'texto',
+      tipo: 'identidade',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
     },
@@ -265,9 +265,9 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
 
   return (
     <Pagina>
+      {/* R5: o texto de apoio saiu do PageHeader e ancora no bloco principal. */}
       <PageHeader
         titulo="Acesso a Prioridade Diretoria"
-        subtitulo="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,
@@ -286,7 +286,9 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       )}
 
       <BlocoConteudo
-        titulo={`Usuarios (${totalConfigurados} configurado(s))`}
+        titulo="Usuarios"
+        contagem={`${totalConfigurados} configurado(s)`}
+        descricao="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
         variante="primario"
         cor="var(--c-primary)"
         acoes={(

@@ -102,8 +102,14 @@ export default function TabelaPadrao({
   useEffect(() => {
     if (!shellRef.current) return undefined;
     const medir = () => {
-      const largura = shellRef.current?.getBoundingClientRect().width;
-      if (largura) setLarguraDisponivel((atual) => atual ?? Math.floor(largura));
+      const el = shellRef.current;
+      if (!el) return;
+      // A largura que vale é a do CONTAINER DE ROLAGEM da tabela (a caixa
+      // externa do shell tem padding e distribuía sobra a mais, cortando a
+      // coluna de ações).
+      const rolagem = el.querySelector('.resizable-table-scroll');
+      const largura = rolagem ? rolagem.clientWidth : el.clientWidth;
+      if (largura > 0) setLarguraDisponivel((atual) => atual ?? Math.floor(largura));
     };
     medir();
     const raf = requestAnimationFrame(medir);
@@ -124,7 +130,9 @@ export default function TabelaPadrao({
       acoesLinha ? larguraAcoesEfetiva : 0
     );
     const piso = Math.max(Number(coluna.minWidth || 160), 160);
-    return { ...coluna, largura: Math.max(piso, larguraDisponivel - fixas - 4) };
+    // Folga de 12px: bordas e arredondamentos nunca podem cortar a última
+    // coluna (ações) — sobrar 1 degrau é invisível, cortar não é.
+    return { ...coluna, largura: Math.max(piso, larguraDisponivel - fixas - 12) };
   });
 
   if (carregando) {
@@ -189,7 +197,9 @@ export default function TabelaPadrao({
           width: c.largura,
           minWidth: c.minWidth || 90
         }))}
-        storageKey={storageKey}
+        // ":v2" descarta as larguras que o defeito do persist-no-mount
+        // gravou como se fossem escolha do usuário (02/09).
+        storageKey={storageKey ? `${storageKey}:v2` : undefined}
         scrollLabel={rotuloRolagem}
       >
         <thead>
