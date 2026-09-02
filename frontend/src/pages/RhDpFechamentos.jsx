@@ -256,20 +256,25 @@ export default function RhDpFechamentos() {
 
     const competencia = detalhe.apuracao?.competencia || 'desta competencia';
     const totalTitulos = Number(detalhe.total_titulos || 0);
-    const { ok } = await confirmar({
+    /*
+      R3/R19: confirmar e justificar num passo só. Antes eram dois — a
+      confirmação do sistema e, logo depois, um `window.prompt` para a
+      justificativa. Além de a caixa do navegador ser o que a regra bane,
+      pedir em dois passos deixava a pessoa confirmar um estorno e só então
+      descobrir que precisava escrever o motivo.
+    */
+    const { ok, texto: justificativa } = await confirmar({
       titulo: 'Estornar fechamento',
       mensagem: `Estornar o fechamento de ${competencia} (${detalhe.apuracao?.empresaGrupo?.nome || 'empresa do grupo'})? Os ${totalTitulos} titulo(s) ja gerados no financeiro sao cancelados e a apuracao volta a ficar aberta. So e permitido se nenhum desses titulos estiver baixado.`,
       rotuloConfirmar: 'Estornar',
-      destrutiva: true
+      destrutiva: true,
+      campo: {
+        rotulo: 'Justificativa do estorno',
+        obrigatorio: true,
+        multilinha: true
+      }
     });
-    if (!ok) return;
-
-    const justificativa = window.prompt(
-      'Informe a justificativa para estornar o fechamento e reabrir a apuracao. Esta acao so sera permitida se os titulos financeiros nao estiverem baixados.'
-    );
-    if (!justificativa || !justificativa.trim()) {
-      return;
-    }
+    if (!ok || !justificativa.trim()) return;
 
     try {
       setReabrindo(true);

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import {
   HiOutlineArrowPath,
   HiOutlineArrowsRightLeft,
@@ -7,7 +7,19 @@ import {
   HiOutlineUserMinus
 } from 'react-icons/hi2';
 import OverlayModal from '../components/ui/OverlayModal';
-import { CelulaDupla, TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  CelulaDupla,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -267,8 +279,16 @@ export default function RhDpPessoal() {
    */
   const [checklistDoTipo, setChecklistDoTipo] = useState([]);
   const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
+  /**
+   * R3/R16: aviso e confirmacao tem UM dono.
+   *
+   * As faixas `alert alert-danger`/`alert-success` com estado proprio (`erro`,
+   * `aviso`) faziam o mesmo papel do `Avisos` do padrao, e o `window.confirm`/
+   * `window.prompt` faziam o do `useConfirmacao` — com a diferenca de que a
+   * caixa do navegador ignora tema, tokens e nao existe no DOM para ser lida.
+   */
+  const { avisos, avisar, fechar, limpar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   /**
    * DUAS ABAS, e a de solicitacoes vem PRIMEIRO de proposito.
@@ -301,7 +321,19 @@ export default function RhDpPessoal() {
     }, { replace: true });
   }, [setParametros]);
 
-  const [filtroObra, setFiltroObra] = useState('');
+  /**
+   * R12: o recorte por obra e MARCACAO, nao lista suspensa.
+   *
+   * O servico aceita UM valor (`obra_id=1`), entao a dimensao e declarada
+   * `unico: true` na BarraFiltros — marca redonda, marcar outra substitui.
+   * Sem isso, marcar duas obras faria a tela mandar filtro NENHUM: duas
+   * etiquetas visiveis e a lista sem estreitar. Daqui sai exatamente o mesmo
+   * parametro de antes; conjunto vazio = todas as obras que a pessoa enxerga.
+   */
+  const [marcados, setMarcados] = useState({ obra_id: new Set() });
+  const filtroObra = marcados.obra_id.size === 1
+    ? marcados.obra_id.values().next().value
+    : '';
   const [busca, setBusca] = useState('');
 
   const [formulario, setFormulario] = useState(null);
@@ -325,9 +357,17 @@ export default function RhDpPessoal() {
   const podeDecidir = hasAnyExplicitPermissao(user, ['rh_dp.solicitacoes.decidir']);
   const podeAprovarSalario = hasAnyExplicitPermissao(user, ['rh_dp.salario.aprovar']);
 
+  /**
+   * `carregar` NAO limpa os avisos.
+   *
+   * Quem limpa e a acao, no comeco dela. Limpar aqui apagaria a confirmacao da
+   * acao que acabou de dar certo — ela e escrita e logo em seguida a lista
+   * recarrega — e a pessoa ficaria sem retorno nenhum (defeito visto na tela
+   * irma). Pelo mesmo motivo as acoes daqui recarregam PRIMEIRO e so entao
+   * confirmam.
+   */
   const carregar = useCallback(async () => {
     setCarregando(true);
-    setErro('');
     try {
       const [lista, listaObras] = await Promise.all([
         getRhColaboradores({ obra_id: filtroObra || undefined, q: busca || undefined }),
@@ -336,16 +376,27 @@ export default function RhDpPessoal() {
       setColaboradores(Array.isArray(lista) ? lista : []);
       if (!obras.length) setObras(Array.isArray(listaObras) ? listaObras : []);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel carregar a lista de pessoal.');
+      avisar.erro(error.message || 'Nao foi possivel carregar a lista de pessoal.');
     } finally {
       setCarregando(false);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filtroObra, busca, obras, empresas]);
 
+  /**
+   * A marcacao aplica sozinha; a busca digitada espera 350ms para nao martelar
+   * a API a cada tecla.
+   *
+   * Antes a busca so valia com Enter dentro do input ou com o clique em
+   * "Atualizar" — a busca da BarraFiltros nao tem Enter, entao sem este atraso
+   * o campo ficaria digitando para ninguem. "Atualizar" continua existindo,
+   * agora no cabecalho, para quem quer forcar a releitura.
+   */
   useEffect(() => {
-    carregar();
+    const atraso = setTimeout(() => { carregar(); }, 350);
+    return () => clearTimeout(atraso);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtroObra]);
+  }, [filtroObra, busca]);
 
   const pendentes = useMemo(
     () => colaboradores.filter((c) => c.tem_solicitacao_aberta),
@@ -364,8 +415,7 @@ export default function RhDpPessoal() {
 
   async function abrirPedido(evento) {
     evento.preventDefault();
-    setErro('');
-    setAviso('');
+    limpar();
 
     const f = formulario;
     const dados = {};
@@ -465,29 +515,35 @@ export default function RhDpPessoal() {
        * existir: o DP nao ve rascunho. Quem lesse isso acharia que tinha terminado, e o pedido
        * ficaria parado sem ninguem saber.
        */
-      if (falhas.length) {
+      const retorno = falhas.length
         // O rascunho FICA, com o que subiu. Apagar perderia os arquivos que deram certo e o
         // formulario inteiro que a pessoa preencheu.
-        setErro(
-          `Rascunho #${criada.id} criado, mas ${falhas.length} arquivo(s) nao subiram: `
-          + `${falhas.join(', ')}. Abra o rascunho e reenvie so esses.`
-        );
-      } else {
-        setAviso(
-          `Rascunho #${criada.id} criado${comArquivo.length ? ` com ${comArquivo.length} arquivo(s)` : ''}. `
-          + 'Confira a documentacao e clique em Enviar para o Departamento Pessoal receber.'
-        );
-      }
+        ? {
+          tipo: 'erro',
+          texto: `Rascunho #${criada.id} criado, mas ${falhas.length} arquivo(s) nao subiram: `
+            + `${falhas.join(', ')}. Abra o rascunho e reenvie so esses.`
+        }
+        : {
+          tipo: 'sucesso',
+          texto: `Rascunho #${criada.id} criado${comArquivo.length ? ` com ${comArquivo.length} arquivo(s)` : ''}. `
+            + 'Confira a documentacao e clique em Enviar para o Departamento Pessoal receber.'
+        };
+
       setFormulario(null);
+      // RECARREGA E SO ENTAO AVISA: escrever a faixa antes de `carregar()` a
+      // deixava a merce do recarregamento — o retorno sumia antes de ser lido.
       await carregar();
+      avisar[retorno.tipo](retorno.texto);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel abrir a solicitacao.');
+      avisar.erro(error.message || 'Nao foi possivel abrir a solicitacao.');
     }
   }
 
   async function decidir(pedido, acao) {
-    setErro('');
-    setAviso('');
+    limpar();
+    // A confirmacao so e escrita DEPOIS de a lista recarregar — ver o comentario
+    // de `carregar`.
+    let confirmacao = '';
     try {
       if (acao === 'aprovar') {
         /**
@@ -500,50 +556,76 @@ export default function RhDpPessoal() {
         const conferido = await conferirDocumentacaoRhSolicitacao(pedido.id);
         if (conferido?.exigeConferencia && conferido.faltando?.length) {
           const faltas = conferido.faltando.map((d) => d.nome).join(', ');
-          // eslint-disable-next-line no-alert
-          const seguir = window.confirm(
-            `Faltam documentos obrigatorios: ${faltas}.\n\nAprovar mesmo assim?`
-          );
-          if (!seguir) return;
+          const { ok } = await confirmar({
+            titulo: 'Aprovar com documentacao pendente',
+            mensagem: `Faltam documentos obrigatorios: ${faltas}. Aprovar mesmo assim?`,
+            rotuloConfirmar: 'Aprovar mesmo assim'
+          });
+          if (!ok) return;
         }
         await aprovarRhSolicitacao(pedido.id);
-        setAviso('Solicitacao aprovada.');
+        confirmacao = 'Solicitacao aprovada.';
       }
 
       if (acao === 'devolver') {
-        // eslint-disable-next-line no-alert
-        const motivo = window.prompt('Por que esta sendo devolvida? Quem pediu precisa saber o que corrigir.');
-        if (!motivo || !motivo.trim()) return;
-        await rejeitarRhSolicitacao(pedido.id, motivo.trim());
-        setAviso('Solicitacao devolvida a quem abriu.');
+        // O motivo era um `window.prompt`: nao e `alert` nem `confirm`, mas e a
+        // MESMA caixa do navegador. Agora e o campo obrigatorio da confirmacao,
+        // num passo so — e o `return` do fluxo antigo (sem motivo, nao devolve)
+        // continua valendo.
+        const { ok, texto } = await confirmar({
+          titulo: 'Devolver solicitacao',
+          mensagem: 'Quem pediu precisa saber o que corrigir.',
+          rotuloConfirmar: 'Devolver',
+          destrutiva: true,
+          campo: { rotulo: 'Por que esta sendo devolvida?', obrigatorio: true, multilinha: true }
+        });
+        if (!ok || !texto.trim()) return;
+        await rejeitarRhSolicitacao(pedido.id, texto.trim());
+        confirmacao = 'Solicitacao devolvida a quem abriu.';
       }
 
       if (acao === 'reenviar') {
         await reenviarRhSolicitacao(pedido.id, {});
-        setAviso('Solicitacao reenviada.');
+        confirmacao = 'Solicitacao reenviada.';
       }
 
       if (acao === 'cancelar') {
-        // eslint-disable-next-line no-alert
-        const motivo = window.prompt('Motivo do cancelamento (opcional):') || '';
-        await cancelarRhSolicitacao(pedido.id, motivo);
-        setAviso('Solicitacao cancelada.');
+        /**
+         * AQUI O FLUXO ANTIGO ERA DEFEITUOSO, e o defeito nao sobrevive.
+         *
+         * O `window.prompt` de antes vinha com `|| ''` na frente, e por isso
+         * cancelava a solicitacao TAMBEM quando a pessoa clicava em Cancelar na
+         * caixa: o "sair sem fazer" do navegador virava "cancelar sem motivo".
+         * Com a confirmacao do sistema, "Voltar" volta e "Cancelar solicitacao"
+         * cancela — o motivo segue opcional.
+         */
+        const { ok, texto } = await confirmar({
+          titulo: 'Cancelar solicitacao',
+          mensagem: 'A solicitacao deixa de valer para quem abriu e para o Departamento Pessoal.',
+          rotuloConfirmar: 'Cancelar solicitacao',
+          rotuloCancelar: 'Voltar',
+          destrutiva: true,
+          campo: { rotulo: 'Motivo do cancelamento (opcional)', multilinha: true }
+        });
+        if (!ok) return;
+        await cancelarRhSolicitacao(pedido.id, texto || '');
+        confirmacao = 'Solicitacao cancelada.';
       }
 
       await carregar();
       setPedidosDoColaborador({ id: null, lista: [] });
+      if (confirmacao) avisar.sucesso(confirmacao);
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel concluir a acao.');
+      avisar.erro(error.message || 'Nao foi possivel concluir a acao.');
     }
   }
 
   async function verPedidos(colaborador) {
-    setErro('');
     try {
       const lista = await listarRhSolicitacoes({ colaborador_id: colaborador.id });
       setPedidosDoColaborador({ id: colaborador.id, lista: Array.isArray(lista) ? lista : [] });
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel carregar as solicitacoes do colaborador.');
+      avisar.erro(error.message || 'Nao foi possivel carregar as solicitacoes do colaborador.');
     }
   }
 
@@ -682,29 +764,55 @@ export default function RhDpPessoal() {
     });
   }
 
+  /**
+   * R16: UM dono para a faixa de avisos, e ela precisa estar ONDE o olho esta.
+   *
+   * Com um modal aberto, a faixa no topo da pagina fica atras do fundo escuro —
+   * e justamente quando a acao FALHA o modal continua aberto (aprovar, devolver,
+   * salvar rascunho). O erro existia e ninguem lia. Entao: modal aberto, a faixa
+   * vive dentro dele; modal fechado, logo abaixo do PageHeader.
+   */
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const algumModalAberto = Boolean(formulario || pedidosDoColaborador.id);
+
+  /**
+   * AS ACOES DO CABECALHO SAO AS DA ABA QUE ESTA ABERTA.
+   *
+   * As tres nasceram na barra da aba Colaboradores e continuam valendo so nela:
+   * "Pedir admissao" abre um pedido a partir daquela lista, "Enviar jornada"
+   * leva para a aba de jornada e "Atualizar" recarrega aquela lista. Jornada e
+   * Apuracao trazem as suas proprias. O que muda e o lugar: na faixa fixa do
+   * PageHeader elas continuam a um clique com as 137 linhas ja roladas.
+   *
+   * D6/R11: "Voltar ao RH/DP" e "Cadastro completo" sairam — sao navegacao, e
+   * disso cuidam o breadcrumb e o menu (Colaboradores esta la).
+   */
+  const acoesDaAba = abaAtiva === 'colaboradores'
+    ? [
+      podeAbrir ? { rotulo: 'Enviar jornada', onClick: () => setAbaAtiva('jornada') } : null,
+      {
+        rotulo: carregando ? 'Carregando...' : 'Atualizar',
+        onClick: carregar,
+        desabilitada: carregando
+      }
+    ].filter(Boolean)
+    : [];
+
   return (
-    <div className="page solicitacoes-page rhdp-page rh-pessoal-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">RH/DP • Pessoal</h1>
-            <p className="page-subtitle">
-              A obra pede, o Departamento Pessoal decide. Quem tem solicitacao em aberto aparece
-              primeiro na lista.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/rh-dp" className="btn btn-outline">Voltar ao RH/DP</Link>
-            <Link to="/rh-dp/colaboradores" className="btn btn-outline">Cadastro completo</Link>
-          </div>
-        </div>
-      </div>
+    <Pagina className="rhdp-page rh-pessoal-page">
+      <PageHeader
+        titulo="Pessoal"
+        descricao="A obra pede, o Departamento Pessoal decide. Quem tem solicitacao em aberto aparece primeiro na lista."
+        acaoPrincipal={abaAtiva === 'colaboradores' && podeAbrir
+          ? { rotulo: 'Pedir admissao', onClick: () => novoPedido('ADMISSAO') }
+          : undefined}
+        secundarias={acoesDaAba}
+      />
 
-      {erro ? <div className="alert alert-danger">{erro}</div> : null}
-      {aviso ? <div className="alert alert-success">{aviso}</div> : null}
+      {!algumModalAberto && faixaAvisos}
 
-      {/* As duas abas. A de solicitacoes carrega o numero do que esta parado, no proprio rotulo —
-          e o aviso visual que o cliente pediu, no lugar onde o olho ja vai. */}
+      {/* As abas (quatro desde a D1). A de solicitacoes carrega o numero do que esta parado, no
+          proprio rotulo — e o aviso visual que o cliente pediu, no lugar onde o olho ja vai. */}
       <div className="rh-pessoal-abas" role="tablist">
         <button
           type="button"
@@ -768,58 +876,51 @@ export default function RhDpPessoal() {
 
       {abaAtiva === 'colaboradores' ? (
         <>
-      {/* Os avisos visuais que o cliente pediu: o que exige acao, contado por tipo. */}
-      <div className="rh-pessoal-alertas">
-        <div className="rh-pessoal-alerta">
-          <div className="rh-pessoal-alerta-numero">{pendentes.length}</div>
-          <div className="rh-pessoal-alerta-texto">
-            {pendentes.length === 1 ? 'colaborador com solicitacao aberta' : 'colaboradores com solicitacao aberta'}
-          </div>
-        </div>
+      {/*
+        OS AVISOS VISUAIS QUE O CLIENTE PEDIU CONTINUAM AQUI — o que exige acao,
+        contado por tipo. O que mudou e o dono do desenho: `rh-pessoal-alerta`
+        era um quarto dialeto de "dado unico", com medida (1.6rem) e azul
+        escritos a mao no CSS; agora e o ladrilho do padrao (R16), em tokens.
+        O tom `warning` so aparece quando ha o que resolver, e e o MESMO tom que
+        destaca a linha do colaborador com pedido em aberto na tabela.
+      */}
+      <StatGrid colunas={4}>
+        <StatTile
+          label={pendentes.length === 1
+            ? 'Colaborador com solicitacao aberta'
+            : 'Colaboradores com solicitacao aberta'}
+          valor={pendentes.length}
+          tom={pendentes.length ? 'warning' : undefined}
+        />
         {Object.entries(alertas).map(([tipo, quantidade]) => (
-          <div className="rh-pessoal-alerta" key={tipo}>
-            <div className="rh-pessoal-alerta-numero">{quantidade}</div>
-            <div className="rh-pessoal-alerta-texto">{ROTULO_TIPO[tipo] || tipo}</div>
-          </div>
+          <StatTile key={tipo} label={ROTULO_TIPO[tipo] || tipo} valor={quantidade} tom="warning" />
         ))}
-      </div>
+      </StatGrid>
 
-      <div className="sol-surface-card solicitacoes-toolbar app-toolbar-card rounded-xl p-3 md:p-4 space-y-3">
-        <div className="rh-colaboradores-filter-grid">
-          <select
-            className="form-control"
-            value={filtroObra}
-            onChange={(e) => setFiltroObra(e.target.value)}
-          >
-            <option value="">Todas as obras que eu enxergo</option>
-            {obras.map((obra) => (
-              <option key={obra.id} value={obra.id}>{obra.nome}</option>
-            ))}
-          </select>
-          <input
-            className="form-control"
-            placeholder="Nome, CPF ou matricula"
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') carregar(); }}
-          />
-        </div>
-        <div className="app-page-actions">
-          <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
-            {carregando ? 'Carregando...' : 'Atualizar'}
-          </button>
-          {podeAbrir ? (
-            <>
-              <button type="button" className="btn btn-primary" onClick={() => novoPedido('ADMISSAO')}>
-                Pedir admissao
-              </button>
-              <button type="button" className="btn btn-outline" onClick={() => setAbaAtiva('jornada')}>
-                Enviar jornada
-              </button>
-            </>
-          ) : null}
-        </div>
-      </div>
+      {/*
+        R12: busca larga em cima e o recorte por obra em MARCACAO, com etiqueta
+        removivel — o que esta filtrado se le sem abrir nada. Sem marca, a lista
+        traz todas as obras que a pessoa enxerga, que era o que a opcao vazia do
+        select dizia. Atualizar/Pedir admissao/Enviar jornada nao sao filtro:
+        foram para o cabecalho.
+      */}
+      <BarraFiltros
+        busca={{ valor: busca, aoMudar: setBusca, placeholder: 'Nome, CPF ou matricula' }}
+        filtros={[
+          {
+            id: 'obra_id',
+            rotulo: 'Obra',
+            // O servico aceita UMA obra: marcar outra substitui (marca redonda).
+            unico: true,
+            opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+          }
+        ]}
+        ativos={marcados}
+        aoAlternar={(dimensao, valor, opcoes) => setMarcados(
+          (atual) => alternarValorFiltro(atual, dimensao, valor, opcoes)
+        )}
+        aoLimpar={() => { setMarcados({ obra_id: new Set() }); setBusca(''); }}
+      />
 
       <div className="card sol-surface-card">
         <TabelaPadrao
@@ -941,6 +1042,7 @@ export default function RhDpPessoal() {
           onFechar={() => setPedidosDoColaborador({ id: null, lista: [] })}
         >
           <div className="rh-modal-conteudo space-y-3">
+            {!formulario && faixaAvisos}
             <div className="app-page-header-row">
               <h2 className="text-lg font-semibold">Solicitacoes do colaborador</h2>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setPedidosDoColaborador({ id: null, lista: [] })}>
@@ -1011,11 +1113,15 @@ export default function RhDpPessoal() {
           onFechar={() => setFormulario(null)}
         >
           <div className="rh-modal-conteudo space-y-3">
+            {faixaAvisos}
             <div className="app-page-header-row">
               <div>
                 <h2 className="text-lg font-semibold">{tituloDoFormulario(formulario)}</h2>
+                {/* R5: o apoio fica ancorado ao titulo do bloco — aqui, o do modal.
+                    `page-subtitle` e do cabecalho de PAGINA, que nao existe dentro
+                    de um modal. */}
                 {formulario.nomeDoColaborador ? (
-                  <p className="page-subtitle">{formulario.nomeDoColaborador}</p>
+                  <p className="app-bloco-lead">{formulario.nomeDoColaborador}</p>
                 ) : null}
               </div>
               <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormulario(null)}>
@@ -1686,6 +1792,8 @@ export default function RhDpPessoal() {
           Faltam: {conferencia.faltando.map((d) => d.nome).join(', ')}
         </div>
       ) : null}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

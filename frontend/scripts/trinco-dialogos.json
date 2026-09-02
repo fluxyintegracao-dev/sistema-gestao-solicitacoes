@@ -4,15 +4,13 @@
   "porque": "Passivo herdado de window.alert()/confirm()/prompt() congelado na data em que a R19 nasceu. A regra vale para o sistema inteiro desde ja: arquivo novo ou contagem que sobe REPROVA. Este numero so pode diminuir - cada leva zera os arquivos que tocar.",
   "total_em": {
     "data": "2026-09-02",
-    "chamadas": 862,
-    "arquivos": 126
+    "chamadas": 828,
+    "arquivos": 119
   },
   "arquivos": {
     "src/components/financeiro/BaixaCompostaModal.jsx": 1,
     "src/components/lista-avancada/ListaAvancada.jsx": 3,
     "src/components/NotificacoesBell.jsx": 1,
-    "src/components/padrao/Avisos.jsx": 1,
-    "src/components/padrao/Confirmacao.jsx": 3,
     "src/contexts/AuthContext.jsx": 2,
     "src/modules/crm/pages/CrmAdminCanais.jsx": 4,
     "src/modules/crm/pages/CrmAdminIntegracoes.jsx": 5,
@@ -96,12 +94,7 @@
     "src/pages/PermissoesAreasPadroes.jsx": 1,
     "src/pages/PermissoesSetor.jsx": 3,
     "src/pages/PrioridadesDiretoria.jsx": 20,
-    "src/pages/RhDpApuracao.jsx": 14,
     "src/pages/RhDpFechamentos.jsx": 1,
-    "src/pages/RhDpImportacoes.jsx": 7,
-    "src/pages/RhDpJornada.jsx": 1,
-    "src/pages/RhDpPessoal.jsx": 3,
-    "src/pages/RhDpPessoalSolicitacoes.jsx": 5,
     "src/pages/Setores.jsx": 1,
     "src/pages/SetoresAcessoTodasObras.jsx": 2,
     "src/pages/SetoresCriacaoTodasObras.jsx": 2,
