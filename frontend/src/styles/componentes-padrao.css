@@ -303,6 +303,10 @@
   flex-wrap: nowrap;
 }
 
+.app-tabela td .app-actionbar .btn {
+  white-space: nowrap;
+}
+
 .app-tabela .resizable-table td {
   padding: 0.5rem 0.65rem;
   font-size: 0.84rem;

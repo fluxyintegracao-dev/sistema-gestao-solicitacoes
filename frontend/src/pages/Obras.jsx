@@ -361,8 +361,8 @@ export default function Obras() {
             {
               id: 'obra',
               titulo: 'Obra / Centro de custo',
-              largura: 260,
-              minWidth: 190,
+              largura: 230,
+              minWidth: 180,
               noCard: 'titulo',
               render: (obra) => (
                 <CelulaDupla
@@ -374,7 +374,7 @@ export default function Obras() {
             {
               id: 'empresa',
               titulo: 'Empresa / Tipo',
-              largura: 190,
+              largura: 150,
               render: (obra) => (
                 <CelulaDupla
                   principal={obra.empresaGrupo?.nome || 'Não vinculada'}
@@ -386,7 +386,7 @@ export default function Obras() {
             {
               id: 'vgv',
               titulo: 'VGV / Orçamento',
-              largura: 165,
+              largura: 145,
               alinhar: 'right',
               render: (obra) => {
                 if (!isCadastroObra(obra)) return '-';
@@ -408,7 +408,7 @@ export default function Obras() {
             {
               id: 'executado',
               titulo: 'Executado',
-              largura: 150,
+              largura: 140,
               alinhar: 'right',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
@@ -426,7 +426,7 @@ export default function Obras() {
             {
               id: 'recebido',
               titulo: 'Recebido',
-              largura: 160,
+              largura: 150,
               alinhar: 'right',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
@@ -443,7 +443,7 @@ export default function Obras() {
             {
               id: 'lucro',
               titulo: 'Lucro/Prejuízo',
-              largura: 140,
+              largura: 125,
               alinhar: 'right',
               render: (obra) => {
                 if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
@@ -465,7 +465,7 @@ export default function Obras() {
           itens={obrasFiltradas}
           carregando={loading}
           storageKey="tabela:obras"
-          larguraAcoes={podeGerenciarCadastro ? 300 : 150}
+          larguraAcoes={podeGerenciarCadastro ? 290 : 140}
           aoClicarLinha={(obra) => {
             if (gestaoObrasHabilitada && isCadastroObra(obra)) {
               navigate(`/obras/${obra.id}`);

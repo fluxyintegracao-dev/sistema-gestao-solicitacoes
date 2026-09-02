@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getTiposSolicitacao,
   criarTipoSolicitacao,
@@ -13,6 +13,14 @@ import {
   salvarTiposSolicitacaoPorSetor
 } from '../services/configuracoesSistema';
 import { getDefaultTipoSolicitacaoBehavior, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import {
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  FormSecao,
+  CampoForm
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 const BEHAVIOR_FIELDS = [
   { key: 'mostrar_valor', label: 'Mostrar valor' },
@@ -80,6 +88,8 @@ export default function TiposSolicitacao() {
   const [editCodigoInterno, setEditCodigoInterno] = useState('');
   const [editComportamento, setEditComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
   const [saving, setSaving] = useState(false);
+  const [formAberto, setFormAberto] = useState(false);
+  const formRef = useRef(null);
 
   async function carregar() {
     const [tiposData, setoresData, cfg] = await Promise.all([
@@ -104,6 +114,11 @@ export default function TiposSolicitacao() {
   useEffect(() => {
     carregar();
   }, []);
+
+  function abrirNovoTipo() {
+    setFormAberto(true);
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -151,6 +166,7 @@ export default function TiposSolicitacao() {
     setNome('');
     setCodigoInterno('');
     setComportamento(getDefaultTipoSolicitacaoBehavior());
+    setFormAberto(false);
     carregar();
   }
 
@@ -216,179 +232,243 @@ export default function TiposSolicitacao() {
     return getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
   })();
 
+  const setorAtual = setores.find(s => setorKey(s) === setorSelecionado);
+
+  const colunas = [
+    {
+      id: 'nome',
+      titulo: 'Nome',
+      largura: 210,
+      minWidth: 150,
+      noCard: 'titulo',
+      render: (t) => (
+        editId === t.id ? (
+          <input
+            className="input input-sm w-full"
+            value={editNome}
+            onChange={e => setEditNome(e.target.value)}
+            aria-label="Nome do tipo"
+          />
+        ) : (
+          t.nome
+        )
+      )
+    },
+    {
+      id: 'codigo_interno',
+      titulo: 'Codigo interno',
+      largura: 180,
+      render: (t) => (
+        editId === t.id ? (
+          <input
+            className="input input-sm w-full"
+            value={editCodigoInterno}
+            onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
+            aria-label="Codigo interno do tipo"
+          />
+        ) : (
+          t.codigo_interno || '-'
+        )
+      )
+    },
+    {
+      id: 'regras',
+      titulo: 'Regras',
+      largura: 330,
+      render: (t) => (
+        editId === t.id ? (
+          <div className="grid gap-1 md:grid-cols-2">
+            {BEHAVIOR_FIELDS.map(field => (
+              <label key={field.key} className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={Boolean(editComportamento[field.key])}
+                  onChange={e => setEditComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                />
+                <span>{field.label}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
+              <span key={label} className="fx-badge fx-badge--neutral">
+                {label}
+              </span>
+            )) : <span className="text-xs text-[var(--c-muted)]">Padrao</span>}
+          </div>
+        )
+      )
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      largura: 110,
+      render: (t) => <StatusBadge status={t.ativo ? 'Ativo' : 'Inativo'} />
+    }
+  ];
+
   return (
     <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Tipos (Macro)</h1>
-        <p className="page-subtitle">Cadastro dos tipos macro utilizados nas solicitacoes.</p>
-      </div>
+      <PageHeader
+        titulo="Tipos (Macro)"
+        subtitulo="Cadastro dos tipos macro utilizados nas solicitacoes."
+        acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
+      />
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">Novo tipo</h2>
-        </div>
-        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-[220px_1fr_220px_auto]">
-          <label className="grid gap-1 text-sm">
-            Setor
-            <select
-              className="input"
-              value={setorSelecionado}
-              onChange={e => setSetorSelecionado(e.target.value)}
-              required
+      <div className="space-y-3">
+        {/* PADRÃO DE TELA MISTA (piloto Parceiros): o form de criação abre
+            como painel ACIMA da lista e assume a barra de cor; a lista
+            rebaixa para neutra enquanto o painel está ativo. */}
+        {formAberto && (
+          <div ref={formRef}>
+            <BlocoConteudo
+              titulo="Novo tipo"
+              variante="primario"
+              cor="var(--sem-info)"
+              acoes={(
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                  Fechar
+                </button>
+              )}
             >
-              <option value="">Selecione</option>
-              {setores.map(s => (
-                <option key={s.id} value={setorKey(s)}>
-                  {s.nome || s.codigo}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm">
-            Nome do tipo
-            <input
-              className="input"
-              placeholder="Ex: Adm. Local"
-              value={nome}
-              onChange={e => setNome(e.target.value)}
-              required
-            />
-          </label>
-          <label className="grid gap-1 text-sm">
-            Codigo interno
-            <input
-              className="input"
-              placeholder="Ex: SOLICITACAO_DE_COMPRA"
-              value={codigoInterno}
-              onChange={e => setCodigoInterno(e.target.value.toUpperCase())}
-            />
-          </label>
-          <button type="submit" className="btn btn-primary md:self-end">
-            Adicionar
-          </button>
-          <div className="grid gap-2 text-sm md:col-span-4">
-            <span>Comportamento do tipo</span>
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-              {BEHAVIOR_FIELDS.map(field => (
-                <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(comportamento[field.key])}
-                    onChange={e => setComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                  />
-                  <span>{field.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        </form>
-        <p className="mt-2 text-xs" style={{ color: 'var(--c-muted)' }}>
-          O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado.
-        </p>
-      </div>
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <FormSecao legenda="Identificacao" colunas={2}>
+                  <CampoForm label="Nome do tipo" obrigatorio>
+                    <input
+                      className="input w-full"
+                      placeholder="Ex: Adm. Local"
+                      value={nome}
+                      onChange={e => setNome(e.target.value)}
+                      required
+                    />
+                  </CampoForm>
+                  <CampoForm
+                    label="Codigo interno"
+                    hint="Opcional; usado por integracoes e regras internas."
+                  >
+                    <input
+                      className="input w-full"
+                      placeholder="Ex: SOLICITACAO_DE_COMPRA"
+                      value={codigoInterno}
+                      onChange={e => setCodigoInterno(e.target.value.toUpperCase())}
+                    />
+                  </CampoForm>
+                </FormSecao>
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">
-            Tipos {setorSelecionado ? 'do setor selecionado' : ''}
-          </h2>
-        </div>
-        <div className="table-wrapper">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Codigo interno</th>
-              <th>Regras</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tiposFiltrados.map(t => (
-              <tr key={t.id}>
-                <td>
-                  {editId === t.id ? (
-                    <input
-                      className="input"
-                      value={editNome}
-                      onChange={e => setEditNome(e.target.value)}
-                    />
+                <BlocoConteudo
+                  titulo="Comportamento do tipo"
+                  variante="secundario"
+                  recolhivel
+                  recolhidoPadrao
+                >
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                    {BEHAVIOR_FIELDS.map(field => (
+                      <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(comportamento[field.key])}
+                          onChange={e => setComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                        />
+                        <span>{field.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </BlocoConteudo>
+
+                <p className="app-note">
+                  O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado na lista abaixo.
+                </p>
+
+                <div className="app-actionbar">
+                  <button type="submit" className="btn btn-primary">
+                    Adicionar
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </BlocoConteudo>
+          </div>
+        )}
+
+        <BlocoConteudo
+          titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
+          variante={formAberto ? 'neutro' : 'primario'}
+          cor="var(--c-primary)"
+          acoes={(
+            <label className="flex items-center gap-2 text-sm font-normal">
+              <span className="text-[var(--c-muted)]">Setor</span>
+              <select
+                className="input input-sm w-[200px]"
+                value={setorSelecionado}
+                onChange={e => setSetorSelecionado(e.target.value)}
+                aria-label="Setor dos tipos listados e do vinculo de novos tipos"
+              >
+                <option value="">Selecione</option>
+                {setores.map(s => (
+                  <option key={s.id} value={setorKey(s)}>
+                    {s.nome || s.codigo}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        >
+          <TabelaPadrao
+            colunas={colunas}
+            itens={tiposFiltrados}
+            storageKey="tabela:tipos-solicitacao"
+            larguraAcoes={330}
+            aoClicarLinha={(t) => {
+              // Clique na linha abre a edição inline; com uma edição ativa
+              // o clique não faz nada (evita perder o que foi digitado).
+              if (editId === null) iniciarEdicao(t);
+            }}
+            vazio={{
+              title: 'Nenhum tipo cadastrado',
+              message: 'Use "Novo tipo" para criar o primeiro registro deste setor.'
+            }}
+            acoesLinha={(t) => (
+              editId === t.id ? (
+                <>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
+                    Editar
+                  </button>
+                  {t.ativo ? (
+                    <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggle(t)}>
+                      Desativar
+                    </button>
                   ) : (
-                    t.nome
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
+                      Ativar
+                    </button>
                   )}
-                </td>
-                <td>
-                  {editId === t.id ? (
-                    <input
-                      className="input"
-                      value={editCodigoInterno}
-                      onChange={e => setEditCodigoInterno(e.target.value.toUpperCase())}
-                    />
-                  ) : (
-                    t.codigo_interno || '-'
-                  )}
-                </td>
-                <td>
-                  {editId === t.id ? (
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {BEHAVIOR_FIELDS.map(field => (
-                        <label key={field.key} className="flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(editComportamento[field.key])}
-                            onChange={e => setEditComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                          />
-                          <span>{field.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
-                        <span key={label} className="rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1 text-xs">
-                          {label}
-                        </span>
-                      )) : <span className="text-xs text-[var(--c-muted)]">Padrao</span>}
-                    </div>
-                  )}
-                </td>
-                <td>{t.ativo ? 'Ativo' : 'Inativo'}</td>
-                <td>
-                  {editId === t.id ? (
-                    <>
-                      <button type="button" className="btn btn-primary" onClick={() => salvarEdicao(t.id)} disabled={saving}>
-                        {saving ? 'Salvando...' : 'Salvar'}
-                      </button>{' '}
-                      <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(t)}>
-                        Editar
-                      </button>{' '}
-                      <button type="button" className="btn btn-secondary" onClick={() => toggle(t)}>
-                        {t.ativo ? 'Desativar' : 'Ativar'}
-                      </button>
-                      {' '}
-                      <button type="button" className="btn btn-danger" onClick={() => excluir(t)}>
-                        Excluir
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {tiposFiltrados.length === 0 && (
-              <tr>
-                <td colSpan="5" align="center">Nenhum tipo cadastrado</td>
-              </tr>
+                  <span className="app-actionbar-apartada">
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm btn-perigo-suave"
+                      onClick={() => excluir(t)}
+                      title="Excluir definitivamente este tipo"
+                    >
+                      Excluir
+                    </button>
+                  </span>
+                </>
+              )
             )}
-          </tbody>
-        </table>
-        </div>
+          />
+        </BlocoConteudo>
       </div>
     </div>
   );

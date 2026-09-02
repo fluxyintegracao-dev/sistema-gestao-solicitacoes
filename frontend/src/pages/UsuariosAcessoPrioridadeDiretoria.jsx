@@ -3,6 +3,8 @@ import {
   getUsuariosAcessoPrioridadeDiretoria,
   salvarUsuariosAcessoPrioridadeDiretoria
 } from '../services/configuracoesSistema';
+import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 const MODO_NENHUM = 'NENHUM';
 const MODO_TODOS = 'TODOS';
@@ -172,125 +174,141 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     }
   }
 
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Acesso a Prioridade Diretoria</h1>
-        <p className="mt-1 text-sm text-[var(--c-muted)]">
-          Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas.
-        </p>
-      </div>
-
-      <div className="card space-y-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <label className="grid gap-1 text-sm w-full md:max-w-md">
-            Buscar usuario
-            <input
-              className="input"
-              placeholder="Nome, email, perfil ou setor"
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-            />
-          </label>
-
-          <div className="flex gap-2 flex-wrap">
-            <button type="button" className="btn btn-outline" onClick={selecionarTodosFiltrados}>
-              Todos os lotes filtrados
-            </button>
-            <button type="button" className="btn btn-outline" onClick={limparTodosFiltrados}>
-              Limpar filtrados
-            </button>
+  const colunas = [
+    {
+      id: 'usuario',
+      titulo: 'Usuario',
+      largura: 240,
+      minWidth: 170,
+      noCard: 'titulo',
+      render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
+    },
+    {
+      id: 'perfil',
+      titulo: 'Perfil',
+      largura: 130,
+      render: (usuario) => String(usuario.perfil || '').toUpperCase() || '-'
+    },
+    {
+      id: 'setor',
+      titulo: 'Setor',
+      largura: 140,
+      render: (usuario) => usuario?.setor?.nome || usuario?.setor?.codigo || '-'
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      largura: 100,
+      render: (usuario) => <StatusBadge status={usuario?.ativo !== false ? 'Ativo' : 'Inativo'} />
+    },
+    {
+      id: 'escopo',
+      titulo: 'Escopo',
+      largura: 190,
+      minWidth: 150,
+      render: (usuario) => {
+        const acesso = normalizarAcesso(acessos[String(usuario.id)]);
+        const ativo = usuario?.ativo !== false;
+        return (
+          <select
+            className="input input-sm w-full"
+            value={acesso.modo}
+            disabled={!ativo}
+            aria-label={`Escopo de ${usuario.nome}`}
+            onChange={(event) => alterarModo(usuario.id, event.target.value)}
+          >
+            <option value={MODO_NENHUM}>Sem acesso</option>
+            <option value={MODO_TODOS}>Todos os lotes</option>
+            <option value={MODO_DIRETORIAS}>Diretorias especificas</option>
+          </select>
+        );
+      }
+    },
+    {
+      id: 'diretorias',
+      titulo: 'Diretorias',
+      largura: 280,
+      minWidth: 180,
+      render: (usuario) => {
+        const acesso = normalizarAcesso(acessos[String(usuario.id)]);
+        const ativo = usuario?.ativo !== false;
+        if (acesso.modo !== MODO_DIRETORIAS) {
+          return (
+            <span
+              className="text-[var(--c-muted)]"
+              title="Disponivel apenas no escopo 'Diretorias especificas'"
+            >
+              -
+            </span>
+          );
+        }
+        return (
+          <div className="flex flex-col gap-1">
+            {diretorias.map((diretoria) => {
+              const classificacao = String(diretoria.classificacao || '').toUpperCase();
+              return (
+                <label key={`${usuario.id}-${classificacao}`} className="inline-flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={acesso.diretorias.includes(classificacao)}
+                    disabled={!ativo}
+                    onChange={() => alternarDiretoria(usuario.id, classificacao)}
+                  />
+                  <span>{classificacao} - {diretoria.diretoria_label}</span>
+                </label>
+              );
+            })}
           </div>
-        </div>
+        );
+      }
+    }
+  ];
 
-        <div className="text-sm text-[var(--c-muted)]">
-          Usuarios configurados: <strong>{totalConfigurados}</strong>
-        </div>
+  return (
+    <div className="page solicitacoes-page">
+      <PageHeader
+        titulo="Acesso a Prioridade Diretoria"
+        subtitulo="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+        secundarias={[
+          { rotulo: 'Todos os lotes filtrados', onClick: selecionarTodosFiltrados },
+          { rotulo: 'Limpar filtrados', onClick: limparTodosFiltrados }
+        ]}
+      />
 
-        {diretorias.length === 0 && (
-          <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+      <div className="space-y-3">
+        {diretorias.length === 0 && !carregando && (
+          <div className="app-alert">
             Nenhuma diretoria esta configurada em Aprovacao por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
           </div>
         )}
 
-        {carregando ? (
-          <p className="text-sm text-[var(--c-muted)]">Carregando usuarios...</p>
-        ) : (
-          <div className="grid grid-cols-1 gap-2">
-            {usuariosFiltrados.map((usuario) => {
-              const acesso = normalizarAcesso(acessos[String(usuario.id)]);
-              const setorLabel = usuario?.setor?.nome || usuario?.setor?.codigo || '-';
-              const ativo = usuario?.ativo !== false;
-
-              return (
-                <div
-                  key={usuario.id}
-                  className="rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-3 text-sm"
-                >
-                  <div className="grid gap-3 md:grid-cols-[1fr_240px] md:items-start">
-                    <div className="grid gap-1">
-                      <span className="font-medium text-[var(--c-text)]">
-                        {usuario.nome}
-                        {!ativo ? ' (inativo)' : ''}
-                      </span>
-                      <span className="text-[var(--c-muted)]">
-                        {usuario.email} - {String(usuario.perfil || '').toUpperCase()} - {setorLabel}
-                      </span>
-                    </div>
-
-                    <label className="grid gap-1">
-                      Escopo
-                      <select
-                        className="input"
-                        value={acesso.modo}
-                        disabled={!ativo}
-                        onChange={(event) => alterarModo(usuario.id, event.target.value)}
-                      >
-                        <option value={MODO_NENHUM}>Sem acesso</option>
-                        <option value={MODO_TODOS}>Todos os lotes</option>
-                        <option value={MODO_DIRETORIAS}>Diretorias especificas</option>
-                      </select>
-                    </label>
-                  </div>
-
-                  {acesso.modo === MODO_DIRETORIAS && (
-                    <div className="mt-3 flex flex-wrap gap-3">
-                      {diretorias.map((diretoria) => {
-                        const classificacao = String(diretoria.classificacao || '').toUpperCase();
-                        return (
-                          <label key={`${usuario.id}-${classificacao}`} className="inline-flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={acesso.diretorias.includes(classificacao)}
-                              disabled={!ativo}
-                              onChange={() => alternarDiretoria(usuario.id, classificacao)}
-                            />
-                            <span>{classificacao} - {diretoria.diretoria_label}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-            {usuariosFiltrados.length === 0 && (
-              <p className="text-sm text-gray-600">Nenhum usuario encontrado.</p>
-            )}
-          </div>
-        )}
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={salvar}
-            disabled={salvando}
-          >
-            {salvando ? 'Salvando...' : 'Salvar configuracao'}
-          </button>
-        </div>
+        <BlocoConteudo
+          titulo={`Usuarios (${totalConfigurados} configurado(s))`}
+          variante="primario"
+          cor="var(--c-primary)"
+          acoes={(
+            <input
+              className="input input-sm w-[220px]"
+              placeholder="Nome, email, perfil ou setor"
+              aria-label="Buscar usuario"
+              value={busca}
+              onChange={(event) => setBusca(event.target.value)}
+            />
+          )}
+        >
+          <TabelaPadrao
+            colunas={colunas}
+            itens={usuariosFiltrados}
+            carregando={carregando}
+            storageKey="tabela:usuarios-prioridade-diretoria"
+            vazio={{ title: 'Nenhum usuario encontrado' }}
+          />
+        </BlocoConteudo>
       </div>
     </div>
   );

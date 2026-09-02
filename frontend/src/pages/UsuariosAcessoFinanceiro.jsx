@@ -4,6 +4,8 @@ import {
   getUsuariosAcessoFinanceiro,
   salvarUsuariosAcessoFinanceiro
 } from '../services/configuracoesSistema';
+import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 function hasFinanceiroBaseAccess(usuario) {
   const perfil = String(usuario?.perfil || '').trim().toUpperCase();
@@ -70,63 +72,98 @@ export default function UsuariosAcessoFinanceiro() {
     }
   }
 
+  const colunas = [
+    {
+      id: 'extra',
+      titulo: 'Acesso extra',
+      largura: 110,
+      minWidth: 90,
+      render: (usuario) => (
+        <input
+          type="checkbox"
+          checked={selecionados.has(Number(usuario.id))}
+          onChange={() => alternarUsuario(usuario.id)}
+          aria-label={`Liberar acesso ao financeiro para ${usuario.nome}`}
+        />
+      )
+    },
+    {
+      id: 'usuario',
+      titulo: 'Usuario',
+      largura: 260,
+      minWidth: 180,
+      noCard: 'titulo',
+      render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
+    },
+    {
+      id: 'setor',
+      titulo: 'Setor',
+      largura: 160,
+      render: (usuario) => String(usuario?.setor?.nome || '-').toUpperCase()
+    },
+    {
+      id: 'perfil',
+      titulo: 'Perfil',
+      largura: 140,
+      render: (usuario) => String(usuario?.perfil || '').toUpperCase() || '-'
+    },
+    {
+      id: 'base',
+      titulo: 'Regra base',
+      largura: 160,
+      render: (usuario) => (
+        hasFinanceiroBaseAccess(usuario) ? (
+          <span title="Ja possui acesso por perfil/setor, mesmo sem marcacao nesta tela">
+            <StatusBadge status="Ja liberado" kind="success" />
+          </span>
+        ) : (
+          <span className="text-[var(--c-muted)]">-</span>
+        )
+      )
+    }
+  ];
+
   return (
     <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Acesso ao financeiro por usuario</h1>
-        <p className="page-subtitle mt-1">
-          Marque usuarios extras que devem acessar o modulo financeiro.
-          Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras.
-        </p>
-      </div>
+      <PageHeader
+        titulo="Acesso ao financeiro por usuario"
+        subtitulo="Marque usuarios extras que devem acessar o modulo financeiro. Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras."
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando...' : 'Salvar',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+      />
 
-      <div className="card space-y-4">
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuarios de setor financeiro
-          ja possuem acesso por regra base, mesmo sem marcacao nesta tela.
-        </div>
+      <div className="space-y-3">
+        <BlocoConteudo
+          titulo="Quem ja tem acesso por regra base"
+          variante="secundario"
+          recolhivel
+          recolhidoPadrao
+        >
+          <p className="app-note">
+            Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuarios de setor financeiro
+            ja possuem acesso por regra base, mesmo sem marcacao nesta tela. Eles aparecem na
+            lista com a etiqueta &quot;Ja liberado&quot;.
+          </p>
+        </BlocoConteudo>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-          {usuariosOrdenados.map((usuario) => {
-            const marcado = selecionados.has(Number(usuario.id));
-            const acessoBase = hasFinanceiroBaseAccess(usuario);
-            const setorNome = String(usuario?.setor?.nome || '-').toUpperCase();
-
-            return (
-              <label key={usuario.id} className="flex items-start gap-2 rounded-lg border border-slate-200 px-3 py-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={marcado}
-                  onChange={() => alternarUsuario(usuario.id)}
-                />
-                <span className="flex flex-col gap-1">
-                  <span className="font-medium text-slate-900">
-                    {usuario.nome}
-                  </span>
-                  <span className="text-slate-600">
-                    {usuario.email} | {setorNome} | {String(usuario?.perfil || '').toUpperCase()}
-                  </span>
-                  {acessoBase ? (
-                    <span className="text-xs font-medium text-emerald-700">
-                      Ja possui acesso por perfil/setor
-                    </span>
-                  ) : null}
-                </span>
-              </label>
-            );
-          })}
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={salvar}
-            disabled={salvando}
-          >
-            {salvando ? 'Salvando...' : 'Salvar'}
-          </button>
-        </div>
+        <BlocoConteudo
+          titulo={`Usuarios ativos (${selecionados.size} com acesso extra)`}
+          variante="primario"
+          cor="var(--module-financeiro)"
+        >
+          <TabelaPadrao
+            colunas={colunas}
+            itens={usuariosOrdenados}
+            storageKey="tabela:usuarios-acesso-financeiro"
+            vazio={{
+              title: 'Nenhum usuario para exibir',
+              message: 'Aguarde o carregamento ou verifique o cadastro de usuarios ativos.'
+            }}
+          />
+        </BlocoConteudo>
       </div>
     </div>
   );

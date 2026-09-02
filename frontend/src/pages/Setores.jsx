@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getSetores,
   criarSetor,
@@ -6,6 +6,14 @@ import {
   ativarSetor,
   desativarSetor
 } from '../services/setores';
+import {
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  FormSecao,
+  CampoForm
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 const CAPABILITY_FIELDS = [
   { key: 'eh_setor_obra', label: 'Setor de obra' },
@@ -39,6 +47,8 @@ export default function Setores() {
   const [editCodigo, setEditCodigo] = useState('');
   const [editCapabilities, setEditCapabilities] = useState(emptyCapabilities);
   const [saving, setSaving] = useState(false);
+  const [formAberto, setFormAberto] = useState(false);
+  const formRef = useRef(null);
 
   useEffect(() => {
     carregarSetores();
@@ -56,6 +66,11 @@ export default function Setores() {
     }
   }
 
+  function abrirNovoSetor() {
+    setFormAberto(true);
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -68,6 +83,7 @@ export default function Setores() {
     setNome('');
     setCodigo('');
     setCapabilities(emptyCapabilities());
+    setFormAberto(false);
     carregarSetores();
   }
 
@@ -106,175 +122,205 @@ export default function Setores() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="page solicitacoes-page">
-        <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando setores...</p>
-      </div>
-    );
-  }
+  const colunas = [
+    {
+      id: 'nome',
+      titulo: 'Nome',
+      largura: 220,
+      minWidth: 150,
+      noCard: 'titulo',
+      render: (s) => (
+        editId === s.id ? (
+          <input
+            className="input input-sm w-full"
+            value={editNome}
+            onChange={e => setEditNome(e.target.value)}
+            aria-label="Nome do setor"
+          />
+        ) : (
+          s.nome
+        )
+      )
+    },
+    {
+      id: 'codigo',
+      titulo: 'Codigo',
+      largura: 130,
+      render: (s) => (
+        editId === s.id ? (
+          <input
+            className="input input-sm w-full"
+            value={editCodigo}
+            onChange={e => setEditCodigo(e.target.value.toUpperCase())}
+            aria-label="Codigo do setor"
+          />
+        ) : (
+          s.codigo
+        )
+      )
+    },
+    {
+      id: 'capacidades',
+      titulo: 'Capacidades',
+      largura: 320,
+      render: (s) => (
+        editId === s.id ? (
+          <div className="grid gap-1 md:grid-cols-2">
+            {CAPABILITY_FIELDS.map(field => (
+              <label key={field.key} className="flex items-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  checked={Boolean(editCapabilities[field.key])}
+                  onChange={e => setEditCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                />
+                <span>{field.label}</span>
+              </label>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-wrap gap-1">
+            {formatarCapacidades(s).length > 0 ? formatarCapacidades(s).map(label => (
+              <span key={label} className="fx-badge fx-badge--neutral">
+                {label}
+              </span>
+            )) : <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>}
+          </div>
+        )
+      )
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      largura: 110,
+      render: (s) => <StatusBadge status={s.ativo ? 'Ativo' : 'Inativo'} />
+    }
+  ];
 
   return (
     <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Setores</h1>
-        <p className="page-subtitle">Cadastro e manutencao de setores.</p>
-      </div>
+      <PageHeader
+        titulo="Setores"
+        subtitulo={loading
+          ? 'Cadastro e manutencao de setores.'
+          : `${setores.length} setor(es) · cadastro e manutencao.`}
+        acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
+      />
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">Novo setor</h2>
-        </div>
-        <form
-          onSubmit={handleSubmit}
-          className="grid gap-3 md:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)_auto] md:items-end"
-        >
-          <label className="grid gap-1 text-sm">
-            Nome do setor
-            <input
-              className="input"
-              placeholder="Ex: Geoprocessamento"
-              value={nome}
-              onChange={e => setNome(e.target.value)}
-              required
-            />
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Codigo
-            <input
-              className="input"
-              placeholder="Ex: GEO"
-              value={codigo}
-              onChange={e => setCodigo(e.target.value.toUpperCase())}
-              required
-            />
-          </label>
-
-          <div className="grid gap-2 text-sm md:col-span-3">
-            <span>Capacidades do setor</span>
-            <div className="grid gap-2 md:grid-cols-3">
-              {CAPABILITY_FIELDS.map(field => (
-                <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(capabilities[field.key])}
-                    onChange={e => setCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                  />
-                  <span>{field.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <button type="submit" className="btn btn-primary w-full md:w-auto md:px-5">
-            Adicionar setor
-          </button>
-        </form>
-      </div>
-
-      <div className="card">
-        <div className="table-wrapper">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Codigo</th>
-              <th>Capacidades</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {setores.length === 0 && (
-              <tr>
-                <td colSpan="5" align="center">
-                  Nenhum setor cadastrado
-                </td>
-              </tr>
-            )}
-
-            {setores.map(s => (
-              <tr key={s.id}>
-                <td>
-                  {editId === s.id ? (
+      <div className="space-y-3">
+        {/* PADRÃO DE TELA MISTA (piloto Parceiros): o form de criação abre
+            como painel ACIMA da lista e assume a barra de cor; a lista
+            rebaixa para neutra enquanto o painel está ativo. */}
+        {formAberto && (
+          <div ref={formRef}>
+            <BlocoConteudo
+              titulo="Novo setor"
+              variante="primario"
+              cor="var(--sem-info)"
+              acoes={(
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                  Fechar
+                </button>
+              )}
+            >
+              <form className="space-y-4" onSubmit={handleSubmit}>
+                <FormSecao legenda="Identificacao" colunas={2}>
+                  <CampoForm label="Nome do setor" obrigatorio>
                     <input
-                      className="input"
-                      value={editNome}
-                      onChange={e => setEditNome(e.target.value)}
+                      className="input w-full"
+                      placeholder="Ex: Geoprocessamento"
+                      value={nome}
+                      onChange={e => setNome(e.target.value)}
+                      required
                     />
-                  ) : (
-                    s.nome
-                  )}
-                </td>
-                <td>
-                  {editId === s.id ? (
+                  </CampoForm>
+                  <CampoForm label="Codigo" obrigatorio>
                     <input
-                      className="input"
-                      value={editCodigo}
-                      onChange={e => setEditCodigo(e.target.value.toUpperCase())}
+                      className="input w-full"
+                      placeholder="Ex: GEO"
+                      value={codigo}
+                      onChange={e => setCodigo(e.target.value.toUpperCase())}
+                      required
                     />
-                  ) : (
-                    s.codigo
-                  )}
-                </td>
-                <td>
-                  {editId === s.id ? (
-                    <div className="grid gap-2 md:grid-cols-2">
+                  </CampoForm>
+                  <div className="form-campo--linha">
+                    <span className="form-label">Capacidades do setor</span>
+                    <div className="mt-1 grid gap-2 md:grid-cols-3">
                       {CAPABILITY_FIELDS.map(field => (
-                        <label key={field.key} className="flex items-center gap-2 text-xs">
+                        <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
                           <input
                             type="checkbox"
-                            checked={Boolean(editCapabilities[field.key])}
-                            onChange={e => setEditCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                            checked={Boolean(capabilities[field.key])}
+                            onChange={e => setCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
                           />
                           <span>{field.label}</span>
                         </label>
                       ))}
                     </div>
+                  </div>
+                </FormSecao>
+
+                <div className="app-actionbar">
+                  <button type="submit" className="btn btn-primary">
+                    Adicionar setor
+                  </button>
+                  <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </BlocoConteudo>
+          </div>
+        )}
+
+        <BlocoConteudo
+          titulo="Setores cadastrados"
+          variante={formAberto ? 'neutro' : 'primario'}
+          cor="var(--c-primary)"
+        >
+          <TabelaPadrao
+            colunas={colunas}
+            itens={setores}
+            carregando={loading}
+            storageKey="tabela:setores"
+            larguraAcoes={230}
+            aoClicarLinha={(s) => {
+              // Clique na linha abre a edição inline; com uma edição ativa
+              // o clique não faz nada (evita perder o que foi digitado).
+              if (editId === null) iniciarEdicao(s);
+            }}
+            vazio={{
+              title: 'Nenhum setor cadastrado',
+              message: 'Use "Novo setor" para criar o primeiro registro.'
+            }}
+            acoesLinha={(s) => (
+              editId === s.id ? (
+                <>
+                  <button className="btn btn-primary btn-sm" onClick={() => salvarEdicao(s.id)} disabled={saving}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(s)}>
+                    Editar
+                  </button>
+                  {s.ativo ? (
+                    <button className="btn btn-outline btn-sm btn-perigo-suave" onClick={async () => { await desativarSetor(s.id); carregarSetores(); }}>
+                      Desativar
+                    </button>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
-                      {formatarCapacidades(s).length > 0 ? formatarCapacidades(s).map(label => (
-                        <span key={label} className="rounded-full border border-[var(--c-border)] bg-[var(--c-surface)] px-2 py-1 text-xs">
-                          {label}
-                        </span>
-                      )) : <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>}
-                    </div>
+                    <button className="btn btn-outline btn-sm" onClick={async () => { await ativarSetor(s.id); carregarSetores(); }}>
+                      Ativar
+                    </button>
                   )}
-                </td>
-                <td>{s.ativo ? 'Ativo' : 'Inativo'}</td>
-                <td>
-                  {editId === s.id ? (
-                    <>
-                      <button className="btn btn-primary" onClick={() => salvarEdicao(s.id)} disabled={saving}>
-                        {saving ? 'Salvando...' : 'Salvar'}
-                      </button>{' '}
-                      <button className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn btn-outline" onClick={() => iniciarEdicao(s)}>
-                        Editar
-                      </button>{' '}
-                      {s.ativo ? (
-                        <button className="btn btn-secondary" onClick={async () => { await desativarSetor(s.id); carregarSetores(); }}>
-                          Desativar
-                        </button>
-                      ) : (
-                        <button className="btn btn-success" onClick={async () => { await ativarSetor(s.id); carregarSetores(); }}>
-                          Ativar
-                        </button>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+                </>
+              )
+            )}
+          />
+        </BlocoConteudo>
       </div>
     </div>
   );

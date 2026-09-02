@@ -1,10 +1,11 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { API_URL, authHeaders } from '../services/api';
 import { getUsuario, criarUsuario, atualizarUsuario } from '../services/usuarios';
 import { useAuth } from '../contexts/AuthContext';
 import { isBusinessAdmin, isSuperadmin } from '../utils/acessoProduto';
 import { useSafeNavigateBack } from '../utils/navigation';
+import { PageHeader, BlocoConteudo, FormSecao, CampoForm } from '../components/padrao';
 
 export default function UsuarioNovo() {
   const { user } = useAuth();
@@ -117,196 +118,197 @@ export default function UsuarioNovo() {
   }
 
   if (loading) {
-    return <p>Carregando usuario...</p>;
+    return (
+      <div className="page solicitacoes-page">
+        <div className="app-empty-card">Carregando usuario...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="page solicitacoes-page max-w-3xl mx-auto">
-      <h1 className="page-title">
-        {editando ? 'Editar Usuario' : 'Novo Usuario'}
-      </h1>
+    <div className="page solicitacoes-page">
+      <PageHeader
+        titulo={editando ? 'Editar usuario' : 'Novo usuario'}
+        subtitulo="Dados de acesso, perfil, permissoes e obras vinculadas."
+      />
 
-      <form
-        onSubmit={salvar}
-        className="card space-y-4"
-      >
-        <div className="grid md:grid-cols-2 gap-4">
-          <label className="grid gap-1 text-sm">
-            Nome
-            <input
-              className="input"
-              placeholder="Nome"
-              value={nome}
-              onChange={e => setNome(e.target.value)}
-              required
-            />
-          </label>
+      <form onSubmit={salvar} className="space-y-3">
+        <BlocoConteudo variante="primario" cor="var(--sem-info)">
+          <div className="space-y-4">
+            <FormSecao legenda="Identificacao e acesso" colunas={2}>
+              <CampoForm label="Nome" obrigatorio>
+                <input
+                  className="input w-full"
+                  value={nome}
+                  onChange={e => setNome(e.target.value)}
+                  required
+                />
+              </CampoForm>
 
-          <label className="grid gap-1 text-sm">
-            Email
-            <input
-              className="input"
-              placeholder="Email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              required
-            />
-          </label>
+              <CampoForm label="Email" obrigatorio>
+                <input
+                  className="input w-full"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  required
+                />
+              </CampoForm>
 
-          <label className="grid gap-1 text-sm">
-            Senha
-            <input
-              type="password"
-              className="input"
-              placeholder={
-                editando
-                  ? 'Deixe em branco para manter a senha'
-                  : enviarConvite
-                    ? 'Opcional; usuario recebera link seguro'
-                    : 'Senha inicial forte'
-              }
-              value={senha}
-              onChange={e => setSenha(e.target.value)}
-              required={!editando && !enviarConvite}
-            />
-          </label>
+              <CampoForm
+                label="Senha"
+                obrigatorio={!editando && !enviarConvite}
+                hint={
+                  editando
+                    ? 'Deixe em branco para manter a senha atual.'
+                    : enviarConvite
+                      ? 'Opcional: o usuario recebera um link seguro para definir a propria senha.'
+                      : 'Informe uma senha inicial forte.'
+                }
+              >
+                <input
+                  type="password"
+                  className="input w-full"
+                  value={senha}
+                  onChange={e => setSenha(e.target.value)}
+                  required={!editando && !enviarConvite}
+                />
+              </CampoForm>
 
-          <label className="grid gap-1 text-sm">
-            Perfil
-            <select
-              className="input"
-              value={perfil}
-              onChange={e => setPerfil(e.target.value)}
-              required
-            >
-              <option value="">Selecione</option>
-              {isBusinessAdminLogado && <option value="ADMINISTRADOR">ADMINISTRADOR</option>}
-              <option value="ADMIN">ADMIN</option>
-              <option value="ESTAGIARIO">ESTAGIARIO</option>
-              {isSuperadminLogado && <option value="SUPERADMIN">SUPERADMIN</option>}
-              <option value="USUARIO">USUARIO</option>
-            </select>
-          </label>
+              <CampoForm label="Perfil" obrigatorio>
+                <select
+                  className="input w-full"
+                  value={perfil}
+                  onChange={e => setPerfil(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {isBusinessAdminLogado && <option value="ADMINISTRADOR">ADMINISTRADOR</option>}
+                  <option value="ADMIN">ADMIN</option>
+                  <option value="ESTAGIARIO">ESTAGIARIO</option>
+                  {isSuperadminLogado && <option value="SUPERADMIN">SUPERADMIN</option>}
+                  <option value="USUARIO">USUARIO</option>
+                </select>
+              </CampoForm>
 
-          <label className="grid gap-1 text-sm">
-            Setor
-            <select
-              className="input"
-              value={setorId}
-              onChange={e => setSetorId(e.target.value)}
-            >
-              <option value="">Selecione</option>
-              {listaSetores.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+              <CampoForm label="Setor">
+                <select
+                  className="input w-full"
+                  value={setorId}
+                  onChange={e => setSetorId(e.target.value)}
+                >
+                  <option value="">Selecione</option>
+                  {listaSetores.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.nome}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+            </FormSecao>
 
-        {!editando && (
-          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <label className="flex items-start gap-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={enviarConvite}
-                onChange={e => setEnviarConvite(e.target.checked)}
-              />
-              <span className="grid gap-1">
-                <span className="font-medium">Enviar link para definir senha por e-mail</span>
-                <span className="text-[var(--c-muted)]">
-                  O usuario recebe um link seguro para criar a propria senha. Se desmarcar, informe uma senha inicial forte.
-                </span>
-              </span>
-            </label>
-          </div>
-        )}
-
-        {isBusinessAdminLogado && (
-          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <label className="flex items-start gap-3 text-sm">
-              <input
-                type="checkbox"
-                className="mt-1"
-                checked={permissaoCompraTravada ? true : podeCriarSolicitacaoCompra}
-                onChange={e => setPodeCriarSolicitacaoCompra(e.target.checked)}
-                disabled={permissaoCompraTravada}
-              />
-              <span className="grid gap-1">
-                <span className="font-medium">Permitir acesso a Nova Solicitação de Compra</span>
-                <span className="text-[var(--c-muted)]">
-                  {permissaoCompraTravada
-                    ? 'Perfis ADMIN, ADMINISTRADOR e SUPERADMIN ja possuem esse acesso automaticamente.'
-                    : 'Define se este usuário pode acessar e utilizar a tela de Nova Solicitação de Compra.'}
-                </span>
-              </span>
-            </label>
-          </div>
-        )}
-
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="font-medium">Obras vinculadas</p>
-            <span className="text-sm text-[var(--c-muted)]">
-              {obras.length} selecionada(s)
-            </span>
-          </div>
-
-          <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
-            {listaObras.length === 0 ? (
-              <div className="px-4 py-4 text-sm text-[var(--c-muted)]">
-                Nenhuma obra disponivel para vinculo.
-              </div>
-            ) : (
-              listaObras.map((obra) => {
-                const checked = obras.includes(obra.id);
-
-                return (
-                  <label
-                    key={obra.id}
-                    className={`flex cursor-pointer items-start gap-3 border-b border-[var(--c-border)] px-4 py-3 last:border-b-0 ${
-                      checked ? 'bg-blue-50/70' : ''
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="mt-1"
-                      checked={checked}
-                      onChange={() => toggleObra(obra.id)}
-                    />
-                    <span className="grid gap-1">
-                      <span className="font-medium">
-                        {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
-                      </span>
-                      <span className="text-xs text-[var(--c-muted)]">
-                        ID {obra.id}
-                      </span>
+            {!editando && (
+              <BlocoConteudo
+                titulo="Convite por e-mail"
+                variante="secundario"
+                recolhivel
+                recolhidoPadrao={!enviarConvite}
+                key="convite-novo"
+              >
+                <label className="flex items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={enviarConvite}
+                    onChange={e => setEnviarConvite(e.target.checked)}
+                  />
+                  <span className="grid gap-1">
+                    <span className="font-medium">Enviar link para definir senha por e-mail</span>
+                    <span className="app-note">
+                      O usuario recebe um link seguro para criar a propria senha. Se desmarcar, informe uma senha inicial forte.
                     </span>
-                  </label>
-                );
-              })
+                  </span>
+                </label>
+              </BlocoConteudo>
             )}
+
+            {isBusinessAdminLogado && (
+              <BlocoConteudo
+                titulo="Permissao de solicitacao de compra"
+                variante="secundario"
+                recolhivel
+                recolhidoPadrao={!(permissaoCompraTravada || podeCriarSolicitacaoCompra)}
+                key={`compra-${id || 'novo'}`}
+              >
+                <label className="flex items-start gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={permissaoCompraTravada ? true : podeCriarSolicitacaoCompra}
+                    onChange={e => setPodeCriarSolicitacaoCompra(e.target.checked)}
+                    disabled={permissaoCompraTravada}
+                  />
+                  <span className="grid gap-1">
+                    <span className="font-medium">Permitir acesso a Nova Solicitação de Compra</span>
+                    <span className="app-note">
+                      {permissaoCompraTravada
+                        ? 'Perfis ADMIN, ADMINISTRADOR e SUPERADMIN ja possuem esse acesso automaticamente.'
+                        : 'Define se este usuário pode acessar e utilizar a tela de Nova Solicitação de Compra.'}
+                    </span>
+                  </span>
+                </label>
+              </BlocoConteudo>
+            )}
+
+            <BlocoConteudo
+              titulo={`Obras vinculadas (${obras.length} selecionada(s))`}
+              variante="secundario"
+            >
+              <div className="max-h-72 overflow-y-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
+                {listaObras.length === 0 ? (
+                  <div className="px-4 py-4 text-sm text-[var(--c-muted)]">
+                    Nenhuma obra disponivel para vinculo.
+                  </div>
+                ) : (
+                  listaObras.map((obra) => {
+                    const checked = obras.includes(obra.id);
+
+                    return (
+                      <label
+                        key={obra.id}
+                        title={`ID ${obra.id}`}
+                        className={`flex cursor-pointer items-center gap-3 border-b border-[var(--c-border)] px-4 py-2.5 text-sm last:border-b-0 ${
+                          checked ? 'bg-[var(--sem-info-bg)]' : ''
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleObra(obra.id)}
+                        />
+                        <span className="font-medium">
+                          {obra.codigo ? `${obra.codigo} - ${obra.nome}` : obra.nome}
+                        </span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+            </BlocoConteudo>
+
+            <div className="app-actionbar">
+              <button type="submit" className="btn btn-primary">
+                Salvar
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => navigateBack('/usuarios')}
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
-        </div>
-
-        <div className="flex justify-end gap-3 pt-4">
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => navigateBack('/usuarios')}
-          >
-            Cancelar
-          </button>
-
-          <button
-            className="btn-primary"
-            type="submit"
-          >
-            Salvar
-          </button>
-        </div>
+        </BlocoConteudo>
       </form>
     </div>
   );

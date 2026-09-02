@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   getTiposSubContrato,
   criarTipoSubContrato,
@@ -10,6 +10,15 @@ import {
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
 import { getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
+import {
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  FormSecao,
+  CampoForm
+} from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 function setorKey(setor) {
   return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
@@ -35,12 +44,14 @@ export default function TiposSubContrato() {
   const [regrasTiposPorSetor, setRegrasTiposPorSetor] = useState({});
   const [setorSelecionado, setSetorSelecionado] = useState('');
   const [mostrarTiposInativos, setMostrarTiposInativos] = useState(false);
+  const [formAberto, setFormAberto] = useState(false); // painel "Novo subtipo"
   const [nome, setNome] = useState('');
   const [tipoMacroId, setTipoMacroId] = useState('');
   const [editId, setEditId] = useState(null);
   const [editNome, setEditNome] = useState('');
   const [editMacroId, setEditMacroId] = useState('');
   const [saving, setSaving] = useState(false);
+  const formRef = useRef(null);
 
   async function carregar() {
     const data = await getTiposSubContrato();
@@ -68,6 +79,11 @@ export default function TiposSubContrato() {
     carregar();
     carregarMacros();
   }, []);
+
+  function abrirNovoSubtipo() {
+    setFormAberto(true);
+    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -212,171 +228,220 @@ export default function TiposSubContrato() {
     return contextos.map(item => item.label).join(', ');
   }
 
+  function macroDoSubtipo(t) {
+    return macrosPorId.get(Number(t.tipo_macro_id)) || t.macro;
+  }
+
+  // 6 colunas viraram 3 + acoes. O que a tabela antiga repetia foi unificado:
+  // a coluna "Setor" e o "status do tipo" apareciam soltos E dentro do texto
+  // da coluna "Tipo macro" (macroLabel) — agora setores viram o subtexto da
+  // coluna Tipo macro e o status do tipo vira o subtexto da coluna Status.
+  const colunas = [
+    {
+      id: 'subtipo',
+      titulo: 'Subtipo',
+      largura: 200,
+      minWidth: 150,
+      noCard: 'titulo',
+      render: (t) => (
+        editId === t.id ? (
+          <input
+            className="input input-sm w-full"
+            aria-label="Nome do subtipo"
+            value={editNome}
+            onChange={e => setEditNome(e.target.value)}
+          />
+        ) : (
+          t.nome
+        )
+      )
+    },
+    {
+      id: 'tipo_macro',
+      titulo: 'Tipo macro',
+      largura: 280,
+      render: (t) => (
+        editId === t.id ? (
+          <select
+            className="input input-sm w-full"
+            aria-label="Tipo macro"
+            value={editMacroId}
+            onChange={e => setEditMacroId(e.target.value)}
+          >
+            <option value="">Tipo macro</option>
+            {macrosDoSetor.map(m => (
+              <option key={m.id} value={m.id}>
+                {macroLabel(m)}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <CelulaDupla
+            principal={macroDoSubtipo(t)?.nome || '-'}
+            sub={macroSetoresLabel(t.tipo_macro_id)}
+          />
+        )
+      )
+    },
+    {
+      id: 'status',
+      titulo: 'Status',
+      largura: 150,
+      render: (t) => {
+        const macro = macroDoSubtipo(t);
+        const statusTipo = macro?.ativo === false ? 'inativo' : 'ativo';
+        return (
+          <CelulaDupla
+            principal={<StatusBadge status={t.ativo ? 'Ativo' : 'Inativo'} />}
+            sub={`Tipo ${statusTipo}`}
+            title={`Subtipo ${t.ativo ? 'ativo' : 'inativo'} — tipo macro ${statusTipo}`}
+          />
+        );
+      }
+    }
+  ];
+
   return (
     <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Subtipos</h1>
-        <p className="page-subtitle">Cadastro dos subtipos vinculados ao tipo e ao contexto operacional do setor.</p>
-      </div>
+      <PageHeader
+        titulo="Subtipos"
+        subtitulo="Cadastro dos subtipos vinculados ao tipo e ao contexto operacional do setor."
+        acaoPrincipal={{ rotulo: 'Novo subtipo', onClick: abrirNovoSubtipo }}
+      />
 
-      <div className="card">
-        <div className="card-header">
-          <h2 className="font-semibold">Novo subtipo</h2>
-        </div>
-        <form onSubmit={handleSubmit} className="grid gap-3 md:grid-cols-4">
-          <label className="grid gap-1 text-sm">
-            Setor
-            <select
-              className="input"
-              value={setorSelecionado}
-              onChange={e => {
-                setSetorSelecionado(e.target.value);
-                setTipoMacroId('');
-                cancelarEdicao();
-              }}
-              required
+      <div className="space-y-3">
+        {/* PADRÃO DE TELA MISTA (piloto Parceiros): a lista é o bloco
+            principal em largura total; o formulário de cadastro abre como
+            painel ACIMA quando acionado e assume a barra de cor — a lista
+            rebaixa para neutra. O seletor de Setor ficou junto da lista
+            porque também é o recorte dela (mesmo estado de sempre). */}
+        {formAberto && (
+          <div ref={formRef}>
+            <BlocoConteudo
+              titulo="Novo subtipo"
+              variante="primario"
+              cor="var(--sem-info)"
+              acoes={(
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+                  Fechar
+                </button>
+              )}
             >
-              <option value="">Selecione</option>
-              {setores.map(setor => (
-                <option key={setor.id} value={setorKey(setor)}>
-                  {setorLabel(setor)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Tipo macro
-            <select
-              className="input"
-              value={tipoMacroId}
-              onChange={e => setTipoMacroId(e.target.value)}
-              required
-            >
-              <option value="">Selecione</option>
-              {macrosDoSetor.map(m => (
-                <option key={m.id} value={m.id}>
-                  {macroLabel(m)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="grid gap-1 text-sm">
-            Nome do subtipo
-            <input
-              className="input"
-              placeholder="Ex: Combustivel"
-              value={nome}
-              onChange={e => setNome(e.target.value)}
-              required
-            />
-          </label>
-
-          <button type="submit" className="btn btn-primary md:self-end">
-            Adicionar
-          </button>
-        </form>
-
-        <div className="mt-3 flex flex-col gap-2 text-sm md:flex-row md:items-center md:justify-between" style={{ color: 'var(--c-muted)' }}>
-          <span>
-            O subtipo continua vinculado ao ID do tipo. O setor serve para evitar escolher um tipo duplicado por engano.
-          </span>
-          <label className="inline-flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={mostrarTiposInativos}
-              onChange={event => setMostrarTiposInativos(event.target.checked)}
-            />
-            Mostrar tipos inativos
-          </label>
-        </div>
-      </div>
-
-      <div className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Setor</th>
-              <th>Tipo macro</th>
-              <th>Subtipo</th>
-              <th>Status do tipo</th>
-              <th>Status do subtipo</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tiposFiltrados.map(t => {
-              const macro = macrosPorId.get(Number(t.tipo_macro_id)) || t.macro;
-              return (
-              <tr key={t.id}>
-                <td>{macroSetoresLabel(t.tipo_macro_id)}</td>
-                <td>
-                  {editId === t.id ? (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <FormSecao legenda="Dados do subtipo" colunas={3}>
+                  <CampoForm
+                    label="Tipo macro"
+                    obrigatorio
+                    hint="Opções limitadas ao setor selecionado no recorte da lista."
+                  >
                     <select
-                      className="input"
-                      value={editMacroId}
-                      onChange={e => setEditMacroId(e.target.value)}
+                      className="input w-full"
+                      value={tipoMacroId}
+                      onChange={e => setTipoMacroId(e.target.value)}
+                      required
                     >
-                      <option value="">Tipo macro</option>
+                      <option value="">Selecione</option>
                       {macrosDoSetor.map(m => (
                         <option key={m.id} value={m.id}>
                           {macroLabel(m)}
                         </option>
                       ))}
                     </select>
-                  ) : (
-                    macroLabel(macro)
-                  )}
-                </td>
-                <td>
-                  {editId === t.id ? (
+                  </CampoForm>
+
+                  <CampoForm label="Nome do subtipo" obrigatorio hint="Ex: Combustivel">
                     <input
-                      className="input"
-                      value={editNome}
-                      onChange={e => setEditNome(e.target.value)}
+                      className="input w-full"
+                      value={nome}
+                      onChange={e => setNome(e.target.value)}
+                      required
                     />
-                  ) : (
-                    t.nome
-                  )}
-                </td>
-                <td>{macro?.ativo === false ? 'Inativo' : 'Ativo'}</td>
-                <td>{t.ativo ? 'Ativo' : 'Inativo'}</td>
-                <td>
-                  {editId === t.id ? (
-                    <>
-                      <button type="button" className="btn btn-primary" onClick={() => salvarEdicao(t.id)} disabled={saving}>
-                        {saving ? 'Salvando...' : 'Salvar'}
-                      </button>{' '}
-                      <button type="button" className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(t)}>
-                        Editar
-                      </button>{' '}
-                      <button type="button" className="btn btn-secondary" onClick={() => toggle(t)}>
-                        {t.ativo ? 'Desativar' : 'Ativar'}
-                      </button>
-                      {' '}
-                      <button type="button" className="btn btn-danger" onClick={() => excluir(t)}>
-                        Excluir
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-              );
-            })}
-            {tiposFiltrados.length === 0 && (
-              <tr>
-                <td colSpan="6" align="center">Nenhum subtipo cadastrado para este recorte</td>
-              </tr>
+                  </CampoForm>
+
+                  <div className="flex items-end">
+                    <button type="submit" className="btn btn-primary">
+                      Adicionar
+                    </button>
+                  </div>
+                </FormSecao>
+
+                <p className="app-note">
+                  O subtipo continua vinculado ao ID do tipo. O setor serve para evitar escolher um tipo duplicado por engano.
+                </p>
+              </form>
+            </BlocoConteudo>
+          </div>
+        )}
+
+        <BlocoConteudo
+          titulo="Subtipos cadastrados"
+          variante={formAberto ? 'neutro' : 'primario'}
+          cor="var(--c-primary)"
+          acoes={(
+            <>
+              <select
+                className="input input-sm w-[220px]"
+                aria-label="Setor"
+                value={setorSelecionado}
+                onChange={e => {
+                  setSetorSelecionado(e.target.value);
+                  setTipoMacroId('');
+                  cancelarEdicao();
+                }}
+              >
+                <option value="">Selecione o setor</option>
+                {setores.map(setor => (
+                  <option key={setor.id} value={setorKey(setor)}>
+                    {setorLabel(setor)}
+                  </option>
+                ))}
+              </select>
+              <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--c-muted)' }}>
+                <input
+                  type="checkbox"
+                  checked={mostrarTiposInativos}
+                  onChange={event => setMostrarTiposInativos(event.target.checked)}
+                />
+                Mostrar tipos inativos
+              </label>
+            </>
+          )}
+        >
+          <TabelaPadrao
+            colunas={colunas}
+            itens={tiposFiltrados}
+            storageKey="tabela:tipos-subcontrato"
+            larguraAcoes={260}
+            aoClicarLinha={(t) => {
+              if (editId !== t.id) iniciarEdicao(t);
+            }}
+            vazio={{ title: 'Nenhum subtipo cadastrado para este recorte' }}
+            acoesLinha={(t) => (
+              editId === t.id ? (
+                <>
+                  <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
+                    {saving ? 'Salvando...' : 'Salvar'}
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                    Cancelar
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
+                    Editar
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
+                    {t.ativo ? 'Desativar' : 'Ativar'}
+                  </button>
+                  <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => excluir(t)}>
+                    Excluir
+                  </button>
+                </>
+              )
             )}
-          </tbody>
-        </table>
+          />
+        </BlocoConteudo>
       </div>
     </div>
   );
