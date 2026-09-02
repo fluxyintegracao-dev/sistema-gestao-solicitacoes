@@ -1003,3 +1003,17 @@ fieldset.form-section {
   padding-top: var(--esp-2);
   border-top: 1px solid var(--ui-border);
 }
+
+/* Linha selecionada: realce próprio (a tarja lateral é de URGÊNCIA, não de
+   seleção — usar `urgencia` para isso diria a coisa errada). */
+.app-tabela .app-tabela-linha--selecionada > td,
+.app-tabela .app-tabela-linha--selecionada > td.celula-fixa {
+  background: color-mix(in srgb, var(--c-primary) 8%, var(--ui-surface));
+}
+
+/* Linha clicável recebe foco de teclado: quem não usa mouse precisa
+   chegar na ação (R2 vale para a linha inteira também). */
+.app-tabela .app-tabela-linha--clicavel:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: -2px;
+}

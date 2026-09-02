@@ -340,10 +340,13 @@ export default function TabelaPadrao({
   // eslint-disable-next-line no-unused-vars
   semIdentidade = false,
   // --- capacidades opcionais (ver cabeçalho do arquivo) ---
-  selecao,              // { selecionados:Set|Array, aoAlternar(id,item), aoAlternarTodos(marcar,ids), elegivel?(item) }
+  selecao,              // { selecionados:Set|Array, aoAlternar(id,item), aoAlternarTodos(marcar,ids), elegivel?(item), unica? }
   linhaExpansivel,      // (item) => ReactNode | null
+  rotuloDetalhe,        // (item) => string — nomeia o detalhe para leitor de tela
   agruparPor,           // { chave(item), titulo(chave, itens) }
   colunasConfiguraveis = false,
+  aoMudarColunas,       // (idsVisiveis[]) => void — a tela precisa saber (ex.: exportar CSV só do que está à vista)
+  linhaSelecionada,     // (item) => boolean — realce e aria-selected da linha
   acoesTabela           // ReactNode extra na barra acima da tabela
 }) {
   const ehMovel = useEhMovel();
@@ -380,6 +383,13 @@ export default function TabelaPadrao({
   const salvarPrefColunas = (proxima) => {
     setPrefColunas(proxima);
     gravarJson(chaveColunas, proxima);
+    // A tela precisa da escolha para agir sobre ela (exportar CSV só das
+    // colunas à vista, por exemplo). Sem isso ela teria que ler o
+    // localStorage do componente — acoplamento que já apareceu na prática.
+    if (aoMudarColunas) {
+      const visiveis = proxima?.visiveis || idsPadrao;
+      aoMudarColunas((proxima?.ordem || idsPadrao).filter((id) => visiveis.includes(id)));
+    }
   };
 
   const alternarColuna = (id) => {
@@ -407,6 +417,7 @@ export default function TabelaPadrao({
     if (chaveColunas && typeof window !== 'undefined') {
       try { window.localStorage.removeItem(chaveColunas); } catch { /* sem storage */ }
     }
+    if (aoMudarColunas) aoMudarColunas(idsPadrao);
   };
 
   const colunasBase = useMemo(() => {
@@ -415,6 +426,16 @@ export default function TabelaPadrao({
       .map((id) => colunasDeclaradas.find((c) => c.id === id))
       .filter((c) => c && visiveisColunas.includes(c.id));
   }, [colunasConfiguraveis, ordemColunas, visiveisColunas, colunas]);
+
+  // Escolha inicial (vinda do storage) também precisa chegar à tela: sem
+  // isto, depois de um F5 a tela agiria sobre as colunas padrão enquanto a
+  // tabela mostra outras.
+  const avisouInicial = useRef(false);
+  useEffect(() => {
+    if (!colunasConfiguraveis || !aoMudarColunas || avisouInicial.current) return;
+    avisouInicial.current = true;
+    aoMudarColunas(ordemColunas.filter((id) => visiveisColunas.includes(id)));
+  }, [colunasConfiguraveis, aoMudarColunas, ordemColunas, visiveisColunas]);
 
   /* ---- R14 — alinhamento escolhido pelo usuário, salvo por lista ------ */
   const chaveAlinhar = storageKey ? `${storageKey}:alinhar` : null;
@@ -434,9 +455,14 @@ export default function TabelaPadrao({
   /* ---- Ordenação (clique no título) ----------------------------------- */
   const [ordem, setOrdem] = useState(null); // { coluna, direcao } | null
   const alternarOrdem = (colunaId) => {
+    // `ordemInicial: 'desc'` na coluna: dinheiro e quantidade costumam
+    // interessar do MAIOR para o menor no primeiro clique.
+    const inicial = colunasBase.find((c) => c.id === colunaId)?.ordemInicial === 'desc'
+      ? 'desc' : 'asc';
+    const oposta = inicial === 'asc' ? 'desc' : 'asc';
     setOrdem((atual) => {
-      if (!atual || atual.coluna !== colunaId) return { coluna: colunaId, direcao: 'asc' };
-      if (atual.direcao === 'asc') return { coluna: colunaId, direcao: 'desc' };
+      if (!atual || atual.coluna !== colunaId) return { coluna: colunaId, direcao: inicial };
+      if (atual.direcao === inicial) return { coluna: colunaId, direcao: oposta };
       return null; // terceiro clique volta à ordem original da tela
     });
   };
@@ -634,21 +660,36 @@ export default function TabelaPadrao({
     const id = getId(item);
     const detalhe = linhaExpansivel?.(item);
     const aberta = expandidas.has(id);
+    const marcada = linhaSelecionada ? linhaSelecionada(item) : selecionados.has(id);
     const classes = [
       'app-tabela-linha',
       aoClicarLinha && 'app-tabela-linha--clicavel',
+      (linhaSelecionada || selecao) && marcada && 'app-tabela-linha--selecionada',
       tom && `app-tabela-linha--${tom}`
     ].filter(Boolean).join(' ');
     return [
       <tr
         key={id}
         className={classes}
+        // Linha clicável precisa de caminho de TECLADO: sem isto, quem não
+        // usa mouse perde a ação inteira (regressão real pega na migração).
+        tabIndex={aoClicarLinha ? 0 : undefined}
+        role={aoClicarLinha ? 'button' : undefined}
+        aria-selected={(linhaSelecionada || selecao) ? marcada : undefined}
+        onKeyDown={aoClicarLinha ? (evento) => {
+          if (evento.target !== evento.currentTarget) return;
+          if (evento.key === 'Enter' || evento.key === ' ') {
+            evento.preventDefault();
+            aoClicarLinha(item);
+          }
+        } : undefined}
         onClick={aoClicarLinha ? () => aoClicarLinha(item) : undefined}
       >
         {selecao ? (
           <td className="celula-selecao" onClick={(e) => e.stopPropagation()}>
             <input
-              type="checkbox"
+              type={selecao.unica ? 'radio' : 'checkbox'}
+              name={selecao.unica ? `selecao:${storageKey || 'tabela'}` : undefined}
               checked={selecionados.has(id)}
               disabled={selecao.elegivel ? !selecao.elegivel(item) : false}
               aria-label={`Selecionar linha ${id}`}
@@ -663,7 +704,8 @@ export default function TabelaPadrao({
                 type="button"
                 className="app-tabela-expandir"
                 aria-expanded={aberta}
-                aria-label={aberta ? 'Ocultar detalhe' : 'Ver detalhe'}
+                aria-controls={`detalhe:${id}`}
+                aria-label={`${aberta ? 'Ocultar' : 'Ver'} detalhe${rotuloDetalhe ? ` de ${rotuloDetalhe(item)}` : ''}`}
                 title={aberta ? 'Ocultar detalhe' : 'Ver detalhe'}
                 onClick={() => setExpandidas((atual) => {
                   const proximo = new Set(atual);
@@ -693,7 +735,7 @@ export default function TabelaPadrao({
       </tr>,
       detalhe && aberta ? (
         <tr key={`${id}:detalhe`} className="app-tabela-detalhe">
-          <td colSpan={totalColunas}>{detalhe}</td>
+          <td colSpan={totalColunas} id={`detalhe:${id}`}>{detalhe}</td>
         </tr>
       ) : null
     ];
@@ -731,7 +773,7 @@ export default function TabelaPadrao({
       >
         <thead>
           <tr>
-            {selecao ? (
+            {selecao && !selecao.unica ? (
               <th className="resizable-th celula-selecao">
                 <input
                   type="checkbox"
@@ -747,6 +789,9 @@ export default function TabelaPadrao({
                   onChange={() => selecao.aoAlternarTodos(!todosMarcados, idsElegiveis)}
                 />
               </th>
+            ) : selecao ? (
+              // Seleção ÚNICA: não existe "todos" — o cabeçalho só rotula.
+              <th className="resizable-th celula-selecao" aria-label="Selecionada" />
             ) : null}
             {linhaExpansivel ? <th className="resizable-th celula-expandir" aria-label="Detalhe" /> : null}
             {colunasComFlex.map((coluna) => (

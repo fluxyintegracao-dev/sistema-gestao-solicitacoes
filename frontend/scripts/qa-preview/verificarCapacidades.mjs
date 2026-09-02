@@ -59,9 +59,14 @@ function totp(seg) {
 }
 
 const resultados = [];
-const registrar = (capacidade, tela, ok, detalhe) => {
-  resultados.push({ capacidade, tela, ok, detalhe });
-  console.log(`${ok ? '✓' : '✗'} ${capacidade} (${tela}): ${detalhe}`);
+/* estado: 'ok' | 'falhou' | 'sem-dado'
+   "sem-dado" NÃO é aprovação nem reprovação: é a base de desenvolvimento
+   não ter registro para exercitar a capacidade. Misturar isso com falha
+   produz relatório mentiroso — nos dois sentidos. */
+const registrar = (capacidade, tela, estado, detalhe) => {
+  resultados.push({ capacidade, tela, estado, detalhe });
+  const marca = estado === 'ok' ? '✓' : estado === 'sem-dado' ? '—' : '✗';
+  console.log(`${marca} ${capacidade} (${tela}): ${detalhe}`);
 };
 
 async function esperarCarregar(page) {
@@ -103,7 +108,7 @@ async function checarOrdenacao(page, tela, rota) {
   await esperarCarregar(page);
   const titulo = page.locator('.app-th-botao--ordenavel').first();
   if (!(await titulo.count())) {
-    registrar('1. ordenação', tela, false, 'nenhum título ordenável no DOM — a capacidade não chegou à tela');
+    registrar('1. ordenação', tela, 'falhou', 'nenhum título ordenável no DOM — a capacidade não chegou à tela');
     return;
   }
   const indice = await titulo.evaluate((el) => {
@@ -112,7 +117,7 @@ async function checarOrdenacao(page, tela, rota) {
   });
   const original = await textosDaColuna(page, indice);
   if (!original || original.length < 2) {
-    registrar('1. ordenação', tela, false, `tabela com ${original?.length ?? 0} linha(s) — sem dado real para ordenar`);
+    registrar('1. ordenação', tela, 'sem-dado', `tabela com ${original?.length ?? 0} linha(s) — sem dado real para ordenar`);
     return;
   }
 
@@ -137,7 +142,7 @@ async function checarOrdenacao(page, tela, rota) {
   if (!ascOk) problemas.push('1º clique não ordenou em crescente');
   if (!descOk) problemas.push('2º clique não inverteu');
   if (!voltaOk) problemas.push('3º clique não voltou à ordem original');
-  registrar('1. ordenação', tela, problemas.length === 0,
+  registrar('1. ordenação', tela, problemas.length === 0 ? 'ok' : 'falhou',
     problemas.length ? problemas.join('; ') : `${original.length} linhas: crescente, decrescente e volta ao original`);
 }
 
@@ -147,7 +152,13 @@ async function checarSelecao(page, tela, rota) {
   await esperarCarregar(page);
   const todos = page.locator('.app-tabela thead th.celula-selecao input[type="checkbox"]').first();
   if (!(await todos.count())) {
-    registrar('2. seleção em lote', tela, false, 'sem checkbox "todos" no cabeçalho — a capacidade não chegou à tela');
+    const temTabela = await page.locator('.app-tabela .resizable-table').count();
+    const linhas = await page.locator('.app-tabela tbody tr.app-tabela-linha').count();
+    registrar('2. seleção em lote', tela,
+      temTabela && linhas ? 'falhou' : 'sem-dado',
+      temTabela && linhas
+        ? 'sem checkbox "todos" no cabeçalho — a capacidade não chegou à tela'
+        : 'a base de desenvolvimento não tem registro nesta tela (tabela não renderiza)');
     return;
   }
   const antes = await page.locator('.app-tabela tbody td.celula-selecao input:checked').count();
@@ -160,7 +171,7 @@ async function checarSelecao(page, tela, rota) {
   const limpo = await page.locator('.app-tabela tbody td.celula-selecao input:checked').count();
 
   const ok = depois === habilitados && habilitados > 0 && limpo === 0;
-  registrar('2. seleção em lote', tela, ok,
+  registrar('2. seleção em lote', tela, ok ? 'ok' : 'falhou',
     ok ? `marcou ${depois}/${habilitados} elegíveis e desmarcou tudo`
       : `antes=${antes}, depois=${depois}, elegíveis=${habilitados}, após desmarcar=${limpo}`);
 }
@@ -169,6 +180,13 @@ async function checarSelecao(page, tela, rota) {
 async function checarColunaFixa(page, tela, rota) {
   await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
+  // A auditoria carrega a trilha sob demanda (mesma ideia da consulta de
+  // títulos): sem clicar em Atualizar, não há tabela para medir.
+  const atualizar = page.getByRole('button', { name: /atualizar/i }).first();
+  if (await atualizar.count()) {
+    await atualizar.click();
+    await page.waitForTimeout(3000);
+  }
   const medida = await page.evaluate(() => {
     const rolagem = document.querySelector('.app-tabela .resizable-table-scroll');
     const fixa = document.querySelector('.app-tabela td.celula-fixa');
@@ -179,11 +197,11 @@ async function checarColunaFixa(page, tela, rota) {
     return { podeRolar, antes, opaca: getComputedStyle(fixa).backgroundColor };
   });
   if (medida.erro) {
-    registrar('3. coluna fixa', tela, false, `${medida.erro} — a capacidade não chegou à tela`);
+    registrar('3. coluna fixa', tela, 'falhou', `${medida.erro} — a capacidade não chegou à tela`);
     return;
   }
   if (medida.podeRolar < 20) {
-    registrar('3. coluna fixa', tela, false, 'tabela não tem rolagem horizontal nesta largura — não dá para provar');
+    registrar('3. coluna fixa', tela, 'sem-dado', 'tabela não tem rolagem horizontal nesta largura — não dá para provar');
     return;
   }
   await page.waitForTimeout(500);
@@ -194,7 +212,7 @@ async function checarColunaFixa(page, tela, rota) {
   });
   const transparente = /rgba\([\d\s,.]+,\s*0\)/.test(medida.opaca) || medida.opaca === 'transparent';
   const grudou = Math.abs(depois - medida.antes) < 2;
-  registrar('3. coluna fixa', tela, grudou && !transparente,
+  registrar('3. coluna fixa', tela, (grudou && !transparente) ? 'ok' : 'falhou',
     grudou && !transparente
       ? `rolou ${Math.min(300, medida.podeRolar)}px e a coluna ficou na borda (fundo opaco)`
       : `esquerda antes=${Math.round(medida.antes)}px, depois=${Math.round(depois)}px${transparente ? '; fundo TRANSPARENTE (conteúdo passa por baixo)' : ''}`);
@@ -206,7 +224,10 @@ async function checarExpansivel(page, tela, rota) {
   await esperarCarregar(page);
   const seta = page.locator('.app-tabela-expandir').first();
   if (!(await seta.count())) {
-    registrar('4. linha expansível', tela, false, 'sem botão de expandir — a capacidade não chegou à tela');
+    const linhas4 = await page.locator('.app-tabela tbody tr.app-tabela-linha').count();
+    registrar('4. linha expansível', tela, linhas4 ? 'falhou' : 'sem-dado',
+      linhas4 ? 'sem botão de expandir — a capacidade não chegou à tela'
+        : 'sem item nesta solicitação (base de desenvolvimento)');
     return;
   }
   const antes = await page.locator('.app-tabela .app-tabela-detalhe').count();
@@ -220,7 +241,7 @@ async function checarExpansivel(page, tela, rota) {
   const fechado = await page.locator('.app-tabela .app-tabela-detalhe').count();
 
   const ok = antes === 0 && aberto === 1 && temConteudo && fechado === 0;
-  registrar('4. linha expansível', tela, ok,
+  registrar('4. linha expansível', tela, ok ? 'ok' : 'falhou',
     ok ? 'abre com conteúdo e fecha'
       : `detalhes antes=${antes}, ao abrir=${aberto} (com conteúdo: ${temConteudo}), ao fechar=${fechado}`);
 }
@@ -231,7 +252,7 @@ async function checarColunas(page, tela, rota) {
   await esperarCarregar(page);
   const botao = page.getByRole('button', { name: /^colunas$/i }).first();
   if (!(await botao.count())) {
-    registrar('5. colunas do usuário', tela, false, 'sem botão "Colunas" — a capacidade não chegou à tela');
+    registrar('5. colunas do usuário', tela, 'falhou', 'sem botão "Colunas" — a capacidade não chegou à tela');
     return;
   }
   const contarColunas = () => page.locator('.app-tabela thead th').count();
@@ -241,7 +262,7 @@ async function checarColunas(page, tela, rota) {
   await page.waitForTimeout(400);
   const caixa = page.locator('.app-colunas-menu input[type="checkbox"]:not([disabled]):checked').first();
   if (!(await caixa.count())) {
-    registrar('5. colunas do usuário', tela, false, 'painel abriu sem coluna que possa ser escondida');
+    registrar('5. colunas do usuário', tela, 'falhou', 'painel abriu sem coluna que possa ser escondida');
     return;
   }
   await caixa.click();
@@ -263,7 +284,7 @@ async function checarColunas(page, tela, rota) {
 
   const escondeu = depois === antes - 1;
   const reordenou = JSON.stringify(ordemAntes) !== JSON.stringify(ordemDepois);
-  registrar('5. colunas do usuário', tela, escondeu && reordenou,
+  registrar('5. colunas do usuário', tela, (escondeu && reordenou) ? 'ok' : 'falhou',
     escondeu && reordenou
       ? `escondeu 1 coluna (${antes}→${depois}) e reordenou`
       : `colunas ${antes}→${depois} (esperado ${antes - 1}); reordenou: ${reordenou}`);
@@ -305,18 +326,27 @@ async function main() {
     console.log('[capacidades] login ok\n');
 
     await checarOrdenacao(page, 'gestao-contratos', '/gestao-contratos');
+    // A seleção é provada onde HÁ dado real: /gestao-contratos tem 311
+    // linhas; /conversas/entrada está vazia nesta base.
+    await checarSelecao(page, 'gestao-contratos', '/gestao-contratos');
     await checarSelecao(page, 'conversas-entrada', '/conversas/entrada');
     await checarColunaFixa(page, 'auditoria-operacional', '/governanca/auditoria-operacional');
     await checarExpansivel(page, 'solicitacao-compra-detalhe', await primeiraSolicitacaoCompra(page));
     await checarColunas(page, 'financeiro-relatorio-analitico', '/financeiro/relatorios/analitico');
 
-    const falhas = resultados.filter((r) => !r.ok);
+    const falhas = resultados.filter((r) => r.estado === 'falhou');
+    const provadas = resultados.filter((r) => r.estado === 'ok');
+    const semDado = resultados.filter((r) => r.estado === 'sem-dado');
     fs.mkdirSync(path.join(AQUI, 'saida'), { recursive: true });
     fs.writeFileSync(
       path.join(AQUI, 'saida', 'capacidades.json'),
       JSON.stringify({ quando: new Date().toISOString(), resultados }, null, 2)
     );
-    console.log(`\n[capacidades] ${resultados.length - falhas.length}/${resultados.length} capacidades provadas na tela real`);
+    console.log(`\n[capacidades] ${provadas.length} provada(s) na tela real · ${falhas.length} falha(s) · ${semDado.length} sem dado na base`);
+    if (semDado.length) {
+      console.log('[capacidades] SEM DADO não é aprovação: a capacidade segue não provada nessas telas.');
+      semDado.forEach((r) => console.log(`   — ${r.capacidade} (${r.tela}): ${r.detalhe}`));
+    }
     process.exit(falhas.length ? 1 : 0);
   } finally {
     await navegador.close();
@@ -327,18 +357,12 @@ async function main() {
 async function primeiraSolicitacaoCompra(page) {
   await page.goto(`${BASE}/solicitacoes-compra`, { waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
-  const rota = await page.evaluate(() => {
-    const linha = document.querySelector('tbody tr.app-tabela-linha');
-    if (!linha) return null;
-    const link = linha.querySelector('a[href*="/solicitacoes-compra/"]');
-    return link ? link.getAttribute('href') : null;
-  });
-  if (rota) return rota;
-  // sem link na linha: tenta abrir pelo clique de linha
-  const linha = page.locator('tbody tr.app-tabela-linha').first();
-  if (await linha.count()) {
-    await linha.click();
-    await page.waitForTimeout(1500);
+  // A linha NÃO navega por clique nesta tela: quem abre é o botão de ação
+  // da própria linha (verificado no preview).
+  const acao = page.locator('tbody tr.app-tabela-linha .app-actionbar button, tbody tr.app-tabela-linha .app-actionbar a').first();
+  if (await acao.count()) {
+    await acao.click();
+    await page.waitForTimeout(3000);
     const atual = new URL(page.url()).pathname;
     if (/\/solicitacoes-compra\/\d+/.test(atual)) return atual;
   }
