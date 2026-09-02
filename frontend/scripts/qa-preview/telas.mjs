@@ -61,7 +61,10 @@ export const TELAS = [
     id: 'obra-gestao',
     arquivo: 'src/pages/ObraGestao.jsx',
     resolver: 'obraGestao',
-    tipo: 'detalhe'
+    tipo: 'detalhe',
+    // As tabelas da tela vivem nas ABAS — verificar só o dashboard seria
+    // "implementado no componente" sem cobertura (proibido pela DoD).
+    variantes: ['?aba=orcamento', '?aba=custos', '?aba=parcelas', '?aba=arquivos', '?aba=relatorio-final']
   },
   {
     id: 'obra-tipo-apropriacao',

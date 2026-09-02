@@ -323,9 +323,14 @@ async function checarRedimensionamento(page, tela, resultado) {
       break;
     }
   }
-  // Persistência: recarrega e mede de novo.
+  // Persistência: recarrega e mede de novo. Blocos recolhidos voltam
+  // fechados no reload — reabre para a tabela deles seguir mensurável.
   await page.reload({ waitUntil: 'domcontentloaded' });
   await esperarCarregar(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
+  });
+  await page.waitForTimeout(500);
   const recarregado = await medir();
   if (!recarregado || Math.abs(recarregado[idx] - depois[idx]) > 4) {
     problemas.push(`largura não persistiu ao recarregar (${depois?.[idx]}→${recarregado?.[idx]}px)`);
@@ -579,6 +584,54 @@ async function main() {
         await checarEtiquetasFiltro(page, resultado.itens);
         await checarRedimensionamento(page, tela, resultado.itens);
         await checarModalCadastro(page, tela, resultado.itens);
+        // Variantes da mesma tela (abas com tabela) e blocos RECOLHIDOS:
+        // conteúdo que existe mas não está à vista também é da tela — sem
+        // isso, tabela em aba/bloco ficaria "N/A" e viraria capacidade sem
+        // cobertura. FALHOU de variante vence; PASSOU cobre N/A.
+        const fundirVariante = (extra, rotulo) => {
+          ['T1', 'T2', 'T4', 'T5', 'T6', 'T7', 'M1', 'M3', 'M4', 'B5'].forEach((item) => {
+            const atual = resultado.itens[item];
+            const novo = extra[item];
+            if (!novo) return;
+            if (novo.estado === 'FALHOU' && atual?.estado !== 'FALHOU') {
+              resultado.itens[item] = { ...novo, motivo: `[${rotulo}] ${novo.motivo || ''}` };
+            } else if ((!atual || atual.estado === 'N/A') && novo.estado === 'PASSOU') {
+              resultado.itens[item] = { estado: 'PASSOU' };
+            }
+          });
+        };
+
+        // Blocos recolhidos da própria tela: expande e mede as tabelas.
+        const expandiu = await page.evaluate(() => {
+          const botoes = Array.from(document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]'));
+          botoes.forEach((b) => b.click());
+          return botoes.length;
+        });
+        if (expandiu > 0) {
+          await page.waitForTimeout(600);
+          fundirVariante(await page.evaluate(checksEstaticos, { tipo: tela.tipo }), 'blocos expandidos');
+          if (resultado.itens.T3?.estado === 'N/A' && await page.locator('.resizable-table').count()) {
+            await checarAffordanceAlinhamento(page, resultado.itens);
+            await checarRedimensionamento(page, tela, resultado.itens);
+          }
+        }
+
+        for (const sufixo of tela.variantes || []) {
+          await page.goto(`${BASE}${rota}${sufixo}`, { waitUntil: 'domcontentloaded' });
+          await esperarCarregar(page);
+          fundirVariante(await page.evaluate(checksEstaticos, { tipo: tela.tipo }), sufixo);
+          if ((!resultado.itens.T3 || resultado.itens.T3.estado === 'N/A') && await page.locator('.resizable-table').count()) {
+            resultado.itens.T3 = undefined;
+            await checarAffordanceAlinhamento(page, resultado.itens);
+            await checarRedimensionamento(page, tela, resultado.itens);
+            if (resultado.itens.T3) resultado.itens.T3.motivo = `[${sufixo}] ${resultado.itens.T3.motivo || ''}`.trim() || undefined;
+          }
+        }
+        if (tela.variantes?.length || expandiu > 0) {
+          await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
+          await esperarCarregar(page);
+        }
+
         resultado.itens.M2 = m2Para(tela.arquivo, validador);
 
         if (capturar) {
