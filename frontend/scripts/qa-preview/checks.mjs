@@ -216,6 +216,16 @@ export function checksEstaticos({ tipo }) {
       if (!scroll) return;
       const folga = scroll.clientWidth - tab.getBoundingClientRect().width;
       if (folga > 40) t4.push(`${cssPath(tab)}: ${Math.round(folga)}px de sobra não distribuída`);
+      /* Folga NEGATIVA é transbordo: a tabela pede mais largura do que o
+         contêiner tem, e a última coluna aparece cortada na borda do cartão.
+         O check só olhava sobra positiva e passava calado justamente no caso
+         pior — foi assim que a coluna "Resultado" das Importações chegou
+         cortada à matriz com ✅. Rolagem horizontal do contêiner é legítima
+         (R18 permite overflow-x: auto), mas só quando o contêiner ROLA de
+         verdade; aqui a tabela transborda um cartão que não rola. */
+      if (folga < -8 && scroll.scrollWidth <= scroll.clientWidth + 8) {
+        t4.push(`${cssPath(tab)}: tabela TRANSBORDA ${Math.abs(Math.round(folga))}px do contêiner, que não rola — a última coluna fica cortada na borda`);
+      }
 
       // Folga POR COLUNA: quanto a coluna tem além do que seu conteúdo usa.
       const cabecalhos = Array.from(tab.querySelectorAll('thead th'));
@@ -275,8 +285,43 @@ export function checksEstaticos({ tipo }) {
           if (!completo && (!pior || el.textContent.length > pior.textContent.length)) pior = el;
         }
       });
-      r.T6 = pior
-        ? { estado: 'FALHOU', motivo: `texto cortado sem tooltip: "${pior.textContent.trim().slice(0, 50)}…"`, seletor: cssPath(pior) }
+      /*
+        Duas cegueiras que o revisor achou em 02/09, com a matriz aprovando:
+
+        1) QUEBRA DE LINHA NO MEIO DA PALAVRA. `scrollWidth > clientWidth`
+           só vê corte HORIZONTAL. Quando a célula não tem `white-space:
+           nowrap`, a palavra que não cabe QUEBRA — "CONFIRMADA" virava
+           "CONFIRM"/"ADA" — e o scrollWidth continua igual ao clientWidth.
+           Palavra partida ao meio é pior que reticências: ela vira duas
+           outras palavras.
+        2) O CABEÇALHO nunca era medido. "COMPETÊNCIA" cortava sem tooltip e
+           nenhum check olhava `th`.
+      */
+      const partidos = qa('.resizable-table td').filter(visivel).filter(foraDeModal)
+        .filter((td) => {
+          const estilo = getComputedStyle(td);
+          if (estilo.whiteSpace.includes('nowrap')) return false;
+          const alturaLinha = parseFloat(estilo.lineHeight) || 20;
+          // Mais de uma linha E uma palavra só (sem espaço) = partiu a palavra.
+          const texto = td.innerText.trim();
+          return td.scrollHeight > alturaLinha * 1.6 && texto.length > 0 && !/\s/.test(texto);
+        });
+
+      const cabecalhosCortados = qa('.resizable-table th').filter(visivel).filter(foraDeModal)
+        .filter((th) => {
+          const rotulo = th.querySelector('.resizable-th-label, .app-th-titulo') || th;
+          if (rotulo.scrollWidth <= rotulo.clientWidth + 2) return false;
+          const tooltip = th.closest('[title]') || th.querySelector('[title]');
+          return !tooltip;
+        });
+
+      const problemasT6 = [];
+      if (pior) problemasT6.push(`texto cortado sem tooltip: "${pior.textContent.trim().slice(0, 50)}…"`);
+      if (partidos.length) problemasT6.push(`palavra QUEBRADA ao meio (célula sem nowrap): "${partidos[0].innerText.trim().slice(0, 40)}"`);
+      if (cabecalhosCortados.length) problemasT6.push(`cabeçalho cortado sem tooltip: "${cabecalhosCortados[0].innerText.trim().slice(0, 40)}"`);
+
+      r.T6 = problemasT6.length
+        ? { estado: 'FALHOU', motivo: problemasT6.join(' | '), seletor: cssPath(pior || partidos[0] || cabecalhosCortados[0]) }
         : { estado: 'PASSOU' };
     }
 

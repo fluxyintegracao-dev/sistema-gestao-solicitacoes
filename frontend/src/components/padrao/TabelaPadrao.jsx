@@ -562,21 +562,55 @@ export default function TabelaPadrao({
   const LARGURA_SELECAO = 44;
   const LARGURA_EXPANDIR = 44;
 
+  /*
+    A largura tem de ser REMEDIDA quando o contêiner muda de tamanho.
+
+    A primeira versão media uma vez e guardava (`atual ?? Math.floor(...)`),
+    com dependências que não incluíam largura nenhuma. Consequência medida no
+    preview em 02/09: as capturas de 1920 e 1366 da mesma tela têm as colunas
+    nas MESMAS posições x — a tabela ficou com a medida de 1920 e deixou
+    ~340px vazios em 1366. Valia para TODA tela com TabelaPadrao, não só a
+    que o revisor olhou: qualquer janela redimensionada, menu lateral
+    recolhido ou bloco que abre ao lado desalinha a distribuição em silêncio.
+
+    `ResizeObserver` no contêiner de rolagem, então, e o `atual ??` sai. O
+    estado só é escrito quando o número muda de verdade, para não entrar em
+    laço de render (o observer dispara na própria mudança de layout).
+  */
   useEffect(() => {
-    if (!shellRef.current) return undefined;
+    const el = shellRef.current;
+    if (!el) return undefined;
+
     const medir = () => {
-      const el = shellRef.current;
-      if (!el) return;
+      const alvo = shellRef.current;
+      if (!alvo) return;
       // A largura que vale é a do CONTAINER DE ROLAGEM da tabela (a caixa
       // externa do shell tem padding e distribuía sobra a mais, cortando a
       // coluna de ações).
-      const rolagem = el.querySelector('.resizable-table-scroll');
-      const largura = rolagem ? rolagem.clientWidth : el.clientWidth;
-      if (largura > 0) setLarguraDisponivel((atual) => atual ?? Math.floor(largura));
+      const rolagem = alvo.querySelector('.resizable-table-scroll');
+      const largura = Math.floor(rolagem ? rolagem.clientWidth : alvo.clientWidth);
+      if (largura > 0) {
+        setLarguraDisponivel((atual) => (atual === largura ? atual : largura));
+      }
     };
+
     medir();
     const raf = requestAnimationFrame(medir);
-    return () => cancelAnimationFrame(raf);
+
+    let observador = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      observador = new ResizeObserver(medir);
+      const rolagem = el.querySelector('.resizable-table-scroll');
+      observador.observe(rolagem || el);
+    } else {
+      window.addEventListener('resize', medir);
+    }
+
+    return () => {
+      cancelAnimationFrame(raf);
+      if (observador) observador.disconnect();
+      else window.removeEventListener('resize', medir);
+    };
   }, [carregando, ehMovel, itens.length]);
 
   // T6: célula que trunca ganha tooltip com o texto COMPLETO — cortar com
@@ -865,6 +899,13 @@ export default function TabelaPadrao({
                 key={coluna.id}
                 columnKey={coluna.id}
                 className={coluna.fixa ? 'celula-fixa' : undefined}
+                /* Cabeçalho que corta ganha o texto inteiro no tooltip —
+                   mesma regra que já valia para a CÉLULA (T6) e que faltava
+                   aqui: "COMPETÊNCIA" era cortado sem caminho para ler o
+                   resto. O piso de largura pelo título já evita o corte na
+                   maioria dos casos; o tooltip é a rede para quando o
+                   usuário estreita a coluna à mão. */
+                title={typeof coluna.titulo === 'string' ? coluna.titulo : undefined}
                 aria-sort={ordem?.coluna === coluna.id
                   ? (ordem.direcao === 'asc' ? 'ascending' : 'descending')
                   : undefined}

@@ -30,6 +30,17 @@ corrigir**, porque é regra dele.
   fallback), mas é campo morto — ou o modelo deveria ter o campo, ou a
   leitura sobra.
 
+### N3b — Status `SUBSTITUIDA` existe no banco e não pode ser filtrado
+- **Onde**: `backend/src/services/rhJornadaFormularioService.js` grava
+  `status: 'SUBSTITUIDA'` em `rh_importacoes`, mas `RH_STATUS_IMPORTACAO`
+  (`backend/src/validators/rhValidators.js`) só aceita
+  `PREVIEW | CONFIRMADA | CANCELADA` na consulta.
+- **O que acontece**: existe lote que APARECE na lista e **não pode ser
+  filtrado** — acrescentar a opção ao filtro faria o servidor recusar a
+  consulta. A tela trata `SUBSTITUIDA` só na exibição.
+- **Precisa de decisão**: ou o validador passa a aceitar `SUBSTITUIDA`, ou o
+  formulário de jornada grava outro valor. É contrato de API, não layout.
+
 ### N3 — Líquido apurado maior que o bruto (a conferir)
 - **Onde**: aba Apuração do Pessoal, ladrilhos de resumo. No preview de
   02/09: **BRUTO FILTRADO R$ 13.710,97** e **LÍQUIDO FILTRADO R$ 15.070,97**.
@@ -67,6 +78,23 @@ Vários rótulos e mensagens do módulo estão sem acento ("Solicitacoes",
 estava reescrevendo a linha; o resto ficou.
 
 ---
+
+### T3b — CSS órfão deixado pelas migrações
+Classes sem nenhum consumidor no JSX, sobradas da troca por
+`BlocoConteudo`/`TabelaPadrao`/`StatGrid`. Não apagadas porque o `index.css`
+não era escopo de nenhum agente da leva:
+- `frontend/src/index.css` ~10327-10435: `.rhdp-importacoes-list-card`,
+  `.rhdp-importacoes-detail-card`, `.rhdp-importacoes-lotes-wrapper`,
+  `.rhdp-importacoes-lotes-table` (com cinco `nth-child` de largura),
+  `.rhdp-importacoes-lote-file`, `.rhdp-importacao-summary-grid`,
+  `.rhdp-importacao-preview-table`.
+- `frontend/src/index.css` ~9966-10150: bloco `.rhdp-apuracao-*`.
+- `frontend/src/index.css` ~11869-11899: `.rh-pessoal-alerta*`.
+- `frontend/src/index.css`: `.rh-colaboradores-filter-card`,
+  `.rh-colaboradores-actions`, `.rh-colaborador-form-card`,
+  `.rh-colaboradores-table thead th`.
+  **Atenção**: `.rh-colaboradores-filter-grid` continua VIVA (Jornada e
+  Pessoal ainda a usam) — não apagar essa junto.
 
 ### T4 — `ModuloRelatorios.jsx` nunca foi migrada (hub de TODOS os módulos)
 - **Rota que a expõe no RH/DP**: `/rh-dp/relatorios`.
