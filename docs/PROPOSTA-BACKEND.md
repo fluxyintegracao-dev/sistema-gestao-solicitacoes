@@ -17,7 +17,7 @@ Data: 2026-09-01 · Autor: Sávio (savioleal12@gmail.com)
 
 | # | Funcionalidade | O que precisa no backend | Sem isso, o usuário perde |
 |---|---|---|---|
-| 1 | Correções de bug | 2 ajustes pontuais (sem tabela, sem endpoint) | Estabilidade: o servidor cai com erro assíncrono; deploy em Linux quebra em 2 telas |
+| 1 | Correção de bug | 1 ajuste pontual (sem tabela, sem endpoint) | Estabilidade: o servidor cai com erro assíncrono não tratado |
 | 2 | Preferências de usuário | 2 tabelas + 5 rotas CRUD (só do próprio usuário) | Toda personalização (colunas, filtros salvos, layout da Home/detalhe, atalhos, tela inicial) — ou ela fica presa ao navegador/máquina |
 | 3 | Pendências da Home | 1 endpoint de leitura + 1 parâmetro novo nas listas | A Home vira só um menu: sem "Para resolver agora", sem cartões com números que abrem exatamente o que contam |
 | 4 | Busca universal (Ctrl+K) | 1 endpoint de leitura + 3 índices | Ctrl+K só navega para telas; não encontra solicitações, contratos, títulos, obras nem parceiros |
@@ -38,22 +38,21 @@ Princípios seguidos em tudo:
 
 ---
 
-## 1. Correções de bug (independentes da reforma)
+## 1. Correção de bug (independente da reforma)
 
-Interessam ao projeto mesmo que nada da reforma visual seja aprovado.
+Interessa ao projeto mesmo que nada da reforma visual seja aprovado.
 
-### 1a. `tableName` explícito nos models `Comprovante` e `Obra`
+> **Item 1a retirado da proposta (02/09/2026).** A proposta original incluía
+> `tableName` explícito nos models `Comprovante` e `Obra`. A verificação no
+> repositório oficial mostrou que **não era bug do sistema, e sim adaptação ao
+> ambiente local onde a reforma foi desenvolvida** (tabelas minúsculas): no
+> servidor oficial a tabela física é `Obras`, com maiúscula, a pluralização
+> padrão do Sequelize já casa com o banco real, e o fix teria **quebrado as
+> telas de obras no deploy**. O oficial trata a variação de nome físico nas
+> migrations, via `resolveTableName`. Registro completo no aviso da seção C3
+> de `docs/MIGRACAO-PARA-OFICIAL.md`.
 
-**Bug:** os dois models não declaram `tableName`; o Sequelize pluraliza para
-`Comprovantes`/`Obras` (maiúscula inicial). Em MySQL no Linux com
-`lower_case_table_names=0` (padrão), tabela é case-sensitive — as consultas falham com
-"table doesn't exist". Em Windows/mac não aparece, por isso passou despercebido.
-
-**Correção:** 4 linhas (2 por model). Zero efeito onde hoje funciona.
-**Impacto de não ter:** qualquer ambiente Linux novo (staging, migração de servidor)
-quebra nas telas que tocam comprovantes e obras.
-
-### 1b. Handlers globais de processo (`server.js`)
+### 1b. Handlers globais de processo (`server.js`) — mantido integralmente
 
 **Bug:** um `unhandledRejection` — por exemplo, uma falha de banco disparada por uma
 única tela — **derruba o processo Node inteiro**, tirando o sistema do ar para todos até
@@ -204,7 +203,7 @@ permitiria gravar destino inválido ou sem permissão, o que rejeitamos.
 
 ## Ordem sugerida de aprovação
 
-1. **Item 1** (correções) — pode ir já, risco baixíssimo.
+1. **Item 1** (correção 1b) — pode ir já, risco baixíssimo.
 2. **Item 2** (preferências) — destrava a personalização inteira e os itens 6 e 7.
 3. **Itens 3 e 4** (pendências e busca) — o coração da experiência nova; só leitura.
 4. **Itens 5, 6 e 7** — complementos, na ordem que convier.

@@ -165,9 +165,24 @@ A preferência de tela inicial **não** criou coluna em `users` — reusa
 
 ### C3. CORREÇÕES DE BUG — interessam ao responsável independentemente da reforma
 
+> ⚠️ **CORREÇÃO 1 DESCARTADA NO PORTE (02/09/2026) — NÃO APLICAR.**
+> A verificação prévia no repositório oficial mostrou que o fix teria **quebrado
+> as telas de obras no deploy**: no MySQL Linux do servidor oficial a tabela
+> física é **`Obras`, com O maiúsculo** (confirmado no handoff
+> `docs/handoffs/TRANSFORMACAO_DEV_V2_PARA_V4_2026-08-29.md` — o deploy de 29/08
+> parou exatamente nisso), então a pluralização padrão do Sequelize já casa com o
+> banco real, e cravar `tableName: 'obras'` (minúsculo) apontaria para uma tabela
+> que lá não existe. O "bug" era, na verdade, adaptação ao ambiente local do
+> FLUXY, onde as tabelas eram minúsculas. O oficial já trata a variação de nome
+> físico no lado certo: as migrations resolvem dinamicamente via
+> `resolveTableName(['Obras','obras'])` (commit `f58e030`), e para comprovantes
+> existe migration de compatibilidade cobrindo `Comprovantes` E `comprovantes`.
+> Padronizar os nomes físicos, se um dia for desejado, é trabalho de renomeação
+> no banco de produção com janela própria — fora do escopo deste porte.
+
 | # | Correção | Arquivo | Bug |
 |---|---|---|---|
-| 1 | **`tableName` explícito em `Comprovante` e `Obra`** | `backend/src/models/Comprovante.js`, `Obra.js` | Sem ele o Sequelize pluraliza para `Comprovantes`/`Obras` e **quebra em MySQL Linux com `lower_case_table_names=0`** (tabela não encontrada). Pré-existente; qualquer deploy em Linux case-sensitive esbarra nisso. |
+| 1 | ~~`tableName` explícito em `Comprovante` e `Obra`~~ **DESCARTADA — ver aviso acima** | — | O diagnóstico original valia só para o ambiente local do FLUXY; no servidor oficial o fix inverteria o problema. |
 | 2 | **Handlers globais de processo** | `backend/server.js` | Um `unhandledRejection` (ex.: falha de banco disparada por uma tela) **derrubava o servidor inteiro**. Agora loga com stack e segue; falha durante o boot continua encerrando o processo. |
 | 3 | **Status composto `EM_ABERTO`** | `backend/src/services/tituloFinanceiroService.js` | Cartão somava PREVISAO+ABERTO+PARCIAL mas o link abria a lista só com ABERTO — números divergentes. Extensão aditiva do filtro `status` (`EM_ABERTO` → `Op.in` dos três). |
 | 4 | **Contador com teto de 61 / links errados** | `DashboardPendenciasController` + `pendenciasVisoes.js` | Contador vinha de `findAll` com `limit 61` e acima disso caía num link genérico por área ("61 aprovações" abria lista com 3.590 registros). Corrigido com COUNT sem teto + visões nomeadas: **cartão e lista usam literalmente o mesmo recorte SQL**. (Bug e correção dentro da reforma — o padrão importa para qualquer porte das pendências.) |
@@ -247,7 +262,7 @@ depois.
 
 | Pacote | Conteúdo | Risco | Antes precisa de |
 |---|---|---|---|
-| **B0 — Correções de bug** | `tableName` (C3.1), handlers globais (C3.2) | Baixíssimo; independentes de tudo | Só o OK do responsável |
+| **B0 — Correções de bug** | Handlers globais (C3.2) — **entregue em 02/09**; a C3.1 (`tableName`) foi **descartada** (ver aviso em C3) | Baixíssimo; independentes de tudo | Só o OK do responsável |
 | **B1 — Preferências** | Migration `202608300050` (parcial: 2 tabelas de usuário) + `ListaPreferenciasController` + rotas | Baixo: tabelas novas, CRUD do próprio usuário | OK do responsável (fura a regra "nenhuma migration") |
 | **B2 — Busca universal** | `BuscaController` + utils + migration de índices | Baixo/médio: só leitura, mas toca escopos de 4 telas — revisar com o responsável grupo a grupo | B0 recomendado |
 | **B3 — Solicitações (params) + pendências** | Rework `SolicitacaoController`, `pendenciasVisoes`, `DashboardPendenciasController`, `EM_ABERTO` (C3.3), param `visao` | Médio: mexe no controller mais usado do sistema (aditivo, mas grande). Validar com `valida-pendencias.js` em staging | B1 (contadores de visão aparecem na lista) |
@@ -271,6 +286,56 @@ test:responsive + build + conferência funcional da tela afetada.
 
 `DevQuickLoginController` e rotas, `DEV_QUICK_LOGIN` em `env.js`, tela "Entrar como",
 CORS de IP privado, `outputs/**`, docs do ambiente local deste repositório.
+
+---
+
+## MIGRATIONS DO PORTE — execução e verificação (para o responsável)
+
+O `server.js` do oficial **não roda migrations no boot**: ele apenas confere o
+schema (`assertMigrationsUpToDate`) e **recusa subir** se houver migration
+pendente. A aplicação é um passo explícito e autorizado:
+
+```bash
+cd backend
+ALLOW_SCHEMA_MIGRATIONS=true npm run migrate
+```
+
+O runner só aplica migrations de estrutura (ele mesmo rejeita arquivo com
+mutação de dados) e registra cada uma em `schema_migrations` pelo nome do
+arquivo. Rodar duas vezes é seguro: a segunda execução não aplica nada — e essa
+é exatamente a conferência de idempotência a fazer.
+
+Migrations que este porte adiciona, **na ordem de execução** (o runner ordena
+por nome):
+
+| # | Migration | Pacote | Cria | Verificar depois |
+|---|---|---|---|---|
+| 1 | `202609020050_lista_preferencias_filtros.js` | B1 (entregue) | Tabelas `usuario_lista_preferencias` (única por usuário+lista, FK `fk_usr_lista_pref_user` → users) e `usuario_lista_filtros` (FK `fk_usr_lista_filtros_user`) | `npm run migrate` de novo não aplica nada; `SHOW CREATE TABLE usuario_lista_preferencias` mostra o índice único `uq_usr_lista_pref` e a FK; na tela de Solicitações, mudar colunas/larguras, recarregar e ver a escolha mantida |
+| 2 | `2026____xxxx_indices_busca.js` | B2 (a entrar) | Índices `idx_obras_nome`, `idx_parceiros_nome`, `idx_parceiros_cpf_cnpj` | segunda execução não aplica nada; `SHOW INDEX FROM obras`/`parceiros` lista os três; Ctrl+K responde rápido com texto de 2+ caracteres |
+| 3 | `2026____xxxx_atalhos_setor_layout_detalhe.js` | B4 (a entrar) | Tabelas `setor_atalhos_padrao` e `setor_detalhe_layout` (já com a coluna `tela`) | segunda execução não aplica nada; telas de admin (Atalhos por Setor / Layout do Detalhe) gravam e relêem |
+| 4 | (B4) tabela `acoes_principais_setor` — na mesma migration do item 3 | B4 | Mapeamento setor+estado → ação principal do detalhe | admin cadastra um mapeamento e o botão em destaque aparece no detalhe |
+
+> Os nomes exatos dos itens 2–3 serão fixados quando cada pacote entrar
+> (data de criação + faixa 0050+, conforme `CONVENCAO-MIGRATIONS.md`); esta
+> tabela será atualizada junto. O B5 (tela inicial) não cria migration —
+> reusa `usuario_lista_preferencias`. B3 e B6 também não criam tabela.
+
+### O que o preview mostra ANTES de o backend-dev subir com este código
+
+O frontend da branch publica sozinho no preview (`refactor-dev.jrfluxy.com.br`)
+a cada push, mas ele conversa com a API dev **atual** — os pacotes de backend
+só ficam ativos quando o responsável (1) subir o `backend-dev` com este código
+e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver:
+
+| Pacote | Sem o backend novo, o preview mostra | Com backend + migration, passa a |
+|---|---|---|
+| B1 — preferências | Personalização (colunas, larguras, modo, filtros salvos, arranjo da Home/detalhe, atalhos) funciona na sessão mas **volta ao padrão ao recarregar**; salvar filtro falha em silêncio | Persistir por usuário, sobrevivendo a troca de máquina e limpeza de cache |
+| B0 — handlers | (efeito só no servidor) | Erro assíncrono de uma tela não derruba o backend; log `[unhandledRejection]` |
+| B2 — busca | Ctrl+K encontra **só telas e ações** | Ctrl+K encontra solicitações, contratos, títulos, obras e parceiros |
+| B3 — solicitações/pendências | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado, busca única e ordenação no banco inteiro |
+| B4 — config. por setor | Telas de admin ausentes; sem ação principal em destaque no detalhe; sem atalhos/layout padrão por setor | Camada do administrador ativa |
+| B5 — tela inicial | Sem a "casinha" no topo; login cai sempre na Home | Usuário escolhe onde o login cai, validado no backend |
+| B6 — blocos da Home | "Adicionar bloco" só com os básicos | Catálogo completo de 12 blocos opcionais |
 
 ---
 
