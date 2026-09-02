@@ -13,9 +13,24 @@ import { FiltroRapido } from '../lista-avancada/ListaAvancada';
  *
  * A tela guarda o estado: `ativos` = { dimensaoId: Set(valores) } e trata
  * `aoAlternar(dimensaoId, valor)`. Conjunto vazio = sem filtro (todas).
+ *
+ * ## `campos` — o recorte que NÃO é enumerável (R16b, 02/09)
+ *
+ * Marcação pressupõe lista fechada de opções. Competência (`month`) e
+ * período (`date` inicial/final) não têm lista: são contínuos. Na leva do
+ * RH/DP seis telas precisavam disso, e sem lugar no componente elas
+ * voltariam à grade crua de `select`/`input` — vinte exceções não é regra
+ * (R16b: o padrão cresce, a exceção não se acumula).
+ *
+ * Então `campos` é um espaço declarado, na MESMA faixa, antes da linha de
+ * marcação: `[{ id, rotulo, tipo: 'month'|'date'|'number', valor, aoMudar }]`.
+ * NÃO use para recorte enumerável — status, obra, vínculo e empresa são
+ * `filtros`, com marcação e etiqueta removível. Campo aqui é exceção
+ * declarada, não porta dos fundos.
  */
 export default function BarraFiltros({
   busca,               // { valor, aoMudar, placeholder }
+  campos = [],         // [{ id, rotulo, tipo, valor, aoMudar, min, max }]
   filtros = [],        // [{ id, rotulo, opcoes: [{ valor, rotulo }] }]
   ativos = {},         // { [id]: Set<string> }
   aoAlternar,
@@ -50,6 +65,23 @@ export default function BarraFiltros({
           )}
         </div>
       ) : null}
+
+      {campos.length > 0 && (
+        <div className="app-filtros-campos">
+          {campos.map((campo) => (
+            <label key={campo.id} className="app-filtros-campo">
+              <span className="app-filtros-campo-rotulo">{campo.rotulo}</span>
+              <input
+                type={campo.tipo || 'text'}
+                value={campo.valor ?? ''}
+                min={campo.min}
+                max={campo.max}
+                onChange={(event) => campo.aoMudar(event.target.value)}
+              />
+            </label>
+          ))}
+        </div>
+      )}
 
       {filtros.length > 0 && (
         <div className="la-filtros-linha">

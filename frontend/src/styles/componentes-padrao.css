@@ -1079,3 +1079,42 @@ fieldset.form-section {
   gap: var(--esp-2);
   margin-block-start: var(--esp-2);
 }
+
+/* Campos de recorte contínuo da BarraFiltros (R16b, 02/09): competência e
+   período não têm lista de opções, então não cabem na marcação. Ficam na
+   MESMA faixa, antes da linha de filtros — o recorte inteiro fica em um
+   lugar só (R16). */
+.app-filtros .app-filtros-campos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--esp-3);
+  align-items: end;
+}
+
+.app-filtros .app-filtros-campo {
+  display: grid;
+  gap: var(--esp-1);
+}
+
+.app-filtros .app-filtros-campo-rotulo {
+  font-size: var(--fonte-detalhe);
+  line-height: var(--lh-detalhe);
+  color: var(--c-muted);
+}
+
+/* Mesma altura e tratamento dos demais controles da faixa — alvo de clique
+   nunca abaixo de 32px (M-alvo). */
+.app-filtros .app-filtros-campo input {
+  min-height: 32px;
+  padding-inline: var(--esp-2);
+  font-size: var(--fonte-corpo);
+  color: var(--c-text);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--raio-1);
+}
+
+.app-filtros .app-filtros-campo input:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 1px;
+}

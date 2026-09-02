@@ -162,6 +162,70 @@ export const TELAS = [
     arquivo: 'src/pages/UsuariosPermissoesRhDp.jsx',
     rota: '/usuarios-permissoes-rh-dp',
     tipo: 'listagem'
+  },
+
+  /* ---------------------------------------------------------------------
+     ETAPA B — MÓDULO RH/DP (02/09). Nenhuma destas telas tinha sido medida
+     contra a DoD até esta leva: o módulo inteiro estava fora do manifesto,
+     e a matriz de 22 telas que fechou 100% não o cobria.
+
+     Duas telas do levantamento NÃO entram porque deixaram de existir:
+     RhDpInicio (D3 — o hub do módulo já é o índice) e RhDpEmpresas (D2 —
+     Empresas do grupo passou a existir uma vez só, em Cadastros). Jornada e
+     Apuração também não têm linha própria: viraram ABAS do Pessoal (D1) e
+     são medidas como variantes dele.
+     --------------------------------------------------------------------- */
+  {
+    id: 'rhdp-pessoal',
+    arquivo: 'src/pages/RhDpPessoal.jsx',
+    rota: '/rh-dp/pessoal',
+    tipo: 'mista',
+    // As quatro abas da porta única do DP (D1). Jornada e Apuração são
+    // arquivos próprios (RhDpJornada.jsx, RhDpApuracao.jsx) medidos aqui —
+    // é onde o usuário os encontra.
+    variantes: ['?aba=colaboradores', '?aba=jornada', '?aba=apuracao']
+  },
+  {
+    id: 'rhdp-colaboradores',
+    arquivo: 'src/pages/RhDpColaboradores.jsx',
+    rota: '/rh-dp/colaboradores',
+    tipo: 'listagem'
+  },
+  {
+    id: 'rhdp-documentos',
+    arquivo: 'src/pages/RhDpDocumentos.jsx',
+    rota: '/rh-dp/documentos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'rhdp-importacoes',
+    arquivo: 'src/pages/RhDpImportacoes.jsx',
+    rota: '/rh-dp/importacoes',
+    tipo: 'mista'
+  },
+  {
+    id: 'rhdp-fechamentos',
+    arquivo: 'src/pages/RhDpFechamentos.jsx',
+    rota: '/rh-dp/fechamentos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'rhdp-relatorios',
+    arquivo: 'src/pages/ModuloRelatorios.jsx',
+    rota: '/rh-dp/relatorios',
+    tipo: 'listagem',
+    naoAplica: {
+      T1: 'hub de relatórios do módulo: cartões de destino, não tem tabela',
+      T2: 'sem tabela', T3: 'sem tabela', T4: 'sem tabela', T5: 'sem tabela',
+      T6: 'sem tabela', T7: 'sem tabela',
+      X1: 'sem tabela para virar card no mobile'
+    }
+  },
+  {
+    id: 'rhdp-relatorio-operacional',
+    arquivo: 'src/pages/RhDpRelatorioOperacional.jsx',
+    rota: '/rh-dp/relatorios/operacional',
+    tipo: 'listagem'
   }
 ];
 
@@ -173,6 +237,9 @@ export const ITENS_DOD = [
   'B1', 'B2', 'B3', 'B4', 'B5',
   'M1', 'M2', 'M3', 'M4',
   'R1', 'R2',
+  // Leva RH/DP (02/09): nenhuma caixa do navegador — aviso e confirmação
+  // usam o componente do sistema.
+  'R3',
   'X1', 'X2', 'X3',
   // Leva do componente (02/09): sticky sequestrado por overflow hidden e
   // acessibilidade por teclado da linha acionável.

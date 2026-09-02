@@ -227,6 +227,56 @@ function rodarValidadorEstatico() {
   }
 }
 
+/**
+ * R3 — nenhum `alert()`/`confirm()` do navegador (DoD, 02/09).
+ *
+ * Duas medidas somadas, porque nenhuma sozinha basta:
+ *  - RUNTIME: o spy de `dialog` da página. Pega o que dispara de verdade no
+ *    preview durante carga e navegação — inclusive o `catch { alert(...) }`
+ *    de erro de carregamento, que aparece sem o usuário pedir nada.
+ *  - ESTÁTICO: a R19 do validador sobre o arquivo da tela. É exaustiva
+ *    (pega o alert do salvar e do excluir, que o harness não exercita
+ *    porque é só navegação e leitura no ambiente compartilhado).
+ */
+const TRINCO_DIALOGOS = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(RAIZ_FRONT, 'scripts', 'trinco-dialogos.json'), 'utf8')).arquivos || {};
+  } catch {
+    return {};
+  }
+})();
+
+function r3Para(arquivo, validador, caixas) {
+  if (caixas.length) {
+    const lista = caixas.map((c) => `${c.tipo}: "${String(c.mensagem).slice(0, 80)}"`).join('; ');
+    return { estado: 'FALHOU', motivo: `caixa do navegador disparou na tela — ${lista}` };
+  }
+  // A saída do validador é texto; a linha da R19 traz o arquivo e o motivo.
+  // FALHA (arquivo novo/contagem que subiu) e AVISO (passivo herdado que
+  // ainda existe, só congelado no trinco) reprovam igual AQUI: o trinco
+  // segura o build do sistema inteiro, não absolve a tela da leva.
+  const linhas = String(validador?.saida || '')
+    .split('\n')
+    .filter((l) => l.includes('[R19]') && l.includes(arquivo));
+  if (linhas.length) {
+    return { estado: 'FALHOU', motivo: `R19 estático: ${linhas[0].trim().slice(0, 200)}` };
+  }
+  // Sem linha da R19 pode ser "zerou" OU "está congelado e igual ao trinco"
+  // — o trinco não emite nada quando a contagem bate. Então lê o próprio
+  // trinco: arquivo listado lá ainda tem caixa do navegador.
+  if (TRINCO_DIALOGOS[arquivo] !== undefined) {
+    return {
+      estado: 'FALHOU',
+      motivo: `arquivo ainda no trinco herdado da R19 com ${TRINCO_DIALOGOS[arquivo]} chamada(s) de alert()/confirm()`
+    };
+  }
+  return {
+    estado: 'PASSOU',
+    motivo: 'sem caixa do navegador na carga (runtime) e sem alert()/confirm() no arquivo (R19 estático)'
+  };
+}
+
+
 function m2Para(arquivo, validador) {
   if (validador.ok) return { estado: 'PASSOU' };
   const linhas = validador.saida.split('\n').filter((l) => l.includes(arquivo));
@@ -548,6 +598,27 @@ async function main() {
   });
   const page = await contexto.newPage();
 
+  /*
+    R3 (DoD) / R19 — PROVA DE RUNTIME de que a tela não abre caixa do
+    navegador. O check estático mede o arquivo; este mede o que acontece de
+    verdade no preview: qualquer alert/confirm/prompt disparado enquanto o
+    harness carrega e navega a tela cai aqui, com a mensagem, e reprova a
+    tela em que ocorreu.
+
+    Escopo honesto do que esta prova cobre: o harness é SÓ NAVEGAÇÃO E
+    LEITURA (não cria, não altera, não apaga no ambiente compartilhado),
+    então ela pega as caixas do caminho de CARGA e de erro de carga — que
+    são justamente as que aparecem sem o usuário pedir. As de salvar e
+    excluir ficam com o check estático R19, que é exaustivo por arquivo.
+    Registrado assim na matriz para ninguém ler PASSOU como "não existe
+    mais nenhuma".
+  */
+  const caixasDoNavegador = [];
+  page.on('dialog', async (dialog) => {
+    caixasDoNavegador.push({ tipo: dialog.type(), mensagem: dialog.message() });
+    await dialog.dismiss().catch(() => {});
+  });
+
   try {
     await esperarDeploy(page);
     await login(page);
@@ -577,6 +648,10 @@ async function main() {
         }
         const bloqueada = await page.evaluate(() => /acesso negado|sem permiss|não autorizado|nao autorizado/i.test(document.body.innerText.slice(0, 3000)));
         if (bloqueada) throw new Error('tela bloqueada por permissão para o usuário de QA');
+
+        // Zera antes da tela: o que for capturado daqui em diante é DESTA
+        // tela, não sobra da anterior.
+        caixasDoNavegador.length = 0;
 
         fundir(resultado.itens, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
         fundir(resultado.itens, await page.evaluate(checkStickyEAcessibilidade));
@@ -634,6 +709,12 @@ async function main() {
         }
 
         resultado.itens.M2 = m2Para(tela.arquivo, validador);
+
+        // R3 — nenhuma caixa do navegador. Runtime (o que o spy de dialog
+        // capturou nesta tela) somado ao estático (R19 sobre o arquivo):
+        // um FALHA sozinho reprova. O motivo do PASSOU diz o que foi
+        // medido, para ninguém ler como "não existe mais nenhuma".
+        resultado.itens.R3 = r3Para(tela.arquivo, validador, caixasDoNavegador);
 
         if (capturar) {
           fs.mkdirSync(path.join(CAPTURAS, tela.id), { recursive: true });
