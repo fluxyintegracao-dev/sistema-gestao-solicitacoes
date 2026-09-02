@@ -297,18 +297,33 @@ automaticamente se sair do padrão.
 - **Onde vale**: qualquer ancestral de faixa fixa (`.app-page-header`),
   coluna fixa (`tipo` com `fixa`), contêiner de rolagem de tabela
   (`.resizable-table-scroll`) ou cabeçalho grudado.
-- **Onde NÃO vale**: elementos pequenos que só recortam forma —
+- **Onde NÃO vale (1) — `overflow-x: auto` / `scroll` no contêiner de
+  rolagem** (aprovado pelo cliente em 02/09): só `hidden` sequestra sticky.
+  `auto`/`scroll` é a forma CORRETA de rolar a tabela na horizontal, e é
+  exatamente o scrollport ao qual a coluna fixa PRECISA grudar. Exemplo que
+  vale: `.resizable-table-scroll { overflow-x: auto }` — a coluna com
+  `fixa` gruda nele, que é o comportamento desejado. Proibir aqui seria
+  proibir a solução certa.
+- **Onde NÃO vale (2)**: elementos pequenos que só recortam forma —
   avatar redondo, barra de progresso, miniatura. Ali `hidden` é inofensivo
   porque nada dentro precisa grudar.
+- **Onde NÃO vale (3)**: o idioma de truncamento `overflow: hidden` +
+  `text-overflow: ellipsis` / `white-space: nowrap` numa célula ou rótulo.
+  Não é ancestral de nada fixo; o check estático inspeciona o BLOCO da
+  regra e ignora esse par (regra que vira ruído deixa de ser lida).
 - **O que usar quando precisa cortar**: `overflow: clip`. Corta igual e
   NÃO cria scrollport, então preserva o sticky.
 - **Histórico** (por isso a regra existe): `.rhdp-page` derrubou a faixa do
-  topo; `.ao-financial` derrubou a coluna fixa da auditoria. Duas vezes o
-  mesmo mecanismo, nas duas o código parecia certo.
+  topo; `.ao-financial` derrubou a coluna fixa da auditoria; a varredura
+  completa achou NOVE telas de detalhe com a faixa fixa quebrada desde o
+  início. Sempre o mesmo mecanismo, sempre com o código parecendo certo.
 - **Verificação**: check estático no `validarLayout.mjs` (CSS dos
-  componentes padrão e dos módulos com tela reformada) + prova no harness,
-  que anda a cadeia de ancestrais de cada elemento fixo no DOM real e
-  nomeia o culpado.
+  componentes padrão e dos módulos com tela reformada) + **prova no
+  harness**, que rola a tela real e mede se o elemento fixo continuou no
+  lugar, andando a cadeia de ancestrais até o scrollport PRETENDIDO — a
+  janela, no caso da faixa; o `.resizable-table-scroll`, no caso da coluna
+  fixa — e nomeia o culpado. Sem a prova de runtime o check estático dá
+  falso "conforme": foi assim que as nove telas passaram anos aprovadas.
 
 ## A1 — Linha acionável alcançável por TECLADO (02/09)
 
@@ -332,6 +347,13 @@ automaticamente se sair do padrão.
 3. **Defeito apontado que a DoD não cobre**: o item entra em
    `docs/DEFINICAO-DE-PRONTO.md` ANTES da correção, e a matriz roda de novo
    em todas as telas.
+4. **Regra nova nasce com prova no harness**, não só com check estático.
+   Check estático mede um arquivo; o defeito costuma morar na composição de
+   vários, no navegador, depois da rolagem. A R18 é o caso-testemunha: nove
+   telas de detalhe estavam com a faixa fixa quebrada desde o início e
+   nenhum check estático poderia ter pego, porque cada arquivo, isolado,
+   estava conforme. Regra que só tem check estático é regra que ainda não
+   sabe se funciona.
 
 ## Verificação
 

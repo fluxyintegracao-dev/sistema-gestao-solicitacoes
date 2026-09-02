@@ -124,7 +124,7 @@ componente" NÃO são evidência.
 
 ## Por que o preview real — casos registrados (02/09)
 
-Três defeitos desta rodada eram **código "correto" que não produzia o
+Quatro defeitos desta rodada eram **código "correto" que não produzia o
 elemento (ou o sinal) no DOM** — a classe de defeito que NENHUMA validação
 em mock/código pega, e que o harness contra o preview real existe para
 pegar:
@@ -146,8 +146,28 @@ pegar:
    como certo e o defeito só existia no ambiente real. O mesmo vale para a
    faixa que nascia compactada (sentinela com margem fixa): só rolagem numa
    janela real, com a topbar real, revela.
+4. **Nove telas de detalhe com a faixa fixa quebrada desde o início.** Ao
+   varrer o sistema atrás de `overflow: hidden` sequestrando sticky (R18),
+   apareceram NOVE telas de detalhe cuja faixa do topo nunca grudou — não
+   foi regressão de uma leva, estava assim desde que a tela existe. O
+   componente `PageHeader` estava certo, o CSS da faixa estava certo, o
+   `position: sticky` estava lá: um ancestral da tela (`.rhdp-page`,
+   `.ao-financial` e afins) criava scrollport com `overflow: hidden` e a
+   faixa passava a grudar nele — ou seja, em lugar nenhum visível. Zero
+   erro no console, zero falha de build, zero reprovação no validador.
+   Nenhum check pegou porque o único check existente era estático, e
+   estaticamente TUDO estava conforme: o defeito só existe na composição
+   dos três arquivos, dentro de uma janela que rola.
 
 Moral operacional: **mock valida lógica; só o preview publicado valida
 EXISTÊNCIA e SINAL** — elemento presente, affordance visível, medida feita
 sobre o DOM que o usuário vê. Por isso a matriz só aceita verificação no
 preview.
+
+Consequência do 4º caso, que vale para o processo daqui pra frente: **toda
+regra nova nasce com PROVA NO HARNESS, não só com check estático.** Check
+estático mede um arquivo; o defeito mora na composição de vários, no
+navegador, depois da rolagem. A R18 só virou regra de verdade quando ganhou
+a prova de runtime — rolar a tela real e medir se o elemento fixo continua
+no lugar. Regra que só tem check estático é regra que ainda não sabe se
+funciona.
