@@ -490,7 +490,7 @@ async function checarModalCadastro(page, tela, resultado) {
 }
 
 /* ------------------------------------------------------------------ mobile */
-async function checarMobile(page, contexto, tela, url, resultado) {
+async function checarMobile(page, contexto, tela, url, resultado, opcoes = {}) {
   const pagina = await contexto.newPage();
   await pagina.setViewportSize({ width: 390, height: 844 });
   await pagina.goto(url, { waitUntil: 'domcontentloaded' });
@@ -523,9 +523,12 @@ async function checarMobile(page, contexto, tela, url, resultado) {
     }
   }
 
-  if (capturar) {
-    fs.mkdirSync(path.join(CAPTURAS, tela.id), { recursive: true });
-    await pagina.screenshot({ path: path.join(CAPTURAS, tela.id, '390.png'), fullPage: true }).catch(() => {});
+  // `capturarEm` permite que a VARIANTE (aba) guarde a captura na pasta
+  // dela em vez de sobrescrever a da rota base.
+  const pasta = opcoes.capturarEm || (capturar ? tela.id : null);
+  if (pasta) {
+    fs.mkdirSync(path.join(CAPTURAS, pasta), { recursive: true });
+    await pagina.screenshot({ path: path.join(CAPTURAS, pasta, '390.png'), fullPage: true }).catch(() => {});
   }
   await pagina.close();
 }
@@ -688,8 +691,31 @@ async function main() {
         // conteúdo que existe mas não está à vista também é da tela — sem
         // isso, tabela em aba/bloco ficaria "N/A" e viraria capacidade sem
         // cobertura. FALHOU de variante vence; PASSOU cobre N/A.
+        /*
+          Que itens a variante pode influenciar.
+
+          A lista era de 10 (só os de tabela), e isso abriu um BURACO DE
+          EVIDÊNCIA que o revisor achou em 02/09: com a D1, Jornada e
+          Apuração deixaram de ter rota própria e viraram ABAS do Pessoal.
+          Como as abas só entram na matriz por aqui, 24 dos 34 itens —
+          C1–C6, F1–F4, B1–B4, M2, R1, R2, R3, X1–X3, R18, A1 — NUNCA eram
+          medidos nelas. Duas das nove telas reescritas na leva tinham
+          evidência parcial, e foi por isso que um formulário deslocado
+          ~450px na Apuração passou batido: o R2 do Pessoal estava
+          registrado como N/A "tela sem formulário visível", medido na aba
+          de Solicitações.
+
+          Agora a variante influencia TUDO que ela pode influenciar. Ficam
+          de fora só os itens que pertencem à PÁGINA, não ao conteúdo da
+          aba: a faixa fixa e seu conteúdo (C1–C6) e a M2, que vem do
+          validador estático sobre o arquivo da rota. Medir C1 numa aba
+          reprovaria o Pessoal por um cabeçalho que é, corretamente, um só
+          para as quatro.
+        */
+        const ITENS_DE_PAGINA = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'M2'];
+        const ITENS_DE_VARIANTE = ITENS_DOD.filter((item) => !ITENS_DE_PAGINA.includes(item));
         const fundirVariante = (extra, rotulo) => {
-          ['T1', 'T2', 'T4', 'T5', 'T6', 'T7', 'M1', 'M3', 'M4', 'B5'].forEach((item) => {
+          ITENS_DE_VARIANTE.forEach((item) => {
             const atual = resultado.itens[item];
             const novo = extra[item];
             if (!novo) return;
@@ -719,13 +745,52 @@ async function main() {
         for (const sufixo of tela.variantes || []) {
           await page.goto(`${BASE}${rota}${sufixo}`, { waitUntil: 'domcontentloaded' });
           await esperarCarregar(page);
-          fundirVariante(await page.evaluate(checksEstaticos, { tipo: tela.tipo }), sufixo);
+
+          /*
+            A variante roda os MESMOS checks interativos da rota base — não
+            só o `checksEstaticos`. Antes só o estático rodava aqui, e por
+            isso os itens de acessibilidade (A1), sticky (R18), filtro (F3)
+            e formulário (R1/R2) da aba nunca eram exercitados.
+          */
+          const itensDaVariante = {};
+          fundir(itensDaVariante, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
+          fundir(itensDaVariante, await page.evaluate(checkStickyEAcessibilidade));
+          await checarEtiquetasFiltro(page, itensDaVariante);
+          await checarModalCadastro(page, tela, itensDaVariante);
+          fundirVariante(itensDaVariante, sufixo);
+
           if ((!resultado.itens.T3 || resultado.itens.T3.estado === 'N/A') && await page.locator('.resizable-table').count()) {
             resultado.itens.T3 = undefined;
             await checarAffordanceAlinhamento(page, resultado.itens);
             await checarRedimensionamento(page, tela, resultado.itens);
             if (resultado.itens.T3) resultado.itens.T3.motivo = `[${sufixo}] ${resultado.itens.T3.motivo || ''}`.trim() || undefined;
           }
+
+          /*
+            E a variante é FOTOGRAFADA, nas mesmas três larguras. Sem isto,
+            duas das nove telas da leva do RH/DP (Jornada e Apuração, que a
+            D1 transformou em abas) não tinham captura nenhuma — e a
+            evidência que a Parte 7 exige é captura por tela, não por rota.
+          */
+          if (capturar) {
+            const nomeVariante = sufixo.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'variante';
+            const pastaVariante = path.join(CAPTURAS, `${tela.id}--${nomeVariante}`);
+            fs.mkdirSync(pastaVariante, { recursive: true });
+            await page.evaluate(() => window.scrollTo(0, 0));
+            await page.waitForTimeout(250);
+            await page.screenshot({ path: path.join(pastaVariante, '1920.png'), fullPage: true }).catch(() => {});
+            await page.setViewportSize({ width: 1366, height: 900 });
+            await page.waitForTimeout(500);
+            await page.screenshot({ path: path.join(pastaVariante, '1366.png'), fullPage: true }).catch(() => {});
+            await page.setViewportSize({ width: 1920, height: 1080 });
+            await page.waitForTimeout(300);
+          }
+
+          // Mobile da variante: X1/X2/X3 da aba, que também nunca eram medidos.
+          await checarMobile(page, contexto, tela, `${BASE}${rota}${sufixo}`, itensDaVariante, {
+            capturarEm: capturar ? `${tela.id}--${sufixo.replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '')}` : null
+          });
+          fundirVariante(itensDaVariante, sufixo);
         }
         if (tela.variantes?.length || expandiu > 0) {
           await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });

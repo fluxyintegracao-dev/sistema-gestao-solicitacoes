@@ -209,18 +209,27 @@ export const TELAS = [
     rota: '/rh-dp/fechamentos',
     tipo: 'listagem'
   },
-  {
-    id: 'rhdp-relatorios',
-    arquivo: 'src/pages/ModuloRelatorios.jsx',
-    rota: '/rh-dp/relatorios',
-    tipo: 'listagem',
-    naoAplica: {
-      T1: 'hub de relatórios do módulo: cartões de destino, não tem tabela',
-      T2: 'sem tabela', T3: 'sem tabela', T4: 'sem tabela', T5: 'sem tabela',
-      T6: 'sem tabela', T7: 'sem tabela',
-      X1: 'sem tabela para virar card no mobile'
-    }
-  },
+  /*
+    RETIRADA DO MANIFESTO em 02/09, com justificativa (decisão do cliente).
+
+    `/rh-dp/relatorios` renderiza `ModuloRelatorios.jsx`, que é um hub
+    COMPARTILHADO por seis módulos (solicitações, financeiro, CRM, SST,
+    comercial e RH/DP) — cada um com seu próprio bloco de configuração
+    dentro do mesmo arquivo. Ele nunca foi migrado: não usa `Pagina`,
+    `PageHeader` nem `.app-bloco`; é Tailwind à mão.
+
+    Eu a coloquei no manifesto por engano ao abrir a Etapa B: a rota começa
+    com /rh-dp, mas o arquivo não é do RH/DP e ninguém o reescreveu nesta
+    leva. O resultado foram cinco células FALHOU (C1, C2, C5, B1, X2) que
+    não pertenciam à leva e que a matriz apresentava como se pertencessem.
+
+    Reescrevê-la muda a cara dos relatórios de TODOS os módulos ao mesmo
+    tempo — é leva própria, não um apêndice do RH/DP. Volta ao manifesto
+    quando essa leva acontecer. Enquanto isso, fica registrado em
+    docs/PENDENCIAS-REGISTRADAS.md, com um achado extra: o título renderiza
+    "Relatorios de RH/DP", ou seja, o prefixo que a D7 mandou tirar
+    sobrevive nesta tela por ela estar fora do escopo.
+  */
   {
     id: 'rhdp-relatorio-operacional',
     arquivo: 'src/pages/RhDpRelatorioOperacional.jsx',

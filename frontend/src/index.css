@@ -18,8 +18,18 @@
   --c-success: #116149;
   --app-heading-color: #0f1c2e;
   --app-body-color: #0f1c2e;
-  --app-muted-color: #64748b;
-  --app-subtle-color: #74808f;
+  /* Igual a --c-muted (02/09). Eram DOIS tokens para o mesmo papel com
+     valores diferentes: #64748b (slate-500 do Tailwind) dava 4,51:1 sobre
+     --ui-surface-2 — passava por 0,01 e reprovava assim que a superfície
+     mudava um fio (o harness mediu 4,4996 num bloco secundário). Um dono
+     por responsabilidade (R16): o texto secundário do sistema é --c-muted,
+     que dá 4,92:1 e tem folga. No tema escuro os dois já eram idênticos. */
+  --app-muted-color: #5f6e83;
+  /* 02/09: era #74808f, que dá 3,81:1 sobre --ui-surface-2 — REPROVA o AA
+     (mínimo 4,5) e é usado em TEXTO (.la-fim, rodapés de lista). Agora
+     4,63:1 com folga. O terceiro tom de texto continua existindo — é mais
+     claro que --c-muted, só que dentro do mínimo legível. */
+  --app-subtle-color: #667283;
   --app-link-color: #2563eb;
   --app-inverse-color: #ffffff;
   --app-number-color: #0f1c2e;
@@ -196,7 +206,10 @@
   --app-heading-color: #e8edf8;
   --app-body-color: #e8edf8;
   --app-muted-color: #94a8cc;
-  --app-subtle-color: #5a7098;
+  /* 02/09: era #5a7098, que no escuro dava 3,02:1 sobre --ui-surface-2 —
+     pior que o claro, e ninguém tinha medido o tema escuro até aqui.
+     Agora 5,12:1. */
+  --app-subtle-color: #8397be;
   --app-link-color: #92aafc;
   --app-inverse-color: #0d1524;
   --app-number-color: #e8edf8;

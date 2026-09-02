@@ -68,6 +68,45 @@ estava reescrevendo a linha; o resto ficou.
 
 ---
 
+### T4 — `ModuloRelatorios.jsx` nunca foi migrada (hub de TODOS os módulos)
+- **Rota que a expõe no RH/DP**: `/rh-dp/relatorios`.
+- **O que é**: hub de cartões compartilhado por SEIS módulos (solicitações,
+  financeiro, CRM, SST, comercial e RH/DP), cada um com seu bloco de
+  configuração dentro do mesmo arquivo.
+- **Estado**: fora do padrão — não usa `Pagina`, `PageHeader` nem
+  `.app-bloco`; é Tailwind à mão. A faixa não gruda (X2), o cabeçalho não é
+  `.app-page-header` (C1/C2/C5) e não há bloco padrão (B1).
+- **Por que saiu do manifesto do harness em 02/09**: eu a coloquei lá por
+  engano ao abrir a Etapa B — a rota começa com `/rh-dp`, mas o arquivo não
+  é do RH/DP e ninguém o reescreveu nesta leva. As cinco células FALHOU que
+  ela gerava não pertenciam à leva, e a matriz as apresentava como se
+  pertencessem. Retirada com justificativa, por decisão do cliente.
+- **Achado extra**: o título renderiza **"Relatorios de RH/DP"** — o prefixo
+  que a D7 mandou tirar sobrevive aqui porque a tela está fora do escopo.
+- **Quando volta**: na leva que reescrever o hub de relatórios. Aí ela
+  volta ao manifesto e a D7 se aplica a todos os módulos de uma vez.
+
+---
+
+## Achado que a leva corrigiu e vale registrar: contraste nunca medido no escuro
+
+Ao perseguir uma célula M3 marginal (4,4996:1 contra o mínimo de 4,5), o
+que apareceu foi maior que o sintoma:
+
+1. **Dois tokens para o mesmo papel, com valores diferentes.**
+   `--app-muted-color` (#64748b, o slate-500 do Tailwind) e `--c-muted`
+   (#5f6e83, o do sistema). O primeiro dava 4,51:1 — passava por 0,01 e
+   reprovava assim que a superfície mudava um fio. Unificados no valor do
+   sistema (4,92:1). É a R16 outra vez: um dono por responsabilidade.
+2. **`--app-subtle-color` reprovava o AA nos DOIS temas, e é usado em
+   texto.** Claro: 3,81:1. **Escuro: 3,02:1** — pior, e ninguém tinha
+   medido o tema escuro até aqui. Corrigidos para 4,63 e 5,12.
+
+**A lacuna de processo que isto expõe**: o harness roda só no tema claro.
+Um token pode passar no claro e reprovar no escuro sem que a matriz saiba —
+foi exatamente o caso do `--app-subtle-color`. Medir o M3 nos dois temas é
+trabalho para a próxima leva do harness.
+
 ## Perdas declaradas nesta leva
 
 ### P1 — "Todas as obras que eu enxergo"
