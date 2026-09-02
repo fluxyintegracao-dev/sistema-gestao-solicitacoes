@@ -52,6 +52,18 @@ function formatDateTime(value) {
   return date.toLocaleString('pt-BR');
 }
 
+// Coluna `tipo: 'data'` é medida para "22/08/2026" (110px, TabelaPadrao). O
+// carimbo com hora ("02/09/2026 21:30:11") precisa de 128px e quebrava em duas
+// linhas no preview de 1920px. Na LISTA vale o dia — a hora exata continua à
+// vista no cabeçalho do detalhe ("criada em ... por ...") e é assim que todas
+// as outras telas do sistema fazem em coluna `data` (ComprasRelatorio*, etc).
+function formatDate(value) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('pt-BR');
+}
+
 function formatNumber(value) {
   const number = Number(value || 0);
   return number.toLocaleString('pt-BR', {
@@ -491,7 +503,10 @@ export default function RhDpApuracao() {
         descricao="A pre-folha da competencia sai das obras informadas nas importacoes confirmadas; depois revise por colaborador e registre os ajustes auditados."
       >
         <form className="space-y-4" onSubmit={onGerarApuracao}>
-          <FormSecao legenda="Recorte da apuracao" colunas={2}>
+          {/* Três controles curtos + a observação, que toma a linha (tipo
+              "observacao"). Com `colunas={2}` sobrava uma célula vazia no meio
+              da grade; com 3 a linha fecha exata. */}
+          <FormSecao legenda="Recorte da apuracao" colunas={3}>
             <CampoForm label="Competencia">
               <input
                 type="month"
@@ -597,18 +612,34 @@ export default function RhDpApuracao() {
               render: (item) => item.competencia
             },
             {
-              id: 'empresa',
-              titulo: 'Empresa',
-              // R17: a EMPRESA do grupo é o que nomeia a apuracao na lista.
-              tipo: 'identidade',
-              noCard: 'titulo',
-              render: (item) => item.empresaGrupo?.nome || 'Por colaborador'
-            },
-            {
+              /*
+                R17 — quem NOMEIA a apuracao é a OBRA, não a empresa do grupo.
+                O gerador só cria apuracao a partir de importacao CONFIRMADA
+                com obra (`obra_id: { [Op.ne]: null }`, rhApuracaoService), uma
+                por obra; `empresa_grupo_id` é opcional e vem nulo sempre que a
+                importacao não tem empresa do grupo — daí o "Por colaborador"
+                repetido em toda linha. O detalhe já titula o registro assim:
+                "Apuracao {competencia} - {obra}".
+
+                Corrigir o papel também conserta a largura (T4): a sobra do
+                contêiner vai para a PRIMEIRA coluna flexível, e com a empresa
+                marcada como identidade era ela que engolia ~570px para exibir
+                um rótulo de 144px, enquanto a obra (291px de nome real em
+                180px de coluna) quebrava em duas linhas. Por isso a obra vem
+                antes: identidade primeiro é a ordem de leitura das outras
+                listas, e a sobra passa a cair no texto que precisa dela.
+              */
               id: 'obra',
               titulo: 'Obra',
-              tipo: 'texto',
+              tipo: 'identidade',
+              noCard: 'titulo',
               render: (item) => item.obra?.nome || '-'
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'texto',
+              render: (item) => item.empresaGrupo?.nome || 'Por colaborador'
             },
             {
               id: 'vinculo',
@@ -646,7 +677,7 @@ export default function RhDpApuracao() {
               id: 'gerada',
               titulo: 'Gerada em',
               tipo: 'data',
-              render: (item) => formatDateTime(item.createdAt)
+              render: (item) => formatDate(item.createdAt)
             }
           ]}
           itens={apuracoes}
@@ -744,7 +775,10 @@ export default function RhDpApuracao() {
               descricao="O fechamento gera titulos PAGAR no financeiro central e vincula cada item da apuracao ao respectivo titulo. A categoria financeira deve estar marcada para DRE e com grupo DRE classificado."
             >
               <form className="space-y-4" onSubmit={onFecharApuracao}>
-                <FormSecao legenda="Dados do lote" colunas={2}>
+                {/* Quatro células: as duas datas, a categoria em `span={2}` e a
+                    observação na linha. Fecha sem buraco e sem esticar um
+                    campo de data por metade do bloco. */}
+                <FormSecao legenda="Dados do lote" colunas={4}>
                   <CampoForm label="Data de fechamento">
                     <input
                       type="date"

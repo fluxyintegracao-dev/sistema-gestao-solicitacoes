@@ -485,7 +485,16 @@ export default function Parceiros() {
             )}
           >
             <form className="space-y-4" onSubmit={handleSalvar}>
-              <FormSecao legenda="Identificacao" colunas={2}>
+              {/*
+                colunas={4} desde 02/09. O painel é de largura total, e até
+                agora o form era preso em 940px CENTRADOS por uma regra
+                legada de página (.solicitacoes-page form) — o que também o
+                deixava ~450px à direita do próprio título. Com a regra
+                corrigida na FormSecao, o form passou a ocupar o bloco, e
+                aí duas colunas dariam ~890px de campo para um CPF. Quatro
+                campos curtos cabem numa linha.
+              */}
+              <FormSecao legenda="Identificacao" colunas={4}>
                 <CampoForm label="CPF/CNPJ" obrigatorio>
                   <input
                     className="input w-full"

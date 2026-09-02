@@ -197,13 +197,52 @@ export function checksEstaticos({ tipo }) {
         : { estado: 'PASSOU' };
     }
 
-    /* T4: a sobra do contêiner vai para as colunas de conteúdo */
+    /* T4: a sobra do contêiner vai para as colunas de conteúdo — e vai para
+       a coluna CERTA.
+
+       O check só media sobra NÃO DISTRIBUÍDA (espaço vazio à direita da
+       tabela). Passava com ✅ enquanto uma coluna ficava com 574px para um
+       rótulo de 144px e a coluna ao lado quebrava o nome da obra em duas
+       linhas: a sobra tinha sido distribuída, só que para quem não
+       precisava. O revisor achou isso na captura, com a matriz aprovando.
+
+       Segundo critério, então: célula que QUEBRA EM MAIS DE UMA LINHA
+       enquanto outra coluna da mesma tabela tem folga larga é má
+       distribuição — o `tipo` declarado provavelmente está errado (R17), e
+       é lá que se conserta, não fixando largura à mão. */
     const t4 = [];
     tabelas.forEach((tab) => {
       const scroll = tab.closest('.resizable-table-scroll');
       if (!scroll) return;
       const folga = scroll.clientWidth - tab.getBoundingClientRect().width;
       if (folga > 40) t4.push(`${cssPath(tab)}: ${Math.round(folga)}px de sobra não distribuída`);
+
+      // Folga POR COLUNA: quanto a coluna tem além do que seu conteúdo usa.
+      const cabecalhos = Array.from(tab.querySelectorAll('thead th'));
+      const folgaPorColuna = cabecalhos.map((th, i) => {
+        const celulas = Array.from(tab.querySelectorAll(`tbody tr > *:nth-child(${i + 1})`)).slice(0, 40);
+        if (!celulas.length) return { indice: i, folga: 0, quebra: false, titulo: th.innerText.trim() };
+        const largura = th.getBoundingClientRect().width;
+        let maiorConteudo = 0;
+        let quebra = false;
+        celulas.forEach((td) => {
+          const alvo = td.firstElementChild || td;
+          maiorConteudo = Math.max(maiorConteudo, alvo.scrollWidth);
+          // Duas linhas ou mais de texto na célula.
+          const alturaLinha = parseFloat(getComputedStyle(td).lineHeight) || 20;
+          if (td.scrollHeight > alturaLinha * 1.6) quebra = true;
+        });
+        return { indice: i, titulo: th.innerText.trim(), folga: largura - maiorConteudo, quebra };
+      });
+
+      const comFolga = folgaPorColuna.filter((c) => c.folga > 200);
+      const quebrando = folgaPorColuna.filter((c) => c.quebra && c.folga < 40);
+      if (comFolga.length && quebrando.length) {
+        t4.push(
+          `${cssPath(tab)}: "${quebrando[0].titulo}" quebra em duas linhas enquanto "${comFolga[0].titulo}" `
+          + `tem ${Math.round(comFolga[0].folga)}px de folga — a sobra foi para a coluna errada (confira o \`tipo\` declarado, R17)`
+        );
+      }
     });
     r.T4 = t4.length ? { estado: 'FALHOU', motivo: t4.join(' | ') } : { estado: 'PASSOU' };
 

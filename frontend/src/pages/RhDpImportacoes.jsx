@@ -16,6 +16,7 @@ import {
   useAvisos,
   useConfirmacao
 } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -38,11 +39,57 @@ const VINCULOS = [
   { value: 'NAO_CLT', label: 'Não CLT' }
 ];
 
+// Só estes três valem como FILTRO: o validador do serviço
+// (backend/src/validators/rhValidators.js, RH_STATUS_IMPORTACAO) recusa
+// qualquer outro na consulta. O catálogo de EXIBIÇÃO é outro (abaixo) e é
+// maior — a base tem lotes SUBSTITUIDA gravados pelo formulário de jornada.
 const STATUS_LOTE = [
   { value: 'PREVIEW', label: 'Preview' },
   { value: 'CONFIRMADA', label: 'Confirmada' },
   { value: 'CANCELADA', label: 'Cancelada' }
 ];
+
+/*
+  Status é ETIQUETA (StatusBadge/`fx-badge`), não texto solto na célula.
+
+  Por que isto é conserto e não enfeite: a célula de `tipo: 'status'` não
+  ganha `white-space: nowrap` de ninguém — `.resizable-table td` traz
+  `overflow: hidden; text-overflow: ellipsis` SEM `nowrap`, então texto puro
+  que não cabe QUEBRA NO MEIO DA PALAVRA ("CONFIRM/ADA", "SUBSTITU/IDA",
+  medido nas capturas de 1920 e 1366). Quebra não aumenta `scrollWidth`, e
+  por isso o T6 do harness — que compara `scrollWidth` com `clientWidth` —
+  passava com o defeito na tela. A pílula resolve na raiz: `fx-badge` tem
+  `white-space: nowrap` + `overflow: clip` próprios (design-tokens.css) e o
+  texto dela é de 12px, mais estreito que os 14px da célula.
+
+  O rótulo humano ("Confirmada" no lugar de CONFIRMADA) é o mesmo critério
+  já aplicado ao tipo por `rotuloTipo`: quem lê a tela vê o rótulo do
+  catálogo. De quebra, caixa mista é mais estreita que caixa alta e a
+  pílula inteira passa a caber nos 132px que o componente reserva para a
+  coluna de status.
+
+  `tom` só onde a classificação automática de `familiaSemanticaDoStatus`
+  erraria: "Válida" não casa com nenhum padrão de sucesso e "Substituída"
+  não casa com nenhum padrão de arquivamento.
+*/
+const STATUS_LOTE_EXIBICAO = {
+  PREVIEW: { rotulo: 'Preview' },
+  CONFIRMADA: { rotulo: 'Confirmada' },
+  CANCELADA: { rotulo: 'Cancelada' },
+  SUBSTITUIDA: { rotulo: 'Substituída', tom: 'neutral' }
+};
+
+const STATUS_LINHA_EXIBICAO = {
+  VALIDA: { rotulo: 'Válida', tom: 'success' },
+  ERRO: { rotulo: 'Erro' },
+  CONFIRMADA: { rotulo: 'Confirmada' }
+};
+
+function EtiquetaStatus({ valor, catalogo }) {
+  if (!valor) return '-';
+  const item = catalogo[String(valor).toUpperCase()];
+  return <StatusBadge status={item?.rotulo || valor} kind={item?.tom} />;
+}
 
 const IMPORTACAO_PAYLOAD_COLUMNS = {
   JORNADA: [
@@ -530,7 +577,15 @@ export default function RhDpImportacoes() {
         )}
       </BlocoConteudo>
 
-      <div className="rhdp-importacoes-workspace">
+      {/*
+        A proporção das duas colunas segue O CONTEÚDO, não um número fixo:
+        sem lote escolhido o painel da direita carrega UMA frase e quem
+        precisa de largura é a tabela de lotes; com lote escolhido o preview
+        vira o bloco principal (resumo + tabela por linha) e a divisão fica
+        equilibrada. Quem lê essa diferença é o CSS da classe (o piso da
+        coluna da lista é o que a tabela pede) — a tela não escreve medida.
+      */}
+      <div className={`rhdp-importacoes-workspace${detalhe ? ' rhdp-importacoes-workspace--com-preview' : ''}`}>
         <BlocoConteudo titulo="Lotes enviados">
           <BarraFiltros
             campos={[{
@@ -595,7 +650,9 @@ export default function RhDpImportacoes() {
                 id: 'status',
                 titulo: 'Status',
                 tipo: 'status',
-                render: (item) => item.status
+                render: (item) => (
+                  <EtiquetaStatus valor={item.status} catalogo={STATUS_LOTE_EXIBICAO} />
+                )
               },
               {
                 id: 'resultado',
@@ -691,7 +748,9 @@ export default function RhDpImportacoes() {
                     id: 'status',
                     titulo: 'Status',
                     tipo: 'status',
-                    render: (linha) => linha.status
+                    render: (linha) => (
+                      <EtiquetaStatus valor={linha.status} catalogo={STATUS_LINHA_EXIBICAO} />
+                    )
                   },
                   // Colunas VINDAS DO ARQUIVO importado: o papel de cada uma é
                   // derivado aqui, no ponto de uso, para que nenhuma coluna

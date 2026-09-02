@@ -838,6 +838,35 @@ fieldset.form-section {
   color: var(--c-muted);
 }
 
+/*
+  FORMULÁRIO DENTRO DE BLOCO: a largura é do BLOCO, não da casca de página.
+
+  O sistema tem uma regra antiga para a tela que É um formulário:
+
+    .solicitacoes-page:not(.solicitacao-nova-page) form {
+      width: min(100%, var(--app-form-shell-max-width));   [940px]
+      margin-inline: auto;
+    }
+
+  Ela está certa para a página de digitação — campo de texto com 1300px é
+  desconfortável de ler. Mas ela pega QUALQUER `form` descendente da página,
+  inclusive o que mora dentro de um `BlocoConteudo`. Ali o resultado é uma
+  grade quebrada: medido no preview de 1920px (02/09), o corpo do bloco tem
+  1806px, o form fica com 940px CENTRADOS e começa em x=450 — um vão vazio de
+  450px embaixo do título do bloco, que é alinhado à esquerda, e o formulário
+  sem chegar à borda direita. Dentro de um bloco quem já limita a medida é o
+  próprio bloco; o form não pode ter uma segunda casca por cima.
+
+  Especificidade (0,3,1) para vencer a regra do sistema (0,2,1) por peso, e
+  não por ordem de importação. O `:has(> .form-section)` mantém isto uma regra
+  da FormSecao: form que não usa o componente segue como estava.
+*/
+.app-bloco .app-bloco-corpo form:has(> .form-section) {
+  width: 100%;
+  max-width: 100%;
+  margin-inline: 0;
+}
+
 /* ---- Responsivo -------------------------------------------------------- */
 @media (max-width: 1023px) {
   .app-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

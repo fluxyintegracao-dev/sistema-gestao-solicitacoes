@@ -10434,10 +10434,42 @@ body {
   white-space: normal;
 }
 
+/*
+  DUAS COLUNAS: a proporção sai do CONTEÚDO, não de um palpite.
+
+  O defeito que isto corrige (medido nas capturas de 02/09, 1920 e 1366):
+  a divisão era 0,78fr para a lista e 1,22fr para o preview — ~700px contra
+  ~1150px em 1920. Só que a tabela de lotes tem SEIS colunas com largura de
+  papel dada pelo componente (identidade 160 de piso + código 130 + texto
+  180 + status 132 + texto 180 + ações 120 = 902px). Em 700px de cartão ela
+  não cabia: a coluna "Resultado" ficava cortada pela metade na borda do
+  cartão e o cabeçalho "COMPETÊNCIA" truncava. Do outro lado, o painel de
+  preview SEM lote escolhido tem uma frase dentro e ficava com 1150px.
+
+  Por isso o piso de 63rem na coluna da lista: 902px de tabela + o respiro
+  do cartão (2 × 16px do `.app-bloco`) + o do contêiner da tabela
+  (2 × 16px do `.app-table-shell`) + a calha de rolagem reservada
+  (`scrollbar-gutter: stable`, ~15px) = ~981px, com uma folga de degrau.
+  Abaixo disso a tabela volta a rolar dentro do cartão; acima, a sobra vai
+  para a coluna de conteúdo (T4).
+
+  As duas frações dizem o resto: enquanto o preview é só a frase de convite,
+  a lista vale o dobro dele; assim que um lote é escolhido (a tela põe o
+  modificador), o preview vira o bloco principal e a divisão se equilibra —
+  sem nunca comer o piso da lista.
+
+  O ponto de virada continua em 1536px porque abaixo dele os dois pisos
+  (63rem + 20rem + o vão) não caberiam lado a lado: empilhado, a tabela usa
+  a largura inteira da página, que é o melhor arranjo em 1366.
+*/
 @media (min-width: 1536px) {
   .layout-shell .rhdp-importacoes-workspace {
-    grid-template-columns: minmax(31rem, 0.78fr) minmax(0, 1.22fr);
+    grid-template-columns: minmax(63rem, 2fr) minmax(20rem, 1fr);
     align-items: start;
+  }
+
+  .layout-shell .rhdp-importacoes-workspace--com-preview {
+    grid-template-columns: minmax(63rem, 1fr) minmax(20rem, 1fr);
   }
 }
 

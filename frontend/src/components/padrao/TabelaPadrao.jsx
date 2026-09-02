@@ -102,16 +102,47 @@ const TIPOS_COLUNA = {
   badge:  { largura: 120, alinhar: 'center' }
 };
 
+/*
+  Piso de largura pelo PRÓPRIO CABEÇALHO (02/09).
+
+  A largura vem do tipo — do pior caso do DADO. Mas o cabeçalho também
+  ocupa lugar, e nele cabe menos do que parece: o `th` gasta ~54px entre
+  padding, indicador de ordem, ícone de alinhamento e alça de
+  redimensionamento. Numa coluna `numero` (120px) sobram ~66px, e
+  "COLABORADORES" precisa de ~118px — o título era cortado sem que nenhum
+  `tipo` correto resolvesse, e a tela não pode fixar largura à mão (R1/R10).
+
+  Então a largura passa a ser `max(largura do tipo, largura do título)`.
+  Não é caso isolado do RH/DP: qualquer título com mais de ~10 caracteres
+  em coluna `numero`, `data` ou `badge` truncava.
+
+  A medida do texto é uma estimativa deliberada, não uma medição no DOM:
+  o cabeçalho é 12px semibold em maiúsculas, e ~7.3px por caractere erra
+  para mais em telas estreitas — o que é o lado seguro (sobra, não corta).
+  Medir no canvas custaria um reflow por coluna a cada render.
+*/
+const LARGURA_CONTROLES_TH = 54;
+const LARGURA_CARACTERE_TH = 7.3;
+
+function larguraMinimaDoTitulo(titulo) {
+  const texto = String(titulo ?? '').trim();
+  if (!texto) return 0;
+  return Math.ceil(texto.length * LARGURA_CARACTERE_TH) + LARGURA_CONTROLES_TH;
+}
+
 function normalizarColuna(coluna) {
   const base = TIPOS_COLUNA[coluna.tipo];
   if (!base) return coluna;
+  const larguraDoTipo = coluna.largura ?? base.largura;
+  // Largura declarada à mão pela tela manda: quem escreveu sabia por quê.
+  const largura = coluna.largura ?? Math.max(larguraDoTipo, larguraMinimaDoTitulo(coluna.titulo));
   return {
     ...coluna,
-    largura: coluna.largura ?? base.largura,
+    largura,
     // T7: coluna de dinheiro/número não encolhe abaixo do pior caso — nem
     // por arrasto do usuário, nem por distribuição. Valor truncado com
     // reticências é defeito sempre; texto longo trunca, dinheiro não.
-    minWidth: coluna.minWidth ?? (base.valor ? base.largura : undefined),
+    minWidth: coluna.minWidth ?? (base.valor ? Math.max(base.largura, larguraMinimaDoTitulo(coluna.titulo)) : undefined),
     alinhar: coluna.alinhar ?? base.alinhar,
     flex: coluna.flex ?? (base.flexPadrao || undefined),
     __valor: base.valor || undefined,
