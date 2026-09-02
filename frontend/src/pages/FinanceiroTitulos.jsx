@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'react-router-dom';
 import {
@@ -39,30 +39,30 @@ import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao 
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 import ChequePagamentoFields from '../components/financeiro/ChequePagamentoFields';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
-import { TabelaPadrao } from '../components/padrao';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
-const COLUMN_ORDER_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnOrder';
-const COLUMN_WIDTH_STORAGE_PREFIX = 'fluxy.financeiro.titulos.columnWidths';
-const TABLE_COLUMN_WIDTHS = {
-  Titulo: 190,
-  Status: 110,
-  Tipo: 90,
-  Documento: 140,
-  Credor: 200,
-  Cliente: 200,
-  Obra: 180,
-  Categoria: 180,
-  'Forma pagamento': 170,
-  Origem: 140,
-  Emissao: 110,
-  Vencimento: 120,
-  'Valor total': 130,
-  Saldo: 130,
-  Acoes: 112
-};
+/* COLUNAS DA GRADE — a escolha (quais e em que ordem) é do usuário, pelo
+   painel "Colunas" da TabelaPadrao, que salva em `<storageKey>:colunas`.
+   Substitui `tableHeaders`/`moverColuna` e as chaves antigas
+   "fluxy.financeiro.titulos.columnOrder/columnWidths", mantidas à mão.
+   A largura de cada coluna vem do `tipo` (R1/R6/R7) — a tela não mede. */
+const IDS_COLUNAS_TITULOS = [
+  'titulo',
+  'status',
+  'tipo',
+  'documento',
+  'parceiro',
+  'obra',
+  'categoria',
+  'forma_pagamento',
+  'origem',
+  'emissao',
+  'vencimento',
+  'valor_total',
+  'saldo'
+];
 const PAGE_SIZE_OPTIONS = ['25', '50', '100', '150', '200', 'all'];
 const NATUREZAS_INTERCOMPANY_BAIXA = [
   {
@@ -478,32 +478,6 @@ function loadVisibleFilterIds(user, storagePrefix = FILTER_VISIBILITY_STORAGE_PR
     return normalized.length > 0 ? normalized : DEFAULT_VISIBLE_FILTER_IDS;
   } catch (error) {
     return DEFAULT_VISIBLE_FILTER_IDS;
-  }
-}
-
-function getColumnOrderStorageKey(user, fixedTipo = null) {
-  const userToken = user?.id || user?.email || 'anonimo';
-  const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
-  return `${COLUMN_ORDER_STORAGE_PREFIX}.${scope}.${userToken}`;
-}
-
-function getColumnWidthStorageKey(user, fixedTipo = null) {
-  const userToken = user?.id || user?.email || 'anonimo';
-  const scope = fixedTipo ? fixedTipo.toLowerCase() : 'geral';
-  return `${COLUMN_WIDTH_STORAGE_PREFIX}.${scope}.${userToken}`;
-}
-
-function loadColumnOrder(user, fixedTipo, headers) {
-  try {
-    const stored = localStorage.getItem(getColumnOrderStorageKey(user, fixedTipo));
-    const parsed = stored ? JSON.parse(stored) : null;
-    if (!Array.isArray(parsed)) return headers;
-    const allowed = new Set(headers);
-    const ordered = parsed.filter((header) => allowed.has(header));
-    const missing = headers.filter((header) => !ordered.includes(header));
-    return [...ordered, ...missing];
-  } catch (error) {
-    return headers;
   }
 }
 
@@ -1207,42 +1181,19 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   const parceiroResultadoLabel = tipoReferencia === 'PAGAR' ? 'Credor' : 'Cliente';
   const categoriasLabel = tipoAtual === 'PAGAR' ? 'contas a pagar' : 'contas a receber';
   const showTipoColumn = !fixedTipo;
-  const baseTableHeaders = useMemo(() => [
-    'Titulo',
-    'Status',
-    ...(showTipoColumn ? ['Tipo'] : []),
-    'Documento',
-    parceiroResultadoLabel,
-    'Obra',
-    'Categoria',
-    'Forma pagamento',
-    'Origem',
-    'Emissao',
-    'Vencimento',
-    'Valor total',
-    'Saldo',
-    'Acoes'
-  ], [showTipoColumn, parceiroResultadoLabel]);
-  const [columnOrder, setColumnOrder] = useState(() => loadColumnOrder(user, fixedTipo, baseTableHeaders));
-  const tableHeaders = useMemo(() => {
-    const allowed = new Set(baseTableHeaders);
-    const ordered = columnOrder.filter((header) => allowed.has(header));
-    const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
-    return [...ordered, ...missing];
-  }, [baseTableHeaders, columnOrder]);
-  const resizableTableColumns = useMemo(() => [
-    { key: '__select__', width: 48, minWidth: 44 },
-    ...tableHeaders.map((header) => ({
-      key: header,
-      width: TABLE_COLUMN_WIDTHS[header] || 140,
-      minWidth: header === 'Acoes' ? 96 : 80
-    }))
-  ], [tableHeaders]);
-  const columnWidthStorageKey = useMemo(
-    () => getColumnWidthStorageKey(user, fixedTipo),
-    [fixedTipo, user]
-  );
-  const totalColunas = 1 + tableHeaders.length;
+  // A escolha de colunas do usuário mora na TabelaPadrao; a tela guarda só
+  // o RESULTADO (ids visíveis, na ordem escolhida) porque precisa agir
+  // sobre ele — o CSV exporta exatamente as colunas à vista.
+  const [colunasVisiveisIds, setColunasVisiveisIds] = useState(null);
+  const aoMudarColunas = useCallback((ids) => setColunasVisiveisIds(ids), []);
+  const idsColunasExport = useMemo(() => {
+    const disponiveis = IDS_COLUNAS_TITULOS.filter((id) => (id === 'tipo' ? showTipoColumn : true));
+    if (!colunasVisiveisIds) return disponiveis;
+    return colunasVisiveisIds.filter((id) => disponiveis.includes(id));
+  }, [colunasVisiveisIds, showTipoColumn]);
+  // Uma chave por escopo da tela (geral / pagar / receber): a escolha de
+  // colunas e as larguras de "contas a pagar" não valem para "a receber".
+  const tabelaStorageKey = `tabela:financeiro-titulos:${fixedTipo ? String(fixedTipo).toLowerCase() : 'geral'}`;
   const titulosBaixaveis = useMemo(() => titulos.filter(isTituloBaixavel), [titulos]);
   const selectedTituloSet = useMemo(() => new Set(selectedTituloIds.map((id) => Number(id))), [selectedTituloIds]);
   const selectedTitulos = useMemo(
@@ -1318,7 +1269,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     (baixaMassaForm.parcelas || []).reduce((total, parcela) => total + parseCurrencyInput(parcela.valor), 0)
   ), [baixaMassaForm.parcelas]);
   const baixaMassaDiferencaParcelas = roundValue(selectedSaldo - baixaMassaTotalParcelas);
-  const allBaixaveisSelected = titulosBaixaveis.length > 0 && titulosBaixaveis.every((titulo) => selectedTituloSet.has(Number(titulo.id)));
 
   useEffect(() => {
     if (!mostrarFretesPendentes) {
@@ -1400,166 +1350,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
 
     return `/financeiro/titulos/novo?${params.toString()}`;
-  }
-
-  useEffect(() => {
-    setColumnOrder((current) => {
-      const allowed = new Set(baseTableHeaders);
-      const ordered = current.filter((header) => allowed.has(header));
-      const missing = baseTableHeaders.filter((header) => !ordered.includes(header));
-      return [...ordered, ...missing];
-    });
-  }, [baseTableHeaders]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(getColumnOrderStorageKey(user, fixedTipo), JSON.stringify(tableHeaders));
-    } catch (error) {
-      // Mantem a tabela funcional mesmo quando o navegador bloqueia storage.
-    }
-  }, [fixedTipo, tableHeaders, user]);
-
-  function moverColuna(header, direction) {
-    setColumnOrder(() => {
-      const ordered = tableHeaders.slice();
-      const index = ordered.indexOf(header);
-      const nextIndex = direction === 'left' ? index - 1 : index + 1;
-      if (index < 0 || nextIndex < 0 || nextIndex >= ordered.length) return ordered;
-      [ordered[index], ordered[nextIndex]] = [ordered[nextIndex], ordered[index]];
-      return ordered;
-    });
-  }
-
-  function renderTituloCell(titulo, header) {
-    switch (header) {
-      case 'Titulo':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap">
-            <Link
-              className="font-semibold text-[var(--c-primary)] hover:underline"
-              to={`/financeiro/titulos/${titulo.id}`}
-            >
-              {getTituloCodigo(titulo)}
-            </Link>
-            <div className="max-w-[220px] truncate text-[10px] text-[var(--c-muted)]">
-              {titulo.descricao || '-'}
-            </div>
-          </td>
-        );
-      case 'Status':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap">
-            {isOverdue(titulo) ? (
-              <StatusBadge status={`${titulo.status} · VENCIDO`} kind="danger" />
-            ) : (
-              <StatusBadge status={titulo.status} />
-            )}
-          </td>
-        );
-      case 'Tipo':
-        return <td className="px-3 py-2 font-medium text-[var(--c-muted)] whitespace-nowrap">{titulo.tipo}</td>;
-      case 'Documento':
-        return <td className="px-3 py-2 whitespace-nowrap">{titulo.numero_documento || '-'}</td>;
-      case parceiroResultadoLabel:
-        return (
-          <td className="px-3 py-2">
-            <div className="max-w-[180px] truncate font-medium text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</div>
-            <div className="text-[10px] text-[var(--c-muted)]">{titulo.parceiro?.cpf_cnpj || ''}</div>
-          </td>
-        );
-      case 'Obra':
-        return (
-          <td className="px-3 py-2">
-            <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.obra?.nome || '-'}</div>
-          </td>
-        );
-      case 'Categoria':
-        return (
-          <td className="px-3 py-2">
-            <div className="max-w-[150px] truncate text-[var(--c-muted)]">{titulo.categoriaFinanceira?.nome || '-'}</div>
-          </td>
-        );
-      case 'Forma pagamento':
-        return (
-          <td className="px-3 py-2">
-            <div className="max-w-[160px] truncate text-[var(--c-muted)]">
-              {titulo.formaPagamento?.nome || '-'}
-            </div>
-            {titulo.formaPagamento?.codigo ? (
-              <div className="text-[10px] text-[var(--c-muted)]">{titulo.formaPagamento.codigo}</div>
-            ) : null}
-          </td>
-        );
-      case 'Origem':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap">
-            {titulo.solicitacao?.id ? (
-              <Link
-                className="text-[var(--c-primary)] hover:underline"
-                to={`/solicitacoes/${titulo.solicitacao.id}`}
-              >
-                {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
-              </Link>
-            ) : (
-              getOrigemTitulo(titulo)
-            )}
-          </td>
-        );
-      case 'Emissao':
-        return <td className="px-3 py-2 whitespace-nowrap text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</td>;
-      case 'Vencimento':
-        return (
-          <td className={`px-3 py-2 whitespace-nowrap ${isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}`}>
-            {formatDate(titulo.data_vencimento)}
-          </td>
-        );
-      case 'Valor total':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap text-[var(--c-text)] tabular-nums">
-            {formatCurrency(titulo.valor_original)}
-          </td>
-        );
-      case 'Saldo':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap font-semibold text-[var(--c-text)] tabular-nums">
-            {formatCurrency(titulo.valor_saldo)}
-          </td>
-        );
-      case 'Acoes':
-        return (
-          <td className="px-3 py-2 whitespace-nowrap">
-            <div className="flex items-center gap-2">
-              <Link
-                className="btn btn-outline btn-sm"
-                to={`/financeiro/titulos/${titulo.id}`}
-                title="Abrir titulo"
-              >
-                <HiOutlineEye className="h-4 w-4" />
-              </Link>
-              {isTituloEditavel(titulo) ? (
-                <Link
-                  className="btn btn-outline btn-sm"
-                  to={`/financeiro/titulos/${titulo.id}/editar`}
-                  title="Editar informacoes do titulo"
-                >
-                  <HiOutlinePencilSquare className="h-4 w-4" />
-                </Link>
-              ) : (
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm opacity-50"
-                  disabled
-                  title="Somente titulos em aberto e sem baixa podem ser editados"
-                >
-                  <HiOutlinePencilSquare className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </td>
-        );
-      default:
-        return <td className="px-3 py-2">-</td>;
-    }
   }
 
   function setFilter(name, value) {
@@ -1942,57 +1732,59 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   function getTituloExportColumns() {
     const columns = [{ key: 'id', value: (titulo) => titulo.id || '' }];
 
-    tableHeaders.forEach((header) => {
-      switch (header) {
-        case 'Titulo':
+    // O CSV exporta EXATAMENTE as colunas à vista, na ordem escolhida — a
+    // TabelaPadrao devolve a escolha em `aoMudarColunas`.
+    idsColunasExport.forEach((id) => {
+      switch (id) {
+        case 'titulo':
           columns.push(
             { key: 'codigo', value: (titulo) => getTituloCodigo(titulo) },
             { key: 'descricao', value: (titulo) => titulo.descricao || '' }
           );
           break;
-        case 'Status':
+        case 'status':
           columns.push({ key: 'status', value: (titulo) => titulo.status || '' });
           break;
-        case 'Tipo':
+        case 'tipo':
           columns.push({ key: 'tipo', value: (titulo) => titulo.tipo || '' });
           break;
-        case 'Documento':
+        case 'documento':
           columns.push({ key: 'numero_documento', value: (titulo) => titulo.numero_documento || '' });
           break;
-        case parceiroResultadoLabel:
+        case 'parceiro':
           columns.push(
             { key: 'credor_cliente', value: (titulo) => titulo.parceiro?.nome || '' },
             { key: 'documento_parceiro', value: (titulo) => titulo.parceiro?.cpf_cnpj || '' }
           );
           break;
-        case 'Obra':
+        case 'obra':
           columns.push({ key: 'obra', value: (titulo) => titulo.obra?.nome || '' });
           break;
-        case 'Categoria':
+        case 'categoria':
           columns.push({ key: 'categoria_financeira', value: (titulo) => titulo.categoriaFinanceira?.nome || '' });
           break;
-        case 'Forma pagamento':
+        case 'forma_pagamento':
           columns.push(
             { key: 'forma_pagamento', value: (titulo) => titulo.formaPagamento?.nome || '' },
             { key: 'forma_pagamento_codigo', value: (titulo) => titulo.formaPagamento?.codigo || '' }
           );
           break;
-        case 'Origem':
+        case 'origem':
           columns.push({
             key: 'origem',
             value: (titulo) => titulo.solicitacao?.codigo || getOrigemTitulo(titulo) || ''
           });
           break;
-        case 'Emissao':
+        case 'emissao':
           columns.push({ key: 'emissao', value: (titulo) => formatDate(titulo.data_emissao) });
           break;
-        case 'Vencimento':
+        case 'vencimento':
           columns.push({ key: 'vencimento', value: (titulo) => formatDate(titulo.data_vencimento) });
           break;
-        case 'Valor total':
+        case 'valor_total':
           columns.push({ key: 'valor_total', value: (titulo) => formatCurrencyForExport(titulo.valor_original) });
           break;
-        case 'Saldo':
+        case 'saldo':
           columns.push({ key: 'valor_saldo', value: (titulo) => formatCurrencyForExport(titulo.valor_saldo) });
           break;
         default:
@@ -2758,7 +2550,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       ) : null}
 
-      <div className="sol-surface-card card overflow-hidden">
+      <div className="sol-surface-card card overflow-clip">
         <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="text-sm font-semibold text-[var(--c-text)]">Resultado da consulta</h2>
@@ -2916,119 +2708,184 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </div>
         ) : null}
 
-        <div className="overflow-x-auto">
-          <ResizableTable
-            columns={resizableTableColumns}
-            storageKey={columnWidthStorageKey}
-            className="text-xs"
-          >
-            <thead>
-              <tr className="border-b border-[var(--c-border)] bg-[var(--c-bg)]">
-                <ResizableTh
-                  columnKey="__select__"
-                  className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
-                >
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4 accent-[var(--c-primary)]"
-                    checked={allBaixaveisSelected}
-                    disabled={titulosBaixaveis.length === 0}
-                    onChange={(event) => toggleTodosBaixaveis(event.target.checked)}
-                    title="Selecionar todos os titulos filtrados baixaveis"
+        <div className="px-3 py-3">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'titulo',
+                titulo: 'Titulo',
+                // R17: o codigo do titulo nomeia o registro desta lista.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (titulo) => (
+                  <CelulaDupla
+                    title={`${getTituloCodigo(titulo)}${titulo.descricao ? ` — ${titulo.descricao}` : ''}`}
+                    principal={(
+                      <Link
+                        className="font-semibold text-[var(--c-primary)] hover:underline"
+                        to={`/financeiro/titulos/${titulo.id}`}
+                      >
+                        {getTituloCodigo(titulo)}
+                      </Link>
+                    )}
+                    sub={titulo.descricao || '-'}
                   />
-                </ResizableTh>
-                {tableHeaders.map((header) => (
-                  <ResizableTh
-                    key={header}
-                    columnKey={header}
-                    className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-[var(--c-muted)] whitespace-nowrap"
+                )
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (titulo) => (isOverdue(titulo)
+                  ? <StatusBadge status={`${titulo.status} · VENCIDO`} kind="danger" />
+                  : <StatusBadge status={titulo.status} />)
+              },
+              ...(showTipoColumn ? [{
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'texto',
+                render: (titulo) => <span className="font-medium text-[var(--c-muted)]">{titulo.tipo}</span>
+              }] : []),
+              {
+                id: 'documento',
+                titulo: 'Documento',
+                tipo: 'codigo',
+                render: (titulo) => titulo.numero_documento || '-'
+              },
+              {
+                id: 'parceiro',
+                titulo: parceiroResultadoLabel,
+                tipo: 'texto',
+                render: (titulo) => (
+                  <CelulaDupla
+                    principal={titulo.parceiro?.nome || '-'}
+                    sub={titulo.parceiro?.cpf_cnpj || ''}
+                  />
+                )
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (titulo) => <span className="text-[var(--c-muted)]">{titulo.obra?.nome || '-'}</span>
+              },
+              {
+                id: 'categoria',
+                titulo: 'Categoria',
+                tipo: 'texto',
+                render: (titulo) => <span className="text-[var(--c-muted)]">{titulo.categoriaFinanceira?.nome || '-'}</span>
+              },
+              {
+                id: 'forma_pagamento',
+                titulo: 'Forma pagamento',
+                tipo: 'texto',
+                render: (titulo) => (
+                  <CelulaDupla
+                    principal={titulo.formaPagamento?.nome || '-'}
+                    sub={titulo.formaPagamento?.codigo || ''}
+                  />
+                )
+              },
+              {
+                id: 'origem',
+                titulo: 'Origem',
+                tipo: 'codigo',
+                render: (titulo) => (titulo.solicitacao?.id ? (
+                  <Link
+                    className="text-[var(--c-primary)] hover:underline"
+                    to={`/solicitacoes/${titulo.solicitacao.id}`}
                   >
-                    <span className="inline-flex items-center gap-1">
-                      <span>{header}</span>
-                      <span className="inline-flex rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] normal-case shadow-sm">
-                        <button
-                          type="button"
-                          className="px-1 text-[10px] leading-4 text-[var(--c-muted)] hover:text-[var(--c-primary)] disabled:opacity-30"
-                          onClick={() => moverColuna(header, 'left')}
-                          disabled={tableHeaders.indexOf(header) === 0}
-                          title="Mover coluna para esquerda"
-                        >
-                          {'<'}
-                        </button>
-                        <button
-                          type="button"
-                          className="border-l border-[var(--c-border)] px-1 text-[10px] leading-4 text-[var(--c-muted)] hover:text-[var(--c-primary)] disabled:opacity-30"
-                          onClick={() => moverColuna(header, 'right')}
-                          disabled={tableHeaders.indexOf(header) === tableHeaders.length - 1}
-                          title="Mover coluna para direita"
-                        >
-                          {'>'}
-                        </button>
-                      </span>
-                    </span>
-                  </ResizableTh>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {!hasConsulted ? (
-                <tr>
-                  <td colSpan={totalColunas} className="px-3 py-10 text-center">
-                    <div className="mx-auto max-w-md">
-                      <div className="text-sm font-medium text-[var(--c-text)]">Nenhum filtro aplicado</div>
-                      <p className="mt-1 text-xs text-[var(--c-muted)]">
-                        A tabela fica vazia ate voce consultar os titulos com os filtros desejados.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-
-              {loading ? (
-                <tr>
-                  <td colSpan={totalColunas} className="px-3 py-8 text-center text-[var(--c-muted)]">
-                    Carregando...
-                  </td>
-                </tr>
-              ) : null}
-
-              {hasConsulted && !loading && titulos.length === 0 ? (
-                <tr>
-                  <td colSpan={totalColunas} className="px-3 py-10 text-center">
-                    <div className="mx-auto max-w-md">
-                      <div className="text-sm font-medium text-[var(--c-text)]">Nenhum titulo encontrado</div>
-                      <p className="mt-1 text-xs text-[var(--c-muted)]">
-                        Ajuste os filtros ou limpe a consulta para ampliar o resultado.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              ) : null}
-
-              {!loading && titulos.map((titulo) => (
-                <tr
-                  key={titulo.id}
-                  className={`align-top transition-colors hover:bg-[var(--c-bg)] ${
-                    selectedTituloSet.has(Number(titulo.id)) ? 'bg-blue-50/60' : isOverdue(titulo) ? 'bg-rose-50/40' : ''
-                  }`}
+                    {titulo.solicitacao.codigo || `#${titulo.solicitacao.id}`}
+                  </Link>
+                ) : getOrigemTitulo(titulo))
+              },
+              {
+                id: 'emissao',
+                titulo: 'Emissao',
+                tipo: 'data',
+                render: (titulo) => <span className="text-[var(--c-muted)]">{formatDate(titulo.data_emissao)}</span>
+              },
+              {
+                id: 'vencimento',
+                titulo: 'Vencimento',
+                tipo: 'data',
+                render: (titulo) => (
+                  <span className={isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}>
+                    {formatDate(titulo.data_vencimento)}
+                  </span>
+                )
+              },
+              {
+                id: 'valor_total',
+                titulo: 'Valor total',
+                tipo: 'valor',
+                render: (titulo) => formatCurrency(titulo.valor_original)
+              },
+              {
+                id: 'saldo',
+                titulo: 'Saldo',
+                tipo: 'valor',
+                render: (titulo) => <strong className="text-[var(--c-text)]">{formatCurrency(titulo.valor_saldo)}</strong>
+              }
+            ]}
+            itens={titulos}
+            getId={(titulo) => Number(titulo.id)}
+            carregando={loading}
+            // TRÊS estados distintos: carregando (acima), "sem filtro
+            // aplicado" e "nada encontrado" — o segundo e o terceiro são a
+            // mesma prop `vazio`, decidida pela tela, porque só ela sabe se
+            // já houve consulta.
+            vazio={hasConsulted
+              ? {
+                title: 'Nenhum titulo encontrado',
+                message: 'Ajuste os filtros ou limpe a consulta para ampliar o resultado.'
+              }
+              : {
+                title: 'Nenhum filtro aplicado',
+                message: 'A tabela fica vazia ate voce consultar os titulos com os filtros desejados.'
+              }}
+            urgencia={(titulo) => (isOverdue(titulo) ? 'danger' : null)}
+            colunasConfiguraveis
+            aoMudarColunas={aoMudarColunas}
+            storageKey={tabelaStorageKey}
+            rotuloRolagem={`Titulos ${tipoLabel}`}
+            selecao={{
+              selecionados: selectedTituloIds.map((id) => Number(id)),
+              elegivel: isTituloBaixavel,
+              aoAlternar: (id, titulo) => toggleTituloSelecionado(titulo, !selectedTituloSet.has(Number(id))),
+              aoAlternarTodos: (marcar) => toggleTodosBaixaveis(marcar)
+            }}
+            larguraAcoes={120}
+            acoesLinha={(titulo) => (
+              <>
+                <Link
+                  className="btn btn-outline btn-sm"
+                  to={`/financeiro/titulos/${titulo.id}`}
+                  title="Abrir titulo"
                 >
-                  <td className="px-3 py-2 whitespace-nowrap">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 accent-[var(--c-primary)]"
-                      checked={selectedTituloSet.has(Number(titulo.id))}
-                      disabled={!isTituloBaixavel(titulo)}
-                      onChange={(event) => toggleTituloSelecionado(titulo, event.target.checked)}
-                      title={isTituloBaixavel(titulo) ? 'Selecionar titulo para baixa' : 'Somente titulos abertos ou parciais podem ser baixados'}
-                    />
-                  </td>
-                  {tableHeaders.map((header) => (
-                    <Fragment key={header}>{renderTituloCell(titulo, header)}</Fragment>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
+                  <HiOutlineEye className="h-4 w-4" />
+                </Link>
+                {isTituloEditavel(titulo) ? (
+                  <Link
+                    className="btn btn-outline btn-sm"
+                    to={`/financeiro/titulos/${titulo.id}/editar`}
+                    title="Editar informacoes do titulo"
+                  >
+                    <HiOutlinePencilSquare className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm opacity-50"
+                    disabled
+                    title="Somente titulos em aberto e sem baixa podem ser editados"
+                  >
+                    <HiOutlinePencilSquare className="h-4 w-4" />
+                  </button>
+                )}
+              </>
+            )}
+          />
         </div>
       </div>
 

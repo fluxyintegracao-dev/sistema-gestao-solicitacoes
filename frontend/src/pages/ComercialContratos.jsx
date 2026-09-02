@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
@@ -50,20 +50,6 @@ const PERIODICIDADES = [
   { value: 'PERSONALIZADA', label: 'Datas pre-definidas', intervalMonths: null }
 ];
 const CONTRATO_COMERCIAL_DRAFT_KEY = 'fluxy:comercial:contrato-venda:draft';
-const CONTRATOS_CARTEIRA_COLUMNS = [
-  { key: 'contrato', width: 190, minWidth: 140 },
-  { key: 'status', width: 200, minWidth: 140 },
-  { key: 'cliente', width: 250, minWidth: 170 },
-  { key: 'empreendimento', width: 210, minWidth: 150 },
-  { key: 'unidade', width: 160, minWidth: 120 },
-  { key: 'corretor', width: 190, minWidth: 140 },
-  { key: 'comissao', width: 100, minWidth: 84 },
-  { key: 'obra', width: 220, minWidth: 160 },
-  { key: 'valor_total', width: 145, minWidth: 120 },
-  { key: 'em_aberto', width: 145, minWidth: 120 },
-  { key: 'vencido', width: 140, minWidth: 115 },
-  { key: 'acoes', width: 104, minWidth: 96 }
-];
 
 function getOptionValue(option) {
   return String(option?.value || option || '').trim();
@@ -2416,122 +2402,162 @@ export default function ComercialContratos() {
                 </div>
               )}
 
+              {/* Mesma agenda de parcelas do bloco de cards acima, agora em
+                  tabela para telas largas (o bloco `xl:hidden` continua sendo
+                  a versao de edicao no celular, com rotulo por campo). */}
               {form.parcelas.length > 0 && (
-                <div className="hidden overflow-x-auto rounded-2xl border border-[var(--c-border)] xl:block">
-                  <table className="min-w-[1180px] text-sm">
-                    <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
-                      <tr>
-                        <th className="px-3 py-3 text-left">Descricao</th>
-                        <th className="px-3 py-3 text-left">Tipo</th>
-                        <th className="px-3 py-3 text-left">Forma</th>
-                        <th className="px-3 py-3 text-left">Reajuste</th>
-                        <th className="px-3 py-3 text-left">Detalhe</th>
-                        <th className="px-3 py-3 text-left">Vencimento</th>
-                        <th className="px-3 py-3 text-left">Competencia DRE</th>
-                        <th className="px-3 py-3 text-right">Valor</th>
-                        <th className="px-3 py-3 text-right">Acoes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.parcelas.map((item, index) => (
-                        (() => {
-                          const isEditing = parcelaEditandoIndex === index;
+                <div className="hidden xl:block">
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'descricao',
+                        titulo: 'Descricao',
+                        // R17: a descricao e quem nomeia a parcela.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(item.__indice, 'descricao', e.target.value)} />
+                          ) : (
+                            <span className="font-medium text-[var(--c-text)]">{item.descricao || '-'}</span>
+                          )
+                        )
+                      },
+                      {
+                        id: 'tipo_parcela',
+                        titulo: 'Tipo',
+                        tipo: 'texto',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(item.__indice, 'tipo_parcela', e.target.value)}>
+                              {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-[var(--c-muted)]">{item.tipo_parcela || '-'}</span>
+                          )
+                        )
+                      },
+                      {
+                        id: 'forma_recebimento_prevista',
+                        titulo: 'Forma',
+                        tipo: 'texto',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(item.__indice, 'forma_recebimento_prevista', e.target.value)}>
+                              <option value="">Nao informar</option>
+                              {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-[var(--c-muted)]">{item.forma_recebimento_prevista || '-'}</span>
+                          )
+                        )
+                      },
+                      {
+                        id: 'reajuste_tipo',
+                        titulo: 'Reajuste',
+                        tipo: 'texto',
+                        render: (item) => {
                           const reajusteLabel = getOptionLabel(parcelaReajusteTipos.find((tipo) => getOptionValue(tipo) === (item.reajuste_tipo || 'FIXA'))) || item.reajuste_tipo || 'Fixa';
-                          const canAdjust = Math.abs(diferencaComposicao) > 0.009;
-
-                          return (
-                            <tr key={`${item.descricao}-${index}`} className={`border-t border-[var(--c-border)] ${isEditing ? 'bg-blue-50/50' : ''}`}>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <input className="input w-full" value={item.descricao} onChange={(e) => updateParcela(index, 'descricao', e.target.value)} />
-                                ) : (
-                                  <span className="font-medium text-[var(--c-text)]">{item.descricao || '-'}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <select className="input w-full" value={item.tipo_parcela} onChange={(e) => updateParcela(index, 'tipo_parcela', e.target.value)}>
-                                    {parcelaTipos.map((tipo) => <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}</option>)}
-                                  </select>
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{item.tipo_parcela || '-'}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <select className="input w-full" value={item.forma_recebimento_prevista || ''} onChange={(e) => updateParcela(index, 'forma_recebimento_prevista', e.target.value)}>
-                                    <option value="">Nao informar</option>
-                                    {formasRecebimento.map((forma) => <option key={getOptionValue(forma)} value={getOptionValue(forma)}>{getOptionLabel(forma)}</option>)}
-                                  </select>
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{item.forma_recebimento_prevista || '-'}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(index, 'reajuste_tipo', e.target.value)}>
-                                    {parcelaReajusteTipos.map((tipo) => {
-                                      const resumo = getOptionResumo(tipo);
-                                      return <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}{resumo ? ` (${resumo})` : ''}</option>;
-                                    })}
-                                  </select>
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{reajusteLabel}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(index, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{item.observacoes || '-'}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                {isEditing ? (
-                                  <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(index, 'data_vencimento', e.target.value)} />
-                                ) : (
-                                  <span className="text-[var(--c-muted)]">{formatDate(item.data_vencimento)}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                <span className="text-[var(--c-muted)]">{formatDate(form.data_assinatura)}</span>
-                              </td>
-                              <td className="px-3 py-3 text-right">
-                                {isEditing ? (
-                                  <input className="input w-full text-right" inputMode="decimal" value={item.valor || formatCurrencyInput(item.valor_original)} onChange={(e) => updateParcela(index, 'valor', normalizeCurrencyTyping(e.target.value))} onBlur={(e) => updateParcela(index, 'valor', formatCurrencyInput(e.target.value))} placeholder="R$ 0,00" />
-                                ) : (
-                                  <span className="font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-3">
-                                <div className="flex min-w-[176px] flex-wrap justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    className="btn btn-outline btn-sm inline-flex items-center gap-1.5"
-                                    onClick={() => setParcelaEditandoIndex(isEditing ? null : index)}
-                                    title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
-                                  >
-                                    <HiOutlinePencilSquare className="h-4 w-4" />
-                                    {isEditing ? 'Concluir' : 'Editar'}
-                                  </button>
-                                  {isEditing && canAdjust && (
-                                    <button
-                                      type="button"
-                                      className="btn btn-primary btn-sm"
-                                      onClick={() => ajustarParcelaParaFechamento(index)}
-                                      title="Ajusta esta parcela pela diferenca entre a agenda e o valor total do contrato."
-                                    >
-                                      Fechar diferenca
-                                    </button>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
+                          return parcelaEditandoIndex === item.__indice ? (
+                            <select className="input w-full" value={item.reajuste_tipo || 'FIXA'} onChange={(e) => updateParcela(item.__indice, 'reajuste_tipo', e.target.value)}>
+                              {parcelaReajusteTipos.map((tipo) => {
+                                const resumo = getOptionResumo(tipo);
+                                return <option key={getOptionValue(tipo)} value={getOptionValue(tipo)}>{getOptionLabel(tipo)}{resumo ? ` (${resumo})` : ''}</option>;
+                              })}
+                            </select>
+                          ) : (
+                            <span className="text-[var(--c-muted)]">{reajusteLabel}</span>
                           );
-                        })()
-                      ))}
-                    </tbody>
-                  </table>
+                        }
+                      },
+                      {
+                        id: 'observacoes',
+                        titulo: 'Detalhe',
+                        tipo: 'texto',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <input className="input w-full" value={item.observacoes || ''} onChange={(e) => updateParcela(item.__indice, 'observacoes', e.target.value)} placeholder="Detalhe do bem, permuta ou outro recebimento" />
+                          ) : (
+                            <span className="text-[var(--c-muted)]">{item.observacoes || '-'}</span>
+                          )
+                        )
+                      },
+                      {
+                        id: 'data_vencimento',
+                        titulo: 'Vencimento',
+                        tipo: 'data',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <input className="input w-full" type="date" value={item.data_vencimento} onChange={(e) => updateParcela(item.__indice, 'data_vencimento', e.target.value)} />
+                          ) : (
+                            <span className="text-[var(--c-muted)]">{formatDate(item.data_vencimento)}</span>
+                          )
+                        )
+                      },
+                      {
+                        id: 'competencia_dre',
+                        titulo: 'Competencia DRE',
+                        tipo: 'data',
+                        render: () => <span className="text-[var(--c-muted)]">{formatDate(form.data_assinatura)}</span>
+                      },
+                      {
+                        id: 'valor',
+                        titulo: 'Valor',
+                        tipo: 'valor',
+                        render: (item) => (
+                          parcelaEditandoIndex === item.__indice ? (
+                            <input
+                              className="input w-full text-right"
+                              inputMode="decimal"
+                              value={item.valor || formatCurrencyInput(item.valor_original)}
+                              onChange={(e) => updateParcela(item.__indice, 'valor', normalizeCurrencyTyping(e.target.value))}
+                              onBlur={(e) => updateParcela(item.__indice, 'valor', formatCurrencyInput(e.target.value))}
+                              placeholder="R$ 0,00"
+                            />
+                          ) : (
+                            <span className="font-semibold text-[var(--c-text)]">{formatCurrency(item.valor || item.valor_original)}</span>
+                          )
+                        )
+                      }
+                    ]}
+                    // `__indice` carrega a posicao na agenda: `updateParcela` e
+                    // `parcelaEditandoIndex` trabalham por indice, e a parcela
+                    // recem-gerada ainda nao tem id proprio.
+                    itens={form.parcelas.map((item, index) => ({ ...item, __indice: index }))}
+                    getId={(item) => item.__indice}
+                    storageKey="tabela:comercial-contratos:parcelas-edicao"
+                    rotuloRolagem="Agenda de parcelas do contrato"
+                    vazio="Nenhuma parcela na agenda."
+                    linhaSelecionada={(item) => item.__indice === parcelaEditandoIndex}
+                    larguraAcoes={300}
+                    acoesLinha={(item) => {
+                      const isEditing = parcelaEditandoIndex === item.__indice;
+                      const canAdjust = Math.abs(diferencaComposicao) > 0.009;
+                      return (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-outline btn-sm inline-flex items-center gap-1.5"
+                            onClick={() => setParcelaEditandoIndex(isEditing ? null : item.__indice)}
+                            title={isEditing ? 'Concluir edicao da parcela' : 'Editar parcela'}
+                          >
+                            <HiOutlinePencilSquare className="h-4 w-4" />
+                            {isEditing ? 'Concluir' : 'Editar'}
+                          </button>
+                          {isEditing && canAdjust && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => ajustarParcelaParaFechamento(item.__indice)}
+                              title="Ajusta esta parcela pela diferenca entre a agenda e o valor total do contrato."
+                            >
+                              Fechar diferenca
+                            </button>
+                          )}
+                        </>
+                      );
+                    }}
+                  />
                 </div>
               )}
 
@@ -2623,86 +2649,144 @@ export default function ComercialContratos() {
           </label>
         </div>
 
-        <div className="app-table-shell mt-4 overflow-hidden rounded-xl border border-[var(--c-border)]">
-          {contratosFiltrados.length === 0 ? (
-            <div className="app-empty-card">Nenhum contrato comercial encontrado.</div>
-          ) : (
-            <ResizableTable
-              columns={CONTRATOS_CARTEIRA_COLUMNS}
-              storageKey="fluxy.comercial.contratos.carteira.columns"
-              className="table"
-              scrollLabel="Carteira de contratos comerciais com colunas redimensionaveis"
-            >
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="contrato">Contrato</ResizableTh>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="cliente">Cliente</ResizableTh>
-                  <ResizableTh columnKey="empreendimento">Empreendimento</ResizableTh>
-                  <ResizableTh columnKey="unidade">Torre / unidade</ResizableTh>
-                  <ResizableTh columnKey="corretor">Corretor</ResizableTh>
-                  <ResizableTh columnKey="comissao" className="text-right">Comissao</ResizableTh>
-                  <ResizableTh columnKey="obra">Obra</ResizableTh>
-                  <ResizableTh columnKey="valor_total" className="text-right">Valor total</ResizableTh>
-                  <ResizableTh columnKey="em_aberto" className="text-right">Em aberto</ResizableTh>
-                  <ResizableTh columnKey="vencido" className="text-right">Vencido</ResizableTh>
-                  <ResizableTh columnKey="acoes" className="text-center">Acoes</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {contratosFiltrados.map((item) => (
-                  <tr key={item.id}>
-                    <td className="font-semibold text-[var(--c-text)]" title={item.numero || ''}>{item.numero || '-'}</td>
-                    <td>
-                      <div className="flex flex-col items-start gap-1.5">
-                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
-                      {item.indicadoresFinanceiros?.status_sugerido && item.indicadoresFinanceiros.status_sugerido !== item.status && (
-                          <span className="inline-flex max-w-full rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700" title={`Financeiro sugere ${item.indicadoresFinanceiros.status_sugerido}`}>
-                            Sugere {item.indicadoresFinanceiros.status_sugerido}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td title={item.cliente?.nome || ''}>{item.cliente?.nome || '-'}</td>
-                    <td title={item.empreendimento?.nome || ''}>{item.empreendimento?.nome || '-'}</td>
-                    <td title={[item.unidadeComercial?.torre, item.unidadeComercial?.codigo].filter(Boolean).join(' - ')}>
-                      {[item.unidadeComercial?.torre, item.unidadeComercial?.codigo].filter(Boolean).join(' - ') || '-'}
-                    </td>
-                    <td title={item.corretor_nome || ''}>{item.corretor_nome || '-'}</td>
-                    <td className="text-right">
-                      {Number(item.comissao_percentual || 0) > 0 ? `${Number(item.comissao_percentual).toLocaleString('pt-BR')}%` : '-'}
-                    </td>
-                    <td title={item.obra?.nome || ''}>{item.obra?.nome || '-'}</td>
-                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.valor_total)}</td>
-                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</td>
-                    <td className="text-right font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</td>
-                    <td>
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
-                          onClick={() => selecionarContrato(item.id)}
-                          title="Abrir detalhes"
-                          aria-label={`Abrir detalhes do contrato ${item.numero}`}
-                        >
-                          <HiOutlineEye className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
-                          onClick={() => editarContrato(item.id)}
-                          title="Editar resumo"
-                          aria-label={`Editar resumo do contrato ${item.numero}`}
-                        >
-                          <HiOutlinePencilSquare className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </ResizableTable>
-          )}
+        {/* R18: o container antes tinha `overflow-hidden`, que cria contexto de
+            rolagem e mata o sticky do cabecalho e da coluna fixa da tabela.
+            A propria TabelaPadrao ja traz o shell com a area de rolagem. */}
+        <div className="mt-4">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'contrato',
+                titulo: 'Contrato',
+                // R17: o numero do contrato e quem nomeia o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                ordenavel: true,
+                valorOrdenacao: (item) => item.numero || '',
+                render: (item) => <span title={item.numero || ''}>{item.numero || '-'}</span>
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                ordenavel: true,
+                valorOrdenacao: (item) => item.status || '',
+                render: (item) => (
+                  <div className="flex flex-col items-start gap-1.5">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(item.status)}`}>{item.status}</span>
+                    {item.indicadoresFinanceiros?.status_sugerido && item.indicadoresFinanceiros.status_sugerido !== item.status && (
+                      <span className="inline-flex max-w-full rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-700" title={`Financeiro sugere ${item.indicadoresFinanceiros.status_sugerido}`}>
+                        Sugere {item.indicadoresFinanceiros.status_sugerido}
+                      </span>
+                    )}
+                  </div>
+                )
+              },
+              {
+                id: 'cliente',
+                titulo: 'Cliente',
+                tipo: 'texto',
+                ordenavel: true,
+                valorOrdenacao: (item) => item.cliente?.nome || '',
+                render: (item) => <span title={item.cliente?.nome || ''}>{item.cliente?.nome || '-'}</span>
+              },
+              {
+                id: 'empreendimento',
+                titulo: 'Empreendimento',
+                tipo: 'texto',
+                ordenavel: true,
+                valorOrdenacao: (item) => item.empreendimento?.nome || '',
+                render: (item) => <span title={item.empreendimento?.nome || ''}>{item.empreendimento?.nome || '-'}</span>
+              },
+              {
+                id: 'unidade',
+                titulo: 'Torre / unidade',
+                tipo: 'texto',
+                render: (item) => {
+                  const rotulo = [item.unidadeComercial?.torre, item.unidadeComercial?.codigo].filter(Boolean).join(' - ');
+                  return <span title={rotulo}>{rotulo || '-'}</span>;
+                }
+              },
+              {
+                id: 'corretor',
+                titulo: 'Corretor',
+                tipo: 'texto',
+                render: (item) => <span title={item.corretor_nome || ''}>{item.corretor_nome || '-'}</span>
+              },
+              {
+                id: 'comissao',
+                titulo: 'Comissao',
+                tipo: 'numero',
+                render: (item) => (
+                  Number(item.comissao_percentual || 0) > 0
+                    ? `${Number(item.comissao_percentual).toLocaleString('pt-BR')}%`
+                    : '-'
+                )
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (item) => <span title={item.obra?.nome || ''}>{item.obra?.nome || '-'}</span>
+              },
+              {
+                id: 'valor_total',
+                titulo: 'Valor total',
+                tipo: 'valor',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.valor_total || 0),
+                render: (item) => <span className="font-medium tabular-nums">{formatCurrency(item.valor_total)}</span>
+              },
+              {
+                id: 'em_aberto',
+                titulo: 'Em aberto',
+                tipo: 'valor',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.indicadoresFinanceiros?.valor_em_aberto || 0),
+                render: (item) => <span className="font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_em_aberto || 0)}</span>
+              },
+              {
+                id: 'vencido',
+                titulo: 'Vencido',
+                tipo: 'valor',
+                ordenavel: true,
+                ordemInicial: 'desc',
+                valorOrdenacao: (item) => Number(item.indicadoresFinanceiros?.valor_vencido || 0),
+                render: (item) => <span className="font-medium tabular-nums">{formatCurrency(item.indicadoresFinanceiros?.valor_vencido || 0)}</span>
+              }
+            ]}
+            itens={contratosFiltrados}
+            getId={(item) => item.id}
+            storageKey="tabela:comercial-contratos:carteira"
+            rotuloRolagem="Carteira de contratos comerciais com colunas redimensionaveis"
+            vazio="Nenhum contrato comercial encontrado."
+            colunasConfiguraveis
+            larguraAcoes={140}
+            acoesLinha={(item) => (
+              <>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                  onClick={() => selecionarContrato(item.id)}
+                  title="Abrir detalhes"
+                  aria-label={`Abrir detalhes do contrato ${item.numero}`}
+                >
+                  <HiOutlineEye className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm inline-flex h-9 w-9 items-center justify-center p-0"
+                  onClick={() => editarContrato(item.id)}
+                  title="Editar resumo"
+                  aria-label={`Editar resumo do contrato ${item.numero}`}
+                >
+                  <HiOutlinePencilSquare className="h-4 w-4" />
+                </button>
+              </>
+            )}
+          />
         </div>
       </section>
 
@@ -2952,61 +3036,101 @@ export default function ComercialContratos() {
             </div>
           </div>
 
-          <div className="mt-4 overflow-x-auto rounded-2xl border border-[var(--c-border)]">
-            <table className="min-w-[1180px] text-sm">
-              <thead className="bg-[var(--c-bg)] text-[var(--c-muted)]">
-                <tr>
-                  <th className="px-4 py-3 text-left">Seq.</th>
-                  <th className="px-4 py-3 text-left">Descricao</th>
-                  <th className="px-4 py-3 text-left">Forma prevista</th>
-                  <th className="px-4 py-3 text-left">Reajuste</th>
-                  <th className="px-4 py-3 text-left">Detalhe</th>
-                  <th className="px-4 py-3 text-left">Vencimento</th>
-                  <th className="px-4 py-3 text-left">Competencia DRE</th>
-                  <th className="px-4 py-3 text-right">Valor</th>
-                  <th className="px-4 py-3 text-left">Status financeiro</th>
-                  <th className="px-4 py-3 text-right">Acao</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(contratoSelecionado.parcelas || []).map((parcela) => {
-                  const cheque = parcela.tituloFinanceiro?.chequesTerceiros?.[0];
-                  return (
-                  <tr key={parcela.id} className="border-t border-[var(--c-border)]">
-                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.sequencia}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.descricao}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">
-                      <div>{parcela.forma_recebimento_prevista || '-'}</div>
-                      {cheque && (
-                        <div className="mt-1 max-w-[280px] text-xs leading-relaxed text-[var(--c-muted)]">
-                          Cheque {cheque.numero_cheque} · {cheque.banco || 'Banco nao informado'} · {cheque.titular_nome || 'Titular nao informado'} · {cheque.titular_documento ? maskCpfCnpj(cheque.titular_documento) : 'Documento nao informado'}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{String(parcela.reajuste_tipo || 'FIXA') === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{parcela.observacoes || '-'}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(parcela.competencia_data || parcela.tituloFinanceiro?.competencia_data)}</td>
-                    <td className="px-4 py-3 text-right text-[var(--c-text)]">{formatCurrency(parcela.valor_original)}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parcela.tituloFinanceiro?.status || 'ABERTO')}`}>
-                        {parcela.tituloFinanceiro?.status || 'ABERTO'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {parcela.tituloFinanceiro?.id ? (
-                        <Link className="btn btn-outline" to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`}>
-                          Abrir titulo
-                        </Link>
-                      ) : (
-                        <span className="text-[var(--c-muted)]">-</span>
-                      )}
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="mt-4">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'sequencia',
+                  titulo: 'Seq.',
+                  tipo: 'numero',
+                  render: (parcela) => parcela.sequencia
+                },
+                {
+                  id: 'descricao',
+                  titulo: 'Descricao',
+                  // R17: a descricao e quem nomeia a parcela.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (parcela) => parcela.descricao
+                },
+                {
+                  id: 'forma_recebimento_prevista',
+                  titulo: 'Forma prevista',
+                  tipo: 'texto',
+                  render: (parcela) => {
+                    const cheque = parcela.tituloFinanceiro?.chequesTerceiros?.[0];
+                    return (
+                      <CelulaDupla
+                        principal={parcela.forma_recebimento_prevista || '-'}
+                        sub={cheque
+                          ? `Cheque ${cheque.numero_cheque} · ${cheque.banco || 'Banco nao informado'} · ${cheque.titular_nome || 'Titular nao informado'} · ${cheque.titular_documento ? maskCpfCnpj(cheque.titular_documento) : 'Documento nao informado'}`
+                          : null}
+                      />
+                    );
+                  }
+                },
+                {
+                  id: 'reajuste_tipo',
+                  titulo: 'Reajuste',
+                  tipo: 'texto',
+                  render: (parcela) => (
+                    String(parcela.reajuste_tipo || 'FIXA') === 'REAJUSTAVEL' ? 'Reajustavel (R)' : 'Fixa (F)'
+                  )
+                },
+                {
+                  id: 'observacoes',
+                  titulo: 'Detalhe',
+                  tipo: 'texto',
+                  render: (parcela) => parcela.observacoes || '-'
+                },
+                {
+                  id: 'data_vencimento',
+                  titulo: 'Vencimento',
+                  tipo: 'data',
+                  render: (parcela) => formatDate(parcela.data_vencimento)
+                },
+                {
+                  id: 'competencia_data',
+                  titulo: 'Competencia DRE',
+                  tipo: 'data',
+                  render: (parcela) => formatDate(parcela.competencia_data || parcela.tituloFinanceiro?.competencia_data)
+                },
+                {
+                  id: 'valor_original',
+                  titulo: 'Valor',
+                  tipo: 'valor',
+                  ordenavel: true,
+                  ordemInicial: 'desc',
+                  valorOrdenacao: (parcela) => Number(parcela.valor_original || 0),
+                  render: (parcela) => formatCurrency(parcela.valor_original)
+                },
+                {
+                  id: 'status_financeiro',
+                  titulo: 'Status financeiro',
+                  tipo: 'status',
+                  render: (parcela) => (
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusClass(parcela.tituloFinanceiro?.status || 'ABERTO')}`}>
+                      {parcela.tituloFinanceiro?.status || 'ABERTO'}
+                    </span>
+                  )
+                }
+              ]}
+              itens={contratoSelecionado.parcelas || []}
+              getId={(parcela) => parcela.id}
+              storageKey="tabela:comercial-contratos:parcelas-contrato"
+              rotuloRolagem="Parcelas do contrato comercial"
+              vazio="Nenhuma parcela gerada para este contrato."
+              larguraAcoes={160}
+              acoesLinha={(parcela) => (
+                parcela.tituloFinanceiro?.id ? (
+                  <Link className="btn btn-outline btn-sm" to={`/financeiro/titulos/${parcela.tituloFinanceiro.id}`}>
+                    Abrir titulo
+                  </Link>
+                ) : (
+                  <span className="text-[var(--c-muted)]">-</span>
+                )
+              )}
+            />
           </div>
 
           <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">

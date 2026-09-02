@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -27,19 +27,6 @@ import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatter
  */
 
 const COMPETENCIA_ATUAL = new Date().toISOString().slice(0, 7);
-
-// Ver o comentario em RhDpPessoal.jsx: sem `columns` + `columnKey`, as colunas colapsam.
-const COLUNAS_JORNADA = [
-  { key: 'colaborador', width: 230, minWidth: 170 },
-  { key: 'vinculo', width: 100, minWidth: 85 },
-  { key: 'salario', width: 130, minWidth: 110 },
-  { key: 'dias', width: 100, minWidth: 90 },
-  { key: 'faltas', width: 100, minWidth: 90 },
-  { key: 'horas', width: 120, minWidth: 100 },
-  { key: 'acrescimos', width: 130, minWidth: 110 },
-  { key: 'descontos', width: 130, minWidth: 110 },
-  { key: 'observacao', width: 220, minWidth: 160 }
-];
 
 function linhaVazia(colaborador) {
   const ja = colaborador.jornada_informada || {};
@@ -157,6 +144,13 @@ export default function RhDpJornada({ comoAba = false }) {
       faltas: linha.faltas === '' ? '0' : linha.faltas
     })));
   }
+
+  // `alterar` age por POSICAO na lista; a tabela precisa do indice junto do
+  // registro para os controles inline continuarem escrevendo na linha certa.
+  const linhasTabela = useMemo(
+    () => linhas.map((linha, indice) => ({ ...linha, __indice: indice })),
+    [linhas]
+  );
 
   const jaInformados = useMemo(() => linhas.filter((l) => l.jaInformado).length, [linhas]);
 
@@ -305,96 +299,137 @@ export default function RhDpJornada({ comoAba = false }) {
 
       {linhas.length ? (
         <form onSubmit={enviar} className="space-y-4 rh-form-com-tabela">
-          <div className="card sol-surface-card app-table-shell">
-            <div className="app-dense-table-wrapper">
-              <ResizableTable
-                columns={COLUNAS_JORNADA}
-                storageKey="rh-jornada-colunas"
-                className="app-dense-data-table"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="colaborador">Colaborador</ResizableTh>
-                    <ResizableTh columnKey="vinculo">Vinculo</ResizableTh>
-                    <ResizableTh columnKey="salario">Salario</ResizableTh>
-                    <ResizableTh columnKey="dias">Dias</ResizableTh>
-                    <ResizableTh columnKey="faltas">Faltas</ResizableTh>
-                    <ResizableTh columnKey="horas">Horas extras</ResizableTh>
-                    <ResizableTh columnKey="acrescimos">Acrescimos</ResizableTh>
-                    <ResizableTh columnKey="descontos">Descontos</ResizableTh>
-                    <ResizableTh columnKey="observacao">Observacao</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {linhas.map((linha, indice) => {
-                    const estoura = Number(linha.dias_trabalhados || 0) + Number(linha.faltas || 0) > Number(diasBase);
-                    return (
-                      <tr
-                        key={linha.colaborador_id}
-                        className={[
-                          estoura ? 'rh-jornada-linha--erro' : '',
-                          linha.aindaNaoComecou ? 'rh-jornada-linha--futura' : ''
-                        ].filter(Boolean).join(' ') || undefined}
-                      >
-                        <td>
-                          <div className="font-medium">{linha.nome}</div>
-                          {linha.aindaNaoComecou ? (
-                            <div className="text-xs rh-jornada-futura-nota">
-                              comeca nesta obra em {new Date(`${linha.comecaEm}T00:00:00`).toLocaleDateString('pt-BR')}
-                            </div>
-                          ) : linha.jaInformado ? (
-                            <div className="text-xs opacity-70">ja informado nesta competencia</div>
-                          ) : null}
-                        </td>
-                        <td>{linha.tipo_vinculo}</td>
-                        <td className="tabular-nums">
-                          {linha.salario_base ? formatCurrencyInput(String(linha.salario_base)) : '—'}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control rh-jornada-numero" type="number" min="0" max={diasBase}
-                              value={linha.dias_trabalhados}
-                              onChange={(e) => alterar(indice, 'dias_trabalhados', e.target.value)} />
-                          )}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control rh-jornada-numero" type="number" min="0" max={diasBase}
-                              value={linha.faltas}
-                              onChange={(e) => alterar(indice, 'faltas', e.target.value)} />
-                          )}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control rh-jornada-numero" type="number" min="0" step="0.5"
-                              value={linha.horas_extras}
-                              onChange={(e) => alterar(indice, 'horas_extras', e.target.value)} />
-                          )}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control rh-jornada-numero" value={linha.adicionais}
-                              onChange={(e) => alterar(indice, 'adicionais', formatCurrencyInput(e.target.value))} />
-                          )}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control rh-jornada-numero" value={linha.descontos}
-                              onChange={(e) => alterar(indice, 'descontos', formatCurrencyInput(e.target.value))} />
-                          )}
-                        </td>
-                        <td>
-                          {linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
-                            <input className="form-control" value={linha.observacoes}
-                              onChange={(e) => alterar(indice, 'observacoes', e.target.value)} />
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </ResizableTable>
-            </div>
+          <div className="card sol-surface-card">
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'colaborador',
+                  titulo: 'Colaborador',
+                  // R17: a linha da jornada é de um COLABORADOR nomeado.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (linha) => (
+                    <CelulaDupla
+                      principal={linha.nome}
+                      sub={linha.aindaNaoComecou
+                        ? `comeca nesta obra em ${new Date(`${linha.comecaEm}T00:00:00`).toLocaleDateString('pt-BR')}`
+                        : (linha.jaInformado ? 'ja informado nesta competencia' : '')}
+                    />
+                  )
+                },
+                {
+                  id: 'vinculo',
+                  titulo: 'Vinculo',
+                  tipo: 'badge',
+                  render: (linha) => linha.tipo_vinculo
+                },
+                {
+                  id: 'salario',
+                  titulo: 'Salario',
+                  tipo: 'valor',
+                  render: (linha) => (linha.salario_base ? formatCurrencyInput(String(linha.salario_base)) : '—')
+                },
+                {
+                  id: 'dias',
+                  titulo: 'Dias',
+                  tipo: 'numero',
+                  // Edicao inline: o controle mora no render da coluna.
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control rh-jornada-numero"
+                      type="number"
+                      min="0"
+                      max={diasBase}
+                      aria-label={`Dias trabalhados de ${linha.nome}`}
+                      value={linha.dias_trabalhados}
+                      onChange={(e) => alterar(linha.__indice, 'dias_trabalhados', e.target.value)}
+                    />
+                  ))
+                },
+                {
+                  id: 'faltas',
+                  titulo: 'Faltas',
+                  tipo: 'numero',
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control rh-jornada-numero"
+                      type="number"
+                      min="0"
+                      max={diasBase}
+                      aria-label={`Faltas de ${linha.nome}`}
+                      value={linha.faltas}
+                      onChange={(e) => alterar(linha.__indice, 'faltas', e.target.value)}
+                    />
+                  ))
+                },
+                {
+                  id: 'horas',
+                  titulo: 'Horas extras',
+                  tipo: 'numero',
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control rh-jornada-numero"
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      aria-label={`Horas extras de ${linha.nome}`}
+                      value={linha.horas_extras}
+                      onChange={(e) => alterar(linha.__indice, 'horas_extras', e.target.value)}
+                    />
+                  ))
+                },
+                {
+                  id: 'acrescimos',
+                  titulo: 'Acrescimos',
+                  tipo: 'valor',
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control rh-jornada-numero"
+                      aria-label={`Acrescimos de ${linha.nome}`}
+                      value={linha.adicionais}
+                      onChange={(e) => alterar(linha.__indice, 'adicionais', formatCurrencyInput(e.target.value))}
+                    />
+                  ))
+                },
+                {
+                  id: 'descontos',
+                  titulo: 'Descontos',
+                  tipo: 'valor',
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control rh-jornada-numero"
+                      aria-label={`Descontos de ${linha.nome}`}
+                      value={linha.descontos}
+                      onChange={(e) => alterar(linha.__indice, 'descontos', formatCurrencyInput(e.target.value))}
+                    />
+                  ))
+                },
+                {
+                  id: 'observacao',
+                  titulo: 'Observacao',
+                  tipo: 'texto',
+                  render: (linha) => (linha.aindaNaoComecou ? <span className="opacity-50">—</span> : (
+                    <input
+                      className="form-control"
+                      aria-label={`Observacao de ${linha.nome}`}
+                      value={linha.observacoes}
+                      onChange={(e) => alterar(linha.__indice, 'observacoes', e.target.value)}
+                    />
+                  ))
+                }
+              ]}
+              itens={linhasTabela}
+              getId={(linha) => linha.colaborador_id}
+              storageKey="tabela:rh-dp-jornada:colaboradores"
+              rotuloRolagem="Jornada por colaborador"
+              // A tarja substitui as classes de linha do markup antigo: dias +
+              // faltas acima da base é erro; quem ainda nao comecou é aviso.
+              urgencia={(linha) => {
+                if (Number(linha.dias_trabalhados || 0) + Number(linha.faltas || 0) > Number(diasBase)) return 'danger';
+                return linha.aindaNaoComecou ? 'warning' : null;
+              }}
+              vazio="Nenhum colaborador nesta obra e competencia."
+            />
           </div>
 
           {comProblema.length ? (

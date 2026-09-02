@@ -394,7 +394,10 @@
 .cr-section,
 .cr-workspace {
   min-width: 0;
-  overflow: hidden;
+  /* R18: `overflow: hidden` cria contexto de rolagem e mata o
+     position:sticky do cabeçalho e da coluna fixa da tabela que mora aqui
+     dentro — e mata em silêncio. `clip` corta igual, sem scrollport. */
+  overflow: clip;
   border: 1px solid var(--ui-border);
   border-radius: 13px;
   background: var(--ui-surface);
@@ -3691,56 +3694,39 @@
   font-weight: 800;
 }
 
-.cr-table--cost-ledger {
-  min-width: 1120px;
-}
-
-.cr-table--cost-ledger tbody tr[data-in-competence="true"] {
-  background: color-mix(in srgb, var(--cr-primary) 3.5%, var(--cr-surface));
-}
-
-.cr-table--cost-ledger tbody tr[data-inactive="true"] {
-  opacity: 0.62;
-}
-
-.cr-table--cost-ledger td {
-  vertical-align: top;
-}
-
-.cr-table--cost-ledger td > strong,
-.cr-table--cost-ledger td > small {
-  display: block;
-}
-
-.cr-table--cost-ledger .cr-cost-ledger__macro-row td {
-  background: color-mix(in srgb, var(--cr-primary) 7%, var(--cr-surface));
-  border-top: 1px solid color-mix(in srgb, var(--cr-primary) 20%, var(--cr-border));
-  padding-block: 0.65rem;
-}
-
-.cr-cost-ledger__macro-row td,
-.cr-cost-ledger__macro-row td > span {
+/* Linha de grupo por etapa macro: quem a desenha agora é o `agruparPor` da
+   TabelaPadrao (.app-tabela-grupo); aqui fica só o arranjo do conteúdo —
+   código + descrição à esquerda, contagem e total à direita. */
+.cr-cost-ledger__macro-title,
+.cr-cost-ledger__macro-title > span {
   align-items: center;
   display: flex;
   justify-content: space-between;
 }
 
-.cr-cost-ledger__macro-row td > span {
+.cr-cost-ledger__macro-title {
+  width: 100%;
+}
+
+.cr-cost-ledger__macro-title > span {
   gap: 0.5rem;
   justify-content: flex-start;
 }
 
-.cr-cost-ledger__macro-row td > small {
+.cr-cost-ledger__macro-title > small {
   color: var(--cr-muted);
   font-size: 0.75rem;
   margin: 0;
 }
 
-.cr-table--cost-ledger td > small {
-  max-width: 290px;
+/* Título sem efeito no custo: a opacidade da linha inteira (que dependia de
+   um data-attr próprio na <tr>) virou marca de TEXTO na célula de situação
+   — legível também para quem não distingue o tom esmaecido. */
+.cr-cost-ledger__inactive-mark {
+  display: block;
   margin-top: 3px;
   color: var(--cr-muted);
-  line-height: 1.3;
+  font-size: 0.67rem;
 }
 
 .cr-status-pill[data-status="ABERTO"],

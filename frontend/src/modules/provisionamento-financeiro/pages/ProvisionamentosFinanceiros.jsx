@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  HiAdjustmentsHorizontal,
-  HiViewColumns
-} from 'react-icons/hi2';
+import { HiAdjustmentsHorizontal } from 'react-icons/hi2';
 import {
   getProvisionamentoFinanceiroContexto,
   listarCategoriasMacroProvisionamento,
   listarProvisoesFinanceiras
 } from '../../../services/provisoesFinanceiras';
+import { TabelaPadrao } from '../../../components/padrao';
 import { formatarMoedaBRL } from '../utils/moeda';
 
 const DEFAULT_FILTERS = {
@@ -34,20 +32,34 @@ const FILTER_OPTIONS = [
   { id: 'data_final', label: 'Data final' }
 ];
 
-const COLUMN_DEFS = [
-  { id: 'codigo', label: 'Codigo', sortKey: 'codigo', mandatory: true },
-  { id: 'obra', label: 'Obra', sortKey: 'obra' },
-  { id: 'data_prevista', label: 'Data prevista', sortKey: 'data_prevista_desembolso' },
-  { id: 'categoria', label: 'Item macro', sortKey: 'categoria_macro' },
-  { id: 'descricao', label: 'Descricao', sortKey: 'descricao' },
-  { id: 'fornecedor', label: 'Credor', sortKey: 'fornecedor_texto' },
-  { id: 'valor', label: 'Valor previsto', sortKey: 'valor_previsto' },
-  { id: 'status', label: 'Status' },
-  { id: 'prioridade', label: 'Prioridade' },
-  { id: 'acoes', label: 'Acoes', mandatory: true }
-];
+/* A consulta continua pedindo ao servidor a ordem PADRÃO da lista
+   (desembolso mais próximo primeiro), como antes. Do primeiro clique num
+   título em diante quem ordena é a TabelaPadrao — por isso `alternarOrdenacao`
+   e o indicador à mão saíram: a ordem virou capacidade do componente. */
+const ORDENACAO_PADRAO = {
+  sort_by: 'data_prevista_desembolso',
+  sort_dir: 'ASC'
+};
 
-const DEFAULT_VISIBLE_COLUMNS = COLUMN_DEFS.map((coluna) => coluna.id);
+/* A lista é PAGINADA NO SERVIDOR: ordenar só a página à vista faria o
+   usuário ler "as maiores provisões" quando são apenas as maiores daquelas
+   25. Por isso o clique no cabeçalho reconsulta o backend — o mapa liga a
+   coluna da tabela ao campo que a API ordena. */
+const CAMPO_ORDENACAO_POR_COLUNA = {
+  obra: 'obra_nome',
+  data_prevista: 'data_prevista_desembolso',
+  categoria: 'categoria_nome',
+  descricao: 'descricao',
+  fornecedor: 'fornecedor_nome',
+  valor: 'valor_previsto',
+  status: 'status'
+};
+
+// Uma chave só: a TabelaPadrao guarda nela a escolha de colunas (quais e em
+// que ordem, no painel "Colunas") e as larguras. Substitui o painel de
+// colunas próprio da tela (`colunasVisiveis`/`toggleColuna`).
+const STORAGE_KEY = 'tabela:provisionamentos-financeiros';
+
 const DEFAULT_VISIBLE_FILTERS = FILTER_OPTIONS.map((item) => item.id);
 
 function formatarData(valor) {
@@ -103,14 +115,9 @@ export default function ProvisionamentosFinanceiros() {
   const [resumo, setResumo] = useState({ total_registros_filtrados: 0, valor_total_filtrado: 0 });
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingLista, setLoadingLista] = useState(false);
-  const [mostrarColunas, setMostrarColunas] = useState(false);
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   const [filtros, setFiltros] = useState(DEFAULT_FILTERS);
-  const [ordenacao, setOrdenacao] = useState({
-    sort_by: 'data_prevista_desembolso',
-    sort_dir: 'ASC'
-  });
-  const [colunasVisiveis, setColunasVisiveis] = useState(DEFAULT_VISIBLE_COLUMNS);
+  const [ordenacao, setOrdenacao] = useState(ORDENACAO_PADRAO);
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(DEFAULT_VISIBLE_FILTERS);
 
   useEffect(() => {
@@ -178,10 +185,6 @@ export default function ProvisionamentosFinanceiros() {
     Array.isArray(contexto?.criadores_filtro) ? contexto.criadores_filtro : []
   ), [contexto]);
 
-  const colunasRenderizadas = useMemo(() => (
-    COLUMN_DEFS.filter((coluna) => colunasVisiveis.includes(coluna.id))
-  ), [colunasVisiveis]);
-
   function atualizarFiltro(campo, valor) {
     setMeta((atual) => ({ ...atual, page: 1 }));
     setFiltros((atual) => ({ ...atual, [campo]: valor ?? '' }));
@@ -190,31 +193,6 @@ export default function ProvisionamentosFinanceiros() {
   function limparFiltros() {
     setMeta((atual) => ({ ...atual, page: 1 }));
     setFiltros(DEFAULT_FILTERS);
-  }
-
-  function alternarOrdenacao(sortKey) {
-    if (!sortKey) return;
-    setMeta((atual) => ({ ...atual, page: 1 }));
-    setOrdenacao((atual) => (
-      atual.sort_by === sortKey
-        ? { sort_by: sortKey, sort_dir: atual.sort_dir === 'ASC' ? 'DESC' : 'ASC' }
-        : { sort_by: sortKey, sort_dir: 'ASC' }
-    ));
-  }
-
-  function indicadorOrdenacao(sortKey) {
-    if (ordenacao.sort_by !== sortKey) return '';
-    return ordenacao.sort_dir === 'ASC' ? ' ^' : ' v';
-  }
-
-  function toggleColuna(id) {
-    const obrigatorias = new Set(['codigo', 'acoes']);
-    if (obrigatorias.has(id)) return;
-    setColunasVisiveis((atual) => (
-      atual.includes(id)
-        ? atual.filter((item) => item !== id)
-        : [...atual, id]
-    ));
   }
 
   function toggleFiltro(id) {
@@ -323,41 +301,6 @@ export default function ProvisionamentosFinanceiros() {
     }
   }
 
-  function renderCelula(item, colunaId) {
-    switch (colunaId) {
-      case 'codigo':
-        return <span className="font-mono text-xs font-semibold">{item.codigo}</span>;
-      case 'obra':
-        return formatarObra(item.obra);
-      case 'data_prevista':
-        return formatarData(item.data_prevista_desembolso);
-      case 'categoria':
-        return item.categoriaMacro?.nome || '-';
-      case 'descricao':
-        return item.descricao || '-';
-      case 'fornecedor':
-        return item.fornecedor_texto || '-';
-      case 'valor':
-        return formatarMoedaBRL(item.valor_previsto);
-      case 'status':
-        return formatarStatus(item.status);
-      case 'prioridade':
-        return formatarPrioridade(item.prioridade);
-      case 'acoes':
-        return (
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() => navigate(`/provisoes-financeiras/${item.id}`)}
-          >
-            Detalhes
-          </button>
-        );
-      default:
-        return '-';
-    }
-  }
-
   if (loadingBase) {
     return <div className="page"><p>Carregando modulo...</p></div>;
   }
@@ -393,13 +336,9 @@ export default function ProvisionamentosFinanceiros() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Filtros</h2>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => { setMostrarFiltros((valor) => !valor); setMostrarColunas(false); }}>
+            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => setMostrarFiltros((valor) => !valor)}>
               <HiAdjustmentsHorizontal className="h-4 w-4" />
               Filtros
-            </button>
-            <button type="button" className="btn btn-outline inline-flex items-center gap-2" onClick={() => { setMostrarColunas((valor) => !valor); setMostrarFiltros(false); }}>
-              <HiViewColumns className="h-4 w-4" />
-              Colunas
             </button>
             <button type="button" className="btn btn-outline" onClick={limparFiltros}>
               Limpar
@@ -423,58 +362,114 @@ export default function ProvisionamentosFinanceiros() {
           </div>
         )}
 
-        {mostrarColunas && (
-          <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
-            <div className="flex flex-wrap gap-3">
-              {COLUMN_DEFS.map((item) => (
-                <label key={item.id} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={colunasVisiveis.includes(item.id)}
-                    disabled={Boolean(item.mandatory)}
-                    onChange={() => toggleColuna(item.id)}
-                  />
-                  <span>{item.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="card mx-auto w-full max-w-6xl">
-        {loadingLista ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
-        ) : lista.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Nenhum provisionamento encontrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  {colunasRenderizadas.map((coluna) => (
-                    <th key={coluna.id}>
-                      {coluna.sortKey ? (
-                        <button type="button" className="font-inherit hover:underline" onClick={() => alternarOrdenacao(coluna.sortKey)}>
-                          {coluna.label}{indicadorOrdenacao(coluna.sortKey)}
-                        </button>
-                      ) : coluna.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {lista.map((item) => (
-                  <tr key={item.id}>
-                    {colunasRenderizadas.map((coluna) => (
-                      <td key={coluna.id}>{renderCelula(item, coluna.id)}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'codigo',
+              titulo: 'Codigo',
+              // R17: o codigo NOMEIA a provisao — coluna travada no painel.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              ordenavel: true,
+              valorOrdenacao: (item) => String(item.codigo || ''),
+              render: (item) => <span className="font-semibold">{item.codigo}</span>
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              ordenavel: true,
+              valorOrdenacao: (item) => formatarObra(item.obra),
+              render: (item) => formatarObra(item.obra)
+            },
+            {
+              id: 'data_prevista',
+              titulo: 'Data prevista',
+              tipo: 'data',
+              ordenavel: true,
+              // Ordena pela data ISO crua (AAAA-MM-DD ordena como texto);
+              // o dd/mm/aaaa exibido ordenaria pelo dia.
+              valorOrdenacao: (item) => item.data_prevista_desembolso || '',
+              render: (item) => formatarData(item.data_prevista_desembolso)
+            },
+            {
+              id: 'categoria',
+              titulo: 'Item macro',
+              tipo: 'texto',
+              ordenavel: true,
+              valorOrdenacao: (item) => item.categoriaMacro?.nome || '',
+              render: (item) => item.categoriaMacro?.nome || '-'
+            },
+            {
+              id: 'descricao',
+              titulo: 'Descricao',
+              tipo: 'texto',
+              ordenavel: true,
+              valorOrdenacao: (item) => item.descricao || '',
+              render: (item) => item.descricao || '-'
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Credor',
+              tipo: 'texto',
+              ordenavel: true,
+              valorOrdenacao: (item) => item.fornecedor_texto || '',
+              render: (item) => item.fornecedor_texto || '-'
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor previsto',
+              tipo: 'valor',
+              ordenavel: true,
+              // Dinheiro interessa do MAIOR para o menor no primeiro clique.
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.valor_previsto || 0),
+              render: (item) => formatarMoedaBRL(item.valor_previsto)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => formatarStatus(item.status)
+            },
+            {
+              id: 'prioridade',
+              titulo: 'Prioridade',
+              tipo: 'status',
+              render: (item) => formatarPrioridade(item.prioridade)
+            }
+          ]}
+          itens={lista}
+          getId={(item) => item.id}
+          carregando={loadingLista}
+          vazio="Nenhum provisionamento encontrado."
+          colunasConfiguraveis
+          // Ordenação NO SERVIDOR (lista paginada): a tabela avisa, a tela
+          // reconsulta e volta à página 1 — ordenar mantendo a página 7
+          // mostraria um recorte sem sentido.
+          aoOrdenar={(coluna, direcao) => {
+            const campo = coluna ? CAMPO_ORDENACAO_POR_COLUNA[coluna] : null;
+            setOrdenacao(campo
+              ? { sort_by: campo, sort_dir: direcao === 'desc' ? 'DESC' : 'ASC' }
+              : ORDENACAO_PADRAO);
+            setMeta((atual) => ({ ...atual, page: 1 }));
+          }}
+          storageKey={STORAGE_KEY}
+          rotuloRolagem="Provisionamentos financeiros"
+          larguraAcoes={140}
+          acoesLinha={(item) => (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => navigate(`/provisoes-financeiras/${item.id}`)}
+            >
+              Detalhes
+            </button>
+          )}
+        />
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm">
           <span className="text-[var(--c-muted)]">

@@ -26,6 +26,7 @@ import {
 } from '../services/financeiro';
 import { buscarParceiros } from '../services/parceiros';
 import { getMinhasObras } from '../services/obras';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermissao } from '../utils/acessoProduto';
@@ -212,17 +213,6 @@ function PlusIcon({ className = 'h-4 w-4' }) {
   );
 }
 
-function LinkIcon({ className = 'h-4 w-4' }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className={className} aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1" />
-      <path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1" />
-    </svg>
-  );
-}
-
-// ─── ValorBanco ───────────────────────────────────────────────────────────────
-
 function ValorBanco({ value, size = 'lg' }) {
   const positive = Number(value || 0) >= 0;
   const sizeClass = size === 'xl' ? 'text-2xl font-bold tabular-nums' : size === 'sm' ? 'text-sm font-semibold' : 'text-lg font-semibold';
@@ -369,137 +359,182 @@ function AssociacaoManualTabela({
   selecionados = [],
   totalSelecionado = 0,
   valorEsperado = 0,
-  onToggleSelecionado
+  onToggleSelecionado,
+  onMarcarTodos
 }) {
-  if (loading) {
-    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando movimentos...</div>;
-  }
+  const idDe = (it) => Number(it.movimento_financeiro_id || 0);
 
-  if (!itens.length) {
-    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum movimento encontrado com os filtros atuais.</div>;
-  }
+  // Mesma chave de processamento de antes: sem selecao, a chave usa o id da
+  // propria linha; com selecao, a lista inteira.
+  const processandoLinha = (it) => {
+    const chave = `confirmar-${modal.item?.id}-${selecionados.join('-') || idDe(it)}`;
+    return Boolean(modal.processing) || processingId === chave;
+  };
+
+  // Selecao CRUZADA: o movimento so pode entrar se a soma continuar dentro do
+  // valor do lancamento do extrato (a mesma trava do checkbox anterior).
+  const ultrapassa = (it) => {
+    const selecionado = selecionados.includes(idDe(it));
+    const valor = Math.abs(Number(it.valor_quitacao || 0));
+    return !selecionado && totalSelecionado + valor > valorEsperado + 0.01;
+  };
 
   return (
-    <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
-      <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.12em] text-[var(--c-muted)]">
-        <tr>
-          <th className="px-4 py-3 text-left">Sel.</th>
-          <th className="px-4 py-3 text-left">Titulo</th>
-          <th className="px-4 py-3 text-left">Parceiro</th>
-          <th className="px-4 py-3 text-left">Tipo</th>
-          <th className="px-4 py-3 text-left">Data</th>
-          <th className="px-4 py-3 text-right">Valor</th>
-          <th className="px-4 py-3 text-left">Documento</th>
-          <th className="px-4 py-3 text-center">Score</th>
-          <th className="px-4 py-3 text-center">Acao</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-[var(--c-border)] bg-white dark:bg-[var(--c-surface)]">
-        {itens.map((it) => {
-          const id = Number(it.movimento_financeiro_id || 0);
-          const selected = selecionados.includes(id);
-          const valor = Math.abs(Number(it.valor_quitacao || 0));
-          const ultrapassa = !selected && totalSelecionado + valor > valorEsperado + 0.01;
-          const processingKey = `confirmar-${modal.item?.id}-${selecionados.join('-') || id}`;
-          const processing = modal.processing || processingId === processingKey;
-          return (
-            <tr key={it.movimento_financeiro_id} className={`align-top ${selected ? 'bg-blue-50/60 dark:bg-blue-900/10' : ''}`}>
-              <td className="px-4 py-3">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-[var(--c-border)] text-blue-600"
-                  checked={selected}
-                  disabled={processing || ultrapassa}
-                  title={ultrapassa ? 'Selecionar este movimento ultrapassa o valor do extrato.' : 'Selecionar movimento'}
-                  onChange={() => onToggleSelecionado(id)}
-                />
-              </td>
-              <td className="px-4 py-3 font-medium text-[var(--c-text)]">
-                <div>{it.titulo_descricao || '-'}</div>
-                {it.motivos?.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {it.motivos.map((m) => (
-                      <span key={`${it.movimento_financeiro_id}-${m}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-normal text-slate-600">{m}</span>
-                    ))}
-                  </div>
-                )}
-              </td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{it.parceiro_nome || '-'}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{it.tipo || '-'}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(it.data_movimento)}</td>
-              <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(it.valor_quitacao)}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{it.documento || `mov. #${it.movimento_financeiro_id}`}</td>
-              <td className="px-4 py-3 text-center text-xs uppercase tracking-wide text-[var(--c-muted)]">{it.score || 0}</td>
-              <td className="px-4 py-3 text-center">
-                <button
-                  type="button"
-                  className={`inline-flex h-9 w-9 items-center justify-center rounded-xl border transition ${
-                    selected
-                      ? 'border-blue-500 bg-blue-600 text-white'
-                      : 'border-[var(--c-border)] bg-white text-[var(--c-text)] hover:border-blue-400 hover:text-blue-700'
-                  } disabled:cursor-not-allowed disabled:opacity-40`}
-                  disabled={processing || ultrapassa}
-                  title={selected ? 'Remover da associacao' : ultrapassa ? 'Ultrapassa o valor do extrato' : 'Selecionar para associar'}
-                  aria-label={selected ? 'Remover da associacao' : 'Selecionar para associar'}
-                  onClick={() => onToggleSelecionado(id)}
-                >
-                  <LinkIcon className="h-4 w-4" />
-                </button>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <TabelaPadrao
+      colunas={[
+        {
+          id: 'titulo',
+          titulo: 'Titulo',
+          // R17: a descricao do titulo e quem nomeia o movimento.
+          tipo: 'identidade',
+          noCard: 'titulo',
+          render: (it) => (
+            <div className="min-w-0">
+              <div>{it.titulo_descricao || '-'}</div>
+              {it.motivos?.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {it.motivos.map((m) => (
+                    <span key={`${it.movimento_financeiro_id}-${m}`} className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-normal text-slate-600">{m}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        },
+        {
+          id: 'parceiro',
+          titulo: 'Parceiro',
+          tipo: 'texto',
+          render: (it) => it.parceiro_nome || '-'
+        },
+        {
+          id: 'tipo',
+          titulo: 'Tipo',
+          tipo: 'badge',
+          render: (it) => it.tipo || '-'
+        },
+        {
+          id: 'data_movimento',
+          titulo: 'Data',
+          tipo: 'data',
+          render: (it) => formatDate(it.data_movimento)
+        },
+        {
+          id: 'valor_quitacao',
+          titulo: 'Valor',
+          tipo: 'valor',
+          render: (it) => <strong>{formatCurrency(it.valor_quitacao)}</strong>
+        },
+        {
+          id: 'documento',
+          titulo: 'Documento',
+          tipo: 'codigo',
+          render: (it) => it.documento || `mov. #${it.movimento_financeiro_id}`
+        },
+        {
+          id: 'score',
+          titulo: 'Score',
+          tipo: 'numero',
+          ordenavel: true,
+          ordemInicial: 'desc',
+          valorOrdenacao: (it) => Number(it.score || 0),
+          render: (it) => it.score || 0
+        }
+      ]}
+      itens={itens}
+      getId={idDe}
+      carregando={loading}
+      vazio="Nenhum movimento encontrado com os filtros atuais."
+      storageKey="tabela:financeiro-conciliacao:associacao-manual"
+      rotuloRolagem="Movimentos para associar ao lancamento bancario"
+      selecao={{
+        selecionados,
+        aoAlternar: (id) => onToggleSelecionado(id),
+        // "Todos" nao pode ser literal aqui: marca, em ordem, o que ainda
+        // cabe no valor do extrato (a soma nunca pode ultrapassar).
+        aoAlternarTodos: (marcar) => onMarcarTodos(marcar),
+        elegivel: (it) => !processandoLinha(it) && !ultrapassa(it)
+      }}
+    />
   );
 }
 
 function FaturasAssociacaoTabela({ loading, itens, modal, processingId, onAssociar }) {
-  if (loading) {
-    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando faturas...</div>;
-  }
-
-  if (!itens.length) {
-    return <div className="px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhuma fatura encontrada com os filtros atuais.</div>;
-  }
-
   return (
-    <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
-      <thead className="bg-[var(--c-surface-muted)] text-xs uppercase tracking-[0.12em] text-[var(--c-muted)]">
-        <tr>
-          <th className="px-4 py-3 text-left">Cartao</th>
-          <th className="px-4 py-3 text-left">Competencia</th>
-          <th className="px-4 py-3 text-left">Fechamento</th>
-          <th className="px-4 py-3 text-left">Vencimento</th>
-          <th className="px-4 py-3 text-center">Titulos</th>
-          <th className="px-4 py-3 text-right">Valor</th>
-          <th className="px-4 py-3 text-center">Status</th>
-          <th className="px-4 py-3 text-right">Acao</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-[var(--c-border)] bg-white dark:bg-[var(--c-surface)]">
-        {itens.map((fatura) => {
-          const processingKey = `fatura-${modal.item?.id}-${fatura.id}`;
-          const processing = modal.processing || processingId === processingKey;
-          return (
-            <tr key={fatura.id} className="align-middle">
-              <td className="px-4 py-3 font-medium text-[var(--c-text)]">{fatura.cartao?.nome || 'Cartao'}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{fatura.competencia || '-'}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(fatura.data_fechamento)}</td>
-              <td className="px-4 py-3 text-[var(--c-muted)]">{formatDate(fatura.data_vencimento)}</td>
-              <td className="px-4 py-3 text-center text-[var(--c-muted)]">{fatura.total_titulos || 0}</td>
-              <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(fatura.valor_total)}</td>
-              <td className="px-4 py-3 text-center"><span className={statusClass(fatura.status)}>{fatura.status}</span></td>
-              <td className="px-4 py-3 text-right">
-                <button type="button" className="btn btn-primary btn-sm" disabled={processing} onClick={() => onAssociar(modal.item?.id, fatura.id)}>
-                  {processing ? 'Associando...' : 'Associar'}
-                </button>
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <TabelaPadrao
+      colunas={[
+        {
+          id: 'cartao',
+          titulo: 'Cartao',
+          // R17: o cartao e quem nomeia a fatura na lista.
+          tipo: 'identidade',
+          noCard: 'titulo',
+          render: (fatura) => (
+            <CelulaDupla
+              principal={fatura.cartao?.nome || 'Cartao'}
+              sub={fatura.competencia ? `Competencia ${fatura.competencia}` : null}
+            />
+          )
+        },
+        {
+          id: 'competencia',
+          titulo: 'Competencia',
+          tipo: 'texto',
+          render: (fatura) => fatura.competencia || '-'
+        },
+        {
+          id: 'data_fechamento',
+          titulo: 'Fechamento',
+          tipo: 'data',
+          render: (fatura) => formatDate(fatura.data_fechamento)
+        },
+        {
+          id: 'data_vencimento',
+          titulo: 'Vencimento',
+          tipo: 'data',
+          render: (fatura) => formatDate(fatura.data_vencimento)
+        },
+        {
+          id: 'total_titulos',
+          titulo: 'Titulos',
+          tipo: 'numero',
+          render: (fatura) => fatura.total_titulos || 0
+        },
+        {
+          id: 'valor_total',
+          titulo: 'Valor',
+          tipo: 'valor',
+          render: (fatura) => <strong>{formatCurrency(fatura.valor_total)}</strong>
+        },
+        {
+          id: 'status',
+          titulo: 'Status',
+          tipo: 'status',
+          render: (fatura) => <span className={statusClass(fatura.status)}>{fatura.status}</span>
+        }
+      ]}
+      itens={itens}
+      getId={(fatura) => fatura.id}
+      carregando={loading}
+      vazio="Nenhuma fatura encontrada com os filtros atuais."
+      storageKey="tabela:financeiro-conciliacao:faturas"
+      rotuloRolagem="Faturas de cartao para associar"
+      larguraAcoes={160}
+      acoesLinha={(fatura) => {
+        const processing = Boolean(modal.processing)
+          || processingId === `fatura-${modal.item?.id}-${fatura.id}`;
+        return (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            disabled={processing}
+            onClick={() => onAssociar(modal.item?.id, fatura.id)}
+          >
+            {processing ? 'Associando...' : 'Associar'}
+          </button>
+        );
+      }}
+    />
   );
 }
 
@@ -2066,6 +2101,29 @@ export default function FinanceiroConciliacao() {
     await carregarMovimentosAssociacao(associacaoModal.item.id, associacaoModal.filters);
   }
 
+  // A TabelaPadrao sempre oferece "selecionar todos" quando ha selecao em
+  // lote — e aqui "todos" nao pode ser literal: a soma dos movimentos nao
+  // pode ultrapassar o valor do lancamento do extrato. Marca-se, na ordem da
+  // lista, tudo o que ainda couber; desmarcar limpa a selecao inteira.
+  function marcarTodosMovimentosAssociacaoManual(marcar) {
+    setAssociacaoModal((current) => {
+      if (!marcar) return { ...current, error: '', selecionados: [] };
+      const itens = Array.isArray(current.dados?.itens) ? current.dados.itens : [];
+      const valorEsperado = Math.abs(Number(current.item?.valor || 0));
+      let total = 0;
+      const escolhidos = [];
+      itens.forEach((item) => {
+        const id = Number(item.movimento_financeiro_id || 0);
+        if (!id) return;
+        const proximo = total + valorAbsolutoMovimentoAssociacao(item);
+        if (proximo > valorEsperado + 0.01) return;
+        total = proximo;
+        escolhidos.push(id);
+      });
+      return { ...current, error: '', selecionados: escolhidos };
+    });
+  }
+
   function toggleMovimentoAssociacaoManual(movimentoId) {
     const id = Number(movimentoId || 0);
     if (!id) return;
@@ -3101,7 +3159,7 @@ export default function FinanceiroConciliacao() {
             <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-2 text-sm text-[var(--c-muted)]">
               {associacaoModal.dados.meta.total} movimento(s) encontrado(s)
             </div>
-            <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--c-border)]">
+            <div className="mt-3">
               <AssociacaoManualTabela
                 loading={associacaoModal.loading}
                 itens={associacaoModal.dados.itens}
@@ -3111,6 +3169,7 @@ export default function FinanceiroConciliacao() {
                 totalSelecionado={associacaoResumo.totalSelecionado}
                 valorEsperado={associacaoResumo.valorEsperado}
                 onToggleSelecionado={toggleMovimentoAssociacaoManual}
+                onMarcarTodos={marcarTodosMovimentosAssociacaoManual}
               />
             </div>
             <div className="mt-3 flex flex-col gap-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-3 md:flex-row md:items-center md:justify-between">
@@ -3241,7 +3300,7 @@ export default function FinanceiroConciliacao() {
             <div className="mt-3 rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] px-4 py-2 text-sm text-[var(--c-muted)]">
               {faturaModal.dados.meta.total} fatura(s) encontrada(s)
             </div>
-            <div className="mt-3 overflow-x-auto rounded-xl border border-[var(--c-border)]">
+            <div className="mt-3">
               <FaturasAssociacaoTabela
                 loading={faturaModal.loading}
                 itens={faturaModal.dados.itens}

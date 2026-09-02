@@ -10,6 +10,7 @@ import {
   HiOutlineXMark
 } from 'react-icons/hi2';
 import PessoaChequeAutocomplete from '../components/financeiro/PessoaChequeAutocomplete';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import {
   baixarModeloChequesTerceiros,
@@ -56,7 +57,7 @@ function dateBr(value) {
 function Modal({ title, subtitle, children, onClose, wide = false }) {
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm" role="dialog" aria-modal="true">
-      <section className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-[var(--modal-border)] bg-[var(--modal-bg)] shadow-2xl ${wide ? 'max-w-6xl' : 'max-w-2xl'}`}>
+      <section className={`flex max-h-[92vh] w-full flex-col overflow-clip rounded-2xl border border-[var(--modal-border)] bg-[var(--modal-bg)] shadow-2xl ${wide ? 'max-w-6xl' : 'max-w-2xl'}`}>
         <header className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] px-5 py-4">
           <div><h2 className="text-lg font-semibold text-[var(--c-text)]">{title}</h2>{subtitle ? <p className="mt-1 text-sm text-[var(--c-muted)]">{subtitle}</p> : null}</div>
           <button type="button" className="btn btn-outline btn-sm" onClick={onClose} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button>
@@ -117,6 +118,12 @@ export default function FinanceiroChequesTerceiros() {
   useEffect(() => { const timer = setTimeout(load, 250); return () => clearTimeout(timer); }, [filters.q, filters.empresa_id, filters.status]);
 
   const totalCarteira = Number(data?.totais?.EM_CARTEIRA || 0);
+  // O preview de importação é editado por POSIÇÃO na lista; a tabela precisa
+  // de um id estável por linha, então o índice viaja junto do registro.
+  const linhasImportacao = useMemo(
+    () => importRows.map((row, indice) => ({ ...row, __indice: indice })),
+    [importRows]
+  );
   const contasEmpresaAcao = useMemo(() => contas.filter((item) => Number(item.empresa_id) === Number(selected?.empresa_id)), [contas, selected]);
 
   async function submitCreate(event) {
@@ -206,14 +213,83 @@ export default function FinanceiroChequesTerceiros() {
         </div>
       </section>
 
-      <section className="card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="table min-w-[980px]">
-            <thead><tr><th>Código / cheque</th><th>Empresa</th><th>Titular</th><th>Banco</th><th>Vencimento</th><th className="text-right">Valor</th><th>Status</th><th className="w-20">Ação</th></tr></thead>
-            <tbody>{(data.cheques || []).map((item) => <tr key={item.id}><td><strong>{item.codigo}</strong><small className="block text-[var(--c-muted)]">Nº {item.numero_cheque || '-'}</small></td><td>{item.empresa?.nome || '-'}</td><td>{item.titular_nome || '-'}<small className="block text-[var(--c-muted)]">{item.titular_documento ? maskCpfCnpj(item.titular_documento) : (item.cliente_nome || '')}</small></td><td>{item.banco || '-'}<small className="block text-[var(--c-muted)]">{[item.agencia, item.conta].filter(Boolean).join(' / ')}</small></td><td>{dateBr(item.data_vencimento)}</td><td className="text-right font-semibold">{money(item.valor)}</td><td><StatusBadge status={item.status} /></td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(item.id)} title="Ver histórico"><HiOutlineEye className="h-4 w-4" /></button></td></tr>)}</tbody>
-          </table>
-        </div>
-        {!loading && !(data.cheques || []).length ? <div className="p-8 text-center text-sm text-[var(--c-muted)]">Nenhum cheque encontrado para os filtros.</div> : null}
+      <section className="card overflow-clip">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'codigo',
+              titulo: 'Código / cheque',
+              // R17: o CÓDIGO do documento é o que nomeia o cheque na carteira.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <CelulaDupla principal={item.codigo} sub={`Nº ${item.numero_cheque || '-'}`} />
+              )
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'texto',
+              render: (item) => item.empresa?.nome || '-'
+            },
+            {
+              id: 'titular',
+              titulo: 'Titular',
+              tipo: 'texto',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.titular_nome || '-'}
+                  sub={item.titular_documento ? maskCpfCnpj(item.titular_documento) : (item.cliente_nome || '')}
+                />
+              )
+            },
+            {
+              id: 'banco',
+              titulo: 'Banco',
+              tipo: 'texto',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.banco || '-'}
+                  sub={[item.agencia, item.conta].filter(Boolean).join(' / ')}
+                />
+              )
+            },
+            {
+              id: 'vencimento',
+              titulo: 'Vencimento',
+              tipo: 'data',
+              ordenavel: true,
+              valorOrdenacao: (item) => String(item.data_vencimento || ''),
+              render: (item) => dateBr(item.data_vencimento)
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              ordenavel: true,
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.valor || 0),
+              render: (item) => money(item.valor)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => <StatusBadge status={item.status} />
+            }
+          ]}
+          itens={data.cheques || []}
+          storageKey="tabela:financeiro-cheques-terceiros:carteira"
+          rotuloRolagem="Carteira de cheques de terceiros"
+          carregando={loading}
+          vazio="Nenhum cheque encontrado para os filtros."
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => openDetail(item.id)} title="Ver histórico">
+              <HiOutlineEye className="h-4 w-4" />
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </section>
 
       {createOpen ? (
@@ -325,7 +401,194 @@ export default function FinanceiroChequesTerceiros() {
         </Modal>
       ) : null}
 
-      {importOpen ? <Modal wide title="Importar cheques" subtitle="Revise as linhas antes de confirmar. A operação é atômica e auditada." onClose={() => { setImportOpen(false); setImportRows([]); }}><div className="mb-4 flex flex-wrap gap-2"><button type="button" className="btn btn-outline" onClick={downloadModel}><HiOutlineArrowDownTray className="h-4 w-4" /> Baixar modelo</button><label className="btn btn-primary cursor-pointer"><HiOutlineArrowUpTray className="h-4 w-4" /> Selecionar XLSX<input type="file" className="hidden" accept=".xlsx" onChange={(e) => importFile(e.target.files?.[0])} /></label><button type="button" className="btn btn-outline" onClick={() => setImportRows((rows) => [...rows, { linha: `Nova ${rows.length + 1}`, empresa_id: empresas[0]?.id || '', empresa_codigo: empresas[0]?.codigo || '', numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '', conta: '', valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10), motivo_origem: 'Saldo inicial sem lastro de obra identificado', erros: [], valido: true }])}><HiOutlinePlus /> Adicionar linha</button></div>{importRows.length ? <><div className="max-h-[52vh] overflow-auto rounded-xl border border-[var(--c-border)]"><table className="table min-w-[1200px]"><thead><tr><th>Linha</th><th>Empresa</th><th>Número</th><th>Titular</th><th>Banco</th><th>Valor</th><th>Vencimento</th><th>Validação</th><th /></tr></thead><tbody>{importRows.map((row, index) => <tr key={`${row.linha}-${index}`}><td>{row.linha}</td><td><select className="select select-sm min-w-44" value={row.empresa_id || ''} onChange={(e) => { const empresa = empresas.find((item) => Number(item.id) === Number(e.target.value)); setImportRows((rows) => rows.map((item, i) => i === index ? { ...item, empresa_id: empresa?.id || '', empresa_codigo: empresa?.codigo || '', erros: [], valido: true } : item)); }}><option value="">Selecione</option>{empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}</select></td><td><input className="input input-sm min-w-32" value={row.numero_cheque || ''} onChange={(e) => updateImportRow(index, 'numero_cheque', e.target.value)} /></td><td><input className="input input-sm min-w-48" value={row.titular_nome || ''} onChange={(e) => updateImportRow(index, 'titular_nome', e.target.value)} /></td><td><input className="input input-sm min-w-32" value={row.banco || ''} onChange={(e) => updateImportRow(index, 'banco', e.target.value)} /></td><td><input className="input input-sm w-28" type="number" step="0.01" value={row.valor || ''} onChange={(e) => updateImportRow(index, 'valor', e.target.value)} /></td><td><input className="input input-sm" type="date" value={row.data_vencimento || ''} onChange={(e) => updateImportRow(index, 'data_vencimento', e.target.value)} /></td><td className={row.valido ? 'text-emerald-700' : 'text-rose-700'}>{row.valido ? 'Válida' : (row.erros || []).join(' ')}</td><td><button type="button" className="btn btn-outline btn-sm" onClick={() => setImportRows((rows) => rows.filter((_, i) => i !== index))}><HiOutlineXMark /></button></td></tr>)}</tbody></table></div><div className="mt-4 flex items-center justify-between"><span className="text-sm text-[var(--c-muted)]">{importRows.length} cheque(s) no lote</span><button type="button" className="btn btn-primary" disabled={saving || importRows.some((row) => !row.valido)} onClick={confirmImport}>Confirmar importação</button></div></> : <div className="rounded-xl border border-dashed border-[var(--c-border)] p-8 text-center text-sm text-[var(--c-muted)]">Baixe o modelo, preencha e selecione o arquivo para gerar o preview.</div>}</Modal> : null}
+      {importOpen ? (
+        <Modal
+          wide
+          title="Importar cheques"
+          subtitle="Revise as linhas antes de confirmar. A operação é atômica e auditada."
+          onClose={() => { setImportOpen(false); setImportRows([]); }}
+        >
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button type="button" className="btn btn-outline" onClick={downloadModel}>
+              <HiOutlineArrowDownTray className="h-4 w-4" /> Baixar modelo
+            </button>
+            <label className="btn btn-primary cursor-pointer">
+              <HiOutlineArrowUpTray className="h-4 w-4" /> Selecionar XLSX
+              <input type="file" className="hidden" accept=".xlsx" onChange={(e) => importFile(e.target.files?.[0])} />
+            </label>
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => setImportRows((rows) => [...rows, {
+                linha: `Nova ${rows.length + 1}`,
+                empresa_id: empresas[0]?.id || '',
+                empresa_codigo: empresas[0]?.codigo || '',
+                numero_cheque: '', titular_nome: '', titular_documento: '', banco: '', agencia: '', conta: '',
+                valor: '', data_vencimento: '', data_entrada: new Date().toISOString().slice(0, 10),
+                motivo_origem: 'Saldo inicial sem lastro de obra identificado',
+                erros: [], valido: true
+              }])}
+            >
+              <HiOutlinePlus /> Adicionar linha
+            </button>
+          </div>
+          {importRows.length ? (
+            <>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'linha',
+                    titulo: 'Linha',
+                    // R17: no preview de importação quem nomeia o registro é a
+                    // LINHA da planilha (é por ela que o erro é encontrado no
+                    // arquivo original).
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (row) => row.linha
+                  },
+                  {
+                    id: 'empresa',
+                    titulo: 'Empresa',
+                    tipo: 'texto',
+                    // Edição inline: o controle mora no render da coluna.
+                    render: (row) => (
+                      <select
+                        className="select select-sm"
+                        aria-label={`Empresa da linha ${row.linha}`}
+                        value={row.empresa_id || ''}
+                        onChange={(e) => {
+                          const empresa = empresas.find((item) => Number(item.id) === Number(e.target.value));
+                          setImportRows((rows) => rows.map((item, i) => (i === row.__indice ? {
+                            ...item,
+                            empresa_id: empresa?.id || '',
+                            empresa_codigo: empresa?.codigo || '',
+                            erros: [],
+                            valido: true
+                          } : item)));
+                        }}
+                      >
+                        <option value="">Selecione</option>
+                        {empresas.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
+                      </select>
+                    )
+                  },
+                  {
+                    id: 'numero_cheque',
+                    titulo: 'Número',
+                    tipo: 'codigo',
+                    render: (row) => (
+                      <input
+                        className="input input-sm"
+                        aria-label={`Número do cheque da linha ${row.linha}`}
+                        value={row.numero_cheque || ''}
+                        onChange={(e) => updateImportRow(row.__indice, 'numero_cheque', e.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'titular_nome',
+                    titulo: 'Titular',
+                    tipo: 'texto',
+                    render: (row) => (
+                      <input
+                        className="input input-sm"
+                        aria-label={`Titular da linha ${row.linha}`}
+                        value={row.titular_nome || ''}
+                        onChange={(e) => updateImportRow(row.__indice, 'titular_nome', e.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'banco',
+                    titulo: 'Banco',
+                    tipo: 'texto',
+                    render: (row) => (
+                      <input
+                        className="input input-sm"
+                        aria-label={`Banco da linha ${row.linha}`}
+                        value={row.banco || ''}
+                        onChange={(e) => updateImportRow(row.__indice, 'banco', e.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (row) => (
+                      <input
+                        className="input input-sm"
+                        type="number"
+                        step="0.01"
+                        aria-label={`Valor da linha ${row.linha}`}
+                        value={row.valor || ''}
+                        onChange={(e) => updateImportRow(row.__indice, 'valor', e.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'data_vencimento',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: (row) => (
+                      <input
+                        className="input input-sm"
+                        type="date"
+                        aria-label={`Vencimento da linha ${row.linha}`}
+                        value={row.data_vencimento || ''}
+                        onChange={(e) => updateImportRow(row.__indice, 'data_vencimento', e.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'validacao',
+                    titulo: 'Validação',
+                    tipo: 'status',
+                    render: (row) => (
+                      <span className={row.valido ? 'text-emerald-700' : 'text-rose-700'}>
+                        {row.valido ? 'Válida' : (row.erros || []).join(' ')}
+                      </span>
+                    )
+                  }
+                ]}
+                itens={linhasImportacao}
+                getId={(row) => row.__indice}
+                storageKey="tabela:financeiro-cheques-terceiros:importacao"
+                rotuloRolagem="Linhas do lote de importação"
+                urgencia={(row) => (row.valido ? null : 'danger')}
+                vazio="Nenhuma linha no lote."
+                acoesLinha={(row) => (
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    title="Remover linha"
+                    aria-label={`Remover linha ${row.linha}`}
+                    onClick={() => setImportRows((rows) => rows.filter((_, i) => i !== row.__indice))}
+                  >
+                    <HiOutlineXMark />
+                  </button>
+                )}
+                larguraAcoes={120}
+              />
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-sm text-[var(--c-muted)]">{importRows.length} cheque(s) no lote</span>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={saving || importRows.some((row) => !row.valido)}
+                  onClick={confirmImport}
+                >
+                  Confirmar importação
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-xl border border-dashed border-[var(--c-border)] p-8 text-center text-sm text-[var(--c-muted)]">
+              Baixe o modelo, preencha e selecione o arquivo para gerar o preview.
+            </div>
+          )}
+        </Modal>
+      ) : null}
 
       {selected && !action ? <Modal title={`${selected.codigo} · cheque ${selected.numero_cheque}`} subtitle={`${selected.empresa?.nome || '-'} · ${money(selected.valor)}`} onClose={() => setSelected(null)}><div className="grid gap-3 sm:grid-cols-4"><div><small className="text-[var(--c-muted)]">Status</small><div className="mt-1"><StatusBadge status={selected.status} /></div></div><div><small className="text-[var(--c-muted)]">Titular</small><strong className="block">{selected.titularParceiro?.nome || selected.titular_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Cliente/origem</small><strong className="block">{selected.parceiroEntregou?.nome || selected.cliente_nome || '-'}</strong></div><div><small className="text-[var(--c-muted)]">Vencimento</small><strong className="block">{dateBr(selected.data_vencimento)}</strong></div></div>{selected.status === 'EM_CARTEIRA' ? <div className="mt-5 flex flex-wrap gap-2">{canDeposit ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEPOSITAR')}><HiOutlineBanknotes /> Depositar</button> : null}{canTransfer ? <button className="btn btn-outline btn-sm" onClick={() => setAction('TRANSFERIR')}><HiOutlineArrowRight /> Transferir</button> : null}{canReturn ? <button className="btn btn-outline btn-sm" onClick={() => setAction('DEVOLVER')}>Devolver</button> : null}{canCancel ? <button className="btn btn-outline btn-sm text-rose-700" onClick={() => setAction('CANCELAR')}>Cancelar</button> : null}</div> : null}<h3 className="mt-6 font-semibold">Histórico</h3><div className="mt-2 space-y-2">{(selected.historico || []).map((item) => <div key={item.id} className="rounded-xl border border-[var(--c-border)] p-3 text-sm"><div className="flex justify-between gap-3"><strong>{item.tipo_evento}</strong><span>{dateBr(item.data_evento)}</span></div><p className="mt-1 text-[var(--c-muted)]">{item.observacoes || `${item.status_anterior || '-'} → ${item.status_novo}`}</p></div>)}</div></Modal> : null}
 

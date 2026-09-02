@@ -12,6 +12,7 @@ import {
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi2';
+import { CelulaDupla, TabelaPadrao } from '../../../components/padrao';
 import CrPlanningImportModal from './CrPlanningImportModal';
 import { COMPETENCIA_ESTADO_LABELS } from '../constants/custosRecebiveis';
 import {
@@ -774,127 +775,74 @@ export default function CrPlanejamentoView({
     return measurements.filter((item) => item.etapa_macro_codigo === macroCode);
   }
 
-  function renderCostMacro(macro, macroIndex) {
-    const rows = costsForMacro(macro.codigo);
+  /* AGRUPAMENTO MACRO → SUBITENS (capacidade `agruparPor` da TabelaPadrao).
+     Antes cada etapa macro era uma tabela propria dentro de um <article>; agora
+     é UMA tabela por bloco, com a etapa virando linha de grupo. A etapa SEM
+     nenhum subitem precisa continuar aparecendo — é no cabecalho dela que mora
+     o "Adicionar subitem" —, entao entra na lista com uma linha-marcador. */
+  function linhasPorMacro(porMacro) {
+    return (data?.macros || []).flatMap((macro) => {
+      const linhas = porMacro(macro.codigo);
+      return linhas.length ? linhas : [{ __vazio: true, etapa_macro_codigo: macro.codigo }];
+    });
+  }
+
+  function idDaLinha(item) {
+    return item.__vazio ? `vazio:${item.etapa_macro_codigo}` : planningRowKey(item);
+  }
+
+  function chaveDoMacro(item) {
+    return item.etapa_macro_codigo || 'SEM_MACRO';
+  }
+
+  function macroDoGrupo(codigo) {
+    const lista = data?.macros || [];
+    const indice = lista.findIndex((item) => item.codigo === codigo);
+    return { macro: lista[indice] || { codigo }, indice };
+  }
+
+  function renderCostMacroHeading(codigo, itensDoGrupo) {
+    const { macro, indice } = macroDoGrupo(codigo);
+    const rows = itensDoGrupo.filter((item) => !item.__vazio);
     const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
     return (
-      <article key={macro.codigo} className="cr-macro-planning-block">
-        <header className="cr-macro-planning-heading">
+      <div className="cr-macro-planning-heading">
+        <div>
+          <b>{indice + 1}</b>
           <div>
-            <b>{macroIndex + 1}</b>
-            <div>
-              <strong>{macro.codigo} · {macro.descricao}</strong>
-              <span>Orçado na macro: {currency.format(macro.valor_orcado || 0)}</span>
-            </div>
+            <strong>{macro.codigo} · {macro.descricao}</strong>
+            <span>
+              Orçado na macro: {currency.format(macro.valor_orcado || 0)} · Total da etapa: {currency.format(total)}
+            </span>
           </div>
-          {!readonly && permissions.costs ? (
-            <button type="button" className="btn btn-outline" onClick={() => addCost(macro)}>
-              <HiOutlinePlus className="h-4 w-4" />
-              Adicionar subitem
-            </button>
-          ) : null}
-        </header>
-        <div className="cr-table-shell cr-planning-table cr-macro-subitems-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Descrição do serviço</th>
-                <th>Unidade</th>
-                <th>Quantidade</th>
-                <th>Valor unitário</th>
-                <th>Valor total</th>
-                <th aria-label="Ações" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((item) => {
-                const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
-                const rowError = costErrors.find((entry) => entry.index === index);
-                return (
-                  <tr key={planningRowKey(item)} data-invalid={rowError ? 'true' : undefined}>
-                    <td>
-                      <input
-                        value={item.descricao || ''}
-                        placeholder="Descreva o serviço planejado"
-                        maxLength="500"
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'descricao', event.target.value)}
-                      />
-                      {rowError ? <small>{rowError.messages.join(' · ')}</small> : null}
-                    </td>
-                    <td>
-                      <input
-                        value={item.unidade || ''}
-                        placeholder="un, m², mês..."
-                        maxLength="30"
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'unidade', event.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        value={item.quantidade}
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'quantidade', event.target.value)}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        value={item.custo_unitario}
-                        disabled={readonly || !permissions.costs}
-                        onChange={(event) => updateCost(index, 'custo_unitario', event.target.value)}
-                      />
-                    </td>
-                    <td><strong>{currency.format(item.valor_previsto || 0)}</strong></td>
-                    <td>
-                      {!readonly && permissions.costs ? (
-                        <button
-                          type="button"
-                          className="cr-icon-action"
-                          onClick={() => removeCost(planningRowKey(item))}
-                          aria-label={`Remover ${item.descricao || 'subitem'}`}
-                        >
-                          <HiOutlineTrash className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!rows.length ? (
-                <tr><td colSpan="6" className="cr-table-empty">Nenhum subitem planejado nesta etapa.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
         </div>
-        <footer className="cr-macro-total">
-          <span>Total da etapa</span>
-          <strong>{currency.format(total)}</strong>
-        </footer>
-      </article>
+        {!readonly && permissions.costs ? (
+          <button type="button" className="btn btn-outline" onClick={() => addCost(macro)}>
+            <HiOutlinePlus className="h-4 w-4" />
+            Adicionar subitem
+          </button>
+        ) : null}
+      </div>
     );
   }
 
-  function renderForecastMeasurementMacro(macro, macroIndex) {
-    const rows = receiptsForMacro(macro.codigo);
+  function renderForecastMacroHeading(codigo, itensDoGrupo) {
+    const { macro, indice } = macroDoGrupo(codigo);
+    const rows = itensDoGrupo.filter((item) => !item.__vazio);
+    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
     const selectedIds = new Set(receipts.map((item) => Number(item.plano_item_id)).filter(Boolean));
     const available = forecastSearch.items.filter((item) => !selectedIds.has(Number(item.id)));
-    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_previsto), 0);
     const pickerOpen = measurementPickerMacro === macro.codigo;
     return (
-      <article key={macro.codigo} className="cr-macro-planning-block">
-        <header className="cr-macro-planning-heading">
+      <div className="cr-macro-planning-group">
+        <div className="cr-macro-planning-heading">
           <div>
-            <b>{macroIndex + 1}</b>
+            <b>{indice + 1}</b>
             <div>
               <strong>{macro.codigo} · {macro.descricao}</strong>
-              <span>{rows.length} subitem(ns) na medição prevista</span>
+              <span>
+                {rows.length} subitem(ns) na medição prevista · Total previsto da etapa: {currency.format(total)}
+              </span>
             </div>
           </div>
           {!readonly && permissions.receipts ? (
@@ -911,7 +859,7 @@ export default function CrPlanejamentoView({
               Adicionar subitem
             </button>
           ) : null}
-        </header>
+        </div>
         {pickerOpen ? (
           <div className="cr-macro-subitem-picker">
             <strong>Selecione um subitem da planilha nesta etapa</strong>
@@ -958,94 +906,27 @@ export default function CrPlanejamentoView({
             </div>
           </div>
         ) : null}
-        <div className="cr-table-shell cr-planning-table cr-forecast-measurement-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Serviço</th>
-                <th>Unid.</th>
-                <th>Qtd. orçada</th>
-                <th>Valor unitário</th>
-                <th>Total planejado</th>
-                <th>Qtd. já medida</th>
-                <th>Qtd. medida</th>
-                <th>Nesta medição</th>
-                <th>Saldo a medir</th>
-                <th aria-label="Ações" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((item) => {
-                const index = receipts.findIndex((row) => planningRowKey(row) === planningRowKey(item));
-                const previousQuantity = asNumber(item.item?.quantidade_aprovada_anterior);
-                const remainingQuantity = Math.max(
-                  0,
-                  asNumber(item.quantidade_base) - previousQuantity - asNumber(item.quantidade_prevista)
-                );
-                return (
-                  <tr key={planningRowKey(item)}>
-                    <td><strong>{item.descricao}</strong></td>
-                    <td>{item.unidade || 'un'}</td>
-                    <td>{item.quantidade_base}</td>
-                    <td>{currency.format(item.custo_unitario || 0)}</td>
-                    <td>{currency.format(item.valor_base || 0)}</td>
-                    <td>{previousQuantity}</td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        max={Math.max(0, asNumber(item.quantidade_base) - previousQuantity)}
-                        step="0.0001"
-                        value={item.quantidade_prevista}
-                        disabled={readonly || !permissions.receipts}
-                        onChange={(event) => updateReceipt(index, 'quantidade_prevista', event.target.value)}
-                      />
-                    </td>
-                    <td><strong>{currency.format(item.valor_previsto || 0)}</strong></td>
-                    <td>{remainingQuantity} {item.unidade || 'un'}</td>
-                    <td>
-                      {!readonly && permissions.receipts ? (
-                        <button
-                          type="button"
-                          className="cr-icon-action"
-                          onClick={() => removeReceipt(planningRowKey(item))}
-                          aria-label={`Remover ${item.descricao}`}
-                        >
-                          <HiOutlineTrash className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!rows.length ? (
-                <tr><td colSpan="10" className="cr-table-empty">Adicione os subitens que terão medição prevista.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-        <footer className="cr-macro-total">
-          <span>Total previsto da etapa</span>
-          <strong>{currency.format(total)}</strong>
-        </footer>
-      </article>
+      </div>
     );
   }
 
-  function renderApprovedMeasurementMacro(macro, macroIndex) {
-    const rows = measurementsForMacro(macro.codigo);
+  function renderApprovedMacroHeading(codigo, itensDoGrupo) {
+    const { macro, indice } = macroDoGrupo(codigo);
+    const rows = itensDoGrupo.filter((item) => !item.__vazio);
+    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_medido), 0);
     const selectedIds = new Set(measurements.map((item) => Number(item.plano_item_id)).filter(Boolean));
     const available = approvedItemSearch.items.filter((item) => !selectedIds.has(Number(item.id)));
-    const total = rows.reduce((sum, item) => sum + asNumber(item.valor_medido), 0);
     const pickerOpen = approvedPickerMacro === macro.codigo;
     return (
-      <article key={macro.codigo} className="cr-macro-planning-block">
-        <header className="cr-macro-planning-heading">
+      <div className="cr-macro-planning-group">
+        <div className="cr-macro-planning-heading">
           <div>
-            <b>{macroIndex + 1}</b>
+            <b>{indice + 1}</b>
             <div>
               <strong>{macro.codigo} · {macro.descricao}</strong>
-              <span>{rows.length} subitem(ns) na medição aprovada</span>
+              <span>
+                {rows.length} subitem(ns) na medição aprovada · Total aprovado da etapa: {currency.format(total)}
+              </span>
             </div>
           </div>
           {permissions.measurement ? (
@@ -1062,7 +943,7 @@ export default function CrPlanejamentoView({
               Adicionar subitem
             </button>
           ) : null}
-        </header>
+        </div>
         {pickerOpen ? (
           <div className="cr-macro-subitem-picker">
             <strong>Selecione um subitem aprovado nesta etapa</strong>
@@ -1109,86 +990,7 @@ export default function CrPlanejamentoView({
             </div>
           </div>
         ) : null}
-        <div className="cr-table-shell cr-planning-table cr-forecast-measurement-table">
-          <table>
-            <thead>
-              <tr>
-                <th>Serviço aprovado</th>
-                <th>Unid.</th>
-                <th>Qtd. orçada</th>
-                <th>Qtd. já aprovada</th>
-                <th>Qtd. aprovada</th>
-                <th>Valor unitário</th>
-                <th>Valor aprovado</th>
-                <th>Data / boletim</th>
-                <th aria-label="Ações" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((item) => {
-                const index = measurements.findIndex(
-                  (row) => planningRowKey(row) === planningRowKey(item)
-                );
-                const previousQuantity = asNumber(item.item?.quantidade_aprovada_anterior);
-                return (
-                  <tr key={planningRowKey(item)}>
-                    <td><strong>{item.item?.codigo} · {item.descricao || item.item?.descricao}</strong></td>
-                    <td>{item.unidade || item.item?.unidade || 'un'}</td>
-                    <td>{item.quantidade_base}</td>
-                    <td>{previousQuantity}</td>
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        max={Math.max(0, asNumber(item.quantidade_base) - previousQuantity)}
-                        step="0.0001"
-                        value={item.quantidade_medida}
-                        disabled={!permissions.measurement}
-                        onChange={(event) => updateMeasurement(index, 'quantidade_medida', event.target.value)}
-                      />
-                    </td>
-                    <td>{currency.format(item.custo_unitario || 0)}</td>
-                    <td><strong>{currency.format(item.valor_medido || 0)}</strong></td>
-                    <td>
-                      <input
-                        type="date"
-                        value={item.data_medicao || ''}
-                        disabled={!permissions.measurement}
-                        onChange={(event) => updateMeasurement(index, 'data_medicao', event.target.value)}
-                      />
-                      <input
-                        value={item.numero_medicao || ''}
-                        placeholder="Boletim"
-                        disabled={!permissions.measurement}
-                        onChange={(event) => updateMeasurement(index, 'numero_medicao', event.target.value)}
-                      />
-                    </td>
-                    <td>
-                      {permissions.measurement ? (
-                        <button
-                          type="button"
-                          className="cr-icon-action"
-                          onClick={() => removeMeasurement(planningRowKey(item))}
-                          aria-label={`Remover ${item.descricao || item.item?.descricao}`}
-                        >
-                          <HiOutlineTrash className="h-4 w-4" />
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-              {!rows.length ? (
-                <tr><td colSpan="9" className="cr-table-empty">Adicione os subitens efetivamente aprovados pelo órgão.</td></tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-        <footer className="cr-macro-total">
-          <span>Total aprovado da etapa</span>
-          <strong>{currency.format(total)}</strong>
-        </footer>
-      </article>
+      </div>
     );
   }
 
@@ -1545,12 +1347,112 @@ export default function CrPlanejamentoView({
             </div>
             {renderPlanningSheetActions('medicao-prevista', permissions.receipts)}
           </div>
-          <div className="cr-macro-planning-list">
-            {(data?.macros || []).map(renderForecastMeasurementMacro)}
-            {!data?.macros?.length ? (
-              <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
-            ) : null}
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'servico',
+                titulo: 'Serviço',
+                // R17: o SERVIÇO da planilha é o que nomeia o subitem medido.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (item.__vazio
+                  ? 'Adicione os subitens que terão medição prevista.'
+                  : <strong>{item.descricao}</strong>)
+              },
+              {
+                id: 'unidade',
+                titulo: 'Unid.',
+                tipo: 'codigo',
+                render: (item) => (item.__vazio ? null : (item.unidade || 'un'))
+              },
+              {
+                id: 'quantidade_base',
+                titulo: 'Qtd. orçada',
+                tipo: 'numero',
+                render: (item) => (item.__vazio ? null : item.quantidade_base)
+              },
+              {
+                id: 'custo_unitario',
+                titulo: 'Valor unitário',
+                tipo: 'valor',
+                render: (item) => (item.__vazio ? null : currency.format(item.custo_unitario || 0))
+              },
+              {
+                id: 'valor_base',
+                titulo: 'Total planejado',
+                tipo: 'valor',
+                render: (item) => (item.__vazio ? null : currency.format(item.valor_base || 0))
+              },
+              {
+                id: 'quantidade_anterior',
+                titulo: 'Qtd. já medida',
+                tipo: 'numero',
+                render: (item) => (item.__vazio ? null : asNumber(item.item?.quantidade_aprovada_anterior))
+              },
+              {
+                id: 'quantidade_prevista',
+                titulo: 'Qtd. medida',
+                tipo: 'numero',
+                // Edição inline: o controle mora no render da coluna.
+                render: (item) => (item.__vazio ? null : (
+                  <input
+                    type="number"
+                    min="0"
+                    max={Math.max(0, asNumber(item.quantidade_base) - asNumber(item.item?.quantidade_aprovada_anterior))}
+                    step="0.0001"
+                    aria-label={`Quantidade medida de ${item.descricao || 'subitem'}`}
+                    value={item.quantidade_prevista}
+                    disabled={readonly || !permissions.receipts}
+                    onChange={(event) => updateReceipt(
+                      receipts.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                      'quantidade_prevista',
+                      event.target.value
+                    )}
+                  />
+                ))
+              },
+              {
+                id: 'valor_previsto',
+                titulo: 'Nesta medição',
+                tipo: 'valor',
+                render: (item) => (item.__vazio ? null : <strong>{currency.format(item.valor_previsto || 0)}</strong>)
+              },
+              {
+                id: 'saldo',
+                titulo: 'Saldo a medir',
+                tipo: 'numero',
+                render: (item) => {
+                  if (item.__vazio) return null;
+                  const saldo = Math.max(
+                    0,
+                    asNumber(item.quantidade_base)
+                      - asNumber(item.item?.quantidade_aprovada_anterior)
+                      - asNumber(item.quantidade_prevista)
+                  );
+                  return `${saldo} ${item.unidade || 'un'}`;
+                }
+              }
+            ]}
+            itens={linhasPorMacro(receiptsForMacro)}
+            getId={idDaLinha}
+            agruparPor={{ chave: chaveDoMacro, titulo: renderForecastMacroHeading }}
+            storageKey="tabela:cr-planejamento:medicao-prevista"
+            rotuloRolagem="Medição prevista por etapa macro"
+            vazio="Nenhuma etapa macro disponível no plano publicado."
+            acoesLinha={(item) => (
+              !item.__vazio && !readonly && permissions.receipts ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => removeReceipt(planningRowKey(item))}
+                  aria-label={`Remover ${item.descricao}`}
+                >
+                  <HiOutlineTrash className="h-4 w-4" />
+                </button>
+              ) : null
+            )}
+            larguraAcoes={120}
+          />
           <div className="cr-panel-actions">
             <strong>Total da medição prevista: {currency.format(totalReceipts)}</strong>
             {permissions.receipts ? (
@@ -1579,107 +1481,126 @@ export default function CrPlanejamentoView({
               </p>
             </div>
           </div>
-          <div className="cr-table-shell cr-planning-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>{isPublic ? 'Item micro' : 'Origem contratual'}</th>
-                  {isPublic ? (
-                    <>
-                      <th>Qtd. orçada</th>
-                      <th>Já medida</th>
-                      <th>Nesta medição</th>
-                      <th>Valor previsto</th>
-                      <th>Saldo após medição</th>
-                      <th aria-label="Ações" />
-                    </>
-                  ) : (
-                    <>
-                      <th>Documento</th>
-                      <th>Status financeiro</th>
-                      <th>Vencimento</th>
-                      <th>Valor</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {receipts.map((item, index) => (
-                  <tr key={item.key || item.plano_item_id}>
-                    <td>
-                      <strong>
-                        {isPublic
-                          ? `${item.item.codigo} · ${item.item.descricao}`
-                          : item.descricao}
-                      </strong>
-                      <span>
-                        {isPublic
-                          ? `${item.item.unidade || 'un'} · ${item.item.etapa_macro_codigo || 'Sem macro'}`
-                          : `${item.origem_exibicao === 'TITULO' ? 'Título a receber' : 'Parcela contratual'} · contrato ${item.contrato.numero}`}
-                      </span>
-                    </td>
-                    {isPublic ? (
-                      <>
-                        <td>{item.item.quantidade_orcada} {item.item.unidade || 'un'}</td>
-                        <td>{item.item.quantidade_aprovada_anterior || 0}</td>
-                        <td>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.0001"
-                          value={item.quantidade_prevista}
-                          disabled={readonly || !permissions.receipts}
-                          onChange={(event) => updateReceipt(index, 'quantidade_prevista', event.target.value)}
-                        />
-                        </td>
-                        <td>{currency.format(item.valor_previsto || 0)}</td>
-                        <td>
-                          {Math.max(
-                            0,
-                            asNumber(item.item.quantidade_orcada)
-                              - asNumber(item.item.quantidade_aprovada_anterior)
-                              - asNumber(item.quantidade_prevista)
-                          )} {item.item.unidade || 'un'}
-                        </td>
-                        <td>
-                          {!readonly && permissions.receipts ? (
-                            <button
-                              type="button"
-                              className="cr-icon-action"
-                              onClick={() => removeReceipt(item.plano_item_id)}
-                              aria-label={`Remover ${item.item.descricao}`}
-                            >
-                              <HiOutlineTrash className="h-4 w-4" />
-                            </button>
-                          ) : null}
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{item.documento || 'Parcela contratual'}</td>
-                        <td>
-                          <span className="cr-status-pill" data-status={item.status_financeiro}>
-                            {privateReceiptStatusLabel(item.status_financeiro)}
-                          </span>
-                        </td>
-                        <td>{item.data_prevista}</td>
-                        <td>{currency.format(item.valor_previsto || 0)}</td>
-                      </>
-                    )}
-                  </tr>
-                ))}
-                {!receipts.length ? (
-                  <tr>
-                    <td colSpan={isPublic ? 7 : 5} className="cr-table-empty">
-                      {isPublic
-                        ? 'Pesquise e adicione somente os serviços executados nesta medição.'
-                        : 'Nenhuma parcela ou título a receber encontrado para a competência.'}
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'origem',
+                titulo: isPublic ? 'Item micro' : 'Origem contratual',
+                // R17: a origem (item micro ou documento contratual) nomeia o recebível.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={isPublic ? `${item.item.codigo} · ${item.item.descricao}` : item.descricao}
+                    sub={isPublic
+                      ? `${item.item.unidade || 'un'} · ${item.item.etapa_macro_codigo || 'Sem macro'}`
+                      : `${item.origem_exibicao === 'TITULO' ? 'Título a receber' : 'Parcela contratual'} · contrato ${item.contrato.numero}`}
+                  />
+                )
+              },
+              ...(isPublic ? [
+                {
+                  id: 'quantidade_orcada',
+                  titulo: 'Qtd. orçada',
+                  tipo: 'numero',
+                  render: (item) => `${item.item.quantidade_orcada} ${item.item.unidade || 'un'}`
+                },
+                {
+                  id: 'quantidade_anterior',
+                  titulo: 'Já medida',
+                  tipo: 'numero',
+                  render: (item) => item.item.quantidade_aprovada_anterior || 0
+                },
+                {
+                  id: 'quantidade_prevista',
+                  titulo: 'Nesta medição',
+                  tipo: 'numero',
+                  // Edição inline: o controle mora no render da coluna.
+                  render: (item) => (
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      aria-label={`Quantidade prevista de ${item.item.descricao}`}
+                      value={item.quantidade_prevista}
+                      disabled={readonly || !permissions.receipts}
+                      onChange={(event) => updateReceipt(
+                        receipts.findIndex((row) => (row.key || row.plano_item_id) === (item.key || item.plano_item_id)),
+                        'quantidade_prevista',
+                        event.target.value
+                      )}
+                    />
+                  )
+                },
+                {
+                  id: 'valor_previsto',
+                  titulo: 'Valor previsto',
+                  tipo: 'valor',
+                  render: (item) => currency.format(item.valor_previsto || 0)
+                },
+                {
+                  id: 'saldo',
+                  titulo: 'Saldo após medição',
+                  tipo: 'numero',
+                  render: (item) => `${Math.max(
+                    0,
+                    asNumber(item.item.quantidade_orcada)
+                      - asNumber(item.item.quantidade_aprovada_anterior)
+                      - asNumber(item.quantidade_prevista)
+                  )} ${item.item.unidade || 'un'}`
+                }
+              ] : [
+                {
+                  id: 'documento',
+                  titulo: 'Documento',
+                  tipo: 'codigo',
+                  render: (item) => item.documento || 'Parcela contratual'
+                },
+                {
+                  id: 'status_financeiro',
+                  titulo: 'Status financeiro',
+                  tipo: 'status',
+                  render: (item) => (
+                    <span className="cr-status-pill" data-status={item.status_financeiro}>
+                      {privateReceiptStatusLabel(item.status_financeiro)}
+                    </span>
+                  )
+                },
+                {
+                  id: 'data_prevista',
+                  titulo: 'Vencimento',
+                  tipo: 'data',
+                  render: (item) => item.data_prevista
+                },
+                {
+                  id: 'valor',
+                  titulo: 'Valor',
+                  tipo: 'valor',
+                  render: (item) => currency.format(item.valor_previsto || 0)
+                }
+              ])
+            ]}
+            itens={receipts}
+            getId={(item) => item.key || item.plano_item_id}
+            storageKey={isPublic ? 'tabela:cr-planejamento:recebiveis-publico' : 'tabela:cr-planejamento:recebiveis-privado'}
+            rotuloRolagem={isPublic ? 'Medição prevista no período' : 'Recebíveis cadastrados para o período'}
+            vazio={isPublic
+              ? 'Pesquise e adicione somente os serviços executados nesta medição.'
+              : 'Nenhuma parcela ou título a receber encontrado para a competência.'}
+            {...(isPublic && !readonly && permissions.receipts ? {
+              acoesLinha: (item) => (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => removeReceipt(item.plano_item_id)}
+                  aria-label={`Remover ${item.item.descricao}`}
+                >
+                  <HiOutlineTrash className="h-4 w-4" />
+                </button>
+              ),
+              larguraAcoes: 120
+            } : null)}
+          />
           <div className="cr-panel-actions">
             <strong>{isPublic ? 'Total previsto' : 'Total cadastrado'}: {currency.format(totalReceipts)}</strong>
             {isPublic && permissions.receipts ? (
@@ -1729,12 +1650,122 @@ export default function CrPlanejamentoView({
           </div>
           {permissions.measurementView ? (
             <>
-              <div className="cr-macro-planning-list">
-                {(data?.macros || []).map(renderApprovedMeasurementMacro)}
-                {!data?.macros?.length ? (
-                  <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
-                ) : null}
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'servico_aprovado',
+                    titulo: 'Serviço aprovado',
+                    // R17: o SERVIÇO aprovado é o que nomeia a linha da medição.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => (item.__vazio
+                      ? 'Adicione os subitens efetivamente aprovados pelo órgão.'
+                      : <strong>{item.item?.codigo} · {item.descricao || item.item?.descricao}</strong>)
+                  },
+                  {
+                    id: 'unidade',
+                    titulo: 'Unid.',
+                    tipo: 'codigo',
+                    render: (item) => (item.__vazio ? null : (item.unidade || item.item?.unidade || 'un'))
+                  },
+                  {
+                    id: 'quantidade_base',
+                    titulo: 'Qtd. orçada',
+                    tipo: 'numero',
+                    render: (item) => (item.__vazio ? null : item.quantidade_base)
+                  },
+                  {
+                    id: 'quantidade_anterior',
+                    titulo: 'Qtd. já aprovada',
+                    tipo: 'numero',
+                    render: (item) => (item.__vazio ? null : asNumber(item.item?.quantidade_aprovada_anterior))
+                  },
+                  {
+                    id: 'quantidade_medida',
+                    titulo: 'Qtd. aprovada',
+                    tipo: 'numero',
+                    // Edição inline: o controle mora no render da coluna.
+                    render: (item) => (item.__vazio ? null : (
+                      <input
+                        type="number"
+                        min="0"
+                        max={Math.max(0, asNumber(item.quantidade_base) - asNumber(item.item?.quantidade_aprovada_anterior))}
+                        step="0.0001"
+                        aria-label={`Quantidade aprovada de ${item.descricao || item.item?.descricao || 'subitem'}`}
+                        value={item.quantidade_medida}
+                        disabled={!permissions.measurement}
+                        onChange={(event) => updateMeasurement(
+                          measurements.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                          'quantidade_medida',
+                          event.target.value
+                        )}
+                      />
+                    ))
+                  },
+                  {
+                    id: 'custo_unitario',
+                    titulo: 'Valor unitário',
+                    tipo: 'valor',
+                    render: (item) => (item.__vazio ? null : currency.format(item.custo_unitario || 0))
+                  },
+                  {
+                    id: 'valor_medido',
+                    titulo: 'Valor aprovado',
+                    tipo: 'valor',
+                    render: (item) => (item.__vazio ? null : <strong>{currency.format(item.valor_medido || 0)}</strong>)
+                  },
+                  {
+                    id: 'boletim',
+                    titulo: 'Data / boletim',
+                    tipo: 'texto',
+                    render: (item) => (item.__vazio ? null : (
+                      <>
+                        <input
+                          type="date"
+                          aria-label="Data da medição"
+                          value={item.data_medicao || ''}
+                          disabled={!permissions.measurement}
+                          onChange={(event) => updateMeasurement(
+                            measurements.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                            'data_medicao',
+                            event.target.value
+                          )}
+                        />
+                        <input
+                          value={item.numero_medicao || ''}
+                          placeholder="Boletim"
+                          aria-label="Número do boletim"
+                          disabled={!permissions.measurement}
+                          onChange={(event) => updateMeasurement(
+                            measurements.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                            'numero_medicao',
+                            event.target.value
+                          )}
+                        />
+                      </>
+                    ))
+                  }
+                ]}
+                itens={linhasPorMacro(measurementsForMacro)}
+                getId={idDaLinha}
+                agruparPor={{ chave: chaveDoMacro, titulo: renderApprovedMacroHeading }}
+                storageKey="tabela:cr-planejamento:medicao-aprovada"
+                rotuloRolagem="Medição aprovada por etapa macro"
+                vazio="Nenhuma etapa macro disponível no plano publicado."
+                acoesLinha={(item) => (
+                  !item.__vazio && permissions.measurement ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm"
+                      onClick={() => removeMeasurement(planningRowKey(item))}
+                      aria-label={`Remover ${item.descricao || item.item?.descricao}`}
+                    >
+                      <HiOutlineTrash className="h-4 w-4" />
+                    </button>
+                  ) : null
+                )}
+                larguraAcoes={120}
+              />
               {totalApproved < totalReceipts ? (
                 <label className="cr-field cr-measurement-justification">
                   <span>Justificativa da diferença entre previsto e aprovado</span>
@@ -1791,12 +1822,125 @@ export default function CrPlanejamentoView({
             <strong>{currency.format(totalCosts)}</strong>
             <small>Quantidade × valor unitário compõe o total operacional.</small>
           </div>
-          <div className="cr-macro-planning-list">
-            {(data?.macros || []).map(renderCostMacro)}
-            {!data?.macros?.length ? (
-              <div className="cr-empty-state">Nenhuma etapa macro disponível no plano publicado.</div>
-            ) : null}
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'descricao',
+                titulo: 'Descrição do serviço',
+                // R17: o SERVIÇO é o que nomeia o subitem planejado.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                // Edição inline: o controle mora no render da coluna.
+                render: (item) => {
+                  if (item.__vazio) return 'Nenhum subitem planejado nesta etapa.';
+                  const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
+                  const rowError = costErrors.find((entry) => entry.index === index);
+                  return (
+                    <>
+                      <input
+                        value={item.descricao || ''}
+                        placeholder="Descreva o serviço planejado"
+                        maxLength="500"
+                        aria-label="Descrição do serviço"
+                        disabled={readonly || !permissions.costs}
+                        onChange={(event) => updateCost(index, 'descricao', event.target.value)}
+                      />
+                      {rowError ? <small>{rowError.messages.join(' · ')}</small> : null}
+                    </>
+                  );
+                }
+              },
+              {
+                id: 'unidade',
+                titulo: 'Unidade',
+                tipo: 'codigo',
+                render: (item) => (item.__vazio ? null : (
+                  <input
+                    value={item.unidade || ''}
+                    placeholder="un, m², mês..."
+                    maxLength="30"
+                    aria-label="Unidade"
+                    disabled={readonly || !permissions.costs}
+                    onChange={(event) => updateCost(
+                      costs.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                      'unidade',
+                      event.target.value
+                    )}
+                  />
+                ))
+              },
+              {
+                id: 'quantidade',
+                titulo: 'Quantidade',
+                tipo: 'numero',
+                render: (item) => (item.__vazio ? null : (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    aria-label="Quantidade"
+                    value={item.quantidade}
+                    disabled={readonly || !permissions.costs}
+                    onChange={(event) => updateCost(
+                      costs.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                      'quantidade',
+                      event.target.value
+                    )}
+                  />
+                ))
+              },
+              {
+                id: 'custo_unitario',
+                titulo: 'Valor unitário',
+                tipo: 'valor',
+                render: (item) => (item.__vazio ? null : (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    aria-label="Valor unitário"
+                    value={item.custo_unitario}
+                    disabled={readonly || !permissions.costs}
+                    onChange={(event) => updateCost(
+                      costs.findIndex((row) => planningRowKey(row) === planningRowKey(item)),
+                      'custo_unitario',
+                      event.target.value
+                    )}
+                  />
+                ))
+              },
+              {
+                id: 'valor_previsto',
+                titulo: 'Valor total',
+                tipo: 'valor',
+                render: (item) => (item.__vazio ? null : <strong>{currency.format(item.valor_previsto || 0)}</strong>)
+              }
+            ]}
+            itens={linhasPorMacro(costsForMacro)}
+            getId={idDaLinha}
+            agruparPor={{ chave: chaveDoMacro, titulo: renderCostMacroHeading }}
+            storageKey="tabela:cr-planejamento:custos"
+            rotuloRolagem="Custos planejados por etapa macro"
+            vazio="Nenhuma etapa macro disponível no plano publicado."
+            urgencia={(item) => {
+              if (item.__vazio) return null;
+              const index = costs.findIndex((row) => planningRowKey(row) === planningRowKey(item));
+              return costErrors.some((entry) => entry.index === index) ? 'danger' : null;
+            }}
+            acoesLinha={(item) => (
+              !item.__vazio && !readonly && permissions.costs ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => removeCost(planningRowKey(item))}
+                  aria-label={`Remover ${item.descricao || 'subitem'}`}
+                >
+                  <HiOutlineTrash className="h-4 w-4" />
+                </button>
+              ) : null
+            )}
+            larguraAcoes={120}
+          />
           <div className="cr-panel-actions">
             <strong>Total planejado: {currency.format(totalCosts)}</strong>
             {permissions.costs ? (

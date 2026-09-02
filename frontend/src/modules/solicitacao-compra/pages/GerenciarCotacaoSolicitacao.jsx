@@ -43,7 +43,7 @@ import {
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
-import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 
 // helpers
 
@@ -155,15 +155,6 @@ function itemToCotacaoPayload(item) {
     solicitacao_compra_item_manual_id: itemTipo === 'MANUAL' ? itemReferenciaId : undefined
   };
 }
-
-const FORNECEDOR_LINK_COLUMNS = [
-  { key: 'nome', width: 250, minWidth: 160 },
-  { key: 'telefone', width: 150, minWidth: 120 },
-  { key: 'email', width: 250, minWidth: 160 },
-  { key: 'status', width: 130, minWidth: 105 },
-  { key: 'respondido', width: 130, minWidth: 110 },
-  { key: 'acoes', width: 260, minWidth: 245 }
-];
 
 const CONDICOES_PAGAMENTO_COTACAO = [
   'Pix',
@@ -3283,65 +3274,26 @@ export default function GerenciarCotacaoSolicitacao() {
             {solicitacao.fornecedores?.length > 0 && (
               <div className="mt-4 min-w-0 max-w-full">
                 <h3 className="mb-2 text-sm font-semibold text-[var(--c-text)]">Cotações enviadas</h3>
-                <div
-                  className="app-table-shell cotacao-scroll-region max-w-full overflow-x-auto overscroll-x-contain pb-2"
-                  role="region"
-                  aria-label="Cotações enviadas"
-                  tabIndex={0}
-                >
-                  <ResizableTable
-                    className="table min-w-[1120px] text-[11px]"
-                    columns={FORNECEDOR_LINK_COLUMNS}
-                    storageKey="fluxy.compras.cotacao.fornecedoresLinks.columns"
-                  >
-                    <thead>
-                      <tr>
-                        <ResizableTh columnKey="nome">Nome</ResizableTh>
-                        <ResizableTh columnKey="telefone">Telefone</ResizableTh>
-                        <ResizableTh columnKey="email">E-mail</ResizableTh>
-                        <ResizableTh columnKey="status">Status</ResizableTh>
-                        <ResizableTh columnKey="respondido">Respondido em</ResizableTh>
-                        <ResizableTh columnKey="acoes">Acoes</ResizableTh>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {solicitacao.fornecedores.map((cotacaoFornecedor) => {
-                        const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
-                        const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
-                        const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
+                <TabelaPadrao
+                  colunas={[
+                    {
+                      id: 'nome',
+                      titulo: 'Nome',
+                      // R17: o fornecedor e quem nomeia a cotacao enviada.
+                      tipo: 'identidade',
+                      noCard: 'titulo',
+                      ordenavel: true,
+                      valorOrdenacao: (cf) => cf.fornecedor?.nome || '',
+                      render: (cf) => {
+                        const pedidoFornecedor = pedidosPorFornecedor.get(Number(cf.fornecedor_compra_id));
                         const possuiRespostaArquivo = Boolean(
-                          cotacaoFornecedor.pdf_resposta_url
-                          || cotacaoFornecedor.arquivo_resposta_url
-                          || cotacaoFornecedor.arquivos_resposta?.length
+                          cf.pdf_resposta_url || cf.arquivo_resposta_url || cf.arquivos_resposta?.length
                         );
-                        const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
-                        const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
-                        const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
-                        const possuiSaldoParaNovaOferta = (comparativo?.itens || []).some((item) => (
-                          parseNumeroCompra(item?.saldo_disponivel) > 0.0001
-                          && (item?.respostas || []).some(
-                            (resposta) => Number(resposta?.cotacao_fornecedor_id) === Number(cotacaoFornecedor.id)
-                          )
-                        ));
-                        const podeRegistrarNovaOferta = podeEditarResposta
-                          && statusSolicitacao === 'fechamento_parcial'
-                          && Boolean(pedidoFornecedor?.id)
-                          && possuiSaldoParaNovaOferta;
-                        const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
-                          && !fluxoTerminal;
-                        const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
-                          ? whatsappLink(
-                              cotacaoFornecedor.fornecedor.whatsapp,
-                              gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, pdfUrl)
-                            )
-                          : null;
-
                         return (
-                          <tr key={cotacaoFornecedor.id} className="h-11">
-                          <td className="whitespace-nowrap align-middle">
+                          <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
                               <span className="truncate font-semibold text-[var(--c-text)]">
-                                {cotacaoFornecedor.fornecedor?.nome || '-'}
+                                {cf.fornecedor?.nome || '-'}
                               </span>
                               {possuiRespostaArquivo && (
                                 <span className="shrink-0 rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-700">
@@ -3359,106 +3311,160 @@ export default function GerenciarCotacaoSolicitacao() {
                                 PC-{String(pedidoFornecedor.id).padStart(5, '0')} - {fmtMoeda(pedidoFornecedor.valor_total)}
                               </button>
                             )}
-                          </td>
-                          <td className="whitespace-nowrap align-middle text-[11px]">
-                            <span className="block truncate" title={cotacaoFornecedor.fornecedor?.whatsapp || '-'}>
-                              {cotacaoFornecedor.fornecedor?.whatsapp || '-'}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap align-middle text-[11px]">
-                            <span className="block truncate" title={cotacaoFornecedor.fornecedor?.email || '-'}>
-                              {cotacaoFornecedor.fornecedor?.email || '-'}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap align-middle">
-                            <span className={`${clsStatus(cotacaoFornecedor.status)} px-2 py-1 text-[10px]`}>
-                              {fmtStatus(cotacaoFornecedor.status)}
-                            </span>
-                          </td>
-                          <td className="whitespace-nowrap align-middle text-[11px]">{fmt(cotacaoFornecedor.respondido_em)}</td>
-                          <td className="whitespace-nowrap align-middle">
-                            <div className="flex flex-nowrap items-center gap-1">
-                              <CotacaoActionButton
-                                type="button"
-                                onClick={() => copiarTexto(publicUrl)}
-                                title="Copiar link"
-                                aria-label="Copiar link"
-                              >
-                                <HiOutlineClipboardDocument className="h-3.5 w-3.5" />
-                              </CotacaoActionButton>
-                              <CotacaoActionButton
-                                type="button"
-                                onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}
-                                title="Abrir portal"
-                                aria-label="Abrir portal"
-                              >
-                                <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
-                              </CotacaoActionButton>
-                              <CotacaoActionButton
-                                as="a"
-                                href={pdfUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                download
-                                title="Baixar PDF"
-                                aria-label="Baixar PDF"
-                              >
-                                <HiOutlineArrowDownTray className="h-3.5 w-3.5" />
-                              </CotacaoActionButton>
-                              {linkWa ? (
-                                <CotacaoActionButton
-                                  as="a"
-                                  href={linkWa}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  title="Enviar WhatsApp"
-                                  aria-label="Enviar WhatsApp"
-                                >
-                                  <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
-                                </CotacaoActionButton>
-                              ) : (
-                                <CotacaoActionButton type="button" disabled title="WhatsApp indisponivel" aria-label="WhatsApp indisponivel">
-                                  <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
-                                </CotacaoActionButton>
-                              )}
-                              <CotacaoActionButton
-                                type="button"
-                                onClick={() => abrirRespostaInterna(cotacaoFornecedor)}
-                                disabled={!podeEditarResposta}
-                                title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
-                                aria-label="Editar resposta internamente"
-                              >
-                                <HiOutlinePencilSquare className="h-3.5 w-3.5" />
-                              </CotacaoActionButton>
-                              <CotacaoActionButton
-                                type="button"
-                                onClick={() => abrirNovaOfertaSaldo(cotacaoFornecedor)}
-                                disabled={!podeRegistrarNovaOferta}
-                                title={podeRegistrarNovaOferta
-                                  ? 'Registrar novo preco e prazo deste fornecedor para o saldo'
-                                  : 'Nova oferta disponivel apos um fechamento parcial com este fornecedor'}
-                                aria-label="Registrar nova oferta para o saldo"
-                                className={podeRegistrarNovaOferta ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}
-                              >
-                                <HiOutlinePlusCircle className="h-4 w-4" />
-                              </CotacaoActionButton>
-                              <CotacaoActionButton
-                                type="button"
-                                onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
-                                disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
-                                title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
-                                aria-label="Reabrir cotacao"
-                              >
-                                <HiOutlineArrowPath className={`h-3.5 w-3.5 ${reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : ''}`} />
-                              </CotacaoActionButton>
-                            </div>
-                          </td>
-                          </tr>
+                          </div>
                         );
-                      })}
-                    </tbody>
-                  </ResizableTable>
-                </div>
+                      }
+                    },
+                    {
+                      id: 'telefone',
+                      titulo: 'Telefone',
+                      tipo: 'texto',
+                      render: (cf) => (
+                        <span className="block truncate" title={cf.fornecedor?.whatsapp || '-'}>
+                          {cf.fornecedor?.whatsapp || '-'}
+                        </span>
+                      )
+                    },
+                    {
+                      id: 'email',
+                      titulo: 'E-mail',
+                      tipo: 'texto',
+                      render: (cf) => (
+                        <span className="block truncate" title={cf.fornecedor?.email || '-'}>
+                          {cf.fornecedor?.email || '-'}
+                        </span>
+                      )
+                    },
+                    {
+                      id: 'status',
+                      titulo: 'Status',
+                      tipo: 'status',
+                      render: (cf) => (
+                        <span className={`${clsStatus(cf.status)} px-2 py-1 text-[10px]`}>
+                          {fmtStatus(cf.status)}
+                        </span>
+                      )
+                    },
+                    {
+                      id: 'respondido_em',
+                      titulo: 'Respondido em',
+                      tipo: 'data',
+                      ordenavel: true,
+                      ordemInicial: 'desc',
+                      valorOrdenacao: (cf) => cf.respondido_em || '',
+                      render: (cf) => fmt(cf.respondido_em)
+                    }
+                  ]}
+                  itens={solicitacao.fornecedores}
+                  getId={(cf) => cf.id}
+                  storageKey="tabela:gerenciar-cotacao:fornecedores"
+                  rotuloRolagem="Cotações enviadas"
+                  vazio="Nenhuma cotacao enviada."
+                  larguraAcoes={320}
+                  acoesLinha={(cotacaoFornecedor) => {
+                    const publicUrl = `${window.location.origin}/cotacao/${cotacaoFornecedor.token}`;
+                    const pdfUrl = obterUrlPdfCotacaoPublica(cotacaoFornecedor.token);
+                    const pedidoFornecedor = pedidosPorFornecedor.get(Number(cotacaoFornecedor.fornecedor_compra_id));
+                    const statusFornecedor = String(cotacaoFornecedor.status || '').toUpperCase();
+                    const cotacaoCancelada = ['CANCELADA', 'CANCELADO'].includes(statusFornecedor);
+                    const podeEditarResposta = podeEditarRespostas && !cotacaoCancelada;
+                    const possuiSaldoParaNovaOferta = (comparativo?.itens || []).some((item) => (
+                      parseNumeroCompra(item?.saldo_disponivel) > 0.0001
+                      && (item?.respostas || []).some(
+                        (resposta) => Number(resposta?.cotacao_fornecedor_id) === Number(cotacaoFornecedor.id)
+                      )
+                    ));
+                    const podeRegistrarNovaOferta = podeEditarResposta
+                      && statusSolicitacao === 'fechamento_parcial'
+                      && Boolean(pedidoFornecedor?.id)
+                      && possuiSaldoParaNovaOferta;
+                    const podeReabrirCotacao = podeReabrirCotacaoFornecedor && ['RESPONDIDO', 'RASCUNHO'].includes(statusFornecedor)
+                      && !fluxoTerminal;
+                    const linkWa = cotacaoFornecedor.fornecedor?.whatsapp
+                      ? whatsappLink(
+                          cotacaoFornecedor.fornecedor.whatsapp,
+                          gerarMensagemCotacao(cotacaoFornecedor.fornecedor.nome, publicUrl, itensCombinados, pdfUrl)
+                        )
+                      : null;
+                    return (
+                      <>
+                        <CotacaoActionButton
+                          type="button"
+                          onClick={() => copiarTexto(publicUrl)}
+                          title="Copiar link"
+                          aria-label="Copiar link"
+                        >
+                          <HiOutlineClipboardDocument className="h-3.5 w-3.5" />
+                        </CotacaoActionButton>
+                        <CotacaoActionButton
+                          type="button"
+                          onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                          title="Abrir portal"
+                          aria-label="Abrir portal"
+                        >
+                          <HiOutlineArrowTopRightOnSquare className="h-3.5 w-3.5" />
+                        </CotacaoActionButton>
+                        <CotacaoActionButton
+                          as="a"
+                          href={pdfUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          title="Baixar PDF"
+                          aria-label="Baixar PDF"
+                        >
+                          <HiOutlineArrowDownTray className="h-3.5 w-3.5" />
+                        </CotacaoActionButton>
+                        {linkWa ? (
+                          <CotacaoActionButton
+                            as="a"
+                            href={linkWa}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Enviar WhatsApp"
+                            aria-label="Enviar WhatsApp"
+                          >
+                            <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                          </CotacaoActionButton>
+                        ) : (
+                          <CotacaoActionButton type="button" disabled title="WhatsApp indisponivel" aria-label="WhatsApp indisponivel">
+                            <HiOutlineChatBubbleLeftRight className="h-3.5 w-3.5" />
+                          </CotacaoActionButton>
+                        )}
+                        <CotacaoActionButton
+                          type="button"
+                          onClick={() => abrirRespostaInterna(cotacaoFornecedor)}
+                          disabled={!podeEditarResposta}
+                          title={podeEditarResposta ? 'Editar resposta internamente' : 'Edicao indisponivel'}
+                          aria-label="Editar resposta internamente"
+                        >
+                          <HiOutlinePencilSquare className="h-3.5 w-3.5" />
+                        </CotacaoActionButton>
+                        <CotacaoActionButton
+                          type="button"
+                          onClick={() => abrirNovaOfertaSaldo(cotacaoFornecedor)}
+                          disabled={!podeRegistrarNovaOferta}
+                          title={podeRegistrarNovaOferta
+                            ? 'Registrar novo preco e prazo deste fornecedor para o saldo'
+                            : 'Nova oferta disponivel apos um fechamento parcial com este fornecedor'}
+                          aria-label="Registrar nova oferta para o saldo"
+                          className={podeRegistrarNovaOferta ? 'border-blue-300 bg-blue-50 text-blue-700' : ''}
+                        >
+                          <HiOutlinePlusCircle className="h-4 w-4" />
+                        </CotacaoActionButton>
+                        <CotacaoActionButton
+                          type="button"
+                          onClick={() => handleReabrirCotacao(cotacaoFornecedor)}
+                          disabled={!podeReabrirCotacao || reabrindoCotacaoId === cotacaoFornecedor.id}
+                          title={podeReabrirCotacao ? 'Reabrir cotacao' : 'Reabertura indisponivel'}
+                          aria-label="Reabrir cotacao"
+                        >
+                          <HiOutlineArrowPath className={`h-3.5 w-3.5 ${reabrindoCotacaoId === cotacaoFornecedor.id ? 'animate-spin' : ''}`} />
+                        </CotacaoActionButton>
+                      </>
+                    );
+                  }}
+                />
               </div>
             )}
           </div>

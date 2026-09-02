@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HiOutlineEye } from 'react-icons/hi2';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -44,6 +45,23 @@ const IMPORTACAO_PAYLOAD_COLUMNS = {
     { key: 'observacoes', label: 'Observacoes' }
   ]
 };
+
+// R17 — as colunas do PREVIEW mudam com o tipo do arquivo importado
+// (jornada, evento variavel, desconto). O papel de cada uma é derivado do
+// nome do campo, aqui no ponto de uso, para que nenhuma coluna gerada chegue
+// à tabela sem `tipo` (a medida e o alinhamento saem dele).
+const REGRAS_TIPO_PAYLOAD = [
+  [/(observ|descricao|referencia)/i, 'texto'],
+  [/natureza/i, 'badge'],
+  [/^codigo/i, 'codigo'],
+  [/(valor|adicionais|descontos)/i, 'valor'],
+  [/(dias|faltas|horas|quantidade)/i, 'numero']
+];
+
+function tipoDaColunaPayload(chave) {
+  const regra = REGRAS_TIPO_PAYLOAD.find(([padrao]) => padrao.test(chave));
+  return regra ? regra[1] : 'texto';
+}
 
 function formatDateTime(value) {
   if (!value) return '-';
@@ -144,6 +162,18 @@ export default function RhDpImportacoes() {
   const [obras, setObras] = useState([]);
   const [importacoes, setImportacoes] = useState([]);
   const [detalhe, setDetalhe] = useState(null);
+
+  // Colunas do preview vindas do arquivo: id/titulo do catalogo, papel
+  // derivado do nome do campo (ver REGRAS_TIPO_PAYLOAD).
+  const colunasPayload = useMemo(
+    () => (IMPORTACAO_PAYLOAD_COLUMNS[detalhe?.tipo] || []).map((column) => ({
+      id: column.key,
+      titulo: column.label,
+      tipo: tipoDaColunaPayload(column.key),
+      render: (linha) => formatPayloadValue(linha.payload_json?.[column.key])
+    })),
+    [detalhe]
+  );
   const [filtros, setFiltros] = useState({
     tipo: '',
     competencia: '',
@@ -432,59 +462,72 @@ export default function RhDpImportacoes() {
       </div>
 
       <div className="rhdp-importacoes-workspace">
-        <div className="card sol-surface-card app-table-shell rhdp-importacoes-list-card">
-          <div className="app-dense-table-wrapper rhdp-importacoes-lotes-wrapper">
-            <table className="app-dense-data-table rhdp-importacoes-lotes-table">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Competencia</th>
-                  <th>Obra</th>
-                  <th>Status</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {importacoes.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="font-semibold text-slate-900">#{item.id}</div>
-                      <div className="text-xs uppercase tracking-wide text-slate-500">{item.tipo}</div>
-                      <div className="rhdp-importacoes-lote-file" title={item.nome_arquivo || ''}>
-                        {item.nome_arquivo || '-'}
-                      </div>
-                    </td>
-                    <td>{item.competencia}</td>
-                    <td>{item.obra?.codigo ? `${item.obra.codigo} - ${item.obra.nome}` : item.obra?.nome || '-'}</td>
-                    <td>
-                      <div className="font-semibold text-slate-900">{item.status}</div>
-                      <div className="text-xs text-slate-500">
-                        {item.total_validas || 0} valida(s) · {item.total_erros || 0} erro(s)
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      <button
-                        type="button"
-                        className="app-dense-icon-action"
-                        onClick={() => selecionarImportacao(item.id)}
-                        title="Ver preview"
-                        aria-label={`Ver preview da importacao ${item.id}`}
-                      >
-                        <HiOutlineEye aria-hidden="true" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!importacoes.length && (
-                  <tr>
-                    <td colSpan="5" align="center">
-                      {carregandoBase || carregandoLista ? 'Carregando...' : 'Nenhuma importacao RH/DP localizada'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="card sol-surface-card rhdp-importacoes-list-card">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'lote',
+                titulo: 'Lote',
+                // R17: o lote é nomeado pelo arquivo enviado (o numero sozinho
+                // nao diz a quem procura o envio que deu errado).
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={`#${item.id} · ${item.tipo}`}
+                    sub={item.nome_arquivo || '-'}
+                  />
+                )
+              },
+              {
+                id: 'competencia',
+                titulo: 'Competencia',
+                tipo: 'codigo',
+                ordenavel: true,
+                valorOrdenacao: (item) => String(item.competencia || ''),
+                render: (item) => item.competencia
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (item) => (item.obra?.codigo
+                  ? `${item.obra.codigo} - ${item.obra.nome}`
+                  : item.obra?.nome || '-')
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => item.status
+              },
+              {
+                id: 'resultado',
+                titulo: 'Resultado',
+                tipo: 'texto',
+                render: (item) => `${item.total_validas || 0} valida(s) · ${item.total_erros || 0} erro(s)`
+              }
+            ]}
+            itens={importacoes}
+            storageKey="tabela:rh-dp-importacoes:lotes"
+            rotuloRolagem="Lotes de importacao RH/DP"
+            carregando={carregandoBase || carregandoLista}
+            vazio="Nenhuma importacao RH/DP localizada"
+            linhaSelecionada={(item) => Number(detalhe?.id) === Number(item.id)}
+            urgencia={(item) => (Number(item.total_erros || 0) > 0 ? 'danger' : null)}
+            acoesLinha={(item) => (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => selecionarImportacao(item.id)}
+                title="Ver preview"
+                aria-label={`Ver preview da importacao ${item.id}`}
+              >
+                <HiOutlineEye aria-hidden="true" />
+              </button>
+            )}
+            larguraAcoes={120}
+          />
         </div>
 
         <div className="sol-surface-card rounded-xl p-4 space-y-4 rhdp-importacoes-detail-card">
@@ -540,45 +583,53 @@ export default function RhDpImportacoes() {
                 </div>
               )}
 
-              <div className="app-dense-table-wrapper max-h-[520px]">
-                <table className="app-dense-data-table rhdp-importacao-preview-table">
-                  <thead>
-                    <tr>
-                      <th>Linha</th>
-                      <th>Codigo/matricula</th>
-                      <th>Colaborador</th>
-                      <th>Status</th>
-                      {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
-                        <th key={column.key}>{column.label}</th>
-                      ))}
-                      <th>Erro</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(detalhe.linhas || []).map((linha) => (
-                      <tr key={linha.id}>
-                        <td>{linha.numero_linha}</td>
-                        <td>{getLinhaColaboradorCodigo(linha)}</td>
-                        <td className="font-semibold text-slate-900">{getLinhaColaboradorNome(linha)}</td>
-                        <td>{linha.status}</td>
-                        {(IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).map((column) => (
-                          <td key={column.key} className="text-sm text-slate-700">
-                            {formatPayloadValue(linha.payload_json?.[column.key])}
-                          </td>
-                        ))}
-                        <td className="text-sm text-rose-700">
-                          {linha.erro_mensagem ? `Linha ${linha.numero_linha}: ${linha.erro_mensagem}` : '-'}
-                        </td>
-                      </tr>
-                    ))}
-                    {!detalhe.linhas?.length && (
-                      <tr>
-                        <td colSpan={5 + (IMPORTACAO_PAYLOAD_COLUMNS[detalhe.tipo] || []).length} align="center">Sem linhas registradas</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'numero_linha',
+                    titulo: 'Linha',
+                    tipo: 'codigo',
+                    render: (linha) => linha.numero_linha
+                  },
+                  {
+                    id: 'codigo_ref',
+                    titulo: 'Codigo/matricula',
+                    tipo: 'codigo',
+                    render: (linha) => getLinhaColaboradorCodigo(linha)
+                  },
+                  {
+                    id: 'colaborador',
+                    titulo: 'Colaborador',
+                    // R17: a linha do preview é de um COLABORADOR nomeado.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (linha) => getLinhaColaboradorNome(linha)
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (linha) => linha.status
+                  },
+                  // Colunas VINDAS DO ARQUIVO importado: o papel de cada uma é
+                  // derivado aqui, no ponto de uso, para que nenhuma coluna
+                  // chegue à tabela sem `tipo`.
+                  ...colunasPayload,
+                  {
+                    id: 'erro',
+                    titulo: 'Erro',
+                    tipo: 'texto',
+                    render: (linha) => (linha.erro_mensagem
+                      ? <span className="text-rose-700">{`Linha ${linha.numero_linha}: ${linha.erro_mensagem}`}</span>
+                      : '-')
+                  }
+                ]}
+                itens={detalhe.linhas || []}
+                storageKey="tabela:rh-dp-importacoes:preview"
+                rotuloRolagem="Linhas do preview da importacao"
+                vazio="Sem linhas registradas"
+                urgencia={(linha) => (linha.erro_mensagem ? 'danger' : null)}
+              />
             </>
           )}
         </div>

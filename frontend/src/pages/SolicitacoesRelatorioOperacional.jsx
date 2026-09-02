@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
 import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import {
   getObrasVisiveisSolicitacoes,
@@ -13,15 +12,6 @@ const DEFAULT_FILTERS = {
   data_fim: '',
   obra_id: ''
 };
-
-const ACERTIVIDADE_COLUMNS = [
-  { key: 'usuario', width: 240, minWidth: 160 },
-  { key: 'criadas', width: 96, minWidth: 80 },
-  { key: 'ajustes', width: 145, minWidth: 115 },
-  { key: 'ocorrencias', width: 150, minWidth: 120 },
-  { key: 'acertividade', width: 135, minWidth: 110 },
-  { key: 'setores', width: 340, minWidth: 240 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -87,64 +77,6 @@ function extractErrorMessage(error) {
   return error?.data?.error || error?.message || 'Erro ao carregar relatorio de solicitacoes';
 }
 
-function EmptyRow({ colSpan, children }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center text-[var(--c-muted)] py-6">
-        {children}
-      </td>
-    </tr>
-  );
-}
-
-function SortableResizableTh({
-  columnKey,
-  sortKey = columnKey,
-  sortState,
-  onSort,
-  className = '',
-  children,
-  align = 'left',
-  title
-}) {
-  const active = sortState?.key === sortKey;
-  const direction = active ? sortState.direction : null;
-  const justifyClass = align === 'right' ? 'justify-end text-right' : 'justify-start text-left';
-
-  return (
-    <ResizableTh columnKey={columnKey} className={className} title={title}>
-      <button
-        type="button"
-        className={`inline-flex w-full items-center gap-1.5 rounded-md text-xs font-bold uppercase tracking-[0.08em] text-[var(--c-text)] transition hover:text-[var(--c-primary)] ${justifyClass}`}
-        onClick={() => onSort(sortKey)}
-        title={title || 'Ordenar coluna'}
-      >
-        <span>{children}</span>
-        <span className={`text-[10px] ${active ? 'text-[var(--c-primary)]' : 'text-[var(--c-muted)]'}`}>
-          {direction === 'asc' ? 'ASC' : direction === 'desc' ? 'DESC' : '--'}
-        </span>
-      </button>
-    </ResizableTh>
-  );
-}
-
-function getAcertividadeSortValue(item, key) {
-  switch (key) {
-    case 'usuario':
-      return String(item.usuario_nome || 'Sem criador').toLowerCase();
-    case 'criadas':
-      return Number(item.total_criadas || 0);
-    case 'ajustes':
-      return Number(item.solicitacoes_com_ajuste || 0);
-    case 'ocorrencias':
-      return Number(item.ocorrencias_setor_ajuste || 0);
-    case 'acertividade':
-      return Number(item.taxa_acertividade || 0);
-    default:
-      return 0;
-  }
-}
-
 export default function SolicitacoesRelatorioOperacional() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
@@ -152,7 +84,6 @@ export default function SolicitacoesRelatorioOperacional() {
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
-  const [acertividadeSort, setAcertividadeSort] = useState({ key: 'ajustes', direction: 'desc' });
 
   useEffect(() => {
     let ativo = true;
@@ -216,21 +147,15 @@ export default function SolicitacoesRelatorioOperacional() {
     () => (Array.isArray(relatorio?.pendencias_financeiras_criador) ? relatorio.pendencias_financeiras_criador : []),
     [relatorio]
   );
-  const acertividadeCriacaoOrdenada = useMemo(() => {
-    return [...acertividadeCriacao].sort((a, b) => {
-      const aValue = getAcertividadeSortValue(a, acertividadeSort.key);
-      const bValue = getAcertividadeSortValue(b, acertividadeSort.key);
-      let comparison = 0;
-
-      if (typeof aValue === 'string' || typeof bValue === 'string') {
-        comparison = String(aValue).localeCompare(String(bValue), 'pt-BR', { sensitivity: 'base' });
-      } else {
-        comparison = Number(aValue || 0) - Number(bValue || 0);
-      }
-
-      return acertividadeSort.direction === 'asc' ? comparison : comparison * -1;
-    });
-  }, [acertividadeCriacao, acertividadeSort]);
+  // ORDEM INICIAL da tabela: quem mais voltou para ajuste primeiro — a
+  // mesma de antes. Do primeiro clique num título em diante quem ordena é a
+  // TabelaPadrao (asc → desc → volta a esta ordem), com os MESMOS campos:
+  // usuario, criadas, com ajuste, ocorrencias e acertividade.
+  const acertividadeCriacaoOrdenada = useMemo(() => (
+    [...acertividadeCriacao].sort(
+      (a, b) => Number(b.solicitacoes_com_ajuste || 0) - Number(a.solicitacoes_com_ajuste || 0)
+    )
+  ), [acertividadeCriacao]);
   const porResponsavel = useMemo(() => (Array.isArray(relatorio?.por_responsavel) ? relatorio.por_responsavel : []), [relatorio]);
   const temposEtapas = useMemo(() => (Array.isArray(relatorio?.tempos_etapas) ? relatorio.tempos_etapas : []), [relatorio]);
   const evolucaoMensal = useMemo(() => (Array.isArray(relatorio?.evolucao_mensal) ? relatorio.evolucao_mensal : []), [relatorio]);
@@ -301,15 +226,6 @@ export default function SolicitacoesRelatorioOperacional() {
     () => Math.max(...setorStatus.map((item) => Number(item.total || 0)), 0),
     [setorStatus]
   );
-
-  function ordenarAcertividade(key) {
-    setAcertividadeSort((current) => {
-      if (current.key === key) {
-        return { key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
-      }
-      return { key, direction: key === 'usuario' ? 'asc' : 'desc' };
-    });
-  }
 
   function aplicarFiltros(event) {
     event.preventDefault();
@@ -745,7 +661,7 @@ export default function SolicitacoesRelatorioOperacional() {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Tempos por etapa</h2>
           <p className="page-subtitle mb-3">Medias calculadas apenas quando a etapa possui data real registrada.</p>
           <TabelaPadrao
@@ -770,7 +686,7 @@ export default function SolicitacoesRelatorioOperacional() {
           />
         </div>
 
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Aging por setor atual</h2>
           <p className="page-subtitle mb-3">Solicitacoes abertas agrupadas pelo setor em que estao paradas agora.</p>
           <TabelaPadrao
@@ -797,7 +713,7 @@ export default function SolicitacoesRelatorioOperacional() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
+      <div className="mt-4 card sol-surface-card overflow-clip">
         <div className="app-page-header-row mb-3">
           <div>
             <h2 className="text-lg font-bold text-[var(--c-text)]">Pendencias financeiras por usuario</h2>
@@ -874,7 +790,7 @@ export default function SolicitacoesRelatorioOperacional() {
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por status</h2>
           <TabelaPadrao
             colunas={[
@@ -897,7 +813,7 @@ export default function SolicitacoesRelatorioOperacional() {
           />
         </div>
 
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por setor atual</h2>
           <TabelaPadrao
             colunas={[
@@ -920,7 +836,7 @@ export default function SolicitacoesRelatorioOperacional() {
           />
         </div>
 
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por obra/centro</h2>
           <TabelaPadrao
             colunas={[
@@ -950,7 +866,7 @@ export default function SolicitacoesRelatorioOperacional() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
+      <div className="mt-4 card sol-surface-card overflow-clip">
         <div className="app-page-header-row mb-3">
           <div>
             <h2 className="text-lg font-bold text-[var(--c-text)]">Acertividade na criacao por usuario</h2>
@@ -962,122 +878,108 @@ export default function SolicitacoesRelatorioOperacional() {
         <div className="mb-3 rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-sm text-amber-800">
           <strong>Leitura:</strong> "Com ajuste" conta cada solicitacao uma unica vez. "Ocorrencias por setor" pode ser maior quando a mesma solicitacao recebeu ajuste de mais de um setor.
         </div>
-        <div className="sol-table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={ACERTIVIDADE_COLUMNS}
-            storageKey="fluxy.solicitacoes.relatorio.acertividadeCriacao.columns"
-          >
-            <thead>
-              <tr>
-                <SortableResizableTh
-                  columnKey="usuario"
-                  sortState={acertividadeSort}
-                  onSort={ordenarAcertividade}
-                  title="Ordenar usuario de A-Z ou Z-A"
-                >
-                  Usuario criador
-                </SortableResizableTh>
-                <SortableResizableTh
-                  columnKey="criadas"
-                  sortState={acertividadeSort}
-                  onSort={ordenarAcertividade}
-                  align="right"
-                  className="text-right"
-                  title="Ordenar pela quantidade de solicitacoes criadas"
-                >
-                  Criadas
-                </SortableResizableTh>
-                <SortableResizableTh
-                  columnKey="ajustes"
-                  sortState={acertividadeSort}
-                  onSort={ordenarAcertividade}
-                  align="right"
-                  className="text-right"
-                  title="Ordenar pela quantidade de solicitacoes com ajuste"
-                >
-                  Com ajuste
-                </SortableResizableTh>
-                <SortableResizableTh
-                  columnKey="ocorrencias"
-                  sortState={acertividadeSort}
-                  onSort={ordenarAcertividade}
-                  align="right"
-                  className="text-right"
-                  title="Ordenar pelo total de ocorrencias por setor"
-                >
-                  Ocorr. setor
-                </SortableResizableTh>
-                <SortableResizableTh
-                  columnKey="acertividade"
-                  sortState={acertividadeSort}
-                  onSort={ordenarAcertividade}
-                  align="right"
-                  className="text-right"
-                  title="Ordenar pela taxa de acertividade"
-                >
-                  Acertividade
-                </SortableResizableTh>
-                <ResizableTh columnKey="setores">Setores que pediram ajuste</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <EmptyRow colSpan={6}>Carregando acertividade...</EmptyRow>
-              ) : acertividadeCriacao.length === 0 ? (
-                <EmptyRow colSpan={6}>Sem solicitacoes criadas no periodo.</EmptyRow>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'usuario',
+              titulo: 'Usuario criador',
+              // R17: o criador NOMEIA a linha desta tabela.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              ordenavel: true,
+              valorOrdenacao: (item) => String(item.usuario_nome || 'Sem criador'),
+              render: (item) => item.usuario_nome || 'Sem criador'
+            },
+            {
+              id: 'criadas',
+              titulo: 'Criadas',
+              tipo: 'numero',
+              ordenavel: true,
+              // Quantidade interessa do MAIOR para o menor no 1o clique.
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.total_criadas || 0),
+              render: (item) => formatNumber(item.total_criadas)
+            },
+            {
+              id: 'ajustes',
+              titulo: 'Com ajuste',
+              tipo: 'numero',
+              ordenavel: true,
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.solicitacoes_com_ajuste || 0),
+              render: (item) => (
+                <>
+                  <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {formatPercent(item.taxa_ajuste)} das criadas
+                  </div>
+                </>
+              )
+            },
+            {
+              id: 'ocorrencias',
+              titulo: 'Ocorr. setor',
+              tipo: 'numero',
+              ordenavel: true,
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.ocorrencias_setor_ajuste || 0),
+              render: (item) => (
+                <>
+                  <strong>{formatNumber(item.ocorrencias_setor_ajuste)}</strong>
+                  {Number(item.solicitacoes_com_ajuste_multissetor || 0) > 0 ? (
+                    <div className="text-xs text-amber-700">
+                      {formatNumber(item.solicitacoes_com_ajuste_multissetor)} multi-setor
+                    </div>
+                  ) : (
+                    <div className="text-xs text-[var(--c-muted)]">sem multi-setor</div>
+                  )}
+                </>
+              )
+            },
+            {
+              id: 'acertividade',
+              titulo: 'Acertividade',
+              tipo: 'numero',
+              ordenavel: true,
+              ordemInicial: 'desc',
+              valorOrdenacao: (item) => Number(item.taxa_acertividade || 0),
+              render: (item) => (
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
+                  {formatPercent(item.taxa_acertividade)}
+                </span>
+              )
+            },
+            {
+              id: 'setores',
+              titulo: 'Setores que pediram ajuste',
+              tipo: 'texto',
+              render: (item) => (Array.isArray(item.ajustes_por_setor) && item.ajustes_por_setor.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {item.ajustes_por_setor.map((setor) => (
+                    <span
+                      key={`${item.key}-${setor.setor}`}
+                      className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700"
+                    >
+                      {formatLabel(setor.setor)}: {formatNumber(setor.total)}
+                    </span>
+                  ))}
+                </div>
               ) : (
-                acertividadeCriacaoOrdenada.map((item) => (
-                  <tr key={item.key}>
-                    <td>{item.usuario_nome || 'Sem criador'}</td>
-                    <td className="text-right">{formatNumber(item.total_criadas)}</td>
-                    <td className="text-right">
-                      <strong>{formatNumber(item.solicitacoes_com_ajuste)}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {formatPercent(item.taxa_ajuste)} das criadas
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      <strong>{formatNumber(item.ocorrencias_setor_ajuste)}</strong>
-                      {Number(item.solicitacoes_com_ajuste_multissetor || 0) > 0 ? (
-                        <div className="text-xs text-amber-700">
-                          {formatNumber(item.solicitacoes_com_ajuste_multissetor)} multi-setor
-                        </div>
-                      ) : (
-                        <div className="text-xs text-[var(--c-muted)]">sem multi-setor</div>
-                      )}
-                    </td>
-                    <td className="text-right">
-                      <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700">
-                        {formatPercent(item.taxa_acertividade)}
-                      </span>
-                    </td>
-                    <td>
-                      {Array.isArray(item.ajustes_por_setor) && item.ajustes_por_setor.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {item.ajustes_por_setor.map((setor) => (
-                            <span
-                              key={`${item.key}-${setor.setor}`}
-                              className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700"
-                            >
-                              {formatLabel(setor.setor)}: {formatNumber(setor.total)}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-[var(--c-muted)]">Sem ajustes</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+                <span className="text-[var(--c-muted)]">Sem ajustes</span>
+              ))
+            }
+          ]}
+          itens={acertividadeCriacaoOrdenada}
+          getId={(item) => item.key}
+          carregando={loading}
+          vazio="Sem solicitacoes criadas no periodo."
+          storageKey="tabela:solicitacoes-relatorio-operacional:acertividade-criacao"
+          rotuloRolagem="Acertividade na criacao por usuario"
+        />
       </div>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-3">
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por tipo</h2>
           <TabelaPadrao
             colunas={[
@@ -1100,7 +1002,7 @@ export default function SolicitacoesRelatorioOperacional() {
           />
         </div>
 
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por responsavel atual</h2>
           <TabelaPadrao
             colunas={[
@@ -1123,7 +1025,7 @@ export default function SolicitacoesRelatorioOperacional() {
           />
         </div>
 
-        <div className="card sol-surface-card overflow-hidden">
+        <div className="card sol-surface-card overflow-clip">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-3">Por criador</h2>
           <TabelaPadrao
             colunas={[
@@ -1147,7 +1049,7 @@ export default function SolicitacoesRelatorioOperacional() {
         </div>
       </div>
 
-      <div className="mt-4 card sol-surface-card overflow-hidden">
+      <div className="mt-4 card sol-surface-card overflow-clip">
         <div className="app-page-header-row mb-3">
           <div>
             <h2 className="text-lg font-bold text-[var(--c-text)]">Gargalos operacionais</h2>

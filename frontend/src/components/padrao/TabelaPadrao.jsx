@@ -47,6 +47,9 @@ export function CelulaDupla({ principal, sub, title }) {
  *   1. ORDENAÇÃO      — coluna com `ordenavel`: clique no título ordena
  *                       (asc → desc → sem ordem). O menu de alinhamento sai
  *                       do título e vira ícone próprio (ver R14/R15 abaixo).
+ *                       Em lista PAGINADA NO SERVIDOR, passe `aoOrdenar`: a
+ *                       tela reconsulta e o componente não ordena local —
+ *                       ordenar só a página mente sobre o conjunto.
  *   2. COLUNAS DO USUÁRIO — `colunasConfiguraveis`: painel para mostrar,
  *                       esconder e reordenar; escolha salva por lista.
  *   3. SELEÇÃO EM LOTE — `selecao`: coluna de marcação com "todos" no
@@ -346,6 +349,7 @@ export default function TabelaPadrao({
   agruparPor,           // { chave(item), titulo(chave, itens) }
   colunasConfiguraveis = false,
   aoMudarColunas,       // (idsVisiveis[]) => void — a tela precisa saber (ex.: exportar CSV só do que está à vista)
+  aoOrdenar,            // (coluna, direcao|null) => void — LISTA PAGINADA NO SERVIDOR: a tela reconsulta; o componente NÃO ordena local
   linhaSelecionada,     // (item) => boolean — realce e aria-selected da linha
   acoesTabela           // ReactNode extra na barra acima da tabela
 }) {
@@ -454,6 +458,12 @@ export default function TabelaPadrao({
 
   /* ---- Ordenação (clique no título) ----------------------------------- */
   const [ordem, setOrdem] = useState(null); // { coluna, direcao } | null
+  /* Lista PAGINADA NO SERVIDOR não pode ser ordenada localmente: ordenar
+     só a página à vista faz o usuário ler "os maiores do conjunto" quando
+     são apenas os maiores DAQUELES 25 — mentira pior que a ausência da
+     ordenação. Com `aoOrdenar`, a tela reconsulta o servidor e o
+     componente só exibe o indicador. */
+  const ordenaNoServidor = typeof aoOrdenar === 'function';
   const alternarOrdem = (colunaId) => {
     // `ordemInicial: 'desc'` na coluna: dinheiro e quantidade costumam
     // interessar do MAIOR para o menor no primeiro clique.
@@ -467,7 +477,20 @@ export default function TabelaPadrao({
     });
   };
 
+  // Avisa a tela DEPOIS que o estado mudou (a tela reconsulta com a ordem).
+  const ordemAnterior = useRef(null);
+  useEffect(() => {
+    if (!ordenaNoServidor) return;
+    const chave = ordem ? `${ordem.coluna}:${ordem.direcao}` : '';
+    if (ordemAnterior.current === chave) return;
+    ordemAnterior.current = chave;
+    aoOrdenar(ordem?.coluna ?? null, ordem?.direcao ?? null);
+  }, [ordem, ordenaNoServidor, aoOrdenar]);
+
   const itensOrdenados = useMemo(() => {
+    // Ordenação no servidor: os itens já chegam ordenados; reordenar aqui
+    // embaralharia a página.
+    if (ordenaNoServidor) return itens;
     if (!ordem) return itens;
     const coluna = colunasBase.find((c) => c.id === ordem.coluna);
     if (!coluna) return itens;
@@ -475,7 +498,7 @@ export default function TabelaPadrao({
     const fator = ordem.direcao === 'desc' ? -1 : 1;
     // Cópia: ordenar não pode mutar o array da tela.
     return [...itens].sort((a, b) => fator * compararValores(valorDe(a), valorDe(b)));
-  }, [itens, ordem, colunasBase]);
+  }, [itens, ordem, colunasBase, ordenaNoServidor]);
 
   /* ---- Seleção em lote ------------------------------------------------ */
   const selecionados = useMemo(() => {

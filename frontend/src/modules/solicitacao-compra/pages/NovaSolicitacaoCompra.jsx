@@ -14,6 +14,7 @@ import {
 import { buscarParceiros, criarCredorCompraDireta } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
+import { TabelaPadrao } from '../../../components/padrao';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import CompraPreviewModal from '../components/CompraPreviewModal';
@@ -564,6 +565,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       return nome.includes(termo) || codigo.includes(termo) || categoria.includes(termo);
     });
   }, [buscaInsumo, insumos]);
+
+  // A grade edita por POSICAO na lista; a tabela precisa de um id estavel por
+  // linha, entao o indice viaja junto do item.
+  const itensGrade = useMemo(
+    () => itens.map((item, indice) => ({ ...item, __indice: indice })),
+    [itens]
+  );
 
   const itensPendentesApropriacao = useMemo(
     () => itens.filter((item) => !validarRateiosItem(item).ok).length,
@@ -1889,166 +1897,231 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
           {itens.length === 0 ? (
             <div className="compra-itens-empty py-8 text-center text-sm text-[var(--c-muted)]">Adicione itens a partir da lista de insumos ou crie item manual.</div>
           ) : (
-            <div className="compras-responsive-table compra-itens-table-wrap">
-              <table className="table compra-itens-table">
-                <thead>
-                  <tr>
-                    <th>Insumo</th>
-                    <th>Unidade</th>
-                    <th>Quantidade *</th>
-                    {modoCompraDireta && <th>Valor unitário *</th>}
-                    {modoCompraDireta && <th>Total</th>}
-                    {!modoCompraDireta && <th>Especificação</th>}
-                    <th>Apropriação *</th>
-                    {!modoCompraDireta && <th>Necessário para</th>}
-                    {!modoCompraDireta && <th>Link do produto</th>}
-                    {!modoCompraDireta && <th>Arquivo do item</th>}
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {itens.map((item, index) => (
-                    <tr key={`${item.manual ? 'manual' : item.insumo_id}-${index}`}>
-                      <td>
-                        <input
-                          className={`input min-w-[240px] ${item.manual ? 'border-red-300 text-red-700' : ''}`}
-                          value={item.insumo_nome}
-                          disabled={!item.manual}
-                          onChange={(event) => atualizarItem(index, 'insumo_nome', event.target.value)}
-                        />
-                        {false && (
-                          <p className="mt-1 text-[11px] text-[var(--c-muted)]">
-                            Últ. compra: <span className="font-semibold text-emerald-700">R$ {Number(item.ultimo_preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                          </p>
-                        )}
-                      </td>
-                      <td>
-                        <select
-                          className="input min-w-[110px]"
-                          value={item.unidade_id ? String(item.unidade_id) : ''}
-                          onChange={(event) => atualizarUnidadeItem(index, event.target.value)}
-                        >
-                          <option value="">Selecione</option>
-                          {unidades.map((unidade) => (
-                            <option key={unidade.id || unidade.sigla} value={unidade.id}>
-                              {unidade.sigla || unidade.nome}{unidade.nome && unidade.sigla ? ` - ${unidade.nome}` : ''}
-                            </option>
-                          ))}
-                        </select>
-                        {!item.unidade_id && item.unidade_sigla ? (
-                          <p className="mt-1 text-[11px] text-[var(--c-muted)]">Atual: {item.unidade_sigla}</p>
-                        ) : null}
-                      </td>
-                      <td><input type="number" min="0.01" step="0.01" className="input min-w-[110px]" value={item.quantidade} onChange={(event) => atualizarItem(index, 'quantidade', event.target.value)} /></td>
-                      {modoCompraDireta && (
-                        <td>
-                          <input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            className="input min-w-[140px]"
-                            value={item.valor_unitario}
-                            onChange={(event) => atualizarItem(index, 'valor_unitario', event.target.value)}
-                          />
-                        </td>
-                      )}
-                      {modoCompraDireta && (
-                        <td>
-                          <div className="min-w-[130px] rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm font-semibold">
-                            {formatarMoeda(calcularValorTotalItem(item))}
-                          </div>
-                        </td>
-                      )}
-                      {!modoCompraDireta && (
-                        <td><input className="input min-w-[260px]" value={item.especificacao} onChange={(event) => atualizarItem(index, 'especificacao', event.target.value)} /></td>
-                      )}
-                      <td>
-                        {(() => {
-                          const linhasApropriacao = montarLinhasResumoApropriacao(item, apropriacoes);
-                          const resumoApropriacao = calcularResumoRateios(item);
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'insumo',
+                  titulo: 'Insumo',
+                  // R17: o INSUMO é o que nomeia o item da solicitação.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  // Entrada de dados: o controle mora no render da coluna.
+                  render: (item) => (
+                    <input
+                      className={`input ${item.manual ? 'border-red-300 text-red-700' : ''}`}
+                      aria-label="Nome do insumo"
+                      value={item.insumo_nome}
+                      disabled={!item.manual}
+                      onChange={(event) => atualizarItem(item.__indice, 'insumo_nome', event.target.value)}
+                    />
+                  )
+                },
+                {
+                  id: 'unidade',
+                  titulo: 'Unidade',
+                  tipo: 'codigo',
+                  render: (item) => (
+                    <>
+                      <select
+                        className="input"
+                        aria-label="Unidade do item"
+                        value={item.unidade_id ? String(item.unidade_id) : ''}
+                        onChange={(event) => atualizarUnidadeItem(item.__indice, event.target.value)}
+                      >
+                        <option value="">Selecione</option>
+                        {unidades.map((unidade) => (
+                          <option key={unidade.id || unidade.sigla} value={unidade.id}>
+                            {unidade.sigla || unidade.nome}{unidade.nome && unidade.sigla ? ` - ${unidade.nome}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      {!item.unidade_id && item.unidade_sigla ? (
+                        <p className="mt-1 text-xs text-[var(--c-muted)]">Atual: {item.unidade_sigla}</p>
+                      ) : null}
+                    </>
+                  )
+                },
+                {
+                  id: 'quantidade',
+                  titulo: 'Quantidade *',
+                  tipo: 'numero',
+                  render: (item) => (
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      className="input"
+                      aria-label="Quantidade do item"
+                      value={item.quantidade}
+                      onChange={(event) => atualizarItem(item.__indice, 'quantidade', event.target.value)}
+                    />
+                  )
+                },
+                ...(modoCompraDireta ? [
+                  {
+                    id: 'valor_unitario',
+                    titulo: 'Valor unitário *',
+                    tipo: 'valor',
+                    render: (item) => (
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        className="input"
+                        aria-label="Valor unitário do item"
+                        value={item.valor_unitario}
+                        onChange={(event) => atualizarItem(item.__indice, 'valor_unitario', event.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'valor_total',
+                    titulo: 'Total',
+                    tipo: 'valor',
+                    render: (item) => <strong>{formatarMoeda(calcularValorTotalItem(item))}</strong>
+                  }
+                ] : [
+                  {
+                    id: 'especificacao',
+                    titulo: 'Especificação',
+                    tipo: 'texto',
+                    render: (item) => (
+                      <input
+                        className="input"
+                        aria-label="Especificação do item"
+                        value={item.especificacao}
+                        onChange={(event) => atualizarItem(item.__indice, 'especificacao', event.target.value)}
+                      />
+                    )
+                  }
+                ]),
+                {
+                  id: 'apropriacao',
+                  titulo: 'Apropriação *',
+                  tipo: 'texto',
+                  render: (item) => {
+                    const linhasApropriacao = montarLinhasResumoApropriacao(item, apropriacoes);
+                    const resumoApropriacao = calcularResumoRateios(item);
 
-                          return (
-                            <div className="flex min-w-[200px] items-center gap-2">
-                              <div className="flex-1 min-w-0">
-                                {linhasApropriacao.length > 0 ? (
-                                  <>
-                                    <div className="grid gap-0.5 text-xs text-[var(--c-text)]">
-                                      {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
-                                        <div key={`${linha}-${linhaIndex}`} className="truncate">{linha}</div>
-                                      ))}
-                                      {linhasApropriacao.length > 2 && (
-                                        <div className="text-[var(--c-muted)]">+{linhasApropriacao.length - 2} rateio(s)</div>
-                                      )}
-                                    </div>
-                                    <div className={`text-[11px] font-semibold ${resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'}`}>
-                                      {resumoApropriacao.fechado ? 'Fechado' : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
-                                    </div>
-                                  </>
-                                ) : (
-                                  <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>
+                    return (
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          {linhasApropriacao.length > 0 ? (
+                            <>
+                              <div className="grid gap-1 text-xs text-[var(--c-text)]">
+                                {linhasApropriacao.slice(0, 2).map((linha, linhaIndex) => (
+                                  <div key={`${linha}-${linhaIndex}`} className="truncate">{linha}</div>
+                                ))}
+                                {linhasApropriacao.length > 2 && (
+                                  <div className="text-[var(--c-muted)]">+{linhasApropriacao.length - 2} rateio(s)</div>
                                 )}
                               </div>
-                              <button type="button" className="btn btn-outline text-xs px-2 py-1 shrink-0" onClick={() => abrirModalApropriacao(index)}>
-                                {linhasApropriacao.length > 0 ? 'Editar' : 'Apropriar'}
-                              </button>
-                            </div>
-                          );
-                        })()}
-                      </td>
-                      {!modoCompraDireta && <td><input type="date" className={`input min-w-[170px] ${!item.necessario_para ? 'border-red-400' : ''}`} value={item.necessario_para} onChange={(event) => atualizarItem(index, 'necessario_para', event.target.value)} required /></td>}
-                      {!modoCompraDireta && (
-                        <td>
-                          <input
-                            type="url"
-                            className="input min-w-[260px]"
-                            placeholder="https://"
-                            value={item.link_produto}
-                            onChange={(event) => atualizarItem(index, 'link_produto', event.target.value)}
-                          />
-                        </td>
-                      )}
-                      {!modoCompraDireta && (
-                        <td>
-                          <div className="flex min-w-[260px] flex-col gap-2">
-                            <label className={`btn btn-outline cursor-pointer justify-center ${uploadingArquivos[index] ? 'pointer-events-none opacity-60' : ''}`}>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept={ITEM_ATTACHMENT_ACCEPT}
-                                onChange={(event) => {
-                                  const [file] = Array.from(event.target.files || []);
-                                  void handleSelecionarArquivo(index, file);
-                                  event.target.value = '';
-                                }}
-                              />
-                              {uploadingArquivos[index]
-                                ? 'Enviando...'
-                                : item.arquivo_nome_original
-                                  ? 'Trocar arquivo'
-                                  : 'Anexar arquivo'}
-                            </label>
-                            <div className="text-xs text-[var(--c-muted)]">
-                              {item.arquivo_nome_original || 'Sem arquivo anexado'}
-                            </div>
-                            {item.arquivo_url && (
-                              <div className="flex flex-wrap gap-2 text-xs">
-                                <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
-                                  Abrir
-                                </button>
-                                <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(index)}>
-                                  Remover arquivo
-                                </button>
+                              <div className={`text-xs font-semibold ${resumoApropriacao.fechado ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                {resumoApropriacao.fechado ? 'Fechado' : `Saldo ${formatarQuantidade(resumoApropriacao.saldo)}`}
                               </div>
-                            )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-[var(--c-muted)]">Nenhuma</span>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-sm shrink-0"
+                          onClick={() => abrirModalApropriacao(item.__indice)}
+                        >
+                          {linhasApropriacao.length > 0 ? 'Editar' : 'Apropriar'}
+                        </button>
+                      </div>
+                    );
+                  }
+                },
+                ...(modoCompraDireta ? [] : [
+                  {
+                    id: 'necessario_para',
+                    titulo: 'Necessário para',
+                    tipo: 'data',
+                    render: (item) => (
+                      <input
+                        type="date"
+                        className={`input ${!item.necessario_para ? 'border-red-400' : ''}`}
+                        aria-label="Data em que o item é necessário"
+                        value={item.necessario_para}
+                        onChange={(event) => atualizarItem(item.__indice, 'necessario_para', event.target.value)}
+                        required
+                      />
+                    )
+                  },
+                  {
+                    id: 'link_produto',
+                    titulo: 'Link do produto',
+                    tipo: 'texto',
+                    render: (item) => (
+                      <input
+                        type="url"
+                        className="input"
+                        placeholder="https://"
+                        aria-label="Link do produto"
+                        value={item.link_produto}
+                        onChange={(event) => atualizarItem(item.__indice, 'link_produto', event.target.value)}
+                      />
+                    )
+                  },
+                  {
+                    id: 'arquivo',
+                    titulo: 'Arquivo do item',
+                    tipo: 'texto',
+                    render: (item) => (
+                      <div className="flex flex-col gap-2">
+                        <label className={`btn btn-outline cursor-pointer justify-center ${uploadingArquivos[item.__indice] ? 'pointer-events-none opacity-60' : ''}`}>
+                          <input
+                            type="file"
+                            className="hidden"
+                            accept={ITEM_ATTACHMENT_ACCEPT}
+                            onChange={(event) => {
+                              const [file] = Array.from(event.target.files || []);
+                              void handleSelecionarArquivo(item.__indice, file);
+                              event.target.value = '';
+                            }}
+                          />
+                          {uploadingArquivos[item.__indice]
+                            ? 'Enviando...'
+                            : item.arquivo_nome_original
+                              ? 'Trocar arquivo'
+                              : 'Anexar arquivo'}
+                        </label>
+                        <div className="text-xs text-[var(--c-muted)]">
+                          {item.arquivo_nome_original || 'Sem arquivo anexado'}
+                        </div>
+                        {item.arquivo_url && (
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            <button type="button" className="text-blue-600 hover:underline" onClick={() => abrirArquivoItem(item)}>
+                              Abrir
+                            </button>
+                            <button type="button" className="text-red-600 hover:underline" onClick={() => removerArquivoItem(item.__indice)}>
+                              Remover arquivo
+                            </button>
                           </div>
-                        </td>
-                      )}
-                      <td><button type="button" className="btn btn-danger min-w-[110px] justify-center" onClick={() => removerItem(index)}>Remover</button></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        )}
+                      </div>
+                    )
+                  }
+                ])
+              ]}
+              itens={itensGrade}
+              getId={(item) => `${item.manual ? 'manual' : item.insumo_id}-${item.__indice}`}
+              storageKey={modoCompraDireta
+                ? 'tabela:nova-solicitacao-compra:itens-direta'
+                : 'tabela:nova-solicitacao-compra:itens'}
+              rotuloRolagem="Itens da solicitação"
+              vazio="Adicione itens a partir da lista de insumos ou crie item manual."
+              urgencia={(item) => (calcularResumoRateios(item).fechado ? null : 'warning')}
+              acoesLinha={(item) => (
+                <button type="button" className="btn btn-danger btn-sm" onClick={() => removerItem(item.__indice)}>
+                  Remover
+                </button>
+              )}
+              larguraAcoes={140}
+            />
           )}
 
           <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">

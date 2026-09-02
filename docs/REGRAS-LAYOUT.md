@@ -208,6 +208,13 @@ automaticamente se sair do padrão.
 - Ordenação é **opt-in por coluna**: ligar em todas de uma vez mudaria o
   comportamento de 108 telas em silêncio. Ciclo de três estados —
   crescente, decrescente, e de volta à ordem que a tela definiu.
+- **Lista PAGINADA NO SERVIDOR ordena NO SERVIDOR** (`aoOrdenar`): ordenar
+  só a página carregada faz o usuário ler "os maiores do conjunto" quando
+  são apenas os maiores daqueles 25 — **mentira pior que a ausência da
+  ordenação**. Com `aoOrdenar` a tela reconsulta (e volta à página 1); sem
+  ele, o componente ordena o que recebeu, o que só vale para lista
+  completa em memória. Tela paginada que não puder ordenar no servidor
+  NÃO declara `ordenavel`.
 
 ## R15 — Toda capacidade interativa precisa de affordance VISÍVEL (02/09)
 
