@@ -1,0 +1,655 @@
+// =====================================================================
+// FONTE ÚNICA DE NAVEGAÇÃO
+// ---------------------------------------------------------------------
+// Toda a navegação do sistema (hub principal, hubs de módulo, breadcrumb
+// e busca global Ctrl+K) lê desta árvore. NUNCA duplique esta lista em
+// outro lugar: para adicionar uma tela nova, inclua o nó aqui e a rota
+// correspondente no App.jsx (ver docs/DESIGN-SYSTEM.md).
+//
+// Cada nó tem:
+//   id     - identificador estável (usado na rota /hub/:moduleId)
+//   label  - rótulo exibido (ou getLabel(user) quando varia por perfil)
+//   desc   - uma linha do que se faz na tela/módulo
+//   icon   - componente react-icons/hi2 (associação literal com a função)
+//   to     - rota de destino (apenas folhas)
+//   can    - predicado de permissão; reutiliza as MESMAS funções de
+//            utils/acessoProduto.js usadas pelas rotas do App.jsx.
+//            Módulo sem nenhum filho visível não aparece no hub.
+//   ordem  - posição do card no hub (10, 20, 30…). Critério: tela
+//            principal do módulo primeiro, ação de criação em seguida,
+//            depois operação diária, consultas/relatórios e por último
+//            o raro/arquivo/configuração. A ordem dos cards vem SÓ
+//            daqui — nunca da antiga sidebar.
+//   fixavel- todo destino com rota é fixável como atalho (estrela no
+//            topo da tela). Marque `fixavel: 'acao'` quando o destino
+//            abre PRONTO PARA USO (formulários "Novo/Nova", upload):
+//            esses aparecem com selo de ação no painel de atalhos.
+//            `fixavel: false` desabilita a estrela para o destino.
+// =====================================================================
+import {
+  HiOutlineSquares2X2,
+  HiOutlinePlusCircle,
+  HiOutlineClipboardDocumentList,
+  HiOutlineClipboardDocumentCheck,
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineCloudArrowUp,
+  HiOutlineReceiptRefund,
+  HiOutlineReceiptPercent,
+  HiOutlineUsers,
+  HiOutlineUserGroup,
+  HiOutlineUserCircle,
+  HiOutlineUserPlus,
+  HiOutlineWallet,
+  HiOutlineBuildingOffice2,
+  HiOutlineBuildingStorefront,
+  HiOutlineBuildingLibrary,
+  HiOutlineAdjustmentsHorizontal,
+  HiOutlineCog6Tooth,
+  HiOutlineBanknotes,
+  HiOutlineFolderOpen,
+  HiOutlineArchiveBox,
+  HiOutlineDocumentText,
+  HiOutlineDocumentCheck,
+  HiOutlineExclamationTriangle,
+  HiOutlineShieldCheck,
+  HiOutlineInboxStack,
+  HiOutlinePaperAirplane,
+  HiOutlineSparkles,
+  HiOutlineKey,
+  HiOutlineCreditCard,
+  HiOutlineChatBubbleOvalLeft,
+  HiOutlineBell,
+  HiOutlineAcademicCap,
+  HiOutlineBookOpen,
+  HiOutlineShoppingCart,
+  HiOutlineScale,
+  HiOutlineTruck,
+  HiOutlineChartBar,
+  HiOutlineCalendarDays,
+  HiOutlineArrowTrendingUp,
+  HiOutlineArrowDownCircle,
+  HiOutlineArrowUpCircle,
+  HiOutlineIdentification,
+  HiOutlineMapPin,
+  HiOutlineTableCells,
+  HiOutlineStar,
+  HiOutlinePresentationChartLine,
+  HiOutlineRectangleGroup
+} from 'react-icons/hi2';
+import {
+  canAccessBiblioteca,
+  canAccessBoletos,
+  canAccessComercial,
+  canAccessCadastroObras,
+  canAccessComunicacao,
+  canAccessConfiguracoes,
+  canAccessCompras,
+  canAccessDashboard,
+  canAccessContratos,
+  canAccessFinanceiro,
+  canAccessFinanceiroDda,
+  canAccessBancosEnterprise,
+  canAccessFiscal,
+  canAccessPagamentos,
+  canAccessProvisoes,
+  canAccessPrioridadesDiretoria,
+  canAccessRhDp,
+  canAccessRhDpDashboard,
+  canAccessSst,
+  canAccessTreinamento,
+  canCreateProvisionamentos,
+  canExecuteRhDpImportacoes,
+  canManageProvisionamentoCategorias,
+  canManageSstArea,
+  canViewProvisionamentos,
+  canViewProvisionamentosDashboard,
+  canViewFinanceiroRelatorios,
+  hasPermissao,
+  canViewRhDpApuracao,
+  canViewRhDpColaboradores,
+  canViewRhDpDocumentos,
+  canViewRhDpObrigacoes,
+  canViewSolicitacoesRelatorios,
+  canViewSstArea,
+  canViewSstDashboard,
+  canAccessCrm,
+  canCreateCrmLeads,
+  canManageFiscalConfig,
+  canManageUsers,
+  canViewCrmAtendimento,
+  canViewCrmAutomacoes,
+  canViewCrmConfiguracoes,
+  canViewCrmDashboard,
+  canViewCrmLeads,
+  canViewFiscalDocuments,
+  canViewFiscalLogs,
+  canViewSystemGovernance,
+  canViewOperationalAudit,
+  canCreateCompraSolicitacao,
+  canManageComprasConfiguracoes,
+  canManageConfiguracoesArea,
+  canViewCompraSolicitacoes,
+  canViewComprasCotacoes,
+  canViewComprasDelegacao,
+  canViewComprasFornecedores,
+  canViewComprasPedidos,
+  canViewComprasRelatorios,
+  canViewComercialContratos,
+  canViewComercialEmpreendimentos,
+  hasEnabledModule,
+  isBusinessAdmin,
+  isSuperadmin
+} from '../utils/acessoProduto';
+import {
+  SST_NAV,
+  SST_SIMPLIFIED_MODE
+} from '../modules/sst/constants/sstResources';
+import { canAccessCustosRecebiveis } from '../modules/custosRecebiveis/utils/access';
+
+const SEMPRE = () => true;
+
+const perfilDe = (user) => String(user?.perfil || '').trim().toUpperCase();
+
+const SST_ICONS = {
+  pgr: HiOutlineExclamationTriangle,
+  pcmso: HiOutlineClipboardDocumentCheck,
+  aso: HiOutlineClipboardDocumentCheck,
+  exames: HiOutlineDocumentText,
+  epi: HiOutlineShieldCheck,
+  treinamentos: HiOutlineAcademicCap,
+  documentos: HiOutlineFolderOpen,
+  ltcat: HiOutlineBuildingOffice2,
+  avaliacoes_quantitativas: HiOutlineAdjustmentsHorizontal
+};
+
+const SST_DESCS = {
+  pgr: 'Programa de gerenciamento de riscos por empresa e obra.',
+  pcmso: 'Controle médico de saúde ocupacional.',
+  aso: 'Atestados de saúde ocupacional dos colaboradores.',
+  exames: 'Exames ocupacionais e periodicidades.',
+  epi: 'Entrega e controle de equipamentos de proteção.',
+  treinamentos: 'Treinamentos obrigatórios de segurança.',
+  documentos: 'Documentos de SST por empresa e obra.',
+  ltcat: 'Laudo técnico das condições do ambiente de trabalho.',
+  avaliacoes_quantitativas: 'Medições quantitativas de agentes.'
+};
+
+function sstChildrenSimplified() {
+  return SST_NAV.map(([resource, label], idx) => ({
+      id: `sst-${resource}`,
+      ordem: (idx + 1) * 10,
+      label,
+      desc: SST_DESCS[resource] || `Gestão de ${label.toLowerCase()} em SST.`,
+      icon: SST_ICONS[resource] || HiOutlineShieldCheck,
+      to: `/sst/${resource}`,
+      can: (user) => canViewSstArea(user, resource)
+  }));
+}
+
+function sstChildrenFull() {
+  const view = (resource) => (user) => canViewSstArea(user, resource);
+  const manage = (resource) => (user) => canManageSstArea(user, resource);
+  const dash = (user) => canViewSstDashboard(user);
+  return [
+    { id: 'sst-dashboard', ordem: 10, label: 'Dashboard SST', desc: 'Visão geral dos indicadores de segurança.', icon: HiOutlineSquares2X2, to: '/sst', can: dash },
+    { id: 'sst-centro-operacional', ordem: 150, label: 'Centro Operacional SST', desc: 'Acompanhamento operacional consolidado.', icon: HiOutlineSquares2X2, to: '/sst/relatorios/centro-operacional', can: dash },
+    { id: 'sst-executivo', ordem: 160, label: 'Executivo SST', desc: 'Relatório executivo de segurança do trabalho.', icon: HiOutlineSparkles, to: '/sst/relatorios/executivo', can: dash },
+    { id: 'sst-heatmap', ordem: 170, label: 'Heatmap SST', desc: 'Mapa de calor de riscos e ocorrências.', icon: HiOutlineTableCells, to: '/sst/relatorios/heatmap', can: dash },
+    { id: 'sst-observabilidade', ordem: 220, label: 'Observabilidade SST', desc: 'Monitoramento dos eventos do módulo.', icon: HiOutlineClipboardDocumentList, to: '/sst/observabilidade', can: dash },
+    { id: 'sst-producao', ordem: 230, label: 'Produção SST', desc: 'Monitoramento de produção do módulo.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/producao', can: dash },
+    { id: 'sst-enterprise', ordem: 240, label: 'SST Enterprise', desc: 'Observabilidade avançada do módulo.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/observabilidade-avancada', can: dash },
+    { id: 'sst-timeline', ordem: 180, label: 'Timeline SST', desc: 'Linha do tempo de eventos de segurança.', icon: HiOutlineClipboardDocumentList, to: '/sst/timeline', can: dash },
+    { id: 'sst-relatorios', ordem: 190, label: 'Relatórios SST', desc: 'Central de relatórios de segurança.', icon: HiOutlineChartBar, to: '/sst/relatorios', can: dash },
+    { id: 'sst-riscos', ordem: 20, label: 'Riscos', desc: 'Riscos ocupacionais por empresa, obra e função.', icon: HiOutlineExclamationTriangle, to: '/sst/riscos', can: view('riscos') },
+    { id: 'sst-ambientes', ordem: 30, label: 'Ambientes', desc: 'Ambientes de trabalho e locais operacionais.', icon: HiOutlineBuildingOffice2, to: '/sst/ambientes', can: view('riscos') },
+    { id: 'sst-exposicoes', ordem: 40, label: 'Exposições', desc: 'Exposições de colaboradores a riscos.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/exposicoes', can: view('riscos') },
+    { id: 'sst-aso', ordem: 50, label: 'ASO', desc: SST_DESCS.aso, icon: HiOutlineClipboardDocumentCheck, to: '/sst/aso', can: view('aso') },
+    { id: 'sst-exames', ordem: 60, label: 'Exames', desc: SST_DESCS.exames, icon: HiOutlineDocumentText, to: '/sst/exames', can: view('exames') },
+    { id: 'sst-epi', ordem: 70, label: 'EPI', desc: SST_DESCS.epi, icon: HiOutlineShieldCheck, to: '/sst/epi', can: view('epi') },
+    { id: 'sst-treinamentos', ordem: 80, label: 'Treinamentos', desc: SST_DESCS.treinamentos, icon: HiOutlineAcademicCap, to: '/sst/treinamentos', can: view('treinamentos') },
+    { id: 'sst-acidentes', ordem: 90, label: 'Acidentes', desc: 'Registro e acompanhamento de acidentes.', icon: HiOutlineExclamationTriangle, to: '/sst/acidentes', can: view('acidentes') },
+    { id: 'sst-documentos', ordem: 100, label: 'Documentos', desc: SST_DESCS.documentos, icon: HiOutlineFolderOpen, to: '/sst/documentos', can: view('documentos') },
+    { id: 'sst-esocial', ordem: 110, label: 'eSocial', desc: 'Eventos de SST para o eSocial.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/esocial', can: view('esocial') },
+    { id: 'sst-eventos', ordem: 250, label: 'Eventos', desc: 'Eventos operacionais do módulo.', icon: HiOutlineClipboardDocumentList, to: '/sst/eventos', can: view('analytics') },
+    { id: 'sst-pendencias', ordem: 120, label: 'Pendências SST', desc: 'Pendências abertas de segurança.', icon: HiOutlineInboxStack, to: '/sst/pendencias', can: view('analytics') },
+    { id: 'sst-bloqueios', ordem: 130, label: 'Bloqueios SST', desc: 'Bloqueios ativos por regra de segurança.', icon: HiOutlineKey, to: '/sst/bloqueios', can: view('analytics') },
+    { id: 'sst-notificacoes', ordem: 260, label: 'Notificações SST', desc: 'Notificações emitidas pelo módulo.', icon: HiOutlineChatBubbleOvalLeft, to: '/sst/notificacoes', can: view('analytics') },
+    { id: 'sst-scores', ordem: 200, label: 'Scores SST', desc: 'Scores de conformidade por empresa e obra.', icon: HiOutlineRectangleGroup, to: '/sst/scores', can: view('analytics') },
+    { id: 'sst-recomendacoes', ordem: 210, label: 'Recomendações SST', desc: 'Recomendações geradas pelas análises.', icon: HiOutlineSparkles, to: '/sst/recomendacoes', can: view('analytics') },
+    { id: 'sst-telemetria', ordem: 270, label: 'Telemetria SST', desc: 'Telemetria técnica do módulo.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/telemetria', can: view('analytics') },
+    { id: 'sst-alertas', ordem: 140, label: 'Alertas SST', desc: 'Alertas operacionais de segurança.', icon: HiOutlineExclamationTriangle, to: '/sst/alertas_operacionais', can: view('analytics') },
+    { id: 'sst-workflow-execucoes', ordem: 280, label: 'Execuções Workflow', desc: 'Execuções dos workflows de SST.', icon: HiOutlineClipboardDocumentList, to: '/sst/workflow_execucoes', can: view('analytics') },
+    { id: 'sst-politicas-bloqueio', ordem: 290, label: 'Políticas de bloqueio', desc: 'Regras que bloqueiam operações por SST.', icon: HiOutlineCog6Tooth, to: '/sst/politicas_bloqueio', can: manage('configuracoes') },
+    { id: 'sst-workflows', ordem: 300, label: 'Workflows SST', desc: 'Workflows automáticos de segurança.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/workflows', can: manage('configuracoes') },
+    { id: 'sst-workflow-acoes', ordem: 310, label: 'Ações Workflow', desc: 'Ações executadas pelos workflows.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/workflow_acoes', can: manage('configuracoes') },
+    { id: 'sst-rollout', ordem: 320, label: 'Rollout SST', desc: 'Planos de rollout do módulo.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/rollout_planos', can: manage('configuracoes') },
+    { id: 'sst-hardening', ordem: 330, label: 'Hardening SST', desc: 'Políticas de hardening do módulo.', icon: HiOutlineCog6Tooth, to: '/sst/hardening_policies', can: manage('configuracoes') },
+    { id: 'sst-criticidades', ordem: 340, label: 'Criticidades SST', desc: 'Níveis de criticidade configurados.', icon: HiOutlineAdjustmentsHorizontal, to: '/sst/criticidades', can: manage('configuracoes') },
+    { id: 'sst-configuracoes', ordem: 350, label: 'Configurações', desc: 'Configurações gerais do módulo SST.', icon: HiOutlineCog6Tooth, to: '/sst/configuracoes', can: manage('configuracoes') }
+  ];
+}
+
+// ---------------------------------------------------------------------
+// Árvore de módulos (nível 1) e subitens (nível 2)
+// ---------------------------------------------------------------------
+export const NAV_MODULES = [
+  {
+    id: 'painel',
+    label: 'Painel',
+    desc: 'Visão executiva com indicadores do grupo.',
+    icon: HiOutlineSquares2X2,
+    gate: (user) => canAccessDashboard(user),
+    children: [
+      {
+        id: 'dashboard', ordem: 10,
+        label: 'Dashboard',
+        desc: 'Indicadores executivos de solicitações e financeiro.',
+        icon: HiOutlinePresentationChartLine,
+        to: '/dashboard',
+        can: (user) => canAccessDashboard(user)
+      }
+    ]
+  },
+  {
+    id: 'solicitacoes',
+    label: 'Solicitações',
+    desc: 'Fluxo de solicitações entre setores.',
+    icon: HiOutlineClipboardDocumentList,
+    gate: SEMPRE,
+    children: [
+      {
+        id: 'solicitacoes-lista', ordem: 10,
+        label: 'Solicitações',
+        getLabel: (user) => {
+          const perfil = perfilDe(user);
+          if (perfil === 'USUARIO') return 'Minhas Solicitações';
+          if (perfil === 'SETOR' || perfil === 'FINANCEIRO') return 'Solicitações do Setor';
+          return 'Solicitações';
+        },
+        desc: 'Acompanhe e movimente as solicitações ativas.',
+        icon: HiOutlineClipboardDocumentList,
+        to: '/solicitacoes',
+        can: SEMPRE
+      },
+      { id: 'solicitacoes-relatorios', ordem: 40, label: 'Relatórios', desc: 'Relatórios operacionais de solicitações.', icon: HiOutlineChartBar, to: '/solicitacoes/relatorios', can: (user) => canViewSolicitacoesRelatorios(user) },
+      { id: 'solicitacoes-arquivadas', ordem: 50, label: 'Arquivadas', desc: 'Solicitações que você arquivou.', icon: HiOutlineArchiveBox, to: '/solicitacoes-arquivadas', can: SEMPRE },
+      { id: 'prioridades-diretoria', ordem: 30, label: 'Prioridades Diretoria', desc: 'Lotes de prioridade definidos pela diretoria.', icon: HiOutlineStar, to: '/prioridades-diretoria', can: (user) => canAccessPrioridadesDiretoria(user) },
+      { id: 'nova-solicitacao', fixavel: 'acao', ordem: 20, label: 'Nova Solicitação', desc: 'Abra uma nova solicitação para um setor.', icon: HiOutlinePlusCircle, to: '/nova-solicitacao', can: (user) => !['SETOR', 'FINANCEIRO'].includes(perfilDe(user)) }
+    ]
+  },
+  {
+    id: 'comunicacao',
+    label: 'Comunicação',
+    desc: 'Conversas internas entre usuários e setores.',
+    icon: HiOutlineChatBubbleLeftRight,
+    gate: (user) => canAccessComunicacao(user),
+    children: [
+      { id: 'comunicacao-interna', ordem: 10, label: 'Comunicação Interna', desc: 'Converse com usuários e setores do grupo.', icon: HiOutlineChatBubbleLeftRight, to: '/comunicacao-interna', can: SEMPRE }
+    ]
+  },
+  {
+    id: 'biblioteca',
+    label: 'Biblioteca',
+    desc: 'Arquivos e modelos padronizados do grupo.',
+    icon: HiOutlineBookOpen,
+    gate: (user) => canAccessBiblioteca(user),
+    children: [
+      { id: 'arquivos-modelos', ordem: 10, label: 'Arquivos Modelos', desc: 'Baixe modelos e documentos padronizados.', icon: HiOutlineFolderOpen, to: '/arquivos-modelos', can: SEMPRE }
+    ]
+  },
+  {
+    id: 'treinamento',
+    label: 'Treinamento',
+    desc: 'Central de treinamento do sistema.',
+    icon: HiOutlineAcademicCap,
+    gate: (user) => canAccessTreinamento(user),
+    children: [
+      { id: 'treinamento-central', ordem: 10, label: 'Central de Treinamento', desc: 'Conteúdos de treinamento por módulo.', icon: HiOutlineAcademicCap, to: '/treinamento', can: SEMPRE }
+    ]
+  },
+  {
+    id: 'compras',
+    label: 'Compras',
+    desc: 'Solicitações, cotações e pedidos de compra.',
+    icon: HiOutlineShoppingCart,
+    gate: (user) => canAccessCompras(user),
+    children: [
+      { id: 'compras-solicitacoes', ordem: 10, label: 'Solicitações de Compra', desc: 'Solicitações de compra em andamento.', icon: HiOutlineClipboardDocumentList, to: '/solicitacoes-compra', can: (user) => canViewCompraSolicitacoes(user) },
+      { id: 'compras-nova', fixavel: 'acao', ordem: 20, label: 'Nova Solicitação de Compra', desc: 'Abra uma solicitação de compra de insumos.', icon: HiOutlinePlusCircle, to: '/solicitacoes-compra/nova', can: (user) => canCreateCompraSolicitacao(user) },
+      { id: 'compras-nova-direta', fixavel: 'acao', ordem: 30, label: 'Nova Compra Direta', desc: 'Registre uma compra direta de insumos.', icon: HiOutlinePlusCircle, to: '/solicitacoes-compra-direta/nova', can: (user) => canCreateCompraSolicitacao(user) },
+      { id: 'compras-pedidos', ordem: 50, label: 'Pedidos de Compra', desc: 'Pedidos emitidos aos fornecedores.', icon: HiOutlineTruck, to: '/pedidos-compra', can: (user) => canViewComprasPedidos(user) },
+      { id: 'compras-delegacao', ordem: 60, label: 'Delegação de Compras', desc: 'Distribua solicitações entre compradores.', icon: HiOutlineUserPlus, to: '/compras/delegacao', can: (user) => canViewComprasDelegacao(user) },
+      { id: 'compras-relatorios', ordem: 80, label: 'Relatórios de Compras', desc: 'Relatórios e indicadores de compras.', icon: HiOutlineChartBar, to: '/compras/relatorios', can: (user) => canViewComprasRelatorios(user) },
+      { id: 'compras-cotacoes', ordem: 40, label: 'Cotações', desc: 'Cotações abertas com fornecedores.', icon: HiOutlineScale, to: '/cotacoes', can: (user) => hasEnabledModule(user, 'COTACOES') && canViewComprasCotacoes(user) },
+      { id: 'compras-fornecedores', ordem: 70, label: 'Fornecedores', desc: 'Cadastro de fornecedores para cotação.', icon: HiOutlineBuildingStorefront, to: '/gestao-fornecedores', can: (user) => hasEnabledModule(user, 'COTACOES') && canViewComprasFornecedores(user) },
+      { id: 'compras-config-cotacao', ordem: 90, label: 'Config. Cotações', desc: 'Parâmetros do fluxo de cotação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-cotacao', can: (user) => hasEnabledModule(user, 'COTACOES') && canManageComprasConfiguracoes(user) },
+      { id: 'compras-insumos', ordem: 100, label: 'Gestão de Insumos', desc: 'Catálogo de insumos compráveis.', icon: HiOutlineRectangleGroup, to: '/gestao-insumos', can: (user) => canManageComprasConfiguracoes(user) },
+      { id: 'compras-unidades', ordem: 110, label: 'Gestão de Unidades', desc: 'Unidades de medida dos insumos.', icon: HiOutlineScale, to: '/gestao-unidades', can: (user) => canManageComprasConfiguracoes(user) },
+      { id: 'compras-categorias', ordem: 120, label: 'Gestão de Categorias', desc: 'Categorias de insumos e serviços.', icon: HiOutlineFolderOpen, to: '/gestao-categorias', can: (user) => canManageComprasConfiguracoes(user) }
+    ]
+  },
+  {
+    id: 'financeiro',
+    label: 'Financeiro',
+    desc: 'Títulos, pagamentos, bancos e conciliação.',
+    icon: HiOutlineBanknotes,
+    gate: (user) => (
+      canAccessFinanceiro(user)
+      || canAccessFinanceiroDda(user)
+      || canViewFinanceiroRelatorios(user)
+      || canAccessBancosEnterprise(user)
+      || canAccessPagamentos(user)
+      || canAccessBoletos(user)
+      || canAccessCustosRecebiveis(user)
+    ),
+    children: [
+      { id: 'fin-receber', ordem: 20, label: 'Contas a Receber', desc: 'Títulos a receber em aberto e baixados.', icon: HiOutlineArrowDownCircle, to: '/financeiro/contas-a-receber', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-titulo-novo', fixavel: 'acao', ordem: 60, label: 'Novo Título', desc: 'Cadastre um título a pagar ou a receber.', icon: HiOutlinePlusCircle, to: '/financeiro/titulos/novo', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-pagar', ordem: 10, label: 'Contas a Pagar', desc: 'Títulos a pagar por vencimento.', icon: HiOutlineArrowUpCircle, to: '/financeiro/contas-a-pagar', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-cheques', ordem: 110, label: 'Cheques de Terceiros', desc: 'Custódia e movimentação de cheques.', icon: HiOutlineCreditCard, to: '/financeiro/cheques-terceiros', can: (user) => canAccessFinanceiro(user) && hasPermissao(user, 'financeiro.cheques.visualizar') },
+      { id: 'fin-baixas-compostas', ordem: 100, label: 'Baixas com Múltiplas Fontes', desc: 'Baixas compostas por várias origens de fundo.', icon: HiOutlineReceiptRefund, to: '/financeiro/baixas-compostas', can: (user) => canAccessFinanceiro(user) && hasPermissao(user, 'financeiro.baixas_compostas.visualizar') },
+      { id: 'fin-bancos', ordem: 160, label: 'Bancos Enterprise', desc: 'Integrações bancárias corporativas.', icon: HiOutlineBuildingLibrary, to: '/financeiro/bancos', can: (user) => canAccessBancosEnterprise(user) },
+      { id: 'fin-financiamentos', ordem: 130, label: 'Financiamentos Bancários', desc: 'Contratos de financiamento e parcelas.', icon: HiOutlineBanknotes, to: '/financeiro/financiamentos-bancarios', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-pagamentos', ordem: 70, label: 'Pagamentos em Massa', desc: 'Lotes de pagamento enviados ao banco.', icon: HiOutlinePaperAirplane, to: '/financeiro/pagamentos', can: (user) => canAccessPagamentos(user) },
+      { id: 'fin-dda', ordem: 80, label: 'DDA Bancário', desc: 'Boletos recebidos via DDA.', icon: HiOutlineClipboardDocumentCheck, to: '/financeiro/dda', can: (user) => canAccessFinanceiroDda(user) },
+      { id: 'fin-boletos', ordem: 90, label: 'Boletos', desc: 'Emissão e retorno de boletos.', icon: HiOutlineDocumentText, to: '/financeiro/boletos', can: (user) => canAccessBoletos(user) },
+      { id: 'fin-faturas-cartao', ordem: 120, label: 'Faturas de Cartão', desc: 'Faturas de cartão corporativo.', icon: HiOutlineCreditCard, to: '/financeiro/faturas-cartao', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-relatorios', ordem: 170, label: 'Relatórios Financeiros', desc: 'DRE, fluxo consolidado e análises.', icon: HiOutlineChartBar, to: '/financeiro/relatorios', can: (user) => canViewFinanceiroRelatorios(user) },
+      { id: 'fin-baixas', ordem: 30, label: 'Baixas Realizadas', desc: 'Histórico de baixas de títulos.', icon: HiOutlineBanknotes, to: '/financeiro/baixas', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-conciliacao', ordem: 40, label: 'Conciliação OFX', desc: 'Conciliação de extratos bancários.', icon: HiOutlineScale, to: '/financeiro/conciliacao', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-caixas', ordem: 50, label: 'Caixas e Contas', desc: 'Caixas operacionais e contas bancárias.', icon: HiOutlineWallet, to: '/financeiro/caixas', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-cadastros', ordem: 190, label: 'Cadastros Financeiros', desc: 'Categorias, formas de pagamento e afins.', icon: HiOutlineRectangleGroup, to: '/financeiro/cadastros', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-upload-comprovantes', fixavel: 'acao', ordem: 140, label: 'Upload Comprovantes', desc: 'Envio de comprovantes de pagamento.', icon: HiOutlineCloudArrowUp, to: '/comprovantes/upload', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-comprovantes-pendentes', ordem: 150, label: 'Comprovantes Pendentes', desc: 'Comprovantes aguardando conferência.', icon: HiOutlineReceiptRefund, to: '/comprovantes/pendentes', can: (user) => canAccessFinanceiro(user) },
+      { id: 'custos-recebiveis', ordem: 180, label: 'Custos e Recebíveis', desc: 'Análise de custos e recebíveis por obra.', icon: HiOutlineArrowTrendingUp, to: '/custos-recebiveis', can: (user) => canAccessCustosRecebiveis(user) }
+    ]
+  },
+  {
+    id: 'fiscal',
+    label: 'Fiscal',
+    desc: 'Documentos fiscais e exportação contábil.',
+    icon: HiOutlineReceiptPercent,
+    gate: (user) => canAccessFiscal(user),
+    children: [
+      { id: 'fiscal-painel', ordem: 10, label: 'Painel Fiscal', desc: 'Visão geral dos documentos fiscais.', icon: HiOutlineSquares2X2, to: '/fiscal', can: SEMPRE },
+      { id: 'fiscal-relatorios', ordem: 50, label: 'Relatórios Fiscais', desc: 'Relatórios do módulo fiscal.', icon: HiOutlineChartBar, to: '/fiscal/relatorios', can: SEMPRE },
+      { id: 'fiscal-empresas', ordem: 60, label: 'Empresas Fiscais', desc: 'Empresas monitoradas pelo módulo.', icon: HiOutlineBuildingOffice2, to: '/fiscal/empresas', can: (user) => canManageFiscalConfig(user) },
+      { id: 'fiscal-certificados', ordem: 70, label: 'Certificados', desc: 'Certificados digitais das empresas.', icon: HiOutlineKey, to: '/fiscal/empresas#certificados', can: (user) => canManageFiscalConfig(user) },
+      { id: 'fiscal-diagnostico', ordem: 80, label: 'Diagnóstico', desc: 'Diagnóstico das integrações fiscais.', icon: HiOutlineAdjustmentsHorizontal, to: '/fiscal/diagnostico', can: (user) => canManageFiscalConfig(user) },
+      { id: 'fiscal-documentos', ordem: 20, label: 'Documentos Fiscais', desc: 'NF-e e demais documentos capturados.', icon: HiOutlineDocumentText, to: '/fiscal/documentos', can: (user) => canViewFiscalDocuments(user) },
+      { id: 'fiscal-divergencias', ordem: 30, label: 'Divergências', desc: 'Divergências entre fiscal e financeiro.', icon: HiOutlineExclamationTriangle, to: '/fiscal/divergencias', can: (user) => canViewFiscalDocuments(user) },
+      { id: 'fiscal-exportacao', ordem: 40, label: 'Exportação Contábil', desc: 'Lotes de exportação para a contabilidade.', icon: HiOutlineFolderOpen, to: '/fiscal/exportacao-contabil', can: (user) => canViewFiscalDocuments(user) },
+      { id: 'fiscal-logs', ordem: 90, label: 'Logs de Sincronização', desc: 'Execuções das sincronizações fiscais.', icon: HiOutlineClipboardDocumentList, to: '/fiscal/logs', can: (user) => canViewFiscalLogs(user) }
+    ]
+  },
+  {
+    id: 'crm',
+    label: 'CRM',
+    desc: 'Leads, atendimento e funil comercial.',
+    icon: HiOutlineUserGroup,
+    gate: (user) => canAccessCrm(user),
+    children: [
+      { id: 'crm-dashboard', ordem: 10, label: 'Dashboard', desc: 'Indicadores do funil e do atendimento.', icon: HiOutlinePresentationChartLine, to: '/crm/dashboard', can: (user) => canViewCrmDashboard(user) },
+      { id: 'crm-relatorios', ordem: 80, label: 'Relatórios CRM', desc: 'Relatórios executivos do CRM.', icon: HiOutlineChartBar, to: '/crm/relatorios', can: (user) => canViewCrmDashboard(user) },
+      { id: 'crm-inbox', ordem: 30, label: 'Inbox', desc: 'Conversas com clientes nos canais.', icon: HiOutlineChatBubbleLeftRight, to: '/crm/inbox', can: (user) => canViewCrmAtendimento(user) },
+      { id: 'crm-leads', ordem: 40, label: 'Leads', desc: 'Base de leads do grupo.', icon: HiOutlineUserGroup, to: '/crm/leads', can: (user) => canViewCrmLeads(user) },
+      { id: 'crm-carteira', ordem: 60, label: 'Minha Carteira', desc: 'Leads sob sua responsabilidade.', icon: HiOutlineIdentification, to: '/crm/carteira', can: (user) => canViewCrmLeads(user) },
+      { id: 'crm-novo-lead', fixavel: 'acao', ordem: 20, label: 'Novo Lead', desc: 'Cadastre um novo lead.', icon: HiOutlinePlusCircle, to: '/crm/leads/novo', can: (user) => canCreateCrmLeads(user) },
+      { id: 'crm-kanban', ordem: 50, label: 'Kanban', desc: 'Funil de vendas em quadro kanban.', icon: HiOutlineTableCells, to: '/crm/kanban', can: (user) => canViewCrmLeads(user) },
+      { id: 'crm-tarefas', ordem: 70, label: 'Tarefas', desc: 'Tarefas de follow-up com leads.', icon: HiOutlineClipboardDocumentList, to: '/crm/tarefas', can: (user) => canViewCrmLeads(user) },
+      { id: 'crm-automacoes', ordem: 90, label: 'Automações', desc: 'Regras automáticas do CRM.', icon: HiOutlineAdjustmentsHorizontal, to: '/crm/automacoes', can: (user) => canViewCrmAutomacoes(user) },
+      { id: 'crm-canais', ordem: 100, label: 'Canais', desc: 'Canais de atendimento conectados.', icon: HiOutlineChatBubbleOvalLeft, to: '/crm/admin/canais', can: (user) => canViewCrmConfiguracoes(user) },
+      { id: 'crm-numeros', ordem: 110, label: 'Números', desc: 'Números de WhatsApp do atendimento.', icon: HiOutlinePaperAirplane, to: '/crm/admin/numeros', can: (user) => canViewCrmConfiguracoes(user) },
+      { id: 'crm-integracoes', ordem: 120, label: 'Integrações', desc: 'Integrações externas do CRM.', icon: HiOutlineAdjustmentsHorizontal, to: '/crm/admin/integracoes', can: (user) => canViewCrmConfiguracoes(user) }
+    ]
+  },
+  {
+    id: 'comercial',
+    label: 'Comercial',
+    desc: 'Empreendimentos, unidades e vendas.',
+    icon: HiOutlineBuildingStorefront,
+    gate: (user) => canAccessComercial(user),
+    children: [
+      { id: 'comercial-relatorios', ordem: 60, label: 'Relatórios Comerciais', desc: 'Relatórios de vendas e estoque.', icon: HiOutlineChartBar, to: '/comercial/relatorios', can: SEMPRE },
+      { id: 'comercial-empreendimentos', ordem: 30, label: 'Empreendimentos', desc: 'Cadastro de empreendimentos.', icon: HiOutlineBuildingOffice2, to: '/comercial/empreendimentos', can: (user) => canViewComercialEmpreendimentos(user) },
+      { id: 'comercial-unidades', ordem: 40, label: 'Unidades', desc: 'Unidades por empreendimento.', icon: HiOutlineRectangleGroup, to: '/comercial/unidades', can: (user) => canViewComercialEmpreendimentos(user) },
+      { id: 'comercial-mapa', ordem: 10, label: 'Mapa de Unidades', desc: 'Mapa de disponibilidade das unidades.', icon: HiOutlineMapPin, to: '/comercial/mapa-unidades', can: (user) => canViewComercialEmpreendimentos(user) },
+      { id: 'comercial-tabelas', ordem: 50, label: 'Tabelas de Preço', desc: 'Tabelas de preço por empreendimento.', icon: HiOutlineTableCells, to: '/comercial/tabelas-preco', can: (user) => canViewComercialEmpreendimentos(user) },
+      { id: 'comercial-contratos', ordem: 20, label: 'Contratos de Venda', desc: 'Contratos de venda das unidades.', icon: HiOutlineDocumentCheck, to: '/comercial/contratos', can: (user) => canViewComercialContratos(user) },
+      { id: 'comercial-modelos', ordem: 70, label: 'Modelos de Contrato', desc: 'Modelos usados nos contratos de venda.', icon: HiOutlineFolderOpen, to: '/comercial/modelos-contrato', can: (user) => canViewComercialContratos(user) }
+    ]
+  },
+  {
+    id: 'provisionamento',
+    label: 'Provisionamento',
+    desc: 'Previsão de desembolsos futuros.',
+    icon: HiOutlineCalendarDays,
+    gate: (user) => canAccessProvisoes(user),
+    children: [
+      { id: 'prov-dashboard', ordem: 30, label: 'Dashboard de Previsão', desc: 'Previsão consolidada de desembolsos.', icon: HiOutlinePresentationChartLine, to: '/provisoes-financeiras/dashboard', can: (user) => canViewProvisionamentosDashboard(user) },
+      { id: 'prov-relatorios', ordem: 40, label: 'Relatórios', desc: 'Relatórios de provisionamento.', icon: HiOutlineChartBar, to: '/provisoes-financeiras/relatorios', can: (user) => canViewProvisionamentosDashboard(user) },
+      { id: 'prov-lista', ordem: 10, label: 'Provisionamentos', desc: 'Provisões financeiras registradas.', icon: HiOutlineBanknotes, to: '/provisoes-financeiras', can: (user) => canViewProvisionamentos(user) },
+      { id: 'prov-nova', fixavel: 'acao', ordem: 20, label: 'Nova Provisão', desc: 'Registre uma nova provisão financeira.', icon: HiOutlinePlusCircle, to: '/provisoes-financeiras/nova', can: (user) => canCreateProvisionamentos(user) },
+      { id: 'prov-categorias', ordem: 50, label: 'Categorias Macro', desc: 'Categorias macro das provisões.', icon: HiOutlineFolderOpen, to: '/provisoes-financeiras/categorias', can: (user) => canManageProvisionamentoCategorias(user) }
+    ]
+  },
+  {
+    id: 'rhdp',
+    label: 'RH/DP',
+    desc: 'Colaboradores, apuração e fechamentos.',
+    icon: HiOutlineUsers,
+    gate: (user) => canAccessRhDp(user),
+    children: [
+      { id: 'rhdp-inicio', ordem: 10, label: 'Visão do Módulo', desc: 'Painel geral de RH e departamento pessoal.', icon: HiOutlineSquares2X2, to: '/rh-dp', can: (user) => canAccessRhDpDashboard(user) },
+      { id: 'rhdp-relatorios', ordem: 70, label: 'Relatórios', desc: 'Relatórios de RH/DP.', icon: HiOutlineChartBar, to: '/rh-dp/relatorios', can: (user) => canAccessRhDpDashboard(user) },
+      { id: 'rhdp-colaboradores', ordem: 20, label: 'Colaboradores', desc: 'Cadastro de colaboradores.', icon: HiOutlineUsers, to: '/rh-dp/colaboradores', can: (user) => canViewRhDpColaboradores(user) },
+      { id: 'rhdp-pessoal', ordem: 22, label: 'Pessoal', desc: 'Visão consolidada do pessoal com solicitações em aberto.', icon: HiOutlineUserGroup, to: '/rh-dp/pessoal', can: (user) => canViewRhDpColaboradores(user) },
+      { id: 'rhdp-jornada', ordem: 24, label: 'Jornada', desc: 'Jornada de trabalho dos colaboradores.', icon: HiOutlineCalendarDays, to: '/rh-dp/jornada', can: (user) => canViewRhDpColaboradores(user) },
+      { id: 'rhdp-documentos', ordem: 60, label: 'Documentos', desc: 'Documentos dos colaboradores.', icon: HiOutlineFolderOpen, to: '/rh-dp/documentos', can: (user) => canViewRhDpDocumentos(user) },
+      { id: 'rhdp-importacoes', ordem: 50, label: 'Importações', desc: 'Importações de jornada e eventos.', icon: HiOutlineCloudArrowUp, to: '/rh-dp/importacoes', can: (user) => canExecuteRhDpImportacoes(user) },
+      { id: 'rhdp-apuracao', ordem: 30, label: 'Apuração', desc: 'Apuração de competências.', icon: HiOutlineDocumentText, to: '/rh-dp/apuracao', can: (user) => canViewRhDpApuracao(user) },
+      { id: 'rhdp-fechamentos', ordem: 40, label: 'Fechamentos', desc: 'Fechamentos que geram títulos financeiros.', icon: HiOutlineBanknotes, to: '/rh-dp/fechamentos', can: (user) => canViewRhDpObrigacoes(user) && hasEnabledModule(user, 'FINANCEIRO') }
+    ]
+  },
+  {
+    id: 'sst',
+    label: 'SST',
+    desc: 'Saúde e segurança do trabalho.',
+    icon: HiOutlineShieldCheck,
+    gate: (user) => canAccessSst(user),
+    children: SST_SIMPLIFIED_MODE ? sstChildrenSimplified() : sstChildrenFull()
+  },
+  {
+    id: 'cadastros',
+    label: 'Cadastros',
+    desc: 'Usuários, obras, setores e pessoas.',
+    icon: HiOutlineIdentification,
+    gate: (user) => canManageUsers(user) || isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros'),
+    children: [
+      { id: 'cad-usuarios', ordem: 10, label: 'Usuários', desc: 'Usuários e perfis de acesso.', icon: HiOutlineUsers, to: '/usuarios', can: (user) => canManageUsers(user) },
+      { id: 'cad-usuarios-novo', fixavel: 'acao', ordem: 20, label: 'Novo Usuário', desc: 'Cadastre um usuário com perfil e permissões.', icon: HiOutlineUserPlus, to: '/usuarios/novo', can: (user) => canManageUsers(user) },
+      { id: 'cad-empresas', ordem: 80, label: 'Empresas do Grupo', desc: 'Empresas que compõem o grupo.', icon: HiOutlineBuildingOffice2, to: '/empresas-grupo', can: (user) => isSuperadmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-obras', ordem: 30, label: 'Obras', desc: 'Obras e centros de custo.', icon: HiOutlineBuildingOffice2, to: '/obras', can: (user) => (isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros')) && canAccessCadastroObras(user) },
+      { id: 'cad-apropriacoes', ordem: 90, label: 'Gestão de Apropriações', desc: 'Apropriações de custo por obra.', icon: HiOutlineAdjustmentsHorizontal, to: '/gestao-apropriacoes', can: (user) => isBusinessAdmin(user) && canAccessCadastroObras(user) },
+      { id: 'cad-setores', ordem: 40, label: 'Setores', desc: 'Setores do fluxo de solicitações.', icon: HiOutlineRectangleGroup, to: '/setores', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-tipos', ordem: 50, label: 'Tipos de Solicitação', desc: 'Tipos e subtipos de solicitação.', icon: HiOutlineClipboardDocumentList, to: '/tipos-solicitacao', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-parceiros', ordem: 60, label: 'Cadastro de Pessoas', desc: 'Parceiros, credores e clientes.', icon: HiOutlineUsers, to: '/parceiros', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') },
+      { id: 'cad-parceiros-categorias', ordem: 70, label: 'Categorias de Parceiro', desc: 'Categorias para classificar pessoas.', icon: HiOutlineArchiveBox, to: '/parceiros-categorias', can: (user) => isBusinessAdmin(user) || canManageConfiguracoesArea(user, 'cadastros') }
+    ]
+  },
+  {
+    id: 'contratos',
+    label: 'Contratos',
+    desc: 'Contratos de obra e medições.',
+    icon: HiOutlineDocumentCheck,
+    gate: (user) => canAccessContratos(user),
+    children: [
+      { id: 'contratos-relatorios', ordem: 30, label: 'Relatórios', desc: 'Relatórios operacionais de contratos.', icon: HiOutlineChartBar, to: '/contratos/relatorios', can: SEMPRE },
+      { id: 'contratos-gestao', ordem: 10, label: 'Gestão de Contratos', desc: 'Contratos, aditivos e medições.', icon: HiOutlineDocumentCheck, to: '/gestao-contratos', can: SEMPRE },
+      { id: 'contratos-novo', fixavel: 'acao', ordem: 20, label: 'Novo Contrato', desc: 'Crie um contrato do fluxo com parcelas.', icon: HiOutlinePlusCircle, to: '/contratos/novo', can: SEMPRE }
+    ]
+  },
+  {
+    id: 'administracao',
+    label: 'Administração',
+    desc: 'Governança e auditoria do sistema.',
+    icon: HiOutlineBuildingLibrary,
+    gate: (user) => canViewSystemGovernance(user) || canViewOperationalAudit(user),
+    children: [
+      { id: 'adm-governanca', ordem: 10, label: 'Governança do Sistema', desc: 'Saúde, segurança e módulos do sistema.', icon: HiOutlineShieldCheck, to: '/governanca', can: (user) => canViewSystemGovernance(user) },
+      { id: 'adm-auditoria', ordem: 20, label: 'Auditoria Operacional', desc: 'Trilha de auditoria das operações.', icon: HiOutlineClipboardDocumentList, to: '/governanca/auditoria-operacional', can: (user) => canViewOperationalAudit(user) }
+    ]
+  },
+  {
+    id: 'configuracoes',
+    label: 'Configurações',
+    desc: 'Parâmetros e vínculos do sistema.',
+    icon: HiOutlineCog6Tooth,
+    gate: (user) => canAccessConfiguracoes(user),
+    children: [
+      { id: 'cfg-central', ordem: 10, label: 'Configurações', desc: 'Central de configurações do sistema.', icon: HiOutlineCog6Tooth, to: '/configuracoes', can: SEMPRE },
+      { id: 'cfg-acesso-prioridades', ordem: 20, label: 'Acesso Prioridades', desc: 'Usuários com acesso às prioridades.', icon: HiOutlineUsers, to: '/usuarios-acesso-prioridade-diretoria', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-envio-livre', ordem: 30, label: 'Envio Livre por Usuário', desc: 'Usuários que enviam a qualquer setor.', icon: HiOutlineUsers, to: '/usuarios-envio-qualquer-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-tipos-compartilhados', ordem: 40, label: 'Tipos Compartilhados', desc: 'Tipos de solicitação compartilhados.', icon: HiOutlineClipboardDocumentList, to: '/tipos-compartilhados-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-automacao-status', ordem: 50, label: 'Automação por Status', desc: 'Envio automático ao mudar status.', icon: HiOutlinePaperAirplane, to: '/automacao-status-setor', can: (user) => canManageConfiguracoesArea(user, 'status_vinculos') },
+      { id: 'cfg-contrato-alertas-formas', ordem: 60, label: 'Formas da Nova Solicitação', desc: 'Alertas de contrato e formas de pagamento exibidas na Nova Solicitação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-formas-pagamento-solicitacao', can: (user) => canManageConfiguracoesArea(user, 'geral') },
+      { id: 'cfg-cartoes-recarga', ordem: 62, label: 'Cartões de Recarga', desc: 'Cadastro dos cartões usados no fluxo de recarga.', icon: HiOutlineCreditCard, to: '/configuracoes-cartoes-recarga', can: (user) => isSuperadmin(user) },
+      { id: 'cfg-cotacao', ordem: 70, label: 'Config. Cotações', desc: 'Parâmetros do fluxo de cotação.', icon: HiOutlineAdjustmentsHorizontal, to: '/configuracoes-cotacao', can: (user) => hasEnabledModule(user, 'COTACOES') && canManageComprasConfiguracoes(user) },
+      { id: 'cfg-status-pedidos', ordem: 80, label: 'Status dos Pedidos', desc: 'Status dos pedidos de compra.', icon: HiOutlineClipboardDocumentList, to: '/configuracoes-status-pedidos-compra', can: (user) => canManageComprasConfiguracoes(user) },
+      { id: 'cfg-comercial-categorias', ordem: 90, label: 'Categorias Comerciais', desc: 'Categorias do módulo comercial.', icon: HiOutlineArchiveBox, to: '/configuracoes-comercial-categorias', can: (user) => canManageConfiguracoesArea(user, 'geral') && canAccessComercial(user) },
+      { id: 'cfg-modulos', ordem: 100, label: 'Módulos e Planos', desc: 'Ativação de módulos do sistema.', icon: HiOutlineCog6Tooth, to: '/configuracoes-modulos', can: (user) => canManageConfiguracoesArea(user, 'modulos') },
+      { id: 'cfg-notificacoes', ordem: 110, label: 'Notificações Sistema', desc: 'Eventos que geram notificações.', icon: HiOutlineBell, to: '/configuracoes-notificacoes-sistema', can: (user) => canManageConfiguracoesArea(user, 'aparencia') },
+      { id: 'cfg-arquivos-modelos', ordem: 120, label: 'Arquivos Modelos', desc: 'Gestão da biblioteca de modelos.', icon: HiOutlineFolderOpen, to: '/arquivos-modelos-config', can: (user) => isSuperadmin(user) && hasEnabledModule(user, 'BIBLIOTECA_MODELOS') }
+    ]
+  },
+  {
+    id: 'conta',
+    label: 'Conta',
+    desc: 'Seus dados e preferências.',
+    icon: HiOutlineUserCircle,
+    gate: SEMPRE,
+    children: [
+      { id: 'perfil', ordem: 10, label: 'Meu Perfil', desc: 'Dados pessoais, senha e MFA.', icon: HiOutlineUserCircle, to: '/perfil', can: SEMPRE }
+    ]
+  }
+];
+
+// ---------------------------------------------------------------------
+// Helpers — todos os consumidores (hubs, breadcrumb, busca) usam estes.
+// ---------------------------------------------------------------------
+
+export function resolveLabel(node, user) {
+  return typeof node.getLabel === 'function' ? node.getLabel(user) : node.label;
+}
+
+// Módulos visíveis para o usuário, cada um já com os filhos filtrados
+// por permissão. Módulo sem filho visível (permissão ou módulo
+// desativado) NÃO aparece.
+export function getVisibleModules(user) {
+  if (!user) return [];
+  return NAV_MODULES
+    .map((mod) => {
+      if (mod.gate && !mod.gate(user)) return null;
+      const children = mod.children
+        .filter((child) => !child.can || child.can(user))
+        .slice()
+        .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+      if (children.length === 0) return null;
+      return { ...mod, children };
+    })
+    .filter(Boolean);
+}
+
+export function getVisibleModule(user, moduleId) {
+  return getVisibleModules(user).find((mod) => mod.id === moduleId) || null;
+}
+
+// Lista plana de destinos visíveis (para a busca global).
+export function getVisibleItems(user) {
+  return getVisibleModules(user).flatMap((mod) => (
+    mod.children.map((child) => ({
+      ...child,
+      label: resolveLabel(child, user),
+      moduleId: mod.id,
+      moduleLabel: mod.label
+    }))
+  ));
+}
+
+// Todos os destinos da árvore, sem filtro de permissão e cobrindo as
+// duas variantes do SST (modo simplificado e completo) — usado pelo
+// script de verificação de links mortos (scripts/validarNavegacao.mjs).
+export function getAllDestinations() {
+  const base = NAV_MODULES.flatMap((mod) => (
+    mod.children.map((child) => ({
+      id: child.id,
+      moduleId: mod.id,
+      label: child.label,
+      to: child.to
+    }))
+  ));
+  const sstVariante = (SST_SIMPLIFIED_MODE ? sstChildrenFull() : sstChildrenSimplified())
+    .map((child) => ({ id: child.id, moduleId: 'sst', label: child.label, to: child.to }));
+  const vistos = new Set(base.map((d) => d.to));
+  return [...base, ...sstVariante.filter((d) => !vistos.has(d.to))];
+}
+
+// ---------------------------------------------------------------------
+// Atalhos personalizados — catálogo de destinos fixáveis.
+// Um atalho guarda só o ID do destino; label/ícone/rota/permissão vêm
+// SEMPRE daqui (fonte única). Destino sem permissão não aparece.
+// ---------------------------------------------------------------------
+
+// Destinos fixáveis visíveis ao usuário, indexados prontos para consumo.
+export function getFixableItems(user) {
+  return getVisibleItems(user).filter((item) => item.fixavel !== false && item.to);
+}
+
+// Resolve uma lista de IDs de atalho em destinos visíveis, preservando a
+// ordem dos IDs e descartando (sem quebrar) o que o usuário não pode ver.
+export function resolverAtalhos(user, ids) {
+  const porId = new Map(getFixableItems(user).map((item) => [item.id, item]));
+  return (Array.isArray(ids) ? ids : [])
+    .map((id) => porId.get(id))
+    .filter(Boolean);
+}
+
+// Destino fixável que corresponde à rota atual (para a estrela do topo).
+export function findFixableByPath(user, pathname) {
+  let best = null;
+  for (const item of getFixableItems(user)) {
+    if (!isPathActive(pathname, item.to)) continue;
+    if (!best || stripHash(item.to).length > stripHash(best.to).length) {
+      best = item;
+    }
+  }
+  // Só considera correspondência exata de rota (a estrela fixa ESTA tela;
+  // páginas de detalhe com :id não são fixáveis).
+  if (best && stripHash(best.to) !== pathname) return null;
+  return best;
+}
+
+function stripHash(path) {
+  const idx = path.indexOf('#');
+  return idx >= 0 ? path.slice(0, idx) : path;
+}
+
+function isPathActive(currentPath, targetPath) {
+  const target = stripHash(targetPath);
+  return currentPath === target || currentPath.startsWith(`${target}/`);
+}
+
+// Melhor correspondência da rota atual na árvore (para o breadcrumb).
+// Retorna { module, item } ou null quando a rota não pertence à árvore.
+export function findActiveNode(user, pathname) {
+  let best = null;
+  for (const mod of getVisibleModules(user)) {
+    for (const item of mod.children) {
+      if (!isPathActive(pathname, item.to)) continue;
+      if (!best || stripHash(item.to).length > stripHash(best.item.to).length) {
+        best = { module: mod, item };
+      }
+    }
+  }
+  return best;
+}

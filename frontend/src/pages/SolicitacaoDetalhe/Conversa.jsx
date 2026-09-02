@@ -10,12 +10,10 @@ import {
 } from '../../utils/pendingAttachments';
 
 /**
- * Comentar e anexar viram UM ato so (item 19, 23/08).
- *
- * Eram dois cards separados — "Novo comentario" e "Anexar arquivos" — e, na pratica, quem comenta
- * costuma estar anexando o documento de que fala. Agora o seletor de arquivos, a lista de pendentes
- * e o envio moram aqui dentro, com UM botao. O card tambem subiu para junto do Historico: era do
- * outro lado da tela do lugar onde o resultado dele aparece.
+ * CONVERSA — comentar e anexar viram UM ato so (item 19, 23/08; card unico
+ * renomeado na reforma visual: dizer algo e mandar o comprovante e a mesma
+ * acao). Por tras, os MESMOS endpoints de comentario e upload de antes —
+ * nenhuma regra muda.
  *
  * Tres decisoes que o botao carrega:
  *
@@ -27,7 +25,7 @@ import {
  *    como ja iam. Amarrar o arquivo AQUELE comentario exigiria `anexos.historico_id` — mudanca de
  *    esquema que ninguem pediu. A medicao tem esse vinculo (`medicao_id`) porque LA foi pedido.
  */
-export default function Comentarios({ solicitacaoId, onSucesso, podeInteragir = true, motivoBloqueio = '' }) {
+export default function Conversa({ solicitacaoId, onSucesso, podeInteragir = true, motivoBloqueio = '' }) {
   const [texto, setTexto] = useState('');
   const [arquivos, setArquivos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -179,7 +177,7 @@ export default function Comentarios({ solicitacaoId, onSucesso, podeInteragir = 
   if (!podeInteragir) {
     return (
       <div className="sol-detail-card" data-testid="comentarios-somente-leitura">
-        <h2 className="sol-detail-card-title">Comentarios e arquivos</h2>
+        <h2 className="sol-detail-card-title">Conversa</h2>
         <p className="text-sm leading-6 text-[var(--c-muted)]">
           {motivoBloqueio || 'As interacoes ficam disponiveis quando a solicitacao estiver no seu setor.'}
         </p>
@@ -188,61 +186,83 @@ export default function Comentarios({ solicitacaoId, onSucesso, podeInteragir = 
   }
 
   return (
-    <div className="sol-detail-card" data-testid="card-comentario">
-      <h2 className="sol-detail-card-title">Novo comentario</h2>
+    <div className="sol-detail-card" id="sol-detail-conversa" data-testid="card-comentario">
+      <h2 className="sol-detail-card-title">Conversa</h2>
 
       <textarea
         value={texto}
         onChange={e => setTexto(e.target.value)}
-        rows={6}
+        rows={5}
         className="input w-full mb-2 sol-detail-comment-textarea"
-        placeholder={'Escreva um comentario...\nUse Enter para quebrar linha e organizar o texto.'}
+        placeholder={'Escreva um comentario e/ou anexe arquivos...\nEnter cria uma nova linha; o historico mantem a formatacao.'}
       />
-      <p className="app-note mb-3">
-        Enter cria uma nova linha. O historico vai manter a formatacao digitada.
-      </p>
 
-      <div className="mb-3">
+      {/* Barra compacta: anexar, mencionar e a contagem no mesmo nivel —
+          os anexos, que eram um card proprio, fazem parte do mesmo ato. */}
+      <div className="flex items-center gap-2 flex-wrap mb-2">
+        <label className={`btn btn-outline btn-sm inline-flex items-center gap-2 cursor-pointer ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
+          <HiPaperClip className="w-4 h-4" />
+          <span>Anexar arquivos</span>
+          <input
+            type="file"
+            multiple
+            ref={inputRef}
+            className="hidden"
+            data-testid="comentario-anexos"
+            disabled={loading}
+            onChange={e => {
+              adicionarArquivos(e.target.files);
+              e.target.value = '';
+            }}
+          />
+        </label>
+
         <button
           type="button"
           onClick={() => setMostrarLista(prev => !prev)}
-          className="btn btn-secondary text-sm"
+          className="btn btn-secondary btn-sm"
         >
           + Mencionar usuario
         </button>
 
-        {mostrarLista && (
-          <div className="mt-2 border rounded p-3 bg-white dark:bg-gray-900">
-            <input
-              type="text"
-              value={buscaUsuario}
-              onChange={e => setBuscaUsuario(e.target.value)}
-              className="input w-full mb-2"
-              placeholder="Buscar usuario por nome ou email"
-            />
-
-            <div className="max-h-48 overflow-y-auto space-y-1">
-              {usuariosDisponiveis.length === 0 && (
-                <p className="text-sm text-[var(--c-muted)] px-2 py-2">
-                  Nenhum usuario disponivel.
-                </p>
-              )}
-
-              {usuariosDisponiveis.map(usuario => (
-                <button
-                  key={usuario.id}
-                  type="button"
-                  onClick={() => adicionarMencao(usuario)}
-                  className="block w-full text-left px-3 py-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm"
-                >
-                  <div className="font-medium">{usuario.nome}</div>
-                  <div className="text-xs text-[var(--c-muted)]">{usuario.email}</div>
-                </button>
-              ))}
-            </div>
-          </div>
+        {arquivos.length > 0 && (
+          <span className="text-xs text-[var(--c-muted)]">
+            {arquivos.length} arquivo(s) para enviar
+          </span>
         )}
       </div>
+
+      {mostrarLista && (
+        <div className="mb-3 border rounded p-3 bg-white dark:bg-gray-900">
+          <input
+            type="text"
+            value={buscaUsuario}
+            onChange={e => setBuscaUsuario(e.target.value)}
+            className="input w-full mb-2"
+            placeholder="Buscar usuario por nome ou email"
+          />
+
+          <div className="max-h-48 overflow-y-auto space-y-1">
+            {usuariosDisponiveis.length === 0 && (
+              <p className="text-sm text-[var(--c-muted)] px-2 py-2">
+                Nenhum usuario disponivel.
+              </p>
+            )}
+
+            {usuariosDisponiveis.map(usuario => (
+              <button
+                key={usuario.id}
+                type="button"
+                onClick={() => adicionarMencao(usuario)}
+                className="block w-full text-left px-3 py-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 text-sm"
+              >
+                <div className="font-medium">{usuario.nome}</div>
+                <div className="text-xs text-[var(--c-muted)]">{usuario.email}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {usuariosSelecionados.length > 0 && (
         <div className="mb-3 p-3 rounded bg-blue-50 dark:bg-blue-950/30">
@@ -266,31 +286,6 @@ export default function Comentarios({ solicitacaoId, onSucesso, podeInteragir = 
           </div>
         </div>
       )}
-
-      {/* Os anexos, que eram um card proprio, agora fazem parte do mesmo ato. */}
-      <div className="flex items-center gap-2 flex-wrap mb-2">
-        <label className={`btn btn-outline inline-flex items-center gap-2 cursor-pointer ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
-          <HiPaperClip className="w-4 h-4" />
-          <span>Anexar arquivos</span>
-          <input
-            type="file"
-            multiple
-            ref={inputRef}
-            className="hidden"
-            data-testid="comentario-anexos"
-            disabled={loading}
-            onChange={e => {
-              adicionarArquivos(e.target.files);
-              e.target.value = '';
-            }}
-          />
-        </label>
-        <span className="text-xs text-[var(--c-muted)]">
-          {arquivos.length > 0
-            ? `${arquivos.length} arquivo(s) selecionado(s)`
-            : 'Nenhum arquivo selecionado'}
-        </span>
-      </div>
 
       <PendingAttachmentsList
         items={arquivos}

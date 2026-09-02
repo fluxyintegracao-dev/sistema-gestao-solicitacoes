@@ -2678,7 +2678,7 @@ export default function FinanceiroCard({
                   return (
                     <div key={pagamento.id || pagamentoIndex} className="financeiro-forma-pagamento-item space-y-3 rounded-2xl border border-slate-200 bg-white p-3">
                       <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                           {geracaoMultiplaTitulos ? `Titulo ${pagamentoIndex + 1}` : 'Titulo unico'}
                         </div>
                         {geracaoMultiplaTitulos && (form.pagamentos || []).length > 1 && (
@@ -2835,7 +2835,7 @@ export default function FinanceiroCard({
                           </div>
                           {(pagamento.parcelas || []).map((parcela, parcelaIndex) => (
                             <div key={parcelaIndex} className="financeiro-forma-pagamento-parcela rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                                 Parcela {parcelaIndex + 1}/{quantidade}
                               </div>
                               <div className="grid gap-3 md:grid-cols-2">
@@ -3007,7 +3007,7 @@ export default function FinanceiroCard({
                           {categoria.tipo} - {categoria.descricao || 'Sem descricao complementar'}
                         </div>
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                         #{categoria.id}
                       </span>
                     </div>

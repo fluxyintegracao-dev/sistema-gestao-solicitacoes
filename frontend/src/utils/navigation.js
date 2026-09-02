@@ -26,7 +26,8 @@ export function getFallbackRoute(pathname = '/') {
   if (path.startsWith('/biblioteca') || path.startsWith('/arquivos-modelos')) return '/arquivos-modelos';
   if (path.startsWith('/solicitacoes')) return '/solicitacoes';
 
-  return '/solicitacoes';
+  // Sem contexto de módulo, o destino padrão é a Home (Hub Principal).
+  return '/';
 }
 
 export function hasSafeBrowserHistory() {

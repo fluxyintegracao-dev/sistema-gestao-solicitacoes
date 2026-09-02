@@ -1,6 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { HiOutlineEllipsisHorizontal, HiOutlineInformationCircle } from 'react-icons/hi2';
 import StatusBadge from '../../components/StatusBadge';
 import { corrigirTextoCorrompido } from '../../utils/texto';
+import { extrairParesDescricao } from '../../utils/formatarTexto';
 import { formatarDataLocalPtBr } from '../../utils/dateLocal';
 import { getTipoSolicitacaoBehavior } from '../../utils/tipoSolicitacao';
 import { formaPagamentoEhPix } from '../../utils/formaPagamento';
@@ -88,10 +90,32 @@ export default function Header({
   podeEditarRefContrato = false,
   mostrarContratoInfo = true,
   contratosObra = [],
-  onSalvarRefContrato
+  onSalvarRefContrato,
+  // Ação em destaque configurável por setor+estado (Configurações →
+  // Ação principal por setor). null = comportamento genérico atual.
+  acaoPrincipal = null
 }) {
   const [contratoSelecionadoId, setContratoSelecionadoId] = useState('');
   const [salvandoRef, setSalvandoRef] = useState(false);
+  // Com ação principal mapeada, as ações secundárias moram no menu "⋯".
+  const [menuAcoesAberto, setMenuAcoesAberto] = useState(false);
+  const menuAcoesRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuAcoesAberto) return undefined;
+    const aoClicar = (event) => {
+      if (!menuAcoesRef.current?.contains(event.target)) setMenuAcoesAberto(false);
+    };
+    const aoTeclar = (event) => {
+      if (event.key === 'Escape') setMenuAcoesAberto(false);
+    };
+    document.addEventListener('mousedown', aoClicar);
+    document.addEventListener('keydown', aoTeclar);
+    return () => {
+      document.removeEventListener('mousedown', aoClicar);
+      document.removeEventListener('keydown', aoTeclar);
+    };
+  }, [menuAcoesAberto]);
 
   useEffect(() => {
     setContratoSelecionadoId(solicitacao?.contrato_id ? String(solicitacao.contrato_id) : '');
@@ -143,6 +167,15 @@ export default function Header({
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
   const setorStatusAtual = ultimoHistoricoStatus?.setor || solicitacao?.area_responsavel || null;
   const descricaoCorrigida = limparDescricaoCompra(corrigirTextoCorrompido(solicitacao?.descricao || ''));
+  // Descrição com pares "Rótulo: valor" vira lista legível abaixo da grade —
+  // parágrafo corrido é mais difícil de ler. Só exibição; nada muda no banco.
+  const descricaoEstruturada = useMemo(
+    () => extrairParesDescricao(descricaoCorrigida),
+    [descricaoCorrigida]
+  );
+  const descricaoExibida = descricaoEstruturada.pares.length > 0
+    ? descricaoEstruturada.textoLivre
+    : descricaoCorrigida;
   const chavePixContrato = String(
     solicitacao?.favorecido_chave_pix
       || (formaPagamentoEhPix(solicitacao?.formaPagamento) ? contratoDoFluxo?.favorecido?.chave : '')
@@ -187,23 +220,93 @@ export default function Header({
           {/* Comparacao com `trim`: a descricao passa por `corrigirTextoCorrompido` e a ref vem crua
               do banco — a do CT-0005 tem espaco no fim. Sem normalizar, "Teste" e "Teste  " seriam
               textos diferentes e a repeticao continuaria na tela. */}
-          {String(descricaoCorrigida || '').trim() !== String(refContratoAtual || '').trim() && (
-            <p className="sol-detail-description">{descricaoCorrigida || 'Sem descricao informada.'}</p>
-          )}
+          {(() => {
+            // Regra do oficial: a descricao so aparece quando DIZ outra coisa que o titulo.
+            // Duas supressões extras da reforma: quando os pares consumiram o texto inteiro,
+            // e quando o que sobrou apenas ecoa o nome do tipo ("COMPRA DIRETA" sob "Compra Direta").
+            if (String(descricaoExibida || '').trim() === String(refContratoAtual || '').trim()) return null;
+            const eco = normalizarTexto(descricaoExibida) === normalizarTexto(solicitacao.tipo?.nome);
+            if (descricaoEstruturada.pares.length > 0 && (!descricaoExibida || eco)) return null;
+            if (eco) return null;
+            return (
+              <p className="sol-detail-description">{descricaoExibida || 'Sem descricao informada.'}</p>
+            );
+          })()}
         </div>
 
         <div className="sol-detail-header-side">
           <div className="sol-detail-actions">
-            {mostrarAlterarStatus && (
-              <button onClick={onAlterarStatus} className="btn btn-outline sol-detail-action-btn" type="button">
-                Alterar status
-              </button>
-            )}
-            <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
-            {mostrarEnviarSetor && (
-              <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
-                Enviar para outro setor
-              </button>
+            {acaoPrincipal ? (
+              <>
+                {/* Ação principal ao lado do status; secundárias no "⋯". */}
+                <button
+                  onClick={acaoPrincipal.executar}
+                  className="btn btn-primary sol-detail-action-btn"
+                  type="button"
+                >
+                  {acaoPrincipal.rotulo}
+                </button>
+                <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
+                {((mostrarAlterarStatus && acaoPrincipal.acao !== 'alterar_status')
+                  || (mostrarEnviarSetor && acaoPrincipal.acao !== 'enviar_setor')) && (
+                  <div className="sol-detail-mais-wrap" ref={menuAcoesRef}>
+                    <button
+                      type="button"
+                      className="btn btn-outline sol-detail-action-btn sol-detail-mais-btn"
+                      onClick={() => setMenuAcoesAberto((aberto) => !aberto)}
+                      aria-expanded={menuAcoesAberto}
+                      aria-haspopup="menu"
+                      aria-label="Mais ações"
+                      title="Mais ações"
+                    >
+                      <HiOutlineEllipsisHorizontal size={20} aria-hidden="true" />
+                    </button>
+                    {menuAcoesAberto && (
+                      <div className="sol-detail-mais-menu" role="menu">
+                        {mostrarAlterarStatus && acaoPrincipal.acao !== 'alterar_status' && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuAcoesAberto(false);
+                              onAlterarStatus();
+                            }}
+                          >
+                            Alterar status
+                          </button>
+                        )}
+                        {mostrarEnviarSetor && acaoPrincipal.acao !== 'enviar_setor' && (
+                          <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                              setMenuAcoesAberto(false);
+                              onEnviarSetor();
+                            }}
+                          >
+                            Enviar para outro setor
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Sem mapeamento de ação principal: comportamento atual. */}
+                {mostrarAlterarStatus && (
+                  <button onClick={onAlterarStatus} className="btn btn-outline sol-detail-action-btn" type="button">
+                    Alterar status
+                  </button>
+                )}
+                <StatusBadge status={solicitacao.status_global} setor={setorStatusAtual} />
+                {mostrarEnviarSetor && (
+                  <button onClick={onEnviarSetor} className="btn btn-outline sol-detail-action-btn" type="button">
+                    Enviar para outro setor
+                  </button>
+                )}
+              </>
             )}
           </div>
           <div className="sol-detail-header-date">
@@ -329,6 +432,28 @@ export default function Header({
           />
         )}
       </div>
+
+      {/* Pares "Rótulo: valor" da DESCRIÇÃO: leitura do texto livre,
+          não são campos do sistema — não alimentam título, previsão
+          nem relatório. Ficam abaixo dos oficiais, discretos; se um
+          repetir um campo oficial, o oficial é a autoridade. */}
+      {descricaoEstruturada.pares.length > 0 && (
+        <div className="sol-detail-informados" aria-label="Detalhes informados na descrição">
+          <p className="sol-detail-informados-titulo">
+            <HiOutlineInformationCircle aria-hidden="true" />
+            Detalhes informados
+            <span className="sol-detail-informados-nota">lidos da descrição</span>
+          </p>
+          <dl className="sol-detail-informados-lista">
+            {descricaoEstruturada.pares.map((par, indice) => (
+              <div key={`${par.rotulo}-${indice}`} className="sol-detail-informados-par">
+                <dt>{par.rotulo}</dt>
+                <dd>{par.valor}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
 
       {mostrarContratoInfo && podeEditarRefContrato && (
         <div className="sol-detail-contract-editor">

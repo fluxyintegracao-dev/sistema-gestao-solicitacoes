@@ -68,11 +68,17 @@ if (responsiveImportPosition < 0 || responsiveImportPosition < indexImportPositi
   fail('responsive-system.css precisa ser carregado depois dos estilos historicos.');
 }
 
-if (!layout.includes("matchMedia('(max-width: 1023px)')")) {
-  fail('o shell precisa tratar smartphone e tablet como viewport compacto.');
+// A reforma removeu a sidebar: o shell agora é o topo (fx-topbar) da
+// fonte única, responsivo por CSS nos tokens. As garantias equivalentes:
+// o Layout renderiza o topo novo, e os tokens tratam tablet e smartphone
+// como viewport compacto.
+const designTokensCss = read('src/styles/design-tokens.css');
+if (!layout.includes('fx-topbar')) {
+  fail('o shell precisa renderizar o topo da navegacao (fx-topbar).');
 }
-if (!layout.includes('fixed lg:sticky') || !layout.includes('lg:hidden')) {
-  fail('o menu lateral precisa usar drawer ate o breakpoint desktop.');
+if (!designTokensCss.includes('@media (max-width: 1023px)')
+  || !designTokensCss.includes('@media (max-width: 767px)')) {
+  fail('o shell precisa tratar smartphone e tablet como viewport compacto.');
 }
 if (/\.layout-shell\.fluxy-app-shell\s*>\s*\*\s*\{[^}]*position\s*:\s*relative/s.test(indexCss)) {
   fail('a regra generica do shell voltou a sobrescrever o posicionamento do drawer.');
