@@ -766,19 +766,27 @@ const ListaAvancada = forwardRef(function ListaAvancada({
       {/* NÍVEL 1 — busca (o controle mais usado) + visualização à direita */}
       <div className="la-nivel1">
         {busca && (
-          <div className="la-busca">
-            <HiOutlineMagnifyingGlass aria-hidden="true" />
-            <input
-              type="text"
-              value={buscaTexto}
-              onChange={(event) => setBuscaTexto(event.target.value)}
-              placeholder={busca.placeholder || 'Buscar…'}
-              aria-label={busca.placeholder || 'Buscar na lista'}
-            />
-            {buscaTexto && (
-              <button type="button" onClick={() => setBuscaTexto('')} aria-label="Limpar busca">
-                <HiOutlineXMark aria-hidden="true" />
-              </button>
+          <div className="la-busca-wrap">
+            <div className="la-busca">
+              <HiOutlineMagnifyingGlass aria-hidden="true" />
+              <input
+                type="text"
+                value={buscaTexto}
+                onChange={(event) => setBuscaTexto(event.target.value)}
+                placeholder={busca.placeholder || 'Buscar…'}
+                aria-label={busca.placeholder || 'Buscar na lista'}
+              />
+              {buscaTexto && (
+                <button type="button" onClick={() => setBuscaTexto('')} aria-label="Limpar busca">
+                  <HiOutlineXMark aria-hidden="true" />
+                </button>
+              )}
+            </div>
+            {/* Aviso de limitação da busca (ex.: enquanto ela roda no
+                cliente, só sobre os registros carregados). A página decide
+                quando existe. */}
+            {busca.aviso && (
+              <p className="la-busca-aviso">{busca.aviso}</p>
             )}
           </div>
         )}

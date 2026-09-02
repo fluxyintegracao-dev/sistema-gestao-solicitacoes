@@ -2289,7 +2289,12 @@ export default function Solicitacoes({ arquivadas = false }) {
             errosDatas={errosFiltrosData}
           />
         )}
-        busca={{ placeholder: 'Buscar por código, obra, descrição ou fornecedor…' }}
+        busca={{
+          placeholder: 'Buscar por código, obra, descrição ou fornecedor…',
+          // Enquanto o B3 não existe a busca roda no cliente — o usuário
+          // precisa saber que ela não varre o banco inteiro.
+          aviso: B3_DISPONIVEL ? '' : 'A busca considera apenas os registros já carregados na tela.'
+        }}
         colunas={colunasLista}
         agrupamentos={[
           { id: 'obra', rotulo: 'obra', valor: (item) => formatarMaiusculas(item.obra?.nome || '(sem obra)') },

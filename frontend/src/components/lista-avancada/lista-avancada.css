@@ -23,6 +23,21 @@
   flex-wrap: wrap;
 }
 
+/* O wrapper herda o espaço que a busca ocupava; o aviso, quando existe,
+   fica discreto logo abaixo do campo, sem empurrar os controles. */
+.la-busca-wrap {
+  flex: 1;
+  min-width: 240px;
+  max-width: 640px;
+}
+
+.la-busca-aviso {
+  margin: 4px 2px 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--c-muted, #64748b);
+}
+
 .la-busca {
   display: flex;
   align-items: center;

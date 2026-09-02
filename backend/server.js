@@ -9,6 +9,18 @@ const { ensureClamavReady } = require('./src/services/clamavService');
 const { iniciarCrmAutomationRuntime } = require('./src/services/crmAutomationRuntimeService');
 const { startGovernancaSnapshotJob } = require('./src/modules/governanca/jobs/governancaSnapshotJob');
 
+// Um erro assíncrono não tratado (ex.: falha de banco disparada por uma
+// tela) não pode derrubar o servidor inteiro: loga com stack e segue.
+// Falhas DURANTE o boot continuam encerrando o processo (catch de start()).
+process.on('unhandledRejection', (reason) => {
+  const erro = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('[unhandledRejection]', erro.stack || erro);
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('[uncaughtException]', error?.stack || error);
+});
+
 async function start() {
   validateRequiredEnv();
   await ensureRateLimitStoreReady();
