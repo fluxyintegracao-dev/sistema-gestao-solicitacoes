@@ -5396,7 +5396,9 @@ input[type="file"]:disabled {
 .app-table-shell {
   width: 100%;
   min-width: 0;
-  overflow: hidden;
+  /* R18 (defesa): clip recorta igual a hidden e NÃO cria scrollport —
+     assim nenhum sticky futuro dentro do shell é sequestrado. */
+  overflow: clip;
 }
 
 .app-table-shell .table-wrapper {

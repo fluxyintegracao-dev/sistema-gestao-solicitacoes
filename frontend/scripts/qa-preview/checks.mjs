@@ -604,28 +604,46 @@ export function checkStickyEAcessibilidade() {
     return partes.join(' > ');
   };
 
-  /* ---- R18: ancestral que sequestra o sticky ---- */
-  const fixos = [
-    ...qa('.layout-main .app-page-header'),
-    ...qa('.app-tabela td.celula-fixa'),
-    ...qa('.app-tabela .resizable-table-scroll')
-  ];
+  /* ---- R18: ancestral que sequestra o sticky ----
+     PRECISÃO IMPORTA: um elemento sticky gruda no SCROLLPORT MAIS PRÓXIMO.
+     Só quebra quem estiver ENTRE o elemento e esse scrollport — ancestral
+     ACIMA dele é irrelevante. Marcar acima seria falso positivo (a primeira
+     versão deste check marcou 10 telas assim, por olhar o
+     `.app-table-shell` que fica acima do `.resizable-table-scroll`).
+
+     - faixa fixa (.app-page-header): gruda na JANELA → qualquer ancestral
+       com overflow hidden/auto/scroll até o topo a quebra;
+     - coluna fixa (td/th.celula-fixa): gruda no .resizable-table-scroll →
+       só o que estiver ANTES dele conta. */
   const culpados = [];
-  fixos.forEach((alvo) => {
+
+  qa('.layout-main .app-page-header').forEach((alvo) => {
     let atual = alvo.parentElement;
     while (atual && atual !== document.documentElement) {
       const cs = getComputedStyle(atual);
-      const eixos = [cs.overflow, cs.overflowX, cs.overflowY];
-      // `hidden` e `auto`/`scroll` criam scrollport; `clip` e `visible` não.
-      // O PRÓPRIO contêiner de rolagem da tabela é legítimo — ele é o alvo.
-      const ehRolagemDaTabela = atual.classList.contains('resizable-table-scroll');
-      if (!ehRolagemDaTabela && eixos.includes('hidden')) {
-        culpados.push(`${cssPath(atual)} (overflow hidden) sobre ${cssPath(alvo)}`);
+      if ([cs.overflow, cs.overflowX, cs.overflowY].includes('hidden')) {
+        culpados.push(`${cssPath(atual)} (overflow hidden) sobre a faixa fixa ${cssPath(alvo)}`);
         break;
       }
       atual = atual.parentElement;
     }
   });
+
+  qa('.app-tabela td.celula-fixa, .app-tabela th.celula-fixa').forEach((alvo) => {
+    let atual = alvo.parentElement;
+    while (atual && atual !== document.documentElement) {
+      // Chegou ao scrollport pretendido: daqui para cima não afeta.
+      if (atual.classList.contains('resizable-table-scroll')) break;
+      const cs = getComputedStyle(atual);
+      if ([cs.overflow, cs.overflowX, cs.overflowY].includes('hidden')) {
+        culpados.push(`${cssPath(atual)} (overflow hidden) sobre a coluna fixa ${cssPath(alvo)}`);
+        break;
+      }
+      atual = atual.parentElement;
+    }
+  });
+
+  const fixos = [...qa('.layout-main .app-page-header'), ...qa('.app-tabela td.celula-fixa')];
   r.R18 = fixos.length === 0
     ? { estado: 'N/A', motivo: 'tela sem elemento fixo (faixa, tabela ou coluna fixa)' }
     : culpados.length
