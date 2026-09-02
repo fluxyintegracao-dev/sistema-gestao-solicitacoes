@@ -53,11 +53,10 @@ const SolicitacaoController = require('./SolicitacaoController');
 // só passam a existir no rework do SolicitacaoController (pacote B3 de
 // docs/PROPOSTA-BACKEND.md). Recriar a regra aqui é proibido — duplicar
 // regra de visibilidade foi a origem do bug "61 aprovações".
-// Ao entregar o B3: mude para true e confira que as duas funções estão
-// exportadas pelo SolicitacaoController. Alinhamento registrado em
+// Ligada em 02/09 junto com o B3 (funções exportadas pelo SolicitacaoController). Alinhamento registrado em
 // docs/MIGRACAO-PARA-OFICIAL.md (seção do plano de ondas).
 // =====================================================================
-const GRUPO_SOLICITACOES_DISPONIVEL = false;
+const GRUPO_SOLICITACOES_DISPONIVEL = true;
 
 const LIMITE_GRUPO = 5;
 const MIN_CARACTERES = 2;
@@ -103,10 +102,14 @@ function condicoesBuscaSolicitacoes(q) {
     { campo: 'codigo_contrato', sql: '`Solicitacao`.`codigo_contrato`' }
   ], q);
   if (q.length >= MIN_CARACTERES_TEXTO) {
+    // Nomes físicos das tabelas via models: no servidor oficial a tabela
+    // de obras é "Obras", com maiúscula (ver CONVENCAO-MIGRATIONS/f58e030).
+    const tabelaObras = String(Obra.getTableName());
+    const tabelaParceiros = String(Parceiro.getTableName());
     ou.push(
       { descricao: { [Op.like]: like } },
-      { obra_id: { [Op.in]: Sequelize.literal(`(SELECT o.id FROM obras o WHERE o.nome LIKE ${likeEscapado})`) } },
-      { parceiro_id: { [Op.in]: Sequelize.literal(`(SELECT p.id FROM parceiros p WHERE p.nome LIKE ${likeEscapado})`) } }
+      { obra_id: { [Op.in]: Sequelize.literal(`(SELECT o.id FROM \`${tabelaObras}\` o WHERE o.nome LIKE ${likeEscapado})`) } },
+      { parceiro_id: { [Op.in]: Sequelize.literal(`(SELECT p.id FROM \`${tabelaParceiros}\` p WHERE p.nome LIKE ${likeEscapado})`) } }
     );
   }
   return ou;
@@ -311,7 +314,7 @@ async function grupoTitulos(req, q) {
     textos: ['descricao']
   });
   if (q.length >= MIN_CARACTERES_TEXTO) {
-    ou.push({ parceiro_id: { [Op.in]: Sequelize.literal(`(SELECT p.id FROM parceiros p WHERE p.nome LIKE ${likeEscapado})`) } });
+    ou.push({ parceiro_id: { [Op.in]: Sequelize.literal(`(SELECT p.id FROM \`${String(Parceiro.getTableName())}\` p WHERE p.nome LIKE ${likeEscapado})`) } });
   }
   const where = { [Op.or]: ou };
   if (obraIds) where.obra_id = { [Op.in]: obraIds };

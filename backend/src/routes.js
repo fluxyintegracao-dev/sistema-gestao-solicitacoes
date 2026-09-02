@@ -370,6 +370,7 @@ const AtalhoSetorController = require('./controllers/AtalhoSetorController');
 const DetalheLayoutController = require('./controllers/DetalheLayoutController');
 const AcaoPrincipalSetorController = require('./controllers/AcaoPrincipalSetorController');
 const DashboardController = require('./controllers/DashboardController');
+const DashboardPendenciasController = require('./controllers/DashboardPendenciasController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
 const InstalacaoController = require('./controllers/InstalacaoController');
@@ -1538,6 +1539,9 @@ router.get('/solicitacoes/apropriacao-padrao', ObraTipoApropriacaoController.res
 router.get('/solicitacoes/despesa-eventual/saldo', SolicitacaoController.saldoDespesaEventual);
 router.get('/solicitacoes/filtros/status', SolicitacaoController.statusVisiveis);
 router.get('/solicitacoes', SolicitacaoController.index);
+// Contadores das visoes da lista — MESMO escopo da listagem (pacote B3).
+// Registrada antes de /solicitacoes/:id para nao casar como id.
+router.get('/solicitacoes/contadores', SolicitacaoController.contadores);
 router.get('/solicitacoes/resumo', SolicitacaoController.resumo);
 router.get('/solicitacoes/relatorios/operacional', allowSolicitacoesRelatorioOperacional, RelatorioSolicitacoesController.operacional);
 router.get('/solicitacoes/:id/resumo-lista', validateRequest({ params: validateNumericIdParam('id', 'Solicitacao') }), SolicitacaoController.resumoLista);
@@ -2271,6 +2275,11 @@ router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirF
 // Busca universal (Ctrl+K): grupos gateados pela permissao da tela
 // correspondente; grupo sem permissao nem e consultado (pacote B2).
 router.get('/busca', BuscaController.index);
+
+// Pendencias do usuario no Hub (pacote B3): consultas nomeadas, gateadas
+// pelas permissoes das telas de destino; contador e lista compartilham o
+// mesmo recorte (pendenciasVisoes + escopo da listagem). Somente leitura.
+router.get('/dashboard/pendencias', DashboardPendenciasController.index);
 
 // Tela inicial escolhida pelo usuario (pacote B5) — validada no backend
 // contra a fonte unica de navegacao compilada (mesmas regras do

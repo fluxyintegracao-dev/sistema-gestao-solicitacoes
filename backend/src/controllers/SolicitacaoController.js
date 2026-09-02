@@ -1,3 +1,6 @@
+const db = require('../models');
+const { condicoesCodigoFlexivel } = require('../utils/buscaFlexivel');
+const { condicoesVisaoPendencia } = require('../services/pendenciasVisoes');
 const {
   Solicitacao,
   Historico,
@@ -121,6 +124,37 @@ const SOLICITACAO_RESPONSAVEL_ACTIONS = [
   'RESPONSAVEL_ASSUMIU',
   'RESPONSAVEL_REMOVIDO'
 ];
+
+// Subqueries do "responsavel atual" de uma solicitacao: o ultimo evento
+// de responsavel (ATRIBUIDO/ASSUMIU/REMOVIDO, MAX(id) como proxy do mais
+// recente). Espelha o criterio do resumo da lista; REMOVIDO como ultimo
+// evento significa "sem responsavel". (Pacote B3 da reforma.)
+const SUBQUERY_ULTIMO_EVENTO_RESPONSAVEL = `
+  SELECT solicitacao_id, MAX(id) AS max_id
+  FROM historicos
+  WHERE acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU', 'RESPONSAVEL_REMOVIDO')
+  GROUP BY solicitacao_id
+`;
+
+function montarSubqueryComResponsavelAtual() {
+  return `(
+    SELECT h.solicitacao_id
+    FROM historicos h
+    INNER JOIN (${SUBQUERY_ULTIMO_EVENTO_RESPONSAVEL}) ult ON ult.max_id = h.id
+    WHERE h.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+  )`;
+}
+
+function montarSubqueryResponsavelAtual(usuarioId) {
+  const id = Number(usuarioId);
+  return `(
+    SELECT h.solicitacao_id
+    FROM historicos h
+    INNER JOIN (${SUBQUERY_ULTIMO_EVENTO_RESPONSAVEL}) ult ON ult.max_id = h.id
+    WHERE h.acao IN ('RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU')
+      AND h.usuario_responsavel_id = ${Number.isInteger(id) ? id : -1}
+  )`;
+}
 const { criarEscopoIdempotencia } = require('../services/idempotenciaCriacaoService');
 const { validarPeriodoMedicao, validarMedicaoParcelas, aplicarMedicaoNasParcelas, registrarMedicaoDoContrato } = require('../services/medicaoContratoService');
 const {
@@ -1510,71 +1544,23 @@ function normalizarTipoPendenciaFinanceira(valor) {
   return TIPOS_PENDENCIA_FINANCEIRA.has(tipo) ? tipo : 'FORA_DO_PRAZO';
 }
 
-module.exports = {
 
-  // =====================================================
-  // LISTAR SOLICITACOES
-  // =====================================================
-  async index(req, res) {
-    try {
-      const { id: usuarioId } = req.user;
-      const perfil = String(req.user?.perfil || '').trim().toUpperCase();
-      let areaUsuario = null;
-      const {
-        area,
-        status,
-        arquivadas,
-        obra_id,
-        obra_ids,
-        codigo,
-        descricao,
-        codigo_contrato,
-        numero_solicitacao,
-        numero_sienge,
-        responsavel,
-        data_registro,
-        data_vencimento,
-        data_vencimento_inicio,
-        data_vencimento_fim,
-        data_inicio,
-        data_fim,
-        valor_min,
-        valor_max,
-        tipo_macro_id,
-        tipo_solicitacao_id,
-        page,
-        limit,
-        apenas_obras,
-        apenas_status
-      } = req.query;
-      const erroDatas = validarDatasConsultaSolicitacoes({
-        data_registro,
-        data_vencimento,
-        data_vencimento_inicio,
-        data_vencimento_fim,
-        data_inicio,
-        data_fim
-      });
-      if (erroDatas) {
-        return res.status(400).json({ error: erroDatas });
-      }
-      const paginacaoSolicitada = true;
-      const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
-        String(apenas_obras || '').trim().toLowerCase()
-      );
-      const apenasStatusSolicitados = ['1', 'true', 'sim'].includes(
-        String(apenas_status || '').trim().toLowerCase()
-      );
-      const paginaAtual = parsePositiveInt(page, 1);
-      const limitePorPagina = parseSolicitacoesPageSize(limit);
-      const offset = (paginaAtual - 1) * limitePorPagina;
-
-      /* ===============================
-        1) BUSCAR SOLICITACOES OCULTADAS
-      =============================== */
-      const listarArquivadas = ['1', 'true', 'sim'].includes(
-        String(arquivadas || '').trim().toLowerCase()
-      );
+// =====================================================================
+// ESCOPO DE VISIBILIDADE DA LISTA — EXTRAÍDO LITERALMENTE do index()
+// (pacote B3 do porte: movimentação de código, NENHUMA mudança de regra;
+// os blocos abaixo são os mesmos que viviam embutidos no index(), com
+// duas costuras mecânicas: o retorno antecipado de "arquivadas sem
+// ocultas" virou a flag `vazio`, e as derivações usuarioComRegraMista/
+// ordenacaoLista vieram junto por serem funções puras do contexto).
+// Consumidores: index(), contadores(), BuscaController (grupo
+// Solicitações) e DashboardPendenciasController — todos enxergam o MESMO
+// recorte e os MESMOS tokens de setor (contexto.setorTokens), por
+// construção.
+// =====================================================================
+async function montarEscopoVisibilidadeLista(req, { listarArquivadas = false } = {}) {
+  const { id: usuarioId } = req.user;
+  const perfil = String(req.user?.perfil || '').trim().toUpperCase();
+  let areaUsuario = null;
 
       const ocultadas = await SolicitacaoVisibilidadeUsuario.findAll({
         where: {
@@ -1593,23 +1579,12 @@ module.exports = {
         cancelada: false
       };
 
+      // Costura mecânica: o retorno antecipado do index() ("arquivadas"
+      // sem nenhuma solicitação oculta) vira a flag `vazio` — o chamador
+      // decide a resposta; nenhuma consulta adicional é feita, como antes.
       if (listarArquivadas) {
         if (idsOcultos.length === 0) {
-          if (apenasObrasSolicitadas || apenasStatusSolicitados) {
-            return res.json([]);
-          }
-          if (!paginacaoSolicitada) {
-            return res.json([]);
-          }
-          return res.json({
-            items: [],
-            meta: {
-              page: paginaAtual,
-              limit: limitePorPagina,
-              total: 0,
-              total_pages: 0
-            }
-          });
+          return { vazio: true, where, contexto: null };
         }
         where[Op.and] = where[Op.and] || [];
         where[Op.and].push({ id: { [Op.in]: idsOcultos } });
@@ -1928,6 +1903,445 @@ module.exports = {
 
         where[Op.and] = where[Op.and] || [];
         where[Op.and].push({ [Op.or]: condicoes.length > 0 ? condicoes : [{ id: -1 }] });
+      }
+
+      const usuarioComRegraMistaPorTipo =
+        perfil === 'USUARIO' &&
+        !adminGEO &&
+        !isSetorObra;
+      // A fila do GEO e operacional: uma prestacao, retorno ou nova movimentacao precisa voltar
+      // ao topo para conferencia. Os demais setores preservam a ordenacao historica por criacao.
+      const ordenacaoLista = isUsuarioGeo
+        ? [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
+        : [['createdAt', 'DESC']];
+
+      return {
+        vazio: false,
+        where,
+        contexto: {
+          usuarioId,
+          perfil,
+          areaUsuario,
+          setorAtual,
+          setorTokens,
+          setoresExtrasUsuario,
+          setoresVisiveisAoAtribuir,
+          setorTodosVisiveis,
+          temPermissoesAreasConfiguradas,
+          podeVerSolicitacoesProprias,
+          podeVerSolicitacoesSetor,
+          podeVerTodasSolicitacoes,
+          isSetorObra,
+          isUsuarioGeo,
+          isSetorAdministrativo,
+          adminGEO,
+          obrasVinculadas,
+          idsOcultos,
+          usuarioComRegraMistaPorTipo,
+          ordenacaoLista
+        }
+      };
+}
+
+// Pós-filtro da regra mista por tipo — EXTRAÍDO LITERALMENTE do index()
+// (mesmo predicado, mesmas consultas). Fora do caso USUARIO comum a
+// função é transparente, como no index() original. Aceita instâncias do
+// Sequelize ou objetos puros (lê os mesmos campos).
+async function filtrarRegraMistaPorTipo(itens, contexto) {
+  if (!contexto?.usuarioComRegraMistaPorTipo) return itens;
+  const lista = Array.isArray(itens) ? itens : [];
+  if (lista.length === 0) return lista;
+  const {
+    usuarioId,
+    setorTokens,
+    setorTodosVisiveis,
+    temPermissoesAreasConfiguradas,
+    podeVerSolicitacoesSetor
+  } = contexto;
+
+        const idsResultado = lista.map(item => Number(item.id));
+        const historicosUsuario = idsResultado.length > 0
+          ? await Historico.findAll({
+              where: {
+                solicitacao_id: { [Op.in]: idsResultado },
+                usuario_responsavel_id: usuarioId,
+                acao: { [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'] }
+              },
+              attributes: ['solicitacao_id']
+            })
+          : [];
+        const idsComInteracaoUsuario = new Set(
+          historicosUsuario.map(h => Number(h.solicitacao_id))
+        );
+
+        const regrasTiposPorSetor = await obterTiposSolicitacaoPorSetorConfig();
+        const setoresUsuarioUpper = new Set(setorTokens.map(t => String(t || '').toUpperCase()));
+
+        return lista.filter(item => {
+          const areaItem = String(item.area_responsavel || '').trim().toUpperCase();
+          const tipoId = Number(item.tipo_solicitacao_id);
+          const itemEhDoSetorUsuario = setoresUsuarioUpper.has(areaItem);
+          const itemCriadoPeloUsuario = Number(item.criado_por) === Number(usuarioId);
+          const itemComInteracaoUsuario = idsComInteracaoUsuario.has(Number(item.id));
+
+          if (!itemEhDoSetorUsuario) return true;
+          if (itemCriadoPeloUsuario || itemComInteracaoUsuario) return true;
+          // A permissao granular explicita prevalece sobre o modo operacional legado
+          // ADMIN_PRIMEIRO. Se o administrador marcou "Ver solicitacoes do setor", o usuario
+          // deve receber todas as demandas do proprio setor, independentemente do tipo.
+          if (temPermissoesAreasConfiguradas && podeVerSolicitacoesSetor) return true;
+
+          // A regra de recebimento pertence ao setor do USUARIO. O item pode estar persistido
+          // com outro alias operacional (por exemplo GEO), enquanto o usuario pertence a
+          // GERENCIA DE PROCESSOS. Consultar apenas `areaItem` escolhia a configuracao do alias
+          // errado e podia rebaixar o tipo para ADMIN_PRIMEIRO depois de a consulta ja o ter
+          // autorizado. `setorTokens` preserva a mesma identidade usada no escopo SQL acima.
+          const regraTipo = obterRegrasTipoPorTokensSetor(regrasTiposPorSetor, setorTokens);
+          let modoPorTipo = null;
+          if (regraTipo?.modos && Number.isInteger(tipoId) && tipoId > 0) {
+            modoPorTipo = regraTipo.modos[String(tipoId)] || null;
+          }
+
+          const modoEfetivo = String(modoPorTipo || (setorTodosVisiveis ? 'TODOS_VISIVEIS' : 'ADMIN_PRIMEIRO')).toUpperCase();
+          return modoEfetivo === 'TODOS_VISIVEIS';
+        });
+}
+
+module.exports = {
+  // Reuso interno da reforma (BuscaController e DashboardPendencias):
+  // o MESMO escopo e o MESMO pós-filtro da lista, sem duplicação.
+  montarEscopoVisibilidadeLista,
+  filtrarRegraMistaPorTipo,
+
+  // ===================================================================
+  // CONTADORES DAS VISOES DA LISTA (Minhas / Fila do setor / Vencendo /
+  // Atrasadas / Todas). Usa o MESMO escopo de visibilidade da listagem
+  // (montarEscopoVisibilidadeLista + filtrarRegraMistaPorTipo): o numero
+  // da aba bate com a lista por construcao. (Pacote B3 da reforma.)
+  // ===================================================================
+  async contadores(req, res) {
+    try {
+      const zeros = { todas: 0, minhas: 0, fila_setor: 0, vencendo: 0, atrasadas: 0 };
+      const escopo = await montarEscopoVisibilidadeLista(req, { listarArquivadas: false });
+      if (escopo.vazio) {
+        return res.json(zeros);
+      }
+
+      const { where, contexto } = escopo;
+      let itens = await Solicitacao.findAll({
+        where,
+        attributes: [
+          'id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id',
+          'criado_por', 'status_global', 'data_vencimento', 'createdAt'
+        ],
+        raw: true
+      });
+
+      itens = await filtrarRegraMistaPorTipo(itens, contexto);
+
+      const usuarioId = Number(contexto.usuarioId);
+      const ids = itens.map((item) => Number(item.id));
+
+      // responsavel ATUAL por solicitacao (ultimo evento vence; ASC +
+      // sobrescrita = MAX(id), mesmo criterio das subqueries da listagem)
+      const responsavelAtual = new Map();
+      if (ids.length > 0) {
+        const eventos = await Historico.findAll({
+          where: {
+            solicitacao_id: { [Op.in]: ids },
+            acao: { [Op.in]: SOLICITACAO_RESPONSAVEL_ACTIONS }
+          },
+          attributes: ['id', 'solicitacao_id', 'acao', 'usuario_responsavel_id'],
+          order: [['id', 'ASC']],
+          raw: true
+        });
+        eventos.forEach((evento) => {
+          responsavelAtual.set(
+            Number(evento.solicitacao_id),
+            String(evento.acao).toUpperCase() === 'RESPONSAVEL_REMOVIDO'
+              ? null
+              : (Number(evento.usuario_responsavel_id) || null)
+          );
+        });
+      }
+
+      // devolucoes: criadas por mim, de volta ao meu setor, que ja foram
+      // enviadas a outro setor (mesma definicao das pendencias do Hub)
+      const tokensSetorUpper = new Set(
+        (contexto.setorTokens || []).filter(Boolean).map((t) => String(t).toUpperCase())
+      );
+      const candidatasDevolucao = itens
+        .filter((item) => (
+          Number(item.criado_por) === usuarioId
+          && tokensSetorUpper.has(String(item.area_responsavel || '').trim().toUpperCase())
+        ))
+        .map((item) => Number(item.id));
+      let idsComEnvio = new Set();
+      if (candidatasDevolucao.length > 0) {
+        const envios = await Historico.findAll({
+          where: {
+            solicitacao_id: { [Op.in]: candidatasDevolucao },
+            acao: 'ENVIADA_SETOR'
+          },
+          attributes: ['solicitacao_id'],
+          raw: true
+        });
+        idsComEnvio = new Set(envios.map((envio) => Number(envio.solicitacao_id)));
+      }
+
+      const hoje = new Date();
+      const isoLocal = (date) => {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const d = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+      const hojeIso = isoLocal(hoje);
+      const limiteData = new Date(hoje);
+      limiteData.setDate(limiteData.getDate() + 7);
+      const limiteIso = isoLocal(limiteData);
+
+      const contagem = { ...zeros, todas: itens.length };
+      itens.forEach((item) => {
+        const id = Number(item.id);
+        const areaItem = String(item.area_responsavel || '').trim().toUpperCase();
+        const responsavel = responsavelAtual.get(id) || null;
+        const vencimento = item.data_vencimento
+          ? String(item.data_vencimento).slice(0, 10)
+          : null;
+
+        if (responsavel === usuarioId || idsComEnvio.has(id)) {
+          contagem.minhas += 1;
+        }
+        if (tokensSetorUpper.has(areaItem) && !responsavel) {
+          contagem.fila_setor += 1;
+        }
+        if (vencimento && vencimento >= hojeIso && vencimento <= limiteIso) {
+          contagem.vencendo += 1;
+        }
+        if (vencimento && vencimento < hojeIso) {
+          contagem.atrasadas += 1;
+        }
+      });
+
+      return res.json(contagem);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ error: 'Erro ao carregar contadores da lista' });
+    }
+  },
+
+  // =====================================================
+  // LISTAR SOLICITACOES
+  // =====================================================
+  async index(req, res) {
+    try {
+      const {
+        area,
+        status,
+        arquivadas,
+        obra_id,
+        obra_ids,
+        codigo,
+        descricao,
+        codigo_contrato,
+        numero_solicitacao,
+        numero_sienge,
+        responsavel,
+        data_registro,
+        data_vencimento,
+        data_vencimento_inicio,
+        data_vencimento_fim,
+        data_inicio,
+        data_fim,
+        valor_min,
+        valor_max,
+        tipo_macro_id,
+        tipo_solicitacao_id,
+        page,
+        limit,
+        apenas_obras,
+        apenas_status,
+        ids,
+        minhas,
+        sem_responsavel,
+        visao,
+        q,
+        ordenar,
+        direcao
+      } = req.query;
+      const erroDatas = validarDatasConsultaSolicitacoes({
+        data_registro,
+        data_vencimento,
+        data_vencimento_inicio,
+        data_vencimento_fim,
+        data_inicio,
+        data_fim
+      });
+      if (erroDatas) {
+        return res.status(400).json({ error: erroDatas });
+      }
+      const paginacaoSolicitada = true;
+      const apenasObrasSolicitadas = ['1', 'true', 'sim'].includes(
+        String(apenas_obras || '').trim().toLowerCase()
+      );
+      const apenasStatusSolicitados = ['1', 'true', 'sim'].includes(
+        String(apenas_status || '').trim().toLowerCase()
+      );
+      const paginaAtual = parsePositiveInt(page, 1);
+      const limitePorPagina = parseSolicitacoesPageSize(limit);
+      const offset = (paginaAtual - 1) * limitePorPagina;
+
+      /* ===============================
+        1) BUSCAR SOLICITACOES OCULTADAS
+      =============================== */
+      const listarArquivadas = ['1', 'true', 'sim'].includes(
+        String(arquivadas || '').trim().toLowerCase()
+      );
+
+      const escopo = await montarEscopoVisibilidadeLista(req, { listarArquivadas });
+      if (escopo.vazio) {
+        if (apenasObrasSolicitadas || apenasStatusSolicitados) {
+          return res.json([]);
+        }
+        if (!paginacaoSolicitada) {
+          return res.json([]);
+        }
+        return res.json({
+          items: [],
+          meta: {
+            page: paginaAtual,
+            limit: limitePorPagina,
+            total: 0,
+            total_pages: 0
+          }
+        });
+      }
+      const { where } = escopo;
+      const { usuarioComRegraMistaPorTipo, ordenacaoLista, usuarioId, setorTokens } = escopo.contexto;
+
+      // =================================================================
+      // PARÂMETROS ADITIVOS DA REFORMA (pacote B3): tudo abaixo apenas
+      // RESTRINGE o conjunto que o escopo acima já autorizou — nenhuma
+      // condição amplia visibilidade.
+      // =================================================================
+
+      // Conjunto explícito de ids (cartões do Hub antigos); teto de 200.
+      const idsFiltro = String(ids || '')
+        .split(',')
+        .map((valor) => Number(valor))
+        .filter((valor) => Number.isInteger(valor) && valor > 0)
+        .slice(0, 200);
+      if (idsFiltro.length > 0) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ id: { [Op.in]: idsFiltro } });
+      }
+
+      // Ordenação opcional por coluna. SEM o parâmetro vale o padrão do
+      // sistema (ordenacaoLista do escopo — inclusive a fila operacional
+      // do GEO por updatedAt); o parâmetro só sobrepõe quando presente.
+      const CAMPOS_ORDENAVEIS = new Set([
+        'createdAt', 'codigo', 'descricao', 'valor', 'status_global',
+        'area_responsavel', 'data_vencimento', 'numero_sienge'
+      ]);
+      const ordenacaoEfetiva = CAMPOS_ORDENAVEIS.has(String(ordenar || '').trim())
+        ? [[String(ordenar).trim(), String(direcao || '').trim().toLowerCase() === 'asc' ? 'ASC' : 'DESC'], ['id', 'DESC']]
+        : ordenacaoLista;
+
+      // Visões "Minhas pendências" e "Fila do setor" (condições AND).
+      const querMinhas = ['1', 'true', 'sim'].includes(String(minhas || '').trim().toLowerCase());
+      const querSemResponsavel = ['1', 'true', 'sim'].includes(String(sem_responsavel || '').trim().toLowerCase());
+
+      if (querMinhas) {
+        const condicoesMinhas = [
+          // responsavel ATUAL sou eu (ultimo evento de responsavel)
+          { id: { [Op.in]: Sequelize.literal(montarSubqueryResponsavelAtual(usuarioId)) } }
+        ];
+        const tokensSetorUsuario = (setorTokens || []).filter(Boolean);
+        if (tokensSetorUsuario.length > 0) {
+          // devolucao recebida: criada por mim, de volta ao meu setor apos
+          // ter sido enviada a outro setor (mesma definicao das pendencias
+          // do Hub — docs/PENDENCIAS-SQL.md)
+          condicoesMinhas.push({
+            [Op.and]: [
+              { criado_por: usuarioId },
+              { area_responsavel: { [Op.in]: tokensSetorUsuario } },
+              {
+                id: {
+                  [Op.in]: Sequelize.literal(`(
+                    SELECT h.solicitacao_id FROM historicos h WHERE h.acao = 'ENVIADA_SETOR'
+                  )`)
+                }
+              }
+            ]
+          });
+        }
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({ [Op.or]: condicoesMinhas });
+      }
+
+      if (querSemResponsavel) {
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          id: { [Op.notIn]: Sequelize.literal(montarSubqueryComResponsavelAtual()) }
+        });
+      }
+
+      // Visão nomeada das pendências do Hub (?visao=...): aplica o MESMO
+      // recorte SQL do contador do cartão, aditivamente sobre o escopo —
+      // número do cartão e lista saem do mesmo WHERE (pendenciasVisoes).
+      // Os tokens de setor vêm do PRÓPRIO escopo (contexto.setorTokens):
+      // contador e lista usam o mesmo resolvedor, por construção.
+      const visaoPendencia = String(visao || '').trim().toLowerCase();
+      if (visaoPendencia) {
+        const condicoesVisao = condicoesVisaoPendencia(visaoPendencia, {
+          usuarioId,
+          tokensSetor: setorTokens
+        });
+        if (condicoesVisao === undefined) {
+          return res.status(400).json({ error: `Visão desconhecida: ${visaoPendencia}` });
+        }
+        where[Op.and] = where[Op.and] || [];
+        if (condicoesVisao === null) {
+          // Usuário sem setor: o contador nem existe — conjunto vazio.
+          where[Op.and].push({ id: -1 });
+        } else {
+          where[Op.and].push(...condicoesVisao);
+        }
+      }
+
+      // Busca única (?q=): codigo, descricao, numeros, contrato, nome da
+      // obra e do parceiro, de uma vez. Caixa/acento insensíveis pela
+      // collation utf8mb4 *_ci do banco. Os nomes físicos de tabela nas
+      // subqueries vêm dos models (getTableName) — no servidor oficial a
+      // tabela de obras é "Obras", com maiúscula (ver CONVENCAO/f58e030).
+      const buscaUnica = String(q || '').trim();
+      if (buscaUnica) {
+        const like = `%${buscaUnica}%`;
+        const likeEscapado = db.sequelize.escape(like);
+        const tabelaObras = String(Obra.getTableName());
+        const tabelaParceiros = String(Parceiro.getTableName());
+        where[Op.and] = where[Op.and] || [];
+        where[Op.and].push({
+          [Op.or]: [
+            { codigo: { [Op.like]: like } },
+            { descricao: { [Op.like]: like } },
+            { numero_sienge: { [Op.like]: like } },
+            { numero_pedido: { [Op.like]: like } },
+            { codigo_contrato: { [Op.like]: like } },
+            // Variações de digitação de código ("sol 5109", "SOL5109",
+            // "5109") — o MESMO casamento flexível da busca universal:
+            // busca e lista devem achar o mesmo conjunto.
+            ...condicoesCodigoFlexivel([
+              { campo: 'codigo', sql: '`Solicitacao`.`codigo`' },
+              { campo: 'numero_sienge', sql: '`Solicitacao`.`numero_sienge`' },
+              { campo: 'numero_pedido', sql: '`Solicitacao`.`numero_pedido`' },
+              { campo: 'codigo_contrato', sql: '`Solicitacao`.`codigo_contrato`' }
+            ], buscaUnica),
+            { obra_id: { [Op.in]: Sequelize.literal(`(SELECT o.id FROM \`${tabelaObras}\` o WHERE o.nome LIKE ${likeEscapado})`) } },
+            { parceiro_id: { [Op.in]: Sequelize.literal(`(SELECT p.id FROM \`${tabelaParceiros}\` p WHERE p.nome LIKE ${likeEscapado})`) } }
+          ]
+        });
       }
 
       /* ===============================
@@ -2250,70 +2664,17 @@ module.exports = {
           .filter(Boolean)
       )).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
-      const usuarioComRegraMistaPorTipo =
-        perfil === 'USUARIO' &&
-        !adminGEO &&
-        !isSetorObra;
-      // A fila do GEO e operacional: uma prestacao, retorno ou nova movimentacao precisa voltar
-      // ao topo para conferencia. Os demais setores preservam a ordenacao historica por criacao.
-      const ordenacaoLista = isUsuarioGeo
-        ? [['updatedAt', 'DESC'], ['createdAt', 'DESC']]
-        : [['createdAt', 'DESC']];
 
       if (usuarioComRegraMistaPorTipo) {
         const solicitacoesFiltro = await Solicitacao.findAll({
           where,
           attributes: ['id', 'obra_id', 'area_responsavel', 'tipo_solicitacao_id', 'criado_por', 'status_global', 'createdAt'],
-          order: ordenacaoLista
+          order: ordenacaoEfetiva
         });
         let resultadoFiltro = solicitacoesFiltro.map(item => item.toJSON());
 
-        const idsResultado = resultadoFiltro.map(item => item.id);
-        const historicosUsuario = idsResultado.length > 0
-          ? await Historico.findAll({
-              where: {
-                solicitacao_id: { [Op.in]: idsResultado },
-                usuario_responsavel_id: usuarioId,
-                acao: { [Op.in]: ['RESPONSAVEL_ATRIBUIDO', 'RESPONSAVEL_ASSUMIU'] }
-              },
-              attributes: ['solicitacao_id']
-            })
-          : [];
-        const idsComInteracaoUsuario = new Set(
-          historicosUsuario.map(h => Number(h.solicitacao_id))
-        );
 
-        const regrasTiposPorSetor = await obterTiposSolicitacaoPorSetorConfig();
-        const setoresUsuarioUpper = new Set(setorTokens.map(t => String(t || '').toUpperCase()));
-
-        resultadoFiltro = resultadoFiltro.filter(item => {
-          const areaItem = String(item.area_responsavel || '').trim().toUpperCase();
-          const tipoId = Number(item.tipo_solicitacao_id);
-          const itemEhDoSetorUsuario = setoresUsuarioUpper.has(areaItem);
-          const itemCriadoPeloUsuario = Number(item.criado_por) === Number(usuarioId);
-          const itemComInteracaoUsuario = idsComInteracaoUsuario.has(Number(item.id));
-
-          if (!itemEhDoSetorUsuario) return true;
-          if (itemCriadoPeloUsuario || itemComInteracaoUsuario) return true;
-          // A permissao granular explicita prevalece sobre o modo operacional legado
-          // ADMIN_PRIMEIRO. Se o administrador marcou "Ver solicitacoes do setor", o usuario
-          // deve receber todas as demandas do proprio setor, independentemente do tipo.
-          if (temPermissoesAreasConfiguradas && podeVerSolicitacoesSetor) return true;
-
-          // A regra de recebimento pertence ao setor do USUARIO. O item pode estar persistido
-          // com outro alias operacional (por exemplo GEO), enquanto o usuario pertence a
-          // GERENCIA DE PROCESSOS. Consultar apenas `areaItem` escolhia a configuracao do alias
-          // errado e podia rebaixar o tipo para ADMIN_PRIMEIRO depois de a consulta ja o ter
-          // autorizado. `setorTokens` preserva a mesma identidade usada no escopo SQL acima.
-          const regraTipo = obterRegrasTipoPorTokensSetor(regrasTiposPorSetor, setorTokens);
-          let modoPorTipo = null;
-          if (regraTipo?.modos && Number.isInteger(tipoId) && tipoId > 0) {
-            modoPorTipo = regraTipo.modos[String(tipoId)] || null;
-          }
-
-          const modoEfetivo = String(modoPorTipo || (setorTodosVisiveis ? 'TODOS_VISIVEIS' : 'ADMIN_PRIMEIRO')).toUpperCase();
-          return modoEfetivo === 'TODOS_VISIVEIS';
-        });
+        resultadoFiltro = await filtrarRegraMistaPorTipo(resultadoFiltro, escopo.contexto);
 
         totalRegistros = resultadoFiltro.length;
 
@@ -2375,7 +2736,7 @@ module.exports = {
         const solicitacoes = await Solicitacao.findAll({
           where,
           include: includeBase,
-          order: ordenacaoLista,
+          order: ordenacaoEfetiva,
           ...(paginacaoSolicitada
             ? { limit: limitePorPagina, offset }
             : {})

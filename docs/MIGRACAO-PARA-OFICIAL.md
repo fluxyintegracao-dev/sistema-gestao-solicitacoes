@@ -317,6 +317,21 @@ por nome):
 > O B5 (tela inicial) não cria migration — reusa `usuario_lista_preferencias`.
 > B3 e B6 também não criam tabela.
 >
+> **Validação obrigatória do B3 em staging — cartão × lista (roda o responsável):**
+> com o backend-dev atualizado e as migrations aplicadas, executar no servidor:
+>
+> ```bash
+> cd backend
+> # usa o .env do backend-dev (exportar DB_* se preciso); NUNCA produção
+> node scripts/valida-pendencias.js
+> ```
+>
+> O script sobe os controllers REAIS contra o banco, monta o cenário (inclui 70
+> aprovações — acima do antigo teto de 61) e compara o total de CADA cartão de
+> /dashboard/pendencias com o meta.total da lista aberta pelo link do próprio
+> cartão. Critério de aceite: **100% dos cartões batem**. Se algum divergir,
+> ajusta-se o recorte da visão (pendenciasVisoes), nunca o escopo da lista.
+>
 > **Artefato do B5 — atenção no deploy do frontend:** o build do frontend
 > ganhou um `prebuild` (`npm run gerar:navegacao`) que compila a fonte única de
 > navegação para `backend/src/generated/navegacaoFonteUnica.cjs` (arquivo
@@ -349,7 +364,7 @@ e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver
 | B1 — preferências | Personalização (colunas, larguras, modo, filtros salvos, arranjo da Home/detalhe, atalhos) funciona na sessão mas **volta ao padrão ao recarregar**; salvar filtro falha em silêncio | Persistir por usuário, sobrevivendo a troca de máquina e limpeza de cache |
 | B0 — handlers | (efeito só no servidor) | Erro assíncrono de uma tela não derruba o backend; log `[unhandledRejection]` |
 | B2 — busca | Ctrl+K encontra **só telas e ações** | Ctrl+K encontra contratos, títulos, obras, parceiros, colaboradores e usuários (o grupo Solicitações liga junto com o B3 — flag `GRUPO_SOLICITACOES_DISPONIVEL` no topo do `BuscaController`) |
-| B3 — solicitações/pendências | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado, busca única e ordenação no banco inteiro |
+| B3 — solicitações/pendências (**entregue 02/09**) | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado (mesmo recorte SQL), busca única `?q=`, ordenação por coluna e contadores no banco inteiro; Ctrl+K passa a encontrar solicitações (inclusive arquivadas/canceladas por código) |
 | B4 — config. por setor | Telas de admin dão erro ao carregar/salvar (endpoints ausentes); sem ação principal em destaque no detalhe; sem atalhos/layout padrão por setor | Camada do administrador ativa (3 telas de admin + ação principal no detalhe) |
 | B5 — tela inicial | A "casinha" aparece mas salvar falha com alerta de erro (endpoints ausentes); login cai sempre na Home | Usuário escolhe onde o login cai (casinha no topo e card no Perfil), validado no backend contra a fonte única compilada |
 | B6 — blocos da Home | "Adicionar bloco" só com os básicos | Catálogo completo de 12 blocos opcionais |

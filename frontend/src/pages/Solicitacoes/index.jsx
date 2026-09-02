@@ -251,7 +251,7 @@ export default function Solicitacoes({ arquivadas = false }) {
   // backend. Enquanto isso: busca e ordenação rodam no cliente sobre a
   // janela carregada, e só as visões cujos parâmetros o controller atual
   // entende ficam visíveis. Religar trocando a constante.
-  const B3_DISPONIVEL = false;
+  const B3_DISPONIVEL = true;
   const consultaListaRef = useRef({ visao: null, filtros: {}, busca: '', ordenacao: { campo: 'createdAt', direcao: 'desc' } });
   const [versaoConsulta, setVersaoConsulta] = useState(0);
   const acumularProximaRef = useRef(false);
