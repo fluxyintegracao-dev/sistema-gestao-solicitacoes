@@ -371,6 +371,7 @@ const DetalheLayoutController = require('./controllers/DetalheLayoutController')
 const AcaoPrincipalSetorController = require('./controllers/AcaoPrincipalSetorController');
 const DashboardController = require('./controllers/DashboardController');
 const DashboardPendenciasController = require('./controllers/DashboardPendenciasController');
+const HomeBlocosController = require('./controllers/HomeBlocosController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
 const InstalacaoController = require('./controllers/InstalacaoController');
@@ -2275,6 +2276,10 @@ router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirF
 // Busca universal (Ctrl+K): grupos gateados pela permissao da tela
 // correspondente; grupo sem permissao nem e consultado (pacote B2).
 router.get('/busca', BuscaController.index);
+
+// Blocos opcionais da Home (pacote B6): dados sob demanda, um bloco por
+// chamada, cada um gateado pelas permissoes e escopos da tela de origem.
+router.get('/home/blocos/:bloco', HomeBlocosController.show);
 
 // Pendencias do usuario no Hub (pacote B3): consultas nomeadas, gateadas
 // pelas permissoes das telas de destino; contador e lista compartilham o

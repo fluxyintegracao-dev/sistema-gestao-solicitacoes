@@ -367,7 +367,7 @@ e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver
 | B3 — solicitações/pendências (**entregue 02/09**) | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado (mesmo recorte SQL), busca única `?q=`, ordenação por coluna e contadores no banco inteiro; Ctrl+K passa a encontrar solicitações (inclusive arquivadas/canceladas por código) |
 | B4 — config. por setor | Telas de admin dão erro ao carregar/salvar (endpoints ausentes); sem ação principal em destaque no detalhe; sem atalhos/layout padrão por setor | Camada do administrador ativa (3 telas de admin + ação principal no detalhe) |
 | B5 — tela inicial | A "casinha" aparece mas salvar falha com alerta de erro (endpoints ausentes); login cai sempre na Home | Usuário escolhe onde o login cai (casinha no topo e card no Perfil), validado no backend contra a fonte única compilada |
-| B6 — blocos da Home | "Adicionar bloco" só com os básicos | Catálogo completo de 12 blocos opcionais |
+| B6 — blocos da Home (**entregue 02/09**) | "Adicionar bloco" só com os básicos | Catálogo completo de 12 blocos opcionais, cada um gateado pela permissão e pelo escopo da tela de origem (compras/pedidos usam o MESMO escopo de obras do middleware das listas) |
 
 ---
 

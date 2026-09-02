@@ -443,10 +443,9 @@ export default function HomeHub() {
 
   // Blocos opcionais: componente com fetch próprio, montado SÓ quando o
   // bloco está visível — desligado não consulta nada.
-  // DEGRADAÇÃO (onda 2 do porte): o endpoint /home/blocos/:bloco ainda não
-  // existe neste backend (pacote B6 da proposta). Enquanto isso os blocos
-  // opcionais ficam fora do catálogo — religar trocando a constante.
-  const BLOCOS_EXTRAS_DISPONIVEIS = false;
+  // Ligado com o pacote B6 (endpoint /home/blocos/:bloco no backend);
+  // a constante fica como interruptor de emergência.
+  const BLOCOS_EXTRAS_DISPONIVEIS = true;
   for (const [blocoId, Componente] of Object.entries(COMPONENTE_BLOCO_EXTRA)) {
     if (!BLOCOS_EXTRAS_DISPONIVEIS) break;
     if (!idsPermitidos.has(blocoId)) continue;
