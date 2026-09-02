@@ -291,6 +291,26 @@ CORS de IP privado, `outputs/**`, docs do ambiente local deste repositório.
 
 ## MIGRATIONS DO PORTE — execução e verificação (para o responsável)
 
+### A ordem exata (cada passo com a sua conferência)
+
+1. **Atualizar o código do `backend-dev`** com a branch `refactor/frontend`
+   (checkout/pull + `npm install` se o lockfile mudou), **sem reiniciar o
+   processo ainda** — com migration pendente o boot recusa subir de propósito.
+   *Conferir:* `git log -1` no servidor mostra o commit esperado da branch.
+2. **Rodar as migrations** (comando abaixo). O runner aplica as três na ordem
+   da tabela. *Conferir:* o log do runner lista as três aplicadas; rodar o
+   comando **de novo** não aplica nada (idempotência); as verificações da
+   coluna "Verificar depois" da tabela, migration a migration.
+3. **Reiniciar o `backend-dev`.** *Conferir:* o boot passa pelo
+   `assertMigrationsUpToDate` sem reclamar e a API responde
+   (`/solicitacoes/contadores` devolve números em vez de 404).
+4. **Rodar o `valida-pendencias.js`** (bloco do B3 abaixo). *Conferir:* 100%
+   dos cartões batem com as listas — qualquer divergência é bug a corrigir no
+   recorte da visão, nunca no escopo da lista.
+5. **Testar o preview** (`refactor-dev.jrfluxy.com.br`) seguindo o
+   `docs/ROTEIRO-DE-TESTE-PREVIEW.md`, pacote a pacote e perfil a perfil.
+   *Conferir:* o checklist de encerramento do próprio roteiro.
+
 O `server.js` do oficial **não roda migrations no boot**: ele apenas confere o
 schema (`assertMigrationsUpToDate`) e **recusa subir** se houver migration
 pendente. A aplicação é um passo explícito e autorizado:
