@@ -505,7 +505,12 @@ export default function Obras() {
       {/* Modal */}
       {modalAberto && (
         <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && fecharModal()}>
-          <div className="modal-dialog modal-dialog--lg">
+          <div
+            className="modal-dialog modal-dialog--lg"
+            role="dialog"
+            aria-modal="true"
+            aria-label={form.id ? 'Editar cadastro' : 'Novo cadastro'}
+          >
             <div className="modal-header">
               <div>
                 <h2 className="modal-title">

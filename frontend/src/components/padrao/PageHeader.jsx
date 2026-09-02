@@ -72,16 +72,23 @@ export default function PageHeader({
 
   // A posição da faixa (--pos-cabecalho-fixo) vem do Pagina, que mede a
   // topbar real — aqui só a compactação.
-  // Compacta quando a sentinela (logo acima da faixa) sai da tela — ou seja,
-  // quando a faixa de fato grudou.
+  // Compacta pela POSIÇÃO DE ROLAGEM, nunca por sentinela com margem fixa:
+  // a versão com IntersectionObserver (rootMargin -120px) compactava JÁ NO
+  // CARREGAMENTO (o topo do conteúdo fica a menos de 120px da janela) e
+  // toda tela nascia com título de 14px — o "cabeçalho pequeno" de 02/09.
   useEffect(() => {
-    if (!sentinelaRef.current || typeof IntersectionObserver === 'undefined') return undefined;
-    const observador = new IntersectionObserver(
-      ([entrada]) => setCompacto(!entrada.isIntersecting),
-      { rootMargin: '-120px 0px 0px 0px' }
-    );
-    observador.observe(sentinelaRef.current);
-    return () => observador.disconnect();
+    let raf = null;
+    const medir = () => {
+      raf = null;
+      setCompacto(window.scrollY > 24);
+    };
+    const agendar = () => { if (raf == null) raf = requestAnimationFrame(medir); };
+    medir();
+    window.addEventListener('scroll', agendar, { passive: true });
+    return () => {
+      if (raf != null) cancelAnimationFrame(raf);
+      window.removeEventListener('scroll', agendar);
+    };
   }, []);
 
   const textoApoio = [contagem, descricao].filter(Boolean).join(' · ');

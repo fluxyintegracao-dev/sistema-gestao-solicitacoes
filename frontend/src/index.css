@@ -10308,7 +10308,11 @@ body {
 
 .layout-shell .rhdp-page {
   max-width: 100%;
-  overflow-x: hidden;
+  /* CLIP, não hidden: hidden cria um contexto de rolagem e o cabeçalho
+     fixo (R13) passa a grudar NELE em vez de grudar na janela — a faixa
+     sumia na rolagem (defeito pego pelo harness em 02/09). Mesmo motivo
+     do overflow-x-clip do layout-shell. */
+  overflow-x: clip;
 }
 
 .layout-shell .rhdp-importacoes-workspace {

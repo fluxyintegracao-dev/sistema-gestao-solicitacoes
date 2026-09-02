@@ -224,6 +224,22 @@ export default function TabelaPadrao({
     return () => cancelAnimationFrame(raf);
   }, [carregando, ehMovel, itens.length]);
 
+  // T6: célula que trunca ganha tooltip com o texto COMPLETO — cortar com
+  // reticências sem caminho para ler o resto é reprovado pela DoD. Roda
+  // depois do layout, sobre o DOM real (mede o corte de fato).
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    el.querySelectorAll('td').forEach((td) => {
+      if (td.closest('[title]')) return;
+      const cortado = td.scrollWidth > td.clientWidth + 2
+        || Array.from(td.querySelectorAll('span, div')).some(
+          (filho) => filho.scrollWidth > filho.clientWidth + 2
+        );
+      if (cortado) td.title = td.innerText.replace(/\s+/g, ' ').trim();
+    });
+  });
+
   const indiceFlex = (() => {
     const marcada = colunasBase.findIndex((c) => c.flex);
     if (marcada >= 0) return marcada;

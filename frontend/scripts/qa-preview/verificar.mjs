@@ -166,15 +166,26 @@ async function esperarDeploy(page) {
 
 /* --------------------------------------- resolvedores de rota de registro */
 const RESOLVEDORES = {
-  /** Abre o título financeiro clicando no primeiro registro da listagem. */
+  /** Abre o título financeiro de MAIOR valor real (pior caso — T6/T7). */
   async tituloDetalhe(page) {
     await page.goto(`${BASE}/financeiro/titulos`, { waitUntil: 'domcontentloaded' });
     await esperarCarregar(page);
-    const linha = page.locator('tbody tr, .la-card').first();
-    await linha.waitFor({ timeout: 30000 });
-    await linha.click();
-    await page.waitForURL(/\/financeiro\/titulos\/\d+/, { timeout: 30000 });
-    return new URL(page.url()).pathname;
+    await page.locator('a[href^="/financeiro/titulos/"]').first().waitFor({ timeout: 30000 });
+    const rota = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a[href^="/financeiro/titulos/"]'))
+        .filter((a) => /^\/financeiro\/titulos\/\d+$/.test(a.getAttribute('href')));
+      let melhor = links[0]; let maior = -1;
+      links.forEach((a) => {
+        const linha = a.closest('tr') || a;
+        const m = String(linha.textContent).match(/R\$\s?([\d.]+,\d{2})/);
+        const v = m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : 0;
+        if (v > maior) { maior = v; melhor = a; }
+      });
+      return melhor ? melhor.getAttribute('href') : null;
+    });
+    if (!rota) throw new Error('nenhum título encontrado na listagem para abrir o detalhe');
+    await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
+    return rota;
   },
   /** Abre a obra de MAIOR VGV real (pior caso de valor monetário — T7). */
   async obraGestao(page) {

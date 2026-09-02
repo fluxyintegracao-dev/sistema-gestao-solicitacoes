@@ -620,6 +620,14 @@
   letter-spacing: normal;
 }
 
+/* M3 — cabeçalho de tabela legada (.table, ex.: pivô de apropriação) em
+   tela reformada: o tom --shell-muted ficava abaixo de AA (4.23:1 medido
+   pelo harness). Cor de texto plena + piso de 12px da escala. */
+.app-pagina .table thead th {
+  color: var(--c-text);
+  font-size: var(--fonte-detalhe);
+}
+
 /* O rótulo do th não pode cortar o menu de alinhamento (overflow do label). */
 .app-tabela .resizable-th-label {
   overflow: visible;
