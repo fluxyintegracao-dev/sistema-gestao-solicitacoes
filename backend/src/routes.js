@@ -364,6 +364,7 @@ const SetorController = require('./controllers/SetorController');
 const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
 const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
+const BuscaController = require('./controllers/BuscaController');
 const DashboardController = require('./controllers/DashboardController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
@@ -2262,6 +2263,10 @@ router.put('/listas/:lista/preferencias', ListaPreferenciasController.putPrefere
 router.get('/listas/:lista/filtros', ListaPreferenciasController.listarFiltros);
 router.post('/listas/:lista/filtros', ListaPreferenciasController.salvarFiltro);
 router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirFiltro);
+
+// Busca universal (Ctrl+K): grupos gateados pela permissao da tela
+// correspondente; grupo sem permissao nem e consultado (pacote B2).
+router.get('/busca', BuscaController.index);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-acesso-todas-obras', ConfiguracaoSistemaController.getSetoresAcessoTodasObras);

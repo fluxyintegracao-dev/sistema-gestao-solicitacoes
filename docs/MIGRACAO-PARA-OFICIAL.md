@@ -311,7 +311,7 @@ por nome):
 | # | Migration | Pacote | Cria | Verificar depois |
 |---|---|---|---|---|
 | 1 | `202609020050_lista_preferencias_filtros.js` | B1 (entregue) | Tabelas `usuario_lista_preferencias` (única por usuário+lista, FK `fk_usr_lista_pref_user` → users) e `usuario_lista_filtros` (FK `fk_usr_lista_filtros_user`) | `npm run migrate` de novo não aplica nada; `SHOW CREATE TABLE usuario_lista_preferencias` mostra o índice único `uq_usr_lista_pref` e a FK; na tela de Solicitações, mudar colunas/larguras, recarregar e ver a escolha mantida |
-| 2 | `2026____xxxx_indices_busca.js` | B2 (a entrar) | Índices `idx_obras_nome`, `idx_parceiros_nome`, `idx_parceiros_cpf_cnpj` | segunda execução não aplica nada; `SHOW INDEX FROM obras`/`parceiros` lista os três; Ctrl+K responde rápido com texto de 2+ caracteres |
+| 2 | `202609020051_indices_busca.js` | B2 (entregue) | Índices `idx_obras_nome` (na tabela de obras, nome físico resolvido em runtime — `Obras` no servidor), `idx_parceiros_nome`, `idx_parceiros_cpf_cnpj` | segunda execução não aplica nada; `SHOW INDEX FROM Obras`/`parceiros` lista os três; Ctrl+K responde rápido com texto de 2+ caracteres |
 | 3 | `2026____xxxx_atalhos_setor_layout_detalhe.js` | B4 (a entrar) | Tabelas `setor_atalhos_padrao` e `setor_detalhe_layout` (já com a coluna `tela`) | segunda execução não aplica nada; telas de admin (Atalhos por Setor / Layout do Detalhe) gravam e relêem |
 | 4 | (B4) tabela `acoes_principais_setor` — na mesma migration do item 3 | B4 | Mapeamento setor+estado → ação principal do detalhe | admin cadastra um mapeamento e o botão em destaque aparece no detalhe |
 
@@ -331,7 +331,7 @@ e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver
 |---|---|---|
 | B1 — preferências | Personalização (colunas, larguras, modo, filtros salvos, arranjo da Home/detalhe, atalhos) funciona na sessão mas **volta ao padrão ao recarregar**; salvar filtro falha em silêncio | Persistir por usuário, sobrevivendo a troca de máquina e limpeza de cache |
 | B0 — handlers | (efeito só no servidor) | Erro assíncrono de uma tela não derruba o backend; log `[unhandledRejection]` |
-| B2 — busca | Ctrl+K encontra **só telas e ações** | Ctrl+K encontra solicitações, contratos, títulos, obras e parceiros |
+| B2 — busca | Ctrl+K encontra **só telas e ações** | Ctrl+K encontra contratos, títulos, obras, parceiros, colaboradores e usuários (o grupo Solicitações liga junto com o B3 — flag `GRUPO_SOLICITACOES_DISPONIVEL` no topo do `BuscaController`) |
 | B3 — solicitações/pendências | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado, busca única e ordenação no banco inteiro |
 | B4 — config. por setor | Telas de admin ausentes; sem ação principal em destaque no detalhe; sem atalhos/layout padrão por setor | Camada do administrador ativa |
 | B5 — tela inicial | Sem a "casinha" no topo; login cai sempre na Home | Usuário escolhe onde o login cai, validado no backend |
