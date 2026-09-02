@@ -4,7 +4,7 @@ import {
   getUsuariosAcessoFinanceiro,
   salvarUsuariosAcessoFinanceiro
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, Avisos, useAvisos } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function hasFinanceiroBaseAccess(usuario) {
@@ -20,6 +20,8 @@ export default function UsuariosAcessoFinanceiro() {
   const [usuarios, setUsuarios] = useState([]);
   const [selecionados, setSelecionados] = useState(new Set());
   const [salvando, setSalvando] = useState(false);
+  // R3 (02/09): aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -63,10 +65,10 @@ export default function UsuariosAcessoFinanceiro() {
     try {
       setSalvando(true);
       await salvarUsuariosAcessoFinanceiro({ usuarios: Array.from(selecionados) });
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuracao.');
+      avisar.erro('Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
@@ -135,6 +137,8 @@ export default function UsuariosAcessoFinanceiro() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Quem ja tem acesso por regra base"

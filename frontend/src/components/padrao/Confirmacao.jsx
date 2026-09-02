@@ -3,9 +3,9 @@ import OverlayModal from '../ui/OverlayModal';
 
 /**
  * CONFIRMAÇÃO DO SISTEMA (item **R3** da DoD, 02/09) — substitui
- * `window.confirm()`.
+ * a caixa `window.confirm` do navegador.
  *
- * O `confirm()` do navegador não sabe o que está sendo confirmado: dá
+ * O `confirm` do navegador não sabe o que está sendo confirmado: dá
  * "OK/Cancelar" para apagar um lote e para arquivar um rascunho com o mesmo
  * peso. Aqui a ação destrutiva vem em vermelho suave e APARTADA, com o
  * rótulo dizendo o que vai acontecer ("Estornar fechamento", não "OK") —

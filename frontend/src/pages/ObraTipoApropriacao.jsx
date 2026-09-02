@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pagina, PageHeader, BlocoConteudo, BarraFiltros } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, BarraFiltros, useConfirmacao } from '../components/padrao';
 import {
   getObraTipoApropriacao,
   getApropriacoesDaObra,
@@ -37,6 +37,7 @@ export default function ObraTipoApropriacao() {
   const [carregandoOpcoes, setCarregandoOpcoes] = useState(false);
   const [salvandoChave, setSalvandoChave] = useState('');
   const [erro, setErro] = useState('');
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   useEffect(() => {
     async function load() {
@@ -115,10 +116,14 @@ export default function ObraTipoApropriacao() {
     if (apropriacaoId === null) {
       const tipo = tipos.find((item) => Number(item.id) === Number(tipoId));
       const obra = obras.find((item) => Number(item.id) === Number(obraId));
-      const confirmar = window.confirm(
-        `Remover o vinculo de ${tipo?.nome || 'tipo'} da obra ${obra?.codigo || obra?.nome || obraId}? Novas solicitacoes deste tipo ficarao bloqueadas ate um novo vinculo ser definido.`
-      );
-      if (!confirmar) return;
+      const { ok } = await confirmar({
+        titulo: 'Remover vinculo de apropriacao',
+        mensagem: `Remover o vinculo de ${tipo?.nome || 'tipo'} da obra ${obra?.codigo || obra?.nome || obraId}? Novas solicitacoes deste tipo ficarao bloqueadas ate um novo vinculo ser definido.`,
+        rotuloConfirmar: 'Remover vinculo',
+        rotuloCancelar: 'Manter vinculo',
+        destrutiva: true
+      });
+      if (!ok) return;
     }
 
     const chave = `${obraId}-${tipoId}`;
@@ -324,6 +329,8 @@ export default function ObraTipoApropriacao() {
           </div>
         )}
       </div>
+
+      {elementoConfirmacao}
     </Pagina>
   );
 }

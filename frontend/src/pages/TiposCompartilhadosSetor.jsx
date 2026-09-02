@@ -5,7 +5,7 @@ import {
   getTiposCompartilhadosSetor,
   salvarTiposCompartilhadosSetor
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm, Avisos, useAvisos } from '../components/padrao';
 
 function normalizarSetorToken(setor) {
   return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
@@ -18,6 +18,8 @@ export default function TiposCompartilhadosSetor() {
   const [setorOrigem, setSetorOrigem] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function carregar() {
@@ -40,7 +42,7 @@ export default function TiposCompartilhadosSetor() {
         if (ordenados.length > 0) setSetorOrigem(normalizarSetorToken(ordenados[0]));
       } catch (error) {
         console.error(error);
-        alert('Erro ao carregar configuracao de tipos compartilhados.');
+        avisar.erro('Erro ao carregar configuracao de tipos compartilhados.');
       } finally {
         setLoading(false);
       }
@@ -85,10 +87,10 @@ export default function TiposCompartilhadosSetor() {
     try {
       setSalvando(true);
       await salvarTiposCompartilhadosSetor({ regras });
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar configuracao.');
+      avisar.erro(error?.message || 'Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
@@ -116,6 +118,8 @@ export default function TiposCompartilhadosSetor() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Compartilhamento por tipo"

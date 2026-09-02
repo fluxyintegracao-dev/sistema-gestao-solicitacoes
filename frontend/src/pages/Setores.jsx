@@ -12,7 +12,9 @@ import {
   BlocoConteudo,
   TabelaPadrao,
   FormSecao,
-  CampoForm
+  CampoForm,
+  Avisos,
+  useAvisos
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
@@ -50,6 +52,8 @@ export default function Setores() {
   const [editCapabilities, setEditCapabilities] = useState(emptyCapabilities);
   const [saving, setSaving] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     carregarSetores();
@@ -116,7 +120,7 @@ export default function Setores() {
       carregarSetores();
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edicao');
     } finally {
       setSaving(false);
     }
@@ -206,6 +210,8 @@ export default function Setores() {
         descricao="Cadastro e manutencao de setores."
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
           principal do cabeçalho; a lista é o bloco primário PERMANENTE.

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSetores } from '../services/setores';
 import { getAreasObra, salvarAreasObra } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, Avisos, useAvisos } from '../components/padrao';
 
 export default function AreasObra() {
   const [setores, setSetores] = useState([]);
   const [selecionadas, setSelecionadas] = useState(new Set());
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -58,10 +60,10 @@ export default function AreasObra() {
     try {
       setSalvando(true);
       await salvarAreasObra({ areas: Array.from(selecionadas) });
-      alert('Configuracao salva com sucesso');
+      avisar.sucesso('Configuracao salva com sucesso');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuracao');
+      avisar.erro('Erro ao salvar configuracao');
     } finally {
       setSalvando(false);
     }
@@ -81,6 +83,8 @@ export default function AreasObra() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Areas selecionaveis"

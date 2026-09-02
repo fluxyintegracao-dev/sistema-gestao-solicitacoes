@@ -4,12 +4,14 @@ import {
   getSetoresAcessoTodasObras,
   salvarSetoresAcessoTodasObras
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, Avisos, useAvisos } from '../components/padrao';
 
 export default function SetoresAcessoTodasObras() {
   const [setores, setSetores] = useState([]);
   const [selecionados, setSelecionados] = useState(new Set());
   const [salvando, setSalvando] = useState(false);
+  // R3 (02/09): aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -57,10 +59,10 @@ export default function SetoresAcessoTodasObras() {
     try {
       setSalvando(true);
       await salvarSetoresAcessoTodasObras({ setores: Array.from(selecionados) });
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuracao.');
+      avisar.erro('Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
@@ -80,6 +82,8 @@ export default function SetoresAcessoTodasObras() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Setores habilitados"

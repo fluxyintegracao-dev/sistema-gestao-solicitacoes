@@ -19,7 +19,10 @@ import {
   BlocoConteudo,
   TabelaPadrao,
   FormSecao,
-  CampoForm
+  CampoForm,
+  Avisos,
+  useAvisos,
+  useConfirmacao
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
@@ -91,6 +94,9 @@ export default function TiposSolicitacao() {
   const [editComportamento, setEditComportamento] = useState(getDefaultTipoSolicitacaoBehavior());
   const [saving, setSaving] = useState(false);
   const [formAberto, setFormAberto] = useState(false);
+  // R3: aviso e confirmação do sistema no lugar das caixas do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     const [tiposData, setoresData, cfg] = await Promise.all([
@@ -124,13 +130,13 @@ export default function TiposSolicitacao() {
     e.preventDefault();
 
     if (!setorSelecionado) {
-      alert('Selecione o setor para vincular o tipo.');
+      avisar.alerta('Selecione o setor para vincular o tipo.');
       return;
     }
 
     const nomeNormalizado = String(nome || '').trim();
     if (!nomeNormalizado) {
-      alert('Informe o nome do tipo.');
+      avisar.alerta('Informe o nome do tipo.');
       return;
     }
 
@@ -180,19 +186,27 @@ export default function TiposSolicitacao() {
       carregar();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao alterar status do tipo');
+      avisar.erro(error.message || 'Erro ao alterar status do tipo');
     }
   }
 
   async function excluir(tipo) {
-    if (!window.confirm(`Deseja excluir o tipo "${tipo.nome}"?`)) return;
+    // confirmar() devolve { ok, texto } — objeto é sempre truthy, então o
+    // retorno TEM de ser desestruturado (R21), senão "Cancelar" excluiria.
+    const { ok } = await confirmar({
+      titulo: 'Excluir tipo',
+      mensagem: `Deseja excluir o tipo "${tipo.nome}"?`,
+      rotuloConfirmar: 'Excluir',
+      destrutiva: true
+    });
+    if (!ok) return;
 
     try {
       await excluirTipoSolicitacao(tipo.id);
       carregar();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao excluir tipo');
+      avisar.erro(error.message || 'Erro ao excluir tipo');
     }
   }
 
@@ -222,11 +236,16 @@ export default function TiposSolicitacao() {
       carregar();
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edicao');
     } finally {
       setSaving(false);
     }
   }
+
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele (a validação do "Novo tipo" avisa com o modal aberto e ficaria
+  // atrás do fundo escuro); fechado, logo abaixo do PageHeader.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
   const tiposFiltrados = (() => {
     return getTiposEfetivosSetor(tipos, regrasTiposPorSetor, setorSelecionado);
@@ -320,6 +339,8 @@ export default function TiposSolicitacao() {
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
+      {!formAberto && faixaAvisos}
+
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
           principal do cabeçalho; a lista é o bloco primário PERMANENTE.
           O ritmo vertical vem do Pagina. */}
@@ -332,6 +353,7 @@ export default function TiposSolicitacao() {
             </button>
           </div>
           <div className="overflow-y-auto px-4 py-3">
+            {faixaAvisos}
             <form className="space-y-4" onSubmit={handleSubmit}>
               <FormSecao legenda="Identificacao" colunas={2}>
                 <CampoForm label="Nome do tipo" obrigatorio>
@@ -471,6 +493,8 @@ export default function TiposSolicitacao() {
           )}
         />
       </BlocoConteudo>
+
+      {elementoConfirmacao}
     </Pagina>
   );
 }

@@ -3,7 +3,7 @@ import {
   getUsuariosAcessoPrioridadeDiretoria,
   salvarUsuariosAcessoPrioridadeDiretoria
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros, Avisos, useAvisos } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 const MODO_NENHUM = 'NENHUM';
@@ -42,6 +42,8 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
   const [busca, setBusca] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [carregando, setCarregando] = useState(true);
+  // R3 (02/09): aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -57,7 +59,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         }, {}));
       } catch (error) {
         console.error(error);
-        alert('Erro ao carregar usuarios com acesso a prioridade diretoria.');
+        avisar.erro('Erro ao carregar usuarios com acesso a prioridade diretoria.');
       } finally {
         setCarregando(false);
       }
@@ -165,10 +167,10 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
       }, {});
 
       await salvarUsuariosAcessoPrioridadeDiretoria({ usuarios: usuariosPayload });
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar configuracao.');
+      avisar.erro(error?.message || 'Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
@@ -281,6 +283,8 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
           { rotulo: 'Limpar filtrados', onClick: limparTodosFiltrados }
         ]}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       {diretorias.length === 0 && !carregando && (
         <div className="app-alert">

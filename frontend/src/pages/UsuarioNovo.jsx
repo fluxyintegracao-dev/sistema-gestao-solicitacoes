@@ -5,7 +5,16 @@ import { getUsuario, criarUsuario, atualizarUsuario } from '../services/usuarios
 import { useAuth } from '../contexts/AuthContext';
 import { isBusinessAdmin, isSuperadmin } from '../utils/acessoProduto';
 import { useSafeNavigateBack } from '../utils/navigation';
-import { Pagina, PageHeader, BlocoConteudo, FormSecao, CampoForm } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  FormSecao,
+  CampoForm,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 
 export default function UsuarioNovo() {
   const { user } = useAuth();
@@ -26,6 +35,8 @@ export default function UsuarioNovo() {
   const [listaSetores, setListaSetores] = useState([]);
   const [listaObras, setListaObras] = useState([]);
   const [loading, setLoading] = useState(true);
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const isSuperadminLogado = isSuperadmin(user);
   const isBusinessAdminLogado = isBusinessAdmin(user);
   const perfilNormalizado = String(perfil || '').toUpperCase();
@@ -61,7 +72,7 @@ export default function UsuarioNovo() {
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar dados do usuario');
+      avisar.erro('Erro ao carregar dados do usuario');
     } finally {
       setLoading(false);
     }
@@ -98,7 +109,7 @@ export default function UsuarioNovo() {
     }
 
     if (!editando && !enviarConvite && !senha.trim()) {
-      alert('Informe uma senha inicial forte ou mantenha o envio de link por e-mail habilitado.');
+      avisar.alerta('Informe uma senha inicial forte ou mantenha o envio de link por e-mail habilitado.');
       return;
     }
 
@@ -108,12 +119,22 @@ export default function UsuarioNovo() {
         : await criarUsuario(payload);
 
       if (!editando && resultado?.convite_erro) {
-        alert(`Usuario criado, mas o link de definicao de senha nao foi enviado: ${resultado.convite_erro}`);
+        // A faixa de avisos morreria com a tela: logo abaixo saímos para
+        // /usuarios e o usuário nunca leria que o link não foi enviado. O
+        // A caixa do navegador daqui segurava a navegação até ser
+        // dispensada — a confirmação do sistema faz o mesmo, e sair é o
+        // único caminho (os dois botões seguem para a listagem).
+        await confirmar({
+          titulo: 'Usuario criado, link nao enviado',
+          mensagem: `Usuario criado, mas o link de definicao de senha nao foi enviado: ${resultado.convite_erro}`,
+          rotuloConfirmar: 'Entendi',
+          rotuloCancelar: 'Fechar'
+        });
       }
       navigate('/usuarios');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar usuario');
+      avisar.erro(error?.message || 'Erro ao salvar usuario');
     }
   }
 
@@ -134,6 +155,8 @@ export default function UsuarioNovo() {
         descricao="Dados de acesso, perfil, permissoes e obras vinculadas."
         voltar={{ to: '/usuarios', title: 'Voltar para usuários' }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <form onSubmit={salvar} className="space-y-3">
         {/* B3: o apoio da TELA mora na faixa; repetir aqui seria a mesma
@@ -318,6 +341,8 @@ export default function UsuarioNovo() {
           </div>
         </BlocoConteudo>
       </form>
+
+      {elementoConfirmacao}
     </Pagina>
   );
 }

@@ -17,7 +17,10 @@ import {
   TabelaPadrao,
   CelulaDupla,
   FormSecao,
-  CampoForm
+  CampoForm,
+  Avisos,
+  useAvisos,
+  useConfirmacao
 } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import StatusBadge from '../components/StatusBadge';
@@ -53,6 +56,9 @@ export default function TiposSubContrato() {
   const [editNome, setEditNome] = useState('');
   const [editMacroId, setEditMacroId] = useState('');
   const [saving, setSaving] = useState(false);
+  // R3: aviso e confirmação do sistema no lugar das caixas do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     const data = await getTiposSubContrato();
@@ -88,7 +94,7 @@ export default function TiposSubContrato() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!setorSelecionado) {
-      alert('Selecione o setor antes de cadastrar o subtipo.');
+      avisar.alerta('Selecione o setor antes de cadastrar o subtipo.');
       return;
     }
     await criarTipoSubContrato({
@@ -110,18 +116,26 @@ export default function TiposSubContrato() {
       carregar();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao alterar status do subtipo');
+      avisar.erro(error?.message || 'Erro ao alterar status do subtipo');
     }
   }
 
   async function excluir(item) {
-    if (!confirm(`Excluir o subtipo "${item.nome}"?`)) return;
+    // confirmar() devolve { ok, texto } — objeto é sempre truthy, então o
+    // retorno TEM de ser desestruturado (R21), senão "Cancelar" excluiria.
+    const { ok } = await confirmar({
+      titulo: 'Excluir subtipo',
+      mensagem: `Excluir o subtipo "${item.nome}"?`,
+      rotuloConfirmar: 'Excluir',
+      destrutiva: true
+    });
+    if (!ok) return;
     try {
       await excluirTipoSubContrato(item.id);
       carregar();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao excluir subtipo');
+      avisar.erro(error?.message || 'Erro ao excluir subtipo');
     }
   }
 
@@ -148,11 +162,16 @@ export default function TiposSubContrato() {
       carregar();
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar edicao');
+      avisar.erro('Erro ao salvar edicao');
     } finally {
       setSaving(false);
     }
   }
+
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele (a validação do "Novo subtipo" avisa com o modal aberto e ficaria
+  // atrás do fundo escuro); fechado, logo abaixo do PageHeader.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
   const setoresPorKey = useMemo(() => {
     const map = new Map();
@@ -311,6 +330,8 @@ export default function TiposSubContrato() {
         acaoPrincipal={{ rotulo: 'Novo subtipo', onClick: abrirNovoSubtipo }}
       />
 
+      {!formAberto && faixaAvisos}
+
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
           principal do cabeçalho; a lista é o bloco primário PERMANENTE.
           O seletor de Setor ficou junto da lista porque também é o recorte
@@ -324,6 +345,7 @@ export default function TiposSubContrato() {
             </button>
           </div>
           <div className="overflow-y-auto px-4 py-3">
+            {faixaAvisos}
             <form onSubmit={handleSubmit} className="space-y-4">
               <FormSecao legenda="Dados do subtipo" colunas={3}>
                 <CampoForm
@@ -441,6 +463,8 @@ export default function TiposSubContrato() {
           )}
         />
       </BlocoConteudo>
+
+      {elementoConfirmacao}
     </Pagina>
   );
 }

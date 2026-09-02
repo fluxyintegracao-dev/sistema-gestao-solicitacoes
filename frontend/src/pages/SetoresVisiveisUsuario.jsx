@@ -5,7 +5,7 @@ import {
   getSetoresVisiveisPorUsuario,
   salvarSetoresVisiveisPorUsuario
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm, Avisos, useAvisos } from '../components/padrao';
 
 export default function SetoresVisiveisUsuario() {
   const [setores, setSetores] = useState([]);
@@ -13,6 +13,8 @@ export default function SetoresVisiveisUsuario() {
   const [regras, setRegras] = useState({});
   const [usuarioSelecionado, setUsuarioSelecionado] = useState('');
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -102,10 +104,10 @@ export default function SetoresVisiveisUsuario() {
     try {
       setSalvando(true);
       await salvarSetoresVisiveisPorUsuario({ regras });
-      alert('Configuracao salva com sucesso');
+      avisar.sucesso('Configuracao salva com sucesso');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuracao');
+      avisar.erro('Erro ao salvar configuracao');
     } finally {
       setSalvando(false);
     }
@@ -131,6 +133,8 @@ export default function SetoresVisiveisUsuario() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Setores visiveis"

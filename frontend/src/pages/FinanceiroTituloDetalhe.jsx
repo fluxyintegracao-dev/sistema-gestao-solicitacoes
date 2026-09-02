@@ -14,7 +14,17 @@ import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { hasPermissao } from '../utils/acessoProduto';
 import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
-import { Pagina, PageHeader, BlocoConteudo, StatGrid, StatTile, CamposComVazios } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  StatGrid,
+  StatTile,
+  CamposComVazios,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 const FORMAS_RECEBIMENTO = ['DINHEIRO', 'PIX', 'CARTAO', 'TRANSFERENCIA', 'BOLETO', 'CHEQUE', 'PERMUTA', 'BENS', 'OUTROS'];
@@ -339,6 +349,11 @@ export default function FinanceiroTituloDetalhe() {
   const [savingBaixa, setSavingBaixa] = useState(false);
   const [estornandoId, setEstornandoId] = useState(null);
   const [corrigindoMovimentoId, setCorrigindoMovimentoId] = useState(null);
+  // R3: aviso e confirmação do sistema no lugar das caixas do navegador. A
+  // faixa `error` desta tela continua como está (erro de fluxo); o
+  // useAvisos cobre só o que era caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const podeVerPagamentosBancarios = hasPermissao(user, 'financeiro.titulos.pagamentos_bancarios.visualizar');
   const podeVerMovimentosFinanceiros = hasPermissao(user, 'financeiro.titulos.movimentos.visualizar');
   const podeVerAuditoriaFinanceira = hasPermissao(user, 'financeiro.titulos.auditoria.visualizar');
@@ -536,8 +551,10 @@ export default function FinanceiroTituloDetalhe() {
         boleto_emitido_em: cobrancaForm.boleto_emitido_em || null
       };
       await atualizarCobrancaTituloFinanceiro(id, payload);
+      // Recarrega primeiro e avisa depois: `carregar()` limpa o estado de
+      // erro da tela, e avisar antes apagaria a confirmação recém-pintada.
       await carregar();
-      alert('Dados de cobranca atualizados com sucesso.');
+      avisar.sucesso('Dados de cobranca atualizados com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao atualizar cobranca do titulo');
     } finally {
@@ -598,8 +615,9 @@ export default function FinanceiroTituloDetalhe() {
       setModalBaixaOpen(false);
       setCorrigindoMovimentoId(null);
       setBaixaForm(buildBaixaForm(titulo, contasBancarias));
+      // Recarrega primeiro e avisa depois (mesma razão do salvar cobranca).
       await carregar();
-      alert(corrigindoMovimentoId ? 'Baixa corrigida com sucesso.' : 'Baixa registrada com sucesso.');
+      avisar.sucesso(corrigindoMovimentoId ? 'Baixa corrigida com sucesso.' : 'Baixa registrada com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao registrar baixa');
     } finally {
@@ -608,15 +626,23 @@ export default function FinanceiroTituloDetalhe() {
   }
 
   async function handleEstornar(movimentoId) {
-    const confirmar = window.confirm('Confirmar estorno desta baixa?');
-    if (!confirmar) return;
+    // confirmar() devolve { ok, texto } — objeto é sempre truthy, então o
+    // retorno TEM de ser desestruturado (R21), senão "Cancelar" estornaria.
+    const { ok } = await confirmar({
+      titulo: 'Estornar baixa',
+      mensagem: 'Confirmar estorno desta baixa?',
+      rotuloConfirmar: 'Estornar',
+      destrutiva: true
+    });
+    if (!ok) return;
 
     try {
       setEstornandoId(movimentoId);
       setError('');
       await estornarMovimentoFinanceiro(id, movimentoId, {});
+      // Recarrega primeiro e avisa depois (mesma razão do salvar cobranca).
       await carregar();
-      alert('Baixa estornada com sucesso.');
+      avisar.sucesso('Baixa estornada com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao estornar baixa');
     } finally {
@@ -625,10 +651,13 @@ export default function FinanceiroTituloDetalhe() {
   }
 
   async function handleCorrigirBaixa(movimento) {
-    const confirmar = window.confirm(
-      'Confirmar estorno desta baixa e abrir a correcao para alterar conta bancaria e data?'
-    );
-    if (!confirmar) return;
+    const { ok } = await confirmar({
+      titulo: 'Corrigir baixa',
+      mensagem: 'Confirmar estorno desta baixa e abrir a correcao para alterar conta bancaria e data?',
+      rotuloConfirmar: 'Estornar e corrigir',
+      destrutiva: true
+    });
+    if (!ok) return;
 
     try {
       setCorrigindoMovimentoId(movimento.id);
@@ -693,6 +722,8 @@ export default function FinanceiroTituloDetalhe() {
               }
           ].filter(Boolean)}
         />
+
+        <Avisos avisos={avisos} aoFechar={fechar} />
 
         {error && (
           <div className="app-alert app-alert--error">
@@ -1736,6 +1767,8 @@ export default function FinanceiroTituloDetalhe() {
           </div>
         </div>
       )}
+
+      {elementoConfirmacao}
     </>
   );
 }

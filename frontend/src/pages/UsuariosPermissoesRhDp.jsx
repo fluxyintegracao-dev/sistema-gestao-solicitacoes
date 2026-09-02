@@ -5,7 +5,7 @@ import {
   salvarUsuariosPermissoesRhDp
 } from '../services/configuracoesSistema';
 import { RH_DP_PERMISSION_GROUPS, normalizeRhDpPermissionList } from '../constants/rhDpPermissions';
-import { Pagina, PageHeader, BlocoConteudo, BarraFiltros } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, BarraFiltros, Avisos, useAvisos } from '../components/padrao';
 
 function normalizePermissionMap(input) {
   const source = input && typeof input === 'object' ? input : {};
@@ -44,6 +44,7 @@ export default function UsuariosPermissoesRhDp() {
   const [selecionados, setSelecionados] = useState({});
   const [salvando, setSalvando] = useState(false);
   const [filtro, setFiltro] = useState('');
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -62,7 +63,7 @@ export default function UsuariosPermissoesRhDp() {
 
     load().catch((error) => {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar permissoes do RH/DP');
+      avisar.erro(error?.message || 'Erro ao carregar permissoes do RH/DP');
     });
   }, []);
 
@@ -121,10 +122,10 @@ export default function UsuariosPermissoesRhDp() {
 
       const response = await salvarUsuariosPermissoesRhDp(payload);
       setSelecionados(normalizePermissionMap(response?.usuarios));
-      alert('Permissoes do RH/DP salvas com sucesso.');
+      avisar.sucesso('Permissoes do RH/DP salvas com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar permissoes do RH/DP');
+      avisar.erro(error?.message || 'Erro ao salvar permissoes do RH/DP');
     } finally {
       setSalvando(false);
     }
@@ -144,6 +145,8 @@ export default function UsuariosPermissoesRhDp() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Regra base de acesso ao RH/DP"

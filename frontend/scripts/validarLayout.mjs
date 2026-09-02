@@ -299,7 +299,16 @@ function validarDialogosDoNavegador() {
       }
       if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
       const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
-      const codigo = fs.readFileSync(caminho, 'utf8');
+      const original = fs.readFileSync(caminho, 'utf8');
+      // Comentário não é código — a mesma correção que a R21 já tinha e
+      // esta não: a documentação do Avisos/Confirmacao CITA
+      // `window.alert()` para explicar o que substitui, e o check contava
+      // essas citações como dívida. Pior que ruído: um agente chegou a
+      // congelar os dois componentes no trinco, que passou a afirmar que
+      // eles carregam caixa do navegador — exatamente o contrário do que
+      // são. Trinco que mente é pior que trinco nenhum.
+      const codigo = original.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+        (trecho) => trecho.replace(/[^\n]/g, ' '));
       const total = [...codigo.matchAll(padrao)].length;
       if (total > 0) contagens[rel] = total;
     }

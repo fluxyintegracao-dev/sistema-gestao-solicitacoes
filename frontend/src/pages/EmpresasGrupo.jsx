@@ -9,7 +9,9 @@ import {
   FormSecao,
   CampoForm,
   BarraFiltros,
-  alternarValorFiltro
+  alternarValorFiltro,
+  Avisos,
+  useAvisos
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import OverlayModal from '../components/ui/OverlayModal';
@@ -64,6 +66,10 @@ export default function EmpresasGrupo() {
   const [form, setForm] = useState(null); // null = painel de formulario fechado
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  // R3: aviso do sistema no lugar da caixa do navegador. Esta tela é a
+  // ÚNICA de empresas do grupo (o RH/DP aponta para cá), então a mensagem
+  // aqui atende também quem chega pelo RH/DP.
+  const { avisos, avisar, fechar } = useAvisos();
 
   // Filtro marcado aplica na hora (padrão Solicitações); a busca digitada
   // espera 350ms para não martelar a API a cada tecla.
@@ -83,7 +89,7 @@ export default function EmpresasGrupo() {
       setEmpresas(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao carregar empresas do grupo');
+      avisar.erro(error?.message || 'Erro ao carregar empresas do grupo');
     } finally {
       setCarregando(false);
     }
@@ -144,11 +150,16 @@ export default function EmpresasGrupo() {
       await carregar();
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar empresa do grupo');
+      avisar.erro(error?.message || 'Erro ao salvar empresa do grupo');
       } finally {
       setSalvando(false);
     }
   }
+
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele (o erro do salvar acontece com o modal aberto e ficaria atrás do
+  // fundo escuro); com o modal fechado, logo abaixo do PageHeader.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
   const holdings = empresas.filter((empresa) => String(empresa.tipo_empresa || '').toUpperCase() === 'HOLDING');
   const formAtivo = form !== null;
@@ -222,6 +233,8 @@ export default function EmpresasGrupo() {
         acaoPrincipal={{ rotulo: 'Nova empresa', onClick: abrirNovaEmpresa }}
       />
 
+      {!formAtivo && faixaAvisos}
+
       {/* R9 (docs/REGRAS-LAYOUT.md): cadastro de uso esporádico abre em
           MODAL — a tela inteira fica com a listagem. Mesmos handlers,
           mesmo payload: só a moldura mudou. O ritmo vertical vem do Pagina. */}
@@ -241,6 +254,7 @@ export default function EmpresasGrupo() {
             )}
           >
             <form className="space-y-4" onSubmit={salvar}>
+              {faixaAvisos}
               <p className="app-note">
                 Essas empresas passam a ser a autoridade central para contas, caixa, pagamentos e RH/DP.
               </p>

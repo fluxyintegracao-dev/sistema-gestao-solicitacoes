@@ -11,7 +11,16 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessGestaoObras, canManageCadastroObras } from '../utils/acessoProduto';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  BarraFiltros,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function formatCurrency(value) {
@@ -165,6 +174,7 @@ export default function Obras() {
   ));
   const [modalAberto, setModalAberto] = useState(false);
   const [form, setForm] = useState(initialFormState());
+  const { avisos, avisar, fechar } = useAvisos();
 
   const podeGerenciarCadastro = canManageCadastroObras(user);
   const gestaoObrasHabilitada = canAccessGestaoObras(user);
@@ -202,7 +212,7 @@ export default function Obras() {
       setObras(lista);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar obras');
+      avisar.erro(error.message || 'Erro ao carregar obras');
     } finally {
       setLoading(false);
     }
@@ -268,7 +278,7 @@ export default function Obras() {
       };
 
       if (!payload.codigo || !payload.nome) {
-        alert('Informe codigo e nome do cadastro.');
+        avisar.alerta('Informe codigo e nome do cadastro.');
         return;
       }
 
@@ -282,7 +292,7 @@ export default function Obras() {
       await carregarObras();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar obra');
+      avisar.erro(error.message || 'Erro ao salvar obra');
     } finally {
       setSaving(false);
     }
@@ -299,7 +309,7 @@ export default function Obras() {
       await carregarObras();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao atualizar status da obra');
+      avisar.erro(error.message || 'Erro ao atualizar status da obra');
     }
   }
 
@@ -322,6 +332,11 @@ export default function Obras() {
     });
   }, [busca, obras]);
 
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele (senão o erro de salvar ficaria atrás do fundo escuro); com o modal
+  // fechado, logo abaixo do PageHeader.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     <Pagina>
       {/* C2 (02/09): toda tela usa a MESMA faixa — título 22px e o apoio
@@ -337,6 +352,8 @@ export default function Obras() {
           ? { rotulo: 'Novo cadastro', onClick: abrirModalNovaObra }
           : null}
       />
+
+      {!modalAberto && faixaAvisos}
 
       <BlocoConteudo
         titulo="Cadastros"
@@ -528,6 +545,7 @@ export default function Obras() {
             </div>
 
             <div className="modal-body">
+            {faixaAvisos}
             <form id="obras-form" onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-3">
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Código

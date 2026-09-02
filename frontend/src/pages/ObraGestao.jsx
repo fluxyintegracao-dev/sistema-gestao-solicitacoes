@@ -12,7 +12,14 @@ import {
   HiOutlineReceiptPercent,
   HiOutlineTrash
 } from 'react-icons/hi2';
-import { CelulaDupla, Pagina, TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  CelulaDupla,
+  Pagina,
+  TabelaPadrao,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageGestaoObrasApropriacoes } from '../utils/acessoProduto';
 import { getObraGestao, obterUrlArquivoObra } from '../services/obras';
@@ -106,6 +113,8 @@ export default function ObraGestao() {
   const [orcamentoDraft, setOrcamentoDraft] = useState([]);
   const [novoItemModal, setNovoItemModal] = useState(false);
   const [novoItem, setNovoItem] = useState({ codigo: '', descricao: '', valor_orcado: '' });
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   const podeEditarApropriacoes = canManageGestaoObrasApropriacoes(user);
   const requestedTab = searchParams.get('aba') || 'dashboard';
@@ -137,7 +146,7 @@ export default function ObraGestao() {
       setData(response);
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao carregar gerenciamento da obra');
+      avisar.erro(error.message || 'Erro ao carregar gerenciamento da obra');
     } finally {
       setLoading(false);
     }
@@ -162,14 +171,21 @@ export default function ObraGestao() {
       await carregarObra();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar orcamento');
+      avisar.erro(error.message || 'Erro ao salvar orcamento');
     } finally {
       setSavingBudget(false);
     }
   }
 
-  function limparOrcamento() {
-    if (!window.confirm('Deseja zerar o valor orcado de todos os itens desta obra?')) {
+  async function limparOrcamento() {
+    const { ok } = await confirmar({
+      titulo: 'Limpar orcamento',
+      mensagem: 'Deseja zerar o valor orcado de todos os itens desta obra?',
+      rotuloConfirmar: 'Zerar valores',
+      rotuloCancelar: 'Manter valores',
+      destrutiva: true
+    });
+    if (!ok) {
       return;
     }
 
@@ -179,7 +195,7 @@ export default function ObraGestao() {
   async function criarNovoItem() {
     try {
       if (!novoItem.codigo.trim()) {
-        alert('Informe o codigo do item.');
+        avisar.alerta('Informe o codigo do item.');
         return;
       }
 
@@ -195,12 +211,19 @@ export default function ObraGestao() {
       await carregarObra();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao criar item de orcamento');
+      avisar.erro(error.message || 'Erro ao criar item de orcamento');
     }
   }
 
   async function removerItemOrcamento(itemId) {
-    if (!window.confirm('Deseja remover este item de orcamento?')) {
+    const { ok } = await confirmar({
+      titulo: 'Remover item de orcamento',
+      mensagem: 'Deseja remover este item de orcamento?',
+      rotuloConfirmar: 'Remover item',
+      rotuloCancelar: 'Manter item',
+      destrutiva: true
+    });
+    if (!ok) {
       return;
     }
 
@@ -209,7 +232,7 @@ export default function ObraGestao() {
       await carregarObra();
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao remover item de orcamento');
+      avisar.erro(error.message || 'Erro ao remover item de orcamento');
     }
   }
 
@@ -217,13 +240,13 @@ export default function ObraGestao() {
     try {
       const url = await obterUrlArquivoObra(item.caminho_arquivo);
       if (!url) {
-        alert('Arquivo indisponivel.');
+        avisar.erro('Arquivo indisponivel.');
         return;
       }
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao abrir arquivo');
+      avisar.erro(error.message || 'Erro ao abrir arquivo');
     }
   }
 
@@ -233,6 +256,11 @@ export default function ObraGestao() {
   );
 
   const kpis = data?.kpis || {};
+
+  // R16: UM dono para a faixa de avisos. Com o modal de novo item aberto ela
+  // vive dentro dele (senão o erro de criar ficaria atrás do fundo escuro);
+  // fora dele, no topo do conteúdo, logo abaixo do cabeçalho fixo.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
   if (loading) {
     return (
@@ -245,6 +273,9 @@ export default function ObraGestao() {
   if (!data?.obra) {
     return (
       <Pagina>
+        {/* A falha do carregamento cai aqui (data continua nulo): sem a faixa
+            neste retorno, o aviso de erro não teria onde ser pintado. */}
+        {faixaAvisos}
         <DetailTableEmpty message="Obra nao encontrada." />
       </Pagina>
     );
@@ -310,6 +341,8 @@ export default function ObraGestao() {
           })}
         </div>
       </section>
+
+      {!novoItemModal && faixaAvisos}
 
       {activeTab === 'dashboard' && (
         <>
@@ -779,6 +812,8 @@ export default function ObraGestao() {
               </button>
             </div>
 
+            {faixaAvisos}
+
             <div className="mt-4 grid gap-3">
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Codigo
@@ -818,6 +853,8 @@ export default function ObraGestao() {
           </div>
         </div>
       )}
+
+      {elementoConfirmacao}
     </Pagina>
   );
 }

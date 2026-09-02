@@ -2,7 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import Alert from '../ui/Alert';
 
 /**
- * AVISO DO SISTEMA (item **R3** da DoD, 02/09) — substitui `window.alert()`.
+ * AVISO DO SISTEMA (item **R3** da DoD, 02/09) — substitui a caixa
+ * `window.alert` do navegador.
  *
  * Motivo (decisão do cliente, 02/09): a caixa cinza do navegador não é do
  * sistema. Ela ignora tema, tipografia, tokens e o idioma visual inteiro;

@@ -3,7 +3,7 @@ import {
   getUsuariosEnvioQualquerSetor,
   salvarUsuariosEnvioQualquerSetor
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla, BarraFiltros, Avisos, useAvisos } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function normalizarTexto(valor) {
@@ -20,6 +20,8 @@ export default function UsuariosEnvioQualquerSetor() {
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  // R3 (02/09): aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function carregar() {
@@ -35,7 +37,7 @@ export default function UsuariosEnvioQualquerSetor() {
         ));
       } catch (error) {
         console.error(error);
-        alert('Erro ao carregar usuarios com permissao especial de envio.');
+        avisar.erro('Erro ao carregar usuarios com permissao especial de envio.');
       } finally {
         setCarregando(false);
       }
@@ -93,10 +95,10 @@ export default function UsuariosEnvioQualquerSetor() {
         ...usuario,
         pode_enviar_qualquer_setor: selecionados.has(String(usuario.id))
       })));
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error?.message || 'Erro ao salvar permissao especial de envio.');
+      avisar.erro(error?.message || 'Erro ao salvar permissao especial de envio.');
     } finally {
       setSalvando(false);
     }
@@ -161,6 +163,8 @@ export default function UsuariosEnvioQualquerSetor() {
           { rotulo: 'Limpar filtrados', onClick: limparFiltrados }
         ]}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Usuarios"

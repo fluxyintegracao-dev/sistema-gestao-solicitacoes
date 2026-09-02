@@ -5,7 +5,7 @@ import {
   getTiposSolicitacaoPorSetor,
   salvarTiposSolicitacaoPorSetor
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm, Avisos, useAvisos } from '../components/padrao';
 
 const MODOS = [
   { value: 'ADMIN_PRIMEIRO', label: 'Admin primeiro' },
@@ -25,6 +25,8 @@ export default function TiposSolicitacaoPorSetor() {
   const [setorSelecionado, setSetorSelecionado] = useState('');
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     carregar();
@@ -49,7 +51,7 @@ export default function TiposSolicitacaoPorSetor() {
       }
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar configurações de tipos por setor.');
+      avisar.erro('Erro ao carregar configurações de tipos por setor.');
     } finally {
       setLoading(false);
     }
@@ -115,10 +117,10 @@ export default function TiposSolicitacaoPorSetor() {
     try {
       setSalvando(true);
       await salvarTiposSolicitacaoPorSetor({ regras });
-      alert('Configuração salva.');
+      avisar.sucesso('Configuração salva.');
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar configuração.');
+      avisar.erro('Erro ao salvar configuração.');
     } finally {
       setSalvando(false);
     }
@@ -148,6 +150,8 @@ export default function TiposSolicitacaoPorSetor() {
           desabilitada: salvando
         }}
       />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo="Tipos habilitados"
