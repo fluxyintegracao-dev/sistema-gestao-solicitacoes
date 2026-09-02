@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validarLayout } from './validarLayout.mjs';
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const srcRoot = path.join(frontendRoot, 'src');
@@ -160,6 +161,15 @@ if (fs.existsSync(distAssets)) {
       }
     }
   }
+}
+
+// Regras mecânicas de layout (docs/REGRAS-LAYOUT.md) sobre as telas do
+// manifesto — reprovam a tela reformada que sair do padrão.
+const layout = validarLayout();
+layout.avisos.forEach((aviso) => console.warn('[layout] AVISO', aviso));
+if (layout.falhas.length > 0) {
+  layout.falhas.forEach((f) => console.error('[layout] FALHA', f));
+  fail(`${layout.falhas.length} violação(ões) das regras mecânicas de layout — veja docs/REGRAS-LAYOUT.md.`);
 }
 
 const sourceFiles = listFiles(srcRoot, ['.jsx', '.js']);

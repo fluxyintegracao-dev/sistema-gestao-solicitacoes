@@ -182,11 +182,10 @@ export default function ObraTipoApropriacao() {
         <div className="flex gap-2 flex-wrap items-center">
           <input
             type="text"
-            className="input"
+            className="input app-busca"
             placeholder="Filtrar obra por nome ou codigo"
             value={filtro}
             onChange={(e) => setFiltro(e.target.value)}
-            style={{ minWidth: 260 }}
           />
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -203,7 +202,7 @@ export default function ObraTipoApropriacao() {
 
         {erro && <div className="app-alert app-alert--error">{erro}</div>}
 
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{ overflowX: 'auto' }} data-pivo="colunas-dinamicas">
           <table className="table">
             <thead>
               <tr>

@@ -5150,7 +5150,9 @@ input[type="file"]:disabled {
 
 .app-summary-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  /* R6 (REGRAS-LAYOUT): caixa de valor dimensionada pelo pior caso — 210px
+     comporta R$ 9.999.999.999,99 no corpo atual sem vazar. */
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 0.75rem;
 }
 
@@ -5179,6 +5181,8 @@ input[type="file"]:disabled {
 .app-summary-grid--compact .app-summary-value {
   margin-top: 0.22rem;
   font-size: 0.94rem;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .app-summary-grid--compact .app-summary-subvalue {

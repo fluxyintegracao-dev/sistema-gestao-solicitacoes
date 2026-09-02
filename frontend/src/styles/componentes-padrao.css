@@ -11,6 +11,72 @@
    Só tokens (--c-*, --sem-*, --ui-*); nenhuma cor à mão.
    ========================================================================== */
 
+/* ---- REGRAS MECÂNICAS (docs/REGRAS-LAYOUT.md) — números, não adjetivos --- */
+:root {
+  --respiro-topbar: 24px;      /* R4: vão mínimo barra fixa → conteúdo */
+  --alvo-clique: 32px;         /* R2: alvo mínimo desktop */
+  --campo-moeda-min: 180px;    /* R6: cabe R$ 9.999.999.999,99 */
+}
+
+/* R2 — alvo de clique: imposto na classe; sair disso exige burlar o sistema. */
+.btn {
+  min-height: var(--alvo-clique);
+  min-width: var(--alvo-clique);
+}
+
+.btn svg {
+  min-width: 18px;
+  min-height: 18px;
+}
+
+@media (pointer: coarse) {
+  :root { --alvo-clique: 44px; }
+  .btn svg { min-width: 20px; min-height: 20px; }
+}
+
+/* R3 — busca/filtro de cabeçalho de bloco ocupa a faixa (220–480px). */
+.app-busca {
+  flex: 1 1 220px;
+  min-width: 220px;
+  max-width: 480px;
+}
+
+/* R6 — campo monetário dimensionado pelo pior caso. */
+.input-moeda {
+  min-width: var(--campo-moeda-min);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.valor-tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* R4 — respiro entre a barra fixa e o primeiro conteúdo. */
+.layout-main .app-page-header {
+  margin-top: var(--respiro-topbar);
+}
+
+/* R5 — texto de apoio ancorado: contagem forte + apoio muted, sob o título. */
+.app-page-lead {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--c-muted);
+  max-width: 78ch;
+  line-height: 1.45;
+}
+
+.app-page-lead strong {
+  color: var(--c-text);
+  font-weight: 700;
+}
+
+/* R8 — série neutra de comparação (par da saturada --c-primary). */
+.barra-serie-neutra {
+  background: var(--ui-border-strong);
+}
+
 /* ---- Tarja lateral de urgência/estado (aplicável a linha, card, bloco) ---- */
 .tarja {
   position: relative;

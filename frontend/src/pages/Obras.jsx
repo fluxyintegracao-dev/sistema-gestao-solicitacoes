@@ -326,11 +326,10 @@ export default function Obras() {
     <div className="page solicitacoes-page">
       <PageHeader
         titulo="Gestão de Obras e Centros de Custo"
-        subtitulo={loading
-          ? (gestaoObrasHabilitada
-            ? 'Controle das obras reais com orçamento e dos centros de custo administrativos usados nas solicitações.'
-            : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.')
-          : `${obras.length} cadastro(s) · obras reais com orçamento e centros de custo administrativos.`}
+        contagem={loading ? null : `${obras.length} cadastro(s)`}
+        subtitulo={gestaoObrasHabilitada
+          ? 'Obras reais com orçamento e centros de custo administrativos usados nas solicitações.'
+          : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
         acaoPrincipal={podeGerenciarCadastro
           ? { rotulo: 'Novo cadastro', onClick: abrirModalNovaObra }
           : null}
@@ -349,7 +348,7 @@ export default function Obras() {
         cor="var(--c-primary)"
         acoes={(
           <input
-            className="input input-sm w-[240px]"
+            className="input input-sm app-busca"
             placeholder="Buscar por codigo, nome ou cidade"
             value={busca}
             onChange={(event) => setBusca(event.target.value)}
@@ -458,7 +457,7 @@ export default function Obras() {
             {
               id: 'status',
               titulo: 'Status',
-              largura: 95,
+              largura: 96,
               render: (obra) => <StatusBadge status={obra.ativo ? 'Ativa' : 'Inativa'} />
             }
           ]}

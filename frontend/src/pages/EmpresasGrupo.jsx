@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { atualizarEmpresaGrupo, criarEmpresaGrupo, getEmpresasGrupo } from '../services/empresasGrupo';
 import {
@@ -10,6 +10,7 @@ import {
   CampoForm
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
+import OverlayModal from '../components/ui/OverlayModal';
 
 function emptyForm() {
   return {
@@ -60,7 +61,6 @@ export default function EmpresasGrupo() {
   const [form, setForm] = useState(null); // null = painel de formulario fechado
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const formRef = useRef(null);
 
   useEffect(() => {
     carregar();
@@ -82,10 +82,6 @@ export default function EmpresasGrupo() {
     }
   }
 
-  function focarFormulario() {
-    requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-  }
-
   function selecionarEmpresa(item) {
     setForm({
       id: item.id,
@@ -102,12 +98,10 @@ export default function EmpresasGrupo() {
       holding_id: item.holding_id ? String(item.holding_id) : '',
       ativo: item.ativo !== false
     });
-    focarFormulario();
   }
 
   function abrirNovaEmpresa() {
     setForm(emptyForm());
-    focarFormulario();
   }
 
   function limparFormulario() {
@@ -204,7 +198,7 @@ export default function EmpresasGrupo() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 110,
+      largura: 96,
       render: (item) => <StatusBadge status={item.ativo ? 'Ativa' : 'Inativa'} />
     }
   ];
@@ -221,16 +215,18 @@ export default function EmpresasGrupo() {
       />
 
       <div className="space-y-3">
-        {/* PADRÃO DE TELA MISTA (piloto Parceiros): lista em largura total;
-            o formulário abre como painel ACIMA quando acionado (Nova empresa /
-            Editar / clique na linha) e assume a barra de cor — a lista rebaixa
-            para neutra. Mesmos handlers, mesmo payload: reorganização pura. */}
+        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro de uso esporádico abre em
+            MODAL — a tela inteira fica com a listagem. Mesmos handlers,
+            mesmo payload: só a moldura mudou. */}
         {formAtivo && (
-          <div ref={formRef} key={form.id || 'nova'}>
+          <OverlayModal
+            aberto
+            rotulo={form.id ? 'Editar empresa do grupo' : 'Nova empresa do grupo'}
+            onFechar={limparFormulario}
+          >
+            <div key={form.id || 'nova'}>
             <BlocoConteudo
               titulo={form.id ? `Editar empresa — ${form.nome || ''}` : 'Nova empresa do grupo'}
-              variante="primario"
-              cor="var(--sem-info)"
               acoes={(
                 <button type="button" className="btn btn-outline btn-sm" onClick={limparFormulario}>
                   Fechar
@@ -376,23 +372,24 @@ export default function EmpresasGrupo() {
                 </div>
               </form>
             </BlocoConteudo>
-          </div>
+            </div>
+          </OverlayModal>
         )}
 
         <BlocoConteudo
           titulo="Empresas cadastradas"
-          variante={formAtivo ? 'neutro' : 'primario'}
+          variante="primario"
           cor="var(--c-primary)"
           acoes={(
             <>
               <input
-                className="input input-sm w-[200px]"
+                className="input input-sm app-busca"
                 placeholder="Buscar nome, código ou CNPJ"
                 value={filtros.q}
                 onChange={(event) => setFiltros((prev) => ({ ...prev, q: event.target.value }))}
               />
               <select
-                className="input input-sm w-[110px]"
+                className="input input-sm"
                 aria-label="Filtrar por situação"
                 value={filtros.ativo}
                 onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}

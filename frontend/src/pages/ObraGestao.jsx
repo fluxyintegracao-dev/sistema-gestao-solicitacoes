@@ -335,7 +335,7 @@ export default function ObraGestao() {
                     </div>
                     <div className="space-y-1.5">
                       <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
-                        <div className="h-full rounded-full obra-bar-fill-soft" style={{ width: widthOrcado }} />
+                        <div className="h-full rounded-full barra-serie-neutra" style={{ width: widthOrcado }} />
                       </div>
                       <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
                         <div className="h-full rounded-full" style={{ width: widthPago, background: 'var(--c-primary)' }} />
@@ -410,8 +410,8 @@ export default function ObraGestao() {
                         <td className="px-4 py-3 text-right">
                           {podeEditarApropriacoes ? (
                             <input
-                              className="input ml-auto max-w-[220px] text-right"
-                              style={{ borderColor: 'var(--ui-border)' }}
+                              className="input input-moeda ml-auto"
+                              style={{ borderColor: 'var(--ui-border)', width: 200 }}
                               value={item.valor_orcado}
                               onChange={(event) => setOrcamentoDraft((current) => current.map((row) => (
                                 row.id === item.id ? { ...row, valor_orcado: event.target.value } : row

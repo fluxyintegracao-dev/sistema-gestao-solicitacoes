@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import EmptyState from '../ui/EmptyState';
 
@@ -49,6 +49,40 @@ export default function TabelaPadrao({
   larguraAcoes = 240
 }) {
   const ehMovel = useEhMovel();
+  const shellRef = useRef(null);
+  const [larguraDisponivel, setLarguraDisponivel] = useState(null);
+
+  // R1 (docs/REGRAS-LAYOUT.md): ação no máximo 320px; a sobra do card vai
+  // SEMPRE para a coluna de conteúdo (flex) — medida uma vez no mount.
+  const larguraAcoesEfetiva = Math.min(larguraAcoes, 320);
+
+  useEffect(() => {
+    if (!shellRef.current) return undefined;
+    const medir = () => {
+      const largura = shellRef.current?.getBoundingClientRect().width;
+      if (largura) setLarguraDisponivel((atual) => atual ?? Math.floor(largura));
+    };
+    medir();
+    const raf = requestAnimationFrame(medir);
+    return () => cancelAnimationFrame(raf);
+  }, [carregando, ehMovel, itens.length]);
+
+  const indiceFlex = (() => {
+    const marcada = colunas.findIndex((c) => c.flex);
+    if (marcada >= 0) return marcada;
+    const titulo = colunas.findIndex((c) => c.noCard === 'titulo');
+    return titulo >= 0 ? titulo : 0;
+  })();
+
+  const colunasComFlex = colunas.map((coluna, i) => {
+    if (i !== indiceFlex || !larguraDisponivel) return coluna;
+    const fixas = colunas.reduce(
+      (soma, c, j) => (j === indiceFlex ? soma : soma + Number(c.largura || 140)),
+      acoesLinha ? larguraAcoesEfetiva : 0
+    );
+    const piso = Math.max(Number(coluna.minWidth || 160), 160);
+    return { ...coluna, largura: Math.max(piso, larguraDisponivel - fixas - 4) };
+  });
 
   if (carregando) {
     return (
@@ -98,12 +132,13 @@ export default function TabelaPadrao({
   }
 
   const colunasTabela = acoesLinha
-    ? [...colunas, { id: '__acoes', titulo: 'Ações', largura: larguraAcoes, minWidth: 120 }]
-    : colunas;
+    ? [...colunasComFlex, { id: '__acoes', titulo: 'Ações', largura: larguraAcoesEfetiva, minWidth: 120 }]
+    : colunasComFlex;
 
   return (
-    <div className="app-table-shell app-tabela">
+    <div className="app-table-shell app-tabela" ref={shellRef}>
       <ResizableTable
+        key={`medida:${larguraDisponivel ?? 'auto'}`}
         columns={colunasTabela.map((c) => ({
           id: c.id,
           width: c.largura,

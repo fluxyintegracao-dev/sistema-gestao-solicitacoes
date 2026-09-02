@@ -38,6 +38,7 @@ function BotaoAcao({ acao, classe }) {
 export default function PageHeader({
   titulo,
   subtitulo,
+  contagem,
   acaoPrincipal,
   secundarias = [],
   destrutiva,
@@ -49,7 +50,15 @@ export default function PageHeader({
       <div className="app-page-header-row">
         <div>
           <h1 className="page-title">{titulo}</h1>
-          {subtitulo ? <p className="page-subtitle">{subtitulo}</p> : null}
+          {/* R5: texto de apoio ancorado — contagem em strong, apoio muted,
+              sempre aqui dentro (parágrafo solto na página é reprovado). */}
+          {(contagem || subtitulo) ? (
+            <p className="app-page-lead">
+              {contagem ? <strong>{contagem}</strong> : null}
+              {contagem && subtitulo ? ' · ' : ''}
+              {subtitulo}
+            </p>
+          ) : null}
         </div>
         <div className="app-actionbar">
           {secundarias.filter(Boolean).map((acao) => (

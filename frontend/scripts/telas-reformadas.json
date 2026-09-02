@@ -1,0 +1,31 @@
+{
+  "descricao": "Telas sob as regras mecânicas de layout (docs/REGRAS-LAYOUT.md). Cada leva adiciona as suas aqui; o validarLayout.mjs reprova o que sair do padrão.",
+  "telas": [
+    "src/pages/Usuarios.jsx",
+    "src/pages/UsuarioNovo.jsx",
+    "src/pages/Parceiros.jsx",
+    "src/pages/ParceiroCategorias.jsx",
+    "src/pages/FinanceiroTituloDetalhe.jsx",
+    "src/pages/Obras.jsx",
+    "src/pages/ObraGestao.jsx",
+    "src/pages/ObraTipoApropriacao.jsx",
+    "src/pages/Setores.jsx",
+    "src/pages/TiposSolicitacao.jsx",
+    "src/pages/TiposSubContrato.jsx",
+    "src/pages/EmpresasGrupo.jsx",
+    "src/pages/AreasObra.jsx",
+    "src/pages/SetoresVisiveisUsuario.jsx",
+    "src/pages/TiposSolicitacaoPorSetor.jsx",
+    "src/pages/TiposCompartilhadosSetor.jsx",
+    "src/pages/SetoresCriacaoTodasObras.jsx",
+    "src/pages/SetoresAcessoTodasObras.jsx",
+    "src/pages/UsuariosEnvioQualquerSetor.jsx",
+    "src/pages/UsuariosAcessoFinanceiro.jsx",
+    "src/pages/UsuariosAcessoPrioridadeDiretoria.jsx",
+    "src/pages/UsuariosPermissoesRhDp.jsx"
+  ],
+  "excecoes_tabela_crua": {
+    "src/pages/ObraGestao.jsx": "5 tabelas internas das abas (2-3 colunas, uma editável) — conversão para ResizableTable pendente de decisão",
+    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado"
+  }
+}
