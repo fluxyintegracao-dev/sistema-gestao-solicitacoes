@@ -4,7 +4,7 @@
 
 ## Resumo
 
-- **No padrão: 108** · a migrar: 10 · aguardam decisão do cliente: 20 · código morto (aguarda ok para remoção): 5 · exceção registrada: 1
+- **No padrão: 125** · a migrar: 10 · aguardam decisão do cliente: 3 · código morto (aguarda ok para remoção): 0 · exceção registrada: 1
 
 _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — não editar a coluna Situação à mão._
 
@@ -76,8 +76,8 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 | `frontend/src/pages/RhDpDocumentos.jsx` | `/rh-dp/documentos` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/RhDpEmpresas.jsx` | `/rh-dp/empresas` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/RhDpFechamentos.jsx` | `/rh-dp/fechamentos` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/RhDpImportacoes.jsx` | `/rh-dp/importacoes` | 2 | `<table>` crua (2) | Não | Não | AGUARDA DECISÃO — decisão do cliente: preview de importação com colunas dinâmicas vindas do arquivo importado |
-| `frontend/src/pages/RhDpJornada.jsx` | `/rh-dp/jornada` | 1 | ResizableTable direto (1) | Parcial | Não | AGUARDA DECISÃO — decisão do cliente: ResizableTable com 6 campos de edição inline de jornada |
+| `frontend/src/pages/RhDpImportacoes.jsx` | `/rh-dp/importacoes` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
+| `frontend/src/pages/RhDpJornada.jsx` | `/rh-dp/jornada` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/RhDpPessoal.jsx` | `/rh-dp/pessoal` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/RhDpPessoalSolicitacoes.jsx` | embutido em RhDpPessoal (`/rh-dp/pessoal`) | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/RhDpRelatorioOperacional.jsx` | `/rh-dp/relatorios/operacional` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
@@ -92,10 +92,10 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 | `frontend/src/pages/FinanceiroBancos.jsx` | `/financeiro/bancos` | 7 | TabelaPadrao (7) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroBoletos.jsx` | `/financeiro/boletos` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroCaixas.jsx` | `/financeiro/caixas` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/FinanceiroChequesTerceiros.jsx` | `/financeiro/cheques-terceiros` | 2 | `<table>` crua (2) | Não | Não | AGUARDA DECISÃO — decisão do cliente: tabelas com 6 campos de edição inline (dados do cheque) |
-| `frontend/src/pages/FinanceiroConciliacao.jsx` | `/financeiro/conciliacao` | 2 | `<table>` crua (2) | Não | Não | AGUARDA DECISÃO — decisão do cliente: duas tabelas espelhadas lado a lado (extrato x sistema) com seleção cruzada para conciliar |
+| `frontend/src/pages/FinanceiroChequesTerceiros.jsx` | `/financeiro/cheques-terceiros` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
+| `frontend/src/pages/FinanceiroConciliacao.jsx` | `/financeiro/conciliacao` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroDda.jsx` | `/financeiro/dda` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/FinanceiroDre.jsx` | `/financeiro/relatorios/dre` | 6 | ResizableTable direto (5) + `<table>` crua (1) | Parcial | Não | AGUARDA DECISÃO — decisão do cliente: árvore de DRE com linhas expansíveis e sub-tabela embutida via colSpan dentro das linhas |
+| `frontend/src/pages/FinanceiroDre.jsx` | `/financeiro/relatorios/dre` | 7 | TabelaPadrao (6) + `<table>` crua (1) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: árvore de DRE com linhas expansíveis e sub-tabela embutida via colSpan dentro das linhas |
 | `frontend/src/pages/FinanceiroEndividamento.jsx` | `/financeiro/relatorios/endividamento` | 4 | TabelaPadrao (4) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroExecutivoGrupo.jsx` | `/financeiro/relatorios/grupo-consolidado` | 4 | TabelaPadrao (4) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroFaturaCartaoDetalhe.jsx` | `/financeiro/faturas-cartao/:id` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
@@ -105,9 +105,9 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 | `frontend/src/pages/FinanceiroIntercompany.jsx` | `/financeiro/relatorios/intercompany` | 4 | TabelaPadrao (4) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroObras.jsx` | `/financeiro/relatorios/financeiro-obras` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroPagamentos.jsx` | `/financeiro/pagamentos` | 3 | TabelaPadrao (3) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/FinanceiroRelatorioAnalitico.jsx` | `/financeiro/relatorios/analitico` | 1 | ResizableTable direto (1) | Parcial | Não | AGUARDA DECISÃO — decisão do cliente: reordenação de colunas por ARRASTAR no cabeçalho (draggable em cada th) |
+| `frontend/src/pages/FinanceiroRelatorioAnalitico.jsx` | `/financeiro/relatorios/analitico` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/FinanceiroRelatorios.jsx` | `/financeiro/relatorios` | 3 | TabelaPadrao (3) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/FinanceiroTitulos.jsx` | `/financeiro/contas-a-receber`, `/financeiro/contas-a-pagar`, `/financeiro/titulos` | 2 | TabelaPadrao (1) + ResizableTable direto (1) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: 1 de 2 migrada; a principal tem colunas escolhidas pelo usuário, reordenação por botões no th, checkbox de lote no cabeçalho e três estados de vazio distintos |
+| `frontend/src/pages/FinanceiroTitulos.jsx` | `/financeiro/contas-a-receber`, `/financeiro/contas-a-pagar`, `/financeiro/titulos` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/ComprovantesPendentes.jsx` | `/comprovantes/pendentes` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/components/financeiro/BaixaCompostaModal.jsx` | modal em FinanceiroTitulos (`/financeiro/titulos`) | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 
@@ -116,12 +116,12 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 | Arquivo | Tela/rota | Nº de tabelas | Componente usado | Redimensionar? | Alinhamento? | Situação |
 |---|---|---|---|---|---|---|
 | `frontend/src/modules/solicitacao-compra/pages/SolicitacoesCompra.jsx` | `/solicitacoes-compra` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
-| `frontend/src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx` | `/solicitacoes-compra/:id` | 2 | TabelaPadrao (1) + `<table>` crua (1) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: 1 de 2 migrada; a de itens emite duas tr por item (linha de detalhe expansível com colSpan) |
-| `frontend/src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx` | `/solicitacoes-compra/nova` | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: grade de itens com 8 campos de edição inline (entrada de dados, não listagem) |
+| `frontend/src/modules/solicitacao-compra/pages/SolicitacaoCompraDetalheView.jsx` | `/solicitacoes-compra/:id` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
+| `frontend/src/modules/solicitacao-compra/pages/NovaSolicitacaoCompra.jsx` | `/solicitacoes-compra/nova` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/solicitacao-compra/pages/RevisarSolicitacaoCompra.jsx` | `/solicitacoes-compra/revisar` | 2 | TabelaPadrao (1) + `<table>` crua (1) | Parcial | Parcial | MIGRADA — a table restante está dentro da STRING HTML do PDF (srcDoc), não é tabela React: fora do escopo por natureza |
 | `frontend/src/modules/solicitacao-compra/pages/ListaCotacoes.jsx` | `/cotacoes` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
-| `frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx` | `/solicitacoes-compra/:id/cotacao` | 6 | ResizableTable direto (1) + `<table>` crua (5) | Parcial | Não | AGUARDA DECISÃO — decisão do cliente: matriz de cotação com colunas dinâmicas por fornecedor e 13 campos de edição inline |
-| `frontend/src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx` | `/cotacao/:token` | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: tela pública (sem login, layout próprio) com edição inline de preços pelo fornecedor |
+| `frontend/src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx` | `/solicitacoes-compra/:id/cotacao` | 6 | TabelaPadrao (4) + `<table>` crua (2) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: matriz de cotação com colunas dinâmicas por fornecedor e 13 campos de edição inline |
+| `frontend/src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx` | `/cotacao/:token` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/solicitacao-compra/pages/PedidosCompra.jsx` | `/pedidos-compra` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/solicitacao-compra/pages/PedidoCompraDetalhe.jsx` | `/pedidos-compra/:id` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx` | `/gestao-apropriacoes` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
@@ -145,7 +145,7 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 
 | Arquivo | Tela/rota | Nº de tabelas | Componente usado | Redimensionar? | Alinhamento? | Situação |
 |---|---|---|---|---|---|---|
-| `frontend/src/pages/ComercialContratos.jsx` | `/comercial/contratos` | 3 | ResizableTable direto (1) + `<table>` crua (2) | Parcial | Não | AGUARDA DECISÃO — decisão do cliente: geração/edição de parcelas com 7 campos inline dentro da tabela |
+| `frontend/src/pages/ComercialContratos.jsx` | `/comercial/contratos` | 3 | TabelaPadrao (3) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/ComercialRelatorioOperacional.jsx` | `/comercial/relatorios/operacional` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/crm/pages/CrmLeads.jsx` | `/crm/leads` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/crm/pages/CrmCarteira.jsx` | `/crm/carteira` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
@@ -174,7 +174,7 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 
 | Arquivo | Tela/rota | Nº de tabelas | Componente usado | Redimensionar? | Alinhamento? | Situação |
 |---|---|---|---|---|---|---|
-| `frontend/src/pages/GestaoContratos.jsx` | `/gestao-contratos` | 2 | TabelaPadrao (1) + ResizableTable direto (1) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: 1 de 2 migrada; a principal ordena por clique no cabeçalho (5 colunas com indicador ASC/DESC) |
+| `frontend/src/pages/GestaoContratos.jsx` | `/gestao-contratos` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/ContratoFluxoNovo.jsx` | `/contratos/novo` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/ContratosRelatorioOperacional.jsx` | `/contratos/relatorios/operacional` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/TiposMacroContrato.jsx` | sem rota/uso encontrado | 1 | `<table>` crua (1) | Não | Não | CÓDIGO MORTO (sem uso — avaliar remoção antes de migrar) |
@@ -214,21 +214,21 @@ _Atualizado automaticamente por scripts/qa-preview/atualizarInventario.mjs — n
 |---|---|---|---|---|---|---|
 | `frontend/src/pages/Solicitacoes/index.jsx` | `/solicitacoes` (tela principal) | 2 | TabelaPadrao (1) + ListaAvancada (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/Solicitacoes/TabelaSolicitacoes.jsx` | tabela da tela `/solicitacoes` (dentro da ListaAvancada) | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: tabela principal do sistema com redimensionamento próprio integrado à ListaAvancada — unificar exige cuidado extra |
-| `frontend/src/pages/SolicitacoesRelatorioOperacional.jsx` | `/solicitacoes/relatorios/operacional` | 11 | TabelaPadrao (10) + ResizableTable direto (1) | Parcial | Parcial | AGUARDA DECISÃO — decisão do cliente: 10 de 11 migradas; "Acertividade na criação por usuário" ordena por clique no cabeçalho. Heatmap em CSS grid intocado |
+| `frontend/src/pages/SolicitacoesRelatorioOperacional.jsx` | `/solicitacoes/relatorios/operacional` | 11 | TabelaPadrao (11) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/SolicitacaoDetalhe/ApropriacoesDoContrato.jsx` | aba de `/solicitacoes/:id` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/SolicitacaoDetalhe/Pagamentos.jsx` | aba de `/solicitacoes/:id` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/pages/SolicitacaoDetalhe/PrevisoesContrato.jsx` | aba de `/solicitacoes/:id` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
-| `frontend/src/pages/ConversasEntrada.jsx` | `/conversas/entrada` (aba de ComunicacaoInterna) | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: checkbox de "selecionar todos" no th (marca a página inteira) |
-| `frontend/src/pages/ConversasSaida.jsx` | `/conversas/saida` (aba de ComunicacaoInterna) | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: checkbox de "selecionar todos" no th (marca a página inteira) |
+| `frontend/src/pages/ConversasEntrada.jsx` | `/conversas/entrada` (aba de ComunicacaoInterna) | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
+| `frontend/src/pages/ConversasSaida.jsx` | `/conversas/saida` (aba de ComunicacaoInterna) | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrObrasView.jsx` | aba de `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrPlanoWorkspace.jsx` | aba de `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
-| `frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx` | aba de `/custos-recebiveis` | 4 | `<table>` crua (4) | Não | Não | AGUARDA DECISÃO — decisão do cliente: planejamento com 9 campos de edição inline e agrupamento macro/subitens em 4 tabelas |
+| `frontend/src/modules/custosRecebiveis/components/CrPlanejamentoView.jsx` | aba de `/custos-recebiveis` | 4 | TabelaPadrao (4) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrMonthlyDetailView.jsx` | aba de `/custos-recebiveis` | 3 | TabelaPadrao (3) | Sim | Sim | OK (padrão) |
-| `frontend/src/modules/custosRecebiveis/components/CrRealizadoView.jsx` | aba de `/custos-recebiveis` | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: linha de grupo com colSpan dentro do tbody (etapa macro com contagem e total) e dois estados de vazio distintos |
+| `frontend/src/modules/custosRecebiveis/components/CrRealizadoView.jsx` | aba de `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrComparativoView.jsx` | aba de `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrImportacoesView.jsx` | aba de `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/custosRecebiveis/components/CrPlanningImportModal.jsx` | modal de importacao em `/custos-recebiveis` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
-| `frontend/src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx` | `/provisoes-financeiras` | 1 | `<table>` crua (1) | Não | Não | AGUARDA DECISÃO — decisão do cliente: ordenação por clique no cabeçalho e colunas escolhidas pelo usuário no painel "Colunas" |
+| `frontend/src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx` | `/provisoes-financeiras` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/provisionamento-financeiro/pages/GestaoCategoriasMacro.jsx` | `/provisoes-financeiras/categorias` | 1 | TabelaPadrao (1) | Sim | Sim | OK (padrão) |
 | `frontend/src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx` | `/provisoes-financeiras/relatorios/operacional` | 2 | TabelaPadrao (2) | Sim | Sim | OK (padrão) |
 | `frontend/src/components/ObraSearchModal.jsx` | sem uso encontrado | 1 | `<table>` crua (1) | Não | Não | CÓDIGO MORTO (sem uso — avaliar remoção antes de migrar) |
