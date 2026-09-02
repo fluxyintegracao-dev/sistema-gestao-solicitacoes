@@ -178,6 +178,10 @@ export function validarLayout() {
   falhas.push(...r19.falhas);
   avisos.push(...r19.avisos);
 
+  // R21 — `confirmar()` devolve OBJETO; ler como booleano nunca cancela.
+  const r21 = validarUsoDaConfirmacao();
+  falhas.push(...r21.falhas);
+
   return {
     falhas,
     avisos,
@@ -186,6 +190,57 @@ export function validarLayout() {
     dialogosDoNavegador: r19.total,
     dialogosNoTrinco: r19.noTrinco
   };
+}
+
+/**
+ * R21 — `confirmar()` do `useConfirmacao` devolve `{ ok, texto }`, e OBJETO
+ * É SEMPRE TRUTHY. Ler o retorno como booleano —
+ * `const ok = await confirmar({...}); if (!ok) return;` — faz o botão
+ * "Cancelar" SEGUIR COM A AÇÃO, calado.
+ *
+ * Aconteceu de verdade em 02/09: o hook nasceu devolvendo booleano e ganhou
+ * o `campo` (que precisa devolver o texto junto) no meio da leva. Quatro
+ * telas já escritas ficaram lendo objeto como booleano — uma delas no
+ * ESTORNO DE FECHAMENTO, que cancela títulos no financeiro. Compilava,
+ * passava no build, passava em todos os outros checks.
+ *
+ * Lição que a regra carrega: mudar o CONTRATO DE RETORNO de um componente
+ * padrão no meio de uma leva não é mudança compatível — quem já escreveu
+ * continua compilando e passa a fazer outra coisa. Ou o check nasce junto
+ * com a mudança, ou a mudança espera.
+ */
+function validarUsoDaConfirmacao() {
+  const falhas = [];
+  // `const ok = await confirmar(` / `let x = await confirmar(` — qualquer
+  // atribuição a um identificador simples. A forma correta desestrutura.
+  const padrao = /\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*await\s+confirmar\s*\(/g;
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) {
+        if (item.name === 'node_modules' || item.name === 'dist') continue;
+        varrer(caminho);
+        continue;
+      }
+      if (!/\.(jsx?|tsx?)$/.test(item.name)) continue;
+      const original = fs.readFileSync(caminho, 'utf8');
+      // Comentário não é código: a própria documentação do componente
+      // mostra a forma ERRADA para explicar por que ela é errada, e marcar
+      // isso seria ruído — e regra que vira ruído deixa de ser lida (R18).
+      // Troca por espaço preservando as quebras, para a linha não deslocar.
+      const codigo = original.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
+        (trecho) => trecho.replace(/[^\n]/g, ' '));
+      const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
+      for (const achado of codigo.matchAll(padrao)) {
+        const linha = codigo.slice(0, achado.index).split('\n').length;
+        falhas.push(`${rel}:${linha} [R21] retorno de confirmar() lido como booleano — objeto é sempre truthy, então "Cancelar" seguiria com a ação. Escreva: const { ok } = await confirmar({ ... }).`);
+      }
+    }
+  };
+  varrer(path.join(frontendRoot, 'src'));
+  return { falhas };
 }
 
 /**

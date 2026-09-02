@@ -378,6 +378,30 @@ automaticamente se sair do padrão.
   prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
   página real reprova a tela em que qualquer caixa dispara.
 
+## R21 — retorno de `confirmar()` se desestrutura (02/09)
+
+- **O problema**: `useConfirmacao().confirmar()` devolve `{ ok, texto }` — e
+  **objeto é sempre truthy**. `const ok = await confirmar({...}); if (!ok)
+  return;` compila, roda, e faz o botão **"Cancelar" seguir com a ação**.
+  Calado.
+- **A forma certa**: `const { ok } = await confirmar({ ... }); if (!ok) return;`
+  (ou `const { ok, texto } =` quando a confirmação pede justificativa).
+- **Onde vale**: todo o `frontend/src`.
+- **História, e é o motivo da regra**: o hook nasceu devolvendo booleano. No
+  meio da leva do RH/DP ele ganhou o `campo` (justificativa de estorno), que
+  precisa devolver o texto junto — então o retorno virou objeto. Quatro
+  telas JÁ ESCRITAS ficaram lendo objeto como booleano, uma delas no
+  **estorno de fechamento**, que cancela títulos no financeiro. Passou pelo
+  build e por todos os outros checks; quem achou foi um agente de outra
+  tela, lendo o código das irmãs.
+- **A lição maior**: mudar o CONTRATO DE RETORNO de um componente padrão no
+  meio de uma leva **não é mudança compatível** — quem já escreveu continua
+  compilando e passa a fazer outra coisa. Ou o check nasce junto com a
+  mudança, ou a mudança espera a leva acabar.
+- **Verificação**: `validarLayout.mjs`, provado nos dois sentidos. O check
+  ignora comentários: a própria documentação do `Confirmacao.jsx` mostra a
+  forma errada para explicar por que é errada, e marcá-la seria ruído.
+
 ## R20 — tela que sai do menu declara o redirecionamento (02/09)
 
 - **O problema**: quando uma tela sai do menu por decisão do cliente, o

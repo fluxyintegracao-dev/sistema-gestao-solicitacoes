@@ -484,7 +484,7 @@ export default function RhDpColaboradores() {
     e.target.value = '';
     if (!file) return;
 
-    const ok = await confirmar({
+    const { ok } = await confirmar({
       titulo: 'Importar colaboradores em massa',
       mensagem: `Importar colaboradores em massa usando o arquivo "${file.name}"?`,
       rotuloConfirmar: 'Importar'
@@ -603,7 +603,7 @@ export default function RhDpColaboradores() {
       return;
     }
 
-    const ok = await confirmar({
+    const { ok } = await confirmar({
       titulo: 'Substituir documento',
       mensagem: `Substituir o documento "${documento.nome_original}"? A versao atual passa para o historico.`,
       rotuloConfirmar: 'Substituir',

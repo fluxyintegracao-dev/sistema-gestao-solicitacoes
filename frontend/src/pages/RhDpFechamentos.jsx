@@ -256,7 +256,7 @@ export default function RhDpFechamentos() {
 
     const competencia = detalhe.apuracao?.competencia || 'desta competencia';
     const totalTitulos = Number(detalhe.total_titulos || 0);
-    const ok = await confirmar({
+    const { ok } = await confirmar({
       titulo: 'Estornar fechamento',
       mensagem: `Estornar o fechamento de ${competencia} (${detalhe.apuracao?.empresaGrupo?.nome || 'empresa do grupo'})? Os ${totalTitulos} titulo(s) ja gerados no financeiro sao cancelados e a apuracao volta a ficar aberta. So e permitido se nenhum desses titulos estiver baixado.`,
       rotuloConfirmar: 'Estornar',

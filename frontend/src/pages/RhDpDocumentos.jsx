@@ -167,7 +167,7 @@ export default function RhDpDocumentos() {
   async function onSelecionarSubstituicao(documento, file) {
     if (!file) return;
 
-    const ok = await confirmar({
+    const { ok } = await confirmar({
       titulo: 'Substituir documento',
       mensagem: `Substituir o documento "${documento.nome_original}"?`,
       rotuloConfirmar: 'Substituir'

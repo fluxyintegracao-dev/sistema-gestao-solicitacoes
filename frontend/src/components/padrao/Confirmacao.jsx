@@ -11,8 +11,17 @@ import OverlayModal from '../ui/OverlayModal';
  * rótulo dizendo o que vai acontecer ("Estornar fechamento", não "OK") —
  * mesma linguagem de botão do `PageHeader`.
  *
- * Devolve Promise<boolean>, então o `if (!confirm(...)) return;` vira
- * `if (!await confirmar({...})) return;` sem reescrever o fluxo.
+ * Devolve `Promise<{ ok, texto }>` — SEMPRE um objeto, nunca um booleano.
+ *
+ * ATENÇÃO, e isto já causou defeito: objeto é sempre truthy. Escrever
+ * `const ok = await confirmar({...}); if (!ok) return;` faz o "Cancelar"
+ * SEGUIR COM A AÇÃO. Tem de desestruturar:
+ *     const { ok } = await confirmar({ ... });
+ *     if (!ok) return;
+ * A primeira versão deste hook devolvia booleano; quando ganhou o `campo`
+ * (que precisa devolver o texto junto), quatro telas já escritas ficaram
+ * lendo o objeto como booleano — uma delas no estorno de fechamento, ação
+ * destrutiva. O validador passou a reprovar essa forma (R21).
  *
  * ## `campo` — a confirmação que PEDE UM TEXTO (R16b, 02/09)
  *
@@ -30,7 +39,7 @@ import OverlayModal from '../ui/OverlayModal';
  *   });
  *   if (!ok) return;
  * O retorno é sempre um objeto; para o caso sem campo, `ok` é o que
- * interessa. Compatível com `if (!(await confirmar({...})).ok) return;`.
+ * interessa.
  *
  * Uso:
  *   const { confirmar, elementoConfirmacao } = useConfirmacao();
