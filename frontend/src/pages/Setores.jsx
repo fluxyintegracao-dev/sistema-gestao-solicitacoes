@@ -7,6 +7,7 @@ import {
   desativarSetor
 } from '../services/setores';
 import {
+  Pagina,
   PageHeader,
   BlocoConteudo,
   TabelaPadrao,
@@ -125,8 +126,7 @@ export default function Setores() {
     {
       id: 'nome',
       titulo: 'Nome',
-      largura: 220,
-      minWidth: 160,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (s) => (
         editId === s.id ? (
@@ -144,7 +144,7 @@ export default function Setores() {
     {
       id: 'codigo',
       titulo: 'Codigo',
-      largura: 130,
+      tipo: 'codigo',
       render: (s) => (
         editId === s.id ? (
           <input
@@ -161,7 +161,7 @@ export default function Setores() {
     {
       id: 'capacidades',
       titulo: 'Capacidades',
-      largura: 320,
+      tipo: 'badge',
       render: (s) => (
         editId === s.id ? (
           <div className="grid gap-1 md:grid-cols-2">
@@ -190,13 +190,13 @@ export default function Setores() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (s) => <StatusBadge status={s.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Setores"
         contagem={loading ? undefined : `${setores.length} setor(es)`}
@@ -204,118 +204,117 @@ export default function Setores() {
         acaoPrincipal={{ rotulo: 'Novo setor', onClick: abrirNovoSetor }}
       />
 
-      <div className="space-y-3">
-        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
-            principal do cabeçalho; a lista é o bloco primário PERMANENTE. */}
-        {formAberto && (
-          <OverlayModal rotulo="Novo setor" onFechar={() => setFormAberto(false)}>
-            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
-              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo setor</h3>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                Fechar
-              </button>
-            </div>
-            <div className="overflow-y-auto px-4 py-3">
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <FormSecao legenda="Identificacao" colunas={2}>
-                  <CampoForm label="Nome do setor" obrigatorio>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex: Geoprocessamento"
-                      value={nome}
-                      onChange={e => setNome(e.target.value)}
-                      required
-                    />
-                  </CampoForm>
-                  <CampoForm label="Codigo" obrigatorio>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex: GEO"
-                      value={codigo}
-                      onChange={e => setCodigo(e.target.value.toUpperCase())}
-                      required
-                    />
-                  </CampoForm>
-                  <div className="form-campo--linha">
-                    <span className="form-label">Capacidades do setor</span>
-                    <div className="mt-1 grid gap-2 md:grid-cols-3">
-                      {CAPABILITY_FIELDS.map(field => (
-                        <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={Boolean(capabilities[field.key])}
-                            onChange={e => setCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                          />
-                          <span>{field.label}</span>
-                        </label>
-                      ))}
-                    </div>
+      {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+          principal do cabeçalho; a lista é o bloco primário PERMANENTE.
+          O ritmo vertical vem do Pagina. */}
+      {formAberto && (
+        <OverlayModal rotulo="Novo setor" onFechar={() => setFormAberto(false)}>
+          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Novo setor</h3>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+              Fechar
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3">
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <FormSecao legenda="Identificacao" colunas={2}>
+                <CampoForm label="Nome do setor" obrigatorio>
+                  <input
+                    className="input w-full"
+                    placeholder="Ex: Geoprocessamento"
+                    value={nome}
+                    onChange={e => setNome(e.target.value)}
+                    required
+                  />
+                </CampoForm>
+                <CampoForm label="Codigo" obrigatorio>
+                  <input
+                    className="input w-full"
+                    placeholder="Ex: GEO"
+                    value={codigo}
+                    onChange={e => setCodigo(e.target.value.toUpperCase())}
+                    required
+                  />
+                </CampoForm>
+                <div className="form-campo--linha">
+                  <span className="form-label">Capacidades do setor</span>
+                  <div className="mt-1 grid gap-2 md:grid-cols-3">
+                    {CAPABILITY_FIELDS.map(field => (
+                      <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(capabilities[field.key])}
+                          onChange={e => setCapabilities(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                        />
+                        <span>{field.label}</span>
+                      </label>
+                    ))}
                   </div>
-                </FormSecao>
-
-                <div className="app-actionbar">
-                  <button type="submit" className="btn btn-primary">
-                    Adicionar setor
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
-                    Cancelar
-                  </button>
                 </div>
-              </form>
-            </div>
-          </OverlayModal>
-        )}
+              </FormSecao>
 
-        <BlocoConteudo
-          titulo="Setores cadastrados"
-          variante="primario"
-          cor="var(--c-primary)"
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={setores}
-            carregando={loading}
-            storageKey="tabela:setores"
-            larguraAcoes={230}
-            aoClicarLinha={(s) => {
-              // Clique na linha abre a edição inline; com uma edição ativa
-              // o clique não faz nada (evita perder o que foi digitado).
-              if (editId === null) iniciarEdicao(s);
-            }}
-            vazio={{
-              title: 'Nenhum setor cadastrado',
-              message: 'Use "Novo setor" para criar o primeiro registro.'
-            }}
-            acoesLinha={(s) => (
-              editId === s.id ? (
-                <>
-                  <button className="btn btn-primary btn-sm" onClick={() => salvarEdicao(s.id)} disabled={saving}>
-                    {saving ? 'Salvando...' : 'Salvar'}
+              <div className="app-actionbar">
+                <button type="submit" className="btn btn-primary">
+                  Adicionar setor
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </OverlayModal>
+      )}
+
+      <BlocoConteudo
+        titulo="Setores cadastrados"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={setores}
+          carregando={loading}
+          storageKey="tabela:setores"
+          larguraAcoes={230}
+          aoClicarLinha={(s) => {
+            // Clique na linha abre a edição inline; com uma edição ativa
+            // o clique não faz nada (evita perder o que foi digitado).
+            if (editId === null) iniciarEdicao(s);
+          }}
+          vazio={{
+            title: 'Nenhum setor cadastrado',
+            message: 'Use "Novo setor" para criar o primeiro registro.'
+          }}
+          acoesLinha={(s) => (
+            editId === s.id ? (
+              <>
+                <button className="btn btn-primary btn-sm" onClick={() => salvarEdicao(s.id)} disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </button>
+                <button className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(s)}>
+                  Editar
+                </button>
+                {s.ativo ? (
+                  <button className="btn btn-outline btn-sm btn-perigo-suave" onClick={async () => { await desativarSetor(s.id); carregarSetores(); }}>
+                    Desativar
                   </button>
-                  <button className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
-                    Cancelar
+                ) : (
+                  <button className="btn btn-outline btn-sm" onClick={async () => { await ativarSetor(s.id); carregarSetores(); }}>
+                    Ativar
                   </button>
-                </>
-              ) : (
-                <>
-                  <button className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(s)}>
-                    Editar
-                  </button>
-                  {s.ativo ? (
-                    <button className="btn btn-outline btn-sm btn-perigo-suave" onClick={async () => { await desativarSetor(s.id); carregarSetores(); }}>
-                      Desativar
-                    </button>
-                  ) : (
-                    <button className="btn btn-outline btn-sm" onClick={async () => { await ativarSetor(s.id); carregarSetores(); }}>
-                      Ativar
-                    </button>
-                  )}
-                </>
-              )
-            )}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+                )}
+              </>
+            )
+          )}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

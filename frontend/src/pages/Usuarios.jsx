@@ -9,7 +9,7 @@ import {
   enviarConviteUsuario,
   forcarResetSenhaUsuarios
 } from '../services/usuarios';
-import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import { useAuth } from '../contexts/AuthContext';
 import { isSuperadmin } from '../utils/acessoProduto';
@@ -156,21 +156,20 @@ export default function Usuarios() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      largura: 260,
-      minWidth: 180,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (u) => <CelulaDupla principal={u.nome} sub={u.email} />
     },
     {
       id: 'setor',
       titulo: 'Setor',
-      largura: 150,
+      tipo: 'texto',
       render: (u) => u.setor?.nome || '-'
     },
     {
       id: 'obras',
       titulo: 'Obras',
-      largura: 240,
+      tipo: 'texto',
       render: (u) => {
         const obras = resumirObras(u.vinculos);
         return <span title={obras.completo}>{obras.texto}</span>;
@@ -179,13 +178,13 @@ export default function Usuarios() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (u) => <StatusBadge status={u.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Usuarios"
         contagem={loading ? null : `${usuarios.length} usuario(s)`}
@@ -216,57 +215,55 @@ export default function Usuarios() {
         disabled={importando}
       />
 
-      <div className="space-y-3">
-        <BlocoConteudo
-          titulo="Modelo de importacao CSV"
-          variante="secundario"
-          recolhivel
-          recolhidoPadrao
-        >
-          <p className="app-note">
-            Colunas: Nome, Email, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>), Senha e Enviar convite. Perfis aceitos: <code>USUARIO</code>, <code>ESTAGIARIO</code>, <code>ADMIN</code>, <code>ADMINISTRADOR</code> e <code>SUPERADMIN</code>. Com convite marcado, a senha pode ficar vazia e o usuario define a propria senha pelo link seguro.
-          </p>
-        </BlocoConteudo>
+      <BlocoConteudo
+        titulo="Modelo de importacao CSV"
+        variante="secundario"
+        recolhivel
+        recolhidoPadrao
+      >
+        <p className="app-note">
+          Colunas: Nome, Email, Setor, Perfil, Obras (separar por <code>|</code> ou <code>,</code>), Senha e Enviar convite. Perfis aceitos: <code>USUARIO</code>, <code>ESTAGIARIO</code>, <code>ADMIN</code>, <code>ADMINISTRADOR</code> e <code>SUPERADMIN</code>. Com convite marcado, a senha pode ficar vazia e o usuario define a propria senha pelo link seguro.
+        </p>
+      </BlocoConteudo>
 
-        <BlocoConteudo variante="primario" cor="var(--c-primary)">
-          <TabelaPadrao
-            colunas={colunas}
-            itens={usuarios}
-            carregando={loading}
-            storageKey="tabela:usuarios"
-            larguraAcoes={320}
-            aoClicarLinha={(u) => navigate(`/usuarios/${u.id}`)}
-            vazio={{
-              title: 'Nenhum usuario cadastrado',
-              message: 'Quando novos acessos forem criados ou importados, eles aparecem aqui.'
-            }}
-            acoesLinha={(u) => (
-              <>
-                <button
-                  className="btn btn-outline btn-sm"
-                  onClick={() => enviarConvite(u)}
-                  title="Enviar link para definir ou redefinir senha"
-                >
-                  <HiEnvelope className="w-4 h-4" />
-                  Convite
+      <BlocoConteudo variante="primario" cor="var(--c-primary)">
+        <TabelaPadrao
+          colunas={colunas}
+          itens={usuarios}
+          carregando={loading}
+          storageKey="tabela:usuarios"
+          larguraAcoes={320}
+          aoClicarLinha={(u) => navigate(`/usuarios/${u.id}`)}
+          vazio={{
+            title: 'Nenhum usuario cadastrado',
+            message: 'Quando novos acessos forem criados ou importados, eles aparecem aqui.'
+          }}
+          acoesLinha={(u) => (
+            <>
+              <button
+                className="btn btn-outline btn-sm"
+                onClick={() => enviarConvite(u)}
+                title="Enviar link para definir ou redefinir senha"
+              >
+                <HiEnvelope className="w-4 h-4" />
+                Convite
+              </button>
+              <button className="btn btn-outline btn-sm" onClick={() => navigate(`/usuarios/${u.id}`)}>
+                Editar
+              </button>
+              {u.ativo ? (
+                <button className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggleAtivo(u)}>
+                  Desativar
                 </button>
-                <button className="btn btn-outline btn-sm" onClick={() => navigate(`/usuarios/${u.id}`)}>
-                  Editar
+              ) : (
+                <button className="btn btn-outline btn-sm" onClick={() => toggleAtivo(u)}>
+                  Ativar
                 </button>
-                {u.ativo ? (
-                  <button className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggleAtivo(u)}>
-                    Desativar
-                  </button>
-                ) : (
-                  <button className="btn btn-outline btn-sm" onClick={() => toggleAtivo(u)}>
-                    Ativar
-                  </button>
-                )}
-              </>
-            )}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+              )}
+            </>
+          )}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

@@ -14,6 +14,7 @@ import {
 } from '../services/configuracoesSistema';
 import { getDefaultTipoSolicitacaoBehavior, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
 import {
+  Pagina,
   PageHeader,
   BlocoConteudo,
   TabelaPadrao,
@@ -237,8 +238,7 @@ export default function TiposSolicitacao() {
     {
       id: 'nome',
       titulo: 'Nome',
-      largura: 210,
-      minWidth: 160,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (
@@ -256,7 +256,9 @@ export default function TiposSolicitacao() {
     {
       id: 'codigo_interno',
       titulo: 'Codigo interno',
-      largura: 180,
+      // Codigo interno é longo (ex: SOLICITACAO_DE_COMPRA) — não cabe nos
+      // 130px do tipo 'codigo'; 'texto' dá a medida de leitura.
+      tipo: 'texto',
       render: (t) => (
         editId === t.id ? (
           <input
@@ -273,7 +275,7 @@ export default function TiposSolicitacao() {
     {
       id: 'regras',
       titulo: 'Regras',
-      largura: 330,
+      tipo: 'badge',
       render: (t) => (
         editId === t.id ? (
           <div className="grid gap-1 md:grid-cols-2">
@@ -302,169 +304,168 @@ export default function TiposSolicitacao() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (t) => <StatusBadge status={t.ativo ? 'Ativo' : 'Inativo'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Tipos (Macro)"
         subtitulo="Cadastro dos tipos macro utilizados nas solicitacoes."
         acaoPrincipal={{ rotulo: 'Novo tipo', onClick: abrirNovoTipo }}
       />
 
-      <div className="space-y-3">
-        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
-            principal do cabeçalho; a lista é o bloco primário PERMANENTE. */}
-        {formAberto && (
-          <OverlayModal rotulo="Novo tipo" onFechar={() => setFormAberto(false)}>
-            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
-              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo tipo</h3>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                Fechar
-              </button>
-            </div>
-            <div className="overflow-y-auto px-4 py-3">
-              <form className="space-y-4" onSubmit={handleSubmit}>
-                <FormSecao legenda="Identificacao" colunas={2}>
-                  <CampoForm label="Nome do tipo" obrigatorio>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex: Adm. Local"
-                      value={nome}
-                      onChange={e => setNome(e.target.value)}
-                      required
-                    />
-                  </CampoForm>
-                  <CampoForm
-                    label="Codigo interno"
-                    hint="Opcional; usado por integracoes e regras internas."
-                  >
-                    <input
-                      className="input w-full"
-                      placeholder="Ex: SOLICITACAO_DE_COMPRA"
-                      value={codigoInterno}
-                      onChange={e => setCodigoInterno(e.target.value.toUpperCase())}
-                    />
-                  </CampoForm>
-                </FormSecao>
-
-                <BlocoConteudo
-                  titulo="Comportamento do tipo"
-                  variante="secundario"
-                  recolhivel
-                  recolhidoPadrao
+      {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+          principal do cabeçalho; a lista é o bloco primário PERMANENTE.
+          O ritmo vertical vem do Pagina. */}
+      {formAberto && (
+        <OverlayModal rotulo="Novo tipo" onFechar={() => setFormAberto(false)}>
+          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Novo tipo</h3>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+              Fechar
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3">
+            <form className="space-y-4" onSubmit={handleSubmit}>
+              <FormSecao legenda="Identificacao" colunas={2}>
+                <CampoForm label="Nome do tipo" obrigatorio>
+                  <input
+                    className="input w-full"
+                    placeholder="Ex: Adm. Local"
+                    value={nome}
+                    onChange={e => setNome(e.target.value)}
+                    required
+                  />
+                </CampoForm>
+                <CampoForm
+                  label="Codigo interno"
+                  hint="Opcional; usado por integracoes e regras internas."
                 >
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-                    {BEHAVIOR_FIELDS.map(field => (
-                      <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(comportamento[field.key])}
-                          onChange={e => setComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
-                        />
-                        <span>{field.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </BlocoConteudo>
+                  <input
+                    className="input w-full"
+                    placeholder="Ex: SOLICITACAO_DE_COMPRA"
+                    value={codigoInterno}
+                    onChange={e => setCodigoInterno(e.target.value.toUpperCase())}
+                  />
+                </CampoForm>
+              </FormSecao>
 
-                <p className="app-note">
-                  O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado na lista abaixo.
-                </p>
-
-                <div className="app-actionbar">
-                  <button type="submit" className="btn btn-primary">
-                    Adicionar
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </OverlayModal>
-        )}
-
-        <BlocoConteudo
-          titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <label className="app-busca flex items-center gap-2 text-sm font-normal">
-              <span className="text-[var(--c-muted)]">Setor</span>
-              <select
-                className="input input-sm flex-1"
-                value={setorSelecionado}
-                onChange={e => setSetorSelecionado(e.target.value)}
-                aria-label="Setor dos tipos listados e do vinculo de novos tipos"
+              <BlocoConteudo
+                titulo="Comportamento do tipo"
+                variante="secundario"
+                recolhivel
+                recolhidoPadrao
               >
-                <option value="">Selecione</option>
-                {setores.map(s => (
-                  <option key={s.id} value={setorKey(s)}>
-                    {s.nome || s.codigo}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  {BEHAVIOR_FIELDS.map(field => (
+                    <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(comportamento[field.key])}
+                        onChange={e => setComportamento(prev => ({ ...prev, [field.key]: e.target.checked }))}
+                      />
+                      <span>{field.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </BlocoConteudo>
+
+              <p className="app-note">
+                O tipo é criado no cadastro geral e automaticamente vinculado ao setor selecionado na lista abaixo.
+              </p>
+
+              <div className="app-actionbar">
+                <button type="submit" className="btn btn-primary">
+                  Adicionar
+                </button>
+                <button type="button" className="btn btn-outline" onClick={() => setFormAberto(false)}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </OverlayModal>
+      )}
+
+      <BlocoConteudo
+        titulo={setorAtual ? `Tipos do setor ${setorAtual.nome || setorAtual.codigo}` : 'Tipos'}
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <label className="app-busca flex items-center gap-2 text-sm font-normal">
+            <span className="text-[var(--c-muted)]">Setor</span>
+            <select
+              className="input input-sm flex-1"
+              value={setorSelecionado}
+              onChange={e => setSetorSelecionado(e.target.value)}
+              aria-label="Setor dos tipos listados e do vinculo de novos tipos"
+            >
+              <option value="">Selecione</option>
+              {setores.map(s => (
+                <option key={s.id} value={setorKey(s)}>
+                  {s.nome || s.codigo}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={tiposFiltrados}
+          storageKey="tabela:tipos-solicitacao"
+          larguraAcoes={320}
+          aoClicarLinha={(t) => {
+            // Clique na linha abre a edição inline; com uma edição ativa
+            // o clique não faz nada (evita perder o que foi digitado).
+            if (editId === null) iniciarEdicao(t);
+          }}
+          vazio={{
+            title: 'Nenhum tipo cadastrado',
+            message: 'Use "Novo tipo" para criar o primeiro registro deste setor.'
+          }}
+          acoesLinha={(t) => (
+            editId === t.id ? (
+              <>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
+                  Editar
+                </button>
+                {t.ativo ? (
+                  <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggle(t)}>
+                    Desativar
+                  </button>
+                ) : (
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
+                    Ativar
+                  </button>
+                )}
+                <span className="app-actionbar-apartada">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm btn-perigo-suave"
+                    onClick={() => excluir(t)}
+                    title="Excluir definitivamente este tipo"
+                  >
+                    Excluir
+                  </button>
+                </span>
+              </>
+            )
           )}
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={tiposFiltrados}
-            storageKey="tabela:tipos-solicitacao"
-            larguraAcoes={320}
-            aoClicarLinha={(t) => {
-              // Clique na linha abre a edição inline; com uma edição ativa
-              // o clique não faz nada (evita perder o que foi digitado).
-              if (editId === null) iniciarEdicao(t);
-            }}
-            vazio={{
-              title: 'Nenhum tipo cadastrado',
-              message: 'Use "Novo tipo" para criar o primeiro registro deste setor.'
-            }}
-            acoesLinha={(t) => (
-              editId === t.id ? (
-                <>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
-                    {saving ? 'Salvando...' : 'Salvar'}
-                  </button>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
-                    Cancelar
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
-                    Editar
-                  </button>
-                  {t.ativo ? (
-                    <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggle(t)}>
-                      Desativar
-                    </button>
-                  ) : (
-                    <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
-                      Ativar
-                    </button>
-                  )}
-                  <span className="app-actionbar-apartada">
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm btn-perigo-suave"
-                      onClick={() => excluir(t)}
-                      title="Excluir definitivamente este tipo"
-                    >
-                      Excluir
-                    </button>
-                  </span>
-                </>
-              )
-            )}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

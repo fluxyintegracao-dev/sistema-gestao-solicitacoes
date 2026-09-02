@@ -6,6 +6,7 @@ import {
   listarCategoriasParceiro
 } from '../services/parceiros';
 import {
+  Pagina,
   PageHeader,
   BlocoConteudo,
   TabelaPadrao,
@@ -129,8 +130,7 @@ export default function ParceiroCategorias() {
     {
       id: 'nome',
       titulo: 'Categoria',
-      largura: 320,
-      minWidth: 180,
+      tipo: 'texto',
       noCard: 'titulo',
       // O "ID {id}" saiu da vista (aparecia sob o nome); o dado continua
       // disponível no title (tooltip) da célula.
@@ -139,13 +139,13 @@ export default function ParceiroCategorias() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (categoria) => <StatusBadge status={categoria.ativo ? 'Ativa' : 'Inativa'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Categorias de Parceiro"
         subtitulo="Use categorias para agrupar fornecedores e facilitar o envio de cotacoes."
@@ -158,112 +158,110 @@ export default function ParceiroCategorias() {
         </div>
       )}
 
-      <div className="space-y-3">
-        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
-            principal do cabeçalho (e pela edição na linha); a lista é o
-            bloco primário PERMANENTE. */}
-        {formAberto && (
-          <OverlayModal
-            key={categoriaForm.id || 'nova'}
-            rotulo={categoriaForm.id ? 'Editar categoria' : 'Nova categoria'}
-            onFechar={fecharForm}
-          >
-            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
-              <h3 className="text-base font-semibold text-[var(--c-text)]">
-                {categoriaForm.id ? `Editar categoria — ${categoriaForm.nome || ''}` : 'Nova categoria'}
-              </h3>
-              <button type="button" className="btn btn-outline btn-sm" onClick={fecharForm}>
-                Fechar
-              </button>
-            </div>
-            <div className="overflow-y-auto px-4 py-3">
-              <form className="space-y-4" onSubmit={handleSalvarCategoria}>
-                <FormSecao legenda="Identificacao" colunas={2}>
-                  <CampoForm label="Nome da categoria" obrigatorio>
-                    <input
-                      className="input w-full"
-                      placeholder="Ex: Material eletrico"
-                      value={categoriaForm.nome}
-                      onChange={(e) => setCategoriaForm((c) => ({ ...c, nome: e.target.value }))}
-                      required
-                    />
-                  </CampoForm>
-                  <CampoForm label="Situacao">
-                    <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={categoriaForm.ativo}
-                        onChange={(e) => setCategoriaForm((c) => ({ ...c, ativo: e.target.checked }))}
-                      />
-                      Categoria ativa
-                    </label>
-                  </CampoForm>
-                </FormSecao>
-
-                <div className="app-actionbar">
-                  <button type="submit" className="btn btn-primary" disabled={saving}>
-                    {saving ? 'Salvando...' : (categoriaForm.id ? 'Salvar alteracoes' : 'Criar categoria')}
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={fecharForm}>
-                    Cancelar
-                  </button>
-                </div>
-              </form>
-            </div>
-          </OverlayModal>
-        )}
-
-        <BlocoConteudo
-          titulo="Categorias cadastradas"
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <input
-              className="input input-sm app-busca"
-              placeholder="Buscar categoria"
-              value={filtro}
-              onChange={(e) => setFiltro(e.target.value)}
-            />
-          )}
+      {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+          principal do cabeçalho (e pela edição na linha); a lista é o
+          bloco primário PERMANENTE. O ritmo vertical vem do Pagina. */}
+      {formAberto && (
+        <OverlayModal
+          key={categoriaForm.id || 'nova'}
+          rotulo={categoriaForm.id ? 'Editar categoria' : 'Nova categoria'}
+          onFechar={fecharForm}
         >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={categoriasFiltradas}
-            carregando={loading}
-            storageKey="tabela:parceiro-categorias"
-            larguraAcoes={210}
-            aoClicarLinha={abrirEdicao}
-            vazio={{
-              title: filtro ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada',
-              message: filtro
-                ? 'Ajuste a busca para ver outras categorias.'
-                : 'Use "Nova categoria" para criar a primeira.'
-            }}
-            acoesLinha={(categoria) => (
-              <>
-                <button
-                  type="button"
-                  className="btn btn-outline btn-sm"
-                  onClick={() => abrirEdicao(categoria)}
-                >
-                  Editar
+          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">
+              {categoriaForm.id ? `Editar categoria — ${categoriaForm.nome || ''}` : 'Nova categoria'}
+            </h3>
+            <button type="button" className="btn btn-outline btn-sm" onClick={fecharForm}>
+              Fechar
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3">
+            <form className="space-y-4" onSubmit={handleSalvarCategoria}>
+              <FormSecao legenda="Identificacao" colunas={2}>
+                <CampoForm label="Nome da categoria" obrigatorio>
+                  <input
+                    className="input w-full"
+                    placeholder="Ex: Material eletrico"
+                    value={categoriaForm.nome}
+                    onChange={(e) => setCategoriaForm((c) => ({ ...c, nome: e.target.value }))}
+                    required
+                  />
+                </CampoForm>
+                <CampoForm label="Situacao">
+                  <label className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={categoriaForm.ativo}
+                      onChange={(e) => setCategoriaForm((c) => ({ ...c, ativo: e.target.checked }))}
+                    />
+                    Categoria ativa
+                  </label>
+                </CampoForm>
+              </FormSecao>
+
+              <div className="app-actionbar">
+                <button type="submit" className="btn btn-primary" disabled={saving}>
+                  {saving ? 'Salvando...' : (categoriaForm.id ? 'Salvar alteracoes' : 'Criar categoria')}
                 </button>
-                {categoria.ativo && (
-                  <span className="app-actionbar-apartada">
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm btn-perigo-suave"
-                      onClick={() => handleDesativar(categoria)}
-                    >
-                      Desativar
-                    </button>
-                  </span>
-                )}
-              </>
-            )}
+                <button type="button" className="btn btn-outline" onClick={fecharForm}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </OverlayModal>
+      )}
+
+      <BlocoConteudo
+        titulo="Categorias cadastradas"
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <input
+            className="input input-sm app-busca"
+            placeholder="Buscar categoria"
+            value={filtro}
+            onChange={(e) => setFiltro(e.target.value)}
           />
-        </BlocoConteudo>
-      </div>
-    </div>
+        )}
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={categoriasFiltradas}
+          carregando={loading}
+          storageKey="tabela:parceiro-categorias"
+          larguraAcoes={210}
+          aoClicarLinha={abrirEdicao}
+          vazio={{
+            title: filtro ? 'Nenhuma categoria encontrada' : 'Nenhuma categoria cadastrada',
+            message: filtro
+              ? 'Ajuste a busca para ver outras categorias.'
+              : 'Use "Nova categoria" para criar a primeira.'
+          }}
+          acoesLinha={(categoria) => (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => abrirEdicao(categoria)}
+              >
+                Editar
+              </button>
+              {categoria.ativo && (
+                <span className="app-actionbar-apartada">
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm btn-perigo-suave"
+                    onClick={() => handleDesativar(categoria)}
+                  >
+                    Desativar
+                  </button>
+                </span>
+              )}
+            </>
+          )}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

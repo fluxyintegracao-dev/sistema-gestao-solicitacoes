@@ -11,6 +11,7 @@ import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
 import { getTiposSolicitacaoPorSetor } from '../services/configuracoesSistema';
 import {
+  Pagina,
   PageHeader,
   BlocoConteudo,
   TabelaPadrao,
@@ -239,8 +240,7 @@ export default function TiposSubContrato() {
     {
       id: 'subtipo',
       titulo: 'Subtipo',
-      largura: 200,
-      minWidth: 160,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (t) => (
         editId === t.id ? (
@@ -258,7 +258,7 @@ export default function TiposSubContrato() {
     {
       id: 'tipo_macro',
       titulo: 'Tipo macro',
-      largura: 280,
+      tipo: 'texto',
       render: (t) => (
         editId === t.id ? (
           <select
@@ -285,7 +285,7 @@ export default function TiposSubContrato() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (t) => {
         const macro = macroDoSubtipo(t);
         const statusTipo = macro?.ativo === false ? 'inativo' : 'ativo';
@@ -301,143 +301,141 @@ export default function TiposSubContrato() {
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Subtipos"
         subtitulo="Cadastro dos subtipos vinculados ao tipo e ao contexto operacional do setor."
         acaoPrincipal={{ rotulo: 'Novo subtipo', onClick: abrirNovoSubtipo }}
       />
 
-      <div className="space-y-3">
-        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
-            principal do cabeçalho; a lista é o bloco primário PERMANENTE.
-            O seletor de Setor ficou junto da lista porque também é o recorte
-            dela (mesmo estado de sempre). */}
-        {formAberto && (
-          <OverlayModal rotulo="Novo subtipo" onFechar={() => setFormAberto(false)}>
-            <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
-              <h3 className="text-base font-semibold text-[var(--c-text)]">Novo subtipo</h3>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
-                Fechar
-              </button>
-            </div>
-            <div className="overflow-y-auto px-4 py-3">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <FormSecao legenda="Dados do subtipo" colunas={3}>
-                  <CampoForm
-                    label="Tipo macro"
-                    obrigatorio
-                    hint="Opções limitadas ao setor selecionado no recorte da lista."
+      {/* R9 (docs/REGRAS-LAYOUT.md): cadastro raro abre em MODAL pela ação
+          principal do cabeçalho; a lista é o bloco primário PERMANENTE.
+          O seletor de Setor ficou junto da lista porque também é o recorte
+          dela (mesmo estado de sempre). O ritmo vertical vem do Pagina. */}
+      {formAberto && (
+        <OverlayModal rotulo="Novo subtipo" onFechar={() => setFormAberto(false)}>
+          <div className="flex items-center justify-between border-b border-[var(--c-border)] px-4 py-3">
+            <h3 className="text-lg font-semibold text-[var(--c-text)]">Novo subtipo</h3>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setFormAberto(false)}>
+              Fechar
+            </button>
+          </div>
+          <div className="overflow-y-auto px-4 py-3">
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <FormSecao legenda="Dados do subtipo" colunas={3}>
+                <CampoForm
+                  label="Tipo macro"
+                  obrigatorio
+                  hint="Opções limitadas ao setor selecionado no recorte da lista."
+                >
+                  <select
+                    className="input w-full"
+                    value={tipoMacroId}
+                    onChange={e => setTipoMacroId(e.target.value)}
+                    required
                   >
-                    <select
-                      className="input w-full"
-                      value={tipoMacroId}
-                      onChange={e => setTipoMacroId(e.target.value)}
-                      required
-                    >
-                      <option value="">Selecione</option>
-                      {macrosDoSetor.map(m => (
-                        <option key={m.id} value={m.id}>
-                          {macroLabel(m)}
-                        </option>
-                      ))}
-                    </select>
-                  </CampoForm>
+                    <option value="">Selecione</option>
+                    {macrosDoSetor.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {macroLabel(m)}
+                      </option>
+                    ))}
+                  </select>
+                </CampoForm>
 
-                  <CampoForm label="Nome do subtipo" obrigatorio hint="Ex: Combustivel">
-                    <input
-                      className="input w-full"
-                      value={nome}
-                      onChange={e => setNome(e.target.value)}
-                      required
-                    />
-                  </CampoForm>
+                <CampoForm label="Nome do subtipo" obrigatorio hint="Ex: Combustivel">
+                  <input
+                    className="input w-full"
+                    value={nome}
+                    onChange={e => setNome(e.target.value)}
+                    required
+                  />
+                </CampoForm>
 
-                  <div className="flex items-end">
-                    <button type="submit" className="btn btn-primary">
-                      Adicionar
-                    </button>
-                  </div>
-                </FormSecao>
+                <div className="flex items-end">
+                  <button type="submit" className="btn btn-primary">
+                    Adicionar
+                  </button>
+                </div>
+              </FormSecao>
 
-                <p className="app-note">
-                  O subtipo continua vinculado ao ID do tipo. O setor serve para evitar escolher um tipo duplicado por engano.
-                </p>
-              </form>
-            </div>
-          </OverlayModal>
+              <p className="app-note">
+                O subtipo continua vinculado ao ID do tipo. O setor serve para evitar escolher um tipo duplicado por engano.
+              </p>
+            </form>
+          </div>
+        </OverlayModal>
+      )}
+
+      <BlocoConteudo
+        titulo="Subtipos cadastrados"
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <>
+            <select
+              className="input input-sm app-busca"
+              aria-label="Setor"
+              value={setorSelecionado}
+              onChange={e => {
+                setSetorSelecionado(e.target.value);
+                setTipoMacroId('');
+                cancelarEdicao();
+              }}
+            >
+              <option value="">Selecione o setor</option>
+              {setores.map(setor => (
+                <option key={setor.id} value={setorKey(setor)}>
+                  {setorLabel(setor)}
+                </option>
+              ))}
+            </select>
+            <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--c-muted)' }}>
+              <input
+                type="checkbox"
+                checked={mostrarTiposInativos}
+                onChange={event => setMostrarTiposInativos(event.target.checked)}
+              />
+              Mostrar tipos inativos
+            </label>
+          </>
         )}
-
-        <BlocoConteudo
-          titulo="Subtipos cadastrados"
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <>
-              <select
-                className="input input-sm app-busca"
-                aria-label="Setor"
-                value={setorSelecionado}
-                onChange={e => {
-                  setSetorSelecionado(e.target.value);
-                  setTipoMacroId('');
-                  cancelarEdicao();
-                }}
-              >
-                <option value="">Selecione o setor</option>
-                {setores.map(setor => (
-                  <option key={setor.id} value={setorKey(setor)}>
-                    {setorLabel(setor)}
-                  </option>
-                ))}
-              </select>
-              <label className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--c-muted)' }}>
-                <input
-                  type="checkbox"
-                  checked={mostrarTiposInativos}
-                  onChange={event => setMostrarTiposInativos(event.target.checked)}
-                />
-                Mostrar tipos inativos
-              </label>
-            </>
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={tiposFiltrados}
+          storageKey="tabela:tipos-subcontrato"
+          larguraAcoes={260}
+          aoClicarLinha={(t) => {
+            if (editId !== t.id) iniciarEdicao(t);
+          }}
+          vazio={{ title: 'Nenhum subtipo cadastrado para este recorte' }}
+          acoesLinha={(t) => (
+            editId === t.id ? (
+              <>
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
+                  Editar
+                </button>
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
+                  {t.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+                <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => excluir(t)}>
+                  Excluir
+                </button>
+              </>
+            )
           )}
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={tiposFiltrados}
-            storageKey="tabela:tipos-subcontrato"
-            larguraAcoes={260}
-            aoClicarLinha={(t) => {
-              if (editId !== t.id) iniciarEdicao(t);
-            }}
-            vazio={{ title: 'Nenhum subtipo cadastrado para este recorte' }}
-            acoesLinha={(t) => (
-              editId === t.id ? (
-                <>
-                  <button type="button" className="btn btn-primary btn-sm" onClick={() => salvarEdicao(t.id)} disabled={saving}>
-                    {saving ? 'Salvando...' : 'Salvar'}
-                  </button>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={cancelarEdicao} disabled={saving}>
-                    Cancelar
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => iniciarEdicao(t)}>
-                    Editar
-                  </button>
-                  <button type="button" className="btn btn-outline btn-sm" onClick={() => toggle(t)}>
-                    {t.ativo ? 'Desativar' : 'Ativar'}
-                  </button>
-                  <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => excluir(t)}>
-                    Excluir
-                  </button>
-                </>
-              )
-            )}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

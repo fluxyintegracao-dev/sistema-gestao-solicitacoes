@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { atualizarEmpresaGrupo, criarEmpresaGrupo, getEmpresasGrupo } from '../services/empresasGrupo';
 import {
+  Pagina,
   PageHeader,
   BlocoConteudo,
   TabelaPadrao,
@@ -153,8 +154,7 @@ export default function EmpresasGrupo() {
     {
       id: 'empresa',
       titulo: 'Empresa',
-      largura: 210,
-      minWidth: 160,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (item) => (
         <CelulaDupla principal={item.nome} sub={item.codigo ? `Cód. ${item.codigo}` : null} />
@@ -163,7 +163,8 @@ export default function EmpresasGrupo() {
     {
       id: 'razao_cnpj',
       titulo: 'Razão social / CNPJ',
-      largura: 230,
+      // CNPJ formatado (18 chars) não cabe nos 130px do tipo 'codigo'.
+      tipo: 'texto',
       render: (item) => (
         <CelulaDupla
           principal={item.razao_social || '-'}
@@ -174,7 +175,7 @@ export default function EmpresasGrupo() {
     {
       id: 'classificacao',
       titulo: 'Classificação',
-      largura: 180,
+      tipo: 'texto',
       render: (item) => (
         <CelulaDupla
           principal={String(item.tipo_empresa || 'OPERACIONAL') === 'HOLDING' ? 'Holding' : 'Empresa operacional'}
@@ -185,7 +186,7 @@ export default function EmpresasGrupo() {
     {
       id: 'grupo',
       titulo: 'Holding / consolidação',
-      largura: 200,
+      tipo: 'texto',
       render: (item) => (
         <CelulaDupla
           principal={item.holding_id
@@ -198,13 +199,13 @@ export default function EmpresasGrupo() {
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (item) => <StatusBadge status={item.ativo ? 'Ativa' : 'Inativa'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Empresas do Grupo"
         subtitulo="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
@@ -214,215 +215,213 @@ export default function EmpresasGrupo() {
         ]}
       />
 
-      <div className="space-y-3">
-        {/* R9 (docs/REGRAS-LAYOUT.md): cadastro de uso esporádico abre em
-            MODAL — a tela inteira fica com a listagem. Mesmos handlers,
-            mesmo payload: só a moldura mudou. */}
-        {formAtivo && (
-          <OverlayModal
-            aberto
-            rotulo={form.id ? 'Editar empresa do grupo' : 'Nova empresa do grupo'}
-            onFechar={limparFormulario}
-          >
-            <div key={form.id || 'nova'}>
-            <BlocoConteudo
-              titulo={form.id ? `Editar empresa — ${form.nome || ''}` : 'Nova empresa do grupo'}
-              acoes={(
-                <button type="button" className="btn btn-outline btn-sm" onClick={limparFormulario}>
-                  Fechar
-                </button>
-              )}
-            >
-              <form className="space-y-4" onSubmit={salvar}>
-                <p className="app-note">
-                  Essas empresas passam a ser a autoridade central para contas, caixa, pagamentos e RH/DP.
-                </p>
-
-                <FormSecao legenda="Identificação" colunas={2}>
-                  <CampoForm label="Nome" obrigatorio span={2}>
-                    <input
-                      className="input w-full"
-                      value={form.nome}
-                      onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
-                      required
-                    />
-                  </CampoForm>
-                  <CampoForm label="Razão social" span={2}>
-                    <input
-                      className="input w-full"
-                      value={form.razao_social}
-                      onChange={(event) => setForm((prev) => ({ ...prev, razao_social: event.target.value }))}
-                    />
-                  </CampoForm>
-                  <CampoForm label="Código">
-                    <input
-                      className="input w-full"
-                      value={form.codigo}
-                      onChange={(event) => setForm((prev) => ({ ...prev, codigo: event.target.value }))}
-                    />
-                  </CampoForm>
-                  <CampoForm label="CNPJ">
-                    <input
-                      className="input w-full"
-                      value={form.cnpj}
-                      onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))}
-                    />
-                  </CampoForm>
-                </FormSecao>
-
-                <FormSecao legenda="Classificação" colunas={2}>
-                  <CampoForm label="Tipo">
-                    <select
-                      className="input w-full"
-                      value={form.tipo_empresa}
-                      onChange={(event) => setForm((prev) => ({
-                        ...prev,
-                        tipo_empresa: event.target.value,
-                        tipo_gerencial: event.target.value === 'HOLDING' ? 'HOLDING' : prev.tipo_gerencial,
-                        empresa_operacional: event.target.value === 'HOLDING' ? false : prev.empresa_operacional,
-                        holding_id: event.target.value === 'HOLDING' ? '' : prev.holding_id
-                      }))}
-                    >
-                      <option value="HOLDING">Holding</option>
-                      <option value="OPERACIONAL">Empresa operacional</option>
-                    </select>
-                  </CampoForm>
-                  <CampoForm label="Tipo gerencial">
-                    <select
-                      className="input w-full"
-                      value={form.tipo_gerencial}
-                      onChange={(event) => setForm((prev) => ({ ...prev, tipo_gerencial: event.target.value }))}
-                    >
-                      {TIPOS_GERENCIAIS.map(([value, label]) => (
-                        <option key={value} value={value}>{label}</option>
-                      ))}
-                    </select>
-                  </CampoForm>
-                  <CampoForm label="Holding controladora">
-                    <select
-                      className="input w-full"
-                      value={form.holding_id}
-                      onChange={(event) => setForm((prev) => ({ ...prev, holding_id: event.target.value }))}
-                      disabled={form.tipo_empresa === 'HOLDING'}
-                    >
-                      <option value="">Não vinculada</option>
-                      {holdings
-                        .filter((holding) => Number(holding.id) !== Number(form.id))
-                        .map((holding) => (
-                          <option key={holding.id} value={holding.id}>
-                            {holding.nome}
-                          </option>
-                      ))}
-                    </select>
-                  </CampoForm>
-                  <div className="form-campo--linha">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={form.ativo}
-                        onChange={(event) => setForm((prev) => ({ ...prev, ativo: event.target.checked }))}
-                      />
-                      Empresa ativa
-                    </label>
-                  </div>
-                </FormSecao>
-
-                <FormSecao legenda="Classificação gerencial" colunas={2}>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.empresa_caixa}
-                      onChange={(event) => setForm((prev) => ({ ...prev, empresa_caixa: event.target.checked }))}
-                    />
-                    Empresa caixa / tesouraria
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.empresa_operacional}
-                      onChange={(event) => setForm((prev) => ({ ...prev, empresa_operacional: event.target.checked }))}
-                    />
-                    Empresa operacional
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.consolidar_no_grupo}
-                      onChange={(event) => setForm((prev) => ({ ...prev, consolidar_no_grupo: event.target.checked }))}
-                    />
-                    Consolidar no grupo
-                  </label>
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={form.elimina_intercompany}
-                      onChange={(event) => setForm((prev) => ({ ...prev, elimina_intercompany: event.target.checked }))}
-                    />
-                    Eliminar entre empresas no consolidado
-                  </label>
-                </FormSecao>
-
-                <div className="app-actionbar">
-                  <button type="submit" className="btn btn-primary" disabled={salvando}>
-                    {salvando ? 'Salvando...' : 'Salvar empresa'}
-                  </button>
-                  <button type="button" className="btn btn-outline" onClick={limparFormulario}>
-                    {form.id ? 'Cancelar edição' : 'Cancelar'}
-                  </button>
-                </div>
-              </form>
-            </BlocoConteudo>
-            </div>
-          </OverlayModal>
-        )}
-
-        <BlocoConteudo
-          titulo="Empresas cadastradas"
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <>
-              <input
-                className="input input-sm app-busca"
-                placeholder="Buscar nome, código ou CNPJ"
-                value={filtros.q}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, q: event.target.value }))}
-              />
-              <select
-                className="input input-sm"
-                aria-label="Filtrar por situação"
-                value={filtros.ativo}
-                onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}
-              >
-                <option value="">Todas</option>
-                <option value="true">Ativas</option>
-                <option value="false">Inativas</option>
-              </select>
-              <button type="button" className="btn btn-outline btn-sm" onClick={carregar} disabled={carregando}>
-                Aplicar filtros
-              </button>
-            </>
-          )}
+      {/* R9 (docs/REGRAS-LAYOUT.md): cadastro de uso esporádico abre em
+          MODAL — a tela inteira fica com a listagem. Mesmos handlers,
+          mesmo payload: só a moldura mudou. O ritmo vertical vem do Pagina. */}
+      {formAtivo && (
+        <OverlayModal
+          aberto
+          rotulo={form.id ? 'Editar empresa do grupo' : 'Nova empresa do grupo'}
+          onFechar={limparFormulario}
         >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={empresas}
-            carregando={carregando}
-            storageKey="tabela:empresas-grupo"
-            larguraAcoes={110}
-            aoClicarLinha={selecionarEmpresa}
-            vazio={{
-              title: 'Nenhuma empresa do grupo cadastrada',
-              message: 'Cadastre a primeira empresa para habilitar contas, caixa, pagamentos e RH/DP multiempresa.'
-            }}
-            acoesLinha={(item) => (
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => selecionarEmpresa(item)}>
-                Editar
+          <div key={form.id || 'nova'}>
+          <BlocoConteudo
+            titulo={form.id ? `Editar empresa — ${form.nome || ''}` : 'Nova empresa do grupo'}
+            acoes={(
+              <button type="button" className="btn btn-outline btn-sm" onClick={limparFormulario}>
+                Fechar
               </button>
             )}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+          >
+            <form className="space-y-4" onSubmit={salvar}>
+              <p className="app-note">
+                Essas empresas passam a ser a autoridade central para contas, caixa, pagamentos e RH/DP.
+              </p>
+
+              <FormSecao legenda="Identificação" colunas={2}>
+                <CampoForm label="Nome" obrigatorio span={2}>
+                  <input
+                    className="input w-full"
+                    value={form.nome}
+                    onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))}
+                    required
+                  />
+                </CampoForm>
+                <CampoForm label="Razão social" span={2}>
+                  <input
+                    className="input w-full"
+                    value={form.razao_social}
+                    onChange={(event) => setForm((prev) => ({ ...prev, razao_social: event.target.value }))}
+                  />
+                </CampoForm>
+                <CampoForm label="Código">
+                  <input
+                    className="input w-full"
+                    value={form.codigo}
+                    onChange={(event) => setForm((prev) => ({ ...prev, codigo: event.target.value }))}
+                  />
+                </CampoForm>
+                <CampoForm label="CNPJ">
+                  <input
+                    className="input w-full"
+                    value={form.cnpj}
+                    onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))}
+                  />
+                </CampoForm>
+              </FormSecao>
+
+              <FormSecao legenda="Classificação" colunas={2}>
+                <CampoForm label="Tipo">
+                  <select
+                    className="input w-full"
+                    value={form.tipo_empresa}
+                    onChange={(event) => setForm((prev) => ({
+                      ...prev,
+                      tipo_empresa: event.target.value,
+                      tipo_gerencial: event.target.value === 'HOLDING' ? 'HOLDING' : prev.tipo_gerencial,
+                      empresa_operacional: event.target.value === 'HOLDING' ? false : prev.empresa_operacional,
+                      holding_id: event.target.value === 'HOLDING' ? '' : prev.holding_id
+                    }))}
+                  >
+                    <option value="HOLDING">Holding</option>
+                    <option value="OPERACIONAL">Empresa operacional</option>
+                  </select>
+                </CampoForm>
+                <CampoForm label="Tipo gerencial">
+                  <select
+                    className="input w-full"
+                    value={form.tipo_gerencial}
+                    onChange={(event) => setForm((prev) => ({ ...prev, tipo_gerencial: event.target.value }))}
+                  >
+                    {TIPOS_GERENCIAIS.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </CampoForm>
+                <CampoForm label="Holding controladora">
+                  <select
+                    className="input w-full"
+                    value={form.holding_id}
+                    onChange={(event) => setForm((prev) => ({ ...prev, holding_id: event.target.value }))}
+                    disabled={form.tipo_empresa === 'HOLDING'}
+                  >
+                    <option value="">Não vinculada</option>
+                    {holdings
+                      .filter((holding) => Number(holding.id) !== Number(form.id))
+                      .map((holding) => (
+                        <option key={holding.id} value={holding.id}>
+                          {holding.nome}
+                        </option>
+                    ))}
+                  </select>
+                </CampoForm>
+                <div className="form-campo--linha">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.ativo}
+                      onChange={(event) => setForm((prev) => ({ ...prev, ativo: event.target.checked }))}
+                    />
+                    Empresa ativa
+                  </label>
+                </div>
+              </FormSecao>
+
+              <FormSecao legenda="Classificação gerencial" colunas={2}>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.empresa_caixa}
+                    onChange={(event) => setForm((prev) => ({ ...prev, empresa_caixa: event.target.checked }))}
+                  />
+                  Empresa caixa / tesouraria
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.empresa_operacional}
+                    onChange={(event) => setForm((prev) => ({ ...prev, empresa_operacional: event.target.checked }))}
+                  />
+                  Empresa operacional
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.consolidar_no_grupo}
+                    onChange={(event) => setForm((prev) => ({ ...prev, consolidar_no_grupo: event.target.checked }))}
+                  />
+                  Consolidar no grupo
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={form.elimina_intercompany}
+                    onChange={(event) => setForm((prev) => ({ ...prev, elimina_intercompany: event.target.checked }))}
+                  />
+                  Eliminar entre empresas no consolidado
+                </label>
+              </FormSecao>
+
+              <div className="app-actionbar">
+                <button type="submit" className="btn btn-primary" disabled={salvando}>
+                  {salvando ? 'Salvando...' : 'Salvar empresa'}
+                </button>
+                <button type="button" className="btn btn-outline" onClick={limparFormulario}>
+                  {form.id ? 'Cancelar edição' : 'Cancelar'}
+                </button>
+              </div>
+            </form>
+          </BlocoConteudo>
+          </div>
+        </OverlayModal>
+      )}
+
+      <BlocoConteudo
+        titulo="Empresas cadastradas"
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <>
+            <input
+              className="input input-sm app-busca"
+              placeholder="Buscar nome, código ou CNPJ"
+              value={filtros.q}
+              onChange={(event) => setFiltros((prev) => ({ ...prev, q: event.target.value }))}
+            />
+            <select
+              className="input input-sm"
+              aria-label="Filtrar por situação"
+              value={filtros.ativo}
+              onChange={(event) => setFiltros((prev) => ({ ...prev, ativo: event.target.value }))}
+            >
+              <option value="">Todas</option>
+              <option value="true">Ativas</option>
+              <option value="false">Inativas</option>
+            </select>
+            <button type="button" className="btn btn-outline btn-sm" onClick={carregar} disabled={carregando}>
+              Aplicar filtros
+            </button>
+          </>
+        )}
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={empresas}
+          carregando={carregando}
+          storageKey="tabela:empresas-grupo"
+          larguraAcoes={110}
+          aoClicarLinha={selecionarEmpresa}
+          vazio={{
+            title: 'Nenhuma empresa do grupo cadastrada',
+            message: 'Cadastre a primeira empresa para habilitar contas, caixa, pagamentos e RH/DP multiempresa.'
+          }}
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => selecionarEmpresa(item)}>
+              Editar
+            </button>
+          )}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }
