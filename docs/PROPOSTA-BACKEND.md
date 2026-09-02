@@ -52,16 +52,26 @@ Interessa ao projeto mesmo que nada da reforma visual seja aprovado.
 > migrations, via `resolveTableName`. Registro completo no aviso da seção C3
 > de `docs/MIGRACAO-PARA-OFICIAL.md`.
 
-### 1b. Handlers globais de processo (`server.js`) — mantido integralmente
+### 1b. Handlers globais de processo (`server.js`) — ajustado pelo responsável (02/09)
 
 **Bug:** um `unhandledRejection` — por exemplo, uma falha de banco disparada por uma
 única tela — **derruba o processo Node inteiro**, tirando o sistema do ar para todos até
 o PM2 reerguer.
 
-**Correção:** `process.on('unhandledRejection'/'uncaughtException')` que loga com stack e
-segue; falha durante o **boot** continua encerrando o processo (comportamento correto).
+**Correção (comportamento final, decidido pelo responsável):** os dois handlers logam
+com stack, mas o destino difere de propósito:
+
+- `unhandledRejection` (erro **assíncrono**): loga e **segue** — o processo continua
+  íntegro e uma falha de uma tela não pode tirar o sistema do ar para todos;
+- `uncaughtException` (erro **síncrono** não capturado): loga e **encerra**
+  (`process.exit(1)`) — depois de um uncaughtException o processo fica em estado
+  indefinido, então deixar o PM2 subir um processo limpo é mais seguro que mantê-lo
+  de pé. (A proposta original mantinha o processo vivo nos dois casos; este item foi
+  ajustado a pedido do responsável.)
+
+Falha durante o **boot** continua encerrando o processo (comportamento correto).
 **Impacto de não ter:** quedas intermitentes do backend em produção com causa difícil de
-rastrear.
+rastrear — ou, pior, um processo corrompido de pé respondendo errado.
 
 ---
 

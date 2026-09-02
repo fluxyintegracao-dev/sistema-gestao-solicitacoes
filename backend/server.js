@@ -17,8 +17,13 @@ process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', erro.stack || erro);
 });
 
+// Exceção SÍNCRONA não capturada é diferente (decisão do responsável, 02/09):
+// depois de um uncaughtException o processo fica em estado indefinido, então
+// logar e ENCERRAR — deixando o PM2 subir um processo limpo — é mais seguro
+// que mantê-lo de pé.
 process.on('uncaughtException', (error) => {
   console.error('[uncaughtException]', error?.stack || error);
+  process.exit(1);
 });
 
 async function start() {

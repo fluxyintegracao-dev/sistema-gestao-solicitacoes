@@ -304,9 +304,12 @@ CORS de IP privado, `outputs/**`, docs do ambiente local deste repositório.
 3. **Reiniciar o `backend-dev`.** *Conferir:* o boot passa pelo
    `assertMigrationsUpToDate` sem reclamar e a API responde
    (`/solicitacoes/contadores` devolve números em vez de 404).
-4. **Rodar o `valida-pendencias.js`** (bloco do B3 abaixo). *Conferir:* 100%
-   dos cartões batem com as listas — qualquer divergência é bug a corrigir no
-   recorte da visão, nunca no escopo da lista.
+4. **Rodar o `valida-pendencias.js`** (bloco do B3 abaixo) — **só DEPOIS das
+   migrations do passo 2**: o script não roda migrations, ele confere e aborta
+   se houver pendente. `ALLOW_DEV_TEST_WRITES=true` é **obrigatório** (ele
+   grava dados de cenário no banco apontado; sem a variável, recusa rodar).
+   *Conferir:* 100% dos cartões batem com as listas — qualquer divergência é
+   bug a corrigir no recorte da visão, nunca no escopo da lista.
 5. **Testar o preview** (`refactor-dev.jrfluxy.com.br`) seguindo o
    `docs/ROTEIRO-DE-TESTE-PREVIEW.md`, pacote a pacote e perfil a perfil.
    *Conferir:* o checklist de encerramento do próprio roteiro.
@@ -338,12 +341,16 @@ por nome):
 > B3 e B6 também não criam tabela.
 >
 > **Validação obrigatória do B3 em staging — cartão × lista (roda o responsável):**
-> com o backend-dev atualizado e as migrations aplicadas, executar no servidor:
+> com o backend-dev atualizado e **as migrations já aplicadas** (o script não
+> roda migrations: ele só confere e **aborta** se houver pendente), executar
+> no servidor:
 >
 > ```bash
 > cd backend
-> # usa o .env do backend-dev (exportar DB_* se preciso); NUNCA produção
-> node scripts/valida-pendencias.js
+> # usa o .env do backend-dev (exportar DB_* se preciso); NUNCA produção.
+> # ALLOW_DEV_TEST_WRITES=true é OBRIGATÓRIO: o script grava dados de
+> # cenário no banco apontado e recusa rodar sem essa confirmação.
+> ALLOW_DEV_TEST_WRITES=true node scripts/valida-pendencias.js
 > ```
 >
 > O script sobe os controllers REAIS contra o banco, monta o cenário (inclui 70

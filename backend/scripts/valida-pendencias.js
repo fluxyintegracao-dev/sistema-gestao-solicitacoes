@@ -8,6 +8,17 @@
 // Cenário inclui 70 aprovações (mais que o antigo teto de 61) para
 // provar que o bug "61 → lista do setor inteiro" morreu.
 // =====================================================================
+// Este script GRAVA dados de cenário no banco apontado (setores, usuários,
+// solicitações, títulos…). A trava abaixo é obrigatória de propósito: só
+// rode contra base descartável ou staging, NUNCA produção.
+if (String(process.env.ALLOW_DEV_TEST_WRITES || '').toLowerCase() !== 'true') {
+  console.error(
+    'valida-pendencias: recusado. Este script grava dados de cenário no banco apontado.\n' +
+    'Exporte ALLOW_DEV_TEST_WRITES=true para confirmar que o banco é descartável/staging.'
+  );
+  process.exit(1);
+}
+
 // Conexão vem do ambiente (o .env do backend-dev serve). Os defaults
 // abaixo só cobrem uma base local descartável de validação — em staging,
 // exporte DB_* antes de rodar. NUNCA aponte para produção.
@@ -18,29 +29,16 @@ process.env.DB_PASSWORD = process.env.DB_PASSWORD || 'fluxy123';
 process.env.DB_NAME = process.env.DB_NAME || 'fluxy_valida_pend';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'valida-pendencias-secret';
-process.env.ALLOW_LEGACY_SCHEMA_BOOTSTRAP_SYNC = process.env.ALLOW_LEGACY_SCHEMA_BOOTSTRAP_SYNC || 'true';
 
 const path = require('path');
 const BACKEND = path.resolve(__dirname, '..');
 
 async function main() {
-  // MariaDB limita identificadores a 64 chars (patch só-na-validação).
-  const dbPre = require(path.join(BACKEND, 'src/models'));
-  for (const model of Object.values(dbPre.sequelize.models)) {
-    const indexes = model.options?.indexes || [];
-    indexes.forEach((ix, i) => {
-      const campos = (ix.fields || []).map((f) => (typeof f === 'string' ? f : f?.name || '')).join('_');
-      const derivado = ix.name || `${model.tableName}_${campos}`;
-      if (derivado.length > 60) {
-        ix.name = `${String(model.tableName).slice(0, 44)}_ix${i}`.slice(0, 60);
-      }
-    });
-  }
-
-  const { runMigrations } = require(path.join(BACKEND, 'src/database/runMigrations'));
-  console.log('rodando migrações...');
-  await runMigrations();
-  console.log('migrações ok');
+  // O script NÃO roda migrations (decisão do responsável, 02/09): o schema
+  // vem pronto do passo anterior do roteiro (ALLOW_SCHEMA_MIGRATIONS=true
+  // npm run migrate). Aqui só se confere — pendência aborta com a lista.
+  const { assertMigrationsUpToDate } = require(path.join(BACKEND, 'src/database/runMigrations'));
+  await assertMigrationsUpToDate();
 
   const db = require(path.join(BACKEND, 'src/models'));
   const {
