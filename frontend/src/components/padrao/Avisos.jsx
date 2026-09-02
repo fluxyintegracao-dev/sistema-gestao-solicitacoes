@@ -14,6 +14,22 @@ import Alert from '../ui/Alert';
  * sozinho depois de 6s, porque confirmação de coisa que deu certo não
  * merece um clique a mais.
  *
+ * ## O que NÃO passa por aqui — a fronteira (02/09)
+ *
+ * `useAvisos` é para EVENTO: algo aconteceu agora (salvou, falhou, importou).
+ * Aviso empilhável, fechável, que some.
+ *
+ * CONDIÇÃO DERIVADA DO CONTEÚDO não é evento e NÃO usa este componente:
+ * "esta obra já tem jornada informada em 09/2026", "dias mais faltas passam
+ * de 30 em Fulano". Elas descrevem o estado do que está na tela; viradas em
+ * aviso dispensável, sumiriam com um clique e voltariam a cada recarga — e
+ * o usuário poderia enviar o formulário com a faixa fechada, sem ver a
+ * condição que a impedia. Essas continuam como faixa fixa no fluxo, ao lado
+ * do que elas descrevem.
+ *
+ * A pergunta que separa: **fecha e o problema continua?** Se sim, é
+ * condição, não aviso.
+ *
  * Uso:
  *   const { avisos, avisar, fechar } = useAvisos();
  *   ...

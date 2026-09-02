@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CelulaDupla, TabelaPadrao } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  CelulaDupla,
+  TabelaPadrao,
+  alternarValorFiltro,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -27,6 +35,12 @@ import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatter
  */
 
 const COMPETENCIA_ATUAL = new Date().toISOString().slice(0, 7);
+const SEM_FILTRO = { obra: new Set(), empresa: new Set() };
+
+/** Dimensao de valor UNICO: o `ativos` guarda um conjunto, o servico recebe um id. */
+function primeiroValor(conjunto) {
+  return Array.from(conjunto || [])[0] || '';
+}
 
 function linhaVazia(colaborador) {
   const ja = colaborador.jornada_informada || {};
@@ -48,29 +62,37 @@ function linhaVazia(colaborador) {
 }
 
 /**
- * Serve de PAGINA e de ABA.
+ * SEMPRE ABA, nunca pagina (decisao do cliente D1, 02/09).
  *
- * `comoAba` tira o cabecalho e o container de pagina — dentro de Pessoal, quem manda no titulo e no
- * espacamento e a pagina anfitria.
+ * `/rh-dp/jornada` virou redirecionamento para `/rh-dp/pessoal?aba=jornada`: a obra informa a
+ * jornada e o DP apura — e o MESMO trabalho em sequencia, e trocar de pagina no meio era o que
+ * fazia perder o fio. Com isso a antiga prop `comoAba` deixou de ter dois valores possiveis e
+ * saiu, junto com o cabecalho proprio que ela escondia.
  *
- * Um parametro, e nao dois componentes: carregar, validar e enviar a jornada e a mesma logica nos
- * dois usos, e duplicar isso seria criar duas versoes da mesma validacao para divergirem depois.
+ * Quem e dono do titulo e da faixa fixa aqui e o RhDpPessoal — este arquivo NAO monta `Pagina`
+ * nem `PageHeader`. Duas faixas fixas empilhadas e exatamente o defeito que a R16 evita; excecao
+ * declarada ao cabecalho padrao, valida para os componentes que so existem como aba.
  */
-export default function RhDpJornada({ comoAba = false }) {
+export default function RhDpJornada() {
   const { user } = useAuth();
+  const { avisos, avisar, fechar, limpar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   const [obras, setObras] = useState([]);
   const [empresas, setEmpresas] = useState([]);
-  const [obra, setObra] = useState('');
-  const [empresa, setEmpresa] = useState('');
+  // R12: obra e empresa sao recortes ENUMERAVEIS — marcacao com etiqueta
+  // removivel, e nao lista suspensa. Ambas com `unico`, porque o servico
+  // recebe UM id por recorte (marcar dois mandaria nenhum).
+  const [ativos, setAtivos] = useState(SEM_FILTRO);
   const [competencia, setCompetencia] = useState(COMPETENCIA_ATUAL);
   const [diasBase, setDiasBase] = useState(30);
 
   const [linhas, setLinhas] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
+
+  const obra = useMemo(() => primeiroValor(ativos.obra), [ativos]);
+  const empresa = useMemo(() => primeiroValor(ativos.empresa), [ativos]);
 
   const podeEnviar = hasAnyExplicitPermissao(user, ['rh_dp.solicitacoes.abrir']);
 
@@ -80,7 +102,7 @@ export default function RhDpJornada({ comoAba = false }) {
         const listaObras = await getObras();
         setObras(Array.isArray(listaObras) ? listaObras : []);
       } catch (error) {
-        setErro(error.message || 'Nao foi possivel carregar as obras.');
+        avisar.erro(error.message || 'Nao foi possivel carregar as obras.');
       }
 
       /**
@@ -98,39 +120,38 @@ export default function RhDpJornada({ comoAba = false }) {
         setEmpresas([]);
       }
     })();
-  }, []);
+  }, [avisar]);
 
   const carregar = useCallback(async () => {
     if (!obra || !competencia) {
-      setErro('Escolha a obra e a competencia.');
+      avisar.erro('Escolha a obra e a competencia.');
       return;
     }
     setCarregando(true);
-    setErro('');
-    setAviso('');
+    limpar();
     try {
       const lista = await colaboradoresParaJornadaRh({ obra_id: obra, competencia });
       setLinhas((Array.isArray(lista) ? lista : []).map(linhaVazia));
-      const ativos = (Array.isArray(lista) ? lista : []).filter((c) => !c.ainda_nao_comecou);
+      const comecaram = (Array.isArray(lista) ? lista : []).filter((c) => !c.ainda_nao_comecou);
       const futuros = (Array.isArray(lista) ? lista : []).filter((c) => c.ainda_nao_comecou);
 
-      if (!ativos.length && futuros.length) {
+      if (!comecaram.length && futuros.length) {
         // A resposta "nenhum colaborador" e tecnicamente certa e pratica errada: quem acabou de
         // lotar alguem nesta obra conclui que a lotacao nao funcionou.
-        setAviso(
+        avisar.alerta(
           `Ninguem trabalhou nesta obra em ${competencia}, mas `
           + `${futuros.length} colaborador(es) comecam depois — eles aparecem abaixo, sem campos.`
         );
-      } else if (!ativos.length) {
-        setAviso('Nenhum colaborador esteve nesta obra nesta competencia.');
+      } else if (!comecaram.length) {
+        avisar.alerta('Nenhum colaborador esteve nesta obra nesta competencia.');
       }
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel montar a lista.');
+      avisar.erro(error.message || 'Nao foi possivel montar a lista.');
       setLinhas([]);
     } finally {
       setCarregando(false);
     }
-  }, [obra, competencia]);
+  }, [obra, competencia, avisar, limpar]);
 
   function alterar(indice, campo, valor) {
     setLinhas((atuais) => atuais.map((linha, i) => (i === indice ? { ...linha, [campo]: valor } : linha)));
@@ -160,10 +181,29 @@ export default function RhDpJornada({ comoAba = false }) {
     return linha.dias_trabalhados !== '' && dias + faltas > Number(diasBase);
   }), [linhas, diasBase]);
 
+  const dimensoesFiltro = useMemo(() => {
+    const dimensoes = [{
+      id: 'obra',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obras.map((o) => ({ valor: o.id, rotulo: o.nome }))
+    }];
+    // A empresa do grupo so aparece para quem consegue le-la — sem permissao
+    // a lista vem vazia e o recorte nao existe (era um select opcional).
+    if (empresas.length) {
+      dimensoes.push({
+        id: 'empresa',
+        rotulo: 'Empresa do grupo',
+        unico: true,
+        opcoes: empresas.map((e) => ({ valor: e.id, rotulo: e.nome }))
+      });
+    }
+    return dimensoes;
+  }, [obras, empresas]);
+
   async function enviar(evento) {
     evento.preventDefault();
-    setErro('');
-    setAviso('');
+    limpar();
 
     /**
      * Quem ainda nao comecou NAO vai no envio.
@@ -176,12 +216,12 @@ export default function RhDpJornada({ comoAba = false }) {
       .filter((l) => !l.aindaNaoComecou)
       .filter((l) => l.dias_trabalhados !== '' || l.faltas !== '');
     if (!preenchidas.length) {
-      setErro('Informe a jornada de ao menos um colaborador.');
+      avisar.erro('Informe a jornada de ao menos um colaborador.');
       return;
     }
 
     if (comProblema.length) {
-      setErro(
+      avisar.erro(
         `Dias trabalhados mais faltas passam de ${diasBase} em: `
         + `${comProblema.map((l) => l.nome).join(', ')}.`
       );
@@ -189,13 +229,14 @@ export default function RhDpJornada({ comoAba = false }) {
     }
 
     if (jaInformados) {
-      // eslint-disable-next-line no-alert
-      const seguir = window.confirm(
-        `Ja existe jornada informada nesta obra e competencia.\n\n`
-        + 'O envio novo SUBSTITUI o anterior — ele nao soma. O envio anterior fica guardado como '
-        + 'historico.\n\nEnviar mesmo assim?'
-      );
-      if (!seguir) return;
+      const { ok } = await confirmar({
+        titulo: 'Substituir a jornada ja informada',
+        mensagem: `Ja existe jornada informada nesta obra em ${competencia}. O envio novo `
+          + 'SUBSTITUI o anterior — ele nao soma. O envio anterior fica guardado como historico. '
+          + 'Enviar mesmo assim?',
+        rotuloConfirmar: 'Substituir e enviar'
+      });
+      if (!ok) return;
     }
 
     setSalvando(true);
@@ -215,80 +256,87 @@ export default function RhDpJornada({ comoAba = false }) {
           observacoes: l.observacoes || undefined
         }))
       });
-      setAviso(
+      /**
+       * A confirmacao vem DEPOIS de remontar a lista, e nao antes.
+       *
+       * Defeito real do fluxo antigo: `setAviso(sucesso)` era seguido de `carregar()`, que comeca
+       * limpando `erro`/`aviso` — a faixa verde do envio bem-sucedido era apagada no mesmo tique,
+       * antes de qualquer pintura. Quem enviava a jornada nao via confirmacao nenhuma. Trocar a
+       * ordem mantem o mesmo texto e o faz aparecer.
+       */
+      await carregar();
+      avisar.sucesso(
         `Jornada de ${preenchidas.length} colaborador(es) registrada. `
         + 'O Departamento Pessoal pode gerar a apuracao desta competencia.'
       );
-      await carregar();
     } catch (error) {
-      setErro(error.message || 'Nao foi possivel registrar a jornada.');
+      avisar.erro(error.message || 'Nao foi possivel registrar a jornada.');
     } finally {
       setSalvando(false);
     }
   }
 
   return (
-    <div className={comoAba ? 'space-y-4' : 'page solicitacoes-page rhdp-page space-y-6'}>
-      {comoAba ? null : (
-        <div className="app-page-header">
-          <div className="app-page-header-row">
-            <div>
-              <h1 className="text-xl font-semibold md:text-2xl">RH/DP • Jornada</h1>
-              <p className="page-subtitle">
-                A obra informa dias trabalhados, faltas, horas extras, acrescimos e descontos. O
-                sistema calcula o pagamento.
-              </p>
-            </div>
-            <div className="app-page-actions">
-              <Link to="/rh-dp/pessoal" className="btn btn-outline">Pessoal</Link>
-              <Link to="/rh-dp/importacoes" className="btn btn-outline">Enviar por planilha</Link>
-            </div>
-          </div>
-        </div>
-      )}
+    <div className="app-pagina">
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {erro ? <div className="alert alert-danger">{erro}</div> : null}
-      {aviso ? <div className="alert alert-success">{aviso}</div> : null}
+      <BlocoConteudo
+        titulo="Jornada da obra"
+        descricao="A obra informa dias trabalhados, faltas, horas extras, acrescimos e descontos. O sistema calcula o pagamento."
+      >
+        {/* R12/R16: o cartao de filtros com grade de select saiu inteiro.
+            Competencia e dias base sao CONTINUOS e vao em `campos`; obra e
+            empresa sao enumeraveis e vao em `filtros`, com marcacao unica e
+            etiqueta removivel. */}
+        <BarraFiltros
+          campos={[
+            {
+              id: 'competencia',
+              rotulo: 'Competencia',
+              tipo: 'month',
+              valor: competencia,
+              aoMudar: setCompetencia
+            },
+            {
+              id: 'diasBase',
+              rotulo: 'Dias base do mes',
+              tipo: 'number',
+              valor: diasBase,
+              aoMudar: setDiasBase,
+              min: 1,
+              max: 31
+            }
+          ]}
+          filtros={dimensoesFiltro}
+          ativos={ativos}
+          aoAlternar={(dimensao, valor, opcoes) => setAtivos(
+            (atuais) => alternarValorFiltro(atuais, dimensao, valor, opcoes)
+          )}
+          aoLimpar={() => setAtivos(SEM_FILTRO)}
+        />
 
-      <div className="sol-surface-card app-toolbar-card rounded-xl p-3 md:p-4 space-y-3">
-        <div className="rh-colaboradores-filter-grid">
-          <select className="form-control" value={obra} onChange={(e) => setObra(e.target.value)}>
-            <option value="">Obra</option>
-            {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
-          </select>
-          <input
-            className="form-control"
-            type="month"
-            value={competencia}
-            onChange={(e) => setCompetencia(e.target.value)}
-          />
-          {empresas.length ? (
-            <select className="form-control" value={empresa} onChange={(e) => setEmpresa(e.target.value)}>
-              <option value="">Empresa do grupo (opcional)</option>
-              {empresas.map((e2) => <option key={e2.id} value={e2.id}>{e2.nome}</option>)}
-            </select>
-          ) : null}
-          <input
-            className="form-control"
-            type="number"
-            min="1"
-            max="31"
-            value={diasBase}
-            onChange={(e) => setDiasBase(e.target.value)}
-            title="Dias base do mes"
-          />
-        </div>
-        <div className="app-page-actions">
-          <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
-            {carregando ? 'Carregando...' : 'Montar lista'}
-          </button>
-          {linhas.length ? (
-            <button type="button" className="btn btn-outline" onClick={preencherMesCheio}>
-              Preencher mes cheio
+        <div className="space-y-3">
+          <div className="app-actionbar">
+            <button type="button" className="btn btn-outline" onClick={carregar} disabled={carregando}>
+              {carregando ? 'Carregando...' : 'Montar lista'}
             </button>
-          ) : null}
+            {linhas.length ? (
+              <button type="button" className="btn btn-outline" onClick={preencherMesCheio}>
+                Preencher mes cheio
+              </button>
+            ) : null}
+          </div>
+
+          {/* Estava solto no rodape da tela como `page-subtitle`, que o
+              validador reprova (R5). E informacao util e continua visivel,
+              agora ancorada ao bloco a que pertence e com token de cor. */}
+          <p className="app-bloco-lead">
+            Os eventos recorrentes — vale alimentacao, desconto de adiantamento, pensao — sao
+            aplicados sozinhos quando o Departamento Pessoal gerar a apuracao. Nao precisam ser
+            digitados aqui.
+          </p>
         </div>
-      </div>
+      </BlocoConteudo>
 
       {jaInformados ? (
         <div className="alert alert-warning">
@@ -298,8 +346,13 @@ export default function RhDpJornada({ comoAba = false }) {
       ) : null}
 
       {linhas.length ? (
-        <form onSubmit={enviar} className="space-y-4 rh-form-com-tabela">
-          <div className="card sol-surface-card">
+        <form onSubmit={enviar} className="rh-form-com-tabela space-y-4">
+          <BlocoConteudo
+            titulo="Lancamento por colaborador"
+            variante="primario"
+            cor="var(--c-primary)"
+            contagem={`${linhas.length} colaborador(es)`}
+          >
             <TabelaPadrao
               colunas={[
                 {
@@ -430,7 +483,7 @@ export default function RhDpJornada({ comoAba = false }) {
               }}
               vazio="Nenhum colaborador nesta obra e competencia."
             />
-          </div>
+          </BlocoConteudo>
 
           {comProblema.length ? (
             <div className="alert alert-danger">
@@ -438,22 +491,19 @@ export default function RhDpJornada({ comoAba = false }) {
             </div>
           ) : null}
 
-          <div className="app-page-actions">
+          <div className="app-actionbar">
             {podeEnviar ? (
               <button type="submit" className="btn btn-primary" disabled={salvando || comProblema.length > 0}>
                 {salvando ? 'Enviando...' : 'Enviar jornada'}
               </button>
             ) : (
-              <p className="opacity-70">Voce nao tem permissao para enviar jornada.</p>
+              <p className="app-bloco-lead">Voce nao tem permissao para enviar jornada.</p>
             )}
           </div>
         </form>
       ) : null}
 
-      <p className="page-subtitle">
-        Os eventos recorrentes — vale alimentacao, desconto de adiantamento, pensao — sao aplicados
-        sozinhos quando o Departamento Pessoal gerar a apuracao. Nao precisam ser digitados aqui.
-      </p>
+      {elementoConfirmacao}
     </div>
   );
 }

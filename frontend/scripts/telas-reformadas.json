@@ -22,7 +22,16 @@
     "src/pages/UsuariosEnvioQualquerSetor.jsx",
     "src/pages/UsuariosAcessoFinanceiro.jsx",
     "src/pages/UsuariosAcessoPrioridadeDiretoria.jsx",
-    "src/pages/UsuariosPermissoesRhDp.jsx"
+    "src/pages/UsuariosPermissoesRhDp.jsx",
+    "src/pages/RhDpPessoal.jsx",
+    "src/pages/RhDpPessoalSolicitacoes.jsx",
+    "src/pages/RhDpColaboradores.jsx",
+    "src/pages/RhDpJornada.jsx",
+    "src/pages/RhDpApuracao.jsx",
+    "src/pages/RhDpDocumentos.jsx",
+    "src/pages/RhDpImportacoes.jsx",
+    "src/pages/RhDpFechamentos.jsx",
+    "src/pages/RhDpRelatorioOperacional.jsx"
   ],
   "excecoes_medidas": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
