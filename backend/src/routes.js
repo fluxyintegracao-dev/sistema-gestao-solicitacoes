@@ -365,6 +365,9 @@ const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
 const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
 const BuscaController = require('./controllers/BuscaController');
+const AtalhoSetorController = require('./controllers/AtalhoSetorController');
+const DetalheLayoutController = require('./controllers/DetalheLayoutController');
+const AcaoPrincipalSetorController = require('./controllers/AcaoPrincipalSetorController');
 const DashboardController = require('./controllers/DashboardController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
@@ -2267,6 +2270,21 @@ router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirF
 // Busca universal (Ctrl+K): grupos gateados pela permissao da tela
 // correspondente; grupo sem permissao nem e consultado (pacote B2).
 router.get('/busca', BuscaController.index);
+
+// Configuracao por setor (pacote B4): leitura aberta a autenticados
+// (metadado de interface); escrita gateada pelo MESMO gate de
+// configuracoes dos demais vinculos de status — nenhuma permissao nova.
+router.get('/configuracoes/atalhos-setor', AtalhoSetorController.index);
+router.post('/configuracoes/atalhos-setor', allowConfiguracoesStatusVinculos, AtalhoSetorController.store);
+router.put('/configuracoes/atalhos-setor/:id', allowConfiguracoesStatusVinculos, AtalhoSetorController.update);
+router.delete('/configuracoes/atalhos-setor/:id', allowConfiguracoesStatusVinculos, AtalhoSetorController.destroy);
+router.get('/configuracoes/detalhe-layout', DetalheLayoutController.index);
+router.put('/configuracoes/detalhe-layout/:setor', allowConfiguracoesStatusVinculos, DetalheLayoutController.upsert);
+router.delete('/configuracoes/detalhe-layout/:setor', allowConfiguracoesStatusVinculos, DetalheLayoutController.destroy);
+router.get('/configuracoes/acoes-principais', AcaoPrincipalSetorController.index);
+router.post('/configuracoes/acoes-principais', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.store);
+router.put('/configuracoes/acoes-principais/:id', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.update);
+router.delete('/configuracoes/acoes-principais/:id', allowConfiguracoesStatusVinculos, AcaoPrincipalSetorController.destroy);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-acesso-todas-obras', ConfiguracaoSistemaController.getSetoresAcessoTodasObras);

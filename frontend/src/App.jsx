@@ -181,6 +181,9 @@ const ConfiguracoesModulos = lazy(() => import('./pages/ConfiguracoesModulos'));
 const ConfiguracoesNotificacoesSistema = lazy(() => import('./pages/ConfiguracoesNotificacoesSistema'));
 const ConfiguracoesContratoAlertasEFormas = lazy(() => import('./pages/ConfiguracoesContratoAlertasEFormas'));
 const CartoesRecarga = lazy(() => import('./pages/CartoesRecarga'));
+const ConfiguracoesAcoesPrincipais = lazy(() => import('./pages/ConfiguracoesAcoesPrincipais'));
+const ConfiguracoesAtalhosSetor = lazy(() => import('./pages/ConfiguracoesAtalhosSetor'));
+const ConfiguracoesDetalheLayout = lazy(() => import('./pages/ConfiguracoesDetalheLayout'));
 const Parceiros = lazy(() => import('./pages/Parceiros'));
 const ParceiroCategorias = lazy(() => import('./pages/ParceiroCategorias'));
 const ComercialEmpreendimentos = lazy(() => import('./pages/ComercialEmpreendimentos'));
@@ -925,6 +928,9 @@ export default function App() {
         <Route path="nova-solicitacao-automacao-destino" element={<ConfiguracoesAreaRoute area="solicitacoes"><NovaSolicitacaoAutomacaoDestinoConfig /></ConfiguracoesAreaRoute>} />
         <Route path="tipos-compartilhados-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><TiposCompartilhadosSetor /></ConfiguracoesAreaRoute>} />
         <Route path="automacao-status-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><AutomacaoStatusSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-acoes-principais" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesAcoesPrincipais /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-atalhos-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesAtalhosSetor /></ConfiguracoesAreaRoute>} />
+        <Route path="configuracoes-detalhe-layout" element={<ConfiguracoesAreaRoute area="status_vinculos"><ConfiguracoesDetalheLayout /></ConfiguracoesAreaRoute>} />
         <Route path="setores-criacao-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresCriacaoTodasObras /></ConfiguracoesAreaRoute>} />
         <Route path="setores-acesso-todas-obras" element={<ConfiguracoesAreaRoute area="status_vinculos"><SetoresAcessoTodasObras /></ConfiguracoesAreaRoute>} />
         <Route path="usuarios-envio-qualquer-setor" element={<ConfiguracoesAreaRoute area="status_vinculos"><UsuariosEnvioQualquerSetor /></ConfiguracoesAreaRoute>} />
