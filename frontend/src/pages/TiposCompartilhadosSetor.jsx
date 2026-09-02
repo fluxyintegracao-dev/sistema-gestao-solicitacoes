@@ -5,7 +5,7 @@ import {
   getTiposCompartilhadosSetor,
   salvarTiposCompartilhadosSetor
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
 
 function normalizarSetorToken(setor) {
   return String(setor?.codigo || setor?.nome || setor?.id || '').trim().toUpperCase();
@@ -96,14 +96,14 @@ export default function TiposCompartilhadosSetor() {
 
   if (loading) {
     return (
-      <div className="page max-w-6xl mx-auto space-y-6">
+      <Pagina className="max-w-6xl mx-auto">
         <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando configuracoes...</p>
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page max-w-6xl mx-auto space-y-6">
+    <Pagina className="max-w-6xl mx-auto">
       <PageHeader
         titulo="Tipos Compartilhados entre Setores"
         subtitulo="Permite que outros setores enxerguem tipos especificos sem alterar a area responsavel da solicitacao."
@@ -119,7 +119,7 @@ export default function TiposCompartilhadosSetor() {
         variante="primario"
         cor="var(--c-primary)"
       >
-        <div className="space-y-5">
+        <div className="space-y-6">
           <div className="max-w-md">
             <CampoForm label="Setor de origem">
               <select className="input w-full" value={setorOrigem} onChange={event => setSetorOrigem(event.target.value)}>
@@ -176,6 +176,6 @@ export default function TiposCompartilhadosSetor() {
           </div>
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

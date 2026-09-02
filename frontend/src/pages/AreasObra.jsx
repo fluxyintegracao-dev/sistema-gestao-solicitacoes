@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getSetores } from '../services/setores';
 import { getAreasObra, salvarAreasObra } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 
 export default function AreasObra() {
   const [setores, setSetores] = useState([]);
@@ -68,7 +68,7 @@ export default function AreasObra() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Areas visiveis para OBRA"
         subtitulo="Marque quais areas os usuarios do setor OBRA podem selecionar na tela de Nova Solicitacao."
@@ -113,6 +113,6 @@ export default function AreasObra() {
           })}
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

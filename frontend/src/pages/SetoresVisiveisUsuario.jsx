@@ -5,7 +5,7 @@ import {
   getSetoresVisiveisPorUsuario,
   salvarSetoresVisiveisPorUsuario
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
 
 export default function SetoresVisiveisUsuario() {
   const [setores, setSetores] = useState([]);
@@ -116,7 +116,7 @@ export default function SetoresVisiveisUsuario() {
     : 0;
 
   return (
-    <div className="space-y-6">
+    <Pagina>
       <PageHeader
         titulo="Setores visiveis por usuario"
         subtitulo="Defina setores adicionais que cada usuario pode visualizar na lista e no detalhe. As acoes continuam obedecendo as permissoes e regras atuais do setor responsavel."
@@ -174,6 +174,6 @@ export default function SetoresVisiveisUsuario() {
           )}
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

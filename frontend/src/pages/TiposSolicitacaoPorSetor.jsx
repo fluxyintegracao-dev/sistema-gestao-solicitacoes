@@ -5,7 +5,7 @@ import {
   getTiposSolicitacaoPorSetor,
   salvarTiposSolicitacaoPorSetor
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, CampoForm } from '../components/padrao';
 
 const MODOS = [
   { value: 'ADMIN_PRIMEIRO', label: 'Admin primeiro' },
@@ -126,16 +126,16 @@ export default function TiposSolicitacaoPorSetor() {
 
   if (loading) {
     return (
-      <div className="page solicitacoes-page">
+      <Pagina>
         <p className="text-sm" style={{ color: 'var(--c-muted)' }}>Carregando configurações...</p>
-      </div>
+      </Pagina>
     );
   }
 
   const tiposSelecionados = new Set((regraAtual.tipos || []).map(Number));
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Tipos de Solicitação por Setor"
         subtitulo="Defina quais tipos ficam habilitados para cada setor e como cada tipo é recebido."
@@ -180,7 +180,7 @@ export default function TiposSolicitacaoPorSetor() {
               const selecionado = tiposSelecionados.has(Number(tipo.id));
               return (
                 <div key={tipo.id} className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:gap-4">
-                  <label className="flex items-center gap-2 md:min-w-[320px]">
+                  <label className="flex items-center gap-2 app-painel-lateral">
                     <input
                       type="checkbox"
                       checked={selecionado}
@@ -218,6 +218,6 @@ export default function TiposSolicitacaoPorSetor() {
           </div>
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

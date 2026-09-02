@@ -5,7 +5,7 @@ import { getUsuario, criarUsuario, atualizarUsuario } from '../services/usuarios
 import { useAuth } from '../contexts/AuthContext';
 import { isBusinessAdmin, isSuperadmin } from '../utils/acessoProduto';
 import { useSafeNavigateBack } from '../utils/navigation';
-import { PageHeader, BlocoConteudo, FormSecao, CampoForm } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, FormSecao, CampoForm } from '../components/padrao';
 
 export default function UsuarioNovo() {
   const { user } = useAuth();
@@ -119,14 +119,14 @@ export default function UsuarioNovo() {
 
   if (loading) {
     return (
-      <div className="page solicitacoes-page">
+      <Pagina>
         <div className="app-empty-card">Carregando usuario...</div>
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo={editando ? 'Editar usuario' : 'Novo usuario'}
         subtitulo="Dados de acesso, perfil, permissoes e obras vinculadas."
@@ -276,7 +276,7 @@ export default function UsuarioNovo() {
                       <label
                         key={obra.id}
                         title={`ID ${obra.id}`}
-                        className={`flex cursor-pointer items-center gap-3 border-b border-[var(--c-border)] px-4 py-2.5 text-sm last:border-b-0 ${
+                        className={`flex cursor-pointer items-center gap-3 border-b border-[var(--c-border)] px-4 py-3 text-sm last:border-b-0 ${
                           checked ? 'bg-[var(--sem-info-bg)]' : ''
                         }`}
                       >
@@ -310,6 +310,6 @@ export default function UsuarioNovo() {
           </div>
         </BlocoConteudo>
       </form>
-    </div>
+    </Pagina>
   );
 }

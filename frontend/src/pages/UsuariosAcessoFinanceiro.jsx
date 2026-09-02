@@ -4,7 +4,7 @@ import {
   getUsuariosAcessoFinanceiro,
   salvarUsuariosAcessoFinanceiro
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function hasFinanceiroBaseAccess(usuario) {
@@ -76,8 +76,7 @@ export default function UsuariosAcessoFinanceiro() {
     {
       id: 'extra',
       titulo: 'Acesso extra',
-      largura: 110,
-      minWidth: 90,
+      tipo: 'status',
       render: (usuario) => (
         <input
           type="checkbox"
@@ -90,27 +89,26 @@ export default function UsuariosAcessoFinanceiro() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      largura: 260,
-      minWidth: 180,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
     },
     {
       id: 'setor',
       titulo: 'Setor',
-      largura: 160,
+      tipo: 'badge',
       render: (usuario) => String(usuario?.setor?.nome || '-').toUpperCase()
     },
     {
       id: 'perfil',
       titulo: 'Perfil',
-      largura: 140,
+      tipo: 'badge',
       render: (usuario) => String(usuario?.perfil || '').toUpperCase() || '-'
     },
     {
       id: 'base',
       titulo: 'Regra base',
-      largura: 160,
+      tipo: 'status',
       render: (usuario) => (
         hasFinanceiroBaseAccess(usuario) ? (
           <span title="Ja possui acesso por perfil/setor, mesmo sem marcacao nesta tela">
@@ -124,7 +122,7 @@ export default function UsuariosAcessoFinanceiro() {
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Acesso ao financeiro por usuario"
         subtitulo="Marque usuarios extras que devem acessar o modulo financeiro. Usuarios liberados aqui tambem passam a operar o financeiro com acesso a todas as obras."
@@ -135,36 +133,34 @@ export default function UsuariosAcessoFinanceiro() {
         }}
       />
 
-      <div className="space-y-3">
-        <BlocoConteudo
-          titulo="Quem ja tem acesso por regra base"
-          variante="secundario"
-          recolhivel
-          recolhidoPadrao
-        >
-          <p className="app-note">
-            Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuarios de setor financeiro
-            ja possuem acesso por regra base, mesmo sem marcacao nesta tela. Eles aparecem na
-            lista com a etiqueta &quot;Ja liberado&quot;.
-          </p>
-        </BlocoConteudo>
+      <BlocoConteudo
+        titulo="Quem ja tem acesso por regra base"
+        variante="secundario"
+        recolhivel
+        recolhidoPadrao
+      >
+        <p className="app-note">
+          Perfis SUPERADMIN, ADMINISTRADOR, perfil FINANCEIRO e usuarios de setor financeiro
+          ja possuem acesso por regra base, mesmo sem marcacao nesta tela. Eles aparecem na
+          lista com a etiqueta &quot;Ja liberado&quot;.
+        </p>
+      </BlocoConteudo>
 
-        <BlocoConteudo
-          titulo={`Usuarios ativos (${selecionados.size} com acesso extra)`}
-          variante="primario"
-          cor="var(--module-financeiro)"
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={usuariosOrdenados}
-            storageKey="tabela:usuarios-acesso-financeiro"
-            vazio={{
-              title: 'Nenhum usuario para exibir',
-              message: 'Aguarde o carregamento ou verifique o cadastro de usuarios ativos.'
-            }}
-          />
-        </BlocoConteudo>
-      </div>
-    </div>
+      <BlocoConteudo
+        titulo={`Usuarios ativos (${selecionados.size} com acesso extra)`}
+        variante="primario"
+        cor="var(--module-financeiro)"
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={usuariosOrdenados}
+          storageKey="tabela:usuarios-acesso-financeiro"
+          vazio={{
+            title: 'Nenhum usuario para exibir',
+            message: 'Aguarde o carregamento ou verifique o cadastro de usuarios ativos.'
+          }}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

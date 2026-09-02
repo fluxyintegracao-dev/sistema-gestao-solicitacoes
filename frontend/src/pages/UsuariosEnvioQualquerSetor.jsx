@@ -3,7 +3,7 @@ import {
   getUsuariosEnvioQualquerSetor,
   salvarUsuariosEnvioQualquerSetor
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 function normalizarTexto(valor) {
@@ -106,8 +106,7 @@ export default function UsuariosEnvioQualquerSetor() {
     {
       id: 'liberado',
       titulo: 'Liberado',
-      largura: 100,
-      minWidth: 80,
+      tipo: 'status',
       render: (usuario) => (
         <input
           type="checkbox"
@@ -120,33 +119,32 @@ export default function UsuariosEnvioQualquerSetor() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      largura: 260,
-      minWidth: 180,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
     },
     {
       id: 'perfil',
       titulo: 'Perfil',
-      largura: 140,
+      tipo: 'badge',
       render: (usuario) => String(usuario.perfil || '').toUpperCase() || '-'
     },
     {
       id: 'setor',
       titulo: 'Setor',
-      largura: 160,
+      tipo: 'badge',
       render: (usuario) => usuario?.setor?.nome || usuario?.setor?.codigo || '-'
     },
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (usuario) => <StatusBadge status={usuario?.ativo !== false ? 'Ativo' : 'Inativo'} />
     }
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Envio livre entre setores"
         subtitulo="Libera usuarios especificos para enviar solicitacoes a outro setor mesmo quando elas nao estao no setor atual deles. Usuarios do setor OBRA continuam fora desta regra."
@@ -161,30 +159,28 @@ export default function UsuariosEnvioQualquerSetor() {
         ]}
       />
 
-      <div className="space-y-3">
-        <BlocoConteudo
-          titulo={`Usuarios (${selecionados.size} marcado(s))`}
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <input
-              className="input input-sm app-busca"
-              placeholder="Nome, email, perfil ou setor"
-              aria-label="Buscar usuario"
-              value={busca}
-              onChange={event => setBusca(event.target.value)}
-            />
-          )}
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={usuariosFiltrados}
-            carregando={carregando}
-            storageKey="tabela:usuarios-envio-livre"
-            vazio={{ title: 'Nenhum usuario encontrado' }}
+      <BlocoConteudo
+        titulo={`Usuarios (${selecionados.size} marcado(s))`}
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <input
+            className="input input-sm app-busca"
+            placeholder="Nome, email, perfil ou setor"
+            aria-label="Buscar usuario"
+            value={busca}
+            onChange={event => setBusca(event.target.value)}
           />
-        </BlocoConteudo>
-      </div>
-    </div>
+        )}
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={usuariosFiltrados}
+          carregando={carregando}
+          storageKey="tabela:usuarios-envio-livre"
+          vazio={{ title: 'Nenhum usuario encontrado' }}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }

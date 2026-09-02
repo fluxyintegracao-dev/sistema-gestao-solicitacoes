@@ -4,7 +4,7 @@ import {
   getSetoresAcessoTodasObras,
   salvarSetoresAcessoTodasObras
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 
 export default function SetoresAcessoTodasObras() {
   const [setores, setSetores] = useState([]);
@@ -67,7 +67,7 @@ export default function SetoresAcessoTodasObras() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Setores com acesso em todas as obras"
         subtitulo="Setores marcados podem visualizar e operar recursos protegidos por obra sem depender de vinculo manual em usuario x obra."
@@ -102,6 +102,6 @@ export default function SetoresAcessoTodasObras() {
           })}
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

@@ -5,7 +5,7 @@ import {
   salvarUsuariosPermissoesRhDp
 } from '../services/configuracoesSistema';
 import { RH_DP_PERMISSION_GROUPS, normalizeRhDpPermissionList } from '../constants/rhDpPermissions';
-import { PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 
 function normalizePermissionMap(input) {
   const source = input && typeof input === 'object' ? input : {};
@@ -131,7 +131,7 @@ export default function UsuariosPermissoesRhDp() {
   }
 
   return (
-    <div className="page solicitacoes-page rhdp-page">
+    <Pagina className="rhdp-page">
       <PageHeader
         titulo="Permissoes RH/DP por usuario"
         subtitulo="Monte usuarios de RH e contabilidade sem criar perfil novo: o ADMINISTRADOR define exatamente quais areas do RH/DP cada usuario pode operar."
@@ -142,35 +142,34 @@ export default function UsuariosPermissoesRhDp() {
         }}
       />
 
-      <div className="space-y-3">
-        <BlocoConteudo
-          titulo="Regra base de acesso ao RH/DP"
-          variante="secundario"
-          recolhivel
-          recolhidoPadrao
-        >
-          <p className="app-note">
-            SUPERADMIN e ADMINISTRADOR continuam com bypass total. Esta tela serve para liberar
-            acessos granulares aos demais usuarios, inclusive contabilidade com escopo parcial.
-          </p>
-        </BlocoConteudo>
+      <BlocoConteudo
+        titulo="Regra base de acesso ao RH/DP"
+        variante="secundario"
+        recolhivel
+        recolhidoPadrao
+      >
+        <p className="app-note">
+          SUPERADMIN e ADMINISTRADOR continuam com bypass total. Esta tela serve para liberar
+          acessos granulares aos demais usuarios, inclusive contabilidade com escopo parcial.
+        </p>
+      </BlocoConteudo>
 
-        <BlocoConteudo
-          titulo={`Usuarios ativos (${Object.keys(selecionados).length} configurado(s))`}
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <input
-              className="input input-sm app-busca"
-              placeholder="Nome, email, perfil ou setor"
-              aria-label="Buscar usuario"
-              value={filtro}
-              onChange={(event) => setFiltro(event.target.value)}
-            />
-          )}
-        >
-          <div className="space-y-3">
-            {usuariosFiltrados.map((usuario) => {
+      <BlocoConteudo
+        titulo={`Usuarios ativos (${Object.keys(selecionados).length} configurado(s))`}
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <input
+            className="input input-sm app-busca"
+            placeholder="Nome, email, perfil ou setor"
+            aria-label="Buscar usuario"
+            value={filtro}
+            onChange={(event) => setFiltro(event.target.value)}
+          />
+        )}
+      >
+        <div className="space-y-3">
+          {usuariosFiltrados.map((usuario) => {
               const currentPermissions = normalizeRhDpPermissionList(selecionados[Number(usuario.id)] || []);
 
               return (
@@ -207,11 +206,11 @@ export default function UsuariosPermissoesRhDp() {
                               >
                                 <input
                                   type="checkbox"
-                                  className="mt-0.5"
+                                  className="mt-1"
                                   checked={checked}
                                   onChange={() => togglePermission(usuario.id, permissionKey)}
                                 />
-                                <span className="flex flex-col gap-0.5">
+                                <span className="flex flex-col gap-1">
                                   <span className="font-medium text-[var(--c-text)]">{permissionLabel}</span>
                                   <span className="app-note">{permissionDescription}</span>
                                 </span>
@@ -233,7 +232,6 @@ export default function UsuariosPermissoesRhDp() {
             )}
           </div>
         </BlocoConteudo>
-      </div>
-    </div>
+    </Pagina>
   );
 }

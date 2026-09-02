@@ -4,7 +4,7 @@ import {
   getSetoresCriacaoTodasObras,
   salvarSetoresCriacaoTodasObras
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo } from '../components/padrao';
 
 export default function SetoresCriacaoTodasObras() {
   const [setores, setSetores] = useState([]);
@@ -66,7 +66,7 @@ export default function SetoresCriacaoTodasObras() {
   }
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Setores com criação em todas as obras"
         subtitulo="Setores marcados podem criar solicitação em qualquer obra na tela de Nova Solicitação. A visibilidade das solicitações continua seguindo as regras atuais."
@@ -101,6 +101,6 @@ export default function SetoresCriacaoTodasObras() {
           })}
         </div>
       </BlocoConteudo>
-    </div>
+    </Pagina>
   );
 }

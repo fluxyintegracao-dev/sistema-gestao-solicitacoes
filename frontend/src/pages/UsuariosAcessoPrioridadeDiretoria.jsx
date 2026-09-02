@@ -3,7 +3,7 @@ import {
   getUsuariosAcessoPrioridadeDiretoria,
   salvarUsuariosAcessoPrioridadeDiretoria
 } from '../services/configuracoesSistema';
-import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 
 const MODO_NENHUM = 'NENHUM';
@@ -178,34 +178,33 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     {
       id: 'usuario',
       titulo: 'Usuario',
-      largura: 240,
-      minWidth: 170,
+      tipo: 'texto',
       noCard: 'titulo',
       render: (usuario) => <CelulaDupla principal={usuario.nome} sub={usuario.email} />
     },
     {
       id: 'perfil',
       titulo: 'Perfil',
-      largura: 130,
+      tipo: 'badge',
       render: (usuario) => String(usuario.perfil || '').toUpperCase() || '-'
     },
     {
       id: 'setor',
       titulo: 'Setor',
-      largura: 140,
+      tipo: 'badge',
       render: (usuario) => usuario?.setor?.nome || usuario?.setor?.codigo || '-'
     },
     {
       id: 'status',
       titulo: 'Status',
-      largura: 96,
+      tipo: 'status',
       render: (usuario) => <StatusBadge status={usuario?.ativo !== false ? 'Ativo' : 'Inativo'} />
     },
     {
       id: 'escopo',
       titulo: 'Escopo',
-      largura: 190,
-      minWidth: 150,
+      tipo: 'texto',
+      flex: false,
       render: (usuario) => {
         const acesso = normalizarAcesso(acessos[String(usuario.id)]);
         const ativo = usuario?.ativo !== false;
@@ -227,8 +226,8 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
     {
       id: 'diretorias',
       titulo: 'Diretorias',
-      largura: 280,
-      minWidth: 180,
+      tipo: 'texto',
+      flex: false,
       render: (usuario) => {
         const acesso = normalizarAcesso(acessos[String(usuario.id)]);
         const ativo = usuario?.ativo !== false;
@@ -265,7 +264,7 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
   ];
 
   return (
-    <div className="page solicitacoes-page">
+    <Pagina>
       <PageHeader
         titulo="Acesso a Prioridade Diretoria"
         subtitulo="Defina quais usuarios acessam os lotes de prioridade e se enxergam todos os lotes ou apenas diretorias especificas."
@@ -280,36 +279,34 @@ export default function UsuariosAcessoPrioridadeDiretoria() {
         ]}
       />
 
-      <div className="space-y-3">
-        {diretorias.length === 0 && !carregando && (
-          <div className="app-alert">
-            Nenhuma diretoria esta configurada em Aprovacao por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
-          </div>
-        )}
+      {diretorias.length === 0 && !carregando && (
+        <div className="app-alert">
+          Nenhuma diretoria esta configurada em Aprovacao por Diretoria. Configure as diretorias antes de limitar por diretoria especifica.
+        </div>
+      )}
 
-        <BlocoConteudo
-          titulo={`Usuarios (${totalConfigurados} configurado(s))`}
-          variante="primario"
-          cor="var(--c-primary)"
-          acoes={(
-            <input
-              className="input input-sm app-busca"
-              placeholder="Nome, email, perfil ou setor"
-              aria-label="Buscar usuario"
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-            />
-          )}
-        >
-          <TabelaPadrao
-            colunas={colunas}
-            itens={usuariosFiltrados}
-            carregando={carregando}
-            storageKey="tabela:usuarios-prioridade-diretoria"
-            vazio={{ title: 'Nenhum usuario encontrado' }}
+      <BlocoConteudo
+        titulo={`Usuarios (${totalConfigurados} configurado(s))`}
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <input
+            className="input input-sm app-busca"
+            placeholder="Nome, email, perfil ou setor"
+            aria-label="Buscar usuario"
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
           />
-        </BlocoConteudo>
-      </div>
-    </div>
+        )}
+      >
+        <TabelaPadrao
+          colunas={colunas}
+          itens={usuariosFiltrados}
+          carregando={carregando}
+          storageKey="tabela:usuarios-prioridade-diretoria"
+          vazio={{ title: 'Nenhum usuario encontrado' }}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }
