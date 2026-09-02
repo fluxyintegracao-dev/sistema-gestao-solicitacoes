@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { PageHeader, BlocoConteudo } from '../components/padrao';
 import {
   getObraTipoApropriacao,
   getApropriacoesDaObra,
@@ -160,27 +161,24 @@ export default function ObraTipoApropriacao() {
 
   return (
     <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Apropriacao padrao por obra</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
-          Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada
-          obra e tipo. Como os codigos de apropriacao variam entre as obras, o vinculo precisa
-          ser informado obra a obra.
-        </p>
-      </div>
+      <PageHeader
+        titulo="Apropriacao padrao por obra"
+        subtitulo="Defina qual apropriacao sera preenchida automaticamente na Nova Solicitacao para cada obra e tipo. Como os codigos variam entre as obras, o vinculo e informado obra a obra."
+      />
 
       {padroesNovaObra.length > 0 && (
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-y border-[var(--c-border)] py-2 text-sm">
-          <span className="font-semibold text-[var(--c-text)]">Novas obras recebem automaticamente:</span>
-          {padroesNovaObra.map((padrao) => (
-            <span key={padrao.tipo_codigo} className="text-[var(--c-muted)]">
-              <strong className="text-[var(--c-text)]">{padrao.codigo}</strong> — {padrao.descricao}
-            </span>
-          ))}
-        </div>
+        <BlocoConteudo titulo="Novas obras recebem automaticamente" variante="secundario" recolhivel>
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+            {padroesNovaObra.map((padrao) => (
+              <span key={padrao.tipo_codigo} className="text-[var(--c-muted)]">
+                <strong className="text-[var(--c-text)]">{padrao.codigo}</strong> — {padrao.descricao}
+              </span>
+            ))}
+          </div>
+        </BlocoConteudo>
       )}
 
-      <div className="card space-y-4">
+      <div className="app-bloco app-bloco--primario space-y-4" style={{ '--bloco-cor': 'var(--c-primary)' }}>
         <div className="flex gap-2 flex-wrap items-center">
           <input
             type="text"

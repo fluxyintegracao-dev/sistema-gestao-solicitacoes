@@ -1,14 +1,6 @@
 ﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  HiOutlineBuildingOffice2,
-  HiOutlineMapPin,
-  HiOutlinePencilSquare,
-  HiOutlinePlus,
-  HiOutlinePower,
-  HiOutlineArrowRight
-} from 'react-icons/hi2';
-import {
   getObras,
   getObrasGestao,
   criarObra,
@@ -19,6 +11,8 @@ import {
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { useAuth } from '../contexts/AuthContext';
 import { canAccessGestaoObras, canManageCadastroObras } from '../utils/acessoProduto';
+import { PageHeader, BlocoConteudo, TabelaPadrao, CelulaDupla } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -123,8 +117,8 @@ function getExecucaoPercentual(orcado, executado) {
 
 function getLucroPrejuizoColor(value) {
   const numero = Number(value || 0);
-  if (numero > 0) return '#10b981';
-  if (numero < 0) return '#ef4444';
+  if (numero > 0) return 'var(--sem-success)';
+  if (numero < 0) return 'var(--sem-danger)';
   return 'var(--c-text)';
 }
 
@@ -330,310 +324,186 @@ export default function Obras() {
 
   return (
     <div className="page solicitacoes-page">
-      {/* Header */}
-      <div
-        className="sol-surface-card rounded-2xl border px-6 py-6 md:px-8"
-        style={{
-          borderColor: 'var(--ui-border)',
-          boxShadow: 'var(--ui-shadow-sm)'
-        }}
-      >
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div className="space-y-1">
-            <span
-              className="inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
-              style={{ borderColor: 'var(--ui-border)', color: 'var(--c-muted)', background: 'var(--ui-canvas)' }}
-            >
-              Portfólio operacional
-            </span>
-            <h1 className="page-title">Gestão de Obras e Centros de Custo</h1>
-            <p className="page-subtitle">
-              {gestaoObrasHabilitada
-                ? 'Controle das obras reais com orçamento e dos centros de custo administrativos usados nas solicitações.'
-                : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.'}
-            </p>
-          </div>
+      <PageHeader
+        titulo="Gestão de Obras e Centros de Custo"
+        subtitulo={loading
+          ? (gestaoObrasHabilitada
+            ? 'Controle das obras reais com orçamento e dos centros de custo administrativos usados nas solicitações.'
+            : 'Cadastro basico de obras e centros de custo utilizado pelo nucleo de solicitacoes.')
+          : `${obras.length} cadastro(s) · obras reais com orçamento e centros de custo administrativos.`}
+        acaoPrincipal={podeGerenciarCadastro
+          ? { rotulo: 'Novo cadastro', onClick: abrirModalNovaObra }
+          : null}
+      />
 
-          <div className="flex w-full flex-col gap-3 md:w-auto md:min-w-[300px]">
-            <input
-              className="input"
-              placeholder="Buscar por codigo, nome ou cidade"
-              value={busca}
-              onChange={(event) => setBusca(event.target.value)}
-            />
-            {podeGerenciarCadastro && (
-              <button
-                type="button"
-                className="btn btn-primary inline-flex items-center justify-center gap-2"
-                onClick={abrirModalNovaObra}
-              >
-                <HiOutlinePlus className="h-5 w-5" />
-                Novo cadastro
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      {loading ? (
-        <div className="app-empty-card">
-          Carregando obras...
-        </div>
-      ) : obrasFiltradas.length === 0 ? (
-        <div className="app-empty-card">
-          <h2 className="text-lg font-bold" style={{ color: 'var(--c-text)' }}>Nenhum cadastro encontrado</h2>
-          <p className="mt-2 text-sm" style={{ color: 'var(--c-muted)' }}>
-            Ajuste o filtro ou cadastre uma nova obra/centro de custo para iniciar o gerenciamento.
-          </p>
-        </div>
-      ) : (
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {obrasFiltradas.map((obra) => {
-            const orcado = Number(obra.resumo?.orcado || 0);
-            const executado = Number(obra.resumo?.executado || 0);
-            const recebido = Number(obra.resumo?.recebido || 0);
-            const faltaReceber = Number(obra.resumo?.falta_receber || 0);
-            const lucroPrejuizo = Number(obra.resumo?.lucro_prejuizo || 0);
-            const percentual = getExecucaoPercentual(orcado, executado);
-            const cadastroEhObra = isCadastroObra(obra);
-
-            return (
-              <article
-                key={obra.id}
-                className="group overflow-hidden rounded-2xl border transition hover:-translate-y-0.5"
-                style={{
-                  background: 'var(--ui-surface)',
-                  borderColor: 'var(--ui-border)',
-                  boxShadow: 'var(--ui-shadow-sm)'
-                }}
-              >
-                <div className="flex min-h-[255px] flex-col p-6">
-                  <div className="flex items-start justify-between gap-4">
-                    <div
-                      className="inline-flex h-14 w-14 items-center justify-center rounded-2xl text-white"
-                      style={{ background: 'var(--c-primary)', boxShadow: '0 8px 20px rgba(0,0,0,0.2)' }}
-                    >
-                      <HiOutlineBuildingOffice2 className="h-7 w-7" />
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                    <span
-                      className={`rounded-full border px-3 py-1 text-[11px] font-bold uppercase tracking-[0.18em] ${
-                        obra.ativo
-                          ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
-                          : 'border-slate-200 bg-slate-100 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'
-                      }`}
-                    >
-                      {obra.ativo ? 'Ativa' : 'Inativa'}
-                    </span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                      {getTipoCadastroLabel(obra)}
-                    </span>
-                    {cadastroEhObra && obra.classificacao && (
-                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                        obra.classificacao === 'PRIVADA'
-                          ? 'border-violet-200 bg-violet-50 text-violet-700'
-                          : 'border-sky-200 bg-sky-50 text-sky-700'
-                      }`}>
-                        {obra.classificacao}
-                      </span>
-                    )}
-                  </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <div
-                      className="text-[11px] font-bold uppercase tracking-[0.26em]"
-                      style={{ color: 'var(--c-muted)' }}
-                    >
-                      {obra.codigo || `OBRA ${obra.id}`}
-                    </div>
-                    <h2
-                      className="mt-2 text-2xl font-black uppercase leading-tight tracking-tight"
-                      style={{ color: 'var(--c-text)' }}
-                    >
-                      {obra.nome}
-                    </h2>
-                    <div
-                      className="mt-3 inline-flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.18em]"
-                      style={{ color: 'var(--c-muted)' }}
-                    >
-                      <HiOutlineMapPin className="h-4 w-4" />
-                      {obra.cidade || 'Cidade nao informada'}
-                    </div>
-                    <div className="mt-2 text-xs font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--c-muted)' }}>
-                      Empresa: {obra.empresaGrupo?.nome || 'Nao vinculada'}
-                    </div>
-                  </div>
-
-                  {cadastroEhObra && (obra.vgv != null || obra.planilha_geral != null || obra.margem_custo_esperada != null) && (
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      {obra.vgv != null && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--c-muted)' }}>VGV</div>
-                          <div className="mt-0.5 text-sm font-bold" style={{ color: 'var(--c-text)' }}>{formatCurrency(obra.vgv)}</div>
-                        </div>
-                      )}
-                      {obra.planilha_geral != null && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--c-muted)' }}>Planilha Geral</div>
-                          <div className="mt-0.5 text-sm font-bold" style={{ color: 'var(--c-text)' }}>{formatCurrency(obra.planilha_geral)}</div>
-                        </div>
-                      )}
-                      {obra.margem_custo_esperada != null && (
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--c-muted)' }}>Margem</div>
-                          <div className="mt-0.5 text-sm font-bold" style={{ color: 'var(--c-text)' }}>{Number(obra.margem_custo_esperada).toFixed(1)}%</div>
-                        </div>
-                      )}
-                      {(() => {
-                        const ref = obra.vgv ?? obra.planilha_geral;
-                        const margem = obra.margem_custo_esperada;
-                        if (ref != null && margem != null && margem > 0) {
-                          const orcamento = Number(ref) * (1 - Number(margem) / 100);
-                          return (
-                            <div>
-                              <div className="text-[10px] font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--c-muted)' }}>Orçamento</div>
-                              <div className="mt-0.5 text-sm font-bold" style={{ color: 'var(--c-primary)' }}>{formatCurrency(orcamento)}</div>
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                  )}
-
-                  {gestaoObrasHabilitada && cadastroEhObra ? (
-                    <>
-                      <div className="mt-8 grid grid-cols-2 gap-4">
-                        <div>
-                          <div
-                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                            style={{ color: 'var(--c-muted)' }}
-                          >
-                            Executado
-                          </div>
-                          <div className="mt-2 text-base font-black" style={{ color: 'var(--c-primary)' }}>
-                            {formatCurrency(executado)}
-                          </div>
-                        </div>
-                        <div>
-                          <div
-                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                            style={{ color: 'var(--c-muted)' }}
-                          >
-                            Recebido
-                          </div>
-                          <div className="mt-2 text-base font-black" style={{ color: '#10b981' }}>
-                            {formatCurrency(recebido)}
-                          </div>
-                        </div>
-                        <div>
-                          <div
-                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                            style={{ color: 'var(--c-muted)' }}
-                          >
-                            Falta receber
-                          </div>
-                          <div className="mt-2 text-base font-black" style={{ color: faltaReceber > 0 ? '#f59e0b' : 'var(--c-text)' }}>
-                            {formatCurrency(faltaReceber)}
-                          </div>
-                        </div>
-                        <div>
-                          <div
-                            className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                            style={{ color: 'var(--c-muted)' }}
-                          >
-                            Lucro/Prejuizo
-                          </div>
-                          <div className="mt-2 text-base font-black" style={{ color: getLucroPrejuizoColor(lucroPrejuizo) }}>
-                            {formatCurrency(lucroPrejuizo)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-5">
-                        <div
-                          className="mb-2 flex items-center justify-between text-[11px] font-semibold uppercase tracking-[0.18em]"
-                          style={{ color: 'var(--c-muted)' }}
-                        >
-                          <span>Execucao</span>
-                          <span>{percentual.toFixed(1)}%</span>
-                        </div>
-                        <div
-                          className="h-2 overflow-hidden rounded-full"
-                          style={{ background: 'var(--ui-border)' }}
-                        >
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${percentual}%`, background: 'var(--c-primary)' }}
-                          />
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="mt-8 rounded-2xl border border-[var(--ui-border)] bg-[var(--ui-canvas)] px-4 py-4">
-                      <div
-                        className="text-[10px] font-bold uppercase tracking-[0.2em]"
-                        style={{ color: 'var(--c-muted)' }}
-                      >
-                        Modo atual
-                      </div>
-                      <div className="mt-2 text-sm font-semibold" style={{ color: 'var(--c-text)' }}>
-                        {cadastroEhObra ? 'Cadastro basico ativo' : 'Centro de custo ativo'}
-                      </div>
-                      <p className="mt-2 text-sm" style={{ color: 'var(--c-muted)' }}>
-                        {cadastroEhObra
-                          ? 'Esta obra continua disponivel para solicitacoes e configuracoes basicas.'
-                          : 'Este centro de custo esta disponivel para solicitacoes e titulos financeiros sem estrutura de obra.'}
-                      </p>
-                    </div>
-                  )}
-
-                  <div className="mt-auto pt-7">
-                    <div className="flex flex-wrap gap-2">
-                      {gestaoObrasHabilitada && cadastroEhObra ? (
-                        <button
-                          type="button"
-                          className="btn btn-primary inline-flex flex-1 items-center justify-center gap-2"
-                          onClick={() => navigate(`/obras/${obra.id}`)}
-                        >
-                          Gerenciar obra
-                          <HiOutlineArrowRight className="h-4 w-4" />
-                        </button>
-                      ) : (
-                        <div className="inline-flex min-h-[44px] flex-1 items-center rounded-xl border border-[var(--ui-border)] bg-[var(--ui-canvas)] px-4 text-sm font-medium text-[var(--c-muted)]">
-                          {cadastroEhObra ? 'Gestao de obras desabilitada no plano' : 'Centro de custo sem abas de obra'}
-                        </div>
-                      )}
-                      {podeGerenciarCadastro && (
-                        <>
-                          <button
-                            type="button"
-                            className="btn btn-outline inline-flex h-[44px] w-[44px] items-center justify-center"
-                            onClick={() => abrirModalEditarObra(obra)}
-                            title="Editar obra"
-                          >
-                            <HiOutlinePencilSquare className="h-5 w-5" />
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline inline-flex h-[44px] w-[44px] items-center justify-center"
-                            onClick={() => toggleAtivo(obra)}
-                            title={obra.ativo ? 'Desativar obra' : 'Ativar obra'}
-                          >
-                            <HiOutlinePower className="h-5 w-5" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </section>
+      {!gestaoObrasHabilitada && (
+        <p className="app-note">
+          Gestão de obras desabilitada no plano — os cadastros seguem disponíveis para
+          solicitações, títulos e configurações básicas.
+        </p>
       )}
+
+      <BlocoConteudo
+        titulo="Cadastros"
+        variante="primario"
+        cor="var(--c-primary)"
+        acoes={(
+          <input
+            className="input input-sm w-[240px]"
+            placeholder="Buscar por codigo, nome ou cidade"
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
+          />
+        )}
+      >
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'obra',
+              titulo: 'Obra / Centro de custo',
+              largura: 260,
+              minWidth: 190,
+              noCard: 'titulo',
+              render: (obra) => (
+                <CelulaDupla
+                  principal={obra.nome}
+                  sub={[obra.codigo || `OBRA ${obra.id}`, obra.cidade].filter(Boolean).join(' · ')}
+                />
+              )
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa / Tipo',
+              largura: 190,
+              render: (obra) => (
+                <CelulaDupla
+                  principal={obra.empresaGrupo?.nome || 'Não vinculada'}
+                  sub={[getTipoCadastroLabel(obra), isCadastroObra(obra) ? obra.classificacao : null]
+                    .filter(Boolean).join(' · ')}
+                />
+              )
+            },
+            {
+              id: 'vgv',
+              titulo: 'VGV / Orçamento',
+              largura: 165,
+              alinhar: 'right',
+              render: (obra) => {
+                if (!isCadastroObra(obra)) return '-';
+                const ref = obra.vgv ?? obra.planilha_geral;
+                const margem = obra.margem_custo_esperada;
+                const orcamento = ref != null && margem != null && margem > 0
+                  ? Number(ref) * (1 - Number(margem) / 100)
+                  : null;
+                if (ref == null && orcamento == null) return '-';
+                return (
+                  <CelulaDupla
+                    principal={ref != null ? formatCurrency(ref) : '-'}
+                    sub={orcamento != null ? `Orç. ${formatCurrency(orcamento)}` : null}
+                    title={margem != null ? `Margem de custo esperada: ${Number(margem).toFixed(1)}%` : undefined}
+                  />
+                );
+              }
+            },
+            {
+              id: 'executado',
+              titulo: 'Executado',
+              largura: 150,
+              alinhar: 'right',
+              render: (obra) => {
+                if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
+                const orcado = Number(obra.resumo?.orcado || 0);
+                const executado = Number(obra.resumo?.executado || 0);
+                const percentual = getExecucaoPercentual(orcado, executado);
+                return (
+                  <CelulaDupla
+                    principal={formatCurrency(executado)}
+                    sub={`${percentual.toFixed(1)}% do orçado`}
+                  />
+                );
+              }
+            },
+            {
+              id: 'recebido',
+              titulo: 'Recebido',
+              largura: 160,
+              alinhar: 'right',
+              render: (obra) => {
+                if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
+                const recebido = Number(obra.resumo?.recebido || 0);
+                const faltaReceber = Number(obra.resumo?.falta_receber || 0);
+                return (
+                  <CelulaDupla
+                    principal={formatCurrency(recebido)}
+                    sub={faltaReceber > 0 ? `Falta ${formatCurrency(faltaReceber)}` : 'Nada a receber'}
+                  />
+                );
+              }
+            },
+            {
+              id: 'lucro',
+              titulo: 'Lucro/Prejuízo',
+              largura: 140,
+              alinhar: 'right',
+              render: (obra) => {
+                if (!(gestaoObrasHabilitada && isCadastroObra(obra))) return '-';
+                const lucroPrejuizo = Number(obra.resumo?.lucro_prejuizo || 0);
+                return (
+                  <span className="font-semibold" style={{ color: getLucroPrejuizoColor(lucroPrejuizo) }}>
+                    {formatCurrency(lucroPrejuizo)}
+                  </span>
+                );
+              }
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              largura: 95,
+              render: (obra) => <StatusBadge status={obra.ativo ? 'Ativa' : 'Inativa'} />
+            }
+          ]}
+          itens={obrasFiltradas}
+          carregando={loading}
+          storageKey="tabela:obras"
+          larguraAcoes={podeGerenciarCadastro ? 300 : 150}
+          aoClicarLinha={(obra) => {
+            if (gestaoObrasHabilitada && isCadastroObra(obra)) {
+              navigate(`/obras/${obra.id}`);
+            } else if (podeGerenciarCadastro) {
+              abrirModalEditarObra(obra);
+            }
+          }}
+          vazio={{
+            title: 'Nenhum cadastro encontrado',
+            message: 'Ajuste o filtro ou cadastre uma nova obra/centro de custo para iniciar o gerenciamento.'
+          }}
+          acoesLinha={(obra) => (
+            <>
+              {gestaoObrasHabilitada && isCadastroObra(obra) && (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => navigate(`/obras/${obra.id}`)}>
+                  Gerenciar
+                </button>
+              )}
+              {podeGerenciarCadastro && (
+                <>
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirModalEditarObra(obra)}>
+                    Editar
+                  </button>
+                  {obra.ativo ? (
+                    <button type="button" className="btn btn-outline btn-sm btn-perigo-suave" onClick={() => toggleAtivo(obra)}>
+                      Desativar
+                    </button>
+                  ) : (
+                    <button type="button" className="btn btn-outline btn-sm" onClick={() => toggleAtivo(obra)}>
+                      Ativar
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          )}
+        />
+      </BlocoConteudo>
 
       {/* Modal */}
       {modalAberto && (
@@ -848,7 +718,6 @@ export default function Obras() {
               </>
               )}
 
-              <div className="flex flex-wrap justify-end gap-3 md:col-span-3" style={{ display: 'none' }} />
             </form>
             </div>
             <div className="modal-footer">

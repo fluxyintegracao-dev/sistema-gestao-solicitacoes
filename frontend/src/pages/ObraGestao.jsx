@@ -309,65 +309,41 @@ export default function ObraGestao() {
             <KpiCard label="Eficiencia" value={percent(kpis.eficiencia)} helper="do orcamento" />
           </section>
 
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
-            <div className="card px-4 py-3">
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Comparativo Orcado vs Executado por Categoria</h2>
-              <div className="mt-3 space-y-3">
-                {dashboardCategorias.length === 0 ? (
-                  <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhuma categoria orcamentaria vinculada a obra.</div>
-                ) : dashboardCategorias.map((item) => {
-                  const base = Math.max(Number(item.valor_orcado || 0), Number(item.pago || 0), 1);
-                  const widthPago = `${Math.min(100, (Number(item.pago || 0) / base) * 100)}%`;
-                  const widthOrcado = `${Math.min(100, (Number(item.valor_orcado || 0) / base) * 100)}%`;
+          {/* Os dois painéis ("Comparativo" e "Status dos Itens Macro") mostravam
+              as MESMAS categorias com os mesmos valores lado a lado, disputando
+              atenção. Ficou UM painel em largura total; o % de execução — o
+              único dado que o segundo painel acrescentava — entrou na linha. */}
+          <section className="card px-4 py-3">
+            <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Comparativo Orcado vs Executado por Categoria</h2>
+            <div className="mt-3 space-y-3">
+              {dashboardCategorias.length === 0 ? (
+                <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Nenhuma categoria orcamentaria vinculada a obra.</div>
+              ) : dashboardCategorias.map((item) => {
+                const base = Math.max(Number(item.valor_orcado || 0), Number(item.pago || 0), 1);
+                const widthPago = `${Math.min(100, (Number(item.pago || 0) / base) * 100)}%`;
+                const widthOrcado = `${Math.min(100, (Number(item.valor_orcado || 0) / base) * 100)}%`;
 
-                  return (
-                    <div key={item.id}>
-                      <div className="mb-1.5 flex items-center justify-between gap-4 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
-                        <span className="max-w-[52%] truncate">{item.descricao}</span>
-                        <div className="flex items-center gap-3 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
-                          <span>Pago {formatCurrency(item.pago)}</span>
-                          <span>Orcado {formatCurrency(item.valor_orcado)}</span>
-                        </div>
-                      </div>
-                      <div className="space-y-1.5">
-                        <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
-                          <div className="h-full rounded-full obra-bar-fill-soft" style={{ width: widthOrcado }} />
-                        </div>
-                        <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
-                          <div className="h-full rounded-full bg-[linear-gradient(90deg,#2454ff_0%,#35b6ff_100%)]" style={{ width: widthPago }} />
-                        </div>
+                return (
+                  <div key={item.id}>
+                    <div className="mb-1.5 flex items-center justify-between gap-4 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
+                      <span className="min-w-0 flex-1 truncate" title={item.descricao}>{item.descricao}</span>
+                      <div className="flex shrink-0 items-center gap-3 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
+                        <span>Pago {formatCurrency(item.pago)}</span>
+                        <span>Orcado {formatCurrency(item.valor_orcado)}</span>
+                        <span className="font-bold obra-accent-blue">{percent(item.percentual_execucao)}</span>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="card px-4 py-3">
-              <h2 className="text-sm font-semibold" style={{ color: 'var(--c-text)' }}>Status dos Itens Macro</h2>
-              <div className="mt-3 space-y-2">
-                {dashboardCategorias.length === 0 ? (
-                  <div className="text-sm" style={{ color: 'var(--c-muted)' }}>Sem dados para acompanhamento.</div>
-                ) : dashboardCategorias.map((item) => (
-                  <div key={item.id} className="rounded-xl border px-3 py-2.5" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="max-w-[75%]">
-                        <div className="truncate text-sm font-semibold uppercase" style={{ color: 'var(--c-text)' }}>{item.descricao}</div>
-                        <div className="mt-1 text-xs uppercase" style={{ color: 'var(--c-muted)' }}>
-                          Orc: {formatCurrency(item.valor_orcado)} &nbsp;|&nbsp; Exec: {formatCurrency(item.pago)}
-                        </div>
+                    <div className="space-y-1.5">
+                      <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
+                        <div className="h-full rounded-full obra-bar-fill-soft" style={{ width: widthOrcado }} />
                       </div>
-                      <div className="text-sm font-bold obra-accent-blue">{percent(item.percentual_execucao)}</div>
-                    </div>
-                    <div className="mt-2.5 h-2 overflow-hidden rounded-full obra-bar-track">
-                      <div
-                        className="h-full rounded-full bg-[linear-gradient(90deg,#2454ff_0%,#35b6ff_100%)]"
-                        style={{ width: `${Math.min(100, Number(item.percentual_execucao || 0))}%` }}
-                      />
+                      <div className="h-2.5 overflow-hidden rounded-full obra-bar-track">
+                        <div className="h-full rounded-full" style={{ width: widthPago, background: 'var(--c-primary)' }} />
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           </section>
         </>
@@ -384,14 +360,16 @@ export default function ObraGestao() {
             </div>
 
             {podeEditarApropriacoes && (
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-outline !rounded-xl" onClick={limparOrcamento}>
-                  Limpar orcamento
-                </button>
-                <button type="button" className="btn btn-primary !rounded-xl" onClick={() => setNovoItemModal(true)}>
+              <div className="app-actionbar">
+                <button type="button" className="btn btn-primary" onClick={() => setNovoItemModal(true)}>
                   <HiOutlinePlus className="h-4 w-4" />
                   Novo item
                 </button>
+                <span className="app-actionbar-apartada">
+                  <button type="button" className="btn btn-outline btn-perigo-suave" onClick={limparOrcamento}>
+                    Limpar orcamento
+                  </button>
+                </span>
               </div>
             )}
           </div>
@@ -418,7 +396,7 @@ export default function ObraGestao() {
                           <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>{item.codigo}</div>
                           {podeEditarApropriacoes ? (
                             <input
-                              className="input mt-1.5 !rounded-xl"
+                              className="input mt-1.5"
                               style={{ borderColor: 'var(--ui-border)' }}
                               value={item.descricao}
                               onChange={(event) => setOrcamentoDraft((current) => current.map((row) => (
@@ -432,7 +410,7 @@ export default function ObraGestao() {
                         <td className="px-4 py-3 text-right">
                           {podeEditarApropriacoes ? (
                             <input
-                              className="input ml-auto max-w-[220px] !rounded-xl text-right"
+                              className="input ml-auto max-w-[220px] text-right"
                               style={{ borderColor: 'var(--ui-border)' }}
                               value={item.valor_orcado}
                               onChange={(event) => setOrcamentoDraft((current) => current.map((row) => (
@@ -475,7 +453,7 @@ export default function ObraGestao() {
 
               {podeEditarApropriacoes && (
                 <div className="mt-4 flex justify-end">
-                  <button type="button" className="btn btn-primary !rounded-xl" onClick={salvarOrcamento} disabled={savingBudget}>
+                  <button type="button" className="btn btn-primary" onClick={salvarOrcamento} disabled={savingBudget}>
                     {savingBudget ? 'Salvando...' : 'Confirmar e salvar orcamento'}
                   </button>
                 </div>
@@ -635,7 +613,7 @@ export default function ObraGestao() {
                       <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--c-text)' }}>{item.nome_original}</td>
                       <td className="px-4 py-3 text-sm" style={{ color: 'var(--c-text)' }}>{formatDate(item.createdAt)}</td>
                       <td className="px-4 py-3.5 text-right">
-                        <button type="button" className="btn btn-outline !rounded-xl" onClick={() => abrirArquivo(item)}>
+                        <button type="button" className="btn btn-outline" onClick={() => abrirArquivo(item)}>
                           Abrir
                         </button>
                       </td>
@@ -706,7 +684,7 @@ export default function ObraGestao() {
           <div className="card w-full max-w-xl px-5 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-2xl font-black uppercase tracking-[-0.03em]" style={{ color: 'var(--c-text)' }}>Novo item do orcamento</h2>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--c-text)' }}>Novo item do orcamento</h2>
                 <p className="mt-1 text-sm" style={{ color: 'var(--c-muted)' }}>
                   O item sera criado como apropriacao da obra e passara a alimentar orcamento, custo e relatorio final.
                 </p>
@@ -724,7 +702,7 @@ export default function ObraGestao() {
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Codigo
                 <input
-                  className="input !rounded-xl"
+                  className="input"
                   value={novoItem.codigo}
                   onChange={(event) => setNovoItem((current) => ({ ...current, codigo: event.target.value }))}
                 />
@@ -732,7 +710,7 @@ export default function ObraGestao() {
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Descricao
                 <input
-                  className="input !rounded-xl"
+                  className="input"
                   value={novoItem.descricao}
                   onChange={(event) => setNovoItem((current) => ({ ...current, descricao: event.target.value }))}
                 />
@@ -740,7 +718,7 @@ export default function ObraGestao() {
               <label className="grid gap-1 text-sm font-medium" style={{ color: 'var(--c-text)' }}>
                 Valor orcado
                 <input
-                  className="input !rounded-xl"
+                  className="input"
                   value={novoItem.valor_orcado}
                   onChange={(event) => setNovoItem((current) => ({ ...current, valor_orcado: event.target.value }))}
                   placeholder="0,00"
@@ -749,10 +727,10 @@ export default function ObraGestao() {
             </div>
 
             <div className="mt-4 flex justify-end gap-3">
-              <button type="button" className="btn btn-outline !rounded-xl" onClick={() => setNovoItemModal(false)}>
+              <button type="button" className="btn btn-outline" onClick={() => setNovoItemModal(false)}>
                 Cancelar
               </button>
-              <button type="button" className="btn btn-primary !rounded-xl" onClick={criarNovoItem}>
+              <button type="button" className="btn btn-primary" onClick={criarNovoItem}>
                 Criar item
               </button>
             </div>
