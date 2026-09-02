@@ -16,10 +16,12 @@ const { SetorDetalheLayout } = require('../models');
 // Blocos aceitos POR TELA — espelho dos catálogos do frontend
 // (blocosDetalhe.js e blocosHome.js). Nome fora daqui é rejeitado para
 // a config nunca referenciar bloco inexistente.
-// Espelho de frontend/src/pages/SolicitacaoDetalhe/blocosDetalhe.js e
-// frontend/src/navigation/blocosHome.js — mudou lá, muda aqui. No porte
-// para o oficial os cards Pagamentos e Pedido saíram do detalhe e o de
-// Aditivos entrou (decisões do próprio oficial, preservadas na reforma).
+// ⚠️ Espelho de frontend/src/pages/SolicitacaoDetalhe/blocosDetalhe.js e
+// frontend/src/navigation/blocosHome.js — mudou lá, muda AQUI TAMBÉM.
+// frontend/scripts/validarNavegacao.mjs compara os dois lados e FALHA na
+// divergência (registro em docs/MIGRACAO-PARA-OFICIAL.md). No porte para
+// o oficial os cards Pagamentos e Pedido saíram do detalhe e o de
+// Aditivos entrou (decisões do próprio oficial, preservadas na onda 2).
 const BLOCOS_POR_TELA = {
   'detalhe-solicitacao': new Set([
     'apropriacoes',

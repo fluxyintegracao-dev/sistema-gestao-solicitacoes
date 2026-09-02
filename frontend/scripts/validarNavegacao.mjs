@@ -130,11 +130,53 @@ try {
     }
   }
 
+  // 3) Catálogo de blocos: o backend valida a config do admin contra uma
+  //    CÓPIA do catálogo do frontend (BLOCOS_POR_TELA no
+  //    DetalheLayoutController). Se alguém criar/remover um bloco num
+  //    lado e esquecer o outro, a tela de admin passa a oferecer card
+  //    inexistente ou a recusar card válido — este check falha ANTES.
+  const blocosDetalheMod = await server.ssrLoadModule('/src/pages/SolicitacaoDetalhe/blocosDetalhe.js');
+  const blocosHomeMod = await server.ssrLoadModule('/src/navigation/blocosHome.js');
+  const catalogosFrontend = {
+    'detalhe-solicitacao': blocosDetalheMod.BLOCOS_DETALHE.map((b) => b.id),
+    home: blocosHomeMod.BLOCOS_HOME.map((b) => b.id)
+  };
+  const controllerPath = path.join(raiz, '../backend/src/controllers/DetalheLayoutController.js');
+  const controllerSrc = readFileSync(controllerPath, 'utf8');
+  const extrairSetBackend = (tela) => {
+    const marcador = tela === 'home' ? /home:\s*new Set\(\[([^\]]*)\]\)/ : /'detalhe-solicitacao':\s*new Set\(\[([^\]]*)\]\)/;
+    const m = controllerSrc.match(marcador);
+    if (!m) return null;
+    return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  };
+  for (const [tela, idsFrontend] of Object.entries(catalogosFrontend)) {
+    const idsBackend = extrairSetBackend(tela);
+    if (!idsBackend) {
+      falhas += 1;
+      console.error(`CATÁLOGO DE BLOCOS: não achei o Set da tela '${tela}' em ${controllerPath}`);
+      continue;
+    }
+    const front = new Set(idsFrontend);
+    const back = new Set(idsBackend);
+    for (const id of front) {
+      if (!back.has(id)) {
+        falhas += 1;
+        console.error(`CATÁLOGO DE BLOCOS divergente ('${tela}'): '${id}' existe no frontend e falta no DetalheLayoutController`);
+      }
+    }
+    for (const id of back) {
+      if (!front.has(id)) {
+        falhas += 1;
+        console.error(`CATÁLOGO DE BLOCOS divergente ('${tela}'): '${id}' existe no DetalheLayoutController e não no frontend`);
+      }
+    }
+  }
+
   if (falhas > 0) {
     console.error(`\nFALHOU: ${falhas} problema(s).`);
     process.exitCode = 1;
   } else {
-    console.log('\nOK: nenhum link morto; nenhum destino da navegação antiga foi perdido.');
+    console.log('\nOK: nenhum link morto; nenhum destino da navegação antiga foi perdido; catálogos de blocos front↔back idênticos.');
   }
 } finally {
   await server.close();

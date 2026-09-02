@@ -365,6 +365,7 @@ const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
 const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
 const BuscaController = require('./controllers/BuscaController');
+const TelaInicialController = require('./controllers/TelaInicialController');
 const AtalhoSetorController = require('./controllers/AtalhoSetorController');
 const DetalheLayoutController = require('./controllers/DetalheLayoutController');
 const AcaoPrincipalSetorController = require('./controllers/AcaoPrincipalSetorController');
@@ -2270,6 +2271,13 @@ router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirF
 // Busca universal (Ctrl+K): grupos gateados pela permissao da tela
 // correspondente; grupo sem permissao nem e consultado (pacote B2).
 router.get('/busca', BuscaController.index);
+
+// Tela inicial escolhida pelo usuario (pacote B5) — validada no backend
+// contra a fonte unica de navegacao compilada (mesmas regras do
+// frontend); fail-closed: sem permissao/rota, limpa e cai na Home.
+router.get('/me/tela-inicial', TelaInicialController.get);
+router.put('/me/tela-inicial', TelaInicialController.put);
+router.delete('/me/tela-inicial', TelaInicialController.delete);
 
 // Configuracao por setor (pacote B4): leitura aberta a autenticados
 // (metadado de interface); escrita gateada pelo MESMO gate de

@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "gerar:navegacao": "node scripts/gerarCatalogoNavegacaoBackend.mjs",
+    "prebuild": "npm run gerar:navegacao",
     "build": "vite build",
     "test:responsive": "node scripts/validarResponsividadeFrontend.mjs",
     "preview": "vite preview",

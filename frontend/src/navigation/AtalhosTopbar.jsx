@@ -33,8 +33,8 @@ import { useFecharAoSair } from '../hooks/useFecharAoSair';
 // =====================================================================
 
 const LARGURA_ICONE = 36; // px por atalho na fileira
-// Pacote B5 (tela inicial) ainda não portado para este backend.
-const TELA_INICIAL_DISPONIVEL = false;
+// Ligado com o pacote B5 (rotas /me/tela-inicial no backend).
+const TELA_INICIAL_DISPONIVEL = true;
 
 export default function AtalhosTopbar() {
   const { user, updateUser } = useContext(AuthContext);

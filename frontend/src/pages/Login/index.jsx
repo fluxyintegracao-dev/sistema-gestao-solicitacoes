@@ -106,9 +106,12 @@ export default function Login() {
       return;
     }
 
-    const perfil = String(data?.user?.perfil || '').trim().toUpperCase();
-    const isAdmin = perfil === 'SUPERADMIN' || perfil.startsWith('ADMIN');
-    navigate(isAdmin ? '/' : '/solicitacoes');
+    // Tela inicial escolhida pelo usuário, já VALIDADA no backend contra
+    // as permissões atuais (payload traz null quando a preferência caiu
+    // — permissão perdida ou rota removida — e nesse caso a Home assume
+    // silenciosamente). Sem escolha, todo perfil cai na Home.
+    const telaInicial = String(data?.user?.tela_inicial?.to || '').trim();
+    navigate(telaInicial.startsWith('/') ? telaInicial : '/');
   }
 
   async function handleSubmit(e) {

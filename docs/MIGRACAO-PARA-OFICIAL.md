@@ -314,10 +314,28 @@ por nome):
 | 2 | `202609020051_indices_busca.js` | B2 (entregue) | Índices `idx_obras_nome` (na tabela de obras, nome físico resolvido em runtime — `Obras` no servidor), `idx_parceiros_nome`, `idx_parceiros_cpf_cnpj` | segunda execução não aplica nada; `SHOW INDEX FROM Obras`/`parceiros` lista os três; Ctrl+K responde rápido com texto de 2+ caracteres |
 | 3 | `202609020052_configuracao_por_setor.js` | B4 (entregue) | Tabelas `setor_atalhos_padrao`, `setor_detalhe_layout` (já com a coluna `tela`) e `acoes_principais_setor` — as três numa migration só | segunda execução não aplica nada; telas de admin (Ação Principal / Atalhos por Setor / Layout do Detalhe) gravam e relêem; mapeamento de ação principal aparece no detalhe |
 
-> Os nomes exatos dos itens 2–3 serão fixados quando cada pacote entrar
-> (data de criação + faixa 0050+, conforme `CONVENCAO-MIGRATIONS.md`); esta
-> tabela será atualizada junto. O B5 (tela inicial) não cria migration —
-> reusa `usuario_lista_preferencias`. B3 e B6 também não criam tabela.
+> O B5 (tela inicial) não cria migration — reusa `usuario_lista_preferencias`.
+> B3 e B6 também não criam tabela.
+>
+> **Artefato do B5 — atenção no deploy do frontend:** o build do frontend
+> ganhou um `prebuild` (`npm run gerar:navegacao`) que compila a fonte única de
+> navegação para `backend/src/generated/navegacaoFonteUnica.cjs` (arquivo
+> COMMITADO — o backend não roda esbuild). O script foi blindado para NUNCA
+> falhar o build: qualquer erro vira aviso no log e o processo sai com código
+> 0, porque o frontend publica sozinho na Vercel a cada push e o backend já
+> degrada em silêncio sem o catálogo (tela inicial cai na Home). Dependências:
+> só o esbuild que o próprio Vite instala.
+
+### Catálogo de blocos: um dado em dois lugares, com guarda
+
+O catálogo de blocos configuráveis (detalhe da solicitação e Home) existe em
+DOIS arquivos que precisam permanecer idênticos: o do frontend
+(`frontend/src/pages/SolicitacaoDetalhe/blocosDetalhe.js` e
+`frontend/src/navigation/blocosHome.js`, que renderizam) e a cópia no backend
+(`BLOCOS_POR_TELA` em `backend/src/controllers/DetalheLayoutController.js`,
+que valida a config do admin). Quem criar ou remover um bloco precisa mudar os
+dois lados — e `frontend/scripts/validarNavegacao.mjs` **falha o check** se
+divergirem (comentários cruzados nos três arquivos apontam um para o outro).
 
 ### O que o preview mostra ANTES de o backend-dev subir com este código
 
@@ -333,7 +351,7 @@ e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver
 | B2 — busca | Ctrl+K encontra **só telas e ações** | Ctrl+K encontra contratos, títulos, obras, parceiros, colaboradores e usuários (o grupo Solicitações liga junto com o B3 — flag `GRUPO_SOLICITACOES_DISPONIVEL` no topo do `BuscaController`) |
 | B3 — solicitações/pendências | Home **sem números** (sem "Para resolver agora"/cartões); lista sem visões "Minhas"/"Fila do setor", sem contadores; busca e ordenação **só sobre os registros carregados** (com aviso sob o campo) | Números reais na Home, cartão abre exatamente o conjunto contado, busca única e ordenação no banco inteiro |
 | B4 — config. por setor | Telas de admin dão erro ao carregar/salvar (endpoints ausentes); sem ação principal em destaque no detalhe; sem atalhos/layout padrão por setor | Camada do administrador ativa (3 telas de admin + ação principal no detalhe) |
-| B5 — tela inicial | Sem a "casinha" no topo; login cai sempre na Home | Usuário escolhe onde o login cai, validado no backend |
+| B5 — tela inicial | A "casinha" aparece mas salvar falha com alerta de erro (endpoints ausentes); login cai sempre na Home | Usuário escolhe onde o login cai (casinha no topo e card no Perfil), validado no backend contra a fonte única compilada |
 | B6 — blocos da Home | "Adicionar bloco" só com os básicos | Catálogo completo de 12 blocos opcionais |
 
 ---

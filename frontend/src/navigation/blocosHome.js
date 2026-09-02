@@ -32,6 +32,10 @@ import {
 
 const SEMPRE = () => true;
 
+// ⚠️ CATÁLOGO ESPELHADO NO BACKEND: BLOCOS_POR_TELA['home'] em
+// backend/src/controllers/DetalheLayoutController.js valida a config do
+// admin contra uma CÓPIA desta lista. Mudou aqui, mude lá — o
+// frontend/scripts/validarNavegacao.mjs FALHA se os dois divergirem.
 export const BLOCOS_HOME = [
   // ----- Home padrão (ligados) ---------------------------------------
   { id: 'pendencias', rotulo: 'Suas pendências', grupo: 'Home', can: SEMPRE },

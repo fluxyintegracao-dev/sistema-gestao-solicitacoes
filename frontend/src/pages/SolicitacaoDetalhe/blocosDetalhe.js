@@ -16,6 +16,10 @@
 
 import { resolverLayoutBlocos } from '../../utils/layoutBlocos';
 
+// ⚠️ CATÁLOGO ESPELHADO NO BACKEND: BLOCOS_POR_TELA['detalhe-solicitacao']
+// em backend/src/controllers/DetalheLayoutController.js valida a config do
+// admin contra uma CÓPIA desta lista. Mudou aqui, mude lá — o
+// frontend/scripts/validarNavegacao.mjs FALHA se os dois divergirem.
 export const BLOCOS_DETALHE = [
   { id: 'apropriacoes', rotulo: 'Apropriações da solicitação' },
   { id: 'itens_compra_direta', rotulo: 'Itens da compra direta' },
