@@ -112,6 +112,56 @@ if (modaisCompraNoPortal < 4) {
   fail('os quatro overlays criticos da gestao de cotacao precisam usar ModalPortal.');
 }
 
+// Comentário que ENGOLE regras (acidente do merge de 02/09): um `/*` de
+// cabeçalho de seção sem o `*/` fica aberto e comenta centenas de regras até
+// o próximo `*/` — CSS válido, então build, minificação e navegador aceitam
+// em silêncio. Detector: regra abrindo em COLUNA 0 dentro de um comentário
+// (prosa que cita uma regra como exemplo é sempre indentada, e não dispara).
+const cssFiles = listFiles(srcRoot, ['.css']);
+for (const cssFile of cssFiles) {
+  const css = fs.readFileSync(cssFile, 'utf8');
+  for (const match of css.matchAll(/\/\*([\s\S]*?)\*\//g)) {
+    const linhaRegra = match[1].split('\n')
+      .find((line) => /^[.#:@[a-zA-Z-][^{}]*\{\s*$/.test(line));
+    if (linhaRegra) {
+      const linha = css.slice(0, match.index).split('\n').length;
+      fail(`comentario iniciado em ${path.relative(frontendRoot, cssFile)}:${linha} `
+        + `engole regras de CSS (ex.: "${linhaRegra.trim()}"). `
+        + 'Provavelmente falta a linha "============================ */" de fechamento do cabecalho.');
+    }
+  }
+}
+
+// Fonte × bundle: toda classe definida nos .css do fonte precisa existir no
+// CSS de produção. Se o dist tiver menos que o fonte, algo foi engolido no
+// caminho (comentário aberto, minificação, purge…) — seja qual for o motivo.
+const distAssets = path.join(frontendRoot, 'dist', 'assets');
+let classesFonte = 0;
+let bundleConferido = false;
+if (fs.existsSync(distAssets)) {
+  const distCss = fs.readdirSync(distAssets)
+    .filter((name) => name.endsWith('.css'))
+    .map((name) => fs.readFileSync(path.join(distAssets, name), 'utf8'))
+    .join('\n');
+  if (distCss) {
+    bundleConferido = true;
+    for (const cssFile of cssFiles) {
+      const semComentarios = fs.readFileSync(cssFile, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+      const nomes = new Set(
+        [...semComentarios.matchAll(/\.([A-Za-z0-9_-]{3,})[\s,{:.[>~+]/g)].map((m) => m[1])
+      );
+      classesFonte += nomes.size;
+      const ausentes = [...nomes].filter((nome) => !distCss.includes(nome));
+      if (ausentes.length > 0) {
+        fail(`${ausentes.length} classe(s) de ${path.relative(frontendRoot, cssFile)} `
+          + `sumiram do CSS de producao (dist/assets): ${ausentes.slice(0, 10).join(', ')}`
+          + `${ausentes.length > 10 ? '…' : ''}. Algo engoliu regras entre o fonte e o bundle — `
+          + 'rode "npm run build" limpo e procure o trecho dessas classes no fonte.');
+      }
+    }
+  }
+}
+
 const sourceFiles = listFiles(srcRoot, ['.jsx', '.js']);
 const routeFiles = sourceFiles.filter((filePath) => {
   const content = fs.readFileSync(filePath, 'utf8');
@@ -129,6 +179,10 @@ console.log(JSON.stringify({
   arquivos_com_tabela: routeFiles.length,
   arquivos_com_wrapper_nomeado: namedScrollFiles.length,
   modais_criticos_com_portal: modaisCompraNoPortal,
+  css_sem_comentario_engolindo_regras: cssFiles.length,
+  classes_fonte_conferidas_no_bundle: bundleConferido
+    ? classesFonte
+    : 'nao conferido — dist ausente, rode npm run build antes',
   protecao_global_de_overlays: true,
   garantia_para_tabelas_historicas: responsiveCss.includes(':has(> table:not(.solicitacoes-table--mobile))'),
   breakpoints: ['smartphone <= 767px', 'tablet <= 1023px', 'desktop >= 1024px']

@@ -409,6 +409,42 @@ e (2) rodar as migrations acima. Até lá, ao testar no preview, é esperado ver
 
 ---
 
+## ⚠️ O comentário que engoliu ~620 regras de CSS (bug de homologação, 02/09)
+
+**O que aconteceu.** O merge de 3 vias da Onda 1 apagou as 20 linhas de
+fechamento (`============================ */`) dos cabeçalhos de seção do
+`frontend/src/index.css`. Linhas idênticas repetidas são exatamente o que
+desalinha um merge — o algoritmo ancorou errado e descartou todas. Cada `/*`
+aberto passou a comentar as regras seguintes até o próximo `*/` do arquivo:
+10 regiões, ~620 blocos engolidos (cabeçalho do detalhe, as duas seções de
+Login, badges de status, tabela responsiva de Solicitações, dashboard,
+filtros, empty states, formulários, tooltips…).
+
+**Por que NADA acusou.** Comentário gigante é CSS *válido*: o build passa sem
+warning, o esbuild remove comentários na minificação (as regras somem do
+bundle em silêncio), o navegador ignora o texto, e o `test:responsive` da
+época checava shell e overflow, não os ladrilhos. Passou por build, teste e
+uma homologação inteira até alguém abrir o detalhe de uma solicitação. Não
+era diferença dev×produção: o arquivo estava igualmente quebrado nos dois —
+no repositório de origem funcionava porque o arquivo de lá estava íntegro.
+
+**O que previne agora.** Dois checks permanentes no
+`frontend/scripts/validarResponsividadeFrontend.mjs` (rodam no
+`test:responsive`, bloqueante antes de cada push):
+
+1. **Comentário engolindo regra** — falha se qualquer comentário de qualquer
+   `.css` do fonte contiver uma linha de abertura de regra em coluna 0
+   (prosa que cita regra como exemplo é indentada e não dispara), apontando
+   arquivo, linha e o trecho engolido.
+2. **Fonte × bundle** — toda classe definida nos `.css` do fonte precisa
+   existir no CSS de `dist/assets` (~1.875 classes conferidas); se o bundle
+   tiver menos que o fonte, o check falha listando as classes sumidas —
+   qualquer que seja o motivo do sumiço, não só comentário.
+
+Regra de ouro que fica: **depois de qualquer merge de arquivo CSS grande,
+rodar o build e comparar fonte×bundle** — merge silencioso + minificação
+silenciosa é uma combinação que esconde estrago grande.
+
 ## Riscos e observações
 
 1. **Snapshot defasado**: o commit inicial daqui é um retrato; o oficial pode ter andado.
