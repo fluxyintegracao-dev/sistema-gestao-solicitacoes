@@ -363,6 +363,7 @@ const CargoController = require('./controllers/CargoController');
 const SetorController = require('./controllers/SetorController');
 const ObraController = require('./controllers/ObraController');
 const TipoSolicitacaoController = require('./controllers/TipoSolicitacaoController');
+const ListaPreferenciasController = require('./controllers/ListaPreferenciasController');
 const DashboardController = require('./controllers/DashboardController');
 const AuthController = require('./controllers/AuthController');
 const LiveUpdatesController = require('./controllers/LiveUpdatesController');
@@ -2252,6 +2253,15 @@ router.get('/configuracoes/tipos-compartilhados-setor', ConfiguracaoSistemaContr
 router.patch('/configuracoes/tipos-compartilhados-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateTiposCompartilhadosSetor);
 router.get('/configuracoes/automacao-status-setor', ConfiguracaoSistemaController.getAutomacaoStatusSetor);
 router.patch('/configuracoes/automacao-status-setor', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateAutomacaoStatusSetor);
+
+// Preferencias e filtros salvos das listas (ListaAvancada) — sempre do
+// proprio usuario autenticado; nao ha como ler ou escrever registro de
+// outra pessoa (pacote B1 de docs/PROPOSTA-BACKEND.md).
+router.get('/listas/:lista/preferencias', ListaPreferenciasController.getPreferencias);
+router.put('/listas/:lista/preferencias', ListaPreferenciasController.putPreferencias);
+router.get('/listas/:lista/filtros', ListaPreferenciasController.listarFiltros);
+router.post('/listas/:lista/filtros', ListaPreferenciasController.salvarFiltro);
+router.delete('/listas/:lista/filtros/:id', ListaPreferenciasController.excluirFiltro);
 router.get('/configuracoes/setores-criacao-todas-obras', ConfiguracaoSistemaController.getSetoresCriacaoTodasObras);
 router.patch('/configuracoes/setores-criacao-todas-obras', allowConfiguracoesStatusVinculos, ConfiguracaoSistemaController.updateSetoresCriacaoTodasObras);
 router.get('/configuracoes/setores-acesso-todas-obras', ConfiguracaoSistemaController.getSetoresAcessoTodasObras);

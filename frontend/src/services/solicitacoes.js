@@ -31,6 +31,16 @@ export async function getSolicitacoes(params = '') {
   return res.json();
 }
 
+// Contadores das visoes da lista (Minhas / Fila do setor / Vencendo /
+// Atrasadas / Todas) — mesmo escopo de visibilidade da listagem.
+export async function getContadoresSolicitacoes() {
+  const res = await fetch(`${API_URL}/solicitacoes/contadores`, {
+    headers: authHeaders()
+  });
+  if (!res.ok) throw new Error('Erro ao carregar contadores das visões');
+  return res.json();
+}
+
 export async function getObrasVisiveisSolicitacoes(params = {}) {
   const query = new URLSearchParams(params).toString();
   const url = query
