@@ -12,6 +12,7 @@ import {
   getCartoesFinanceiros,
   getFaturasCartaoFinanceiro
 } from '../services/financeiro';
+import { TabelaPadrao } from '../components/padrao';
 
 const DEFAULT_FILTERS = {
   status: 'ABERTA',
@@ -253,64 +254,56 @@ export default function FinanceiroFaturasCartao() {
             </button>
           </div>
 
-          <div className="app-dense-table-wrapper">
-            <table className="app-dense-data-table faturas-cartao-table">
-              <colgroup>
-                <col className="app-dense-col-title" />
-                <col className="app-dense-col-title" />
-                <col className="app-dense-col-date" />
-                <col className="app-dense-col-status" />
-                <col className="app-dense-col-money" />
-                <col className="app-dense-col-number" />
-                <col className="app-dense-col-actions" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Fatura</th>
-                  <th>Cartao</th>
-                  <th>Vencimento</th>
-                  <th>Status</th>
-                  <th>Valor</th>
-                  <th>Titulos</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan="7">Carregando faturas...</td></tr>
-                ) : faturas.length === 0 ? (
-                  <tr><td colSpan="7">Nenhuma fatura encontrada.</td></tr>
-                ) : faturas.map((fatura) => (
-                  <tr key={fatura.id}>
-                    <td>
-                      <div className="font-semibold text-[var(--c-text)]">{fatura.competencia || `#${fatura.id}`}</div>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {formatDate(fatura.data_inicio)} a {formatDate(fatura.data_fechamento)}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="text-sm text-[var(--c-text)]">{cartaoLabel(fatura.cartao)}</div>
-                      <div className="text-xs text-[var(--c-muted)]">{contaLabel(fatura.cartao?.contaBancaria)}</div>
-                    </td>
-                    <td>{formatDate(fatura.data_vencimento)}</td>
-                    <td><span className={statusClass(fatura.status)}>{fatura.status || 'ABERTA'}</span></td>
-                    <td className="font-semibold">{formatCurrency(fatura.valor_total)}</td>
-                    <td>{(fatura.titulos || []).length}</td>
-                    <td>
-                      <Link
-                        className="app-dense-icon-action"
-                        to={`/financeiro/faturas-cartao/${fatura.id}`}
-                        title="Abrir detalhes"
-                        aria-label={`Abrir detalhes da fatura ${fatura.competencia || fatura.id}`}
-                      >
-                        <HiOutlineEye />
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'fatura',
+                titulo: 'Fatura',
+                tipo: 'codigo',
+                render: (fatura) => (
+                  <div>
+                    <div className="font-semibold text-[var(--c-text)]">{fatura.competencia || `#${fatura.id}`}</div>
+                    <div className="text-xs text-[var(--c-muted)]">
+                      {formatDate(fatura.data_inicio)} a {formatDate(fatura.data_fechamento)}
+                    </div>
+                  </div>
+                )
+              },
+              {
+                id: 'cartao',
+                titulo: 'Cartao',
+                // R17: o cartao NOMEIA a fatura.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (fatura) => (
+                  <div>
+                    <div className="text-sm text-[var(--c-text)]">{cartaoLabel(fatura.cartao)}</div>
+                    <div className="text-xs text-[var(--c-muted)]">{contaLabel(fatura.cartao?.contaBancaria)}</div>
+                  </div>
+                )
+              },
+              { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (fatura) => formatDate(fatura.data_vencimento) },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (fatura) => <span className={statusClass(fatura.status)}>{fatura.status || 'ABERTA'}</span> },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (fatura) => <span className="font-semibold">{formatCurrency(fatura.valor_total)}</span> },
+              { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (fatura) => (fatura.titulos || []).length }
+            ]}
+            itens={faturas}
+            carregando={loading}
+            vazio="Nenhuma fatura encontrada."
+            storageKey="tabela:faturas-cartao"
+            rotuloRolagem="Faturas de cartao encontradas"
+            larguraAcoes={120}
+            acoesLinha={(fatura) => (
+              <Link
+                className="app-dense-icon-action"
+                to={`/financeiro/faturas-cartao/${fatura.id}`}
+                title="Abrir detalhes"
+                aria-label={`Abrir detalhes da fatura ${fatura.competencia || fatura.id}`}
+              >
+                <HiOutlineEye />
+              </Link>
+            )}
+          />
         </section>
       </div>
     </div>

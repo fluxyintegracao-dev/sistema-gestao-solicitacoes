@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { HiOutlineEye, HiOutlinePencilSquare } from 'react-icons/hi2';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -68,17 +68,6 @@ function formatCpf(value) {
   }
   return value || '-';
 }
-
-const RH_COLABORADORES_COLUMNS = [
-  { key: 'nome', width: 220, minWidth: 170 },
-  { key: 'matricula', width: 130, minWidth: 110 },
-  { key: 'cpf', width: 150, minWidth: 130 },
-  { key: 'empresa', width: 240, minWidth: 180 },
-  { key: 'obra', width: 210, minWidth: 150 },
-  { key: 'vinculo', width: 140, minWidth: 110 },
-  { key: 'status', width: 130, minWidth: 100 },
-  { key: 'acoes', width: 92, minWidth: 76 }
-];
 
 const RH_COLABORADORES_FILTROS_INICIAIS = {
   q: '',
@@ -688,61 +677,74 @@ export default function RhDpColaboradores() {
       </div>
 
       <div className="space-y-6">
-        <div className="card sol-surface-card app-table-shell">
-          <div className="app-dense-table-wrapper rh-colaboradores-table-wrapper">
-            <ResizableTable
-              columns={RH_COLABORADORES_COLUMNS}
-              storageKey="rh-colaboradores-table-columns"
-              className="app-dense-data-table rh-colaboradores-table"
-            >
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="nome">Nome</ResizableTh>
-                  <ResizableTh columnKey="matricula">Matricula</ResizableTh>
-                  <ResizableTh columnKey="cpf">CPF</ResizableTh>
-                  <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                  <ResizableTh columnKey="obra">Obra</ResizableTh>
-                  <ResizableTh columnKey="vinculo">Vinculo</ResizableTh>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="acoes" className="text-center">Acoes</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {colaboradores.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="font-medium text-slate-900">{item.nome}</div>
-                      <div className="text-xs text-slate-500">{item.cargo || item.matricula || '-'}</div>
-                    </td>
-                    <td>{item.matricula || '-'}</td>
-                    <td>{formatCpf(item.cpf)}</td>
-                    <td>{item.empresaGrupo?.nome || '-'}</td>
-                    <td>{item.obra?.nome || '-'}</td>
-                    <td>{item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo}</td>
-                    <td>{item.status}</td>
-                    <td className="text-center">
-                      <button
-                        type="button"
-                        className="app-dense-icon-action"
-                        onClick={() => abrirColaborador(item.id)}
-                        title={podeEditar ? 'Editar colaborador' : 'Ver colaborador'}
-                        aria-label={podeEditar ? `Editar colaborador ${item.nome}` : `Ver colaborador ${item.nome}`}
-                      >
-                        {podeEditar ? <HiOutlinePencilSquare aria-hidden="true" /> : <HiOutlineEye aria-hidden="true" />}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-                {!colaboradores.length && (
-                  <tr>
-                    <td colSpan="8" align="center">
-                      {carregando ? 'Carregando...' : 'Nenhum colaborador cadastrado'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+        <div className="card sol-surface-card">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'nome',
+                titulo: 'Nome',
+                // R17: o NOME do colaborador é o que identifica o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla principal={item.nome} sub={item.cargo || item.matricula || '-'} />
+                )
+              },
+              {
+                id: 'matricula',
+                titulo: 'Matricula',
+                tipo: 'codigo',
+                render: (item) => item.matricula || '-'
+              },
+              {
+                id: 'cpf',
+                titulo: 'CPF',
+                tipo: 'codigo',
+                render: (item) => formatCpf(item.cpf)
+              },
+              {
+                id: 'empresa',
+                titulo: 'Empresa',
+                tipo: 'texto',
+                render: (item) => item.empresaGrupo?.nome || '-'
+              },
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                tipo: 'texto',
+                render: (item) => item.obra?.nome || '-'
+              },
+              {
+                id: 'vinculo',
+                titulo: 'Vinculo',
+                tipo: 'badge',
+                render: (item) => (item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo)
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => item.status
+              }
+            ]}
+            itens={colaboradores}
+            storageKey="tabela:rh-dp-colaboradores:lista"
+            rotuloRolagem="Colaboradores"
+            carregando={carregando}
+            vazio="Nenhum colaborador cadastrado"
+            acoesLinha={(item) => (
+              <button
+                type="button"
+                className="app-dense-icon-action"
+                onClick={() => abrirColaborador(item.id)}
+                title={podeEditar ? 'Editar colaborador' : 'Ver colaborador'}
+                aria-label={podeEditar ? `Editar colaborador ${item.nome}` : `Ver colaborador ${item.nome}`}
+              >
+                {podeEditar ? <HiOutlinePencilSquare aria-hidden="true" /> : <HiOutlineEye aria-hidden="true" />}
+              </button>
+            )}
+            larguraAcoes={96}
+          />
         </div>
 
         <form className="sol-surface-card rh-colaborador-form-card rounded-xl p-4 space-y-4" onSubmit={salvar}>
@@ -1222,65 +1224,66 @@ export default function RhDpColaboradores() {
               <div className="grid gap-4 xl:grid-cols-[1.4fr,1fr]">
                 <div className="space-y-3">
                   <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Arquivos do colaborador</h4>
-                  <div className="overflow-hidden rounded-2xl border border-slate-200">
-                    <div className="table-wrapper">
-                      <table className="table">
-                        <thead>
-                          <tr>
-                            <th>Tipo</th>
-                            <th>Arquivo</th>
-                            <th>Status</th>
-                            <th>Validade</th>
-                            <th>Acoes</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {documentos.map((item) => (
-                            <tr key={item.id}>
-                              <td>{item.tipoDocumento?.nome || '-'}</td>
-                              <td>
-                                <div className="font-medium text-slate-900">{item.nome_original}</div>
-                                <div className="text-xs text-slate-500">{item.observacoes || '-'}</div>
-                              </td>
-                              <td>
-                                <div>{item.status}</div>
-                                <div className="text-xs text-slate-500">{item.ativo ? 'Atual' : 'Historico'}</div>
-                              </td>
-                              <td>
-                                <div>{formatDate(item.validade)}</div>
-                                <div className="text-xs text-slate-500">{validadeLabel(item.validade_status)}</div>
-                              </td>
-                              <td>
-                                <div className="flex flex-wrap gap-2">
-                                  <button type="button" className="btn btn-outline" onClick={() => abrirDocumento(item.id)}>
-                                    Abrir
-                                  </button>
-                                  {podeGerirDocumentos && item.ativo && (
-                                    <label className={`btn btn-outline cursor-pointer ${substituindoDocumentoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
-                                      Substituir
-                                      <input
-                                        type="file"
-                                        className="hidden"
-                                        onChange={(e) => onSelecionarSubstituicao(item, e)}
-                                        disabled={substituindoDocumentoId === item.id}
-                                      />
-                                    </label>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                          {!documentos.length && (
-                            <tr>
-                              <td colSpan="5" align="center">
-                                {carregandoDocumentos ? 'Carregando documentos...' : 'Nenhum documento localizado para este colaborador'}
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
+                  <TabelaPadrao
+                    colunas={[
+                      {
+                        id: 'tipo',
+                        titulo: 'Tipo',
+                        tipo: 'texto',
+                        render: (item) => item.tipoDocumento?.nome || '-'
+                      },
+                      {
+                        id: 'arquivo',
+                        titulo: 'Arquivo',
+                        // R17: o ARQUIVO é o que nomeia o documento na pasta.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (item) => (
+                          <CelulaDupla principal={item.nome_original} sub={item.observacoes || '-'} />
+                        )
+                      },
+                      {
+                        id: 'status',
+                        titulo: 'Status',
+                        tipo: 'status',
+                        render: (item) => (
+                          <CelulaDupla principal={item.status} sub={item.ativo ? 'Atual' : 'Historico'} />
+                        )
+                      },
+                      {
+                        id: 'validade',
+                        titulo: 'Validade',
+                        tipo: 'data',
+                        render: (item) => (
+                          <CelulaDupla principal={formatDate(item.validade)} sub={validadeLabel(item.validade_status)} />
+                        )
+                      }
+                    ]}
+                    itens={documentos}
+                    storageKey="tabela:rh-dp-colaboradores:documentos"
+                    rotuloRolagem="Arquivos do colaborador"
+                    carregando={carregandoDocumentos}
+                    vazio="Nenhum documento localizado para este colaborador"
+                    acoesLinha={(item) => (
+                      <>
+                        <button type="button" className="btn btn-outline" onClick={() => abrirDocumento(item.id)}>
+                          Abrir
+                        </button>
+                        {podeGerirDocumentos && item.ativo && (
+                          <label className={`btn btn-outline cursor-pointer ${substituindoDocumentoId === item.id ? 'opacity-60 pointer-events-none' : ''}`}>
+                            Substituir
+                            <input
+                              type="file"
+                              className="hidden"
+                              onChange={(e) => onSelecionarSubstituicao(item, e)}
+                              disabled={substituindoDocumentoId === item.id}
+                            />
+                          </label>
+                        )}
+                      </>
+                    )}
+                    larguraAcoes={220}
+                  />
                 </div>
 
                 <div className="space-y-3">

@@ -11,6 +11,7 @@ import {
   getContasBancarias,
   getFaturaCartaoFinanceiro
 } from '../services/financeiro';
+import { TabelaPadrao } from '../components/padrao';
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -238,37 +239,37 @@ export default function FinanceiroFaturaCartaoDetalhe() {
                 <p className="text-sm text-[var(--c-muted)]">Lista completa dos titulos vinculados a esta fatura.</p>
               </div>
 
-              <div className="app-table-shell overflow-x-auto">
-                <table className="table min-w-full">
-                  <thead>
-                    <tr>
-                      <th>Titulo</th>
-                      <th>Parceiro</th>
-                      <th>Vencimento</th>
-                      <th>Status</th>
-                      <th>Valor</th>
-                      <th>Saldo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(fatura.titulos || []).length === 0 ? (
-                      <tr><td colSpan="6">Nenhum titulo vinculado a esta fatura.</td></tr>
-                    ) : fatura.titulos.map((titulo) => (
-                      <tr key={titulo.id}>
-                        <td>
-                          <div className="font-semibold text-[var(--c-text)]">{titulo.codigo || `Titulo #${titulo.id}`}</div>
-                          <div className="max-w-xl text-xs text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</div>
-                        </td>
-                        <td>{titulo.parceiro?.nome || 'Parceiro nao informado'}</td>
-                        <td>{formatDate(titulo.data_vencimento)}</td>
-                        <td><span className={statusClass(titulo.status)}>{titulo.status || 'ABERTO'}</span></td>
-                        <td className="font-semibold">{formatCurrency(titulo.valor_original)}</td>
-                        <td>{formatCurrency(titulo.valor_saldo)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'titulo',
+                    titulo: 'Titulo',
+                    tipo: 'codigo',
+                    render: (titulo) => (
+                      <div>
+                        <div className="font-semibold text-[var(--c-text)]">{titulo.codigo || `Titulo #${titulo.id}`}</div>
+                        <div className="text-xs text-[var(--c-muted)]">{titulo.descricao || 'Sem descricao'}</div>
+                      </div>
+                    )
+                  },
+                  {
+                    id: 'parceiro',
+                    titulo: 'Parceiro',
+                    // R17: o parceiro NOMEIA o titulo da fatura.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (titulo) => titulo.parceiro?.nome || 'Parceiro nao informado'
+                  },
+                  { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (titulo) => formatDate(titulo.data_vencimento) },
+                  { id: 'status', titulo: 'Status', tipo: 'status', render: (titulo) => <span className={statusClass(titulo.status)}>{titulo.status || 'ABERTO'}</span> },
+                  { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (titulo) => <span className="font-semibold">{formatCurrency(titulo.valor_original)}</span> },
+                  { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo) }
+                ]}
+                itens={fatura.titulos || []}
+                vazio="Nenhum titulo vinculado a esta fatura."
+                storageKey="tabela:fatura-cartao-detalhe:titulos"
+                rotuloRolagem="Titulos da fatura"
+              />
             </section>
 
             <aside className="card sol-surface-card">

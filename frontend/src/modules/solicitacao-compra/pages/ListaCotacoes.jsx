@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { HiOutlineArrowTopRightOnSquare, HiOutlinePencilSquare } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
+import { TabelaPadrao } from '../../../components/padrao';
 import { listarCotacoes } from '../../../services/compras';
 import { getObras } from '../../../services/obras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
@@ -184,134 +185,112 @@ export default function ListaCotacoes() {
           <span className="text-sm text-[var(--c-muted)]">{cotacoes.length} registro(s)</span>
         </div>
 
-        {loading ? (
-          <div className="app-empty-card">Carregando...</div>
-        ) : cotacoes.length === 0 ? (
-          <div className="app-empty-card">
-            Nenhuma cotacao encontrada. Envie uma solicitacao de compra para fornecedores.
-          </div>
-        ) : (
-          <div className="compras-table-wrapper">
-            <table className="compras-data-table compras-data-table-cotacoes">
-              <colgroup>
-                <col className="compras-col-codigo-curto" />
-                <col className="compras-col-fornecedor" />
-                <col className="compras-col-obra" />
-                <col className="compras-col-solicitacao" />
-                <col className="compras-col-status" />
-                <col className="compras-col-data" />
-                <col className="compras-col-data" />
-                <col className="compras-col-data" />
-                <col className="compras-col-valor" />
-                <col className="compras-col-condicao" />
-                <col className="compras-col-acoes" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Fornecedor</th>
-                  <th>Obra</th>
-                  <th>Solicitacao</th>
-                  <th>Status</th>
-                  <th>Enviado em</th>
-                  <th>Respondido em</th>
-                  <th>Prazo resposta</th>
-                  <th>Val. min. pedido</th>
-                  <th>Cond. pagamento</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {cotacoes.map((cotacao) => (
-                  <tr key={cotacao.id}>
-                    <td className="text-[var(--c-muted)] tabular-nums">
-                      {String(cotacao.id).padStart(5, '0')}
-                    </td>
-                    <td className="font-medium">{cotacao.fornecedor?.nome || '-'}</td>
-                    <td>{cotacao.solicitacao?.obra?.nome || '-'}</td>
-                    <td className="text-[var(--c-muted)]">
-                      {cotacao.solicitacao
-                        ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` - ${cotacao.solicitacao.titulo}` : ''}`
-                        : '-'}
-                    </td>
-                    <td>
-                      <StatusBadge status={cotacao.status} />
-                    </td>
-                    <td className="tabular-nums">{formatDate(cotacao.enviado_em)}</td>
-                    <td className="tabular-nums">{formatDate(cotacao.respondido_em)}</td>
-                    <td className="tabular-nums">{formatDate(cotacao.prazo_resposta)}</td>
-                    <td className="tabular-nums">{formatMoney(cotacao.valor_minimo_pedido)}</td>
-                    <td>{cotacao.condicao_pagamento || '-'}</td>
-                    <td>
-                      <div className="compras-table-actions">
-                        {cotacao.solicitacao?.id && (
-                          <button
-                            type="button"
-                            className="compras-icon-action compras-icon-action-primary"
-                            onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
-                            title="Editar cotacao"
-                            aria-label={`Editar cotacao ${String(cotacao.id).padStart(5, '0')}`}
-                          >
-                            <HiOutlinePencilSquare />
-                          </button>
-                        )}
-                        <a
-                          href={`/cotacao/${cotacao.token}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="compras-icon-action"
-                          title="Abrir portal do fornecedor"
-                          aria-label={`Abrir portal do fornecedor da cotacao ${String(cotacao.id).padStart(5, '0')}`}
-                        >
-                          <HiOutlineArrowTopRightOnSquare />
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {!loading && cotacoes.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Cotacoes">
-            {cotacoes.map((cotacao) => {
-              const codigoCotacao = String(cotacao.id).padStart(5, '0');
-              const solicitacaoCodigo = cotacao.solicitacao
-                ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}`
-                : '-';
-
-              return (
-                <article key={`mobile-${cotacao.id}`} className="compras-mobile-record">
-                  <div className="compras-mobile-record-head">
-                    <div className="compras-mobile-record-title">
-                      <strong>{cotacao.fornecedor?.nome || '-'}</strong>
-                      <span>Cotacao {codigoCotacao} · {solicitacaoCodigo}</span>
-                    </div>
-                    <StatusBadge status={cotacao.status} />
-                  </div>
-                  <div className="compras-mobile-record-grid">
-                    <div className="compras-mobile-field"><span>Obra</span><strong>{cotacao.solicitacao?.obra?.nome || '-'}</strong></div>
-                    <div className="compras-mobile-field"><span>Enviado em</span><strong>{formatDate(cotacao.enviado_em)}</strong></div>
-                    <div className="compras-mobile-field"><span>Prazo</span><strong>{formatDate(cotacao.prazo_resposta)}</strong></div>
-                    <div className="compras-mobile-field"><span>Valor minimo</span><strong>{formatMoney(cotacao.valor_minimo_pedido)}</strong></div>
-                    <div className="compras-mobile-field"><span>Condicao</span><strong>{cotacao.condicao_pagamento || '-'}</strong></div>
-                  </div>
-                  <div className="compras-mobile-record-actions">
-                    {cotacao.solicitacao?.id ? (
-                      <button type="button" className="btn btn-primary" onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}>
-                        Editar cotacao
-                      </button>
-                    ) : null}
-                    <a href={`/cotacao/${cotacao.token}`} target="_blank" rel="noreferrer" className="btn btn-outline">
-                      Portal do fornecedor
-                    </a>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'codigo',
+              titulo: '#',
+              tipo: 'codigo',
+              render: (cotacao) => (
+                <span className="text-[var(--c-muted)] tabular-nums">
+                  {String(cotacao.id).padStart(5, '0')}
+                </span>
+              )
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (cotacao) => cotacao.fornecedor?.nome || '-'
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (cotacao) => cotacao.solicitacao?.obra?.nome || '-'
+            },
+            {
+              id: 'solicitacao',
+              titulo: 'Solicitacao',
+              tipo: 'texto',
+              render: (cotacao) => (
+                <span className="text-[var(--c-muted)]">
+                  {cotacao.solicitacao
+                    ? `SC-${String(cotacao.solicitacao.id).padStart(5, '0')}${cotacao.solicitacao.titulo ? ` - ${cotacao.solicitacao.titulo}` : ''}`
+                    : '-'}
+                </span>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (cotacao) => <StatusBadge status={cotacao.status} />
+            },
+            {
+              id: 'enviado_em',
+              titulo: 'Enviado em',
+              tipo: 'data',
+              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.enviado_em)}</span>
+            },
+            {
+              id: 'respondido_em',
+              titulo: 'Respondido em',
+              tipo: 'data',
+              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.respondido_em)}</span>
+            },
+            {
+              id: 'prazo_resposta',
+              titulo: 'Prazo resposta',
+              tipo: 'data',
+              render: (cotacao) => <span className="tabular-nums">{formatDate(cotacao.prazo_resposta)}</span>
+            },
+            {
+              id: 'valor_minimo',
+              titulo: 'Val. min. pedido',
+              tipo: 'valor',
+              render: (cotacao) => formatMoney(cotacao.valor_minimo_pedido)
+            },
+            {
+              id: 'condicao_pagamento',
+              titulo: 'Cond. pagamento',
+              tipo: 'texto',
+              render: (cotacao) => cotacao.condicao_pagamento || '-'
+            }
+          ]}
+          itens={cotacoes}
+          carregando={loading}
+          vazio="Nenhuma cotacao encontrada. Envie uma solicitacao de compra para fornecedores."
+          storageKey="tabela:lista-cotacoes"
+          rotuloRolagem="Lista de cotacoes"
+          acoesLinha={(cotacao) => (
+            <>
+              {cotacao.solicitacao?.id && (
+                <button
+                  type="button"
+                  className="compras-icon-action compras-icon-action-primary"
+                  onClick={() => navigate(`/solicitacoes-compra/${cotacao.solicitacao.id}/cotacao`)}
+                  title="Editar cotacao"
+                  aria-label={`Editar cotacao ${String(cotacao.id).padStart(5, '0')}`}
+                >
+                  <HiOutlinePencilSquare />
+                </button>
+              )}
+              <a
+                href={`/cotacao/${cotacao.token}`}
+                target="_blank"
+                rel="noreferrer"
+                className="compras-icon-action"
+                title="Abrir portal do fornecedor"
+                aria-label={`Abrir portal do fornecedor da cotacao ${String(cotacao.id).padStart(5, '0')}`}
+              >
+                <HiOutlineArrowTopRightOnSquare />
+              </a>
+            </>
+          )}
+          larguraAcoes={160}
+        />
       </div>
     </div>
   );

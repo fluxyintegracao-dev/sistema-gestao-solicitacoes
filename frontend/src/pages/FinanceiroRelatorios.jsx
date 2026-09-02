@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
@@ -57,18 +57,6 @@ const EMPTY_RELATORIO = {
   serie: []
 };
 
-const DETALHAMENTO_COLUMNS = [
-  { key: 'periodo', width: 150, minWidth: 120 },
-  { key: 'entradas_previstas', width: 170, minWidth: 140 },
-  { key: 'saidas_previstas', width: 160, minWidth: 140 },
-  { key: 'saldo_previsto', width: 150, minWidth: 130 },
-  { key: 'acumulado_previsto', width: 175, minWidth: 145 },
-  { key: 'entradas_realizadas', width: 175, minWidth: 145 },
-  { key: 'saidas_realizadas', width: 165, minWidth: 140 },
-  { key: 'saldo_realizado', width: 155, minWidth: 130 },
-  { key: 'acumulado_realizado', width: 180, minWidth: 145 }
-];
-
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -102,6 +90,32 @@ function formatDate(value) {
   const [year, month, day] = String(value).split('-');
   if (!year || !month || !day) return '-';
   return `${day}/${month}/${year}`;
+}
+
+function vinculoAnalitico(item) {
+  if (item.tipo_conciliacao === 'TRANSFERENCIA') return `Transferencia #${item.transferencia_financeira_id}`;
+  if (item.tipo_conciliacao === 'FATURA_CARTAO') return `Fatura #${item.fatura_cartao_id}`;
+  if (item.tipo_conciliacao === 'TARIFA') return `Tarifa · mov. #${item.movimento_financeiro_id}`;
+  if (item.tipo_conciliacao === 'ESTORNO_TARIFA') return `Estorno de tarifa - mov. #${item.movimento_financeiro_id}`;
+  if (item.tipo_conciliacao === 'ESTORNO_BANCARIO') return `Estorno bancario - mov. #${item.movimento_financeiro_id}`;
+  if (item.tipo_conciliacao === 'CREDITO_ROTATIVO') {
+    return `${item.natureza === 'SAIDA' ? 'Amortizacao' : 'Liberacao'} · mov. #${item.movimento_financeiro_id}`;
+  }
+  return item.titulo_codigo || (item.movimento_financeiro_id ? `Mov. #${item.movimento_financeiro_id}` : '-');
+}
+
+function descricaoAnalitico(item) {
+  if (item.tipo_conciliacao === 'TRANSFERENCIA') {
+    return `${item.conta_origem || 'Origem'} → ${item.conta_destino || 'Destino'}${item.transferencia_descricao ? ` · ${item.transferencia_descricao}` : ''}`;
+  }
+  return item.descricao_banco || item.categoria || item.observacoes || '-';
+}
+
+function observacaoSintetico(item, type) {
+  if (type === 'conciliacao') {
+    return `${item.conciliados || 0} conciliado(s), ${item.pendentes || 0} pendente(s)`;
+  }
+  return Number(item.permutas || 0) > 0 ? `${formatCurrency(item.permutas)} em permutas` : '-';
 }
 
 function getCurrencyTone(value) {
@@ -689,54 +703,45 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
               </p>
             </div>
 
-            <div className="table-wrapper">
-              <ResizableTable
-                columns={DETALHAMENTO_COLUMNS}
-                storageKey="fluxy.financeiro.relatorios.detalhamento.columnWidths"
-                className="table"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="periodo">Periodo</ResizableTh>
-                    <ResizableTh columnKey="entradas_previstas" className="text-right">Entradas previstas</ResizableTh>
-                    <ResizableTh columnKey="saidas_previstas" className="text-right">Saidas previstas</ResizableTh>
-                    <ResizableTh columnKey="saldo_previsto" className="text-right">Saldo previsto</ResizableTh>
-                    <ResizableTh columnKey="acumulado_previsto" className="text-right">Acumulado previsto</ResizableTh>
-                    <ResizableTh columnKey="entradas_realizadas" className="text-right">Entradas realizadas</ResizableTh>
-                    <ResizableTh columnKey="saidas_realizadas" className="text-right">Saidas realizadas</ResizableTh>
-                    <ResizableTh columnKey="saldo_realizado" className="text-right">Saldo realizado</ResizableTh>
-                    <ResizableTh columnKey="acumulado_realizado" className="text-right">Acumulado realizado</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {relatorio.serie.length === 0 ? (
-                    <tr>
-                      <td colSpan={9} className="text-center text-[var(--c-muted)]">
-                        Nenhum dado encontrado para o periodo selecionado.
-                      </td>
-                    </tr>
-                  ) : (
-                    relatorio.serie.map((item) => (
-                      <tr key={item.referencia}>
-                        <td className="font-medium text-[var(--c-text)]">{item.label}</td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.entradas_previstas)}</td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saidas_previstas)}</td>
-                        <td className="text-right font-medium" style={{ color: item.saldo_previsto >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(item.saldo_previsto)}
-                        </td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saldo_previsto_acumulado)}</td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.entradas_realizadas)}</td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saidas_realizadas)}</td>
-                        <td className="text-right font-medium" style={{ color: item.saldo_realizado >= 0 ? '#15803d' : '#b91c1c' }}>
-                          {formatCurrency(item.saldo_realizado)}
-                        </td>
-                        <td className="text-right text-[var(--c-text)]">{formatCurrency(item.saldo_realizado_acumulado)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
+                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_previstas) },
+                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_previstas) },
+                {
+                  id: 'saldo_previsto',
+                  titulo: 'Saldo previsto',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <span className="font-medium" style={{ color: item.saldo_previsto >= 0 ? '#15803d' : '#b91c1c' }}>
+                      {formatCurrency(item.saldo_previsto)}
+                    </span>
+                  )
+                },
+                { id: 'acumulado_previsto', titulo: 'Acumulado previsto', tipo: 'valor', render: (item) => formatCurrency(item.saldo_previsto_acumulado) },
+                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_realizadas) },
+                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_realizadas) },
+                {
+                  id: 'saldo_realizado',
+                  titulo: 'Saldo realizado',
+                  tipo: 'valor',
+                  render: (item) => (
+                    <span className="font-medium" style={{ color: item.saldo_realizado >= 0 ? '#15803d' : '#b91c1c' }}>
+                      {formatCurrency(item.saldo_realizado)}
+                    </span>
+                  )
+                },
+                { id: 'acumulado_realizado', titulo: 'Acumulado realizado', tipo: 'valor', render: (item) => formatCurrency(item.saldo_realizado_acumulado) }
+              ]}
+              itens={relatorio.serie}
+              getId={(item) => item.referencia}
+              storageKey="tabela:financeiro-relatorios:detalhamento-periodo"
+              rotuloRolagem="Detalhamento por periodo"
+              vazio="Nenhum dado encontrado para o periodo selecionado."
+              // R17: linha e periodo x totais da serie — nao existe registro
+              // nomeado nesta tabela, so a competencia temporal.
+              semIdentidade
+            />
           </section>
           ) : null}
         </>
@@ -995,175 +1000,123 @@ function ContaReportShell({ title, subtitle, type }) {
               <h3 className="text-base font-semibold text-slate-950">Sintetico por conta</h3>
               <p className="text-xs text-slate-500">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
             </div>
-            <div className="table-responsive">
-              <ResizableTable
-                storageKey={`financeiro-relatorio-${type}-sintetico`}
-                columns={[
-                  { key: 'conta', width: 320, minWidth: 220 },
-                  { key: 'movimentos', width: 120, minWidth: 100 },
-                  { key: 'entradas', width: 150, minWidth: 120 },
-                  { key: 'saidas', width: 150, minWidth: 120 },
-                  { key: 'saldo', width: 150, minWidth: 120 },
-                  { key: 'status', width: 220, minWidth: 160 }
-                ]}
-                className="table financeiro-report-table"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="conta">Conta</ResizableTh>
-                    <ResizableTh columnKey="movimentos" className="text-right">Movimentos</ResizableTh>
-                    <ResizableTh columnKey="entradas" className="text-right">{type === 'conciliacao' ? 'Conciliados' : 'Entradas'}</ResizableTh>
-                    <ResizableTh columnKey="saidas" className="text-right">{type === 'conciliacao' ? 'Pendentes' : 'Saidas'}</ResizableTh>
-                    <ResizableTh columnKey="saldo" className="text-right">{type === 'conciliacao' ? 'Ignor./remov.' : 'Saldo'}</ResizableTh>
-                    <ResizableTh columnKey="status">Observacao</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sintetico.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="text-center text-slate-500">Nenhum registro encontrado.</td>
-                    </tr>
-                  ) : (
-                    sintetico.map((item) => (
-                      <tr key={item.conta_bancaria_id || item.conta}>
-                        <td className="font-medium text-slate-950">{item.conta}</td>
-                        <td className="text-right">{item.movimentos}</td>
-                        <td className="text-right">{type === 'conciliacao' ? item.conciliados : formatCurrency(item.entradas)}</td>
-                        <td className="text-right">{type === 'conciliacao' ? item.pendentes : formatCurrency(item.saidas)}</td>
-                        <td className="text-right">
-                          {type === 'conciliacao'
-                            ? `${item.ignorados || 0}/${item.removidos || 0}`
-                            : formatCurrency(item.saldo_liquido)}
-                        </td>
-                        <td className="text-slate-500">
-                          {type === 'conciliacao'
-                            ? `${item.conciliados || 0} conciliado(s), ${item.pendentes || 0} pendente(s)`
-                            : Number(item.permutas || 0) > 0
-                              ? `${formatCurrency(item.permutas)} em permutas`
-                              : '-'}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'conta',
+                  titulo: 'Conta',
+                  // R17: a conta bancaria NOMEIA a linha do sintetico.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.conta
+                },
+                { id: 'movimentos', titulo: 'Movimentos', tipo: 'numero', render: (item) => item.movimentos },
+                {
+                  id: 'entradas',
+                  titulo: type === 'conciliacao' ? 'Conciliados' : 'Entradas',
+                  tipo: 'valor',
+                  render: (item) => (type === 'conciliacao' ? item.conciliados : formatCurrency(item.entradas))
+                },
+                {
+                  id: 'saidas',
+                  titulo: type === 'conciliacao' ? 'Pendentes' : 'Saidas',
+                  tipo: 'valor',
+                  render: (item) => (type === 'conciliacao' ? item.pendentes : formatCurrency(item.saidas))
+                },
+                {
+                  id: 'saldo',
+                  titulo: type === 'conciliacao' ? 'Ignor./remov.' : 'Saldo',
+                  tipo: 'valor',
+                  render: (item) => (type === 'conciliacao'
+                    ? `${item.ignorados || 0}/${item.removidos || 0}`
+                    : formatCurrency(item.saldo_liquido))
+                },
+                {
+                  id: 'status',
+                  titulo: 'Observacao',
+                  tipo: 'texto',
+                  render: (item) => <span className="text-slate-500">{observacaoSintetico(item, type)}</span>
+                }
+              ]}
+              itens={sintetico}
+              getId={(item) => item.conta_bancaria_id || item.conta}
+              storageKey={`tabela:financeiro-relatorios:${type}-sintetico`}
+              rotuloRolagem="Sintetico por conta"
+              vazio="Nenhum registro encontrado."
+            />
           </section>
 
           <section className="card sol-surface-card p-4 financeiro-report-card">
             <h3 className="mb-3 text-base font-semibold text-slate-950">Analitico</h3>
-            <div className="table-responsive">
-              <ResizableTable
-                storageKey={`financeiro-relatorio-${type}-analitico`}
-                columns={[
-                  { key: 'data', width: 120, minWidth: 105 },
-                  { key: 'conta', width: 240, minWidth: 170 },
-                  { key: 'status', width: 130, minWidth: 110 },
-                  ...(type === 'conciliacao' ? [{ key: 'natureza', width: 120, minWidth: 105 }] : []),
-                  { key: 'titulo', width: 150, minWidth: 120 },
-                  { key: 'parceiro', width: 200, minWidth: 150 },
-                  { key: 'obra', width: 170, minWidth: 130 },
-                  { key: 'documento', width: 190, minWidth: 145 },
-                  { key: 'valor', width: 140, minWidth: 120 },
-                  ...(type === 'movimentacao' ? [{ key: 'saldo', width: 140, minWidth: 120 }] : []),
-                  { key: 'descricao', width: 280, minWidth: 210 },
-                  ...(type === 'conciliacao' && canEstornarConciliacao ? [{ key: 'acoes', width: 130, minWidth: 120 }] : [])
-                ]}
-                className="table financeiro-report-table"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="data">Data</ResizableTh>
-                    <ResizableTh columnKey="conta">Conta</ResizableTh>
-                    <ResizableTh columnKey="status">{type === 'conciliacao' ? 'Status' : 'Classe'}</ResizableTh>
-                    {type === 'conciliacao' ? <ResizableTh columnKey="natureza">Natureza</ResizableTh> : null}
-                    <ResizableTh columnKey="titulo">{type === 'conciliacao' ? 'Vinculo' : 'Titulo'}</ResizableTh>
-                    <ResizableTh columnKey="parceiro">Cliente/Fornecedor</ResizableTh>
-                    <ResizableTh columnKey="obra">Obra</ResizableTh>
-                    <ResizableTh columnKey="documento">Documento</ResizableTh>
-                    <ResizableTh columnKey="valor" className="text-right">
-                      {type === 'movimentacao' ? 'Movimento' : 'Valor'}
-                    </ResizableTh>
-                    {type === 'movimentacao' ? (
-                      <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                    ) : null}
-                    <ResizableTh columnKey="descricao">Descricao</ResizableTh>
-                    {type === 'conciliacao' && canEstornarConciliacao ? <ResizableTh columnKey="acoes">Acoes</ResizableTh> : null}
-                  </tr>
-                </thead>
-                <tbody>
-                  {analitico.length === 0 ? (
-                    <tr>
-                      <td colSpan={10 + (type === 'conciliacao' && canEstornarConciliacao ? 1 : 0)} className="text-center text-slate-500">Nenhum registro encontrado.</td>
-                    </tr>
-                  ) : (
-                    analitico.map((item) => {
-                      const valorMovimento = type === 'movimentacao'
-                        ? Number(item.valor_movimento ?? item.valor_quitacao ?? item.valor)
-                        : Number(item.valor_quitacao ?? item.valor);
-                      return (
-                        <tr key={item.id}>
-                          <td>{formatDate(item.data_movimento)}</td>
-                          <td>{item.conta}</td>
-                          <td>
-                            <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
-                          </td>
-                          {type === 'conciliacao' ? (
-                            <td>
-                              <span className={`badge ${item.natureza === 'SAIDA' ? 'badge-danger' : 'badge-success'}`}>
-                                {item.natureza === 'SAIDA' ? 'Saída' : 'Entrada'}
-                              </span>
-                            </td>
-                          ) : null}
-                          <td>
-                            {item.tipo_conciliacao === 'TRANSFERENCIA'
-                              ? `Transferencia #${item.transferencia_financeira_id}`
-                              : item.tipo_conciliacao === 'FATURA_CARTAO'
-                                ? `Fatura #${item.fatura_cartao_id}`
-                                : item.tipo_conciliacao === 'TARIFA'
-                                  ? `Tarifa · mov. #${item.movimento_financeiro_id}`
-                                  : item.tipo_conciliacao === 'ESTORNO_TARIFA'
-                                    ? `Estorno de tarifa - mov. #${item.movimento_financeiro_id}`
-                                  : item.tipo_conciliacao === 'ESTORNO_BANCARIO'
-                                    ? `Estorno bancario - mov. #${item.movimento_financeiro_id}`
-                                  : item.tipo_conciliacao === 'CREDITO_ROTATIVO'
-                                    ? `${item.natureza === 'SAIDA' ? 'Amortizacao' : 'Liberacao'} · mov. #${item.movimento_financeiro_id}`
-                                  : item.titulo_codigo || (item.movimento_financeiro_id ? `Mov. #${item.movimento_financeiro_id}` : '-')}
-                          </td>
-                          <td>{item.parceiro || '-'}</td>
-                          <td>{item.obra || '-'}</td>
-                          <td>{item.documento || item.ofx_uid || '-'}</td>
-                          <td className={`text-right font-semibold ${getCurrencyTone(valorMovimento)}`}>
-                            {formatCurrency(valorMovimento)}
-                          </td>
-                          {type === 'movimentacao' ? (
-                            <td className={`text-right font-semibold ${getCurrencyTone(item.saldo_movimento)}`}>
-                              {formatCurrency(item.saldo_movimento)}
-                            </td>
-                          ) : null}
-                          <td>
-                            {item.tipo_conciliacao === 'TRANSFERENCIA'
-                              ? `${item.conta_origem || 'Origem'} → ${item.conta_destino || 'Destino'}${item.transferencia_descricao ? ` · ${item.transferencia_descricao}` : ''}`
-                              : item.descricao_banco || item.categoria || item.observacoes || '-'}
-                          </td>
-                          {type === 'conciliacao' && canEstornarConciliacao ? (
-                            <td>
-                              {item.status === 'CONCILIADO'
-                                && item.tipo_conciliacao !== 'ESTORNO_BANCARIO'
-                                && (item.tipo_conciliacao !== 'TRANSFERENCIA' || item.transferencia_status === 'ATIVA') ? (
-                                <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
-                                  Estornar
-                                </button>
-                              ) : '-'}
-                            </td>
-                          ) : null}
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => formatDate(item.data_movimento) },
+                { id: 'conta', titulo: 'Conta', tipo: 'texto', render: (item) => item.conta },
+                {
+                  id: 'status',
+                  titulo: type === 'conciliacao' ? 'Status' : 'Classe',
+                  tipo: 'status',
+                  render: (item) => <span className="badge badge-soft">{type === 'conciliacao' ? item.status : item.classe}</span>
+                },
+                ...(type === 'conciliacao' ? [{
+                  id: 'natureza',
+                  titulo: 'Natureza',
+                  tipo: 'badge',
+                  render: (item) => (
+                    <span className={`badge ${item.natureza === 'SAIDA' ? 'badge-danger' : 'badge-success'}`}>
+                      {item.natureza === 'SAIDA' ? 'Saída' : 'Entrada'}
+                    </span>
+                  )
+                }] : []),
+                {
+                  id: 'titulo',
+                  titulo: type === 'conciliacao' ? 'Vinculo' : 'Titulo',
+                  tipo: 'texto',
+                  render: (item) => vinculoAnalitico(item)
+                },
+                {
+                  id: 'parceiro',
+                  titulo: 'Cliente/Fornecedor',
+                  // R17: o cliente/fornecedor NOMEIA a linha do analitico.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.parceiro || '-'
+                },
+                { id: 'obra', titulo: 'Obra', tipo: 'texto', render: (item) => item.obra || '-' },
+                { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (item) => item.documento || item.ofx_uid || '-' },
+                {
+                  id: 'valor',
+                  titulo: type === 'movimentacao' ? 'Movimento' : 'Valor',
+                  tipo: 'valor',
+                  render: (item) => {
+                    const valorMovimento = type === 'movimentacao'
+                      ? Number(item.valor_movimento ?? item.valor_quitacao ?? item.valor)
+                      : Number(item.valor_quitacao ?? item.valor);
+                    return <span className={`font-semibold ${getCurrencyTone(valorMovimento)}`}>{formatCurrency(valorMovimento)}</span>;
+                  }
+                },
+                ...(type === 'movimentacao' ? [{
+                  id: 'saldo',
+                  titulo: 'Saldo',
+                  tipo: 'valor',
+                  render: (item) => <span className={`font-semibold ${getCurrencyTone(item.saldo_movimento)}`}>{formatCurrency(item.saldo_movimento)}</span>
+                }] : []),
+                { id: 'descricao', titulo: 'Descricao', tipo: 'texto', render: (item) => descricaoAnalitico(item) }
+              ]}
+              itens={analitico}
+              storageKey={`tabela:financeiro-relatorios:${type}-analitico`}
+              rotuloRolagem="Analitico do relatorio"
+              vazio="Nenhum registro encontrado."
+              acoesLinha={type === 'conciliacao' && canEstornarConciliacao
+                ? (item) => (item.status === 'CONCILIADO'
+                  && item.tipo_conciliacao !== 'ESTORNO_BANCARIO'
+                  && (item.tipo_conciliacao !== 'TRANSFERENCIA' || item.transferencia_status === 'ATIVA') ? (
+                    <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
+                      Estornar
+                    </button>
+                  ) : '-')
+                : undefined}
+            />
           </section>
         </>
       ) : null}

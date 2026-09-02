@@ -37,6 +37,7 @@ import {
 import { useSafeNavigateBack } from '../../../utils/navigation';
 import { isValidCpfCnpj, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -1841,105 +1842,137 @@ export default function PedidoCompraDetalhe() {
               </div>
             </div>
 
-            {itensFiltrados.length ? (
-              <div className="mt-4 app-table-shell compras-responsive-table">
-                <table className="table min-w-[900px]">
-                  <thead>
-                    <tr>
-                      {podeCancelarPedido ? <th className="w-10">Sel.</th> : null}
-                      <th>Item</th>
-                      <th>Origem</th>
-                      <th>Solicitado</th>
-                      <th>Pedido</th>
-                      <th>Itens</th>
-                      <th>Frete</th>
-                      <th>Total aquisicao</th>
-                      <th>Situacao</th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {itensFiltrados.map((item) => {
-                      const situacao = getItemSituacao(item);
+            <div className="mt-4">
+              <TabelaPadrao
+                colunas={[
+                  ...(podeCancelarPedido ? [{
+                    id: 'selecao',
+                    titulo: 'Sel.',
+                    tipo: 'status',
+                    render: (item) => (
+                      <input
+                        type="checkbox"
+                        checked={itensSelecionadosCancelamento.includes(item.id)}
+                        disabled={item.removido || pedidoBloqueado}
+                        onChange={() => toggleItemCancelamento(item.id)}
+                        aria-label={`Selecionar item ${item.descricao}`}
+                      />
+                    )
+                  }] : []),
+                  {
+                    id: 'item',
+                    titulo: 'Item',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => {
                       const precoContext = buildItemPriceContext(item);
-
                       return (
-                        <tr key={item.id} className={item.removido ? 'opacity-80' : ''}>
-                          {podeCancelarPedido ? (
-                            <td>
-                              <input
-                                type="checkbox"
-                                checked={itensSelecionadosCancelamento.includes(item.id)}
-                                disabled={item.removido || pedidoBloqueado}
-                                onChange={() => toggleItemCancelamento(item.id)}
-                              />
-                            </td>
-                          ) : null}
-                          <td>
-                            <div className="font-medium">{item.descricao}</div>
-                            <div className="text-xs text-[var(--c-muted)]">
-                              Minimo: {formatQuantityLabel(item.quantidade_minima_item, item.unidade)}
-                            </div>
-                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-[var(--c-muted)]">
-                              <span>
-                                Cotado: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoCotado, item.unidade)}</span>
+                        <CelulaDupla
+                          title={item.descricao}
+                          principal={item.descricao}
+                          sub={(
+                            <>
+                              <span className="block">
+                                Minimo: {formatQuantityLabel(item.quantidade_minima_item, item.unidade)}
                               </span>
-                              <span>
-                                Atual: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoAtual, item.unidade)}</span>
+                              <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+                                <span>
+                                  Cotado: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoCotado, item.unidade)}</span>
+                                </span>
+                                <span>
+                                  Atual: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.precoAtual, item.unidade)}</span>
+                                </span>
+                                <span>
+                                  Ult. compra: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.ultimoPrecoCompra, item.unidade, 'Sem historico')}</span>
+                                </span>
+                                <span>
+                                  Var.: <span className={`font-semibold ${getVariationTextClass(precoContext.variacaoUltimaCompra)}`}>{formatVariationPercent(precoContext.variacaoUltimaCompra)}</span>
+                                </span>
+                                <span>Mercadoria: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.valor_mercadoria)}</span></span>
+                                <span>IPI: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.ipi_valor)}</span></span>
+                                <span>ICMS: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.icms_valor)}</span></span>
+                                <span>ST: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.st_valor)}</span></span>
+                                <span>DIFAL: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.difal_rateado)}</span></span>
                               </span>
-                              <span>
-                                Ult. compra: <span className="font-semibold text-[var(--c-text)]">{formatUnitPrice(precoContext.ultimoPrecoCompra, item.unidade, 'Sem historico')}</span>
-                              </span>
-                              <span>
-                                Var.: <span className={`font-semibold ${getVariationTextClass(precoContext.variacaoUltimaCompra)}`}>{formatVariationPercent(precoContext.variacaoUltimaCompra)}</span>
-                              </span>
-                              <span>Mercadoria: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.valor_mercadoria)}</span></span>
-                              <span>IPI: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.ipi_valor)}</span></span>
-                              <span>ICMS: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.icms_valor)}</span></span>
-                              <span>ST: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.st_valor)}</span></span>
-                              <span>DIFAL: <span className="font-semibold text-[var(--c-text)]">{formatMoney(item.difal_rateado)}</span></span>
-                            </div>
-                          </td>
-                          <td>{item.origem || '-'}</td>
-                          <td>{formatQuantityLabel(item.quantidade_solicitada, item.unidade)}</td>
-                          <td>{formatQuantityLabel(item.quantidade_pedido, item.unidade)}</td>
-                          <td>{formatMoney(item.valor_total)}</td>
-                          <td>{formatMoney(item.frete_rateado)}</td>
-                          <td>{formatMoney(Number(item.valor_total || 0) + Number(item.frete_rateado || 0))}</td>
-                          <td>
-                            <span className={situacao.className}>{situacao.label}</span>
-                          </td>
-                          <td className="whitespace-nowrap">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                className="btn btn-outline"
-                                onClick={() => abrirModalEdicao(item.id)}
-                              >
-                                {podeEditarItensPedido && !item.removido ? 'Editar' : 'Ver item'}
-                              </button>
-                              {businessAdmin ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline"
-                                  onClick={() => abrirAuditoria(item.id)}
-                                >
-                                  Auditoria
-                                </button>
-                              ) : null}
-                            </div>
-                          </td>
-                        </tr>
+                            </>
+                          )}
+                        />
                       );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="mt-4 app-empty-card">
-                Nenhum item encontrado com os filtros atuais.
-              </div>
-            )}
+                    }
+                  },
+                  {
+                    id: 'origem',
+                    titulo: 'Origem',
+                    tipo: 'texto',
+                    render: (item) => item.origem || '-'
+                  },
+                  {
+                    id: 'solicitado',
+                    titulo: 'Solicitado',
+                    tipo: 'numero',
+                    render: (item) => formatQuantityLabel(item.quantidade_solicitada, item.unidade)
+                  },
+                  {
+                    id: 'pedido',
+                    titulo: 'Pedido',
+                    tipo: 'numero',
+                    render: (item) => formatQuantityLabel(item.quantidade_pedido, item.unidade)
+                  },
+                  {
+                    id: 'itens',
+                    titulo: 'Itens',
+                    tipo: 'valor',
+                    render: (item) => formatMoney(item.valor_total)
+                  },
+                  {
+                    id: 'frete',
+                    titulo: 'Frete',
+                    tipo: 'valor',
+                    render: (item) => formatMoney(item.frete_rateado)
+                  },
+                  {
+                    id: 'total_aquisicao',
+                    titulo: 'Total aquisicao',
+                    tipo: 'valor',
+                    render: (item) => formatMoney(Number(item.valor_total || 0) + Number(item.frete_rateado || 0))
+                  },
+                  {
+                    id: 'situacao',
+                    titulo: 'Situacao',
+                    tipo: 'status',
+                    render: (item) => {
+                      const situacao = getItemSituacao(item);
+                      return <span className={situacao.className}>{situacao.label}</span>;
+                    }
+                  }
+                ]}
+                itens={itensFiltrados}
+                vazio="Nenhum item encontrado com os filtros atuais."
+                storageKey="tabela:pedido-compra-detalhe:itens"
+                rotuloRolagem="Itens do pedido"
+                acoesLinha={(item) => (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => abrirModalEdicao(item.id)}
+                    >
+                      {podeEditarItensPedido && !item.removido ? 'Editar' : 'Ver item'}
+                    </button>
+                    {businessAdmin ? (
+                      <button
+                        type="button"
+                        className="btn btn-outline"
+                        onClick={() => abrirAuditoria(item.id)}
+                      >
+                        Auditoria
+                      </button>
+                    ) : null}
+                  </>
+                )}
+                larguraAcoes={260}
+              />
+            </div>
           </div>
         </div>
       </div>

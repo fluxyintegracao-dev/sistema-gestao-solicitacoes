@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioIntercompanyFinanceiro } from '../services/financeiro';
 
@@ -26,44 +26,6 @@ const TIPOS_INTERCOMPANY = [
   ['ADMINISTRATIVO', 'Administrativo'],
   ['IMPOSTO', 'Imposto'],
   ['TRANSFERENCIA_OPERACIONAL', 'Transferencia operacional']
-];
-
-const RELACOES_COLUMNS = [
-  { key: 'origem', width: 180, minWidth: 130 },
-  { key: 'destino', width: 180, minWidth: 130 },
-  { key: 'titulos', width: 88, minWidth: 76 },
-  { key: 'transferencias', width: 124, minWidth: 104 },
-  { key: 'previsto', width: 132, minWidth: 112 },
-  { key: 'realizado', width: 132, minWidth: 112 }
-];
-
-const TIPOS_COLUMNS = [
-  { key: 'tipo', width: 180, minWidth: 130 },
-  { key: 'titulos', width: 88, minWidth: 76 },
-  { key: 'transferencias', width: 124, minWidth: 104 },
-  { key: 'realizado', width: 132, minWidth: 112 }
-];
-
-const TRANSFERENCIAS_COLUMNS = [
-  { key: 'data', width: 112, minWidth: 96 },
-  { key: 'origem', width: 190, minWidth: 140 },
-  { key: 'destino', width: 190, minWidth: 140 },
-  { key: 'tipo', width: 190, minWidth: 140 },
-  { key: 'status', width: 118, minWidth: 96 },
-  { key: 'valor', width: 132, minWidth: 112 },
-  { key: 'consolidado', width: 120, minWidth: 104 }
-];
-
-const TITULOS_COLUMNS = [
-  { key: 'titulo', width: 160, minWidth: 120 },
-  { key: 'competencia', width: 126, minWidth: 108 },
-  { key: 'origem', width: 160, minWidth: 120 },
-  { key: 'destino', width: 160, minWidth: 120 },
-  { key: 'tipo', width: 168, minWidth: 128 },
-  { key: 'status', width: 118, minWidth: 96 },
-  { key: 'previsto', width: 132, minWidth: 112 },
-  { key: 'realizado', width: 132, minWidth: 112 },
-  { key: 'consolidado', width: 120, minWidth: 104 }
 ];
 
 function formatCurrency(value) {
@@ -112,16 +74,6 @@ function Metric({ label, value, detail, positive = null }) {
       </strong>
       {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
     </div>
-  );
-}
-
-function EmptyRow({ colSpan, message }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center text-[var(--c-muted)]">
-        {message}
-      </td>
-    </tr>
   );
 }
 
@@ -349,40 +301,28 @@ export default function FinanceiroIntercompany() {
                   Mostra quem financia, repassa ou recebe recursos dentro do grupo.
                 </p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  className="table"
-                  columns={RELACOES_COLUMNS}
-                  storageKey="fluxy.financeiro.intercompany.relacoes.columnWidths"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="origem">Origem</ResizableTh>
-                      <ResizableTh columnKey="destino">Destino</ResizableTh>
-                      <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
-                      <ResizableTh columnKey="transferencias" className="text-right">Transferencias</ResizableTh>
-                      <ResizableTh columnKey="previsto" className="text-right">Previsto</ResizableTh>
-                      <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {relacoes.length === 0 ? (
-                      <EmptyRow colSpan={6} message="Nenhuma relacao entre empresas encontrada no periodo." />
-                    ) : (
-                      relacoes.map((item) => (
-                        <tr key={`${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}>
-                          <td className="font-medium text-[var(--c-text)]">{item.empresa_origem_nome}</td>
-                          <td>{item.empresa_destino_nome}</td>
-                          <td className="text-right">{item.titulos}</td>
-                          <td className="text-right">{item.transferencias}</td>
-                          <td className="text-right">{formatCurrency(item.valor_previsto)}</td>
-                          <td className="text-right">{formatCurrency(item.valor_realizado)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'origem',
+                    titulo: 'Origem',
+                    // R17: a empresa de origem NOMEIA a relacao.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => item.empresa_origem_nome
+                  },
+                  { id: 'destino', titulo: 'Destino', tipo: 'texto', render: (item) => item.empresa_destino_nome },
+                  { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (item) => item.titulos },
+                  { id: 'transferencias', titulo: 'Transferencias', tipo: 'numero', render: (item) => item.transferencias },
+                  { id: 'previsto', titulo: 'Previsto', tipo: 'valor', render: (item) => formatCurrency(item.valor_previsto) },
+                  { id: 'realizado', titulo: 'Realizado', tipo: 'valor', render: (item) => formatCurrency(item.valor_realizado) }
+                ]}
+                itens={relacoes}
+                getId={(item) => `${item.empresa_origem_id || 'o'}-${item.empresa_destino_id || 'd'}`}
+                storageKey="tabela:financeiro-intercompany:relacoes"
+                rotuloRolagem="Fluxo entre empresas"
+                vazio="Nenhuma relacao entre empresas encontrada no periodo."
+              />
             </div>
 
             <div className="card sol-surface-card app-table-shell">
@@ -392,36 +332,26 @@ export default function FinanceiroIntercompany() {
                   Ajuda a separar aporte, cobertura de caixa, reembolso e rateio.
                 </p>
               </div>
-              <div className="table-wrapper">
-                <ResizableTable
-                  className="table"
-                  columns={TIPOS_COLUMNS}
-                  storageKey="fluxy.financeiro.intercompany.tipos.columnWidths"
-                >
-                  <thead>
-                    <tr>
-                      <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                      <ResizableTh columnKey="titulos" className="text-right">Titulos</ResizableTh>
-                      <ResizableTh columnKey="transferencias" className="text-right">Transferencias</ResizableTh>
-                      <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {porTipo.length === 0 ? (
-                      <EmptyRow colSpan={4} message="Nenhum tipo encontrado." />
-                    ) : (
-                      porTipo.map((item) => (
-                        <tr key={item.tipo_intercompany}>
-                          <td className="font-medium text-[var(--c-text)]">{labelTipo(item.tipo_intercompany)}</td>
-                          <td className="text-right">{item.titulos}</td>
-                          <td className="text-right">{item.transferencias}</td>
-                          <td className="text-right">{formatCurrency(item.valor_realizado)}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </ResizableTable>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'tipo',
+                    titulo: 'Tipo',
+                    // R17: o tipo de movimento NOMEIA a linha deste resumo.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => labelTipo(item.tipo_intercompany)
+                  },
+                  { id: 'titulos', titulo: 'Titulos', tipo: 'numero', render: (item) => item.titulos },
+                  { id: 'transferencias', titulo: 'Transferencias', tipo: 'numero', render: (item) => item.transferencias },
+                  { id: 'realizado', titulo: 'Realizado', tipo: 'valor', render: (item) => formatCurrency(item.valor_realizado) }
+                ]}
+                itens={porTipo}
+                getId={(item) => item.tipo_intercompany}
+                storageKey="tabela:financeiro-intercompany:tipos"
+                rotuloRolagem="Tipos de movimento entre empresas"
+                vazio="Nenhum tipo encontrado."
+              />
             </div>
           </section>
 
@@ -432,51 +362,53 @@ export default function FinanceiroIntercompany() {
                 Registros efetivos entre contas de empresas diferentes, vindos do caixa ou da conciliacao bancaria.
               </p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={TRANSFERENCIAS_COLUMNS}
-                storageKey="fluxy.financeiro.intercompany.transferencias.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="data">Data</ResizableTh>
-                    <ResizableTh columnKey="origem">Origem</ResizableTh>
-                    <ResizableTh columnKey="destino">Destino</ResizableTh>
-                    <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                    <ResizableTh columnKey="status">Status</ResizableTh>
-                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                    <ResizableTh columnKey="consolidado">Consolidado</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {transferencias.length === 0 ? (
-                    <EmptyRow colSpan={7} message="Nenhuma transferencia entre empresas encontrada para os filtros atuais." />
-                  ) : (
-                    transferencias.map((transferencia) => (
-                      <tr key={transferencia.id}>
-                        <td>{formatDate(transferencia.data_transferencia)}</td>
-                        <td>
-                          <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_origem_nome}</span>
-                          <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_origem_nome || '-'}</div>
-                        </td>
-                        <td>
-                          <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_destino_nome}</span>
-                          <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_destino_nome || '-'}</div>
-                        </td>
-                        <td>
-                          {labelTipo(transferencia.tipo_intercompany)}
-                          <div className="text-xs text-[var(--c-muted)]">{transferencia.motivo_intercompany || transferencia.descricao || '-'}</div>
-                        </td>
-                        <td>{labelStatus(transferencia.status)}</td>
-                        <td className="text-right">{formatCurrency(transferencia.valor_realizado)}</td>
-                        <td>{transferencia.elimina_consolidado ? 'Elimina' : 'Mantem'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                { id: 'data', titulo: 'Data', tipo: 'data', render: (transferencia) => formatDate(transferencia.data_transferencia) },
+                {
+                  id: 'origem',
+                  titulo: 'Origem',
+                  // R17: a empresa de origem NOMEIA a transferencia.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (transferencia) => (
+                    <div>
+                      <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_origem_nome}</span>
+                      <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_origem_nome || '-'}</div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'destino',
+                  titulo: 'Destino',
+                  tipo: 'texto',
+                  render: (transferencia) => (
+                    <div>
+                      <span className="font-medium text-[var(--c-text)]">{transferencia.empresa_destino_nome}</span>
+                      <div className="text-xs text-[var(--c-muted)]">{transferencia.conta_destino_nome || '-'}</div>
+                    </div>
+                  )
+                },
+                {
+                  id: 'tipo',
+                  titulo: 'Tipo',
+                  tipo: 'texto',
+                  render: (transferencia) => (
+                    <div>
+                      {labelTipo(transferencia.tipo_intercompany)}
+                      <div className="text-xs text-[var(--c-muted)]">{transferencia.motivo_intercompany || transferencia.descricao || '-'}</div>
+                    </div>
+                  )
+                },
+                { id: 'status', titulo: 'Status', tipo: 'status', render: (transferencia) => labelStatus(transferencia.status) },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (transferencia) => formatCurrency(transferencia.valor_realizado) },
+                { id: 'consolidado', titulo: 'Consolidado', tipo: 'badge', render: (transferencia) => (transferencia.elimina_consolidado ? 'Elimina' : 'Mantem') }
+              ]}
+              itens={transferencias}
+              storageKey="tabela:financeiro-intercompany:transferencias"
+              rotuloRolagem="Transferencias financeiras entre empresas"
+              vazio="Nenhuma transferencia entre empresas encontrada para os filtros atuais."
+            />
           </section>
 
           <section className="card sol-surface-card app-table-shell">
@@ -486,51 +418,37 @@ export default function FinanceiroIntercompany() {
                 Base analitica para auditoria, conciliacao e explicacao do consolidado.
               </p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable
-                className="table"
-                columns={TITULOS_COLUMNS}
-                storageKey="fluxy.financeiro.intercompany.titulos.columnWidths"
-              >
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="titulo">Titulo</ResizableTh>
-                    <ResizableTh columnKey="competencia">Competencia</ResizableTh>
-                    <ResizableTh columnKey="origem">Origem</ResizableTh>
-                    <ResizableTh columnKey="destino">Destino</ResizableTh>
-                    <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                    <ResizableTh columnKey="status">Status</ResizableTh>
-                    <ResizableTh columnKey="previsto" className="text-right">Previsto</ResizableTh>
-                    <ResizableTh columnKey="realizado" className="text-right">Realizado</ResizableTh>
-                    <ResizableTh columnKey="consolidado">Consolidado</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {titulos.length === 0 ? (
-                    <EmptyRow colSpan={9} message="Nenhum titulo entre empresas encontrado para os filtros atuais." />
-                  ) : (
-                    titulos.map((titulo) => (
-                      <tr key={titulo.id}>
-                        <td>
-                          <Link to={`/financeiro/titulos/${titulo.id}`} className="font-semibold text-[var(--c-primary)]">
-                            {titulo.codigo || `#${titulo.id}`}
-                          </Link>
-                          <div className="text-xs text-[var(--c-muted)]">{titulo.descricao || titulo.parceiro_nome || '-'}</div>
-                        </td>
-                        <td>{formatDate(titulo.competencia_data || titulo.data_emissao || titulo.data_vencimento)}</td>
-                        <td>{titulo.empresa_origem_nome}</td>
-                        <td>{titulo.empresa_destino_nome}</td>
-                        <td>{labelTipo(titulo.tipo_intercompany)}</td>
-                        <td>{labelStatus(titulo.status)}</td>
-                        <td className="text-right">{formatCurrency(titulo.valor_previsto)}</td>
-                        <td className="text-right">{formatCurrency(titulo.valor_realizado)}</td>
-                        <td>{titulo.elimina_consolidado ? 'Elimina' : 'Mantem'}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'titulo',
+                  titulo: 'Titulo',
+                  // R17: o codigo do titulo NOMEIA o registro.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (titulo) => (
+                    <div>
+                      <Link to={`/financeiro/titulos/${titulo.id}`} className="font-semibold text-[var(--c-primary)]">
+                        {titulo.codigo || `#${titulo.id}`}
+                      </Link>
+                      <div className="text-xs text-[var(--c-muted)]">{titulo.descricao || titulo.parceiro_nome || '-'}</div>
+                    </div>
+                  )
+                },
+                { id: 'competencia', titulo: 'Competencia', tipo: 'data', render: (titulo) => formatDate(titulo.competencia_data || titulo.data_emissao || titulo.data_vencimento) },
+                { id: 'origem', titulo: 'Origem', tipo: 'texto', render: (titulo) => titulo.empresa_origem_nome },
+                { id: 'destino', titulo: 'Destino', tipo: 'texto', render: (titulo) => titulo.empresa_destino_nome },
+                { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (titulo) => labelTipo(titulo.tipo_intercompany) },
+                { id: 'status', titulo: 'Status', tipo: 'status', render: (titulo) => labelStatus(titulo.status) },
+                { id: 'previsto', titulo: 'Previsto', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_previsto) },
+                { id: 'realizado', titulo: 'Realizado', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_realizado) },
+                { id: 'consolidado', titulo: 'Consolidado', tipo: 'badge', render: (titulo) => (titulo.elimina_consolidado ? 'Elimina' : 'Mantem') }
+              ]}
+              itens={titulos}
+              storageKey="tabela:financeiro-intercompany:titulos"
+              rotuloRolagem="Titulos entre empresas"
+              vazio="Nenhum titulo entre empresas encontrado para os filtros atuais."
+            />
           </section>
         </>
       )}

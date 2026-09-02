@@ -4,7 +4,6 @@ import {
   HiOutlineArrowPath,
   HiOutlineBanknotes,
   HiOutlineCheck,
-  HiOutlineExclamationTriangle,
   HiOutlineLink,
   HiOutlineMagnifyingGlass,
   HiOutlineNoSymbol,
@@ -23,6 +22,7 @@ import {
   vincularFinanceiroDda
 } from '../services/financeiro';
 import { hasPermissao } from '../utils/acessoProduto';
+import { TabelaPadrao } from '../components/padrao';
 
 const STATUS = [
   { value: '', label: 'Todos os status' },
@@ -209,32 +209,64 @@ export default function FinanceiroDda() {
           </div>
           <HiOutlineBanknotes className="text-xl text-blue-700" />
         </div>
-        <div className="overflow-x-auto">
-          <table className="table table-sm min-w-[1050px]">
-            <thead><tr><th>Vencimento</th><th>Beneficiario</th><th>Documento</th><th>Valor</th><th>Empresa</th><th>Status</th><th>Titulo</th><th className="text-right">Acoes</th></tr></thead>
-            <tbody>
-              {!loading && rows.map((row) => (
-                <tr key={row.id}>
-                  <td className="whitespace-nowrap font-medium">{date(row.data_vencimento)}</td>
-                  <td><div className="max-w-[260px] truncate font-semibold text-slate-900">{row.beneficiario_nome || '-'}</div><div className="text-xs text-slate-500">{row.nosso_numero || row.banco_nome || '-'}</div></td>
-                  <td className="whitespace-nowrap text-xs">{row.beneficiario_documento || '-'}</td>
-                  <td className="whitespace-nowrap font-bold">{currency(row.valor_atual)}</td>
-                  <td className="max-w-[180px] truncate">{row.empresa?.nome || row.empresa?.razao_social || '-'}</td>
-                  <td><span className={`inline-flex rounded-full px-2 py-1 text-[11px] font-bold ${statusTone(row.status)}`}>{STATUS_LABEL[row.status] || row.status}</span></td>
-                  <td>{row.titulo ? <Link className="link link-primary whitespace-nowrap" to={`/financeiro/titulos/${row.titulo.id}`}>{row.titulo.codigo || `#${row.titulo.id}`}</Link> : row.tituloSugerido ? <span className="text-xs text-blue-700">Sugestao: {row.tituloSugerido.codigo || `#${row.tituloSugerido.id}`}</span> : '-'}</td>
-                  <td><div className="flex justify-end gap-1">
-                    {canLink && row.status === 'MATCH_EXATO' && row.titulo_sugerido_id && <button type="button" title="Confirmar correspondencia exata" className="btn btn-ghost btn-xs" disabled={actionId === row.id} onClick={() => runAction(row.id, () => confirmarFinanceiroDdaSugestao(row.id), 'Documento vinculado ao titulo sugerido.')}><HiOutlineCheck /></button>}
-                    {canLink && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Escolher titulo" className="btn btn-ghost btn-xs" disabled={actionId === row.id} onClick={() => openCandidates(row)}><HiOutlineLink /></button>}
-                    {canLink && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Reprocessar correspondencia" className="btn btn-ghost btn-xs" disabled={actionId === row.id} onClick={() => runAction(row.id, () => reprocessarFinanceiroDdaMatch(row.id), 'Correspondencia reprocessada.')}><HiOutlineArrowPath /></button>}
-                    {canIgnore && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Ignorar com justificativa" className="btn btn-ghost btn-xs text-rose-700" disabled={actionId === row.id} onClick={() => ignore(row)}><HiOutlineNoSymbol /></button>}
-                  </div></td>
-                </tr>
-              ))}
-              {!loading && rows.length === 0 && <tr><td colSpan="8"><div className="flex flex-col items-center gap-2 py-12 text-center text-slate-500"><HiOutlineExclamationTriangle className="text-2xl" /><strong className="text-slate-700">Nenhum documento DDA carregado</strong><span className="max-w-xl text-xs">A estrutura esta pronta para receber documentos, mas a sincronizacao bancaria permanece bloqueada ate a homologacao.</span></div></td></tr>}
-              {loading && <tr><td colSpan="8" className="py-12 text-center text-slate-500">Carregando documentos...</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (row) => date(row.data_vencimento) },
+            {
+              id: 'beneficiario',
+              titulo: 'Beneficiario',
+              // R17: o beneficiario NOMEIA o documento DDA.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => (
+                <div>
+                  <div className="truncate font-semibold text-slate-900">{row.beneficiario_nome || '-'}</div>
+                  <div className="text-xs text-slate-500">{row.nosso_numero || row.banco_nome || '-'}</div>
+                </div>
+              )
+            },
+            { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (row) => row.beneficiario_documento || '-' },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (row) => currency(row.valor_atual) },
+            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (row) => row.empresa?.nome || row.empresa?.razao_social || '-' },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (row) => (
+                <span className={`inline-flex rounded-full px-2 py-1 text-xs font-bold ${statusTone(row.status)}`}>
+                  {STATUS_LABEL[row.status] || row.status}
+                </span>
+              )
+            },
+            {
+              id: 'titulo',
+              titulo: 'Titulo',
+              tipo: 'codigo',
+              render: (row) => (row.titulo
+                ? <Link className="link link-primary whitespace-nowrap" to={`/financeiro/titulos/${row.titulo.id}`}>{row.titulo.codigo || `#${row.titulo.id}`}</Link>
+                : row.tituloSugerido
+                  ? <span className="text-xs text-blue-700">Sugestao: {row.tituloSugerido.codigo || `#${row.tituloSugerido.id}`}</span>
+                  : '-')
+            }
+          ]}
+          itens={loading ? [] : rows}
+          carregando={loading}
+          vazio={{
+            title: 'Nenhum documento DDA carregado',
+            message: 'A estrutura esta pronta para receber documentos, mas a sincronizacao bancaria permanece bloqueada ate a homologacao.'
+          }}
+          storageKey="tabela:financeiro-dda:documentos"
+          rotuloRolagem="Documentos DDA apresentados"
+          larguraAcoes={200}
+          acoesLinha={(row) => (
+            <>
+              {canLink && row.status === 'MATCH_EXATO' && row.titulo_sugerido_id && <button type="button" title="Confirmar correspondencia exata" className="btn btn-ghost btn-sm" disabled={actionId === row.id} onClick={() => runAction(row.id, () => confirmarFinanceiroDdaSugestao(row.id), 'Documento vinculado ao titulo sugerido.')}><HiOutlineCheck /></button>}
+              {canLink && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Escolher titulo" className="btn btn-ghost btn-sm" disabled={actionId === row.id} onClick={() => openCandidates(row)}><HiOutlineLink /></button>}
+              {canLink && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Reprocessar correspondencia" className="btn btn-ghost btn-sm" disabled={actionId === row.id} onClick={() => runAction(row.id, () => reprocessarFinanceiroDdaMatch(row.id), 'Correspondencia reprocessada.')}><HiOutlineArrowPath /></button>}
+              {canIgnore && !['VINCULADO', 'IGNORADO'].includes(row.status) && <button type="button" title="Ignorar com justificativa" className="btn btn-ghost btn-sm text-rose-700" disabled={actionId === row.id} onClick={() => ignore(row)}><HiOutlineNoSymbol /></button>}
+            </>
+          )}
+        />
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3 text-sm">
           <span>Pagina {filters.page} de {pages}</span>
           <div className="join"><button type="button" className="btn btn-sm join-item" disabled={filters.page <= 1} onClick={() => setFilters((prior) => ({ ...prior, page: prior.page - 1 }))}>Anterior</button><button type="button" className="btn btn-sm join-item" disabled={filters.page >= pages} onClick={() => setFilters((prior) => ({ ...prior, page: prior.page + 1 }))}>Proxima</button></div>
@@ -248,11 +280,41 @@ export default function FinanceiroDda() {
               <div><h3 className="text-lg font-bold">Vincular titulo a pagar</h3><p className="text-sm text-slate-500">{candidateModal.boleto.beneficiario_nome} · {currency(candidateModal.boleto.valor_atual)} · origem {candidateModal.origem || '-'}</p></div>
               <button type="button" className="btn btn-ghost btn-sm btn-square" onClick={() => setCandidateModal(null)}><HiOutlineXMark /></button>
             </div>
-            <div className="mt-3 max-h-[55vh] overflow-auto rounded-lg border border-slate-200">
-              <table className="table table-sm min-w-[720px]"><thead><tr><th>Titulo</th><th>Credor</th><th>Vencimento</th><th>Saldo</th><th>Empresa</th><th /></tr></thead><tbody>
-                {candidateModal.rows.map((title) => <tr key={title.id}><td>{title.codigo || `#${title.id}`}</td><td>{title.parceiro?.nome || '-'}</td><td>{date(title.data_vencimento)}</td><td>{currency(title.valor_saldo)}</td><td>{title.empresa?.nome || title.empresa?.razao_social || '-'}</td><td className="text-right"><button type="button" className="btn btn-primary btn-xs" disabled={actionId === candidateModal.boleto.id} onClick={async () => { const ok = await runAction(candidateModal.boleto.id, () => vincularFinanceiroDda(candidateModal.boleto.id, title.id), 'Documento vinculado ao titulo selecionado.'); if (ok) setCandidateModal(null); }}>Usar titulo</button></td></tr>)}
-                {candidateModal.rows.length === 0 && <tr><td colSpan="6" className="py-8 text-center text-slate-500">Nenhum titulo elegivel localizado pelos dados do documento.</td></tr>}
-              </tbody></table>
+            <div className="mt-3 max-h-[55vh] overflow-auto">
+              <TabelaPadrao
+                colunas={[
+                  { id: 'codigo', titulo: 'Titulo', tipo: 'codigo', render: (title) => title.codigo || `#${title.id}` },
+                  {
+                    id: 'credor',
+                    titulo: 'Credor',
+                    // R17: o credor NOMEIA o titulo candidato.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (title) => title.parceiro?.nome || '-'
+                  },
+                  { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (title) => date(title.data_vencimento) },
+                  { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (title) => currency(title.valor_saldo) },
+                  { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (title) => title.empresa?.nome || title.empresa?.razao_social || '-' }
+                ]}
+                itens={candidateModal.rows}
+                vazio="Nenhum titulo elegivel localizado pelos dados do documento."
+                storageKey="tabela:financeiro-dda:candidatos"
+                rotuloRolagem="Titulos candidatos ao documento"
+                larguraAcoes={140}
+                acoesLinha={(title) => (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={actionId === candidateModal.boleto.id}
+                    onClick={async () => {
+                      const ok = await runAction(candidateModal.boleto.id, () => vincularFinanceiroDda(candidateModal.boleto.id, title.id), 'Documento vinculado ao titulo selecionado.');
+                      if (ok) setCandidateModal(null);
+                    }}
+                  >
+                    Usar titulo
+                  </button>
+                )}
+              />
             </div>
           </div>
           <button type="button" className="modal-backdrop" aria-label="Fechar" onClick={() => setCandidateModal(null)}>fechar</button>

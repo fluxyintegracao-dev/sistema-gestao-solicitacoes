@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import OverlayModal from '../components/ui/OverlayModal';
 import {
   anexarNaRhSolicitacao,
@@ -46,15 +46,6 @@ const ROTULO_SITUACAO = {
 };
 
 // Ver o comentario em RhDpPessoal.jsx: sem `columns` + `columnKey`, as colunas colapsam.
-const COLUNAS_SOLICITACOES = [
-  { key: 'tipo', width: 150, minWidth: 120 },
-  { key: 'colaborador', width: 220, minWidth: 160 },
-  { key: 'obra', width: 260, minWidth: 200 },
-  { key: 'situacao', width: 200, minWidth: 150 },
-  { key: 'aberta', width: 110, minWidth: 95 },
-  { key: 'acoes', width: 300, minWidth: 240 }
-];
-
 function chipDoTipo(tipo) {
   if (tipo === 'ALTERACAO_SALARIAL') return 'rh-chip rh-chip--diretoria';
   if (tipo === 'EVENTO_RECORRENTE') return 'rh-chip rh-chip--evento';
@@ -311,115 +302,122 @@ export default function RhDpPessoalSolicitacoes({ podeAbrir, podeDecidir, podeAp
         </div>
       </div>
 
-      <div className="card sol-surface-card app-table-shell">
-        <div className="app-dense-table-wrapper">
-          <ResizableTable
-            columns={COLUNAS_SOLICITACOES}
-            storageKey="rh-pessoal-solicitacoes-colunas"
-            className="app-dense-data-table"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="tipo">Tipo</ResizableTh>
-                <ResizableTh columnKey="colaborador">Colaborador</ResizableTh>
-                <ResizableTh columnKey="obra">Obra</ResizableTh>
-                <ResizableTh columnKey="situacao">Situacao</ResizableTh>
-                <ResizableTh columnKey="aberta">Aberta em</ResizableTh>
-                <ResizableTh columnKey="acoes">Acoes</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {solicitacoes.length === 0 && !carregando ? (
-                <tr><td colSpan={6} className="text-center">Nenhuma solicitacao neste filtro.</td></tr>
+      <div className="card sol-surface-card">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'badge',
+              render: (s) => (
+                <span className={chipDoTipo(s.tipo)}>
+                  {/*
+                    Sem obra de origem, o pedido de TROCA_OBRA e a PRIMEIRA lotacao — e "trocar"
+                    seria a palavra errada. Quem decide precisa entender o que esta decidindo.
+                  */}
+                  {(s.tipo === 'TROCA_OBRA' || s.subtipo === 'TRANSFERENCIA_OBRA') && !s.colaborador?.obra_id
+                    ? 'Vincular a obra'
+                    : ROTULO_TIPO[s.tipo] || s.tipo}
+                </span>
+              )
+            },
+            {
+              id: 'colaborador',
+              titulo: 'Colaborador',
+              // R17: a solicitacao e sobre uma PESSOA — o nome dela identifica a linha.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              /* Na admissao o colaborador ainda nao existe: o nome vive no pedido. */
+              render: (s) => s.colaborador?.nome || s.dados_json?.nome || <span className="opacity-60">a admitir</span>
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              /*
+                Na TROCA DE OBRA a linha mostra ORIGEM e DESTINO. Sem isso, quem decide ve so
+                uma obra e nao sabe se e de onde ele sai ou para onde vai — e a decisao e
+                justamente sobre esse movimento.
+              */
+              render: (s) => (s.tipo === 'TROCA_OBRA' ? (
+                <div className="rh-troca-obra">
+                  <span className="rh-troca-obra-origem">
+                    {s.obra?.nome || s.colaborador?.obra?.nome || 'Sem obra'}
+                  </span>
+                  <span className="rh-troca-obra-seta" aria-hidden="true">→</span>
+                  <span className="rh-troca-obra-destino">
+                    {s.obra_destino_nome || '—'}
+                  </span>
+                </div>
+              ) : (
+                s.obra?.nome || '—'
+              ))
+            },
+            {
+              id: 'situacao',
+              titulo: 'Situacao',
+              tipo: 'status',
+              render: (s) => (
+                <>
+                  <span className={chipDaSituacao(s.situacao)}>{ROTULO_SITUACAO[s.situacao] || s.situacao}</span>
+                  {s.motivo_rejeicao ? (
+                    <div className="text-xs rh-pessoal-devolucao">{s.motivo_rejeicao}</div>
+                  ) : null}
+                </>
+              )
+            },
+            {
+              id: 'aberta',
+              titulo: 'Aberta em',
+              tipo: 'data',
+              render: (s) => (s.createdAt ? new Date(s.createdAt).toLocaleDateString('pt-BR') : '—')
+            }
+          ]}
+          itens={solicitacoes}
+          storageKey="tabela:rh-dp-pessoal-solicitacoes"
+          rotuloRolagem="Solicitacoes RH/DP"
+          carregando={carregando}
+          vazio="Nenhuma solicitacao neste filtro."
+          // Rascunho e aberta ainda esperam alguem: a linha fica marcada.
+          urgencia={(s) => (['RASCUNHO', 'ABERTA'].includes(s.situacao) ? 'warning' : null)}
+          acoesLinha={(s) => (
+            <>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirDetalhe(s)}>
+                Abrir
+              </button>
+              {podeDecidir && s.situacao === 'ABERTA' ? (
+                <>
+                  {s.tipo !== 'ALTERACAO_SALARIAL' || podeAprovarSalario ? (
+                    <button type="button" className="btn btn-primary btn-sm" onClick={() => decidir(s, 'aprovar')}>
+                      Aprovar
+                    </button>
+                  ) : (
+                    <span className="text-xs opacity-70">Aguardando a Diretoria</span>
+                  )}
+                  <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'devolver')}>
+                    Devolver
+                  </button>
+                </>
               ) : null}
-
-              {solicitacoes.map((s) => (
-                <tr key={s.id} className={['RASCUNHO', 'ABERTA'].includes(s.situacao) ? 'rh-pessoal-linha--pendente' : undefined}>
-                  <td>
-                    <span className={chipDoTipo(s.tipo)}>
-                      {/*
-                        Sem obra de origem, o pedido de TROCA_OBRA e a PRIMEIRA lotacao — e "trocar"
-                        seria a palavra errada. Quem decide precisa entender o que esta decidindo.
-                      */}
-                      {(s.tipo === 'TROCA_OBRA' || s.subtipo === 'TRANSFERENCIA_OBRA') && !s.colaborador?.obra_id
-                        ? 'Vincular a obra'
-                        : ROTULO_TIPO[s.tipo] || s.tipo}
-                    </span>
-                  </td>
-                  <td>
-                    {/* Na admissao o colaborador ainda nao existe: o nome vive no pedido. */}
-                    {s.colaborador?.nome || s.dados_json?.nome || <span className="opacity-60">a admitir</span>}
-                  </td>
-                  <td>
-                    {/*
-                      Na TROCA DE OBRA a linha mostra ORIGEM e DESTINO. Sem isso, quem decide ve so
-                      uma obra e nao sabe se e de onde ele sai ou para onde vai — e a decisao e
-                      justamente sobre esse movimento.
-                    */}
-                    {s.tipo === 'TROCA_OBRA' ? (
-                      <div className="rh-troca-obra">
-                        <span className="rh-troca-obra-origem">
-                          {s.obra?.nome || s.colaborador?.obra?.nome || 'Sem obra'}
-                        </span>
-                        <span className="rh-troca-obra-seta" aria-hidden="true">→</span>
-                        <span className="rh-troca-obra-destino">
-                          {s.obra_destino_nome || '—'}
-                        </span>
-                      </div>
-                    ) : (
-                      s.obra?.nome || '—'
-                    )}
-                  </td>
-                  <td>
-                    <span className={chipDaSituacao(s.situacao)}>{ROTULO_SITUACAO[s.situacao] || s.situacao}</span>
-                    {s.motivo_rejeicao ? (
-                      <div className="text-xs rh-pessoal-devolucao">{s.motivo_rejeicao}</div>
-                    ) : null}
-                  </td>
-                  <td className="tabular-nums">
-                    {s.createdAt ? new Date(s.createdAt).toLocaleDateString('pt-BR') : '—'}
-                  </td>
-                  <td>
-                    <div className="app-page-actions">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirDetalhe(s)}>
-                        Abrir
-                      </button>
-                      {podeDecidir && s.situacao === 'ABERTA' ? (
-                        <>
-                          {s.tipo !== 'ALTERACAO_SALARIAL' || podeAprovarSalario ? (
-                            <button type="button" className="btn btn-primary btn-sm" onClick={() => decidir(s, 'aprovar')}>
-                              Aprovar
-                            </button>
-                          ) : (
-                            <span className="text-xs opacity-70">Aguardando a Diretoria</span>
-                          )}
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'devolver')}>
-                            Devolver
-                          </button>
-                        </>
-                      ) : null}
-                      {podeAbrir && s.situacao === 'RASCUNHO' ? (
-                        <button type="button" className="btn btn-primary btn-sm" onClick={() => enviarAoDp(s)}>
-                          Enviar
-                        </button>
-                      ) : null}
-                      {podeAbrir && s.situacao === 'REJEITADA' ? (
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'reenviar')}>
-                          Reenviar
-                        </button>
-                      ) : null}
-                      {podeAbrir && ['RASCUNHO', 'ABERTA'].includes(s.situacao) ? (
-                        <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'cancelar')}>
-                          Cancelar
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
+              {podeAbrir && s.situacao === 'RASCUNHO' ? (
+                <button type="button" className="btn btn-primary btn-sm" onClick={() => enviarAoDp(s)}>
+                  Enviar
+                </button>
+              ) : null}
+              {podeAbrir && s.situacao === 'REJEITADA' ? (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'reenviar')}>
+                  Reenviar
+                </button>
+              ) : null}
+              {podeAbrir && ['RASCUNHO', 'ABERTA'].includes(s.situacao) ? (
+                <button type="button" className="btn btn-outline btn-sm" onClick={() => decidir(s, 'cancelar')}>
+                  Cancelar
+                </button>
+              ) : null}
+            </>
+          )}
+          larguraAcoes={300}
+        />
       </div>
 
       {/*

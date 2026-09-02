@@ -21,6 +21,7 @@ import { buscarParceiros } from '../services/parceiros';
 import { useAuth } from '../contexts/AuthContext';
 import { hasEnabledModule } from '../utils/acessoProduto';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
+import { TabelaPadrao } from '../components/padrao';
 
 const STATUS_OPTIONS = [
   { value: '', label: 'Todos elegiveis' },
@@ -930,58 +931,55 @@ export default function FinanceiroBoletos() {
         </div>
 
         {remessasCaixa.length > 0 && (
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)]">
-            <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
-              <thead className="bg-[var(--c-bg)] text-left text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-                <tr>
-                  <th className="px-4 py-3">Ultimas remessas</th>
-                  <th className="px-4 py-3">Arquivo</th>
-                  <th className="px-4 py-3">Boletos</th>
-                  <th className="px-4 py-3 text-right">Valor</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Evidencias</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--c-border)]">
-                {remessasCaixa.slice(0, 5).map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-4 py-3 font-semibold">#{item.numero_remessa}</td>
-                    <td className="px-4 py-3">{item.nome_arquivo}</td>
-                    <td className="px-4 py-3">{item.quantidade_boletos}</td>
-                    <td className="px-4 py-3 text-right">{formatCurrency(item.valor_total)}</td>
-                    <td className="px-4 py-3">{item.status}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-end gap-2">
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => onBaixarRemessa(item)}
-                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
-                        >
-                          {baixandoRemessaId === item.id ? 'REM...' : 'REM'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-outline btn-sm"
-                          onClick={() => onBaixarHomologacao(item)}
-                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
-                        >
-                          {baixandoHomologacaoId === item.id ? 'CSV...' : 'CSV'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-primary btn-sm"
-                          onClick={() => onBaixarPacoteHomologacao(item)}
-                          disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
-                        >
-                          {baixandoPacoteId === item.id ? 'ZIP...' : 'ZIP'}
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-4">
+            <TabelaPadrao
+              colunas={[
+                { id: 'numero', titulo: 'Ultimas remessas', tipo: 'codigo', render: (item) => <strong>#{item.numero_remessa}</strong> },
+                {
+                  id: 'arquivo',
+                  titulo: 'Arquivo',
+                  // R17: o nome do arquivo NOMEIA a remessa.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (item) => item.nome_arquivo
+                },
+                { id: 'boletos', titulo: 'Boletos', tipo: 'numero', render: (item) => item.quantidade_boletos },
+                { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) },
+                { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status }
+              ]}
+              itens={remessasCaixa.slice(0, 5)}
+              storageKey="tabela:financeiro-boletos:remessas"
+              rotuloRolagem="Ultimas remessas de cobranca"
+              larguraAcoes={260}
+              acoesLinha={(item) => (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => onBaixarRemessa(item)}
+                    disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                  >
+                    {baixandoRemessaId === item.id ? 'REM...' : 'REM'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => onBaixarHomologacao(item)}
+                    disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                  >
+                    {baixandoHomologacaoId === item.id ? 'CSV...' : 'CSV'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => onBaixarPacoteHomologacao(item)}
+                    disabled={baixandoRemessaId === item.id || baixandoHomologacaoId === item.id || baixandoPacoteId === item.id}
+                  >
+                    {baixandoPacoteId === item.id ? 'ZIP...' : 'ZIP'}
+                  </button>
+                </>
+              )}
+            />
           </div>
         )}
       </section>
@@ -1206,121 +1204,137 @@ export default function FinanceiroBoletos() {
           </div>
         )}
 
-        <div className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)]">
+        <div className="mt-4">
           {!hasConsulted ? (
             <div className="app-empty-card m-4">
               Nenhum filtro aplicado. Use os filtros acima e clique em Consultar para listar os boletos.
             </div>
-          ) : loading ? (
-            <div className="app-empty-card m-4">Carregando titulos...</div>
-          ) : titulos.length === 0 ? (
-            <div className="app-empty-card m-4">Nenhum titulo elegivel encontrado para os filtros aplicados.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[var(--c-border)] text-sm">
-                <thead className="bg-[var(--c-bg)] text-left text-xs uppercase tracking-[0.14em] text-[var(--c-muted)]">
-                  <tr>
-                    <th className="w-12 px-4 py-3">
-                      <span className="sr-only">Selecionar</span>
-                    </th>
-                    <th className="px-4 py-3">Titulo</th>
-                    <th className="px-4 py-3">Cliente</th>
-                    {comercialHabilitado && <th className="px-4 py-3">Origem</th>}
-                    {comercialHabilitado && <th className="px-4 py-3">Empreendimento</th>}
-                    <th className="px-4 py-3">Vencimento</th>
-                    <th className="px-4 py-3 text-right">Saldo</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Boleto</th>
-                    <th className="px-4 py-3 text-right">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--c-border)]">
-                  {titulos.map((titulo) => (
-                    <tr key={titulo.id} className="align-top hover:bg-[var(--c-bg)]/70">
-                      <td className="px-4 py-3">
-                        <input
-                          type="checkbox"
-                          checked={selecionados.map(Number).includes(Number(titulo.id))}
-                          onChange={(event) => toggleSelecionado(titulo.id, event.target.checked)}
-                          disabled={gerandoMassa}
-                          aria-label={`Selecionar titulo ${titulo.id}`}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Link className="font-semibold text-blue-700 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
-                          {titulo.codigo || `#${titulo.id}`} {titulo.numero_documento ? `- ${titulo.numero_documento}` : ''}
-                        </Link>
-                        <p className="mt-1 max-w-[340px] text-xs text-[var(--c-muted)]">{titulo.descricao}</p>
-                      </td>
-                      <td className="px-4 py-3 text-[var(--c-text)]">{titulo.parceiro?.nome || '-'}</td>
-                      {comercialHabilitado && (
-                        <td className="px-4 py-3 text-[var(--c-muted)]">
-                          {titulo.parcelasComerciais?.length ? 'Comercial' : 'Manual'}
-                        </td>
-                      )}
-                      {comercialHabilitado && (
-                        <td className="px-4 py-3 text-[var(--c-muted)]">
-                          {titulo.parcelasComerciais?.[0]?.contrato?.empreendimento?.nome || '-'}
-                        </td>
-                      )}
-                      <td className="px-4 py-3 text-[var(--c-text)]">{formatDate(titulo.data_vencimento)}</td>
-                      <td className="px-4 py-3 text-right font-semibold text-[var(--c-text)]">{formatCurrency(titulo.valor_saldo)}</td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                          {titulo.status_cobranca || 'NAO_APLICAVEL'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--c-muted)]">
-                        <div>{titulo.nosso_numero ? `Nosso numero: ${titulo.nosso_numero}` : 'Nao emitido'}</div>
-                        {titulo.codigo_barras && <div className="mt-1 text-emerald-700">Codigo gerado</div>}
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            onClick={() => selecionarTitulo(titulo)}
-                            title="Visualizar boleto"
-                            aria-label={`Visualizar boleto do titulo ${titulo.id}`}
-                          >
-                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-                              <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            disabled={gerandoId === titulo.id || gerandoMassa}
-                            onClick={() => onGerarAmostra(titulo)}
-                            title="Gerar amostra para homologacao"
-                          >
-                            Amostra
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            disabled={baixandoPdfId === titulo.id || gerandoMassa}
-                            onClick={() => onBaixarPdf(titulo, { amostra: !titulo.codigo_barras })}
-                            title={titulo.codigo_barras ? 'Baixar PDF do boleto' : 'Baixar PDF de amostra'}
-                          >
-                            {baixandoPdfId === titulo.id ? 'PDF...' : 'PDF'}
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-primary btn-sm"
-                            disabled={gerandoId === titulo.id || gerandoMassa}
-                            onClick={() => onGerar(titulo)}
-                          >
-                            {gerandoId === titulo.id ? 'Gerando...' : (titulo.codigo_barras ? 'Regerar' : 'Gerar')}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'selecao',
+                  titulo: 'Selecionar',
+                  // Seleção em lote: coluna de marcação com render próprio.
+                  tipo: 'status',
+                  render: (titulo) => (
+                    <input
+                      type="checkbox"
+                      checked={selecionados.map(Number).includes(Number(titulo.id))}
+                      onChange={(event) => toggleSelecionado(titulo.id, event.target.checked)}
+                      disabled={gerandoMassa}
+                      aria-label={`Selecionar titulo ${titulo.id}`}
+                    />
+                  )
+                },
+                {
+                  id: 'titulo',
+                  titulo: 'Titulo',
+                  tipo: 'codigo',
+                  render: (titulo) => (
+                    <div>
+                      <Link className="font-semibold text-blue-700 hover:underline" to={`/financeiro/titulos/${titulo.id}`}>
+                        {titulo.codigo || `#${titulo.id}`} {titulo.numero_documento ? `- ${titulo.numero_documento}` : ''}
+                      </Link>
+                      <p className="mt-1 text-xs text-[var(--c-muted)]">{titulo.descricao}</p>
+                    </div>
+                  )
+                },
+                {
+                  id: 'cliente',
+                  titulo: 'Cliente',
+                  // R17: o cliente NOMEIA o titulo a cobrar.
+                  tipo: 'identidade',
+                  noCard: 'titulo',
+                  render: (titulo) => titulo.parceiro?.nome || '-'
+                },
+                ...(comercialHabilitado ? [
+                  {
+                    id: 'origem',
+                    titulo: 'Origem',
+                    tipo: 'badge',
+                    render: (titulo) => (titulo.parcelasComerciais?.length ? 'Comercial' : 'Manual')
+                  },
+                  {
+                    id: 'empreendimento',
+                    titulo: 'Empreendimento',
+                    tipo: 'texto',
+                    render: (titulo) => titulo.parcelasComerciais?.[0]?.contrato?.empreendimento?.nome || '-'
+                  }
+                ] : []),
+                { id: 'vencimento', titulo: 'Vencimento', tipo: 'data', render: (titulo) => formatDate(titulo.data_vencimento) },
+                { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo) },
+                {
+                  id: 'status',
+                  titulo: 'Status',
+                  tipo: 'status',
+                  render: (titulo) => (
+                    <span className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                      {titulo.status_cobranca || 'NAO_APLICAVEL'}
+                    </span>
+                  )
+                },
+                {
+                  id: 'boleto',
+                  titulo: 'Boleto',
+                  tipo: 'texto',
+                  render: (titulo) => (
+                    <div className="text-xs text-[var(--c-muted)]">
+                      <div>{titulo.nosso_numero ? `Nosso numero: ${titulo.nosso_numero}` : 'Nao emitido'}</div>
+                      {titulo.codigo_barras && <div className="mt-1 text-emerald-700">Codigo gerado</div>}
+                    </div>
+                  )
+                }
+              ]}
+              itens={titulos}
+              carregando={loading}
+              vazio="Nenhum titulo elegivel encontrado para os filtros aplicados."
+              storageKey="tabela:financeiro-boletos:titulos"
+              rotuloRolagem="Titulos elegiveis para boleto"
+              larguraAcoes={320}
+              acoesLinha={(titulo) => (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => selecionarTitulo(titulo)}
+                    title="Visualizar boleto"
+                    aria-label={`Visualizar boleto do titulo ${titulo.id}`}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={gerandoId === titulo.id || gerandoMassa}
+                    onClick={() => onGerarAmostra(titulo)}
+                    title="Gerar amostra para homologacao"
+                  >
+                    Amostra
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    disabled={baixandoPdfId === titulo.id || gerandoMassa}
+                    onClick={() => onBaixarPdf(titulo, { amostra: !titulo.codigo_barras })}
+                    title={titulo.codigo_barras ? 'Baixar PDF do boleto' : 'Baixar PDF de amostra'}
+                  >
+                    {baixandoPdfId === titulo.id ? 'PDF...' : 'PDF'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    disabled={gerandoId === titulo.id || gerandoMassa}
+                    onClick={() => onGerar(titulo)}
+                  >
+                    {gerandoId === titulo.id ? 'Gerando...' : (titulo.codigo_barras ? 'Regerar' : 'Gerar')}
+                  </button>
+                </>
+              )}
+            />
           )}
         </div>
       </section>

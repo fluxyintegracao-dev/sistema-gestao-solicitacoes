@@ -7,7 +7,7 @@ import {
   HiOutlineUserMinus
 } from 'react-icons/hi2';
 import OverlayModal from '../components/ui/OverlayModal';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import {
@@ -193,26 +193,6 @@ function chipDoTipo(tipo) {
   if (tipo === 'EVENTO_RECORRENTE') return 'rh-chip rh-chip--evento';
   return 'rh-chip rh-chip--pedido';
 }
-
-/**
- * LARGURAS DAS COLUNAS.
- *
- * `ResizableTable` so distribui largura quando recebe `columns`, e cada `ResizableTh` precisa do
- * `columnKey` correspondente. Sem isso as colunas colapsam para o minimo e o cabecalho aparece
- * como "C...", "O...", "V..." — foi o que aconteceu na primeira versao desta tela.
- *
- * `acoes` e larga (400) porque a linha tem CINCO botoes. Com largura de coluna comum, eles quebram
- * um caractere por linha e a tabela vira uma coluna de letras empilhadas.
- */
-const COLUNAS_COLABORADORES = [
-  { key: 'colaborador', width: 230, minWidth: 170 },
-  { key: 'obra', width: 190, minWidth: 140 },
-  { key: 'vinculo', width: 110, minWidth: 90 },
-  { key: 'salario', width: 130, minWidth: 110 },
-  { key: 'situacao', width: 120, minWidth: 100 },
-  { key: 'solicitacao', width: 190, minWidth: 150 },
-  { key: 'acoes', width: 215, minWidth: 200 }
-];
 
 function formularioVazio(tipo) {
   return {
@@ -813,95 +793,101 @@ export default function RhDpPessoal() {
         </div>
       </div>
 
-      <div className="card sol-surface-card app-table-shell">
-        <div className="app-dense-table-wrapper">
-          <ResizableTable
-            columns={COLUNAS_COLABORADORES}
-            storageKey="rh-pessoal-colaboradores-colunas-v2"
-            className="app-dense-data-table rh-pessoal-table"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="colaborador">Colaborador</ResizableTh>
-                <ResizableTh columnKey="obra">Obra</ResizableTh>
-                <ResizableTh columnKey="vinculo">Vinculo</ResizableTh>
-                <ResizableTh columnKey="salario">Salario</ResizableTh>
-                <ResizableTh columnKey="situacao">Situacao</ResizableTh>
-                <ResizableTh columnKey="solicitacao">Solicitacao em curso</ResizableTh>
-                <ResizableTh columnKey="acoes">Acoes</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {colaboradores.length === 0 && !carregando ? (
-                <tr><td colSpan={7} className="text-center">Nenhum colaborador nesta obra.</td></tr>
-              ) : null}
-
-              {colaboradores.map((colaborador) => (
-                <tr
-                  key={colaborador.id}
-                  /* O destaque visual que o cliente pediu — a linha inteira, nao so um icone. */
-                  className={colaborador.tem_solicitacao_aberta ? 'rh-pessoal-linha--pendente' : undefined}
+      <div className="card sol-surface-card">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'colaborador',
+              titulo: 'Colaborador',
+              // R17: o NOME do colaborador é o que identifica a linha.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (colaborador) => (
+                <CelulaDupla principal={colaborador.nome} sub={colaborador.cargo || '—'} />
+              )
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (colaborador) => colaborador.obra?.nome || '—'
+            },
+            {
+              id: 'vinculo',
+              titulo: 'Vinculo',
+              tipo: 'badge',
+              render: (colaborador) => colaborador.tipo_vinculo
+            },
+            {
+              id: 'salario',
+              titulo: 'Salario',
+              tipo: 'valor',
+              render: (colaborador) => (colaborador.salario_base
+                ? formatCurrencyInput(String(colaborador.salario_base))
+                : '—')
+            },
+            {
+              id: 'situacao',
+              titulo: 'Situacao',
+              tipo: 'status',
+              render: (colaborador) => (
+                <span className={colaborador.status === 'ATIVO' ? 'rh-chip' : 'rh-chip rh-chip--saindo'}>
+                  {colaborador.status}
+                </span>
+              )
+            },
+            {
+              id: 'solicitacao',
+              titulo: 'Solicitacao em curso',
+              tipo: 'texto',
+              render: (colaborador) => ((colaborador.solicitacoes_abertas || []).length === 0 ? (
+                <span className="opacity-60">—</span>
+              ) : (
+                colaborador.solicitacoes_abertas.map((pedido) => (
+                  <span key={pedido.id} className={chipDoTipo(pedido.tipo)}>
+                    {/* Mesma logica do icone: sem obra e "vincular", nao "trocar". */}
+                    {(pedido.tipo === 'TROCA_OBRA' || pedido.subtipo === 'TRANSFERENCIA_OBRA') && !colaborador.obra_id
+                      ? 'Vincular a obra'
+                      : ROTULO_TIPO[pedido.tipo] || pedido.tipo}
+                  </span>
+                ))
+              ))
+            }
+          ]}
+          itens={colaboradores}
+          storageKey="tabela:rh-dp-pessoal:colaboradores"
+          rotuloRolagem="Colaboradores da obra"
+          carregando={carregando}
+          vazio="Nenhum colaborador nesta obra."
+          /* O destaque visual que o cliente pediu — a linha inteira, nao so um icone. */
+          urgencia={(colaborador) => (colaborador.tem_solicitacao_aberta ? 'warning' : null)}
+          acoesLinha={(colaborador) => (
+            <div className="rh-acoes-icones">
+              <button
+                type="button"
+                className="rh-acao-icone"
+                title="Acompanhar solicitacoes deste colaborador"
+                aria-label={`Acompanhar solicitacoes de ${colaborador.nome}`}
+                onClick={() => verPedidos(colaborador)}
+              >
+                <HiOutlineEye aria-hidden="true" />
+              </button>
+              {podeAbrir ? ACOES_DA_LINHA.map(({ tipo, rotulo, Icone }) => (
+                <button
+                  key={tipo}
+                  type="button"
+                  className="rh-acao-icone"
+                  title={rotulo}
+                  aria-label={`${rotulo}: ${colaborador.nome}`}
+                  onClick={() => novoPedido(tipo, colaborador)}
                 >
-                  <td>
-                    <div className="font-medium">{colaborador.nome}</div>
-                    <div className="text-xs opacity-70">{colaborador.cargo || '—'}</div>
-                  </td>
-                  <td>{colaborador.obra?.nome || '—'}</td>
-                  <td>{colaborador.tipo_vinculo}</td>
-                  <td className="tabular-nums">
-                    {colaborador.salario_base
-                      ? formatCurrencyInput(String(colaborador.salario_base))
-                      : '—'}
-                  </td>
-                  <td>
-                    <span className={colaborador.status === 'ATIVO' ? 'rh-chip' : 'rh-chip rh-chip--saindo'}>
-                      {colaborador.status}
-                    </span>
-                  </td>
-                  <td>
-                    {(colaborador.solicitacoes_abertas || []).length === 0 ? (
-                      <span className="opacity-60">—</span>
-                    ) : (
-                      colaborador.solicitacoes_abertas.map((pedido) => (
-                        <span key={pedido.id} className={chipDoTipo(pedido.tipo)}>
-                          {/* Mesma logica do icone: sem obra e "vincular", nao "trocar". */}
-                          {(pedido.tipo === 'TROCA_OBRA' || pedido.subtipo === 'TRANSFERENCIA_OBRA') && !colaborador.obra_id
-                            ? 'Vincular a obra'
-                            : ROTULO_TIPO[pedido.tipo] || pedido.tipo}
-                        </span>
-                      ))
-                    )}
-                  </td>
-                  <td>
-                    <div className="rh-acoes-icones">
-                      <button
-                        type="button"
-                        className="rh-acao-icone"
-                        title="Acompanhar solicitacoes deste colaborador"
-                        aria-label={`Acompanhar solicitacoes de ${colaborador.nome}`}
-                        onClick={() => verPedidos(colaborador)}
-                      >
-                        <HiOutlineEye aria-hidden="true" />
-                      </button>
-                      {podeAbrir ? ACOES_DA_LINHA.map(({ tipo, rotulo, Icone }) => (
-                        <button
-                          key={tipo}
-                          type="button"
-                          className="rh-acao-icone"
-                          title={rotulo}
-                          aria-label={`${rotulo}: ${colaborador.nome}`}
-                          onClick={() => novoPedido(tipo, colaborador)}
-                        >
-                          <Icone aria-hidden="true" />
-                        </button>
-                      )) : null}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
+                  <Icone aria-hidden="true" />
+                </button>
+              )) : null}
+            </div>
+          )}
+          larguraAcoes={215}
+        />
       </div>
 
         </>

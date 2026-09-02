@@ -12,10 +12,8 @@ import { fileUrl } from '../services/api';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 
-const STORAGE_KEY = 'fluxy.financeiro.financeiroObras.columnWidths';
-const IMPORT_PREVIEW_STORAGE_KEY = 'fluxy.financeiro.financeiroObras.importPreview.columnWidths';
 const IMPORT_PREVIEW_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 function getTodayIso() {
@@ -58,33 +56,6 @@ const ANALISE_OPTIONS = [
     label: 'A realizar',
     description: 'Saldo em aberto dos titulos, pela data de vencimento.'
   }
-];
-
-const TABLE_COLUMNS = [
-  { key: 'data_baixa', width: 112, minWidth: 96 },
-  { key: 'data_vencimento', width: 112, minWidth: 96 },
-  { key: 'parceiro_nome', width: 230, minWidth: 150 },
-  { key: 'titulo_parcela', width: 150, minWidth: 116 },
-  { key: 'documento', width: 220, minWidth: 140 },
-  { key: 'plano_financeiro', width: 280, minWidth: 160 },
-  { key: 'credito', width: 130, minWidth: 110 },
-  { key: 'debito', width: 130, minWidth: 110 },
-  { key: 'saldo', width: 130, minWidth: 110 },
-  { key: 'obra_nome', width: 210, minWidth: 140 },
-  { key: 'empresa_nome', width: 200, minWidth: 140 },
-  { key: 'status_titulo', width: 130, minWidth: 110 }
-];
-
-const IMPORT_PREVIEW_COLUMNS = [
-  { key: 'row_number', width: 82, minWidth: 72 },
-  { key: 'status', width: 112, minWidth: 96 },
-  { key: 'data_pagamento', width: 112, minWidth: 96 },
-  { key: 'parceiro_nome', width: 250, minWidth: 160 },
-  { key: 'documento', width: 160, minWidth: 120 },
-  { key: 'plano_financeiro', width: 260, minWidth: 160 },
-  { key: 'credito', width: 150, minWidth: 124 },
-  { key: 'debito', width: 150, minWidth: 124 },
-  { key: 'observacao', width: 260, minWidth: 160 }
 ];
 
 function compact(params = {}) {
@@ -553,65 +524,40 @@ export default function FinanceiroObras() {
           </p>
         </div>
 
-        <div className="app-dense-table-wrapper financeiro-obras-table-wrapper">
-          <ResizableTable columns={TABLE_COLUMNS} storageKey={STORAGE_KEY} className="app-dense-data-table financeiro-obras-table">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="data_baixa">Baixa</ResizableTh>
-                <ResizableTh columnKey="data_vencimento">Vencto</ResizableTh>
-                <ResizableTh columnKey="parceiro_nome">Cliente/Fornecedor</ResizableTh>
-                <ResizableTh columnKey="titulo_parcela">Titulo/Parcela</ResizableTh>
-                <ResizableTh columnKey="documento">Documento</ResizableTh>
-                <ResizableTh columnKey="plano_financeiro">Plano financeiro</ResizableTh>
-                <ResizableTh columnKey="credito" className="text-right">Credito</ResizableTh>
-                <ResizableTh columnKey="debito" className="text-right">Debito</ResizableTh>
-                <ResizableTh columnKey="saldo" className="text-right">Saldo</ResizableTh>
-                <ResizableTh columnKey="obra_nome">Obra</ResizableTh>
-                <ResizableTh columnKey="empresa_nome">Empresa</ResizableTh>
-                <ResizableTh columnKey="status_titulo">Status</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={12} className="text-center text-[var(--c-muted)]">Carregando financeiro de obras...</td>
-                </tr>
-              ) : relatorio.linhas.length === 0 ? (
-                <tr>
-                  <td colSpan={12} className="text-center text-[var(--c-muted)]">Nenhum titulo encontrado para os filtros selecionados.</td>
-                </tr>
-              ) : (
-                relatorio.linhas.map((linha) => (
-                  <tr
-                    key={linha.id}
-                    data-testid={`linha-titulo-${linha.titulo_id || 'sem-titulo'}`}
-                    onClick={() => abrirArquivos(linha)}
-                    style={linha.titulo_id ? { cursor: 'pointer' } : undefined}
-                    title={linha.titulo_id ? 'Ver os arquivos deste pagamento' : undefined}
-                  >
-                    <td>{formatDate(linha.data_baixa)}</td>
-                    <td>{formatDate(linha.data_vencimento)}</td>
-                    <td>
-                      <strong className="block text-[var(--c-text)]">{linha.parceiro_nome || '-'}</strong>
-                      <small className="text-[var(--c-muted)]">{linha.parceiro_cpf_cnpj || ''}</small>
-                    </td>
-                    <td>{linha.titulo_parcela || '-'}</td>
-                    <td className="text-xs">{linha.documento || '-'}</td>
-                    <td>
-                      <span className="line-clamp-2">{linha.plano_financeiro || '-'}</span>
-                    </td>
-                    <td className="text-right text-emerald-700 font-semibold">{linha.credito ? formatCurrency(linha.credito) : '-'}</td>
-                    <td className="text-right text-rose-700 font-semibold">{linha.debito ? formatCurrency(linha.debito) : '-'}</td>
-                    <td className="text-right font-semibold">{formatCurrency(linha.saldo)}</td>
-                    <td>{linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')}</td>
-                    <td>{linha.empresa_nome || '-'}</td>
-                    <td><span className={statusClass(linha.status_titulo)}>{formatStatus(linha.status_titulo)}</span></td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            { id: 'data_baixa', titulo: 'Baixa', tipo: 'data', render: (linha) => formatDate(linha.data_baixa) },
+            { id: 'data_vencimento', titulo: 'Vencto', tipo: 'data', render: (linha) => formatDate(linha.data_vencimento) },
+            {
+              id: 'parceiro_nome',
+              titulo: 'Cliente/Fornecedor',
+              // R17: o parceiro NOMEIA a linha do detalhamento.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (linha) => (
+                <div data-testid={`linha-titulo-${linha.titulo_id || 'sem-titulo'}`}>
+                  <strong className="block text-[var(--c-text)]">{linha.parceiro_nome || '-'}</strong>
+                  <small className="text-[var(--c-muted)]">{linha.parceiro_cpf_cnpj || ''}</small>
+                </div>
+              )
+            },
+            { id: 'titulo_parcela', titulo: 'Titulo/Parcela', tipo: 'codigo', render: (linha) => linha.titulo_parcela || '-' },
+            { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => <span className="text-xs">{linha.documento || '-'}</span> },
+            { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => <span className="line-clamp-2">{linha.plano_financeiro || '-'}</span> },
+            { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="text-emerald-700 font-semibold">{linha.credito ? formatCurrency(linha.credito) : '-'}</span> },
+            { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="text-rose-700 font-semibold">{linha.debito ? formatCurrency(linha.debito) : '-'}</span> },
+            { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (linha) => <strong>{formatCurrency(linha.saldo)}</strong> },
+            { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', render: (linha) => (linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')) },
+            { id: 'empresa_nome', titulo: 'Empresa', tipo: 'texto', render: (linha) => linha.empresa_nome || '-' },
+            { id: 'status_titulo', titulo: 'Status', tipo: 'status', render: (linha) => <span className={statusClass(linha.status_titulo)}>{formatStatus(linha.status_titulo)}</span> }
+          ]}
+          itens={relatorio.linhas}
+          carregando={loading}
+          aoClicarLinha={abrirArquivos}
+          storageKey="tabela:financeiro-obras:detalhamento"
+          rotuloRolagem="Detalhamento financeiro das obras"
+          vazio="Nenhum titulo encontrado para os filtros selecionados."
+        />
       </section>
 
       {arquivosModal || arquivosErro ? (
@@ -807,44 +753,31 @@ export default function FinanceiroObras() {
                 </div>
 
                 <div className="app-dense-table-wrapper max-h-[52vh] overflow-auto">
-                  <ResizableTable
-                    columns={IMPORT_PREVIEW_COLUMNS}
-                    storageKey={IMPORT_PREVIEW_STORAGE_KEY}
-                    className="app-dense-data-table"
-                  >
-                    <thead>
-                      <tr>
-                        <ResizableTh columnKey="row_number">Linha</ResizableTh>
-                        <ResizableTh columnKey="status">Status</ResizableTh>
-                        <ResizableTh columnKey="data_pagamento">Baixa</ResizableTh>
-                        <ResizableTh columnKey="parceiro_nome">Fornecedor</ResizableTh>
-                        <ResizableTh columnKey="documento">Documento</ResizableTh>
-                        <ResizableTh columnKey="plano_financeiro">Plano financeiro</ResizableTh>
-                        <ResizableTh columnKey="credito" className="text-right">Credito</ResizableTh>
-                        <ResizableTh columnKey="debito" className="text-right">Debito</ResizableTh>
-                        <ResizableTh columnKey="observacao">Observacao</ResizableTh>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {importPreviewPagedRows.map((linha) => (
-                        <tr key={`${linha.row_number}-${linha.hash_linha}`}>
-                          <td>{linha.row_number}</td>
-                          <td><span className={statusClass(linha.status === 'VALIDA' ? 'QUITADO' : linha.status)}>{linha.status}</span></td>
-                          <td>{formatDate(linha.data_pagamento)}</td>
-                          <td>{linha.parceiro_nome || '-'}</td>
-                          <td>{linha.documento || '-'}</td>
-                          <td>{linha.plano_financeiro || '-'}</td>
-                          <td className="text-right font-semibold text-emerald-700">
-                            {linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}
-                          </td>
-                          <td className="text-right font-semibold text-rose-700">
-                            {linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}
-                          </td>
-                          <td className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </ResizableTable>
+                  <TabelaPadrao
+                    colunas={[
+                      { id: 'row_number', titulo: 'Linha', tipo: 'numero', render: (linha) => linha.row_number },
+                      { id: 'status', titulo: 'Status', tipo: 'status', render: (linha) => <span className={statusClass(linha.status === 'VALIDA' ? 'QUITADO' : linha.status)}>{linha.status}</span> },
+                      { id: 'data_pagamento', titulo: 'Baixa', tipo: 'data', render: (linha) => formatDate(linha.data_pagamento) },
+                      {
+                        id: 'parceiro_nome',
+                        titulo: 'Fornecedor',
+                        // R17: o fornecedor NOMEIA a linha da pre-visualizacao.
+                        tipo: 'identidade',
+                        noCard: 'titulo',
+                        render: (linha) => linha.parceiro_nome || '-'
+                      },
+                      { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => linha.documento || '-' },
+                      { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => linha.plano_financeiro || '-' },
+                      { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-emerald-700">{linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-rose-700">{linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'observacao', titulo: 'Observacao', tipo: 'texto', render: (linha) => <span className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</span> }
+                    ]}
+                    itens={importPreviewPagedRows}
+                    getId={(linha) => `${linha.row_number}-${linha.hash_linha}`}
+                    storageKey="tabela:financeiro-obras:importacao-preview"
+                    rotuloRolagem="Pre-visualizacao da importacao de custos historicos"
+                    vazio="Nenhuma linha na pre-visualizacao."
+                  />
                 </div>
 
                 <div className="flex justify-end gap-2">

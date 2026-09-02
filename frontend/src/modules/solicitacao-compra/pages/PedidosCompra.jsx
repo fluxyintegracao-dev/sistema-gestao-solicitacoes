@@ -6,6 +6,7 @@ import { getStatusPedidosCompra } from '../../../services/configuracoesSistema';
 import { getObras } from '../../../services/obras';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 import StatusBadge from '../../../components/StatusBadge';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function formatMoney(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -208,112 +209,88 @@ export default function PedidosCompra() {
           <span className="text-sm text-[var(--c-muted)]">{pedidos.length} registro(s)</span>
         </div>
 
-        {loading ? (
-          <div className="app-empty-card">Carregando...</div>
-        ) : pedidos.length === 0 ? (
-          <div className="app-empty-card">Nenhum pedido de compra encontrado para os filtros informados.</div>
-        ) : (
-          <div className="compras-table-wrapper">
-            <table className="compras-data-table compras-data-table-pedidos">
-              <colgroup>
-                <col className="compras-col-codigo" />
-                <col className="compras-col-fornecedor" />
-                <col className="compras-col-obra" />
-                <col className="compras-col-codigo" />
-                <col className="compras-col-numero" />
-                <col className="compras-col-valor" />
-                <col className="compras-col-valor" />
-                <col className="compras-col-status" />
-                <col className="compras-col-acoes" />
-              </colgroup>
-              <thead>
-                <tr>
-                  <th>Pedido</th>
-                  <th>Fornecedor</th>
-                  <th>Obra</th>
-                  <th>Solicitacao</th>
-                  <th>Itens ativos</th>
-                  <th>Valor total</th>
-                  <th>Pedido minimo</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {pedidos.map((pedido) => {
-                  const itensAtivos = pedido.itens_ativos_count
-                    ?? (pedido.itens || []).filter((item) => !item.removido).length;
-
-                  return (
-                    <tr key={pedido.id}>
-                      <td>PC-{String(pedido.id).padStart(5, '0')}</td>
-                      <td>{pedido.fornecedor?.nome || '-'}</td>
-                      <td>{pedido.obra?.nome || '-'}</td>
-                      <td>
-                        SC-{String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}
-                      </td>
-                      <td>{itensAtivos}</td>
-                      <td>{formatMoney(pedido.valor_total)}</td>
-                      <td>
-                        {pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}
-                        {!pedido.atingiu_pedido_minimo ? (
-                          <div className="text-xs font-medium text-amber-700">Nao atingido</div>
-                        ) : null}
-                      </td>
-                      <td>
-                        <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
-                      </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="compras-icon-action"
-                          onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}
-                          title="Abrir pedido"
-                          aria-label={`Abrir pedido PC-${String(pedido.id).padStart(5, '0')}`}
-                        >
-                          <HiOutlineEye />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {!loading && pedidos.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Pedidos de compra">
-            {pedidos.map((pedido) => {
-              const itensAtivos = pedido.itens_ativos_count
-                ?? (pedido.itens || []).filter((item) => !item.removido).length;
-              const codigoPedido = `PC-${String(pedido.id).padStart(5, '0')}`;
-
-              return (
-                <article key={`mobile-${pedido.id}`} className="compras-mobile-record">
-                  <div className="compras-mobile-record-head">
-                    <div className="compras-mobile-record-title">
-                      <strong>{codigoPedido}</strong>
-                      <span>{pedido.fornecedor?.nome || '-'}</span>
-                    </div>
-                    <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
-                  </div>
-                  <div className="compras-mobile-record-grid">
-                    <div className="compras-mobile-field"><span>Obra</span><strong>{pedido.obra?.nome || '-'}</strong></div>
-                    <div className="compras-mobile-field"><span>Solicitacao</span><strong>SC-{String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}</strong></div>
-                    <div className="compras-mobile-field"><span>Itens ativos</span><strong>{itensAtivos}</strong></div>
-                    <div className="compras-mobile-field"><span>Valor total</span><strong>{formatMoney(pedido.valor_total)}</strong></div>
-                    <div className="compras-mobile-field"><span>Pedido minimo</span><strong>{pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}</strong></div>
-                  </div>
-                  <div className="compras-mobile-record-actions">
-                    <button type="button" className="btn btn-outline" onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}>
-                      Abrir pedido
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'pedido',
+              titulo: 'Pedido',
+              tipo: 'codigo',
+              render: (pedido) => `PC-${String(pedido.id).padStart(5, '0')}`
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (pedido) => pedido.fornecedor?.nome || '-'
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (pedido) => pedido.obra?.nome || '-'
+            },
+            {
+              id: 'solicitacao',
+              titulo: 'Solicitacao',
+              tipo: 'codigo',
+              render: (pedido) => `SC-${String(pedido.solicitacao_compra_id || pedido.solicitacao?.id || '').padStart(5, '0')}`
+            },
+            {
+              id: 'itens_ativos',
+              titulo: 'Itens ativos',
+              tipo: 'numero',
+              render: (pedido) => (
+                pedido.itens_ativos_count
+                  ?? (pedido.itens || []).filter((item) => !item.removido).length
+              )
+            },
+            {
+              id: 'valor_total',
+              titulo: 'Valor total',
+              tipo: 'valor',
+              render: (pedido) => formatMoney(pedido.valor_total)
+            },
+            {
+              id: 'pedido_minimo',
+              titulo: 'Pedido minimo',
+              tipo: 'valor',
+              render: (pedido) => (
+                <>
+                  {pedido.valor_minimo_pedido ? formatMoney(pedido.valor_minimo_pedido) : '-'}
+                  {!pedido.atingiu_pedido_minimo ? (
+                    <div className="text-xs font-medium text-amber-700">Nao atingido</div>
+                  ) : null}
+                </>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (pedido) => (
+                <StatusBadge status={formatStatusLabel(pedido.status, statusMap)} kind={statusKind(pedido.status, statusMap)} />
+              )
+            }
+          ]}
+          itens={pedidos}
+          carregando={loading}
+          vazio="Nenhum pedido de compra encontrado para os filtros informados."
+          storageKey="tabela:pedidos-compra"
+          rotuloRolagem="Lista de pedidos"
+          acoesLinha={(pedido) => (
+            <button
+              type="button"
+              className="compras-icon-action"
+              onClick={() => navigate(`/pedidos-compra/${pedido.id}`)}
+              title="Abrir pedido"
+              aria-label={`Abrir pedido PC-${String(pedido.id).padStart(5, '0')}`}
+            >
+              <HiOutlineEye />
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
     </div>
   );

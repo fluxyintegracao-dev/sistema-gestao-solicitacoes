@@ -19,6 +19,7 @@ import {
   salvarCaixaPagamentoConvenio
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
+import { TabelaPadrao } from '../components/padrao';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -79,26 +80,6 @@ function EmptyState({ children = 'Sem registros para exibir.' }) {
   return (
     <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
       {children}
-    </div>
-  );
-}
-
-function MiniTable({ columns, rows, renderRow }) {
-  if (!rows?.length) return <EmptyState />;
-  return (
-    <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-xs">
-        <thead className="border-b border-slate-200 text-[11px] uppercase tracking-[0.14em] text-slate-500">
-          <tr>
-            {columns.map((column) => (
-              <th key={column} className="px-3 py-2 font-semibold">{column}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.map(renderRow)}
-        </tbody>
-      </table>
     </div>
   );
 }
@@ -412,55 +393,70 @@ function CaixaPagamentosPanel() {
               </button>
             </div>
 
-            <div className="mt-4 max-h-[330px] overflow-auto rounded-lg border border-slate-200">
-              <table className="min-w-full text-left text-xs">
-                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-[0.12em] text-slate-500">
-                  <tr>
-                    <th className="px-3 py-2">Sel.</th>
-                    <th className="px-3 py-2">Titulo</th>
-                    <th className="px-3 py-2">Fornecedor</th>
-                    <th className="px-3 py-2">Venc.</th>
-                    <th className="px-3 py-2">Valor</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {!titulos.length ? (
-                    <tr><td colSpan="5" className="px-3 py-6 text-center text-slate-500">Nenhum titulo elegivel encontrado.</td></tr>
-                  ) : titulos.map((titulo) => (
-                    <tr key={titulo.id} className="hover:bg-slate-50">
-                      <td className="px-3 py-2">
-                        <input type="checkbox" checked={selectedTitulos.includes(titulo.id)} onChange={() => toggleTitulo(titulo.id)} />
-                      </td>
-                      <td className="px-3 py-2 font-medium text-slate-900">{titulo.codigo}</td>
-                      <td className="px-3 py-2 text-slate-600">{titulo.parceiro?.nome || '-'}</td>
-                      <td className="px-3 py-2 text-slate-600">{titulo.data_vencimento || '-'}</td>
-                      <td className="px-3 py-2 text-slate-700">{formatCurrency(titulo.valor_saldo || titulo.valor_original)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-4">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'selecao',
+                    titulo: 'Sel.',
+                    // Seleção em lote: coluna de marcação com render próprio.
+                    tipo: 'status',
+                    render: (titulo) => (
+                      <input
+                        type="checkbox"
+                        checked={selectedTitulos.includes(titulo.id)}
+                        onChange={() => toggleTitulo(titulo.id)}
+                        aria-label={`Selecionar titulo ${titulo.codigo}`}
+                      />
+                    )
+                  },
+                  { id: 'codigo', titulo: 'Titulo', tipo: 'codigo', render: (titulo) => titulo.codigo },
+                  {
+                    id: 'fornecedor',
+                    titulo: 'Fornecedor',
+                    // R17: o fornecedor NOMEIA o titulo elegivel.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (titulo) => titulo.parceiro?.nome || '-'
+                  },
+                  { id: 'vencimento', titulo: 'Venc.', tipo: 'data', render: (titulo) => titulo.data_vencimento || '-' },
+                  { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (titulo) => formatCurrency(titulo.valor_saldo || titulo.valor_original) }
+                ]}
+                itens={titulos}
+                storageKey="tabela:financeiro-bancos:titulos-elegiveis"
+                rotuloRolagem="Titulos elegiveis para remessa"
+                vazio="Nenhum titulo elegivel encontrado."
+              />
             </div>
           </div>
         </div>
 
         <div>
           <h3 className="mb-3 text-sm font-semibold text-slate-950">Remessas geradas</h3>
-          <MiniTable
-            columns={['Arquivo', 'Empresa', 'Status', 'Valor', 'Download']}
-            rows={remessas}
-            renderRow={(remessa) => (
-              <tr key={remessa.id}>
-                <td className="px-3 py-3 font-medium text-slate-900">{remessa.nome_arquivo}</td>
-                <td className="px-3 py-3 text-slate-600">{remessa.empresa?.razao_social || remessa.empresa?.nome || '-'}</td>
-                <td className="px-3 py-3"><span className={statusClass(remessa.status)}>{remessa.status}</span></td>
-                <td className="px-3 py-3 text-slate-700">{formatCurrency(remessa.valor_total)}</td>
-                <td className="px-3 py-3">
-                  <button type="button" className="app-button app-button-secondary h-9 px-3" onClick={() => baixarRemessa(remessa.id)}>
-                    <HiOutlineCloudArrowDown />
-                    Baixar
-                  </button>
-                </td>
-              </tr>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'arquivo',
+                titulo: 'Arquivo',
+                // R17: o nome do arquivo NOMEIA a remessa gerada.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (remessa) => remessa.nome_arquivo
+              },
+              { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (remessa) => remessa.empresa?.razao_social || remessa.empresa?.nome || '-' },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (remessa) => <span className={statusClass(remessa.status)}>{remessa.status}</span> },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (remessa) => formatCurrency(remessa.valor_total) }
+            ]}
+            itens={remessas}
+            storageKey="tabela:financeiro-bancos:remessas"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Remessas geradas"
+            larguraAcoes={140}
+            acoesLinha={(remessa) => (
+              <button type="button" className="app-button app-button-secondary" onClick={() => baixarRemessa(remessa.id)}>
+                <HiOutlineCloudArrowDown />
+                Baixar
+              </button>
             )}
           />
         </div>
@@ -557,17 +553,24 @@ export default function FinanceiroBancos() {
 
       <div className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
         <Section title="Contas bancarias" description="Contas vinculadas a empresas do grupo e saldo operacional estimado pelos movimentos registrados.">
-          <MiniTable
-            columns={['Conta', 'Empresa', 'Status', 'Saldo estimado']}
-            rows={snapshots.accounts?.data?.items || []}
-            renderRow={(account) => (
-              <tr key={account.id}>
-                <td className="px-3 py-3 font-medium text-slate-900">{account.nome || account.banco || `Conta #${account.id}`}</td>
-                <td className="px-3 py-3 text-slate-600">{account.empresa?.nome || account.empresa?.razao_social || '-'}</td>
-                <td className="px-3 py-3"><span className={statusClass(account.ativo ? 'ATIVO' : 'INATIVO')}>{account.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
-                <td className="px-3 py-3 text-slate-700">{formatCurrency(account.saldo_operacional_estimado)}</td>
-              </tr>
-            )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'conta',
+                titulo: 'Conta',
+                // R17: a conta/banco NOMEIA o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (account) => account.nome || account.banco || `Conta #${account.id}`
+              },
+              { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (account) => account.empresa?.nome || account.empresa?.razao_social || '-' },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (account) => <span className={statusClass(account.ativo ? 'ATIVO' : 'INATIVO')}>{account.ativo ? 'ATIVO' : 'INATIVO'}</span> },
+              { id: 'saldo', titulo: 'Saldo estimado', tipo: 'valor', render: (account) => formatCurrency(account.saldo_operacional_estimado) }
+            ]}
+            itens={snapshots.accounts?.data?.items || []}
+            storageKey="tabela:financeiro-bancos:contas"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Contas bancarias"
           />
         </Section>
 
@@ -598,67 +601,96 @@ export default function FinanceiroBancos() {
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Section title="Pagamentos BB" description="Lotes e transacoes do motor de pagamento em massa.">
-          <MiniTable
-            columns={['Lote', 'Status', 'Valor', 'Atualizado']}
-            rows={snapshots.bb_payments?.data?.recent_batches || []}
-            renderRow={(batch) => (
-              <tr key={batch.id}>
-                <td className="px-3 py-3 font-medium text-slate-900">{batch.codigo || `#${batch.id}`}</td>
-                <td className="px-3 py-3"><span className={statusClass(batch.status)}>{batch.status || '-'}</span></td>
-                <td className="px-3 py-3 text-slate-700">{formatCurrency(batch.valor_total)}</td>
-                <td className="px-3 py-3 text-slate-500">{formatDateTime(batch.updatedAt)}</td>
-              </tr>
-            )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'lote',
+                titulo: 'Lote',
+                // R17: o codigo do lote NOMEIA o pagamento em massa.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (batch) => batch.codigo || `#${batch.id}`
+              },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (batch) => <span className={statusClass(batch.status)}>{batch.status || '-'}</span> },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (batch) => formatCurrency(batch.valor_total) },
+              { id: 'atualizado', titulo: 'Atualizado', tipo: 'data', render: (batch) => formatDateTime(batch.updatedAt) }
+            ]}
+            itens={snapshots.bb_payments?.data?.recent_batches || []}
+            storageKey="tabela:financeiro-bancos:pagamentos-bb"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Lotes de pagamento BB"
           />
         </Section>
 
         <Section title="Boletos Caixa" description="Remessas, retornos e ocorrencias de cobranca separados do CNAB240 de pagamentos.">
-          <MiniTable
-            columns={['Origem', 'Codigo', 'Status', 'Data']}
-            rows={[
+          <TabelaPadrao
+            colunas={[
+              { id: 'origem', titulo: 'Origem', tipo: 'badge', render: (item) => item.origem },
+              {
+                id: 'codigo',
+                titulo: 'Codigo',
+                // R17: o codigo/arquivo NOMEIA a remessa ou o retorno.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.codigo || item.nome_arquivo || `#${item.id}`
+              },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => <span className={statusClass(item.status)}>{item.status || '-'}</span> },
+              { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => formatDateTime(item.createdAt) }
+            ]}
+            itens={[
               ...(snapshots.caixa_boletos?.data?.remessas?.recent || []).map((item) => ({ ...item, origem: 'Remessa' })),
               ...(snapshots.caixa_boletos?.data?.retornos?.recent || []).map((item) => ({ ...item, origem: 'Retorno' }))
             ].slice(0, 8)}
-            renderRow={(item) => (
-              <tr key={`${item.origem}-${item.id}`}>
-                <td className="px-3 py-3 text-slate-600">{item.origem}</td>
-                <td className="px-3 py-3 font-medium text-slate-900">{item.codigo || item.nome_arquivo || `#${item.id}`}</td>
-                <td className="px-3 py-3"><span className={statusClass(item.status)}>{item.status || '-'}</span></td>
-                <td className="px-3 py-3 text-slate-500">{formatDateTime(item.createdAt)}</td>
-              </tr>
-            )}
+            getId={(item) => `${item.origem}-${item.id}`}
+            storageKey="tabela:financeiro-bancos:boletos-caixa"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Remessas e retornos de boletos Caixa"
           />
         </Section>
       </div>
 
       <div className="grid gap-5 xl:grid-cols-2">
         <Section title="Conciliacao bancaria" description="Importacoes OFX e movimentos pendentes para evitar baixa duplicada ou saldo distorcido.">
-          <MiniTable
-            columns={['Movimento', 'Status', 'Valor', 'Data']}
-            rows={snapshots.reconciliation?.data?.recent || []}
-            renderRow={(item) => (
-              <tr key={item.id}>
-                <td className="px-3 py-3 font-medium text-slate-900">{item.descricao_banco || item.documento || `Movimento #${item.id}`}</td>
-                <td className="px-3 py-3"><span className={statusClass(item.status)}>{item.status || '-'}</span></td>
-                <td className="px-3 py-3 text-slate-700">{formatCurrency(item.valor)}</td>
-                <td className="px-3 py-3 text-slate-500">{item.data_movimento || '-'}</td>
-              </tr>
-            )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'movimento',
+                titulo: 'Movimento',
+                // R17: a descricao do banco NOMEIA o movimento conciliado.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.descricao_banco || item.documento || `Movimento #${item.id}`
+              },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => <span className={statusClass(item.status)}>{item.status || '-'}</span> },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatCurrency(item.valor) },
+              { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => item.data_movimento || '-' }
+            ]}
+            itens={snapshots.reconciliation?.data?.recent || []}
+            storageKey="tabela:financeiro-bancos:conciliacao"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Movimentos de conciliacao"
           />
         </Section>
 
         <Section title="Financiamentos bancarios" description="Contratos bancarios que geram titulos e movimentam contas de credito.">
-          <MiniTable
-            columns={['Contrato', 'Status', 'Parcelas', 'Total']}
-            rows={snapshots.financing?.data?.recent || []}
-            renderRow={(item) => (
-              <tr key={item.id}>
-                <td className="px-3 py-3 font-medium text-slate-900">{item.codigo || item.numero_contrato || `#${item.id}`}</td>
-                <td className="px-3 py-3"><span className={statusClass(item.status)}>{item.status || '-'}</span></td>
-                <td className="px-3 py-3 text-slate-600">{item.quantidade_parcelas || '-'}</td>
-                <td className="px-3 py-3 text-slate-700">{formatCurrency(item.valor_total)}</td>
-              </tr>
-            )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'contrato',
+                titulo: 'Contrato',
+                // R17: o contrato NOMEIA o financiamento.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.codigo || item.numero_contrato || `#${item.id}`
+              },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => <span className={statusClass(item.status)}>{item.status || '-'}</span> },
+              { id: 'parcelas', titulo: 'Parcelas', tipo: 'numero', render: (item) => item.quantidade_parcelas || '-' },
+              { id: 'total', titulo: 'Total', tipo: 'valor', render: (item) => formatCurrency(item.valor_total) }
+            ]}
+            itens={snapshots.financing?.data?.recent || []}
+            storageKey="tabela:financeiro-bancos:financiamentos"
+            vazio="Sem registros para exibir."
+            rotuloRolagem="Financiamentos bancarios"
           />
         </Section>
       </div>

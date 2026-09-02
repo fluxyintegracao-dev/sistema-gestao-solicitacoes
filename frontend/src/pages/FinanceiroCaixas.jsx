@@ -21,29 +21,8 @@ import {
   getContasBancarias,
   registrarMovimentoCaixaFinanceiro
 } from '../services/financeiro';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
-
-const MOVIMENTO_COLUMNS = [
-  { key: 'data', width: 112, minWidth: 96 },
-  { key: 'natureza', width: 118, minWidth: 104 },
-  { key: 'descricao', width: 320, minWidth: 220 },
-  { key: 'documento', width: 170, minWidth: 130 },
-  { key: 'origem', width: 160, minWidth: 130 },
-  { key: 'valor', width: 150, minWidth: 125 },
-  { key: 'acao', width: 112, minWidth: 96 }
-];
-
-const FECHAMENTO_COLUMNS = [
-  { key: 'abertura', width: 120, minWidth: 104 },
-  { key: 'fechamento', width: 120, minWidth: 104 },
-  { key: 'saldo_inicial', width: 150, minWidth: 126 },
-  { key: 'entradas', width: 140, minWidth: 116 },
-  { key: 'saidas', width: 140, minWidth: 116 },
-  { key: 'saldo_contado', width: 158, minWidth: 132 },
-  { key: 'diferenca', width: 156, minWidth: 132 },
-  { key: 'responsavel', width: 220, minWidth: 180 }
-];
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -444,19 +423,60 @@ export default function FinanceiroCaixas() {
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
           <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="text-base font-semibold text-[var(--c-text)]">Livro do caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Entradas, saídas e transferências da sessão.</p></div><span className="shrink-0 rounded-full bg-[var(--c-soft)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">{movimentos.length} registro(s)</span></div>
-          {movimentos.length === 0 ? (
-            <div className="m-4 rounded-xl border border-dashed border-[var(--c-border)] bg-[var(--c-soft)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum movimento registrado nesta sessão.</div>
-          ) : <>
-            <div className="hidden overflow-x-auto md:block">
-              <ResizableTable columns={MOVIMENTO_COLUMNS} storageKey="fluxy.financeiro.caixas.movimentos.columns" className="app-table" scrollLabel="Livro do caixa com colunas redimensionáveis">
-                <thead><tr><ResizableTh columnKey="data">Data</ResizableTh><ResizableTh columnKey="natureza">Natureza</ResizableTh><ResizableTh columnKey="descricao">Descrição</ResizableTh><ResizableTh columnKey="documento">Documento</ResizableTh><ResizableTh columnKey="origem">Origem</ResizableTh><ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh><ResizableTh columnKey="acao">Ação</ResizableTh></tr></thead>
-                <tbody>{movimentos.map((movimento) => <tr key={`${movimento.origem}-${movimento.id}`}><td>{formatDate(movimento.data)}</td><td><span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movimento.natureza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300'}`}>{movimento.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'}</span></td><td className="whitespace-normal"><strong className="block text-[var(--c-text)]">{movimento.descricao}</strong>{movimento.conta_contraparte ? <span className="text-xs text-[var(--c-muted)]">Contraparte: {movimento.conta_contraparte}</span> : null}</td><td>{movimento.documento || '-'}</td><td>{movimento.origem === 'TRANSFERENCIA' ? 'Transferência' : (movimento.tipo?.includes('MANUAL') ? 'Lançamento manual' : 'Financeiro')}</td><td className={`text-right font-semibold ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>{movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}</td><td>{movimento.estornavel ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button> : '-'}</td></tr>)}</tbody>
-              </ResizableTable>
-            </div>
-            <div className="grid gap-3 p-3 md:hidden">
-              {movimentos.map((movimento) => <article key={`${movimento.origem}-${movimento.id}`} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><span className="text-xs text-[var(--c-muted)]">{formatDate(movimento.data)} · {movimento.origem === 'TRANSFERENCIA' ? 'Transferência' : (movimento.tipo?.includes('MANUAL') ? 'Manual' : 'Financeiro')}</span><strong className="mt-1 block text-sm text-[var(--c-text)]">{movimento.descricao}</strong></div><strong className={`shrink-0 text-sm ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>{movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}</strong></div>{movimento.documento ? <p className="mt-2 text-xs text-[var(--c-muted)]">Documento: {movimento.documento}</p> : null}{movimento.estornavel ? <button type="button" className="btn btn-secondary btn-sm mt-3" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button> : null}</article>)}
-            </div>
-          </>}
+          <TabelaPadrao
+            colunas={[
+              { id: 'data', titulo: 'Data', tipo: 'data', render: (movimento) => formatDate(movimento.data) },
+              {
+                id: 'natureza',
+                titulo: 'Natureza',
+                tipo: 'badge',
+                render: (movimento) => (
+                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movimento.natureza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300'}`}>
+                    {movimento.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'}
+                  </span>
+                )
+              },
+              {
+                id: 'descricao',
+                titulo: 'Descrição',
+                // R17: a descrição NOMEIA o movimento do livro de caixa.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (movimento) => (
+                  <div>
+                    <strong className="block text-[var(--c-text)]">{movimento.descricao}</strong>
+                    {movimento.conta_contraparte ? <span className="text-xs text-[var(--c-muted)]">Contraparte: {movimento.conta_contraparte}</span> : null}
+                  </div>
+                )
+              },
+              { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (movimento) => movimento.documento || '-' },
+              {
+                id: 'origem',
+                titulo: 'Origem',
+                tipo: 'texto',
+                render: (movimento) => (movimento.origem === 'TRANSFERENCIA' ? 'Transferência' : (movimento.tipo?.includes('MANUAL') ? 'Lançamento manual' : 'Financeiro'))
+              },
+              {
+                id: 'valor',
+                titulo: 'Valor',
+                tipo: 'valor',
+                render: (movimento) => (
+                  <span className={`font-semibold ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}
+                  </span>
+                )
+              }
+            ]}
+            itens={movimentos}
+            getId={(movimento) => `${movimento.origem}-${movimento.id}`}
+            vazio="Nenhum movimento registrado nesta sessão."
+            storageKey="tabela:financeiro-caixas:movimentos"
+            rotuloRolagem="Livro do caixa"
+            larguraAcoes={140}
+            acoesLinha={(movimento) => (movimento.estornavel
+              ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button>
+              : <span className="text-[var(--c-muted)]">-</span>)}
+          />
         </section>
 
         <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
@@ -478,19 +498,38 @@ export default function FinanceiroCaixas() {
       {contaSelecionada ? (
         <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
           <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineClock className="h-5 w-5" /> Histórico de fechamentos</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Conferências anteriores da conta selecionada.</p></div><span className="shrink-0 text-xs text-[var(--c-muted)]">{sessoesFechadas.length} fechamento(s)</span></div>
-          {sessoesFechadas.length === 0 ? (
-            <div className="m-4 rounded-xl border border-dashed border-[var(--c-border)] bg-[var(--c-soft)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Nenhum fechamento registrado para esta conta.</div>
-          ) : <>
-            <div className="hidden overflow-x-auto md:block">
-              <ResizableTable columns={FECHAMENTO_COLUMNS} storageKey="fluxy.financeiro.caixas.fechamentos.columns" className="app-table" scrollLabel="Histórico de fechamentos com colunas redimensionáveis">
-                <thead><tr><ResizableTh columnKey="abertura">Abertura</ResizableTh><ResizableTh columnKey="fechamento">Fechamento</ResizableTh><ResizableTh columnKey="saldo_inicial" className="text-right">Saldo inicial</ResizableTh><ResizableTh columnKey="entradas" className="text-right">Entradas</ResizableTh><ResizableTh columnKey="saidas" className="text-right">Saídas</ResizableTh><ResizableTh columnKey="saldo_contado" className="text-right">Saldo contado</ResizableTh><ResizableTh columnKey="diferenca" className="pr-4 text-right">Diferença</ResizableTh><ResizableTh columnKey="responsavel" className="border-l border-[var(--c-border)] pl-4">Responsável</ResizableTh></tr></thead>
-                <tbody>{sessoesFechadas.map((sessao) => <tr key={sessao.id}><td>{formatDate(sessao.data_abertura)}</td><td>{formatDate(sessao.data_fechamento)}</td><td className="text-right">{formatCurrency(sessao.saldo_abertura)}</td><td className="text-right text-emerald-600">{formatCurrency(sessao.total_entradas)}</td><td className="text-right text-rose-600">{formatCurrency(sessao.total_saidas)}</td><td className="text-right font-semibold">{formatCurrency(sessao.saldo_informado)}</td><td className={`pr-4 text-right font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</td><td className="border-l border-[var(--c-border)] pl-4 whitespace-normal">{sessao.fechadoPor?.nome || '-'}</td></tr>)}</tbody>
-              </ResizableTable>
-            </div>
-            <div className="grid gap-3 p-3 md:hidden">
-              {sessoesFechadas.map((sessao) => <article key={sessao.id} className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3"><div className="flex items-start justify-between gap-3"><div><span className="text-xs text-[var(--c-muted)]">{formatDate(sessao.data_abertura)} → {formatDate(sessao.data_fechamento)}</span><strong className="mt-1 block text-sm text-[var(--c-text)]">{sessao.fechadoPor?.nome || 'Responsável não informado'}</strong></div><strong className={`text-sm ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatCurrency(sessao.diferenca)}</strong></div><dl className="mt-3 grid grid-cols-2 gap-2 text-xs"><div><dt className="text-[var(--c-muted)]">Saldo inicial</dt><dd className="font-semibold text-[var(--c-text)]">{formatCurrency(sessao.saldo_abertura)}</dd></div><div><dt className="text-[var(--c-muted)]">Saldo contado</dt><dd className="font-semibold text-[var(--c-text)]">{formatCurrency(sessao.saldo_informado)}</dd></div><div><dt className="text-[var(--c-muted)]">Entradas</dt><dd className="font-semibold text-emerald-600">{formatCurrency(sessao.total_entradas)}</dd></div><div><dt className="text-[var(--c-muted)]">Saídas</dt><dd className="font-semibold text-rose-600">{formatCurrency(sessao.total_saidas)}</dd></div></dl></article>)}
-            </div>
-          </>}
+          <TabelaPadrao
+            colunas={[
+              { id: 'abertura', titulo: 'Abertura', tipo: 'data', render: (sessao) => formatDate(sessao.data_abertura) },
+              { id: 'fechamento', titulo: 'Fechamento', tipo: 'data', render: (sessao) => formatDate(sessao.data_fechamento) },
+              { id: 'saldo_inicial', titulo: 'Saldo inicial', tipo: 'valor', render: (sessao) => formatCurrency(sessao.saldo_abertura) },
+              { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (sessao) => <span className="text-emerald-600">{formatCurrency(sessao.total_entradas)}</span> },
+              { id: 'saidas', titulo: 'Saídas', tipo: 'valor', render: (sessao) => <span className="text-rose-600">{formatCurrency(sessao.total_saidas)}</span> },
+              { id: 'saldo_contado', titulo: 'Saldo contado', tipo: 'valor', render: (sessao) => <span className="font-semibold">{formatCurrency(sessao.saldo_informado)}</span> },
+              {
+                id: 'diferenca',
+                titulo: 'Diferença',
+                tipo: 'valor',
+                render: (sessao) => (
+                  <span className={`font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                    {formatCurrency(sessao.diferenca)}
+                  </span>
+                )
+              },
+              {
+                id: 'responsavel',
+                titulo: 'Responsável',
+                // R17: o responsável NOMEIA o fechamento conferido.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (sessao) => sessao.fechadoPor?.nome || '-'
+              }
+            ]}
+            itens={sessoesFechadas}
+            vazio="Nenhum fechamento registrado para esta conta."
+            storageKey="tabela:financeiro-caixas:fechamentos"
+            rotuloRolagem="Histórico de fechamentos"
+          />
         </section>
       ) : null}
 

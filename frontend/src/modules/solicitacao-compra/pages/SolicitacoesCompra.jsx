@@ -12,7 +12,7 @@ import {
 } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
 import { canDeleteCompraSolicitacoes, canEncaminharCompraSolicitacoes } from '../../../utils/acessoProduto';
-import { ResizableTable, ResizableTh } from '../../../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
 function formatarData(data) {
@@ -62,24 +62,6 @@ function classNameStatus(status) {
   return 'app-status-pill compra-status-pill compra-status-default bg-indigo-100 text-indigo-700';
 }
 
-function buildSolicitacoesCompraColumns({ podeSelecionar, podeEncaminharCompras, podeInativar }) {
-  const actionWidth = 96
-    + (podeEncaminharCompras ? 40 : 0)
-    + (podeInativar ? 40 : 0);
-  return [
-    podeSelecionar ? { key: 'selecao', width: 48, minWidth: 44 } : null,
-    { key: 'codigo', width: 112, minWidth: 96 },
-    { key: 'obra', width: 240, minWidth: 180 },
-    { key: 'solicitante', width: 180, minWidth: 140 },
-    { key: 'itens', width: 82, minWidth: 72 },
-    { key: 'fornecedores', width: 112, minWidth: 96 },
-    { key: 'necessario_para', width: 132, minWidth: 116 },
-    { key: 'criada_em', width: 120, minWidth: 104 },
-    { key: 'status', width: 190, minWidth: 160 },
-    { key: 'acoes', width: Math.max(actionWidth, 136), minWidth: Math.max(actionWidth, 128) }
-  ].filter(Boolean);
-}
-
 export default function SolicitacoesCompra() {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -100,11 +82,6 @@ export default function SolicitacoesCompra() {
   const podeInativar = canDeleteCompraSolicitacoes(user);
   const podeEncaminharCompras = canEncaminharCompraSolicitacoes(user);
   const podeSelecionar = podeInativar || podeEncaminharCompras;
-  const tableColumns = useMemo(
-    () => buildSolicitacoesCompraColumns({ podeSelecionar, podeEncaminharCompras, podeInativar }),
-    [podeEncaminharCompras, podeInativar, podeSelecionar]
-  );
-
   async function carregarObras() {
     try {
       const data = await getMinhasObras({ modo: 'CRIACAO' });
@@ -294,6 +271,16 @@ export default function SolicitacoesCompra() {
           ) : null}
         </div>
         <div className="app-page-actions">
+          {podeSelecionar && solicitacoesFiltradas.length > 0 ? (
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={toggleTodasSelecionadas}
+              aria-label="Selecionar solicitacoes listadas"
+            >
+              {todasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
+            </button>
+          ) : null}
           {podeEncaminharCompras && selecionadas.length > 0 ? (
             <button
               type="button"
@@ -388,183 +375,140 @@ export default function SolicitacoesCompra() {
       </div>
 
       <div className="card sol-surface-card compras-table-card compras-adaptive-list">
-        {loading ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
-        ) : solicitacoesFiltradas.length === 0 ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">
-            Nenhuma solicitacao de compra encontrada.
-          </div>
-        ) : (
-          <div className="compras-table-wrapper compras-table-wrapper-scroll">
-            <ResizableTable
-              columns={tableColumns}
-              storageKey="fluxy.solicitacoes-compra.columns.v1"
-              className="compras-data-table compras-data-table-solicitacoes compras-data-table-resizable"
-            >
-              <thead>
-                <tr>
-                  {podeSelecionar ? (
-                    <ResizableTh columnKey="selecao" className="text-center compras-th-selecao">
-                      <input
-                        type="checkbox"
-                        checked={todasSelecionadas}
-                        onChange={toggleTodasSelecionadas}
-                        aria-label="Selecionar solicitacoes listadas"
-                      />
-                    </ResizableTh>
-                  ) : null}
-                  <ResizableTh columnKey="codigo">Codigo</ResizableTh>
-                  <ResizableTh columnKey="obra">Obra</ResizableTh>
-                  <ResizableTh columnKey="solicitante">Solicitante</ResizableTh>
-                  <ResizableTh columnKey="itens">Itens</ResizableTh>
-                  <ResizableTh columnKey="fornecedores">Fornecedores</ResizableTh>
-                  <ResizableTh columnKey="necessario_para">Necessario para</ResizableTh>
-                  <ResizableTh columnKey="criada_em">Criada em</ResizableTh>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="acoes" className="compras-th-acoes">Acoes</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {solicitacoesFiltradas.map((solicitacao) => (
-                  <tr key={solicitacao.id}>
-                    {podeSelecionar ? (
-                      <td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={selecionadas.includes(Number(solicitacao.id))}
-                          onChange={() => toggleSelecionada(solicitacao.id)}
-                          aria-label={`Selecionar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
-                        />
-                      </td>
-                    ) : null}
-                    <td className="font-mono text-sm font-semibold">
-                      SC-{String(solicitacao.id).padStart(5, '0')}
-                    </td>
-                    <td>
-                      <div className="grid gap-1">
-                        <span className="font-medium">{solicitacao.obra?.nome || '-'}</span>
-                        <span className="text-xs text-[var(--c-muted)]">{solicitacao.obra?.codigo || '-'}</span>
-                      </div>
-                    </td>
-                    <td>{solicitacao.solicitante?.nome || '-'}</td>
-                    <td>{solicitacao.itens_count ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0))}</td>
-                    <td>{solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)}</td>
-                    <td>{formatarData(solicitacao.necessario_para)}</td>
-                    <td>{formatarData(solicitacao.createdAt)}</td>
-                    <td>
-                      <span className={classNameStatus(solicitacao.status)}>
-                        {formatarStatus(solicitacao.status)}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="compras-table-actions">
-                        <button
-                          type="button"
-                          className="compras-icon-action"
-                          onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}
-                          title="Abrir detalhes"
-                          aria-label={`Abrir detalhes da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
-                        >
-                          <HiOutlineEye />
-                        </button>
-                        <button
-                          type="button"
-                          className="compras-icon-action"
-                          onClick={() => handleBaixarPdf(solicitacao.id)}
-                          title="Baixar PDF"
-                          aria-label={`Baixar PDF da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
-                        >
-                          <HiOutlineArrowDownTray />
-                        </button>
-                        {podeEncaminharCompras ? (
-                          <button
-                            type="button"
-                            className="compras-icon-action"
-                            onClick={() => handleEncaminharCompras([solicitacao.id])}
-                            title="Enviar para fila de Compras"
-                            aria-label={`Enviar solicitacao SC-${String(solicitacao.id).padStart(5, '0')} para Compras`}
-                            disabled={encaminhando}
-                          >
-                            <HiOutlinePaperAirplane />
-                          </button>
-                        ) : null}
-                        {podeInativar ? (
-                          <button
-                            type="button"
-                            className="compras-icon-action text-red-600 hover:text-red-700"
-                            onClick={() => handleInativar([solicitacao.id])}
-                            title="Inativar solicitacao"
-                            aria-label={`Inativar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
-                            disabled={inativando}
-                          >
-                            <HiOutlineTrash />
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </ResizableTable>
-          </div>
-        )}
-        {!loading && solicitacoesFiltradas.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Solicitacoes de compra">
-            {solicitacoesFiltradas.map((solicitacao) => {
-              const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
-              const totalItens = solicitacao.itens_count
-                ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0));
-
-              return (
-                <article key={`mobile-${solicitacao.id}`} className="compras-mobile-record">
-                  <div className="compras-mobile-record-head">
-                    <div className="compras-mobile-record-title">
-                      <strong>{codigo}</strong>
-                      <span>{solicitacao.obra?.nome || '-'}</span>
-                    </div>
-                    <span className={classNameStatus(solicitacao.status)}>{formatarStatus(solicitacao.status)}</span>
-                  </div>
-                  <div className="compras-mobile-record-grid">
-                    <div className="compras-mobile-field"><span>Codigo da obra</span><strong>{solicitacao.obra?.codigo || '-'}</strong></div>
-                    <div className="compras-mobile-field"><span>Solicitante</span><strong>{solicitacao.solicitante?.nome || '-'}</strong></div>
-                    <div className="compras-mobile-field"><span>Itens</span><strong>{totalItens}</strong></div>
-                    <div className="compras-mobile-field"><span>Fornecedores</span><strong>{solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)}</strong></div>
-                    <div className="compras-mobile-field"><span>Necessario para</span><strong>{formatarData(solicitacao.necessario_para)}</strong></div>
-                    <div className="compras-mobile-field"><span>Criada em</span><strong>{formatarData(solicitacao.createdAt)}</strong></div>
-                  </div>
-                  <div className="compras-mobile-record-actions">
-                    {podeSelecionar ? (
-                      <label className="btn btn-outline">
-                        <input
-                          type="checkbox"
-                          checked={selecionadas.includes(Number(solicitacao.id))}
-                          onChange={() => toggleSelecionada(solicitacao.id)}
-                        />
-                        Selecionar
-                      </label>
-                    ) : null}
-                    <button type="button" className="btn btn-primary" onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}>
-                      Abrir detalhes
-                    </button>
-                    <button type="button" className="btn btn-outline" onClick={() => handleBaixarPdf(solicitacao.id)}>
-                      Baixar PDF
-                    </button>
-                    {podeEncaminharCompras ? (
-                      <button type="button" className="btn btn-outline" onClick={() => handleEncaminharCompras([solicitacao.id])} disabled={encaminhando}>
-                        Enviar para Compras
-                      </button>
-                    ) : null}
-                    {podeInativar ? (
-                      <button type="button" className="btn btn-danger" onClick={() => handleInativar([solicitacao.id])} disabled={inativando}>
-                        Inativar
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        ) : null}
+        <TabelaPadrao
+          colunas={[
+            ...(podeSelecionar ? [{
+              id: 'selecao',
+              titulo: 'Sel.',
+              tipo: 'status',
+              render: (solicitacao) => (
+                <input
+                  type="checkbox"
+                  checked={selecionadas.includes(Number(solicitacao.id))}
+                  onChange={() => toggleSelecionada(solicitacao.id)}
+                  aria-label={`Selecionar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                />
+              )
+            }] : []),
+            {
+              id: 'codigo',
+              titulo: 'Codigo',
+              tipo: 'codigo',
+              render: (solicitacao) => (
+                <span className="font-mono text-sm font-semibold">
+                  SC-{String(solicitacao.id).padStart(5, '0')}
+                </span>
+              )
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (solicitacao) => (
+                <CelulaDupla
+                  principal={solicitacao.obra?.nome || '-'}
+                  sub={solicitacao.obra?.codigo || '-'}
+                />
+              )
+            },
+            {
+              id: 'solicitante',
+              titulo: 'Solicitante',
+              tipo: 'texto',
+              render: (solicitacao) => solicitacao.solicitante?.nome || '-'
+            },
+            {
+              id: 'itens',
+              titulo: 'Itens',
+              tipo: 'numero',
+              render: (solicitacao) => (
+                solicitacao.itens_count
+                  ?? ((solicitacao.itens?.length || 0) + (solicitacao.itensManuais?.length || 0))
+              )
+            },
+            {
+              id: 'fornecedores',
+              titulo: 'Fornecedores',
+              tipo: 'numero',
+              render: (solicitacao) => solicitacao.fornecedores_count ?? (solicitacao.fornecedores?.length || 0)
+            },
+            {
+              id: 'necessario_para',
+              titulo: 'Necessario para',
+              tipo: 'data',
+              render: (solicitacao) => formatarData(solicitacao.necessario_para)
+            },
+            {
+              id: 'criada_em',
+              titulo: 'Criada em',
+              tipo: 'data',
+              render: (solicitacao) => formatarData(solicitacao.createdAt)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (solicitacao) => (
+                <span className={classNameStatus(solicitacao.status)}>
+                  {formatarStatus(solicitacao.status)}
+                </span>
+              )
+            }
+          ]}
+          itens={solicitacoesFiltradas}
+          carregando={loading}
+          vazio="Nenhuma solicitacao de compra encontrada."
+          storageKey="tabela:solicitacoes-compra"
+          rotuloRolagem="Solicitacoes de compra"
+          acoesLinha={(solicitacao) => (
+            <>
+              <button
+                type="button"
+                className="compras-icon-action"
+                onClick={() => navigate(`/solicitacoes-compra/${solicitacao.id}`)}
+                title="Abrir detalhes"
+                aria-label={`Abrir detalhes da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+              >
+                <HiOutlineEye />
+              </button>
+              <button
+                type="button"
+                className="compras-icon-action"
+                onClick={() => handleBaixarPdf(solicitacao.id)}
+                title="Baixar PDF"
+                aria-label={`Baixar PDF da solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+              >
+                <HiOutlineArrowDownTray />
+              </button>
+              {podeEncaminharCompras ? (
+                <button
+                  type="button"
+                  className="compras-icon-action"
+                  onClick={() => handleEncaminharCompras([solicitacao.id])}
+                  title="Enviar para fila de Compras"
+                  aria-label={`Enviar solicitacao SC-${String(solicitacao.id).padStart(5, '0')} para Compras`}
+                  disabled={encaminhando}
+                >
+                  <HiOutlinePaperAirplane />
+                </button>
+              ) : null}
+              {podeInativar ? (
+                <button
+                  type="button"
+                  className="compras-icon-action text-red-600 hover:text-red-700"
+                  onClick={() => handleInativar([solicitacao.id])}
+                  title="Inativar solicitacao"
+                  aria-label={`Inativar solicitacao SC-${String(solicitacao.id).padStart(5, '0')}`}
+                  disabled={inativando}
+                >
+                  <HiOutlineTrash />
+                </button>
+              ) : null}
+            </>
+          )}
+          larguraAcoes={220}
+        />
       </div>
     </div>
   );

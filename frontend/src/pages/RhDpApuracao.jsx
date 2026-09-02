@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { CelulaDupla, TabelaPadrao } from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { getObras } from '../services/obras';
 import { getCategoriasFinanceiras } from '../services/financeiro';
@@ -562,54 +563,81 @@ export default function RhDpApuracao({ comoAba = false }) {
       </div>
 
       <div className="sol-surface-card rhdp-apuracao-list-card rounded-xl p-4">
-        {carregandoBase || carregandoLista ? (
-          <p className="text-sm text-slate-500">Carregando apuracoes...</p>
-        ) : !apuracoes.length ? (
-          <p className="text-sm text-slate-500">Nenhuma apuracao encontrada para os filtros atuais.</p>
-        ) : (
-          <div className="app-dense-table-wrapper rhdp-apuracao-table-wrapper">
-            <table className="app-dense-data-table rhdp-apuracao-table">
-              <thead>
-                <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="px-3 py-2 font-medium">Competencia</th>
-                  <th className="px-3 py-2 font-medium">Empresa</th>
-                  <th className="px-3 py-2 font-medium">Obra</th>
-                  <th className="px-3 py-2 font-medium">Vinculo</th>
-                  <th className="px-3 py-2 font-medium">Base</th>
-                  <th className="px-3 py-2 font-medium">Colaboradores</th>
-                  <th className="px-3 py-2 font-medium">Liquido</th>
-                  <th className="px-3 py-2 font-medium">Status</th>
-                  <th className="px-3 py-2 font-medium">Gerada em</th>
-                  <th className="px-3 py-2 font-medium">Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {apuracoes.map((item) => (
-                  <tr key={item.id} className="border-b border-slate-100 align-top">
-                    <td className="px-3 py-3">{item.competencia}</td>
-                    <td className="px-3 py-3">{item.empresaGrupo?.nome || 'Por colaborador'}</td>
-                    <td className="px-3 py-3">{item.obra?.nome || '-'}</td>
-                    <td className="px-3 py-3">{item.tipo_vinculo || 'Misto'}</td>
-                    <td className="px-3 py-3">{item.dias_base || 30} dias</td>
-                    <td className="px-3 py-3">{item.total_colaboradores || 0}</td>
-                    <td className="px-3 py-3">{formatCurrency(item.total_liquido)}</td>
-                    <td className="px-3 py-3">
-                      <span className={statusClass(item.status)}>
-                        {item.status === 'CONFERIDA' ? 'Conferida' : 'Rascunho'}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3">{formatDateTime(item.createdAt)}</td>
-                    <td className="px-3 py-3">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirApuracao(item.id)}>
-                        Abrir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'competencia',
+              titulo: 'Competencia',
+              tipo: 'codigo',
+              render: (item) => item.competencia
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              // R17: a EMPRESA do grupo é o que nomeia a apuracao na lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.empresaGrupo?.nome || 'Por colaborador'
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (item) => item.obra?.nome || '-'
+            },
+            {
+              id: 'vinculo',
+              titulo: 'Vinculo',
+              tipo: 'badge',
+              render: (item) => item.tipo_vinculo || 'Misto'
+            },
+            {
+              id: 'base',
+              titulo: 'Base',
+              tipo: 'numero',
+              render: (item) => `${item.dias_base || 30} dias`
+            },
+            {
+              id: 'colaboradores',
+              titulo: 'Colaboradores',
+              tipo: 'numero',
+              render: (item) => item.total_colaboradores || 0
+            },
+            {
+              id: 'liquido',
+              titulo: 'Liquido',
+              tipo: 'valor',
+              render: (item) => formatCurrency(item.total_liquido)
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => (
+                <span className={statusClass(item.status)}>
+                  {item.status === 'CONFERIDA' ? 'Conferida' : 'Rascunho'}
+                </span>
+              )
+            },
+            {
+              id: 'gerada',
+              titulo: 'Gerada em',
+              tipo: 'data',
+              render: (item) => formatDateTime(item.createdAt)
+            }
+          ]}
+          itens={apuracoes}
+          storageKey="tabela:rh-dp-apuracao:lista"
+          rotuloRolagem="Apuracoes RH/DP"
+          carregando={carregandoBase || carregandoLista}
+          vazio="Nenhuma apuracao encontrada para os filtros atuais."
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => abrirApuracao(item.id)}>
+              Abrir
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
 
       {detalhe ? (
@@ -781,178 +809,209 @@ export default function RhDpApuracao({ comoAba = false }) {
             </form>
           ) : null}
 
-          {!detalhe.itens?.length ? (
-            <p className="text-sm text-slate-500">A apuracao nao possui itens.</p>
-          ) : (
-            <div className="app-dense-table-wrapper rhdp-apuracao-items-wrapper">
-              <table className="app-dense-data-table rhdp-apuracao-items-table">
-                <colgroup>
-                  <col className="rhdp-apuracao-colaborador-col" />
-                  <col className="rhdp-apuracao-vinculo-col" />
-                  <col className="rhdp-apuracao-numero-col" />
-                  <col className="rhdp-apuracao-horas-col" />
-                  <col className="rhdp-apuracao-moeda-col" />
-                  <col className="rhdp-apuracao-moeda-col" />
-                  <col className="rhdp-apuracao-liquido-col" />
-                  <col className="rhdp-apuracao-pix-col" />
-                  <col className="rhdp-apuracao-ajuste-col" />
-                  <col className="rhdp-apuracao-ajuste-col" />
-                  <col className="rhdp-apuracao-status-col" />
-                  <col className="rhdp-apuracao-observacoes-col" />
-                  <col className="rhdp-apuracao-acoes-col" />
-                </colgroup>
-                <thead>
-                  <tr className="border-b border-slate-200 text-left text-slate-500">
-                    <th className="px-3 py-2 font-medium">Colaborador</th>
-                    <th className="px-3 py-2 font-medium">Vinculo</th>
-                    <th className="px-3 py-2 font-medium">Dias</th>
-                    <th className="px-3 py-2 font-medium">Horas extras</th>
-                    <th className="px-3 py-2 font-medium">Bruto</th>
-                    <th className="px-3 py-2 font-medium">Descontos</th>
-                    <th className="px-3 py-2 font-medium">Liquido</th>
-                    <th className="px-3 py-2 font-medium">PIX do titulo</th>
-                    <th className="px-3 py-2 font-medium">Ajuste credito</th>
-                    <th className="px-3 py-2 font-medium">Ajuste debito</th>
-                    <th className="px-3 py-2 font-medium">Status</th>
-                    <th className="px-3 py-2 font-medium">Observacoes</th>
-                    <th className="px-3 py-2 font-medium">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detalhe.itens.map((item) => {
-                    const pixOptions = getPixOptions(item);
-                    return (
-                    <tr key={item.id} className="border-b border-slate-100 align-top">
-                      <td className="px-3 py-3">
-                        <div className="font-medium text-slate-800">{item.colaborador?.nome || '-'}</div>
-                        <div className="text-xs text-slate-500">
-                          {item.colaborador?.matricula || '-'} | {item.colaborador?.cargo || '-'}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">{item.colaborador?.tipo_vinculo || '-'}</td>
-                      <td className="px-3 py-3">{formatNumber(item.dias_trabalhados)}</td>
-                      <td className="px-3 py-3">{formatNumber(item.horas_extras)}</td>
-                      <td className="px-3 py-3">{formatCurrency(item.valor_bruto)}</td>
-                      <td className="px-3 py-3">{formatCurrency(item.valor_descontos)}</td>
-                      <td className="px-3 py-3">
-                        <div className="font-medium text-slate-800">{formatCurrency(item.valor_liquido)}</div>
-                        <div className="text-xs text-slate-500">{item.regra_aplicada || '-'}</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <select
-                          className="form-control min-w-[190px]"
-                          value={edicoes[item.id]?.chave_pix_titulo ?? getDefaultPixValue(item)}
-                          onChange={(event) =>
-                            setEdicoes((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                chave_pix_titulo: event.target.value
-                              }
-                            }))
-                          }
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO' || !pixOptions.length}
-                        >
-                          {!pixOptions.length ? (
-                            <option value="">Sem chave PIX</option>
-                          ) : (
-                            pixOptions.map((option) => (
-                              <option key={option.key} value={option.value}>
-                                {option.label}: {option.value}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                        <div className="mt-1 text-xs text-slate-500">Principal usada por padrao.</div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          className="form-control min-w-[120px]"
-                          value={edicoes[item.id]?.ajuste_credito_manual ?? ''}
-                          onChange={(event) =>
-                            setEdicoes((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                ajuste_credito_manual: event.target.value
-                              }
-                            }))
-                          }
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <input
-                          type="text"
-                          className="form-control min-w-[120px]"
-                          value={edicoes[item.id]?.ajuste_debito_manual ?? ''}
-                          onChange={(event) =>
-                            setEdicoes((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                ajuste_debito_manual: event.target.value
-                              }
-                            }))
-                          }
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <select
-                          className="form-control min-w-[140px]"
-                          value={edicoes[item.id]?.status || 'PENDENTE'}
-                          onChange={(event) =>
-                            setEdicoes((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                status: event.target.value
-                              }
-                            }))
-                          }
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
-                        >
-                          <option value="PENDENTE">Pendente</option>
-                          <option value="CONFERIDO">Conferido</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-3">
-                        <textarea
-                          className="form-control min-h-[76px] min-w-[220px]"
-                          value={edicoes[item.id]?.observacoes ?? ''}
-                          onChange={(event) =>
-                            setEdicoes((current) => ({
-                              ...current,
-                              [item.id]: {
-                                ...current[item.id],
-                                observacoes: event.target.value
-                              }
-                            }))
-                          }
-                          disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        {podeEditar && detalhe.status === 'RASCUNHO' ? (
-                          <button
-                            type="button"
-                            className="btn btn-outline btn-sm"
-                            onClick={() => salvarItem(item.id)}
-                            disabled={salvandoItemId === item.id}
-                          >
-                            {salvandoItemId === item.id ? 'Salvando...' : 'Salvar ajuste'}
-                          </button>
-                        ) : null}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'colaborador',
+                titulo: 'Colaborador',
+                // R17: o item da apuracao é de um COLABORADOR nomeado.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={item.colaborador?.nome || '-'}
+                    sub={`${item.colaborador?.matricula || '-'} | ${item.colaborador?.cargo || '-'}`}
+                  />
+                )
+              },
+              {
+                id: 'vinculo',
+                titulo: 'Vinculo',
+                tipo: 'badge',
+                render: (item) => item.colaborador?.tipo_vinculo || '-'
+              },
+              {
+                id: 'dias',
+                titulo: 'Dias',
+                tipo: 'numero',
+                render: (item) => formatNumber(item.dias_trabalhados)
+              },
+              {
+                id: 'horas_extras',
+                titulo: 'Horas extras',
+                tipo: 'numero',
+                render: (item) => formatNumber(item.horas_extras)
+              },
+              {
+                id: 'bruto',
+                titulo: 'Bruto',
+                tipo: 'valor',
+                render: (item) => formatCurrency(item.valor_bruto)
+              },
+              {
+                id: 'descontos',
+                titulo: 'Descontos',
+                tipo: 'valor',
+                render: (item) => formatCurrency(item.valor_descontos)
+              },
+              {
+                id: 'liquido',
+                titulo: 'Liquido',
+                tipo: 'valor',
+                render: (item) => (
+                  <CelulaDupla
+                    principal={formatCurrency(item.valor_liquido)}
+                    sub={item.regra_aplicada || '-'}
+                  />
+                )
+              },
+              {
+                id: 'pix',
+                titulo: 'PIX do titulo',
+                tipo: 'texto',
+                // Edicao inline: o controle mora no render da coluna.
+                render: (item) => {
+                  const pixOptions = getPixOptions(item);
+                  return (
+                    <>
+                      <select
+                        className="form-control"
+                        value={edicoes[item.id]?.chave_pix_titulo ?? getDefaultPixValue(item)}
+                        onChange={(event) =>
+                          setEdicoes((current) => ({
+                            ...current,
+                            [item.id]: {
+                              ...current[item.id],
+                              chave_pix_titulo: event.target.value
+                            }
+                          }))
+                        }
+                        disabled={!podeEditar || detalhe.status !== 'RASCUNHO' || !pixOptions.length}
+                      >
+                        {!pixOptions.length ? (
+                          <option value="">Sem chave PIX</option>
+                        ) : (
+                          pixOptions.map((option) => (
+                            <option key={option.key} value={option.value}>
+                              {option.label}: {option.value}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                      <div className="mt-1 text-xs text-slate-500">Principal usada por padrao.</div>
+                    </>
+                  );
+                }
+              },
+              {
+                id: 'ajuste_credito',
+                titulo: 'Ajuste credito',
+                tipo: 'texto',
+                render: (item) => (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={edicoes[item.id]?.ajuste_credito_manual ?? ''}
+                    onChange={(event) =>
+                      setEdicoes((current) => ({
+                        ...current,
+                        [item.id]: {
+                          ...current[item.id],
+                          ajuste_credito_manual: event.target.value
+                        }
+                      }))
+                    }
+                    disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
+                  />
+                )
+              },
+              {
+                id: 'ajuste_debito',
+                titulo: 'Ajuste debito',
+                tipo: 'texto',
+                render: (item) => (
+                  <input
+                    type="text"
+                    className="form-control"
+                    value={edicoes[item.id]?.ajuste_debito_manual ?? ''}
+                    onChange={(event) =>
+                      setEdicoes((current) => ({
+                        ...current,
+                        [item.id]: {
+                          ...current[item.id],
+                          ajuste_debito_manual: event.target.value
+                        }
+                      }))
+                    }
+                    disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
+                  />
+                )
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'badge',
+                render: (item) => (
+                  <select
+                    className="form-control"
+                    value={edicoes[item.id]?.status || 'PENDENTE'}
+                    onChange={(event) =>
+                      setEdicoes((current) => ({
+                        ...current,
+                        [item.id]: {
+                          ...current[item.id],
+                          status: event.target.value
+                        }
+                      }))
+                    }
+                    disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
+                  >
+                    <option value="PENDENTE">Pendente</option>
+                    <option value="CONFERIDO">Conferido</option>
+                  </select>
+                )
+              },
+              {
+                id: 'observacoes',
+                titulo: 'Observacoes',
+                tipo: 'texto',
+                render: (item) => (
+                  <textarea
+                    className="form-control"
+                    rows={2}
+                    value={edicoes[item.id]?.observacoes ?? ''}
+                    onChange={(event) =>
+                      setEdicoes((current) => ({
+                        ...current,
+                        [item.id]: {
+                          ...current[item.id],
+                          observacoes: event.target.value
+                        }
+                      }))
+                    }
+                    disabled={!podeEditar || detalhe.status !== 'RASCUNHO'}
+                  />
+                )
+              }
+            ]}
+            itens={detalhe.itens || []}
+            storageKey="tabela:rh-dp-apuracao:itens"
+            rotuloRolagem="Itens da apuracao"
+            vazio="A apuracao nao possui itens."
+            acoesLinha={(item) => (
+              podeEditar && detalhe.status === 'RASCUNHO' ? (
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => salvarItem(item.id)}
+                  disabled={salvandoItemId === item.id}
+                >
+                  {salvandoItemId === item.id ? 'Salvando...' : 'Salvar ajuste'}
+                </button>
+              ) : null
+            )}
+            larguraAcoes={160}
+          />
         </div>
       ) : null}
     </div>

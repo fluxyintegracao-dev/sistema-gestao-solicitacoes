@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import {
   listarFornecedoresCompra,
   criarFornecedorCompra,
@@ -377,132 +378,106 @@ export default function GestaoFornecedores() {
           <span className="text-sm text-[var(--c-muted)]">{fornecedores.length} fornecedor(es)</span>
         </div>
 
-        {loading ? (
-          <div className="app-empty-card">Carregando...</div>
-        ) : fornecedores.length === 0 ? (
-          <div className="app-empty-card">Nenhum fornecedor encontrado. Ajuste os filtros ou cadastre um novo.</div>
-        ) : (
-          <div className="app-table-shell min-w-0 max-w-full overflow-hidden">
-            <div className="compras-responsive-table min-w-0 max-w-full pb-2">
-              <table className="table min-w-[1120px]">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>CNPJ</th>
-                  <th>WhatsApp</th>
-                  <th>Email</th>
-                  <th>Cidade / UF</th>
-                  <th>Categorias</th>
-                  <th>Status</th>
-                  {canManage && <th>Acoes</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {fornecedores.map((f) => (
-                  <tr key={f.id} className={!f.ativo ? 'opacity-50' : ''}>
-                    <td className="max-w-[260px] font-medium">
-                      {f.nome}
-                      {f.contato && <div className="text-xs text-[var(--c-muted)]">{f.contato}</div>}
-                    </td>
-                    <td>{f.cnpj || '-'}</td>
-                    <td>
-                      {f.whatsapp ? (
-                        <a
-                          href={whatsappLink(f.whatsapp)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-emerald-600 hover:underline font-medium"
-                        >
-                          {f.whatsapp}
-                        </a>
-                      ) : '-'}
-                    </td>
-                    <td className="max-w-[240px] break-words">{f.email || '-'}</td>
-                    <td>
-                      {[f.cidade, f.estado].filter(Boolean).join(' / ') || '-'}
-                    </td>
-                    <td>
-                      <div className="flex flex-wrap gap-1">
-                        {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0
-                          ? f.categoria_insumos.map((cat) => (
-                            <span key={cat} className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
-                              {cat}
-                            </span>
-                          ))
-                          : <span className="text-xs text-[var(--c-muted)]">-</span>
-                        }
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`app-status-pill ${f.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                        {f.ativo ? 'Ativo' : 'Inativo'}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (f) => <CelulaDupla principal={f.nome} sub={f.contato || ''} />
+            },
+            {
+              id: 'cnpj',
+              titulo: 'CNPJ',
+              tipo: 'codigo',
+              render: (f) => f.cnpj || '-'
+            },
+            {
+              id: 'whatsapp',
+              titulo: 'WhatsApp',
+              tipo: 'codigo',
+              render: (f) => (
+                f.whatsapp ? (
+                  <a
+                    href={whatsappLink(f.whatsapp)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-emerald-600 hover:underline font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {f.whatsapp}
+                  </a>
+                ) : '-'
+              )
+            },
+            {
+              id: 'email',
+              titulo: 'Email',
+              tipo: 'texto',
+              render: (f) => f.email || '-'
+            },
+            {
+              id: 'cidade_uf',
+              titulo: 'Cidade / UF',
+              tipo: 'texto',
+              render: (f) => [f.cidade, f.estado].filter(Boolean).join(' / ') || '-'
+            },
+            {
+              id: 'categorias',
+              titulo: 'Categorias',
+              tipo: 'texto',
+              render: (f) => (
+                <div className="flex flex-wrap gap-1">
+                  {Array.isArray(f.categoria_insumos) && f.categoria_insumos.length > 0
+                    ? f.categoria_insumos.map((cat) => (
+                      <span key={cat} className="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                        {cat}
                       </span>
-                    </td>
-                    {canManage && (
-                      <td>
-                        <div className="flex gap-2 whitespace-nowrap">
-                          <button
-                            type="button"
-                            className="btn btn-outline"
-                            onClick={() => { setFornecedorEditando(f); setModalAberto(true); }}
-                          >
-                            Editar
-                          </button>
-                          {f.ativo && (
-                            <button
-                              type="button"
-                              className="btn btn-outline text-red-500 hover:border-red-400"
-                              onClick={() => handleDesativar(f.id)}
-                            >
-                              Desativar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {!loading && fornecedores.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Fornecedores">
-            {fornecedores.map((f) => (
-              <article key={`mobile-${f.id}`} className={`compras-mobile-record ${!f.ativo ? 'is-inactive' : ''}`}>
-                <div className="compras-mobile-record-head">
-                  <div className="compras-mobile-record-title">
-                    <strong>{f.nome}</strong>
-                    <span>{f.cnpj || 'CNPJ nao informado'}</span>
-                  </div>
-                  <span className={`app-status-pill ${f.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                    {f.ativo ? 'Ativo' : 'Inativo'}
-                  </span>
+                    ))
+                    : <span className="text-xs text-[var(--c-muted)]">-</span>
+                  }
                 </div>
-                <div className="compras-mobile-record-grid">
-                  <div className="compras-mobile-field"><span>Contato</span><strong>{f.contato || '-'}</strong></div>
-                  <div className="compras-mobile-field"><span>Cidade / UF</span><strong>{[f.cidade, f.estado].filter(Boolean).join(' / ') || '-'}</strong></div>
-                  <div className="compras-mobile-field"><span>WhatsApp</span>{f.whatsapp ? <a href={whatsappLink(f.whatsapp)} target="_blank" rel="noopener noreferrer">{f.whatsapp}</a> : <strong>-</strong>}</div>
-                  <div className="compras-mobile-field"><span>Email</span><strong>{f.email || '-'}</strong></div>
-                  <div className="compras-mobile-field"><span>Categorias</span><strong>{Array.isArray(f.categoria_insumos) && f.categoria_insumos.length ? f.categoria_insumos.join(', ') : '-'}</strong></div>
-                </div>
-                {canManage ? (
-                  <div className="compras-mobile-record-actions">
-                    <button type="button" className="btn btn-outline" onClick={() => { setFornecedorEditando(f); setModalAberto(true); }}>
-                      Editar
-                    </button>
-                    {f.ativo ? (
-                      <button type="button" className="btn btn-danger" onClick={() => handleDesativar(f.id)}>
-                        Desativar
-                      </button>
-                    ) : null}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
-        ) : null}
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (f) => (
+                <span className={`app-status-pill ${f.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {f.ativo ? 'Ativo' : 'Inativo'}
+                </span>
+              )
+            }
+          ]}
+          itens={fornecedores}
+          carregando={loading}
+          vazio="Nenhum fornecedor encontrado. Ajuste os filtros ou cadastre um novo."
+          storageKey="tabela:gestao-fornecedores"
+          rotuloRolagem="Fornecedores"
+          acoesLinha={canManage ? (f) => (
+            <>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => { setFornecedorEditando(f); setModalAberto(true); }}
+              >
+                Editar
+              </button>
+              {f.ativo && (
+                <button
+                  type="button"
+                  className="btn btn-outline text-red-500 hover:border-red-400"
+                  onClick={() => handleDesativar(f.id)}
+                >
+                  Desativar
+                </button>
+              )}
+            </>
+          ) : undefined}
+          larguraAcoes={240}
+        />
       </div>
 
       {modalAberto && (

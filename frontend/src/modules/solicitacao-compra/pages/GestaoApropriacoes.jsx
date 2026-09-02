@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import { getObras } from '../../../services/obras';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
@@ -395,94 +396,74 @@ export default function GestaoApropriacoes() {
 
         {!obraSelecionada ? (
           <div className="py-8 text-center text-sm text-[var(--c-muted)]">Selecione uma obra para visualizar as apropriacoes.</div>
-        ) : loading ? (
-          <div className="py-8 text-center text-sm text-[var(--c-muted)]">Carregando...</div>
         ) : (
-          <div className="compras-responsive-table">
-          <table className="table min-w-[760px]">
-            <thead>
-              <tr>
-                <th className="w-12">
-                  <input type="checkbox" checked={todosSelecionados} onChange={toggleTodos} />
-                </th>
-                <th>Codigo</th>
-                <th>Descricao</th>
-                <th>Tipo</th>
-                <th>Pai</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apropriacoes.map((item) => (
-                <tr key={item.id}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={selecionados.includes(item.id)}
-                      onChange={() => toggleSelecionado(item.id)}
-                    />
-                  </td>
-                  <td>{item.codigo}</td>
-                  <td>{item.descricao || '-'}</td>
-                  <td>
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                      item.somadora
-                        ? 'bg-amber-100 text-amber-700'
-                        : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      {item.somadora ? 'Somadora' : 'Analitica'}
-                    </span>
-                  </td>
-                  <td>{item.apropriacao_pai?.codigo || '-'}</td>
-                  <td>
-                    <div className="flex gap-2">
-                      <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
-                        Editar
-                      </button>
-                      <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {apropriacoes.length === 0 && (
-                <tr>
-                  <td colSpan="6" align="center">Nenhuma apropriacao cadastrada.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-          </div>
-        )}
-        {obraSelecionada && !loading && apropriacoes.length > 0 ? (
-          <div className="compras-mobile-list" aria-label="Apropriacoes cadastradas">
-            {apropriacoes.map((item) => (
-              <article key={`mobile-${item.id}`} className="compras-mobile-record">
-                <div className="compras-mobile-record-head">
-                  <div className="compras-mobile-record-title">
-                    <strong>{item.codigo}</strong>
-                    <span>{item.descricao || 'Sem descricao'}</span>
-                  </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'selecao',
+                titulo: 'Sel.',
+                tipo: 'status',
+                render: (item) => (
                   <input
                     type="checkbox"
                     checked={selecionados.includes(item.id)}
                     onChange={() => toggleSelecionado(item.id)}
                     aria-label={`Selecionar apropriacao ${item.codigo}`}
                   />
-                </div>
-                <div className="compras-mobile-record-grid">
-                  <div className="compras-mobile-field"><span>Tipo</span><strong>{item.somadora ? 'Somadora' : 'Analitica'}</strong></div>
-                  <div className="compras-mobile-field"><span>Apropriacao pai</span><strong>{item.apropriacao_pai?.codigo || '-'}</strong></div>
-                </div>
-                <div className="compras-mobile-record-actions">
-                  <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>Editar</button>
-                  <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>Excluir</button>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : null}
+                )
+              },
+              {
+                id: 'codigo',
+                titulo: 'Codigo',
+                tipo: 'codigo',
+                render: (item) => item.codigo
+              },
+              {
+                id: 'descricao',
+                titulo: 'Descricao',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.descricao || '-'
+              },
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'badge',
+                render: (item) => (
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    item.somadora
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {item.somadora ? 'Somadora' : 'Analitica'}
+                  </span>
+                )
+              },
+              {
+                id: 'pai',
+                titulo: 'Pai',
+                tipo: 'codigo',
+                render: (item) => item.apropriacao_pai?.codigo || '-'
+              }
+            ]}
+            itens={apropriacoes}
+            carregando={loading}
+            vazio="Nenhuma apropriacao cadastrada."
+            storageKey="tabela:gestao-apropriacoes"
+            rotuloRolagem="Apropriacoes cadastradas"
+            acoesLinha={(item) => (
+              <>
+                <button type="button" className="btn btn-outline" onClick={() => iniciarEdicao(item)}>
+                  Editar
+                </button>
+                <button type="button" className="btn btn-danger" onClick={() => excluirLote([item.id])}>
+                  Excluir
+                </button>
+              </>
+            )}
+            larguraAcoes={240}
+          />
+        )}
       </div>
     </div>
   );
