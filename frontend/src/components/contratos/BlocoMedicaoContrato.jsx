@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getContratoParcelas, getFormasPagamentoMedicao } from '../../services/contratos';
 import { buscarParceiros } from '../../services/parceiros';
+import { TabelaPadrao } from '../padrao';
 import { paraCentavosContrato } from './BlocoContratoFluxoNovo';
 import { HiPaperClip } from 'react-icons/hi2';
 import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } from '../../utils/formaPagamento';
@@ -155,6 +156,12 @@ export default function BlocoMedicaoContrato({
     if (pos <= 0) return true;
     return ordemPorVencimento.slice(0, pos).every((id) => selecao[id]?.marcada);
   };
+
+  // A linha fechada para medicao vinha esmaecida na <tr>; a TabelaPadrao nao
+  // estiliza linha, entao o esmaecido acompanha o conteudo de cada celula.
+  const atenuada = (p, conteudo) => (
+    p.medivel === false || !p.editavel ? <span className="opacity-60">{conteudo}</span> : conteudo
+  );
 
   const itens = useMemo(() => parcelas
     .filter((p) => selecao[p.id]?.marcada)
@@ -318,87 +325,121 @@ export default function BlocoMedicaoContrato({
       )}
 
       {parcelas.length > 0 && (
-        <table className="table">
-          <thead>
-            <tr>
-              <th style={{ width: 40 }}></th>
-              <th>#</th>
-              <th>Valor</th>
-              <th>Vencimento</th>
-              <th>Status</th>
-              <th>Previsto</th>
-            </tr>
-          </thead>
-          <tbody>
-            {parcelas.map((p) => {
-              const sel = selecao[p.id] || {};
-              const valorProjetado = valoresProjetados.get(p.id) ?? p.valor;
-              const foiReajustadaNaProjecao = !sel.marcada
-                && paraCentavosContrato(valorProjetado) !== paraCentavosContrato(p.valor);
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'selecao',
+              titulo: 'Medir',
+              tipo: 'status',
               // `medivel` e nao `editavel`: parcela ja medida segue com o titulo ABERTO ate o
               // pagamento, entao `editavel` continua verdadeiro nela — e o checkbox ficava liberado
               // para medir a mesma parcela de novo.
-              return (
-                <tr key={p.id} style={{ opacity: p.medivel === false || !p.editavel ? 0.6 : 1 }}>
-                  <td>
+              render: (p) => (
+                <input
+                  type="checkbox"
+                  checked={Boolean(selecao[p.id]?.marcada)}
+                  // Quitado e parcialmente pago ficam fechados: o saldo ja foi
+                  // redistribuido no pagamento (PI-7).
+                  disabled={!p.editavel || p.medivel === false || (!selecao[p.id]?.marcada && !liberadaParaMarcar(p.id))}
+                  title={p.medivel === false
+                    ? `Já medida${p.medicao ? ` na medição ${p.medicao.numero}` : ''}: para corrigir o valor, altere aquela medição`
+                    : (!p.editavel
+                      ? `Parcela ${p.status}: fechada para medição`
+                      : (!selecao[p.id]?.marcada && !liberadaParaMarcar(p.id)
+                        ? 'Solicite primeiro as parcelas de vencimento anterior'
+                        : ''))}
+                  onChange={() => alternar(p)}
+                />
+              )
+            },
+            {
+              id: 'numero',
+              titulo: '#',
+              tipo: 'codigo',
+              noCard: 'titulo',
+              render: (p) => atenuada(p, p.numero)
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (p) => {
+                const sel = selecao[p.id] || {};
+                const valorProjetado = valoresProjetados.get(p.id) ?? p.valor;
+                const foiReajustadaNaProjecao = !sel.marcada
+                  && paraCentavosContrato(valorProjetado) !== paraCentavosContrato(p.valor);
+                return atenuada(p, (
+                  <>
                     <input
-                      type="checkbox"
-                      checked={Boolean(sel.marcada)}
-                      // Quitado e parcialmente pago ficam fechados: o saldo ja foi
-                      // redistribuido no pagamento (PI-7).
-                      disabled={!p.editavel || p.medivel === false || (!sel.marcada && !liberadaParaMarcar(p.id))}
-                      title={p.medivel === false
-                        ? `Já medida${p.medicao ? ` na medição ${p.medicao.numero}` : ''}: para corrigir o valor, altere aquela medição`
-                        : (!p.editavel
-                          ? `Parcela ${p.status}: fechada para medição`
-                          : (!sel.marcada && !liberadaParaMarcar(p.id)
-                            ? 'Solicite primeiro as parcelas de vencimento anterior'
-                            : ''))}
-                      onChange={() => alternar(p)}
-                    />
-                  </td>
-                  <td>{p.numero}</td>
-                  <td>
-                    <input
-                      className="input" type="number" step="0.01" style={{ width: 120 }}
+                      className="input" type="number" step="0.01"
                       value={sel.valor ?? valorProjetado}
                       disabled={!p.editavel || p.medivel === false || !sel.marcada}
                       onChange={(e) => alterar(p.id, 'valor', e.target.value)}
                     />
                     {foiReajustadaNaProjecao && (
-                      <span className="text-xs" style={{ display: 'block', marginTop: 3, color: 'var(--c-primary)' }}>
+                      <span className="text-xs" style={{ display: 'block', color: 'var(--c-primary)' }}>
                         reajustado nesta medicao
                       </span>
                     )}
-                  </td>
-                  <td>
-                    <DateInputBR
-                      className="input" style={{ width: 150 }}
-                      name={`vencimento_parcela_${p.id}`}
-                      value={sel.vencimento ?? p.vencimento ?? ''}
-                      disabled={!p.editavel || p.medivel === false || !sel.marcada}
-                      onChange={(e) => alterar(p.id, 'vencimento', e.target.value)}
-                    />
-                  </td>
-                  <td>
-                    {p.status}
-                    {/* Sem esta marca, a linha desabilitada so ficaria acinzentada e a pessoa
-                        precisaria passar o mouse por cima para descobrir o motivo. */}
-                    {p.medivel === false && (
-                      <span className="text-xs" style={{ display: 'block', color: 'var(--c-muted)' }}>
-                        já medida{p.medicao ? ` (medição ${p.medicao.numero})` : ''}
-                      </span>
-                    )}
-                  </td>
-                  {/* Referencia da auditoria: previsto na criacao x solicitado (PI-5). */}
-                  <td className="text-xs" style={{ color: 'var(--c-muted)' }}>
-                    {p.valor_previsto === null ? '-' : formatarMoeda(p.valor_previsto)}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </>
+                ));
+              }
+            },
+            {
+              id: 'vencimento',
+              titulo: 'Vencimento',
+              tipo: 'data',
+              render: (p) => {
+                const sel = selecao[p.id] || {};
+                return atenuada(p, (
+                  <DateInputBR
+                    className="input"
+                    name={`vencimento_parcela_${p.id}`}
+                    value={sel.vencimento ?? p.vencimento ?? ''}
+                    disabled={!p.editavel || p.medivel === false || !sel.marcada}
+                    onChange={(e) => alterar(p.id, 'vencimento', e.target.value)}
+                  />
+                ));
+              }
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (p) => atenuada(p, (
+                <>
+                  {p.status}
+                  {/* Sem esta marca, a linha desabilitada so ficaria acinzentada e a pessoa
+                      precisaria passar o mouse por cima para descobrir o motivo. */}
+                  {p.medivel === false && (
+                    <span className="text-xs" style={{ display: 'block', color: 'var(--c-muted)' }}>
+                      já medida{p.medicao ? ` (medição ${p.medicao.numero})` : ''}
+                    </span>
+                  )}
+                </>
+              ))
+            },
+            {
+              id: 'previsto',
+              titulo: 'Previsto',
+              tipo: 'valor',
+              // Referencia da auditoria: previsto na criacao x solicitado (PI-5).
+              render: (p) => atenuada(p, (
+                <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                  {p.valor_previsto === null ? '-' : formatarMoeda(p.valor_previsto)}
+                </span>
+              ))
+            }
+          ]}
+          itens={parcelas}
+          getId={(p) => p.id}
+          storageKey="tabela:contrato-medicao:parcelas"
+          rotuloRolagem="Parcelas do contrato para medicao"
+          vazio="Este contrato não possui parcelas para medir."
+          /* R17: linha de parcela — numero, valor, vencimento e status; nao ha
+             nome de registro, a parcela e identificada pelo numero. */
+          semIdentidade
+        />
       )}
 
       {/* A forma vem PRIMEIRO e governa os campos condicionais. O favorecido vale para TODAS as

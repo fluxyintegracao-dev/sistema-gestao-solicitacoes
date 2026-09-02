@@ -5,6 +5,7 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineMagnifyingGlass
 } from 'react-icons/hi2';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import CrStatusPill from './CrStatusPill';
 
 const currency = new Intl.NumberFormat('pt-BR', {
@@ -30,46 +31,6 @@ function ClassificationPill({ value }) {
 function BudgetStatus({ obra }) {
   const value = BUDGET_STATUS[obra.situacao_orcamento] || BUDGET_STATUS.PENDENTE;
   return <CrStatusPill status={value.status} label={value.label} />;
-}
-
-function ObraMobileCard({ obra, onOpen }) {
-  return (
-    <article className="cr-mobile-record cr-work-access-card">
-      <div className="flex min-w-0 items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="truncate text-xs font-semibold uppercase text-[var(--c-muted)]">
-            {obra.codigo || `Obra ${obra.id}`}
-          </div>
-          <h3 className="mt-1 text-sm font-bold text-[var(--c-text)]">{obra.nome}</h3>
-          <div className="mt-1 text-xs text-[var(--c-muted)]">
-            {obra.empresa?.nome || 'Empresa não informada'}
-          </div>
-        </div>
-        <ClassificationPill value={obra.classificacao} />
-      </div>
-      <dl className="cr-mobile-record-grid">
-        <div>
-          <dt>Valor contratado</dt>
-          <dd>{currency.format(obra.contrato?.valor_total || 0)}</dd>
-        </div>
-        <div>
-          <dt>Valor orçado</dt>
-          <dd>{currency.format(obra.valor_orcado || 0)}</dd>
-        </div>
-        <div>
-          <dt>Eng. responsável</dt>
-          <dd>{obra.responsavel?.nome || 'Não definido'}</dd>
-        </div>
-        <div>
-          <dt>Situação</dt>
-          <dd className="mt-1"><BudgetStatus obra={obra} /></dd>
-        </div>
-      </dl>
-      <button type="button" className="btn btn-primary w-full" onClick={() => onOpen(obra.id)}>
-        Abrir planejamento
-      </button>
-    </article>
-  );
 }
 
 export default function CrObrasView({
@@ -168,48 +129,63 @@ export default function CrObrasView({
         </div>
       ) : (
         <>
-          <div className="cr-table-shell cr-desktop-table cr-works-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>Obra</th>
-                  <th className="text-right">Valor contratado</th>
-                  <th className="text-right">Valor orçado</th>
-                  <th>Eng. responsável</th>
-                  <th>Situação</th>
-                  <th aria-label="Ação" />
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((obra) => (
-                  <tr key={obra.id}>
-                    <td>
-                      <strong>{obra.codigo || `OBRA ${obra.id}`} · {obra.nome}</strong>
-                      <span>{obra.cidade || '-'} · {obra.empresa?.nome || 'Empresa não informada'}</span>
-                    </td>
-                    <td className="text-right cr-cell-currency">
-                      {currency.format(obra.contrato?.valor_total || 0)}
-                    </td>
-                    <td className="text-right cr-cell-currency">
-                      {currency.format(obra.valor_orcado || 0)}
-                    </td>
-                    <td>{obra.responsavel?.nome || 'Não definido'}</td>
-                    <td><BudgetStatus obra={obra} /></td>
-                    <td className="text-right">
-                      <button type="button" className="btn btn-primary" onClick={() => onOpen(obra.id)}>
-                        Abrir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="cr-mobile-list">
-            {filtered.map((obra) => (
-              <ObraMobileCard key={obra.id} obra={obra} onOpen={onOpen} />
-            ))}
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra',
+                // R17: a obra NOMEIA a linha desta lista de escopo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (obra) => (
+                  <CelulaDupla
+                    principal={`${obra.codigo || `OBRA ${obra.id}`} · ${obra.nome}`}
+                    sub={`${obra.cidade || '-'} · ${obra.empresa?.nome || 'Empresa não informada'}`}
+                  />
+                )
+              },
+              {
+                id: 'valor_contratado',
+                titulo: 'Valor contratado',
+                tipo: 'valor',
+                render: (obra) => currency.format(obra.contrato?.valor_total || 0)
+              },
+              {
+                id: 'valor_orcado',
+                titulo: 'Valor orçado',
+                tipo: 'valor',
+                render: (obra) => currency.format(obra.valor_orcado || 0)
+              },
+              {
+                id: 'responsavel',
+                titulo: 'Eng. responsável',
+                tipo: 'texto',
+                render: (obra) => obra.responsavel?.nome || 'Não definido'
+              },
+              {
+                id: 'classificacao',
+                titulo: 'Classificação',
+                tipo: 'status',
+                render: (obra) => <ClassificationPill value={obra.classificacao} />
+              },
+              {
+                id: 'situacao',
+                titulo: 'Situação',
+                tipo: 'badge',
+                render: (obra) => <BudgetStatus obra={obra} />
+              }
+            ]}
+            itens={filtered}
+            getId={(obra) => obra.id}
+            storageKey="tabela:custos-recebiveis-obras"
+            rotuloRolagem="Obras no seu escopo"
+            acoesLinha={(obra) => (
+              <button type="button" className="btn btn-primary" onClick={() => onOpen(obra.id)}>
+                Abrir
+              </button>
+            )}
+            larguraAcoes={140}
+          />
           <div className="cr-result-count">{filtered.length} obra(s) exibida(s)</div>
         </>
       )}

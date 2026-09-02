@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioPrecosInsumosFornecedores } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,36 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const ITEM_COLUMNS = [
-  { key: 'item', width: 300, minWidth: 190 },
-  { key: 'categoria', width: 220, minWidth: 150 },
-  { key: 'fornecedores', width: 120, minWidth: 90 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'quantidade', width: 120, minWidth: 90 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'preco_medio', width: 150, minWidth: 120 },
-  { key: 'melhor', width: 220, minWidth: 150 }
-];
-
-const COMPARATIVO_COLUMNS = [
-  { key: 'item', width: 280, minWidth: 180 },
-  { key: 'fornecedor', width: 240, minWidth: 160 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'quantidade', width: 120, minWidth: 90 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'preco', width: 140, minWidth: 110 },
-  { key: 'menor', width: 140, minWidth: 110 },
-  { key: 'diferenca', width: 150, minWidth: 120 },
-  { key: 'ultimo', width: 120, minWidth: 100 }
-];
-
-const CATEGORIA_COLUMNS = [
-  { key: 'categoria', width: 260, minWidth: 170 },
-  { key: 'itens', width: 100, minWidth: 80 },
-  { key: 'fornecedores', width: 130, minWidth: 100 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -285,133 +255,121 @@ export default function ComprasRelatorioPrecosInsumos() {
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Insumos por preco medio</h2>
         <p className="page-subtitle mb-3">Resumo por item comprado, com menor preco medio observado entre fornecedores.</p>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={ITEM_COLUMNS} storageKey="fluxy.compras.precosInsumos.itens.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="item">Item</ResizableTh>
-                <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
-                <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                <ResizableTh columnKey="quantidade" className="text-right">Quantidade</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                <ResizableTh columnKey="preco_medio" className="text-right">Preco medio</ResizableTh>
-                <ResizableTh columnKey="melhor">Melhor fornecedor medio</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8}>Carregando...</td></tr>
-              ) : itens.length === 0 ? (
-                <tr><td colSpan={8}>Sem itens de pedido nos filtros.</td></tr>
-              ) : (
-                itens.map((item) => (
-                  <tr key={item.key}>
-                    <td>
-                      <div className="font-semibold text-slate-900">{item.descricao}</div>
-                      <div className="text-xs text-slate-500">{item.unidade || '-'} - {item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}</div>
-                    </td>
-                    <td>{item.categoria_nome || '-'}</td>
-                    <td className="text-right">{formatNumber(item.fornecedores)}</td>
-                    <td className="text-right">{formatNumber(item.pedidos)}</td>
-                    <td className="text-right">{formatNumber(item.quantidade_total, 3)}</td>
-                    <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                    <td className="text-right">{formatMoney(item.preco_medio_geral)}</td>
-                    <td>
-                      <div className="font-semibold text-slate-900">{item.melhor_fornecedor?.nome || '-'}</div>
-                      <div className="text-xs text-slate-500">{formatMoney(item.menor_preco_medio)}</div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'item',
+              titulo: 'Item',
+              // R17: o insumo/item NOMEIA a linha do resumo.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-slate-900">{item.descricao}</div>
+                  <div className="text-xs text-slate-500">{item.unidade || '-'} - {item.origem === 'INSUMO' ? 'Insumo cadastrado' : 'Item manual'}</div>
+                </div>
+              )
+            },
+            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome || '-' },
+            { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+            { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+            { id: 'preco_medio', titulo: 'Preco medio', tipo: 'valor', render: (item) => formatMoney(item.preco_medio_geral) },
+            {
+              id: 'melhor',
+              titulo: 'Melhor fornecedor medio',
+              tipo: 'texto',
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-slate-900">{item.melhor_fornecedor?.nome || '-'}</div>
+                  <div className="text-xs text-slate-500">{formatMoney(item.menor_preco_medio)}</div>
+                </div>
+              )
+            }
+          ]}
+          itens={itens}
+          getId={(item) => item.key}
+          carregando={loading}
+          storageKey="tabela:compras-precos-insumos:itens"
+          rotuloRolagem="Insumos por preco medio"
+          vazio="Sem itens de pedido nos filtros."
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr] mt-4">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Comparativo por fornecedor</h2>
           <p className="page-subtitle mb-3">Cada linha compara o preco medio do fornecedor contra o menor preco medio do mesmo item.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={COMPARATIVO_COLUMNS} storageKey="fluxy.compras.precosInsumos.comparativo.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="item">Item</ResizableTh>
-                  <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                  <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                  <ResizableTh columnKey="quantidade" className="text-right">Quantidade</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                  <ResizableTh columnKey="preco" className="text-right">Preco medio</ResizableTh>
-                  <ResizableTh columnKey="menor" className="text-right">Menor medio</ResizableTh>
-                  <ResizableTh columnKey="diferenca" className="text-right">Diferenca</ResizableTh>
-                  <ResizableTh columnKey="ultimo">Ultimo pedido</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={9}>Carregando...</td></tr>
-                ) : comparativo.length === 0 ? (
-                  <tr><td colSpan={9}>Sem comparativo nos filtros.</td></tr>
-                ) : (
-                  comparativo.map((item, index) => (
-                    <tr key={`${item.item_key}-${item.fornecedor_id || 'sem'}-${index}`}>
-                      <td>
-                        <div className="font-semibold text-slate-900">{item.descricao}</div>
-                        <div className="text-xs text-slate-500">{item.unidade || '-'}</div>
-                      </td>
-                      <td className="font-semibold text-slate-900">{item.fornecedor_nome}</td>
-                      <td className="text-right">{formatNumber(item.pedidos)}</td>
-                      <td className="text-right">{formatNumber(item.quantidade_total, 3)}</td>
-                      <td className="text-right">{formatMoney(item.valor_total)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.preco_medio)}</td>
-                      <td className="text-right">{formatMoney(item.menor_preco_medio_item)}</td>
-                      <td className="text-right">
-                        <div className={Number(item.diferenca_menor_preco_medio || 0) > 0 ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>
-                          {formatMoney(item.diferenca_menor_preco_medio)}
-                        </div>
-                        <div className="text-xs text-slate-500">{formatPercent(item.diferenca_percentual)}</div>
-                      </td>
-                      <td>{formatDate(item.ultimo_pedido_em)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'item',
+                titulo: 'Item',
+                // R17: o insumo/item NOMEIA a linha do comparativo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <div>
+                    <div className="font-semibold text-slate-900">{item.descricao}</div>
+                    <div className="text-xs text-slate-500">{item.unidade || '-'}</div>
+                  </div>
+                )
+              },
+              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-slate-900">{item.fornecedor_nome}</span> },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) },
+              { id: 'preco', titulo: 'Preco medio', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.preco_medio)}</span> },
+              { id: 'menor', titulo: 'Menor medio', tipo: 'valor', render: (item) => formatMoney(item.menor_preco_medio_item) },
+              {
+                id: 'diferenca',
+                titulo: 'Diferenca',
+                tipo: 'valor',
+                render: (item) => (
+                  <div>
+                    <div className={Number(item.diferenca_menor_preco_medio || 0) > 0 ? 'text-amber-700 font-semibold' : 'text-emerald-700 font-semibold'}>
+                      {formatMoney(item.diferenca_menor_preco_medio)}
+                    </div>
+                    <div className="text-xs text-slate-500">{formatPercent(item.diferenca_percentual)}</div>
+                  </div>
+                )
+              },
+              { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+            ]}
+            itens={comparativo}
+            getId={(item) => `${item.item_key}-${item.fornecedor_id || 'sem'}`}
+            carregando={loading}
+            storageKey="tabela:compras-precos-insumos:comparativo"
+            rotuloRolagem="Comparativo por fornecedor"
+            vazio="Sem comparativo nos filtros."
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Categorias</h2>
           <p className="page-subtitle mb-3">Valor analisado por categoria dos insumos.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={CATEGORIA_COLUMNS} storageKey="fluxy.compras.precosInsumos.categorias.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4}>Carregando...</td></tr>
-                ) : categorias.length === 0 ? (
-                  <tr><td colSpan={4}>Sem categorias nos filtros.</td></tr>
-                ) : (
-                  categorias.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.categoria_nome}</td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right">{formatNumber(item.fornecedores)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'categoria',
+                titulo: 'Categoria',
+                // R17: a categoria NOMEIA a linha deste resumo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.categoria_nome
+              },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
+            ]}
+            itens={categorias}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-precos-insumos:categorias"
+            rotuloRolagem="Categorias"
+            vazio="Sem categorias nos filtros."
+          />
         </div>
       </div>
     </div>

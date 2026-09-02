@@ -1,28 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { getObras } from '../services/obras';
 import { getContratosRelatorioOperacional } from '../services/contratos';
-
-const GROUP_COLUMNS = [
-  { key: 'label', width: 260, minWidth: 180 },
-  { key: 'total', width: 90, minWidth: 80 },
-  { key: 'ativos', width: 90, minWidth: 80 },
-  { key: 'sem_anexo', width: 110, minWidth: 95 },
-  { key: 'valor_total', width: 150, minWidth: 120 },
-  { key: 'total_pago', width: 150, minWidth: 120 },
-  { key: 'total_a_pagar', width: 150, minWidth: 120 }
-];
-
-const PENDENCIA_COLUMNS = [
-  { key: 'contrato', width: 170, minWidth: 130 },
-  { key: 'referencia', width: 240, minWidth: 160 },
-  { key: 'obra', width: 260, minWidth: 180 },
-  { key: 'empresa', width: 220, minWidth: 160 },
-  { key: 'valor', width: 140, minWidth: 110 },
-  { key: 'saldo', width: 140, minWidth: 110 },
-  { key: 'pendencias', width: 360, minWidth: 220 }
-];
 
 function money(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -67,44 +47,33 @@ function GroupTable({ title, rows, storageKey, labelHeader = 'Descricao', format
         <span className="text-xs text-slate-500">{number(rows.length)} linha(s)</span>
       </div>
 
-      <div className="table-wrapper">
-        <ResizableTable className="sol-table" columns={GROUP_COLUMNS} storageKey={storageKey}>
-          <thead>
-            <tr>
-              <ResizableTh columnKey="label">{labelHeader}</ResizableTh>
-              <ResizableTh columnKey="total" className="text-right">Contratos</ResizableTh>
-              <ResizableTh columnKey="ativos" className="text-right">Ativos</ResizableTh>
-              <ResizableTh columnKey="sem_anexo" className="text-right">Sem anexo</ResizableTh>
-              <ResizableTh columnKey="valor_total" className="text-right">Valor</ResizableTh>
-              <ResizableTh columnKey="total_pago" className="text-right">Pago</ResizableTh>
-              <ResizableTh columnKey="total_a_pagar" className="text-right">A pagar</ResizableTh>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan="7" className="px-3 py-6 text-center text-sm text-slate-500">
-                  Nenhum dado encontrado para os filtros.
-                </td>
-              </tr>
-            )}
-            {rows.map((row, index) => (
-              <tr key={`${row.label}-${index}`}>
-                <td className="px-3 py-2 font-semibold text-slate-900">
-                  {formatLabel ? formatLabel(row.label) : row.label}
-                  {row.empresa && <div className="text-xs font-normal text-slate-500">{row.empresa}</div>}
-                </td>
-                <td className="px-3 py-2 text-right">{number(row.total)}</td>
-                <td className="px-3 py-2 text-right">{number(row.ativos)}</td>
-                <td className="px-3 py-2 text-right">{number(row.sem_anexo)}</td>
-                <td className="px-3 py-2 text-right">{money(row.valor_total)}</td>
-                <td className="px-3 py-2 text-right">{money(row.total_pago)}</td>
-                <td className="px-3 py-2 text-right">{money(row.total_a_pagar)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </ResizableTable>
-      </div>
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'label',
+            titulo: labelHeader,
+            // R17: a empresa/obra/referencia/status agrupada nomeia a linha.
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (row) => (
+              row.empresa
+                ? <CelulaDupla principal={formatLabel ? formatLabel(row.label) : row.label} sub={row.empresa} />
+                : (formatLabel ? formatLabel(row.label) : row.label)
+            )
+          },
+          { id: 'total', titulo: 'Contratos', tipo: 'numero', render: (row) => number(row.total) },
+          { id: 'ativos', titulo: 'Ativos', tipo: 'numero', render: (row) => number(row.ativos) },
+          { id: 'sem_anexo', titulo: 'Sem anexo', tipo: 'numero', render: (row) => number(row.sem_anexo) },
+          { id: 'valor_total', titulo: 'Valor', tipo: 'valor', render: (row) => money(row.valor_total) },
+          { id: 'total_pago', titulo: 'Pago', tipo: 'valor', render: (row) => money(row.total_pago) },
+          { id: 'total_a_pagar', titulo: 'A pagar', tipo: 'valor', render: (row) => money(row.total_a_pagar) }
+        ]}
+        itens={rows}
+        getId={(row) => `${row.label}-${rows.indexOf(row)}`}
+        storageKey={storageKey}
+        rotuloRolagem={title}
+        vazio="Nenhum dado encontrado para os filtros."
+      />
     </section>
   );
 }
@@ -285,25 +254,25 @@ export default function ContratosRelatorioOperacional() {
         <GroupTable
           title="Contratos por empresa do grupo"
           rows={data?.por_empresa || []}
-          storageKey="fluxy.contratos.operacional.empresas.columns"
+          storageKey="tabela:contratos-relatorio-operacional:empresas"
           labelHeader="Empresa"
         />
         <GroupTable
           title="Contratos por obra/centro"
           rows={data?.por_obra || []}
-          storageKey="fluxy.contratos.operacional.obras.columns"
+          storageKey="tabela:contratos-relatorio-operacional:obras"
           labelHeader="Obra/Centro"
         />
         <GroupTable
           title="Contratos por referencia"
           rows={data?.por_referencia || []}
-          storageKey="fluxy.contratos.operacional.referencias.columns"
+          storageKey="tabela:contratos-relatorio-operacional:referencias"
           labelHeader="Referencia"
         />
         <GroupTable
           title="Contratos por status"
           rows={data?.por_status || []}
-          storageKey="fluxy.contratos.operacional.status.columns"
+          storageKey="tabela:contratos-relatorio-operacional:status"
           labelHeader="Status"
         />
       </div>
@@ -319,53 +288,42 @@ export default function ContratosRelatorioOperacional() {
           <span className="text-xs text-slate-500">{number(data?.pendencias_cadastrais?.length)} contrato(s)</span>
         </div>
 
-        <div className="table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={PENDENCIA_COLUMNS}
-            storageKey="fluxy.contratos.operacional.pendencias.columns"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="contrato">Contrato</ResizableTh>
-                <ResizableTh columnKey="referencia">Referencia</ResizableTh>
-                <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                <ResizableTh columnKey="empresa">Empresa</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                <ResizableTh columnKey="saldo" className="text-right">A pagar</ResizableTh>
-                <ResizableTh columnKey="pendencias">Pendencias</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {(data?.pendencias_cadastrais || []).length === 0 && (
-                <tr>
-                  <td colSpan="7" className="px-3 py-6 text-center text-sm text-slate-500">
-                    Nenhuma pendencia cadastral nos filtros atuais.
-                  </td>
-                </tr>
-              )}
-              {(data?.pendencias_cadastrais || []).map((item) => (
-                <tr key={item.id}>
-                  <td className="px-3 py-2 font-semibold text-slate-900">{item.codigo}</td>
-                  <td className="px-3 py-2">{item.referencia || '-'}</td>
-                  <td className="px-3 py-2">{item.obra || '-'}</td>
-                  <td className="px-3 py-2">{item.empresa || '-'}</td>
-                  <td className="px-3 py-2 text-right">{money(item.valor_total)}</td>
-                  <td className="px-3 py-2 text-right">{money(item.total_a_pagar)}</td>
-                  <td className="px-3 py-2">
-                    <div className="flex flex-wrap gap-1">
-                      {(item.pendencias || []).map((pendencia) => (
-                        <span key={pendencia} className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
-                          {pendencia}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'contrato',
+              titulo: 'Contrato',
+              // R17: o codigo do contrato nomeia a pendencia listada.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.codigo
+            },
+            { id: 'referencia', titulo: 'Referencia', tipo: 'texto', render: (item) => item.referencia || '-' },
+            { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra || '-' },
+            { id: 'empresa', titulo: 'Empresa', tipo: 'texto', render: (item) => item.empresa || '-' },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => money(item.valor_total) },
+            { id: 'saldo', titulo: 'A pagar', tipo: 'valor', render: (item) => money(item.total_a_pagar) },
+            {
+              id: 'pendencias',
+              titulo: 'Pendencias',
+              tipo: 'texto',
+              render: (item) => (
+                <div className="flex flex-wrap gap-1">
+                  {(item.pendencias || []).map((pendencia) => (
+                    <span key={pendencia} className="rounded-full bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-700">
+                      {pendencia}
+                    </span>
+                  ))}
+                </div>
+              )
+            }
+          ]}
+          itens={data?.pendencias_cadastrais || []}
+          getId={(item) => item.id}
+          storageKey="tabela:contratos-relatorio-operacional:pendencias"
+          rotuloRolagem="Pendencias cadastrais"
+          vazio="Nenhuma pendencia cadastral nos filtros atuais."
+        />
       </section>
     </div>
   );
