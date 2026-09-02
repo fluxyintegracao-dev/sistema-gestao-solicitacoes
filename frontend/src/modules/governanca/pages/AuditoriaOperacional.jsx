@@ -15,6 +15,7 @@ import {
   HiOutlineUserGroup
 } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import { useAuth } from '../../../contexts/AuthContext';
 import {
   canExportOperationalAudit,
@@ -156,30 +157,46 @@ function FinancialIndicators({ data, canUsers }) {
           ))}
         </div>
       ) : (
-        <div className="ao-financial-table-wrap">
-          <table className="ao-financial-table">
-            <thead><tr>
-              <th>{view === 'USUARIOS' ? 'Usuario / setor' : 'Setor'}</th>
-              <th>Titulos cadastrados</th><th>Titulos baixados</th><th>Baixas</th>
-              <th>Match automatico</th><th>Sem match</th><th>Mais de um match</th><th>Titulo criado na conciliacao</th>
-            </tr></thead>
-            <tbody>
-              {(rows || []).map((item) => (
-                <tr key={view === 'USUARIOS' ? item.usuario.id : item.setor.id || 'sem-setor'}>
-                  <td><strong>{view === 'USUARIOS' ? item.usuario.nome : item.setor.nome}</strong>{view === 'USUARIOS' && <small>{item.setor?.nome || 'Sem setor atual'}</small>}</td>
-                  <td>{item.periodo.titulos_criados}<small>Total {item.acumulado.titulos_criados}</small></td>
-                  <td>{item.periodo.titulos_baixados}<small>Total {item.acumulado.titulos_baixados}</small></td>
-                  <td>{item.periodo.baixas_registradas}<small>Total {item.acumulado.baixas_registradas}</small></td>
-                  <td>{item.periodo.matches_automaticos}<small>Total {item.acumulado.matches_automaticos}</small></td>
-                  <td>{item.periodo.sem_match}<small>Total {item.acumulado.sem_match}</small></td>
-                  <td>{item.periodo.matches_ambiguos}<small>Total {item.acumulado.matches_ambiguos}</small></td>
-                  <td>{item.periodo.titulos_criados_via_conciliacao}<small>Total {item.acumulado.titulos_criados_via_conciliacao}</small></td>
-                </tr>
-              ))}
-              {!rows?.length && <tr><td colSpan="8" className="ao-financial-empty">Nenhuma atividade financeira atribuida neste recorte.</td></tr>}
-            </tbody>
-          </table>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'entidade',
+              titulo: view === 'USUARIOS' ? 'Usuario / setor' : 'Setor',
+              // R17: usuario (ou setor) é quem nomeia a linha do recorte.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                view === 'USUARIOS'
+                  ? <CelulaDupla principal={item.usuario.nome} sub={item.setor?.nome || 'Sem setor atual'} />
+                  : item.setor.nome
+              )
+            },
+            ...[
+              ['titulos_criados', 'Titulos cadastrados'],
+              ['titulos_baixados', 'Titulos baixados'],
+              ['baixas_registradas', 'Baixas'],
+              ['matches_automaticos', 'Match automatico'],
+              ['sem_match', 'Sem match'],
+              ['matches_ambiguos', 'Mais de um match'],
+              ['titulos_criados_via_conciliacao', 'Titulo criado na conciliacao']
+            ].map(([chave, rotulo]) => ({
+              id: chave,
+              titulo: rotulo,
+              tipo: 'numero',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.periodo[chave]}
+                  sub={`Total ${item.acumulado[chave]}`}
+                />
+              )
+            }))
+          ]}
+          itens={rows || []}
+          getId={(item) => (view === 'USUARIOS' ? item.usuario.id : item.setor.id || 'sem-setor')}
+          storageKey="tabela:auditoria-operacional:produtividade-financeira"
+          rotuloRolagem="Produtividade financeira"
+          vazio="Nenhuma atividade financeira atribuida neste recorte."
+        />
       )}
       <div className="ao-financial-note">
         <HiOutlineShieldCheck />

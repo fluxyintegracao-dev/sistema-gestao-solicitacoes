@@ -5,6 +5,7 @@ import {
   excluirNumeroCrm,
   listarNumerosCrm
 } from '../../../services/crm';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const EMPTY_FORM = {
   label: '',
@@ -218,49 +219,66 @@ export default function CrmAdminNumeros() {
       </form>
 
       <div className="card sol-surface-card mt-3 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">Nenhum numero cadastrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table w-full">
-              <thead>
-                <tr>
-                  <th>Numero</th>
-                  <th>Papel</th>
-                  <th>Provider</th>
-                  <th>Uso</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="font-semibold text-main">{item.label}</div>
-                      <div className="text-xs text-muted">{item.country_code} {item.phone_number}</div>
-                    </td>
-                    <td className="text-sm text-sub">{ROLE_LABEL[item.role_type] || item.role_type}</td>
-                    <td className="text-sm text-sub">{item.provider || '-'}</td>
-                    <td className="text-xs text-muted">
-                      <div>WhatsApp: {item.is_whatsapp_enabled ? 'sim' : 'nao'}</div>
-                      <div>Meta: {item.is_meta_ads_enabled ? 'sim' : 'nao'} | Google: {item.is_google_ads_enabled ? 'sim' : 'nao'}</div>
-                    </td>
-                    <td><span className="app-status-pill bg-elevated text-main">{STATUS_LABEL[item.status] || item.status}</span></td>
-                    <td>
-                      <div className="flex justify-end gap-2">
-                        <button type="button" className="btn btn-secondary text-xs" onClick={() => edit(item)}>Editar</button>
-                        <button type="button" className="btn btn-secondary text-xs text-red-600" onClick={() => remove(item.id)}>Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'numero',
+              titulo: 'Numero',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <>
+                  <div className="font-semibold text-main">{item.label}</div>
+                  <div className="text-xs text-muted">{item.country_code} {item.phone_number}</div>
+                </>
+              )
+            },
+            {
+              id: 'papel',
+              titulo: 'Papel',
+              tipo: 'badge',
+              render: (item) => <span className="text-sm text-sub">{ROLE_LABEL[item.role_type] || item.role_type}</span>
+            },
+            {
+              id: 'provider',
+              titulo: 'Provider',
+              tipo: 'texto',
+              render: (item) => <span className="text-sm text-sub">{item.provider || '-'}</span>
+            },
+            {
+              id: 'uso',
+              titulo: 'Uso',
+              tipo: 'texto',
+              render: (item) => (
+                <div className="text-xs text-muted">
+                  <div>WhatsApp: {item.is_whatsapp_enabled ? 'sim' : 'nao'}</div>
+                  <div>Meta: {item.is_meta_ads_enabled ? 'sim' : 'nao'} | Google: {item.is_google_ads_enabled ? 'sim' : 'nao'}</div>
+                </div>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => (
+                <span className="app-status-pill bg-elevated text-main">{STATUS_LABEL[item.status] || item.status}</span>
+              )
+            }
+          ]}
+          itens={items}
+          getId={(item) => item.id}
+          carregando={loading}
+          vazio="Nenhum numero cadastrado."
+          storageKey="tabela:crm-admin-numeros"
+          rotuloRolagem="Numeros CRM"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-secondary text-xs" onClick={() => edit(item)}>Editar</button>
+              <button type="button" className="btn btn-secondary text-xs text-red-600" onClick={() => remove(item.id)}>Excluir</button>
+            </>
+          )}
+          larguraAcoes={200}
+        />
       </div>
     </div>
   );

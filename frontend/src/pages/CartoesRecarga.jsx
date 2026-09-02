@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { buscarParceiros } from '../services/parceiros';
 import { listarCartoesRecargaAdmin, salvarCartaoRecarga } from '../services/recargasCartao';
 
@@ -133,33 +134,54 @@ export default function CartoesRecarga() {
       {sucesso ? <div className="app-alert app-alert--success" role="status">{sucesso}</div> : null}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-        <section className="overflow-x-auto rounded-xl border border-[var(--c-border)] bg-[var(--c-card)]">
-          <table className="w-full min-w-[520px] text-sm">
-            <thead className="bg-[var(--c-surface-alt)] text-left text-xs uppercase text-[var(--c-muted)]">
-              <tr><th className="px-3 py-2">Cartão</th><th className="px-3 py-2">Usuários</th><th className="px-3 py-2">Status</th><th className="px-3 py-2 text-right">Ação</th></tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--c-border)]">
-              {carregando ? <tr><td colSpan="4" className="px-3 py-4 text-[var(--c-muted)]">Carregando...</td></tr> : null}
-              {!carregando && !(dados.cartoes || []).length ? <tr><td colSpan="4" className="px-3 py-4 text-[var(--c-muted)]">Nenhum cartão cadastrado.</td></tr> : null}
-              {(dados.cartoes || []).map((cartao) => (
-                <tr key={cartao.id} className={Number(editandoId) === Number(cartao.id) ? 'bg-[var(--c-surface-alt)]' : ''}>
-                  <td className="px-3 py-2"><strong className="block">{cartao.nome}</strong><span className="text-xs text-[var(--c-muted)]">{cartao.identificador} · final {cartao.ultimos_quatro}</span></td>
-                  <td className="px-3 py-2 tabular-nums">{(cartao.vinculosUsuarios || []).filter((item) => item.ativo !== false).length}</td>
-                  <td className="px-3 py-2">{cartao.ativo !== false ? 'Ativo' : 'Inativo'}</td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      className="btn btn-outline btn-sm"
-                      onClick={() => editar(cartao)}
-                      aria-label={`Editar cartão ${cartao.nome}`}
-                    >
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <section className="rounded-xl border border-[var(--c-border)] bg-[var(--c-card)]">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'cartao',
+                titulo: 'Cartão',
+                // R17: o cartão é o registro desta lista.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (cartao) => (
+                  <CelulaDupla
+                    principal={cartao.nome}
+                    sub={`${cartao.identificador} · final ${cartao.ultimos_quatro}`}
+                  />
+                )
+              },
+              {
+                id: 'usuarios',
+                titulo: 'Usuários',
+                tipo: 'numero',
+                render: (cartao) => (cartao.vinculosUsuarios || []).filter((item) => item.ativo !== false).length
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (cartao) => (cartao.ativo !== false ? 'Ativo' : 'Inativo')
+              }
+            ]}
+            itens={dados.cartoes || []}
+            getId={(cartao) => cartao.id}
+            carregando={carregando}
+            storageKey="tabela:cartoes-recarga"
+            rotuloRolagem="Cartões de recarga"
+            vazio="Nenhum cartão cadastrado."
+            urgencia={(cartao) => (Number(editandoId) === Number(cartao.id) ? 'warning' : null)}
+            acoesLinha={(cartao) => (
+              <button
+                type="button"
+                className="btn btn-outline btn-sm"
+                onClick={() => editar(cartao)}
+                aria-label={`Editar cartão ${cartao.nome}`}
+              >
+                Editar
+              </button>
+            )}
+            larguraAcoes={120}
+          />
         </section>
 
         <form className="card space-y-4" onSubmit={salvar}>

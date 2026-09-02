@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   createFiscalDivergence,
   generateFiscalDocumentDanfe,
@@ -676,31 +677,41 @@ export default function FiscalDocumentDetail() {
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Eventos</h2>
-        <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-              <tr>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3">Tipo</th>
-                <th className="px-4 py-3">Protocolo</th>
-                <th className="px-4 py-3">Descricao</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {events.length ? events.map((event) => (
-                <tr key={event.id}>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(event.event_date)}</td>
-                  <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{event.event_type}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{event.event_protocol || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{event.event_description || '-'}</td>
-                </tr>
-              )) : (
-                <tr><td className="px-4 py-5 text-slate-500" colSpan={4}>Nenhum evento registrado.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+        <div className="mt-4">
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'data',
+                titulo: 'Data',
+                tipo: 'data',
+                render: (event) => formatDateTime(event.event_date)
+              },
+              {
+                id: 'tipo',
+                titulo: 'Tipo',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (event) => event.event_type
+              },
+              {
+                id: 'protocolo',
+                titulo: 'Protocolo',
+                tipo: 'codigo',
+                render: (event) => event.event_protocol || '-'
+              },
+              {
+                id: 'descricao',
+                titulo: 'Descricao',
+                tipo: 'texto',
+                render: (event) => event.event_description || '-'
+              }
+            ]}
+            itens={events}
+            storageKey="tabela:documento-fiscal:eventos"
+            rotuloRolagem="Eventos"
+            vazio="Nenhum evento registrado."
+          />
+        </div>      </section>
 
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <h2 className="text-lg font-semibold text-slate-950 dark:text-white">Dados extraidos</h2>

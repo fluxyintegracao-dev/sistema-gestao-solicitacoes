@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import { getFiscalCompanies, getFiscalDivergences } from '../services/fiscalApi';
 
 const divergenceTypes = [
@@ -159,58 +160,82 @@ export default function FiscalDivergences() {
         <div className="border-b border-slate-200 px-4 py-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
           {loading ? 'Carregando divergencias...' : `${pagination.total || 0} divergencia(s) encontrada(s)`}
         </div>
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-            <tr>
-              <th className="px-4 py-3">Documento</th>
-              <th className="px-4 py-3">Fornecedor</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Severidade</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Descricao</th>
-              <th className="px-4 py-3">Valores</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando divergencias...</td></tr>
-            ) : items.length ? items.map((item) => {
-              const document = item.document || {};
-              const company = document.company || {};
-              const typeLabel = divergenceTypes.find(([value]) => value === item.divergence_type)?.[1] || item.divergence_type;
-              return (
-                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/40">
-                  <td className="px-4 py-3">
-                    <Link className="font-semibold text-slate-950 hover:text-blue-600 dark:text-white" to={`/fiscal/documentos/${document.id}`}>
-                      {document.document_number || document.access_key || `Documento ${document.id}`}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'documento',
+              titulo: 'Documento',
+              tipo: 'codigo',
+              noCard: 'titulo',
+              render: (item) => {
+                const documento = item.document || {};
+                const company = documento.company || {};
+                return (
+                  <div>
+                    <Link className="font-semibold text-slate-950 hover:text-blue-600 dark:text-white" to={`/fiscal/documentos/${documento.id}`}>
+                      {documento.document_number || documento.access_key || `Documento ${documento.id}`}
                     </Link>
                     <div className="mt-1 text-xs text-slate-500">
-                      {formatDate(document.emission_date)} - {formatMoney(document.total_value)}
+                      {formatDate(documento.emission_date)} - {formatMoney(documento.total_value)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">{company.razao_social || '-'}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                    <div className="font-medium text-slate-950 dark:text-white">{document.issuer_name || '-'}</div>
-                    <div className="text-xs text-slate-500">{document.issuer_cnpj || '-'}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{typeLabel}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{severityLabels[item.severity] || item.severity}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{statusLabels[item.status] || item.status}</td>
-                  <td className="max-w-[320px] px-4 py-3 text-slate-600 dark:text-slate-300">
-                    <div className="line-clamp-3">{item.description}</div>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-slate-500">
-                    <div>Esperado: {item.expected_value || '-'}</div>
-                    <div>Encontrado: {item.actual_value || '-'}</div>
-                  </td>
-                </tr>
-              );
-            }) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhuma divergencia fiscal encontrada.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                  </div>
+                );
+              }
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              tipo: 'identidade',
+              render: (item) => (
+                <CelulaDupla
+                  principal={item.document?.issuer_name || '-'}
+                  sub={item.document?.issuer_cnpj || '-'}
+                />
+              )
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'texto',
+              render: (item) => divergenceTypes.find(([value]) => value === item.divergence_type)?.[1] || item.divergence_type
+            },
+            {
+              id: 'severidade',
+              titulo: 'Severidade',
+              tipo: 'badge',
+              render: (item) => severityLabels[item.severity] || item.severity
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => statusLabels[item.status] || item.status
+            },
+            {
+              id: 'descricao',
+              titulo: 'Descricao',
+              tipo: 'texto',
+              render: (item) => <div className="line-clamp-3">{item.description}</div>
+            },
+            {
+              id: 'valores',
+              titulo: 'Valores',
+              tipo: 'texto',
+              render: (item) => (
+                <div className="text-xs text-slate-500">
+                  <div>Esperado: {item.expected_value || '-'}</div>
+                  <div>Encontrado: {item.actual_value || '-'}</div>
+                </div>
+              )
+            }
+          ]}
+          itens={items}
+          carregando={loading}
+          vazio="Nenhuma divergencia fiscal encontrada."
+          storageKey="tabela:divergencias-fiscais"
+          rotuloRolagem="Divergencias fiscais"
+        />      </div>
     </div>
   );
 }

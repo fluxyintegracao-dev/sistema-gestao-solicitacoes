@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TabelaPadrao } from '../../../components/padrao';
 import { getFiscalDashboard } from '../services/fiscalApi';
 
 function MetricCard({ label, value, detail }) {
@@ -130,67 +131,98 @@ export default function FiscalDashboard() {
               <h2 className="text-base font-semibold text-slate-950 dark:text-white">Documentos recentes</h2>
               <Link className="text-sm font-semibold text-blue-600" to="/fiscal/documentos">Ver todos</Link>
             </div>
-            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-                  <tr>
-                    <th className="px-4 py-3">Emissao</th>
-                    <th className="px-4 py-3">Fornecedor</th>
-                    <th className="px-4 py-3">Numero</th>
-                    <th className="px-4 py-3">Valor</th>
-                    <th className="px-4 py-3">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {documentos.recentes?.length ? documentos.recentes.map((item) => (
-                    <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDate(item.emission_date)}</td>
-                      <td className="px-4 py-3">
-                        <Link className="font-medium text-slate-950 hover:text-blue-600 dark:text-white" to={`/fiscal/documentos/${item.id}`}>
-                          {item.issuer_name || item.issuer_cnpj || '-'}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_number || '-'}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatMoney(item.total_value)}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
-                    </tr>
-                  )) : (
-                    <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum documento fiscal encontrado.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <div className="mt-4">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'emissao',
+                    titulo: 'Emissao',
+                    tipo: 'data',
+                    render: (item) => formatDate(item.emission_date)
+                  },
+                  {
+                    id: 'fornecedor',
+                    titulo: 'Fornecedor',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => (
+                      <Link className="font-medium text-slate-950 hover:text-blue-600 dark:text-white" to={`/fiscal/documentos/${item.id}`}>
+                        {item.issuer_name || item.issuer_cnpj || '-'}
+                      </Link>
+                    )
+                  },
+                  {
+                    id: 'numero',
+                    titulo: 'Numero',
+                    tipo: 'codigo',
+                    render: (item) => item.document_number || '-'
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: (item) => formatMoney(item.total_value)
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (item) => item.document_status
+                  }
+                ]}
+                itens={documentos.recentes || []}
+                storageKey="tabela:painel-fiscal:documentos-recentes"
+                rotuloRolagem="Documentos recentes"
+                vazio="Nenhum documento fiscal encontrado."
+              />
+            </div>          </div>
 
           <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h2 className="text-base font-semibold text-slate-950 dark:text-white">Logs recentes</h2>
-            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-800">
-              <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-                <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-                  <tr>
-                    <th className="px-4 py-3">Inicio</th>
-                    <th className="px-4 py-3">Tipo</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3">Docs</th>
-                    <th className="px-4 py-3">Mensagem</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {sincronizacao.logs_recentes?.length ? sincronizacao.logs_recentes.map((log) => (
-                    <tr key={log.id}>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(log.started_at)}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.request_type}</td>
-                      <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{log.status}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.documents_processed || log.documents_found || 0}</td>
-                      <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.response_message || log.error_message || '-'}</td>
-                    </tr>
-                  )) : (
-                    <tr><td className="px-4 py-5 text-slate-500" colSpan={5}>Nenhum log fiscal registrado.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+            <div className="mt-4">
+              {/* semIdentidade: log de sincronizacao nao nomeia registro algum —
+                  e um evento (inicio + tipo + status), sem entidade titular. */}
+              <TabelaPadrao
+                semIdentidade
+                colunas={[
+                  {
+                    id: 'inicio',
+                    titulo: 'Inicio',
+                    tipo: 'data',
+                    noCard: 'titulo',
+                    render: (log) => formatDateTime(log.started_at)
+                  },
+                  {
+                    id: 'tipo',
+                    titulo: 'Tipo',
+                    tipo: 'texto',
+                    render: (log) => log.request_type
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'status',
+                    render: (log) => log.status
+                  },
+                  {
+                    id: 'docs',
+                    titulo: 'Docs',
+                    tipo: 'numero',
+                    render: (log) => log.documents_processed || log.documents_found || 0
+                  },
+                  {
+                    id: 'mensagem',
+                    titulo: 'Mensagem',
+                    tipo: 'texto',
+                    render: (log) => log.response_message || log.error_message || '-'
+                  }
+                ]}
+                itens={sincronizacao.logs_recentes || []}
+                storageKey="tabela:painel-fiscal:logs-recentes"
+                rotuloRolagem="Logs recentes"
+                vazio="Nenhum log fiscal registrado."
+              />
+            </div>          </div>
         </>
       ) : null}
     </div>

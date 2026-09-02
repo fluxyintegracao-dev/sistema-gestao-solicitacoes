@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getSetores } from '../services/setores';
 import {
   CATALOGO_ACOES_PRINCIPAIS,
@@ -163,49 +164,61 @@ export default function ConfiguracoesAcoesPrincipais() {
 
       <div className="card">
         <h2 className="text-base font-semibold text-[var(--c-text)] mb-3">Mapeamentos</h2>
-        {carregando ? (
-          <p className="text-sm text-[var(--c-muted)]">Carregando…</p>
-        ) : itens.length === 0 ? (
-          <p className="text-sm text-[var(--c-muted)]">
-            Nenhum mapeamento — o detalhe da solicitação segue com as ações genéricas.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-[var(--c-muted)]">
-                  <th className="py-2 pr-3">Setor</th>
-                  <th className="py-2 pr-3">Estado</th>
-                  <th className="py-2 pr-3">Ação</th>
-                  <th className="py-2 pr-3">Rótulo</th>
-                  <th className="py-2 pr-3">Ativo</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {itens.map((item) => (
-                  <tr key={item.id} className="border-t border-[var(--ui-border)]">
-                    <td className="py-2 pr-3 font-semibold">{item.setor}</td>
-                    <td className="py-2 pr-3">{item.status_global || <em className="text-[var(--c-muted)]">qualquer estado</em>}</td>
-                    <td className="py-2 pr-3">{rotuloAcao(item.acao)}</td>
-                    <td className="py-2 pr-3">{item.rotulo || '-'}</td>
-                    <td className="py-2 pr-3">
-                      <label className="inline-flex items-center gap-2">
-                        <input type="checkbox" checked={Boolean(item.ativo)} onChange={() => alternarAtivo(item)} />
-                        <span>{item.ativo ? 'Sim' : 'Não'}</span>
-                      </label>
-                    </td>
-                    <td className="py-2 text-right">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => excluir(item)}>
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'setor',
+              titulo: 'Setor',
+              // R17: o setor é quem nomeia o mapeamento desta lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.setor
+            },
+            {
+              id: 'status_global',
+              titulo: 'Estado',
+              tipo: 'texto',
+              render: (item) => (
+                item.status_global || <em className="text-[var(--c-muted)]">qualquer estado</em>
+              )
+            },
+            {
+              id: 'acao',
+              titulo: 'Ação',
+              tipo: 'texto',
+              render: (item) => rotuloAcao(item.acao)
+            },
+            {
+              id: 'rotulo',
+              titulo: 'Rótulo',
+              tipo: 'texto',
+              render: (item) => item.rotulo || '-'
+            },
+            {
+              id: 'ativo',
+              titulo: 'Ativo',
+              tipo: 'status',
+              render: (item) => (
+                <label className="inline-flex items-center gap-2">
+                  <input type="checkbox" checked={Boolean(item.ativo)} onChange={() => alternarAtivo(item)} />
+                  <span>{item.ativo ? 'Sim' : 'Não'}</span>
+                </label>
+              )
+            }
+          ]}
+          itens={itens}
+          getId={(item) => item.id}
+          carregando={carregando}
+          storageKey="tabela:configuracoes-acoes-principais"
+          rotuloRolagem="Mapeamentos de ação principal"
+          vazio="Nenhum mapeamento — o detalhe da solicitação segue com as ações genéricas."
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => excluir(item)}>
+              Excluir
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   createFiscalAccountingBatch,
   generateFiscalAccountingBatch,
@@ -183,48 +184,64 @@ export default function FiscalAccountingBatches() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-            <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-              <tr>
-                <th className="px-4 py-3">Periodo</th>
-                <th className="px-4 py-3">Empresa</th>
-                <th className="px-4 py-3">Documentos</th>
-                <th className="px-4 py-3">Valor</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Arquivo</th>
-                <th className="px-4 py-3 text-right">Acao</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {loading ? (
-                <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando lotes...</td></tr>
-              ) : batches.length ? batches.map((batch) => (
-                <tr key={batch.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/40">
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{String(batch.reference_month).padStart(2, '0')}/{batch.reference_year}</td>
-                  <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{batch.company?.razao_social || '-'}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{batch.total_documents || 0}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatMoney(batch.total_value)}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{batch.status}</td>
-                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{batch.zip_storage_key ? 'ZIP gerado' : 'Pendente'}</td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button className="btn-secondary btn-sm" type="button" onClick={() => openBatch(batch.id)} disabled={opening}>
-                        Abrir
-                      </button>
-                      {batch.zip_storage_key ? (
-                        <button className="btn-secondary btn-sm" type="button" onClick={() => openZip(batch.id)} disabled={openingZip}>
-                          ZIP
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </tr>
-              )) : (
-                <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhum lote contabil fiscal encontrado.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'periodo',
+                titulo: 'Periodo',
+                tipo: 'data',
+                render: (batch) => `${String(batch.reference_month).padStart(2, '0')}/${batch.reference_year}`
+              },
+              {
+                id: 'empresa',
+                titulo: 'Empresa',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (batch) => batch.company?.razao_social || '-'
+              },
+              {
+                id: 'documentos',
+                titulo: 'Documentos',
+                tipo: 'numero',
+                render: (batch) => batch.total_documents || 0
+              },
+              {
+                id: 'valor',
+                titulo: 'Valor',
+                tipo: 'valor',
+                render: (batch) => formatMoney(batch.total_value)
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (batch) => batch.status
+              },
+              {
+                id: 'arquivo',
+                titulo: 'Arquivo',
+                tipo: 'badge',
+                render: (batch) => (batch.zip_storage_key ? 'ZIP gerado' : 'Pendente')
+              }
+            ]}
+            itens={batches}
+            carregando={loading}
+            vazio="Nenhum lote contabil fiscal encontrado."
+            storageKey="tabela:lotes-contabeis-fiscais"
+            rotuloRolagem="Lotes contabeis"
+            acoesLinha={(batch) => (
+              <>
+                <button className="btn-secondary btn-sm" type="button" onClick={() => openBatch(batch.id)} disabled={opening}>
+                  Abrir
+                </button>
+                {batch.zip_storage_key ? (
+                  <button className="btn-secondary btn-sm" type="button" onClick={() => openZip(batch.id)} disabled={openingZip}>
+                    ZIP
+                  </button>
+                ) : null}
+              </>
+            )}
+          />        </div>
 
         <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <h2 className="text-base font-semibold text-slate-950 dark:text-white">Detalhe do lote</h2>

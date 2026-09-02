@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   getFiscalCompanies,
   getFiscalDiagnostics,
@@ -255,94 +256,137 @@ export default function FiscalLogs() {
           <h2 className="text-base font-semibold text-slate-950 dark:text-white">Estados de sincronizacao</h2>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Controle de NSU por empresa, ambiente e tipo documental.</p>
         </div>
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-            <tr>
-              <th className="px-4 py-3">Empresa</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Ambiente</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Ult. NSU</th>
-              <th className="px-4 py-3">Max. NSU</th>
-              <th className="px-4 py-3">Ultima tentativa</th>
-              <th className="px-4 py-3">Proxima tentativa</th>
-              <th className="px-4 py-3">Erro</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={9}>Carregando estados...</td></tr>
-            ) : states.length ? states.map((state) => (
-              <tr key={state.id}>
-                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{state.company?.razao_social || '-'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{state.document_type}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{state.ambiente_sefaz}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{state.status}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{state.ult_nsu || '0'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{state.max_nsu || '0'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(state.last_attempt_at)}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(state.next_allowed_sync_at)}</td>
-                <td className="max-w-[260px] px-4 py-3 text-xs text-slate-500">
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (state) => state.company?.razao_social || '-'
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'texto',
+              render: (state) => state.document_type
+            },
+            {
+              id: 'ambiente',
+              titulo: 'Ambiente',
+              tipo: 'texto',
+              render: (state) => state.ambiente_sefaz
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (state) => state.status
+            },
+            {
+              id: 'ult_nsu',
+              titulo: 'Ult. NSU',
+              tipo: 'numero',
+              render: (state) => state.ult_nsu || '0'
+            },
+            {
+              id: 'max_nsu',
+              titulo: 'Max. NSU',
+              tipo: 'numero',
+              render: (state) => state.max_nsu || '0'
+            },
+            {
+              id: 'ultima_tentativa',
+              titulo: 'Ultima tentativa',
+              tipo: 'data',
+              render: (state) => formatDateTime(state.last_attempt_at)
+            },
+            {
+              id: 'proxima_tentativa',
+              titulo: 'Proxima tentativa',
+              tipo: 'data',
+              render: (state) => formatDateTime(state.next_allowed_sync_at)
+            },
+            {
+              id: 'erro',
+              titulo: 'Erro',
+              tipo: 'texto',
+              render: (state) => (
+                <div className="text-xs text-slate-500">
                   {state.last_error_code ? <div className="font-semibold text-slate-700 dark:text-slate-200">{state.last_error_code}</div> : null}
                   <div className="line-clamp-2">{state.last_error_message || '-'}</div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={9}>Nenhum estado de sincronizacao registrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+                </div>
+              )
+            }
+          ]}
+          itens={states}
+          carregando={loading}
+          vazio="Nenhum estado de sincronizacao registrado."
+          storageKey="tabela:logs-fiscais:estados-sincronizacao"
+          rotuloRolagem="Estados de sincronizacao"
+        />      </div>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div className="border-b border-slate-200 p-4 dark:border-slate-800">
           <h2 className="text-base font-semibold text-slate-950 dark:text-white">Logs recentes</h2>
         </div>
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-            <tr>
-              <th className="px-4 py-3">Inicio</th>
-              <th className="px-4 py-3">Empresa</th>
-              <th className="px-4 py-3">Tipo</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Mensagem</th>
-              <th className="px-4 py-3">Raw</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Carregando logs...</td></tr>
-            ) : logs.length ? logs.map((log) => (
-              <tr key={log.id}>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{formatDateTime(log.started_at)}</td>
-                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{log.company?.razao_social || '-'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.document_type}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.status}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{log.response_message || log.error_message || '-'}</td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-2">
-                    {log.raw_request_storage_key ? (
-                      <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'request')}>
-                        Request
-                      </button>
-                    ) : null}
-                    {log.raw_response_storage_key ? (
-                      <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'response')}>
-                        Response
-                      </button>
-                    ) : null}
-                    {!log.raw_request_storage_key && !log.raw_response_storage_key ? (
-                      <span className="text-xs text-slate-500">-</span>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={6}>Nenhum log fiscal registrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'inicio',
+              titulo: 'Inicio',
+              tipo: 'data',
+              render: (log) => formatDateTime(log.started_at)
+            },
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (log) => log.company?.razao_social || '-'
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'texto',
+              render: (log) => log.document_type
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (log) => log.status
+            },
+            {
+              id: 'mensagem',
+              titulo: 'Mensagem',
+              tipo: 'texto',
+              render: (log) => log.response_message || log.error_message || '-'
+            }
+          ]}
+          itens={logs}
+          carregando={loading}
+          vazio="Nenhum log fiscal registrado."
+          storageKey="tabela:logs-fiscais:logs-recentes"
+          rotuloRolagem="Logs recentes"
+          acoesLinha={(log) => (
+            <>
+              {log.raw_request_storage_key ? (
+                <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'request')}>
+                  Request
+                </button>
+              ) : null}
+              {log.raw_response_storage_key ? (
+                <button className="btn-secondary text-xs" type="button" onClick={() => openRawPayload(log, 'response')}>
+                  Response
+                </button>
+              ) : null}
+              {!log.raw_request_storage_key && !log.raw_response_storage_key ? (
+                <span className="text-xs text-slate-500">-</span>
+              ) : null}
+            </>
+          )}
+        />      </div>
     </div>
   );
 }

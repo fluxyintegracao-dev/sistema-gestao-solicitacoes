@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import {
   cancelarLotePrioridadeDiretoria,
   criarLotePrioridadeDiretoria,
@@ -510,81 +511,86 @@ export default function PrioridadesDiretoria() {
                 </label>
               </div>
 
-              <div className="app-dense-table-wrapper">
-                <table className="app-dense-data-table prioridade-titulos-table">
-                  <colgroup>
-                    {loteDetalhe.status === 'ABERTO' && <col className="app-dense-col-check" />}
-                    <col className="app-dense-col-title" />
-                    <col className="app-dense-col-title" />
-                    <col className="app-dense-col-medium" />
-                    <col className="app-dense-col-date" />
-                    <col className="app-dense-col-money" />
-                    <col className="app-dense-col-status" />
-                  </colgroup>
-                  <thead>
-                    <tr>
-                      {loteDetalhe.status === 'ABERTO' && <th className="w-10"></th>}
-                      <th>Titulo</th>
-                      <th>Solicitacao</th>
-                      <th>Obra</th>
-                      <th>Vencimento</th>
-                      <th className="text-right">Valor</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {titulosVisiveis.map(item => (
-                      <tr
-                        key={item.id}
-                        className="cursor-pointer"
-                        onClick={() => item.solicitacao?.id && abrirSolicitacao(item.solicitacao.id)}
-                      >
-                        {loteDetalhe.status === 'ABERTO' && (
-                          <td>
-                            <input
-                              type="checkbox"
-                              checked={selecionados.has(String(item.id))}
-                              onClick={event => event.stopPropagation()}
-                              onChange={() => alternarTitulo(item.id)}
-                            />
-                          </td>
-                        )}
-                        <td>
-                          <span className="font-semibold text-[var(--c-primary)]">
-                            {item.codigo || `#${item.id}`}
-                          </span>
-                          <p className="text-xs text-[var(--c-muted)]">{item.parceiro?.nome || item.descricao || '-'}</p>
-                        </td>
-                        <td>
-                          {item.solicitacao ? (
-                            <>
-                              <span className="font-semibold">{item.solicitacao.codigo || `#${item.solicitacao.id}`}</span>
-                              <p className="text-xs text-[var(--c-muted)]">{item.solicitacao.tipo?.nome || item.solicitacao.descricao || '-'}</p>
-                            </>
-                          ) : (
-                            <span className="text-[var(--c-muted)]">Sem solicitacao</span>
-                          )}
-                        </td>
-                        <td>{item.obra?.nome || '-'}</td>
-                        <td>{data(item.data_vencimento)}</td>
-                        <td className="text-right font-semibold">{moeda(item.valor_prioridade)}</td>
-                        <td>
-                          <span className="badge badge-neutral">
-                            {item.status || '-'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                    {titulosVisiveis.length === 0 && (
-                      <tr>
-                        <td colSpan={loteDetalhe.status === 'ABERTO' ? 7 : 6} className="text-center text-[var(--c-muted)] py-8">
-                          Nenhum titulo encontrado para este lote.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <TabelaPadrao
+                colunas={[
+                  // Coluna de seleção só existe enquanto o lote está ABERTO.
+                  ...(loteDetalhe.status === 'ABERTO' ? [{
+                    id: 'selecao',
+                    titulo: 'Sel.',
+                    tipo: 'status',
+                    render: item => (
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(String(item.id))}
+                        onClick={event => event.stopPropagation()}
+                        onChange={() => alternarTitulo(item.id)}
+                      />
+                    )
+                  }] : []),
+                  {
+                    id: 'titulo',
+                    titulo: 'Titulo',
+                    // R17: o título (código + credor) é o registro desta lista.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: item => (
+                      <CelulaDupla
+                        principal={item.codigo || `#${item.id}`}
+                        sub={item.parceiro?.nome || item.descricao || '-'}
+                      />
+                    )
+                  },
+                  {
+                    id: 'solicitacao',
+                    titulo: 'Solicitacao',
+                    tipo: 'texto',
+                    render: item => (
+                      item.solicitacao ? (
+                        <CelulaDupla
+                          principal={item.solicitacao.codigo || `#${item.solicitacao.id}`}
+                          sub={item.solicitacao.tipo?.nome || item.solicitacao.descricao || '-'}
+                        />
+                      ) : (
+                        <span className="text-[var(--c-muted)]">Sem solicitacao</span>
+                      )
+                    )
+                  },
+                  {
+                    id: 'obra',
+                    titulo: 'Obra',
+                    tipo: 'texto',
+                    render: item => item.obra?.nome || '-'
+                  },
+                  {
+                    id: 'vencimento',
+                    titulo: 'Vencimento',
+                    tipo: 'data',
+                    render: item => data(item.data_vencimento)
+                  },
+                  {
+                    id: 'valor',
+                    titulo: 'Valor',
+                    tipo: 'valor',
+                    render: item => moeda(item.valor_prioridade)
+                  },
+                  {
+                    id: 'status',
+                    titulo: 'Status',
+                    tipo: 'badge',
+                    render: item => (
+                      <span className="badge badge-neutral">
+                        {item.status || '-'}
+                      </span>
+                    )
+                  }
+                ]}
+                itens={titulosVisiveis}
+                getId={item => item.id}
+                aoClicarLinha={item => item.solicitacao?.id && abrirSolicitacao(item.solicitacao.id)}
+                storageKey="tabela:prioridades-diretoria:titulos"
+                rotuloRolagem="Titulos do lote"
+                vazio="Nenhum titulo encontrado para este lote."
+              />
             </>
           )}
         </div>

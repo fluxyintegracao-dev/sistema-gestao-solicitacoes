@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import {
   generateFiscalDocumentDanfe,
   getFiscalCompanies,
@@ -251,33 +252,41 @@ export default function FiscalDocuments() {
             </div>
           </div>
           {importReport.failed?.length ? (
-            <div className="mt-4 overflow-hidden rounded-lg border border-red-200 dark:border-red-900/60">
-              <table className="min-w-full divide-y divide-red-100 text-sm dark:divide-red-900/60">
-                <thead className="bg-red-50 text-left text-xs font-semibold uppercase text-red-700 dark:bg-red-950/30 dark:text-red-200">
-                  <tr>
-                    <th className="px-4 py-3">Arquivo</th>
-                    <th className="px-4 py-3">Motivo</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-red-100 dark:divide-red-900/60">
-                  {importReport.failed.map((item, index) => {
-                    const file = getImportFileInfo(item.original_name);
-                    return (
-                      <tr key={`${item.original_name}-${index}`}>
-                        <td className="px-4 py-3 text-slate-700 dark:text-slate-200" title={file.fullPath}>
-                          <p className="break-all text-sm font-semibold text-slate-950 dark:text-white">{file.fileName}</p>
-                          <p className="mt-1 break-all text-xs text-slate-500 dark:text-slate-400">
-                            {[file.container, file.folder].filter(Boolean).join(':') || file.fullPath}
-                          </p>
-                        </td>
-                        <td className="px-4 py-3 text-red-700 dark:text-red-200">{item.error || 'Erro ao importar XML fiscal.'}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ) : null}
+            <div className="mt-4">
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'arquivo',
+                    titulo: 'Arquivo',
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (item) => {
+                      const file = getImportFileInfo(item.original_name);
+                      return (
+                        <CelulaDupla
+                          principal={file.fileName}
+                          sub={[file.container, file.folder].filter(Boolean).join(':') || file.fullPath}
+                          title={file.fullPath}
+                        />
+                      );
+                    }
+                  },
+                  {
+                    id: 'motivo',
+                    titulo: 'Motivo',
+                    tipo: 'texto',
+                    render: (item) => (
+                      <span className="text-red-700 dark:text-red-200">{item.error || 'Erro ao importar XML fiscal.'}</span>
+                    )
+                  }
+                ]}
+                itens={importReport.failed}
+                getId={(item) => item.original_name}
+                storageKey="tabela:documentos-fiscais:falhas-importacao"
+                rotuloRolagem="Falhas de importacao"
+                vazio="Nenhuma falha de importacao."
+              />
+            </div>          ) : null}
         </section>
       ) : null}
 
@@ -378,92 +387,109 @@ export default function FiscalDocuments() {
       </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-            <tr>
-              <th className="px-4 py-3">Emissao</th>
-              <th className="px-4 py-3">Fornecedor</th>
-              <th className="px-4 py-3">Chave</th>
-              <th className="px-4 py-3">Numero</th>
-              <th className="px-4 py-3">Valor</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3 text-right">Arquivos</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando documentos...</td></tr>
-            ) : documents.length ? documents.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-950/40">
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.emission_date ? new Date(item.emission_date).toLocaleDateString('pt-BR') : '-'}</td>
-                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">
-                  <Link className="hover:text-blue-600" to={`/fiscal/documentos/${item.id}`}>
-                    {item.issuer_name || item.issuer_cnpj || '-'}
-                  </Link>
-                </td>
-                <td className="max-w-[240px] truncate px-4 py-3 text-xs text-slate-500" title={item.access_key}>{item.access_key || '-'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_number || '-'}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{Number(item.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{item.document_status}</td>
-                <td className="px-4 py-3">
-                  <div className="fiscal-documents-actions flex justify-end gap-1.5">
-                    <Link className="btn-secondary btn-sm" to={`/fiscal/documentos/${item.id}`}>
-                      Detalhes
-                    </Link>
-                    {item.xml_storage_key ? (
-                      <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'xml')} disabled={openingFile === `${item.id}-xml`}>
-                        XML
-                      </button>
-                    ) : null}
-                    {item.pdf_storage_key ? (
-                      <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'pdf')} disabled={openingFile === `${item.id}-pdf`}>
-                        PDF
-                      </button>
-                    ) : null}
-                    {item.xml_storage_key && !item.danfe_storage_key ? (
-                      <button
-                        className="btn-secondary btn-sm"
-                        type="button"
-                        onClick={() => generateDanfe(item.id)}
-                        disabled={generatingDanfe === String(item.id)}
-                      >
-                        {generatingDanfe === String(item.id) ? 'Gerando...' : 'Gerar DANFE'}
-                      </button>
-                    ) : null}
-                    {item.danfe_storage_key ? (
-                      <>
-                        <button
-                          className="btn-secondary btn-sm"
-                          type="button"
-                          onClick={() => openFile(item.id, 'danfe')}
-                          disabled={openingFile === `${item.id}-danfe`}
-                        >
-                          Abrir DANFE
-                        </button>
-                        {item.xml_storage_key ? (
-                          <button
-                            className="btn-secondary btn-sm"
-                            type="button"
-                            onClick={() => generateDanfe(item.id)}
-                            disabled={generatingDanfe === String(item.id)}
-                          >
-                            {generatingDanfe === String(item.id) ? 'Gerando...' : 'Regerar DANFE'}
-                          </button>
-                        ) : null}
-                      </>
-                    ) : null}
-                    {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
-                      <span className="inline-flex min-h-6 items-center text-xs text-slate-500">Indisponivel</span>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhum documento fiscal encontrado.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'emissao',
+              titulo: 'Emissao',
+              tipo: 'data',
+              render: (item) => (item.emission_date ? new Date(item.emission_date).toLocaleDateString('pt-BR') : '-')
+            },
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <Link className="font-medium hover:text-blue-600" to={`/fiscal/documentos/${item.id}`}>
+                  {item.issuer_name || item.issuer_cnpj || '-'}
+                </Link>
+              )
+            },
+            {
+              id: 'chave',
+              titulo: 'Chave',
+              tipo: 'codigo',
+              render: (item) => item.access_key || '-'
+            },
+            {
+              id: 'numero',
+              titulo: 'Numero',
+              tipo: 'codigo',
+              render: (item) => item.document_number || '-'
+            },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (item) => Number(item.total_value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => item.document_status
+            }
+          ]}
+          itens={documents}
+          carregando={loading}
+          vazio="Nenhum documento fiscal encontrado."
+          storageKey="tabela:documentos-fiscais"
+          rotuloRolagem="Documentos fiscais"
+          larguraAcoes={320}
+          acoesLinha={(item) => (
+            <>
+              <Link className="btn-secondary btn-sm" to={`/fiscal/documentos/${item.id}`}>
+                Detalhes
+              </Link>
+              {item.xml_storage_key ? (
+                <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'xml')} disabled={openingFile === `${item.id}-xml`}>
+                  XML
+                </button>
+              ) : null}
+              {item.pdf_storage_key ? (
+                <button className="btn-secondary btn-sm" type="button" onClick={() => openFile(item.id, 'pdf')} disabled={openingFile === `${item.id}-pdf`}>
+                  PDF
+                </button>
+              ) : null}
+              {item.xml_storage_key && !item.danfe_storage_key ? (
+                <button
+                  className="btn-secondary btn-sm"
+                  type="button"
+                  onClick={() => generateDanfe(item.id)}
+                  disabled={generatingDanfe === String(item.id)}
+                >
+                  {generatingDanfe === String(item.id) ? 'Gerando...' : 'Gerar DANFE'}
+                </button>
+              ) : null}
+              {item.danfe_storage_key ? (
+                <>
+                  <button
+                    className="btn-secondary btn-sm"
+                    type="button"
+                    onClick={() => openFile(item.id, 'danfe')}
+                    disabled={openingFile === `${item.id}-danfe`}
+                  >
+                    Abrir DANFE
+                  </button>
+                  {item.xml_storage_key ? (
+                    <button
+                      className="btn-secondary btn-sm"
+                      type="button"
+                      onClick={() => generateDanfe(item.id)}
+                      disabled={generatingDanfe === String(item.id)}
+                    >
+                      {generatingDanfe === String(item.id) ? 'Gerando...' : 'Regerar DANFE'}
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+              {!item.xml_storage_key && !item.pdf_storage_key && !item.danfe_storage_key ? (
+                <span className="inline-flex min-h-6 items-center text-xs text-slate-500">Indisponivel</span>
+              ) : null}
+            </>
+          )}
+        />
+      </div>    </div>
   );
 }

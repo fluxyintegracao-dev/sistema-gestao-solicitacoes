@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getSetores } from '../services/setores';
 import {
   getSlaSolicitacoesSetor,
@@ -128,57 +129,69 @@ export default function SolicitacoesSlaSetor() {
           </p>
         </div>
 
-        {loading ? (
-          <div className="app-empty-card">Carregando setores...</div>
-        ) : setoresOrdenados.length === 0 ? (
-          <div className="app-empty-card">Nenhum setor ativo encontrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 text-left text-xs font-bold uppercase tracking-[0.12em] text-[var(--c-muted)]">
-                <tr>
-                  <th className="px-4 py-3">Setor</th>
-                  <th className="px-4 py-3">Codigo</th>
-                  <th className="px-4 py-3">SLA em dias</th>
-                  <th className="px-4 py-3">Ativo</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {setoresOrdenados.map((setor) => {
-                  const codigo = normalizeSetor(setor.codigo || setor.nome);
-                  const regra = regras?.[codigo] || {};
-                  return (
-                    <tr key={setor.id || codigo} className="hover:bg-slate-50">
-                      <td className="px-4 py-3 font-semibold text-[var(--c-text)]">{setor.nome || '-'}</td>
-                      <td className="px-4 py-3 text-[var(--c-muted)]">{codigo}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.5"
-                          className="input max-w-[140px]"
-                          value={regra.dias ?? ''}
-                          placeholder="Ex: 3"
-                          onChange={(event) => atualizarRegra(codigo, { dias: event.target.value })}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <label className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
-                          <input
-                            type="checkbox"
-                            checked={regra.ativo !== false}
-                            onChange={(event) => atualizarRegra(codigo, { ativo: event.target.checked })}
-                          />
-                          Usar no relatorio
-                        </label>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'setor',
+              titulo: 'Setor',
+              // R17: o setor é o registro desta lista de SLA.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (setor) => setor.nome || '-'
+            },
+            {
+              id: 'codigo',
+              titulo: 'Codigo',
+              tipo: 'codigo',
+              render: (setor) => normalizeSetor(setor.codigo || setor.nome)
+            },
+            {
+              id: 'dias',
+              titulo: 'SLA em dias',
+              tipo: 'numero',
+              render: (setor) => {
+                const codigo = normalizeSetor(setor.codigo || setor.nome);
+                const regra = regras?.[codigo] || {};
+                return (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    className="input"
+                    value={regra.dias ?? ''}
+                    placeholder="Ex: 3"
+                    onChange={(event) => atualizarRegra(codigo, { dias: event.target.value })}
+                  />
+                );
+              }
+            },
+            {
+              id: 'ativo',
+              titulo: 'Ativo',
+              tipo: 'status',
+              render: (setor) => {
+                const codigo = normalizeSetor(setor.codigo || setor.nome);
+                const regra = regras?.[codigo] || {};
+                return (
+                  <label className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--c-text)]">
+                    <input
+                      type="checkbox"
+                      checked={regra.ativo !== false}
+                      onChange={(event) => atualizarRegra(codigo, { ativo: event.target.checked })}
+                    />
+                    Usar no relatorio
+                  </label>
+                );
+              }
+            }
+          ]}
+          itens={setoresOrdenados}
+          getId={(setor) => setor.id || normalizeSetor(setor.codigo || setor.nome)}
+          carregando={loading}
+          storageKey="tabela:solicitacoes-sla-setor"
+          rotuloRolagem="SLA por setor"
+          vazio="Nenhum setor ativo encontrado."
+        />
       </div>
     </div>
   );

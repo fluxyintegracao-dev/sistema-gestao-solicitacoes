@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { listarTarefas, concluirTarefa, cancelarTarefa } from '../../../services/crm';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const STATUS_MAP = {
   PENDING:   { label: 'Pendente',  cls: 'app-status-pill bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' },
@@ -133,77 +134,93 @@ export default function CrmTarefas() {
 
       {/* Lista */}
       <div className="card sol-surface-card mt-3 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-        ) : tasks.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">Nenhuma tarefa encontrada.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table w-full">
-              <thead>
-                <tr>
-                  <th>Tarefa</th>
-                  <th>Lead</th>
-                  <th>Tipo</th>
-                  <th>Prioridade</th>
-                  <th>Responsavel</th>
-                  <th>Prazo</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {tasks.map((task) => {
-                  const overdue = isOverdue(task);
-                  const statusKey = overdue ? 'OVERDUE' : task.status;
-                  const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP.PENDING;
-                  const priorityInfo = PRIORITY_MAP[task.priority] || PRIORITY_MAP.MEDIUM;
-                  return (
-                    <tr key={task.id} className={overdue ? 'bg-red-50/30 dark:bg-red-900/10' : ''}>
-                      <td className="font-medium text-main">{task.title}</td>
-                      <td>
-                        {task.lead ? (
-                          <Link to={`/crm/leads/${task.lead.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
-                            {task.lead.nome}
-                          </Link>
-                        ) : '—'}
-                      </td>
-                      <td className="text-sm text-sub">{TYPE_MAP[task.task_type] || task.task_type}</td>
-                      <td>
-                        <span className={`text-sm font-medium ${priorityInfo.cls}`}>{priorityInfo.label}</span>
-                      </td>
-                      <td className="text-sm text-sub">{task.responsavel?.nome || '—'}</td>
-                      <td className={`text-sm whitespace-nowrap ${overdue ? 'text-red-500 font-medium' : 'text-sub'}`}>
-                        {fmt(task.due_at)}
-                      </td>
-                      <td><span className={statusInfo.cls}>{statusInfo.label}</span></td>
-                      <td>
-                        <div className="flex gap-1">
-                          {task.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleComplete(task.id)}
-                                className="btn btn-secondary text-xs text-emerald-700 dark:text-emerald-400"
-                              >
-                                Concluir
-                              </button>
-                              <button
-                                onClick={() => handleCancel(task.id)}
-                                className="btn btn-secondary text-xs text-red-600 dark:text-red-400"
-                              >
-                                Cancelar
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'titulo',
+              titulo: 'Tarefa',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (task) => <span className="font-medium text-main">{task.title}</span>
+            },
+            {
+              id: 'lead',
+              titulo: 'Lead',
+              tipo: 'texto',
+              render: (task) => (task.lead ? (
+                <Link to={`/crm/leads/${task.lead.id}`} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+                  {task.lead.nome}
+                </Link>
+              ) : '—')
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'texto',
+              render: (task) => <span className="text-sm text-sub">{TYPE_MAP[task.task_type] || task.task_type}</span>
+            },
+            {
+              id: 'prioridade',
+              titulo: 'Prioridade',
+              tipo: 'badge',
+              render: (task) => {
+                const priorityInfo = PRIORITY_MAP[task.priority] || PRIORITY_MAP.MEDIUM;
+                return <span className={`text-sm font-medium ${priorityInfo.cls}`}>{priorityInfo.label}</span>;
+              }
+            },
+            {
+              id: 'responsavel',
+              titulo: 'Responsavel',
+              tipo: 'texto',
+              render: (task) => <span className="text-sm text-sub">{task.responsavel?.nome || '—'}</span>
+            },
+            {
+              id: 'prazo',
+              titulo: 'Prazo',
+              tipo: 'data',
+              render: (task) => (
+                <span className={`text-sm whitespace-nowrap ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-sub'}`}>
+                  {fmt(task.due_at)}
+                </span>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (task) => {
+                const statusInfo = STATUS_MAP[isOverdue(task) ? 'OVERDUE' : task.status] || STATUS_MAP.PENDING;
+                return <span className={statusInfo.cls}>{statusInfo.label}</span>;
+              }
+            }
+          ]}
+          itens={tasks}
+          getId={(task) => task.id}
+          carregando={loading}
+          vazio="Nenhuma tarefa encontrada."
+          storageKey="tabela:crm-tarefas"
+          rotuloRolagem="Tarefas CRM"
+          urgencia={(task) => (isOverdue(task) ? 'danger' : null)}
+          acoesLinha={(task) => (task.status === 'PENDING' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleComplete(task.id)}
+                className="btn btn-secondary text-xs text-emerald-700 dark:text-emerald-400"
+              >
+                Concluir
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCancel(task.id)}
+                className="btn btn-secondary text-xs text-red-600 dark:text-red-400"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : null)}
+          larguraAcoes={200}
+        />
       </div>
 
       {/* Paginacao */}

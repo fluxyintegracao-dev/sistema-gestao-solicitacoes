@@ -8,6 +8,7 @@ import {
   reprocessarEventoMetaCrm
 } from '../../../services/crm';
 import { API_ORIGIN } from '../../../services/api';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const API_BASE_URL = API_ORIGIN || window.location.origin;
 
@@ -50,7 +51,7 @@ function VinculosEvento({ event }) {
   );
 }
 
-function EventosTabela({ title, events, loading, onReprocess }) {
+function EventosTabela({ title, events, loading, onReprocess, storageKey }) {
   return (
     <div className="card sol-surface-card overflow-hidden">
       <div className="p-4 border-b border-base flex items-center justify-between">
@@ -59,52 +60,69 @@ function EventosTabela({ title, events, loading, onReprocess }) {
           <p className="text-xs text-muted">Ultimos eventos recebidos e processados pelo CRM.</p>
         </div>
       </div>
-      {loading ? (
-        <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-      ) : events.length === 0 ? (
-        <div className="p-8 text-center text-muted text-sm">Nenhum evento registrado.</div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="app-table w-full">
-            <thead>
-              <tr>
-                <th>Evento</th>
-                <th>Campanha</th>
-                <th>Status</th>
-                <th>Vinculos</th>
-                <th>Recebido em</th>
-                <th>Erro</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <tr key={event.id}>
-                  <td>
-                    <div className="font-medium text-main">{event.external_event_id || `#${event.id}`}</div>
-                    <div className="text-xs text-muted">{event.event_type || '-'}</div>
-                  </td>
-                  <td>
-                    <div className="text-sm text-sub">{event.campaign_name || '-'}</div>
-                    <div className="text-xs text-muted">{event.adset_name || event.ad_group_name || event.asset_name || '-'}</div>
-                  </td>
-                  <td><StatusPill status={event.processing_status} /></td>
-                  <td><VinculosEvento event={event} /></td>
-                  <td className="text-sm text-sub whitespace-nowrap">{fmtDate(event.received_at)}</td>
-                  <td className="text-xs text-muted max-w-xs truncate">{event.error_message || '-'}</td>
-                  <td>
-                    {event.processing_status === 'ERROR' && (
-                      <button className="btn btn-secondary text-xs" onClick={() => onReprocess(event.id)}>
-                        Reprocessar
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'evento',
+            titulo: 'Evento',
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (event) => (
+              <>
+                <div className="font-medium text-main">{event.external_event_id || `#${event.id}`}</div>
+                <div className="text-xs text-muted">{event.event_type || '-'}</div>
+              </>
+            )
+          },
+          {
+            id: 'campanha',
+            titulo: 'Campanha',
+            tipo: 'texto',
+            render: (event) => (
+              <>
+                <div className="text-sm text-sub">{event.campaign_name || '-'}</div>
+                <div className="text-xs text-muted">{event.adset_name || event.ad_group_name || event.asset_name || '-'}</div>
+              </>
+            )
+          },
+          {
+            id: 'status',
+            titulo: 'Status',
+            tipo: 'status',
+            render: (event) => <StatusPill status={event.processing_status} />
+          },
+          {
+            id: 'vinculos',
+            titulo: 'Vinculos',
+            tipo: 'texto',
+            render: (event) => <VinculosEvento event={event} />
+          },
+          {
+            id: 'recebido_em',
+            titulo: 'Recebido em',
+            tipo: 'data',
+            render: (event) => <span className="text-sm text-sub whitespace-nowrap">{fmtDate(event.received_at)}</span>
+          },
+          {
+            id: 'erro',
+            titulo: 'Erro',
+            tipo: 'texto',
+            render: (event) => <span className="text-xs text-muted">{event.error_message || '-'}</span>
+          }
+        ]}
+        itens={events || []}
+        getId={(event) => event.id}
+        carregando={loading}
+        vazio="Nenhum evento registrado."
+        storageKey={storageKey}
+        rotuloRolagem={title}
+        acoesLinha={(event) => (event.processing_status === 'ERROR' ? (
+          <button type="button" className="btn btn-secondary text-xs" onClick={() => onReprocess(event.id)}>
+            Reprocessar
+          </button>
+        ) : null)}
+        larguraAcoes={180}
+      />
     </div>
   );
 }
@@ -267,8 +285,20 @@ export default function CrmAdminIntegracoes() {
       </form>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-4">
-        <EventosTabela title="Eventos Meta" events={metaEvents} loading={loading} onReprocess={reprocessMeta} />
-        <EventosTabela title="Eventos Google" events={googleEvents} loading={loading} onReprocess={reprocessGoogle} />
+        <EventosTabela
+          title="Eventos Meta"
+          events={metaEvents}
+          loading={loading}
+          onReprocess={reprocessMeta}
+          storageKey="tabela:crm-admin-integracoes:eventos-meta"
+        />
+        <EventosTabela
+          title="Eventos Google"
+          events={googleEvents}
+          loading={loading}
+          onReprocess={reprocessGoogle}
+          storageKey="tabela:crm-admin-integracoes:eventos-google"
+        />
       </div>
     </div>
   );

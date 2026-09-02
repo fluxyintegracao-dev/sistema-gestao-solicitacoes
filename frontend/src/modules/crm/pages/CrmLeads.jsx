@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../../contexts/AuthContext';
 import { arquivarLead, exportarLeadsCrm, listarLeads } from '../../../services/crm';
 import { canExportCrmLeads } from '../../../utils/acessoProduto';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const LIFECYCLE_MAP = {
   NOVO:        { label: 'Novo',        cls: 'app-status-pill bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' },
@@ -183,83 +184,116 @@ export default function CrmLeads() {
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-        ) : leads.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">Nenhum lead encontrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table w-full">
-              <thead>
-                <tr>
-                  <th className="app-th">#</th>
-                  <th className="app-th">Nome</th>
-                  <th className="app-th">Telefone</th>
-                  <th className="app-th">Status</th>
-                  <th className="app-th">Temp.</th>
-                  <th className="app-th">Etapa</th>
-                  <th className="app-th">Responsavel</th>
-                  <th className="app-th">Origem</th>
-                  <th className="app-th">Cadastrado em</th>
-                  <th className="app-th">Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead) => {
-                  const lifecycle = LIFECYCLE_MAP[lead.lifecycle_status] || { label: lead.lifecycle_status, cls: 'app-status-pill bg-elevated text-muted' };
-                  const temp = TEMP_MAP[lead.temperatura] || {};
-                  return (
-                    <tr key={lead.id} className="app-tr">
-                      <td className="app-td text-muted text-xs">{lead.id}</td>
-                      <td className="app-td">
-                        <Link to={`/crm/leads/${lead.id}`} className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline">
-                          {lead.nome}
-                        </Link>
-                        {lead.empreendimento_interesse && (
-                          <p className="text-xs text-muted">{lead.empreendimento_interesse}</p>
-                        )}
-                      </td>
-                      <td className="app-td text-sm">{lead.telefone || '—'}</td>
-                      <td className="app-td"><span className={lifecycle.cls}>{lifecycle.label}</span></td>
-                      <td className="app-td text-center">
-                        <span className={`text-sm ${temp.cls || ''}`} title={temp.label}>{temp.emoji || '—'}</span>
-                      </td>
-                      <td className="app-td text-sm">
-                        {lead.etapa ? (
-                          <span className="inline-flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full" style={{ background: lead.etapa.cor }} />
-                            {lead.etapa.nome}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className="app-td text-sm">{lead.responsavel?.nome || '—'}</td>
-                      <td className="app-td text-xs text-muted">{lead.source_type?.replace('_', ' ')}</td>
-                      <td className="app-td text-xs text-muted">{formatDate(lead.createdAt)}</td>
-                      <td className="app-td">
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => navigate(`/crm/leads/${lead.id}`)}
-                            className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
-                          >
-                            Abrir
-                          </button>
-                          {lead.lifecycle_status !== 'ARQUIVADO' && (
-                            <button
-                              onClick={() => handleArquivar(lead.id, lead.nome)}
-                              className="text-xs text-muted hover:text-red-500 ml-2"
-                            >
-                              Arquivar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'id',
+              titulo: '#',
+              tipo: 'codigo',
+              render: (lead) => <span className="text-muted text-xs">{lead.id}</span>
+            },
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (lead) => (
+                <>
+                  <Link
+                    to={`/crm/leads/${lead.id}`}
+                    className="font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                  >
+                    {lead.nome}
+                  </Link>
+                  {lead.empreendimento_interesse && (
+                    <p className="text-xs text-muted">{lead.empreendimento_interesse}</p>
+                  )}
+                </>
+              )
+            },
+            {
+              id: 'telefone',
+              titulo: 'Telefone',
+              tipo: 'codigo',
+              render: (lead) => lead.telefone || '—'
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (lead) => {
+                const lifecycle = LIFECYCLE_MAP[lead.lifecycle_status]
+                  || { label: lead.lifecycle_status, cls: 'app-status-pill bg-elevated text-muted' };
+                return <span className={lifecycle.cls}>{lifecycle.label}</span>;
+              }
+            },
+            {
+              id: 'temperatura',
+              titulo: 'Temp.',
+              tipo: 'badge',
+              render: (lead) => {
+                const temp = TEMP_MAP[lead.temperatura] || {};
+                return <span className={`text-sm ${temp.cls || ''}`} title={temp.label}>{temp.emoji || '—'}</span>;
+              }
+            },
+            {
+              id: 'etapa',
+              titulo: 'Etapa',
+              tipo: 'texto',
+              render: (lead) => (lead.etapa ? (
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full" style={{ background: lead.etapa.cor }} />
+                  {lead.etapa.nome}
+                </span>
+              ) : '—')
+            },
+            {
+              id: 'responsavel',
+              titulo: 'Responsavel',
+              tipo: 'texto',
+              render: (lead) => lead.responsavel?.nome || '—'
+            },
+            {
+              id: 'origem',
+              titulo: 'Origem',
+              tipo: 'texto',
+              render: (lead) => <span className="text-xs text-muted">{lead.source_type?.replace('_', ' ')}</span>
+            },
+            {
+              id: 'criado_em',
+              titulo: 'Cadastrado em',
+              tipo: 'data',
+              render: (lead) => <span className="text-xs text-muted">{formatDate(lead.createdAt)}</span>
+            }
+          ]}
+          itens={leads}
+          getId={(lead) => lead.id}
+          carregando={loading}
+          vazio="Nenhum lead encontrado."
+          storageKey="tabela:crm-leads"
+          rotuloRolagem="Leads"
+          acoesLinha={(lead) => (
+            <>
+              <button
+                type="button"
+                onClick={() => navigate(`/crm/leads/${lead.id}`)}
+                className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline"
+              >
+                Abrir
+              </button>
+              {lead.lifecycle_status !== 'ARQUIVADO' && (
+                <button
+                  type="button"
+                  onClick={() => handleArquivar(lead.id, lead.nome)}
+                  className="text-xs text-muted hover:text-red-500 ml-2"
+                >
+                  Arquivar
+                </button>
+              )}
+            </>
+          )}
+          larguraAcoes={180}
+        />
       </div>
     </div>
   );

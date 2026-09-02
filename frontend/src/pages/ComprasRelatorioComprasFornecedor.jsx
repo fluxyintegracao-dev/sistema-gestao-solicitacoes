@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioComprasPorFornecedor } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,37 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const FORNECEDOR_COLUMNS = [
-  { key: 'fornecedor', width: 280, minWidth: 180 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'itens', width: 90, minWidth: 70 },
-  { key: 'obras', width: 180, minWidth: 130 },
-  { key: 'valor', width: 160, minWidth: 120 },
-  { key: 'ticket', width: 150, minWidth: 120 },
-  { key: 'minimo', width: 130, minWidth: 100 },
-  { key: 'ultimo', width: 120, minWidth: 100 }
-];
-
-const OBRA_COLUMNS = [
-  { key: 'obra', width: 260, minWidth: 180 },
-  { key: 'fornecedores', width: 130, minWidth: 100 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'itens', width: 90, minWidth: 70 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'ticket', width: 140, minWidth: 110 }
-];
-
-const PEDIDO_COLUMNS = [
-  { key: 'pedido', width: 110, minWidth: 90 },
-  { key: 'fornecedor', width: 240, minWidth: 160 },
-  { key: 'status', width: 140, minWidth: 110 },
-  { key: 'obra', width: 220, minWidth: 150 },
-  { key: 'solicitacao', width: 190, minWidth: 140 },
-  { key: 'itens', width: 80, minWidth: 70 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'criado', width: 120, minWidth: 100 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -333,137 +302,117 @@ export default function ComprasRelatorioComprasFornecedor() {
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Fornecedores por valor pedido</h2>
         <p className="page-subtitle mb-3">Ranking de fornecedores usando somente pedidos de compra emitidos.</p>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={FORNECEDOR_COLUMNS} storageKey="fluxy.compras.comprasFornecedor.fornecedores.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                <ResizableTh columnKey="obras">Obras/centros</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor pedido</ResizableTh>
-                <ResizableTh columnKey="ticket" className="text-right">Ticket medio</ResizableTh>
-                <ResizableTh columnKey="minimo" className="text-right">Minimo nao atingido</ResizableTh>
-                <ResizableTh columnKey="ultimo">Ultimo pedido</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8}>Carregando...</td></tr>
-              ) : fornecedores.length === 0 ? (
-                <tr><td colSpan={8}>Sem pedidos emitidos nos filtros.</td></tr>
-              ) : (
-                fornecedores.map((item) => (
-                  <tr key={item.key}>
-                    <td>
-                      <div className="font-semibold text-slate-900">{item.fornecedor_nome}</div>
-                      <div className="text-xs text-slate-500">{item.cnpj || 'Sem CNPJ'} {item.estado ? `- ${item.estado}` : ''}</div>
-                    </td>
-                    <td className="text-right">{formatNumber(item.pedidos)}</td>
-                    <td className="text-right">{formatNumber(item.itens)}</td>
-                    <td>
-                      <div className="font-semibold text-slate-900">{formatNumber(item.obras)}</div>
-                      <div className="text-xs text-slate-500">{(item.obras_nomes || []).join(', ') || '-'}</div>
-                    </td>
-                    <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                    <td className="text-right">{formatMoney(item.ticket_medio)}</td>
-                    <td className="text-right">{formatNumber(item.pedidos_minimo_nao_atingido)}</td>
-                    <td>{formatDate(item.ultimo_pedido_em)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'fornecedor',
+              titulo: 'Fornecedor',
+              // R17: o fornecedor NOMEIA a linha do ranking.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-slate-900">{item.fornecedor_nome}</div>
+                  <div className="text-xs text-slate-500">{item.cnpj || 'Sem CNPJ'} {item.estado ? `- ${item.estado}` : ''}</div>
+                </div>
+              )
+            },
+            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+            {
+              id: 'obras',
+              titulo: 'Obras/centros',
+              tipo: 'texto',
+              render: (item) => (
+                <div>
+                  <div className="font-semibold text-slate-900">{formatNumber(item.obras)}</div>
+                  <div className="text-xs text-slate-500">{(item.obras_nomes || []).join(', ') || '-'}</div>
+                </div>
+              )
+            },
+            { id: 'valor', titulo: 'Valor pedido', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+            { id: 'ticket', titulo: 'Ticket medio', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+            { id: 'minimo', titulo: 'Minimo nao atingido', tipo: 'numero', render: (item) => formatNumber(item.pedidos_minimo_nao_atingido) },
+            { id: 'ultimo', titulo: 'Ultimo pedido', tipo: 'data', render: (item) => formatDate(item.ultimo_pedido_em) }
+          ]}
+          itens={fornecedores}
+          getId={(item) => item.key}
+          carregando={loading}
+          storageKey="tabela:compras-fornecedor:fornecedores"
+          rotuloRolagem="Fornecedores por valor pedido"
+          vazio="Sem pedidos emitidos nos filtros."
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 mt-4">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Compras por obra/centro</h2>
           <p className="page-subtitle mb-3">Onde o valor comprado por fornecedor esta concentrado.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={OBRA_COLUMNS} storageKey="fluxy.compras.comprasFornecedor.obras.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
-                  <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                  <ResizableTh columnKey="ticket" className="text-right">Ticket</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={6}>Carregando...</td></tr>
-                ) : obrasResumo.length === 0 ? (
-                  <tr><td colSpan={6}>Sem pedidos por obra/centro nos filtros.</td></tr>
-                ) : (
-                  obrasResumo.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.obra_nome}</td>
-                      <td className="text-right">{formatNumber(item.fornecedores)}</td>
-                      <td className="text-right">{formatNumber(item.pedidos)}</td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                      <td className="text-right">{formatMoney(item.ticket_medio)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra/Centro',
+                // R17: a obra/centro NOMEIA a linha deste resumo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.obra_nome
+              },
+              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+              { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) }
+            ]}
+            itens={obrasResumo}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-fornecedor:obras"
+            rotuloRolagem="Compras por obra/centro"
+            vazio="Sem pedidos por obra/centro nos filtros."
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Pedidos recentes</h2>
           <p className="page-subtitle mb-3">Ultimos 100 pedidos usados no relatorio.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={PEDIDO_COLUMNS} storageKey="fluxy.compras.comprasFornecedor.pedidos.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="pedido">Pedido</ResizableTh>
-                  <ResizableTh columnKey="fornecedor">Fornecedor</ResizableTh>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="solicitacao">Solicitacao</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                  <ResizableTh columnKey="criado">Criado em</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={8}>Carregando...</td></tr>
-                ) : pedidos.length === 0 ? (
-                  <tr><td colSpan={8}>Sem pedidos nos filtros.</td></tr>
-                ) : (
-                  pedidos.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <Link className="font-semibold text-blue-700 hover:underline" to={`/pedidos-compra/${item.id}`}>
-                          PC #{item.id}
-                        </Link>
-                      </td>
-                      <td className="font-semibold text-slate-900">{item.fornecedor?.nome || 'Sem fornecedor'}</td>
-                      <td>{item.status_label}</td>
-                      <td>{item.obra?.nome || '-'}</td>
-                      <td>
-                        {item.solicitacao?.id ? (
-                          <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.solicitacao.id}`}>
-                            SC #{item.solicitacao.id}
-                          </Link>
-                        ) : '-'}
-                      </td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                      <td>{formatDate(item.criado_em)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'pedido',
+                titulo: 'Pedido',
+                // R17: o pedido de compra NOMEIA o registro.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <Link className="font-semibold text-blue-700 hover:underline" to={`/pedidos-compra/${item.id}`}>
+                    PC #{item.id}
+                  </Link>
+                )
+              },
+              { id: 'fornecedor', titulo: 'Fornecedor', tipo: 'texto', render: (item) => <span className="font-semibold text-slate-900">{item.fornecedor?.nome || 'Sem fornecedor'}</span> },
+              { id: 'status', titulo: 'Status', tipo: 'status', render: (item) => item.status_label },
+              { id: 'obra', titulo: 'Obra/Centro', tipo: 'texto', render: (item) => item.obra?.nome || '-' },
+              {
+                id: 'solicitacao',
+                titulo: 'Solicitacao',
+                tipo: 'codigo',
+                render: (item) => (item.solicitacao?.id ? (
+                  <Link className="font-semibold text-blue-700 hover:underline" to={`/solicitacoes-compra/${item.solicitacao.id}`}>
+                    SC #{item.solicitacao.id}
+                  </Link>
+                ) : '-')
+              },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+              { id: 'criado', titulo: 'Criado em', tipo: 'data', render: (item) => formatDate(item.criado_em) }
+            ]}
+            itens={pedidos}
+            carregando={loading}
+            storageKey="tabela:compras-fornecedor:pedidos"
+            rotuloRolagem="Pedidos recentes"
+            vazio="Sem pedidos nos filtros."
+          />
         </div>
       </div>
     </div>

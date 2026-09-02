@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioCategoriasInsumosCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,31 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const CATEGORIA_COLUMNS = [
-  { key: 'categoria', width: 260, minWidth: 170 },
-  { key: 'itens', width: 100, minWidth: 80 },
-  { key: 'pedidos', width: 110, minWidth: 90 },
-  { key: 'quantidade', width: 130, minWidth: 105 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
-
-const INSUMO_COLUMNS = [
-  { key: 'descricao', width: 280, minWidth: 190 },
-  { key: 'categoria', width: 210, minWidth: 150 },
-  { key: 'unidade', width: 100, minWidth: 80 },
-  { key: 'itens', width: 90, minWidth: 76 },
-  { key: 'pedidos', width: 100, minWidth: 84 },
-  { key: 'quantidade', width: 130, minWidth: 105 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
-
-const OBRA_COLUMNS = [
-  { key: 'obra', width: 260, minWidth: 170 },
-  { key: 'itens', width: 100, minWidth: 80 },
-  { key: 'pedidos', width: 110, minWidth: 90 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -304,109 +279,84 @@ export default function ComprasRelatorioCategoriasInsumos() {
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Por categoria</h2>
           <p className="page-subtitle mb-3">Categorias do cadastro de insumos e itens manuais sem categoria.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={CATEGORIA_COLUMNS} storageKey="fluxy.compras.categoriasInsumos.categorias.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                  <ResizableTh columnKey="quantidade" className="text-right">Quantidade</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={5}>Carregando...</td></tr>
-                ) : categorias.length === 0 ? (
-                  <tr><td colSpan={5}>Sem itens de pedido no periodo.</td></tr>
-                ) : (
-                  categorias.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.categoria_nome}</td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right">{formatNumber(item.pedidos)}</td>
-                      <td className="text-right">{formatNumber(item.quantidade_total, 3)}</td>
-                      <td className="text-right">{formatMoney(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'categoria',
+                titulo: 'Categoria',
+                // R17: a categoria NOMEIA a linha deste resumo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.categoria_nome
+              },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+            ]}
+            itens={categorias}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-categorias-insumos:categorias"
+            rotuloRolagem="Compras por categoria"
+            vazio="Sem itens de pedido no periodo."
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Por obra/centro</h2>
           <p className="page-subtitle mb-3">Concentracao de valor pedido por origem operacional.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={OBRA_COLUMNS} storageKey="fluxy.compras.categoriasInsumos.obras.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={4}>Carregando...</td></tr>
-                ) : obrasResumo.length === 0 ? (
-                  <tr><td colSpan={4}>Sem itens de pedido no periodo.</td></tr>
-                ) : (
-                  obrasResumo.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.obra_nome}</td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right">{formatNumber(item.pedidos)}</td>
-                      <td className="text-right">{formatMoney(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra/Centro',
+                // R17: a obra/centro NOMEIA a linha deste resumo.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.obra_nome
+              },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+            ]}
+            itens={obrasResumo}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-categorias-insumos:obras"
+            rotuloRolagem="Compras por obra/centro"
+            vazio="Sem itens de pedido no periodo."
+          />
         </div>
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Por insumo/item</h2>
         <p className="page-subtitle mb-3">Top 100 itens por valor total pedido.</p>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={INSUMO_COLUMNS} storageKey="fluxy.compras.categoriasInsumos.insumos.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="descricao">Insumo/Item</ResizableTh>
-                <ResizableTh columnKey="categoria">Categoria</ResizableTh>
-                <ResizableTh columnKey="unidade">Unidade</ResizableTh>
-                <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                <ResizableTh columnKey="quantidade" className="text-right">Quantidade</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={7}>Carregando...</td></tr>
-              ) : insumos.length === 0 ? (
-                <tr><td colSpan={7}>Sem itens de pedido no periodo.</td></tr>
-              ) : (
-                insumos.map((item) => (
-                  <tr key={item.key}>
-                    <td className="font-semibold text-slate-900">{item.descricao}</td>
-                    <td>{item.categoria_nome}</td>
-                    <td>{item.unidade || '-'}</td>
-                    <td className="text-right">{formatNumber(item.itens)}</td>
-                    <td className="text-right">{formatNumber(item.pedidos)}</td>
-                    <td className="text-right">{formatNumber(item.quantidade_total, 3)}</td>
-                    <td className="text-right">{formatMoney(item.valor_total)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'descricao',
+              titulo: 'Insumo/Item',
+              // R17: a descricao do insumo NOMEIA o registro.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.descricao
+            },
+            { id: 'categoria', titulo: 'Categoria', tipo: 'texto', render: (item) => item.categoria_nome },
+            { id: 'unidade', titulo: 'Unidade', tipo: 'texto', render: (item) => item.unidade || '-' },
+            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+            { id: 'quantidade', titulo: 'Quantidade', tipo: 'numero', render: (item) => formatNumber(item.quantidade_total, 3) },
+            { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => formatMoney(item.valor_total) }
+          ]}
+          itens={insumos}
+          getId={(item) => item.key}
+          carregando={loading}
+          storageKey="tabela:compras-categorias-insumos:insumos"
+          rotuloRolagem="Compras por insumo/item"
+          vazio="Sem itens de pedido no periodo."
+        />
       </div>
     </div>
   );

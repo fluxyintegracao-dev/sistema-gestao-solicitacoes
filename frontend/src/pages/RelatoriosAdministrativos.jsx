@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { listarAuditoriaItensPedidoCompra } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -414,68 +415,86 @@ export default function RelatoriosAdministrativos() {
           </div>
         ) : null}
 
-        {loading ? (
-          <div className="app-empty-card">Carregando...</div>
-        ) : erroCarregamento ? (
+        {erroCarregamento && !loading ? (
           <div className="app-empty-card">
             A tela esta pronta, mas a consulta depende do backend com a rota de auditoria ativa.
           </div>
-        ) : registros.length === 0 ? (
-          <div className="app-empty-card">Nenhum registro de auditoria encontrado para os filtros informados.</div>
         ) : (
-          <div className="app-table-shell overflow-x-auto">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Acao</th>
-                  <th>Pedido / obra</th>
-                  <th>Item</th>
-                  <th>Usuario</th>
-                  <th>Detalhes</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {registros.map((registro) => (
-                  <tr key={registro.id}>
-                    <td className="whitespace-nowrap">{formatDateTime(registro.createdAt)}</td>
-                    <td className="whitespace-nowrap">
-                      <span className={actionClassName(registro.acao)}>{formatActionLabel(registro.acao)}</span>
-                    </td>
-                    <td>
-                      <div className="font-medium">{registro.pedido?.codigo || '-'}</div>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {registro.pedido?.obra?.nome || '-'}
-                        {registro.pedido?.obra?.codigo ? ` - ${registro.pedido.obra.codigo}` : ''}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="font-medium">{registro.item?.descricao || '-'}</div>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {registro.item?.origem || '-'}
-                        {registro.item?.unidade ? ` - ${registro.item.unidade}` : ''}
-                      </div>
-                    </td>
-                    <td>{registro.usuario?.nome || 'Sistema'}</td>
-                    <td className="max-w-[420px] whitespace-normal">
-                      <div>{registro.descricao || '-'}</div>
-                      <div className="mt-1 text-xs text-[var(--c-muted)]">{buildChangeSummary(registro)}</div>
-                    </td>
-                    <td className="whitespace-nowrap">
-                      {registro.pedido?.id ? (
-                        <Link to={`/pedidos-compra/${registro.pedido.id}`} className="btn btn-outline">
-                          Abrir pedido
-                        </Link>
-                      ) : (
-                        <span className="text-xs text-[var(--c-muted)]">Sem pedido</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'data',
+                titulo: 'Data',
+                tipo: 'data',
+                render: (registro) => formatDateTime(registro.createdAt)
+              },
+              {
+                id: 'acao',
+                titulo: 'Acao',
+                tipo: 'badge',
+                render: (registro) => (
+                  <span className={actionClassName(registro.acao)}>{formatActionLabel(registro.acao)}</span>
+                )
+              },
+              {
+                id: 'pedido',
+                titulo: 'Pedido / obra',
+                // R17: o pedido (com a obra) nomeia o registro auditado.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (registro) => (
+                  <CelulaDupla
+                    principal={registro.pedido?.codigo || '-'}
+                    sub={`${registro.pedido?.obra?.nome || '-'}${registro.pedido?.obra?.codigo ? ` - ${registro.pedido.obra.codigo}` : ''}`}
+                  />
+                )
+              },
+              {
+                id: 'item',
+                titulo: 'Item',
+                tipo: 'texto',
+                render: (registro) => (
+                  <CelulaDupla
+                    principal={registro.item?.descricao || '-'}
+                    sub={`${registro.item?.origem || '-'}${registro.item?.unidade ? ` - ${registro.item.unidade}` : ''}`}
+                  />
+                )
+              },
+              {
+                id: 'usuario',
+                titulo: 'Usuario',
+                tipo: 'texto',
+                render: (registro) => registro.usuario?.nome || 'Sistema'
+              },
+              {
+                id: 'detalhes',
+                titulo: 'Detalhes',
+                tipo: 'texto',
+                render: (registro) => (
+                  <CelulaDupla
+                    principal={registro.descricao || '-'}
+                    sub={buildChangeSummary(registro)}
+                  />
+                )
+              }
+            ]}
+            itens={registros}
+            getId={(registro) => registro.id}
+            carregando={loading}
+            storageKey="tabela:relatorios-administrativos:auditoria"
+            rotuloRolagem="Historico de alteracoes"
+            vazio="Nenhum registro de auditoria encontrado para os filtros informados."
+            acoesLinha={(registro) => (
+              registro.pedido?.id ? (
+                <Link to={`/pedidos-compra/${registro.pedido.id}`} className="btn btn-outline">
+                  Abrir pedido
+                </Link>
+              ) : (
+                <span className="text-xs text-[var(--c-muted)]">Sem pedido</span>
+              )
+            )}
+            larguraAcoes={160}
+          />
         )}
       </div>
     </div>

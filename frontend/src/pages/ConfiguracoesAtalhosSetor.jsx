@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getSetores } from '../services/setores';
 import { getAllDestinations } from '../navigation/navigationConfig';
 import {
@@ -167,62 +168,72 @@ export default function ConfiguracoesAtalhosSetor() {
 
       <div className="card">
         <h2 className="text-base font-semibold text-[var(--c-text)] mb-3">Atalhos configurados</h2>
-        {carregando ? (
-          <p className="text-sm text-[var(--c-muted)]">Carregando…</p>
-        ) : itens.length === 0 ? (
-          <p className="text-sm text-[var(--c-muted)]">
-            Nenhum atalho configurado — cada setor recebe as sugestões padrão do sistema.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-[var(--c-muted)]">
-                  <th className="py-2 pr-3">Setor</th>
-                  <th className="py-2 pr-3">Destino</th>
-                  <th className="py-2 pr-3">Posição</th>
-                  <th className="py-2 pr-3">Obrigatório</th>
-                  <th className="py-2 pr-3">Ativo</th>
-                  <th className="py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {itens.map((item) => (
-                  <tr key={item.id} className="border-t border-[var(--ui-border)]">
-                    <td className="py-2 pr-3 font-semibold">{item.setor}</td>
-                    <td className="py-2 pr-3">{rotuloDestino(item.destino_id)}</td>
-                    <td className="py-2 pr-3">{item.posicao}</td>
-                    <td className="py-2 pr-3">
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.obrigatorio)}
-                          onChange={() => alternar(item, 'obrigatorio')}
-                        />
-                        <span>{item.obrigatorio ? 'Sim' : 'Não'}</span>
-                      </label>
-                    </td>
-                    <td className="py-2 pr-3">
-                      <label className="inline-flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(item.ativo)}
-                          onChange={() => alternar(item, 'ativo')}
-                        />
-                        <span>{item.ativo ? 'Sim' : 'Não'}</span>
-                      </label>
-                    </td>
-                    <td className="py-2 text-right">
-                      <button type="button" className="btn btn-outline btn-sm" onClick={() => excluir(item)}>
-                        Excluir
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'setor',
+              titulo: 'Setor',
+              // R17: o setor é quem nomeia o atalho configurado.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => item.setor
+            },
+            {
+              id: 'destino',
+              titulo: 'Destino',
+              tipo: 'texto',
+              render: (item) => rotuloDestino(item.destino_id)
+            },
+            {
+              id: 'posicao',
+              titulo: 'Posição',
+              tipo: 'numero',
+              render: (item) => item.posicao
+            },
+            {
+              id: 'obrigatorio',
+              titulo: 'Obrigatório',
+              tipo: 'status',
+              render: (item) => (
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.obrigatorio)}
+                    onChange={() => alternar(item, 'obrigatorio')}
+                  />
+                  <span>{item.obrigatorio ? 'Sim' : 'Não'}</span>
+                </label>
+              )
+            },
+            {
+              id: 'ativo',
+              titulo: 'Ativo',
+              tipo: 'status',
+              render: (item) => (
+                <label className="inline-flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.ativo)}
+                    onChange={() => alternar(item, 'ativo')}
+                  />
+                  <span>{item.ativo ? 'Sim' : 'Não'}</span>
+                </label>
+              )
+            }
+          ]}
+          itens={itens}
+          getId={(item) => item.id}
+          carregando={carregando}
+          storageKey="tabela:configuracoes-atalhos-setor"
+          rotuloRolagem="Atalhos configurados por setor"
+          vazio="Nenhum atalho configurado — cada setor recebe as sugestões padrão do sistema."
+          acoesLinha={(item) => (
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => excluir(item)}>
+              Excluir
+            </button>
+          )}
+          larguraAcoes={120}
+        />
       </div>
     </div>
   );

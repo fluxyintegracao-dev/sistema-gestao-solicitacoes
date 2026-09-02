@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import { getEmpreendimentosComerciais, getRelatorioComercialOperacional } from '../services/comercial';
 import { getObras } from '../services/obras';
@@ -13,17 +13,6 @@ const DEFAULT_FILTERS = {
   obra_id: '',
   status: ''
 };
-
-const CONTRATOS_COLUMNS = [
-  { key: 'numero', width: 150, minWidth: 110 },
-  { key: 'empreendimento', width: 230, minWidth: 170 },
-  { key: 'unidade', width: 120, minWidth: 90 },
-  { key: 'cliente', width: 220, minWidth: 160 },
-  { key: 'status', width: 130, minWidth: 100 },
-  { key: 'data', width: 130, minWidth: 100 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'desconto', width: 140, minWidth: 110 }
-];
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', {
@@ -89,14 +78,6 @@ function DistributionList({ title, rows, valueKey = 'total', formatter = (value)
         )}
       </div>
     </section>
-  );
-}
-
-function EmptyRow({ colSpan, message }) {
-  return (
-    <tr>
-      <td colSpan={colSpan} className="text-center text-[var(--c-muted)]">{message}</td>
-    </tr>
   );
 }
 
@@ -264,43 +245,73 @@ export default function ComercialRelatorioOperacional() {
           ) : null}
 
           {isVisible('comercial.relatorio_operacional.contratos') ? (
-          <section className="card sol-surface-card app-table-shell">
+          <section className="card sol-surface-card">
             <div className="border-b border-[var(--c-border)] px-4 py-3">
               <h2 className="text-lg font-semibold text-[var(--c-text)]">Contratos comerciais</h2>
               <p className="text-sm text-[var(--c-muted)]">Base analitica do periodo com valores reais cadastrados.</p>
             </div>
-            <div className="table-wrapper">
-              <ResizableTable columns={CONTRATOS_COLUMNS} storageKey="fluxy.comercial.relatorio.contratos.columns" className="table">
-                <thead>
-                  <tr>
-                    <ResizableTh columnKey="numero">Numero</ResizableTh>
-                    <ResizableTh columnKey="empreendimento">Empreendimento</ResizableTh>
-                    <ResizableTh columnKey="unidade">Unidade</ResizableTh>
-                    <ResizableTh columnKey="cliente">Cliente</ResizableTh>
-                    <ResizableTh columnKey="status">Status</ResizableTh>
-                    <ResizableTh columnKey="data">Data</ResizableTh>
-                    <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                    <ResizableTh columnKey="desconto" className="text-right">Desconto</ResizableTh>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(contratos.analitico || []).length === 0 ? (
-                    <EmptyRow colSpan={8} message="Nenhum contrato encontrado no periodo." />
-                  ) : contratos.analitico.map((contrato) => (
-                    <tr key={contrato.id}>
-                      <td className="font-semibold text-[var(--c-text)]">{contrato.numero}</td>
-                      <td>{contrato.empreendimento_nome || '-'}</td>
-                      <td>{contrato.unidade_codigo || '-'}</td>
-                      <td>{contrato.cliente_nome || '-'}</td>
-                      <td><span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusColor(contrato.status)}`}>{contrato.status}</span></td>
-                      <td>{formatDate(contrato.data_contrato)}</td>
-                      <td className="text-right">{formatCurrency(contrato.valor_total)}</td>
-                      <td className="text-right">{formatCurrency(contrato.desconto_concedido)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </ResizableTable>
-            </div>
+            <TabelaPadrao
+              colunas={[
+                {
+                  id: 'numero',
+                  titulo: 'Numero',
+                  tipo: 'codigo',
+                  noCard: 'titulo',
+                  render: (contrato) => <span className="font-semibold text-[var(--c-text)]">{contrato.numero}</span>
+                },
+                {
+                  id: 'empreendimento',
+                  titulo: 'Empreendimento',
+                  tipo: 'texto',
+                  render: (contrato) => contrato.empreendimento_nome || '-'
+                },
+                {
+                  id: 'unidade',
+                  titulo: 'Unidade',
+                  tipo: 'codigo',
+                  render: (contrato) => contrato.unidade_codigo || '-'
+                },
+                {
+                  id: 'cliente',
+                  titulo: 'Cliente',
+                  tipo: 'identidade',
+                  render: (contrato) => contrato.cliente_nome || '-'
+                },
+                {
+                  id: 'status',
+                  titulo: 'Status',
+                  tipo: 'status',
+                  render: (contrato) => (
+                    <span className={`rounded-full px-2 py-1 text-xs font-semibold ${statusColor(contrato.status)}`}>
+                      {contrato.status}
+                    </span>
+                  )
+                },
+                {
+                  id: 'data',
+                  titulo: 'Data',
+                  tipo: 'data',
+                  render: (contrato) => formatDate(contrato.data_contrato)
+                },
+                {
+                  id: 'valor',
+                  titulo: 'Valor',
+                  tipo: 'valor',
+                  render: (contrato) => formatCurrency(contrato.valor_total)
+                },
+                {
+                  id: 'desconto',
+                  titulo: 'Desconto',
+                  tipo: 'valor',
+                  render: (contrato) => formatCurrency(contrato.desconto_concedido)
+                }
+              ]}
+              itens={contratos.analitico || []}
+              getId={(contrato) => contrato.id}
+              storageKey="tabela:comercial-relatorio-operacional:contratos"
+              rotuloRolagem="Contratos comerciais"
+              vazio="Nenhum contrato encontrado no periodo."
+            />
           </section>
           ) : null}
 

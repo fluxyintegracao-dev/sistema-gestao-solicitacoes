@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getSetores } from '../services/setores';
 import {
   getStatusSetor,
@@ -177,73 +178,79 @@ export default function StatusSetor() {
           </button>
         </div>
 
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Ordem</th>
-              <th>Nome</th>
-              <th>Status</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {status.map(s => (
-              <tr key={s.id}>
-                <td>
-                  {editId === s.id ? (
-                    <input
-                      className="input"
-                      type="number"
-                      min="1"
-                      value={editOrdem}
-                      onChange={e => setEditOrdem(e.target.value)}
-                    />
-                  ) : (
-                    s.ordem
-                  )}
-                </td>
-                <td>
-                  {editId === s.id ? (
-                    <input
-                      className="input"
-                      value={editNome}
-                      onChange={e => setEditNome(e.target.value)}
-                    />
-                  ) : (
-                    s.nome
-                  )}
-                </td>
-                <td>{s.ativo ? 'Ativo' : 'Inativo'}</td>
-                <td>
-                  {editId === s.id ? (
-                    <>
-                      <button className="btn btn-primary" onClick={() => salvarEdicao(s.id)} disabled={saving}>
-                        {saving ? 'Salvando...' : 'Salvar'}
-                      </button>{' '}
-                      <button className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
-                        Cancelar
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button className="btn btn-outline" onClick={() => iniciarEdicao(s)}>
-                        Editar
-                      </button>{' '}
-                      <button className="btn btn-secondary" onClick={() => toggle(s)}>
-                        {s.ativo ? 'Desativar' : 'Ativar'}
-                      </button>
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-            {status.length === 0 && (
-              <tr>
-                <td colSpan="4" align="center">Nenhum status cadastrado</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'ordem',
+              titulo: 'Ordem',
+              tipo: 'numero',
+              render: s => (
+                editId === s.id ? (
+                  <input
+                    className="input"
+                    type="number"
+                    min="1"
+                    value={editOrdem}
+                    onChange={e => setEditOrdem(e.target.value)}
+                  />
+                ) : (
+                  s.ordem
+                )
+              )
+            },
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              // R17: o nome do status é o registro desta lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: s => (
+                editId === s.id ? (
+                  <input
+                    className="input"
+                    value={editNome}
+                    onChange={e => setEditNome(e.target.value)}
+                  />
+                ) : (
+                  s.nome
+                )
+              )
+            },
+            {
+              id: 'ativo',
+              titulo: 'Status',
+              tipo: 'status',
+              render: s => (s.ativo ? 'Ativo' : 'Inativo')
+            }
+          ]}
+          itens={status}
+          getId={s => s.id}
+          storageKey="tabela:status-setor"
+          rotuloRolagem="Status do setor"
+          vazio="Nenhum status cadastrado"
+          acoesLinha={s => (
+            editId === s.id ? (
+              <>
+                <button className="btn btn-primary" onClick={() => salvarEdicao(s.id)} disabled={saving}>
+                  {saving ? 'Salvando...' : 'Salvar'}
+                </button>{' '}
+                <button className="btn btn-outline" onClick={cancelarEdicao} disabled={saving}>
+                  Cancelar
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn btn-outline" onClick={() => iniciarEdicao(s)}>
+                  Editar
+                </button>{' '}
+                <button className="btn btn-secondary" onClick={() => toggle(s)}>
+                  {s.ativo ? 'Desativar' : 'Ativar'}
+                </button>
+              </>
+            )
+          )}
+          larguraAcoes={200}
+        />
       </div>
     </div>
   );

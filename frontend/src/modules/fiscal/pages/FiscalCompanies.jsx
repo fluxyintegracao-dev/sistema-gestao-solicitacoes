@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   createFiscalCertificate,
   createFiscalCompany,
@@ -235,43 +236,61 @@ export default function FiscalCompanies() {
       </form>
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <table className="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
-          <thead className="bg-slate-50 text-left text-xs font-semibold uppercase text-slate-500 dark:bg-slate-950/40">
-            <tr>
-              <th className="px-4 py-3">Empresa</th>
-              <th className="px-4 py-3">CNPJ</th>
-              <th className="px-4 py-3">UF</th>
-              <th className="px-4 py-3">Ambiente</th>
-              <th className="px-4 py-3">Status</th>
-              <th className="px-4 py-3">Fiscal</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-            {loading ? (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Carregando empresas...</td></tr>
-            ) : companies.length ? companies.map((company) => (
-              <tr key={company.id}>
-                <td className="px-4 py-3 font-medium text-slate-950 dark:text-white">{company.razao_social}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.cnpj}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.uf}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{company.ambiente_sefaz}</td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  <StatusPill active={company.ativo}>{company.ativo ? 'Ativa' : 'Inativa'}</StatusPill>
-                </td>
-                <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                  <StatusPill active={company.modulo_fiscal_habilitado}>
-                    {company.modulo_fiscal_habilitado ? 'Monitorando' : 'Desligado'}
-                  </StatusPill>
-                </td>
-                <td className="px-4 py-3 text-right"><button className="btn-secondary" type="button" onClick={() => editCompany(company)}>Editar</button></td>
-              </tr>
-            )) : (
-              <tr><td className="px-4 py-5 text-slate-500" colSpan={7}>Nenhuma empresa fiscal cadastrada.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'empresa',
+              titulo: 'Empresa',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (company) => company.razao_social
+            },
+            {
+              id: 'cnpj',
+              titulo: 'CNPJ',
+              tipo: 'codigo',
+              render: (company) => company.cnpj
+            },
+            {
+              id: 'uf',
+              titulo: 'UF',
+              tipo: 'codigo',
+              render: (company) => company.uf
+            },
+            {
+              id: 'ambiente',
+              titulo: 'Ambiente',
+              tipo: 'texto',
+              render: (company) => company.ambiente_sefaz
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (company) => (
+                <StatusPill active={company.ativo}>{company.ativo ? 'Ativa' : 'Inativa'}</StatusPill>
+              )
+            },
+            {
+              id: 'fiscal',
+              titulo: 'Fiscal',
+              tipo: 'status',
+              render: (company) => (
+                <StatusPill active={company.modulo_fiscal_habilitado}>
+                  {company.modulo_fiscal_habilitado ? 'Monitorando' : 'Desligado'}
+                </StatusPill>
+              )
+            }
+          ]}
+          itens={companies}
+          carregando={loading}
+          vazio="Nenhuma empresa fiscal cadastrada."
+          storageKey="tabela:empresas-fiscais"
+          rotuloRolagem="Empresas fiscais"
+          acoesLinha={(company) => (
+            <button className="btn-secondary" type="button" onClick={() => editCompany(company)}>Editar</button>
+          )}
+        />      </div>
 
       <section id="certificados" className="grid gap-5 scroll-mt-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <form onSubmit={submitCertificate} className="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:grid-cols-2">

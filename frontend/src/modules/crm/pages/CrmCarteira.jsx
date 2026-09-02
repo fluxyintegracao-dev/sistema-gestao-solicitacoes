@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { listarLeads } from '../../../services/crm';
 import { useAuth } from '../../../contexts/AuthContext';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const LIFECYCLE_MAP = {
   NOVO:        { label: 'Novo',         cls: 'app-status-pill bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' },
@@ -106,57 +107,79 @@ export default function CrmCarteira() {
 
       {/* Lista */}
       <div className="card sol-surface-card mt-3 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-        ) : leads.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">Nenhum lead encontrado na sua carteira.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table w-full">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Telefone</th>
-                  <th>Status</th>
-                  <th>Temp.</th>
-                  <th>Etapa</th>
-                  <th>Follow-up</th>
-                  <th>Cadastrado</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {leads.map((lead) => {
-                  const lifecycle = LIFECYCLE_MAP[lead.lifecycle_status] || { label: lead.lifecycle_status, cls: 'app-status-pill bg-elevated text-muted' };
-                  const temp = TEMP_MAP[lead.temperatura] || {};
-                  return (
-                    <tr key={lead.id}>
-                      <td className="font-medium text-main">{lead.nome}</td>
-                      <td className="text-sm text-sub">{lead.telefone || '—'}</td>
-                      <td><span className={lifecycle.cls}>{lifecycle.label}</span></td>
-                      <td className="text-base" title={temp.label}>{temp.emoji || '—'}</td>
-                      <td>
-                        {lead.etapa ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-sub">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: lead.etapa.cor }} />
-                            {lead.etapa.nome}
-                          </span>
-                        ) : '—'}
-                      </td>
-                      <td className={`text-sm ${lead.proximo_followup_at && new Date(lead.proximo_followup_at) < new Date() ? 'text-red-500 font-medium' : 'text-sub'}`}>
-                        {fmt(lead.proximo_followup_at)}
-                      </td>
-                      <td className="text-sm text-sub">{fmt(lead.createdAt)}</td>
-                      <td>
-                        <Link to={`/crm/leads/${lead.id}`} className="btn btn-secondary text-xs">Ver</Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'nome',
+              titulo: 'Nome',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (lead) => <span className="font-medium text-main">{lead.nome}</span>
+            },
+            {
+              id: 'telefone',
+              titulo: 'Telefone',
+              tipo: 'codigo',
+              render: (lead) => <span className="text-sm text-sub">{lead.telefone || '—'}</span>
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (lead) => {
+                const lifecycle = LIFECYCLE_MAP[lead.lifecycle_status]
+                  || { label: lead.lifecycle_status, cls: 'app-status-pill bg-elevated text-muted' };
+                return <span className={lifecycle.cls}>{lifecycle.label}</span>;
+              }
+            },
+            {
+              id: 'temperatura',
+              titulo: 'Temp.',
+              tipo: 'badge',
+              render: (lead) => {
+                const temp = TEMP_MAP[lead.temperatura] || {};
+                return <span title={temp.label}>{temp.emoji || '—'}</span>;
+              }
+            },
+            {
+              id: 'etapa',
+              titulo: 'Etapa',
+              tipo: 'texto',
+              render: (lead) => (lead.etapa ? (
+                <span className="inline-flex items-center gap-1 text-xs text-sub">
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: lead.etapa.cor }} />
+                  {lead.etapa.nome}
+                </span>
+              ) : '—')
+            },
+            {
+              id: 'followup',
+              titulo: 'Follow-up',
+              tipo: 'data',
+              render: (lead) => (
+                <span className={`text-sm ${lead.proximo_followup_at && new Date(lead.proximo_followup_at) < new Date() ? 'text-red-500 font-medium' : 'text-sub'}`}>
+                  {fmt(lead.proximo_followup_at)}
+                </span>
+              )
+            },
+            {
+              id: 'cadastrado',
+              titulo: 'Cadastrado',
+              tipo: 'data',
+              render: (lead) => <span className="text-sm text-sub">{fmt(lead.createdAt)}</span>
+            }
+          ]}
+          itens={leads}
+          getId={(lead) => lead.id}
+          carregando={loading}
+          vazio="Nenhum lead encontrado na sua carteira."
+          storageKey="tabela:crm-carteira"
+          rotuloRolagem="Minha carteira"
+          acoesLinha={(lead) => (
+            <Link to={`/crm/leads/${lead.id}`} className="btn btn-secondary text-xs">Ver</Link>
+          )}
+          larguraAcoes={140}
+        />
       </div>
 
       {/* Paginacao */}

@@ -9,6 +9,7 @@ import {
   HiOutlineDocumentText,
   HiOutlineShieldCheck
 } from 'react-icons/hi2';
+import { TabelaPadrao } from '../../../components/padrao';
 import {
   buildGovernancaExportUrl,
   gerarGovernancaSnapshot,
@@ -252,29 +253,41 @@ export default function GovernancaSistema() {
               <Metric label="Acessos governanca" value={audit.acessos_governanca} />
             </div>
             <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 text-xs uppercase tracking-[0.16em] text-slate-500">
-                  <tr>
-                    <th className="px-4 py-3">Data</th>
-                    <th className="px-4 py-3">Acao</th>
-                    <th className="px-4 py-3">Usuario</th>
-                    <th className="px-4 py-3">IP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(audit.logs || []).map((log) => (
-                    <tr key={log.id} className="border-t border-slate-100">
-                      <td className="px-4 py-3">{log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-'}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-800">{log.acao}</td>
-                      <td className="px-4 py-3">#{log.usuario_id || '-'}</td>
-                      <td className="px-4 py-3">{log.ip || '-'}</td>
-                    </tr>
-                  ))}
-                  {!audit.logs?.length ? (
-                    <tr><td colSpan="4" className="px-4 py-6 text-center text-slate-500">Nenhum log de governanca registrado ainda.</td></tr>
-                  ) : null}
-                </tbody>
-              </table>
+              <TabelaPadrao
+                colunas={[
+                  {
+                    id: 'data',
+                    titulo: 'Data',
+                    tipo: 'data',
+                    render: (log) => (log.createdAt ? new Date(log.createdAt).toLocaleString('pt-BR') : '-')
+                  },
+                  {
+                    id: 'acao',
+                    titulo: 'Acao',
+                    // R17: a acao registrada nomeia o log de governanca.
+                    tipo: 'identidade',
+                    noCard: 'titulo',
+                    render: (log) => log.acao
+                  },
+                  {
+                    id: 'usuario',
+                    titulo: 'Usuario',
+                    tipo: 'codigo',
+                    render: (log) => `#${log.usuario_id || '-'}`
+                  },
+                  {
+                    id: 'ip',
+                    titulo: 'IP',
+                    tipo: 'codigo',
+                    render: (log) => log.ip || '-'
+                  }
+                ]}
+                itens={audit.logs || []}
+                getId={(log) => log.id}
+                storageKey="tabela:governanca-sistema:auditoria"
+                rotuloRolagem="Logs de governanca"
+                vazio="Nenhum log de governanca registrado ainda."
+              />
             </div>
           </Section>
         ) : null}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { obterDashboardDistribuicaoCrm } from '../../../services/crm';
+import { TabelaPadrao } from '../../../components/padrao';
 
 function fmtDate(value) {
   if (!value) return '-';
@@ -64,51 +65,73 @@ function ResponsaveisTable({ rows }) {
         <p className="text-xs text-muted">Base para identificar sobrecarga, carteira parada e desequilibrio operacional.</p>
       </div>
 
-      {!rows?.length ? (
-        <EmptyState>Nenhum responsavel com carteira ativa no periodo.</EmptyState>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="app-table w-full">
-            <thead>
-              <tr>
-                <th className="app-th">Responsavel</th>
-                <th className="app-th">Carteira</th>
-                <th className="app-th">Novos periodo</th>
-                <th className="app-th">Sem atividade</th>
-                <th className="app-th">Convertidos</th>
-                <th className="app-th">Taxa periodo</th>
-                <th className="app-th">Pressao</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.usuario?.id || row.usuario?.nome} className="app-tr">
-                  <td className="app-td">
-                    <p className="font-medium text-main">{row.usuario?.nome || '-'}</p>
-                    <p className="text-xs text-muted">{row.usuario?.perfil || '-'}</p>
-                  </td>
-                  <td className="app-td min-w-[170px]">
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-semibold text-main">{row.totalCarteira}</span>
-                        <span className="text-xs text-muted">ativos</span>
-                      </div>
-                      <ProgressBar value={row.totalCarteira} max={maxCarteira} />
-                    </div>
-                  </td>
-                  <td className="app-td">{row.novosPeriodo}</td>
-                  <td className="app-td">
-                    <span className={row.semAtividade > 0 ? 'font-semibold text-amber-600' : ''}>{row.semAtividade}</span>
-                  </td>
-                  <td className="app-td">{row.convertidosPeriodo}</td>
-                  <td className="app-td">{row.taxaConversaoPeriodo}%</td>
-                  <td className="app-td font-semibold text-main">{row.pressaoCarteira}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'responsavel',
+            titulo: 'Responsavel',
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (row) => (
+              <>
+                <p className="font-medium text-main">{row.usuario?.nome || '-'}</p>
+                <p className="text-xs text-muted">{row.usuario?.perfil || '-'}</p>
+              </>
+            )
+          },
+          {
+            id: 'carteira',
+            titulo: 'Carteira',
+            tipo: 'numero',
+            render: (row) => (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-semibold text-main">{row.totalCarteira}</span>
+                  <span className="text-xs text-muted">ativos</span>
+                </div>
+                <ProgressBar value={row.totalCarteira} max={maxCarteira} />
+              </div>
+            )
+          },
+          {
+            id: 'novos',
+            titulo: 'Novos periodo',
+            tipo: 'numero',
+            render: (row) => row.novosPeriodo
+          },
+          {
+            id: 'sem_atividade',
+            titulo: 'Sem atividade',
+            tipo: 'numero',
+            render: (row) => (
+              <span className={row.semAtividade > 0 ? 'font-semibold text-amber-600' : ''}>{row.semAtividade}</span>
+            )
+          },
+          {
+            id: 'convertidos',
+            titulo: 'Convertidos',
+            tipo: 'numero',
+            render: (row) => row.convertidosPeriodo
+          },
+          {
+            id: 'taxa',
+            titulo: 'Taxa periodo',
+            tipo: 'numero',
+            render: (row) => `${row.taxaConversaoPeriodo}%`
+          },
+          {
+            id: 'pressao',
+            titulo: 'Pressao',
+            tipo: 'numero',
+            render: (row) => <span className="font-semibold text-main">{row.pressaoCarteira}</span>
+          }
+        ]}
+        itens={rows || []}
+        getId={(row) => row.usuario?.id || row.usuario?.nome}
+        vazio="Nenhum responsavel com carteira ativa no periodo."
+        storageKey="tabela:crm-dashboard-distribuicao:responsaveis"
+        rotuloRolagem="Carteira por responsavel"
+      />
     </section>
   );
 }

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioEvolucaoCompras } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,33 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const MES_COLUMNS = [
-  { key: 'mes', width: 120, minWidth: 90 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'fornecedores', width: 130, minWidth: 100 },
-  { key: 'obras', width: 110, minWidth: 90 },
-  { key: 'itens', width: 90, minWidth: 70 },
-  { key: 'valor', width: 160, minWidth: 120 },
-  { key: 'ticket', width: 150, minWidth: 120 },
-  { key: 'status', width: 240, minWidth: 160 }
-];
-
-const OBRA_COLUMNS = [
-  { key: 'obra', width: 260, minWidth: 170 },
-  { key: 'pedidos', width: 100, minWidth: 80 },
-  { key: 'fornecedores', width: 130, minWidth: 100 },
-  { key: 'itens', width: 90, minWidth: 70 },
-  { key: 'valor', width: 150, minWidth: 120 },
-  { key: 'ticket', width: 140, minWidth: 110 },
-  { key: 'meses', width: 220, minWidth: 150 }
-];
-
-const STATUS_COLUMNS = [
-  { key: 'status', width: 220, minWidth: 140 },
-  { key: 'total', width: 100, minWidth: 80 },
-  { key: 'valor', width: 150, minWidth: 120 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -272,124 +245,114 @@ export default function ComprasRelatorioEvolucao() {
       <div className="mt-4 card sol-surface-card overflow-hidden">
         <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Curva mensal</h2>
         <p className="page-subtitle mb-3">Pedidos agrupados pelo mes real de criacao do pedido de compra.</p>
-        <div className="sol-table-wrapper">
-          <ResizableTable className="sol-table" columns={MES_COLUMNS} storageKey="fluxy.compras.evolucao.meses.columns">
-            <thead>
-              <tr>
-                <ResizableTh columnKey="mes">Mes</ResizableTh>
-                <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
-                <ResizableTh columnKey="obras" className="text-right">Obras</ResizableTh>
-                <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                <ResizableTh columnKey="ticket" className="text-right">Ticket</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan={8}>Carregando...</td></tr>
-              ) : meses.length === 0 ? (
-                <tr><td colSpan={8}>Sem pedidos nos filtros.</td></tr>
-              ) : (
-                meses.map((item) => (
-                  <tr key={item.key}>
-                    <td className="font-semibold text-slate-900">{item.label}</td>
-                    <td className="text-right">{formatNumber(item.pedidos)}</td>
-                    <td className="text-right">{formatNumber(item.fornecedores)}</td>
-                    <td className="text-right">{formatNumber(item.obras)}</td>
-                    <td className="text-right">{formatNumber(item.itens)}</td>
-                    <td className="text-right font-semibold">
-                      {formatMoney(item.valor_total)}
-                      <MiniBar value={item.valor_total} max={maxMesValor} />
-                    </td>
-                    <td className="text-right">{formatMoney(item.ticket_medio)}</td>
-                    <td>
-                      {(item.status || []).slice(0, 3).map((status) => (
-                        <span key={status.key} className="badge badge-soft mr-1">
-                          {status.label}: {status.total}
-                        </span>
-                      ))}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          // R17: serie puramente temporal (mes x totais) — a linha e um
+          // periodo, nao um registro nomeado; nao ha coluna de identidade.
+          semIdentidade
+          colunas={[
+            { id: 'mes', titulo: 'Mes', tipo: 'texto', noCard: 'titulo', render: (item) => <span className="font-semibold text-slate-900">{item.label}</span> },
+            { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+            { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+            { id: 'obras', titulo: 'Obras', tipo: 'numero', render: (item) => formatNumber(item.obras) },
+            { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+            {
+              id: 'valor',
+              titulo: 'Valor',
+              tipo: 'valor',
+              render: (item) => (
+                <span className="font-semibold">
+                  {formatMoney(item.valor_total)}
+                  <MiniBar value={item.valor_total} max={maxMesValor} />
+                </span>
+              )
+            },
+            { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'texto',
+              render: (item) => (
+                <>
+                  {(item.status || []).slice(0, 3).map((status) => (
+                    <span key={status.key} className="badge badge-soft mr-1">
+                      {status.label}: {status.total}
+                    </span>
+                  ))}
+                </>
+              )
+            }
+          ]}
+          itens={meses}
+          getId={(item) => item.key}
+          carregando={loading}
+          storageKey="tabela:compras-evolucao:meses"
+          rotuloRolagem="Curva mensal"
+          vazio="Sem pedidos nos filtros."
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[2fr_1fr] mt-4">
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Compras por obra/centro</h2>
           <p className="page-subtitle mb-3">Ranking de valor comprado por obra ou centro de custo no periodo.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={OBRA_COLUMNS} storageKey="fluxy.compras.evolucao.obras.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="obra">Obra/Centro</ResizableTh>
-                  <ResizableTh columnKey="pedidos" className="text-right">Pedidos</ResizableTh>
-                  <ResizableTh columnKey="fornecedores" className="text-right">Fornecedores</ResizableTh>
-                  <ResizableTh columnKey="itens" className="text-right">Itens</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                  <ResizableTh columnKey="ticket" className="text-right">Ticket</ResizableTh>
-                  <ResizableTh columnKey="meses">Meses</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={7}>Carregando...</td></tr>
-                ) : obrasResumo.length === 0 ? (
-                  <tr><td colSpan={7}>Sem dados por obra/centro.</td></tr>
-                ) : (
-                  obrasResumo.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.obra_nome}</td>
-                      <td className="text-right">{formatNumber(item.pedidos)}</td>
-                      <td className="text-right">{formatNumber(item.fornecedores)}</td>
-                      <td className="text-right">{formatNumber(item.itens)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                      <td className="text-right">{formatMoney(item.ticket_medio)}</td>
-                      <td className="text-xs text-slate-600">
-                        {(item.meses || []).slice(-3).map((mes) => `${mes.label}: ${formatMoney(mes.valor_total)}`).join(' | ') || '-'}
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'obra',
+                titulo: 'Obra/Centro',
+                // R17: a obra/centro NOMEIA a linha do ranking.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.obra_nome
+              },
+              { id: 'pedidos', titulo: 'Pedidos', tipo: 'numero', render: (item) => formatNumber(item.pedidos) },
+              { id: 'fornecedores', titulo: 'Fornecedores', tipo: 'numero', render: (item) => formatNumber(item.fornecedores) },
+              { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (item) => formatNumber(item.itens) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> },
+              { id: 'ticket', titulo: 'Ticket', tipo: 'valor', render: (item) => formatMoney(item.ticket_medio) },
+              {
+                id: 'meses',
+                titulo: 'Meses',
+                tipo: 'texto',
+                render: (item) => (
+                  <span className="text-xs text-slate-600">
+                    {(item.meses || []).slice(-3).map((mes) => `${mes.label}: ${formatMoney(mes.valor_total)}`).join(' | ') || '-'}
+                  </span>
+                )
+              }
+            ]}
+            itens={obrasResumo}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-evolucao:obras"
+            rotuloRolagem="Compras por obra/centro"
+            vazio="Sem dados por obra/centro."
+          />
         </div>
 
         <div className="card sol-surface-card overflow-hidden">
           <h2 className="text-lg font-bold text-[var(--c-text)] mb-1">Pedidos por status</h2>
           <p className="page-subtitle mb-3">Distribuicao dos pedidos usados na evolucao.</p>
-          <div className="sol-table-wrapper">
-            <ResizableTable className="sol-table" columns={STATUS_COLUMNS} storageKey="fluxy.compras.evolucao.status.columns">
-              <thead>
-                <tr>
-                  <ResizableTh columnKey="status">Status</ResizableTh>
-                  <ResizableTh columnKey="total" className="text-right">Total</ResizableTh>
-                  <ResizableTh columnKey="valor" className="text-right">Valor</ResizableTh>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr><td colSpan={3}>Carregando...</td></tr>
-                ) : statusResumo.length === 0 ? (
-                  <tr><td colSpan={3}>Sem status nos filtros.</td></tr>
-                ) : (
-                  statusResumo.map((item) => (
-                    <tr key={item.key}>
-                      <td className="font-semibold text-slate-900">{item.label}</td>
-                      <td className="text-right">{formatNumber(item.total)}</td>
-                      <td className="text-right font-semibold">{formatMoney(item.valor_total)}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </ResizableTable>
-          </div>
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'status',
+                titulo: 'Status',
+                // R17: o status NOMEIA a linha deste agrupamento.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => item.label
+              },
+              { id: 'total', titulo: 'Total', tipo: 'numero', render: (item) => formatNumber(item.total) },
+              { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (item) => <span className="font-semibold">{formatMoney(item.valor_total)}</span> }
+            ]}
+            itens={statusResumo}
+            getId={(item) => item.key}
+            carregando={loading}
+            storageKey="tabela:compras-evolucao:status"
+            rotuloRolagem="Pedidos por status"
+            vazio="Sem status nos filtros."
+          />
         </div>
       </div>
     </div>

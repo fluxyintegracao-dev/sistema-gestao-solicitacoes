@@ -8,6 +8,7 @@ import {
   listarExecucoesAutomacaoCrm,
   listarAutomacoesCrm
 } from '../../../services/crm';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const TRIGGERS = {
   LEAD_CREATED: 'Lead criado',
@@ -251,49 +252,60 @@ export default function CrmAutomacoes() {
             </div>
           </div>
 
-          {loading ? (
-            <p className="text-sm text-muted">Carregando automacoes...</p>
-          ) : items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-base p-8 text-center text-sm text-muted">Nenhuma automacao cadastrada.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="text-left text-xs uppercase tracking-[0.12em] text-muted">
-                  <tr className="border-b border-base">
-                    <th className="py-3 pr-4">Automacao</th>
-                    <th className="py-3 pr-4">Gatilho</th>
-                    <th className="py-3 pr-4">Prioridade</th>
-                    <th className="py-3 pr-4">Status</th>
-                    <th className="py-3 text-right">Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {items.map((item) => (
-                    <tr key={item.id} className="border-b border-base last:border-0">
-                      <td className="py-3 pr-4">
-                        <p className="font-semibold text-main">{item.nome}</p>
-                        <p className="text-xs text-muted">Criado por {item.criadoPor?.nome || '-'}</p>
-                        <p className="text-xs text-muted">Ultima execucao: {item.last_run_at ? new Date(item.last_run_at).toLocaleString('pt-BR') : '-'}</p>
-                      </td>
-                      <td className="py-3 pr-4 text-sub">{TRIGGERS[item.trigger_type] || item.trigger_type}</td>
-                      <td className="py-3 pr-4 text-sub">{item.priority}</td>
-                      <td className="py-3 pr-4">
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-elevated text-muted'}`}>
-                          {item.ativo ? 'Ativa' : 'Inativa'}
-                        </span>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex justify-end gap-2">
-                          <button type="button" className="btn btn-secondary text-xs" onClick={() => startEdit(item)}>Editar</button>
-                          <button type="button" className="btn btn-secondary text-xs" onClick={() => toggleStatus(item)}>{item.ativo ? 'Desativar' : 'Ativar'}</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'automacao',
+                titulo: 'Automacao',
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (item) => (
+                  <>
+                    <p className="font-semibold text-main">{item.nome}</p>
+                    <p className="text-xs text-muted">Criado por {item.criadoPor?.nome || '-'}</p>
+                    <p className="text-xs text-muted">
+                      Ultima execucao: {item.last_run_at ? new Date(item.last_run_at).toLocaleString('pt-BR') : '-'}
+                    </p>
+                  </>
+                )
+              },
+              {
+                id: 'gatilho',
+                titulo: 'Gatilho',
+                tipo: 'texto',
+                render: (item) => <span className="text-sub">{TRIGGERS[item.trigger_type] || item.trigger_type}</span>
+              },
+              {
+                id: 'prioridade',
+                titulo: 'Prioridade',
+                tipo: 'numero',
+                render: (item) => <span className="text-sub">{item.priority}</span>
+              },
+              {
+                id: 'status',
+                titulo: 'Status',
+                tipo: 'status',
+                render: (item) => (
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${item.ativo ? 'bg-emerald-100 text-emerald-700' : 'bg-elevated text-muted'}`}>
+                    {item.ativo ? 'Ativa' : 'Inativa'}
+                  </span>
+                )
+              }
+            ]}
+            itens={items}
+            getId={(item) => item.id}
+            carregando={loading}
+            vazio="Nenhuma automacao cadastrada."
+            storageKey="tabela:crm-automacoes:regras"
+            rotuloRolagem="Regras cadastradas"
+            acoesLinha={(item) => (
+              <>
+                <button type="button" className="btn btn-secondary text-xs" onClick={() => startEdit(item)}>Editar</button>
+                <button type="button" className="btn btn-secondary text-xs" onClick={() => toggleStatus(item)}>{item.ativo ? 'Desativar' : 'Ativar'}</button>
+              </>
+            )}
+            larguraAcoes={220}
+          />
         </section>
       </div>
 
@@ -312,50 +324,72 @@ export default function CrmAutomacoes() {
           </button>
         </div>
 
-        {executions.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-base p-8 text-center text-sm text-muted">Nenhuma execucao registrada ate o momento.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead className="text-left text-xs uppercase tracking-[0.12em] text-muted">
-                <tr className="border-b border-base">
-                  <th className="py-3 pr-4">Quando</th>
-                  <th className="py-3 pr-4">Regra</th>
-                  <th className="py-3 pr-4">Lead</th>
-                  <th className="py-3 pr-4">Trigger</th>
-                  <th className="py-3 pr-4">Status</th>
-                  <th className="py-3">Mensagem</th>
-                </tr>
-              </thead>
-              <tbody>
-                {executions.map((execution) => (
-                  <tr key={execution.id} className="border-b border-base last:border-0">
-                    <td className="py-3 pr-4 text-sub">{execution.createdAt ? new Date(execution.createdAt).toLocaleString('pt-BR') : '-'}</td>
-                    <td className="py-3 pr-4">
-                      <p className="font-semibold text-main">{execution.rule?.nome || `Regra #${execution.rule_id}`}</p>
-                    </td>
-                    <td className="py-3 pr-4 text-sub">{execution.lead?.nome || '-'}</td>
-                    <td className="py-3 pr-4 text-sub">{TRIGGERS[execution.trigger_type] || execution.trigger_type}</td>
-                    <td className="py-3 pr-4">
-                      <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        execution.status === 'SUCCESS'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : execution.status === 'ERROR'
-                            ? 'bg-red-100 text-red-700'
-                            : execution.status === 'PROCESSING'
-                              ? 'bg-blue-100 text-blue-700'
-                              : 'bg-elevated text-muted'
-                      }`}>
-                        {execution.status}
-                      </span>
-                    </td>
-                    <td className="py-3 text-sub">{execution.message || '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'quando',
+              titulo: 'Quando',
+              tipo: 'data',
+              render: (execution) => (
+                <span className="text-sub">
+                  {execution.createdAt ? new Date(execution.createdAt).toLocaleString('pt-BR') : '-'}
+                </span>
+              )
+            },
+            {
+              id: 'regra',
+              titulo: 'Regra',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (execution) => (
+                <p className="font-semibold text-main">{execution.rule?.nome || `Regra #${execution.rule_id}`}</p>
+              )
+            },
+            {
+              id: 'lead',
+              titulo: 'Lead',
+              tipo: 'texto',
+              render: (execution) => <span className="text-sub">{execution.lead?.nome || '-'}</span>
+            },
+            {
+              id: 'trigger',
+              titulo: 'Trigger',
+              tipo: 'texto',
+              render: (execution) => (
+                <span className="text-sub">{TRIGGERS[execution.trigger_type] || execution.trigger_type}</span>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (execution) => (
+                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                  execution.status === 'SUCCESS'
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : execution.status === 'ERROR'
+                      ? 'bg-red-100 text-red-700'
+                      : execution.status === 'PROCESSING'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-elevated text-muted'
+                }`}>
+                  {execution.status}
+                </span>
+              )
+            },
+            {
+              id: 'mensagem',
+              titulo: 'Mensagem',
+              tipo: 'texto',
+              render: (execution) => <span className="text-sub">{execution.message || '-'}</span>
+            }
+          ]}
+          itens={executions}
+          getId={(execution) => execution.id}
+          vazio="Nenhuma execucao registrada ate o momento."
+          storageKey="tabela:crm-automacoes:execucoes"
+          rotuloRolagem="Execucoes recentes"
+        />
       </section>
     </div>
   );

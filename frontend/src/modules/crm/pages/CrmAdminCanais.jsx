@@ -5,6 +5,7 @@ import {
   excluirCanalCrm,
   listarCanaisCrm
 } from '../../../services/crm';
+import { TabelaPadrao } from '../../../components/padrao';
 
 const EMPTY_FORM = {
   nome: '',
@@ -193,50 +194,67 @@ export default function CrmAdminCanais() {
       </form>
 
       <div className="card sol-surface-card mt-3 overflow-hidden">
-        {loading ? (
-          <div className="p-8 text-center text-muted text-sm">Carregando...</div>
-        ) : items.length === 0 ? (
-          <div className="p-8 text-center text-muted text-sm">Nenhum canal cadastrado.</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="app-table w-full">
-              <thead>
-                <tr>
-                  <th>Canal</th>
-                  <th>Tipo</th>
-                  <th>Provider</th>
-                  <th>Numeros</th>
-                  <th>Status</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <div className="font-semibold text-main">{item.nome}</div>
-                      <div className="text-xs text-muted">{item.public_label || '-'}</div>
-                    </td>
-                    <td className="text-sm text-sub">{TYPE_LABEL[item.type] || item.type}</td>
-                    <td className="text-sm text-sub">{item.provider || '-'}</td>
-                    <td className="text-xs text-muted">
-                      <div>Principal: {item.business_main_phone || '-'}</div>
-                      <div>Operacional: {item.operational_phone || '-'}</div>
-                      <div>Tracking: {item.tracking_phone || '-'}</div>
-                    </td>
-                    <td><span className="app-status-pill bg-elevated text-main">{STATUS_LABEL[item.status] || item.status}</span></td>
-                    <td>
-                      <div className="flex justify-end gap-2">
-                        <button type="button" className="btn btn-secondary text-xs" onClick={() => edit(item)}>Editar</button>
-                        <button type="button" className="btn btn-secondary text-xs text-red-600" onClick={() => remove(item.id)}>Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'canal',
+              titulo: 'Canal',
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (item) => (
+                <>
+                  <div className="font-semibold text-main">{item.nome}</div>
+                  <div className="text-xs text-muted">{item.public_label || '-'}</div>
+                </>
+              )
+            },
+            {
+              id: 'tipo',
+              titulo: 'Tipo',
+              tipo: 'badge',
+              render: (item) => <span className="text-sm text-sub">{TYPE_LABEL[item.type] || item.type}</span>
+            },
+            {
+              id: 'provider',
+              titulo: 'Provider',
+              tipo: 'texto',
+              render: (item) => <span className="text-sm text-sub">{item.provider || '-'}</span>
+            },
+            {
+              id: 'numeros',
+              titulo: 'Numeros',
+              tipo: 'texto',
+              render: (item) => (
+                <div className="text-xs text-muted">
+                  <div>Principal: {item.business_main_phone || '-'}</div>
+                  <div>Operacional: {item.operational_phone || '-'}</div>
+                  <div>Tracking: {item.tracking_phone || '-'}</div>
+                </div>
+              )
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (item) => (
+                <span className="app-status-pill bg-elevated text-main">{STATUS_LABEL[item.status] || item.status}</span>
+              )
+            }
+          ]}
+          itens={items}
+          getId={(item) => item.id}
+          carregando={loading}
+          vazio="Nenhum canal cadastrado."
+          storageKey="tabela:crm-admin-canais"
+          rotuloRolagem="Canais CRM"
+          acoesLinha={(item) => (
+            <>
+              <button type="button" className="btn btn-secondary text-xs" onClick={() => edit(item)}>Editar</button>
+              <button type="button" className="btn btn-secondary text-xs text-red-600" onClick={() => remove(item.id)}>Excluir</button>
+            </>
+          )}
+          larguraAcoes={200}
+        />
       </div>
     </div>
   );

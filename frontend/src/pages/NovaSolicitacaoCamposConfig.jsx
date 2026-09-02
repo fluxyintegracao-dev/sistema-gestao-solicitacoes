@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { TabelaPadrao } from '../components/padrao';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getSetores } from '../services/setores';
@@ -382,69 +383,96 @@ export default function NovaSolicitacaoCamposConfig() {
               ))}
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b border-[var(--c-border)] text-left text-xs uppercase tracking-[0.08em] text-[var(--c-muted)]">
-                  <th className="px-3 py-3">Campo</th>
-                  <th className="px-3 py-3">Aparece</th>
-                  <th className="px-3 py-3">Obrigatorio</th>
-                  <th className="px-3 py-3">Padrao atual</th>
-                </tr>
-              </thead>
-              <tbody>
-                {camposDisponiveis.map((campo) => {
-                  const resolvido = camposResolvidos[campo.id] || {};
+          <TabelaPadrao
+            colunas={[
+              {
+                id: 'campo',
+                titulo: 'Campo',
+                // R17: o campo configurado é o registro desta lista.
+                tipo: 'identidade',
+                noCard: 'titulo',
+                render: (campo) => {
                   const controladoAutomaticamente = camposControladosPelaApropriacaoAutomatica.has(campo.id);
                   const labelCampo = campo.id === 'descricao' && comportamentoTipo.usa_fluxo_contrato_novo
                     ? 'Titulo do contrato'
                     : campo.label;
                   return (
-                    <tr key={campo.id} className="border-b border-[var(--c-border)] last:border-0">
-                      <td className="px-3 py-3 align-top">
-                        <div className="font-semibold text-[var(--c-text)]">{labelCampo}</div>
-                        <div className="mt-1 text-xs text-[var(--c-muted)]">{campo.descricao}</div>
-                        {campo.somenteFluxoContratoNovo && (
-                          <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
-                            Campo do novo fluxo de contrato
-                          </span>
-                        )}
-                        {campo.fixo && (
-                          <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
-                            Campo estrutural
-                          </span>
-                        )}
-                        {controladoAutomaticamente && (
-                          <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
-                            Controlado pela apropriacao automatica
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(resolvido.visivel)}
-                          disabled={campo.fixo || controladoAutomaticamente}
-                          onChange={(event) => atualizarCampo(campo.id, { visivel: event.target.checked })}
-                        />
-                      </td>
-                      <td className="px-3 py-3 align-top">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(resolvido.obrigatorio)}
-                          disabled={campo.fixo || controladoAutomaticamente || campo.permiteObrigatorio === false || !resolvido.visivel}
-                          onChange={(event) => atualizarCampo(campo.id, { obrigatorio: event.target.checked })}
-                        />
-                      </td>
-                      <td className="px-3 py-3 align-top text-xs text-[var(--c-muted)]">
-                        {resolvido.visivel_padrao ? 'Visivel' : 'Oculto'} / {resolvido.obrigatorio_padrao ? 'Obrigatorio' : 'Opcional'}
-                      </td>
-                    </tr>
+                    <div>
+                      <div className="font-semibold text-[var(--c-text)]">{labelCampo}</div>
+                      <div className="mt-1 text-xs text-[var(--c-muted)]">{campo.descricao}</div>
+                      {campo.somenteFluxoContratoNovo && (
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                          Campo do novo fluxo de contrato
+                        </span>
+                      )}
+                      {campo.fixo && (
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                          Campo estrutural
+                        </span>
+                      )}
+                      {controladoAutomaticamente && (
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                          Controlado pela apropriacao automatica
+                        </span>
+                      )}
+                    </div>
                   );
-                })}
-              </tbody>
-            </table>
-          </div>
+                }
+              },
+              {
+                id: 'visivel',
+                titulo: 'Aparece',
+                tipo: 'status',
+                render: (campo) => {
+                  const resolvido = camposResolvidos[campo.id] || {};
+                  const controladoAutomaticamente = camposControladosPelaApropriacaoAutomatica.has(campo.id);
+                  return (
+                    <input
+                      type="checkbox"
+                      checked={Boolean(resolvido.visivel)}
+                      disabled={campo.fixo || controladoAutomaticamente}
+                      onChange={(event) => atualizarCampo(campo.id, { visivel: event.target.checked })}
+                    />
+                  );
+                }
+              },
+              {
+                id: 'obrigatorio',
+                titulo: 'Obrigatorio',
+                tipo: 'status',
+                render: (campo) => {
+                  const resolvido = camposResolvidos[campo.id] || {};
+                  const controladoAutomaticamente = camposControladosPelaApropriacaoAutomatica.has(campo.id);
+                  return (
+                    <input
+                      type="checkbox"
+                      checked={Boolean(resolvido.obrigatorio)}
+                      disabled={campo.fixo || controladoAutomaticamente || campo.permiteObrigatorio === false || !resolvido.visivel}
+                      onChange={(event) => atualizarCampo(campo.id, { obrigatorio: event.target.checked })}
+                    />
+                  );
+                }
+              },
+              {
+                id: 'padrao',
+                titulo: 'Padrao atual',
+                tipo: 'texto',
+                render: (campo) => {
+                  const resolvido = camposResolvidos[campo.id] || {};
+                  return (
+                    <span className="text-xs text-[var(--c-muted)]">
+                      {resolvido.visivel_padrao ? 'Visivel' : 'Oculto'} / {resolvido.obrigatorio_padrao ? 'Obrigatorio' : 'Opcional'}
+                    </span>
+                  );
+                }
+              }
+            ]}
+            itens={camposDisponiveis}
+            getId={(campo) => campo.id}
+            storageKey="tabela:nova-solicitacao-campos-config"
+            rotuloRolagem="Campos da nova solicitacao"
+            vazio="Nenhum campo disponivel para este tipo."
+          />
         </section>
       </div>
     </div>

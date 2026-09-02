@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioComprasDiretas } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -13,21 +13,6 @@ const DEFAULT_FILTERS = {
   item: '',
   limit: '1000'
 };
-
-const DETAIL_COLUMNS = [
-  { key: 'data', width: 120, minWidth: 95 },
-  { key: 'compra', width: 110, minWidth: 95 },
-  { key: 'solicitacao', width: 120, minWidth: 100 },
-  { key: 'solicitante', width: 220, minWidth: 160 },
-  { key: 'obra', width: 240, minWidth: 170 },
-  { key: 'credor', width: 260, minWidth: 180 },
-  { key: 'item', width: 260, minWidth: 180 },
-  { key: 'unidade', width: 90, minWidth: 70 },
-  { key: 'quantidade', width: 120, minWidth: 90 },
-  { key: 'unitario', width: 130, minWidth: 105 },
-  { key: 'total', width: 140, minWidth: 110 },
-  { key: 'status', width: 170, minWidth: 120 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -86,7 +71,7 @@ function extractErrorMessage(error) {
   }
 }
 
-function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = 'label', metaKey }) {
+function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = 'label', metaKey, storageKey }) {
   const safeRows = Array.isArray(rows) ? rows.slice(0, 8) : [];
 
   return (
@@ -97,35 +82,31 @@ function RankingTable({ title, subtitle, rows, valueLabel = 'Valor', nameKey = '
           {subtitle ? <p className="muted-text">{subtitle}</p> : null}
         </div>
       </div>
-      <div className="table-wrapper compras-responsive-table">
-        <table className="table compact-table min-w-[980px]">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Compras</th>
-              <th>Itens</th>
-              <th>{valueLabel}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {safeRows.length ? safeRows.map((row) => (
-              <tr key={row.key}>
-                <td>
-                  <strong>{row[nameKey] || row.label || '-'}</strong>
-                  {metaKey && row[metaKey] ? <small className="block muted-text">{row[metaKey]}</small> : null}
-                </td>
-                <td>{formatNumber(row.compras)}</td>
-                <td>{formatNumber(row.itens)}</td>
-                <td>{formatMoney(row.valor_total)}</td>
-              </tr>
-            )) : (
-              <tr>
-                <td colSpan={4} className="text-center muted-text">Sem dados no periodo.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <TabelaPadrao
+        colunas={[
+          {
+            id: 'nome',
+            titulo: 'Nome',
+            // R17: o nome do ranking (solicitante/credor/item/obra) NOMEIA a linha.
+            tipo: 'identidade',
+            noCard: 'titulo',
+            render: (row) => (
+              <div>
+                <strong>{row[nameKey] || row.label || '-'}</strong>
+                {metaKey && row[metaKey] ? <small className="block muted-text">{row[metaKey]}</small> : null}
+              </div>
+            )
+          },
+          { id: 'compras', titulo: 'Compras', tipo: 'numero', render: (row) => formatNumber(row.compras) },
+          { id: 'itens', titulo: 'Itens', tipo: 'numero', render: (row) => formatNumber(row.itens) },
+          { id: 'valor', titulo: valueLabel, tipo: 'valor', render: (row) => formatMoney(row.valor_total) }
+        ]}
+        itens={safeRows}
+        getId={(row) => row.key}
+        storageKey={storageKey}
+        rotuloRolagem={title}
+        vazio="Sem dados no periodo."
+      />
     </div>
   );
 }
@@ -360,24 +341,28 @@ export default function ComprasRelatorioComprasDiretas() {
           subtitle="Usuarios que mais abriram compras diretas."
           rows={relatorio?.solicitantes}
           metaKey="email"
+          storageKey="tabela:compras-diretas:solicitantes"
         />
         <RankingTable
           title="Credores"
           subtitle="Fornecedores/credores mais usados em compra direta."
           rows={relatorio?.credores}
           metaKey="documento"
+          storageKey="tabela:compras-diretas:credores"
         />
         <RankingTable
           title="Itens comprados"
           subtitle="Itens com maior valor acumulado."
           rows={relatorio?.itens_ranking}
           metaKey="unidade"
+          storageKey="tabela:compras-diretas:itens-ranking"
         />
         <RankingTable
           title="Obras / centros"
           subtitle="Centros de custo com maior uso de compra direta."
           rows={relatorio?.obras}
           metaKey="obra_codigo"
+          storageKey="tabela:compras-diretas:obras"
         />
       </div>
 
@@ -391,80 +376,92 @@ export default function ComprasRelatorioComprasDiretas() {
           </div>
         </div>
 
-        <div className="table-wrapper">
-          <ResizableTable
-            columns={DETAIL_COLUMNS}
-            storageKey="compras-diretas-relatorio-detalhe-v1"
-            className="table compact-table"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="data">Data</ResizableTh>
-                <ResizableTh columnKey="compra">SC</ResizableTh>
-                <ResizableTh columnKey="solicitacao">SOL</ResizableTh>
-                <ResizableTh columnKey="solicitante">Solicitante</ResizableTh>
-                <ResizableTh columnKey="obra">Obra</ResizableTh>
-                <ResizableTh columnKey="credor">Credor</ResizableTh>
-                <ResizableTh columnKey="item">Item</ResizableTh>
-                <ResizableTh columnKey="unidade">Unid.</ResizableTh>
-                <ResizableTh columnKey="quantidade">Qtd.</ResizableTh>
-                <ResizableTh columnKey="unitario">Unitario</ResizableTh>
-                <ResizableTh columnKey="total">Total</ResizableTh>
-                <ResizableTh columnKey="status">Status</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.length ? itens.map((row) => (
-                <tr key={`${row.compra_id}-${row.item?.tipo}-${row.item?.id}`}>
-                  <td>{formatDate(row.criado_em)}</td>
-                  <td>
-                    <Link to={`/solicitacoes-compra/${row.compra_id}`} className="link-primary">
-                      {row.compra_codigo}
-                    </Link>
-                  </td>
-                  <td>
-                    {row.solicitacao_id ? (
-                      <Link to={`/solicitacoes/${row.solicitacao_id}`} className="link-primary">
-                        {row.solicitacao_codigo || `#${row.solicitacao_id}`}
-                      </Link>
-                    ) : '-'}
-                  </td>
-                  <td>
-                    <strong>{row.solicitante?.nome || '-'}</strong>
-                    {row.solicitante?.email ? <small className="block muted-text">{row.solicitante.email}</small> : null}
-                  </td>
-                  <td>
-                    <strong>{row.obra?.nome || '-'}</strong>
-                    {row.obra?.codigo ? <small className="block muted-text">{row.obra.codigo}</small> : null}
-                  </td>
-                  <td>
-                    <strong>{row.credor?.nome || 'Sem credor'}</strong>
-                    {row.credor?.documento ? <small className="block muted-text">{row.credor.documento}</small> : null}
-                  </td>
-                  <td>
-                    <strong>{row.item?.descricao || '-'}</strong>
-                    {row.item?.apropriacao?.codigo ? (
-                      <small className="block muted-text">
-                        {row.item.apropriacao.codigo} {row.item.apropriacao.descricao || ''}
-                      </small>
-                    ) : null}
-                  </td>
-                  <td>{row.item?.unidade || '-'}</td>
-                  <td>{formatNumber(row.quantidade, 2)}</td>
-                  <td>{formatMoney(row.valor_unitario)}</td>
-                  <td>{formatMoney(row.valor_total)}</td>
-                  <td><span className="badge badge-soft">{row.status_label || row.status}</span></td>
-                </tr>
-              )) : (
-                <tr>
-                  <td colSpan={12} className="text-center muted-text">
-                    Nenhuma compra direta encontrada para os filtros informados.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+        <TabelaPadrao
+          colunas={[
+            { id: 'data', titulo: 'Data', tipo: 'data', render: (row) => formatDate(row.criado_em) },
+            {
+              id: 'compra',
+              titulo: 'SC',
+              tipo: 'codigo',
+              render: (row) => (
+                <Link to={`/solicitacoes-compra/${row.compra_id}`} className="link-primary">
+                  {row.compra_codigo}
+                </Link>
+              )
+            },
+            {
+              id: 'solicitacao',
+              titulo: 'SOL',
+              tipo: 'codigo',
+              render: (row) => (row.solicitacao_id ? (
+                <Link to={`/solicitacoes/${row.solicitacao_id}`} className="link-primary">
+                  {row.solicitacao_codigo || `#${row.solicitacao_id}`}
+                </Link>
+              ) : '-')
+            },
+            {
+              id: 'solicitante',
+              titulo: 'Solicitante',
+              tipo: 'texto',
+              render: (row) => (
+                <div>
+                  <strong>{row.solicitante?.nome || '-'}</strong>
+                  {row.solicitante?.email ? <small className="block muted-text">{row.solicitante.email}</small> : null}
+                </div>
+              )
+            },
+            {
+              id: 'obra',
+              titulo: 'Obra',
+              tipo: 'texto',
+              render: (row) => (
+                <div>
+                  <strong>{row.obra?.nome || '-'}</strong>
+                  {row.obra?.codigo ? <small className="block muted-text">{row.obra.codigo}</small> : null}
+                </div>
+              )
+            },
+            {
+              id: 'credor',
+              titulo: 'Credor',
+              tipo: 'texto',
+              render: (row) => (
+                <div>
+                  <strong>{row.credor?.nome || 'Sem credor'}</strong>
+                  {row.credor?.documento ? <small className="block muted-text">{row.credor.documento}</small> : null}
+                </div>
+              )
+            },
+            {
+              id: 'item',
+              titulo: 'Item',
+              // R17: o item comprado NOMEIA a linha do detalhamento.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (row) => (
+                <div>
+                  <strong>{row.item?.descricao || '-'}</strong>
+                  {row.item?.apropriacao?.codigo ? (
+                    <small className="block muted-text">
+                      {row.item.apropriacao.codigo} {row.item.apropriacao.descricao || ''}
+                    </small>
+                  ) : null}
+                </div>
+              )
+            },
+            { id: 'unidade', titulo: 'Unid.', tipo: 'texto', render: (row) => row.item?.unidade || '-' },
+            { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (row) => formatNumber(row.quantidade, 2) },
+            { id: 'unitario', titulo: 'Unitario', tipo: 'valor', render: (row) => formatMoney(row.valor_unitario) },
+            { id: 'total', titulo: 'Total', tipo: 'valor', render: (row) => formatMoney(row.valor_total) },
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (row) => <span className="badge badge-soft">{row.status_label || row.status}</span> }
+          ]}
+          itens={itens}
+          getId={(row) => `${row.compra_id}-${row.item?.tipo}-${row.item?.id}`}
+          carregando={loading}
+          storageKey="tabela:compras-diretas:detalhe"
+          rotuloRolagem="Detalhamento por item"
+          vazio="Nenhuma compra direta encontrada para os filtros informados."
+        />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ResizableTable, ResizableTh } from '../components/ResizableTable';
+import { TabelaPadrao } from '../components/padrao';
 import { obterRelatorioEconomiaCotacoes } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -9,17 +9,6 @@ const DEFAULT_FILTERS = {
   data_inicio: '',
   data_fim: ''
 };
-
-const TABLE_COLUMNS = [
-  { key: 'cotacao', width: 150, minWidth: 118 },
-  { key: 'item', width: 210, minWidth: 150 },
-  { key: 'quantidade', width: 90, minWidth: 72 },
-  { key: 'menor_preco', width: 158, minWidth: 124 },
-  { key: 'vencedor', width: 158, minWidth: 124 },
-  { key: 'economia', width: 122, minWidth: 104 },
-  { key: 'sobrepreco', width: 124, minWidth: 104 },
-  { key: 'sinal', width: 132, minWidth: 112 }
-];
 
 function readFilters(searchParams) {
   return {
@@ -368,82 +357,99 @@ export default function ComprasRelatorioEconomiaCotacoes() {
       </div>
 
       <div className="mt-4 card sol-surface-card overflow-hidden">
-        <div className="sol-table-wrapper">
-          <ResizableTable
-            className="sol-table"
-            columns={TABLE_COLUMNS}
-            storageKey="fluxy.compras.relatorioEconomiaCotacoes.columnWidths"
-          >
-            <thead>
-              <tr>
-                <ResizableTh columnKey="cotacao">Cotacao</ResizableTh>
-                <ResizableTh columnKey="item">Item</ResizableTh>
-                <ResizableTh columnKey="quantidade" className="text-right">Qtd.</ResizableTh>
-                <ResizableTh columnKey="menor_preco" className="text-right">Menor preco</ResizableTh>
-                <ResizableTh columnKey="vencedor" className="text-right">Vencedor</ResizableTh>
-                <ResizableTh columnKey="economia" className="text-right">Economia</ResizableTh>
-                <ResizableTh columnKey="sobrepreco" className="text-right">Sobrepreco</ResizableTh>
-                <ResizableTh columnKey="sinal">Sinal</ResizableTh>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="text-center text-[var(--c-muted)] py-6">
-                    Carregando economia das cotacoes...
-                  </td>
-                </tr>
-              ) : itens.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="text-center text-[var(--c-muted)] py-6">
-                    Nenhum item com vencedor encontrado para os filtros selecionados.
-                  </td>
-                </tr>
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'cotacao',
+              titulo: 'Cotacao',
+              tipo: 'codigo',
+              render: (linha) => (
+                <div>
+                  <strong>SC #{linha.solicitacao.id}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    Encerrada em {formatDate(linha.solicitacao.encerrado_em)}
+                  </div>
+                </div>
+              )
+            },
+            {
+              id: 'item',
+              titulo: 'Item',
+              // R17: o item cotado NOMEIA a linha do comparativo.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (linha) => (
+                <div>
+                  <strong>{linha.item.descricao}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">{linha.item.unidade}</div>
+                </div>
+              )
+            },
+            { id: 'quantidade', titulo: 'Qtd.', tipo: 'numero', render: (linha) => Number(linha.item.quantidade || 0).toLocaleString('pt-BR') },
+            {
+              id: 'menor_preco',
+              titulo: 'Menor preco',
+              tipo: 'valor',
+              render: (linha) => (
+                <div>
+                  <strong>{formatMoney(linha.menor_preco.valor_total)}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {linha.menor_preco.fornecedor_nome} · {formatMoney(linha.menor_preco.preco_unitario)}
+                  </div>
+                </div>
+              )
+            },
+            {
+              id: 'vencedor',
+              titulo: 'Vencedor',
+              tipo: 'valor',
+              render: (linha) => (
+                <div>
+                  <strong>{formatMoney(linha.vencedor.valor_total)}</strong>
+                  <div className="text-xs text-[var(--c-muted)]">
+                    {linha.vencedor.fornecedor_nome} · {formatMoney(linha.vencedor.preco_unitario)}
+                  </div>
+                </div>
+              )
+            },
+            {
+              id: 'economia',
+              titulo: 'Economia',
+              tipo: 'valor',
+              render: (linha) => (
+                <span style={{ color: metricColor(linha.economia), fontWeight: 700 }}>
+                  {formatMoney(linha.economia)}
+                </span>
+              )
+            },
+            {
+              id: 'sobrepreco',
+              titulo: 'Sobrepreco',
+              tipo: 'valor',
+              render: (linha) => (
+                <span style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: 700 }}>
+                  {formatMoney(linha.sobrepreco)}
+                </span>
+              )
+            },
+            {
+              id: 'sinal',
+              titulo: 'Sinal',
+              tipo: 'badge',
+              render: (linha) => (linha.selecionou_menor_preco ? (
+                <span className="badge badge-success">Menor preco</span>
               ) : (
-                itens.map((linha) => (
-                  <tr key={`${linha.solicitacao.id}-${linha.item.item_tipo}-${linha.item.item_referencia_id}`}>
-                    <td>
-                      <strong>SC #{linha.solicitacao.id}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        Encerrada em {formatDate(linha.solicitacao.encerrado_em)}
-                      </div>
-                    </td>
-                    <td>
-                      <strong>{linha.item.descricao}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">{linha.item.unidade}</div>
-                    </td>
-                    <td className="text-right">{Number(linha.item.quantidade || 0).toLocaleString('pt-BR')}</td>
-                    <td className="text-right">
-                      <strong>{formatMoney(linha.menor_preco.valor_total)}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {linha.menor_preco.fornecedor_nome} · {formatMoney(linha.menor_preco.preco_unitario)}
-                      </div>
-                    </td>
-                    <td className="text-right">
-                      <strong>{formatMoney(linha.vencedor.valor_total)}</strong>
-                      <div className="text-xs text-[var(--c-muted)]">
-                        {linha.vencedor.fornecedor_nome} · {formatMoney(linha.vencedor.preco_unitario)}
-                      </div>
-                    </td>
-                    <td className="text-right" style={{ color: metricColor(linha.economia), fontWeight: 700 }}>
-                      {formatMoney(linha.economia)}
-                    </td>
-                    <td className="text-right" style={{ color: Number(linha.sobrepreco || 0) > 0 ? 'var(--c-danger)' : 'var(--c-muted)', fontWeight: 700 }}>
-                      {formatMoney(linha.sobrepreco)}
-                    </td>
-                    <td>
-                      {linha.selecionou_menor_preco ? (
-                        <span className="badge badge-success">Menor preco</span>
-                      ) : (
-                        <span className="badge badge-warning">Acima do menor</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </ResizableTable>
-        </div>
+                <span className="badge badge-warning">Acima do menor</span>
+              ))
+            }
+          ]}
+          itens={itens}
+          getId={(linha) => `${linha.solicitacao.id}-${linha.item.item_tipo}-${linha.item.item_referencia_id}`}
+          carregando={loading}
+          storageKey="tabela:compras-economia-cotacoes:itens"
+          rotuloRolagem="Economia por item cotado"
+          vazio="Nenhum item com vencedor encontrado para os filtros selecionados."
+        />
       </div>
     </div>
   );
