@@ -235,6 +235,7 @@ export default function RhDpImportacoes() {
   const [form, setForm] = useState({
     tipo: 'JORNADA',
     competencia: '',
+    empresa_grupo_id: '',
     obra_id: '',
     tipo_vinculo: '',
     observacoes: ''
@@ -355,6 +356,7 @@ export default function RhDpImportacoes() {
         tipo: form.tipo,
         competencia: form.competencia,
         obra_id: form.obra_id,
+        empresa_grupo_id: form.empresa_grupo_id || undefined,
         tipo_vinculo: form.tipo_vinculo || undefined,
         observacoes: form.observacoes || undefined,
         file
@@ -467,6 +469,27 @@ export default function RhDpImportacoes() {
               <option value="">Selecione a obra</option>
               {obras.map((item) => (
                 <option key={item.id} value={item.id}>{rotuloObra(item)}</option>
+              ))}
+            </select>
+          </CampoForm>
+          {/*
+            Decisão do cliente (02/09): o filtro "Empresa do grupo" do
+            histórico era NATIMORTO — a tela nunca mandava `empresa_grupo_id`
+            ao criar o lote, então todo lote nascia com o campo nulo e o
+            filtro só podia devolver lista vazia. O backend aceita e persiste
+            o campo (validateRhImportacaoCreateBody + rhImportacaoService);
+            faltava a tela oferecê-lo. Opcional, como no backend.
+          */}
+          <CampoForm label="Empresa do grupo">
+            <select
+              className="input w-full"
+              value={form.empresa_grupo_id}
+              onChange={(e) => setForm((prev) => ({ ...prev, empresa_grupo_id: e.target.value }))}
+              disabled={!podeEditar}
+            >
+              <option value="">Não informar</option>
+              {empresas.map((item) => (
+                <option key={item.id} value={item.id}>{item.nome}</option>
               ))}
             </select>
           </CampoForm>

@@ -378,6 +378,33 @@ automaticamente se sair do padrão.
   prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
   página real reprova a tela em que qualquer caixa dispara.
 
+## R23 — filtro aplica ao marcar; consulta cara confirma (02/09)
+
+Decisão do cliente, com critério explícito **de propósito**: sem número, isso
+vira julgamento tela a tela, e aí duas telas irmãs se comportam diferente
+sem ninguém saber dizer por quê.
+
+- **Regra**: marcar um filtro **aplica na hora**. A etiqueta que aparece na
+  faixa afirma o que está filtrando; se ela aparecer antes de a lista
+  mudar, a etiqueta mente (F3).
+- **Exceção — consulta cara**: a tela mantém um botão explícito
+  ("Atualizar relatório") e as marcas viram RASCUNHO até o clique, quando
+  qualquer um destes for verdade:
+  - montar o recorte dispararia **mais de 3 requisições** (ou seja, a tela
+    tem 4+ dimensões que o usuário costuma combinar); **ou**
+  - a consulta leva **mais de 2 segundos** para responder no ambiente de
+    dev com dados reais.
+- **Quando a exceção vale, ela é declarada na tela**: o botão diz o que faz
+  ("Atualizar relatório", não "Aplicar filtros") e o texto de apoio avisa
+  que o recorte só vale no clique. Sem isso, a etiqueta continua mentindo —
+  só que mais devagar.
+- **Onde vale hoje**: lista aplica ao marcar (Documentos, Fechamentos,
+  Colaboradores, Importações, Apuração, Pessoal); o **Relatório
+  Operacional** é a exceção — 6 dimensões e agregação pesada.
+- **Onde NÃO vale**: busca textual, que sempre tem espera de digitação
+  (350ms) e nunca botão; e filtro de uma dimensão só, que não chega perto
+  do critério.
+
 ## R22 — hook usado é hook importado (02/09)
 
 - **O problema**: `useRef` (ou qualquer hook) usado sem estar no `import`.
