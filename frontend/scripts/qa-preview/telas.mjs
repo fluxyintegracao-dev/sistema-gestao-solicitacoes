@@ -173,5 +173,8 @@ export const ITENS_DOD = [
   'B1', 'B2', 'B3', 'B4', 'B5',
   'M1', 'M2', 'M3', 'M4',
   'R1', 'R2',
-  'X1', 'X2', 'X3'
+  'X1', 'X2', 'X3',
+  // Leva do componente (02/09): sticky sequestrado por overflow hidden e
+  // acessibilidade por teclado da linha acionável.
+  'R18', 'A1'
 ];

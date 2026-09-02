@@ -280,6 +280,40 @@ automaticamente se sair do padrão.
   agora reprova na origem e some da matriz e da próxima leva ao mesmo
   tempo.
 
+## R18 — `overflow: hidden` nunca em ancestral de sticky (02/09)
+
+- **O problema**: `overflow: hidden` cria um contexto de rolagem, e todo
+  `position: sticky` dentro dele passa a grudar NELE em vez de grudar na
+  janela. O elemento simplesmente para de funcionar — **sem erro no
+  console, sem falhar o build, sem aparecer em teste de unidade**. É a
+  classe de defeito que só o DOM real denuncia.
+- **Onde vale**: qualquer ancestral de faixa fixa (`.app-page-header`),
+  coluna fixa (`tipo` com `fixa`), contêiner de rolagem de tabela
+  (`.resizable-table-scroll`) ou cabeçalho grudado.
+- **Onde NÃO vale**: elementos pequenos que só recortam forma —
+  avatar redondo, barra de progresso, miniatura. Ali `hidden` é inofensivo
+  porque nada dentro precisa grudar.
+- **O que usar quando precisa cortar**: `overflow: clip`. Corta igual e
+  NÃO cria scrollport, então preserva o sticky.
+- **Histórico** (por isso a regra existe): `.rhdp-page` derrubou a faixa do
+  topo; `.ao-financial` derrubou a coluna fixa da auditoria. Duas vezes o
+  mesmo mecanismo, nas duas o código parecia certo.
+- **Verificação**: check estático no `validarLayout.mjs` (CSS dos
+  componentes padrão e dos módulos com tela reformada) + prova no harness,
+  que anda a cadeia de ancestrais de cada elemento fixo no DOM real e
+  nomeia o culpado.
+
+## A1 — Linha acionável alcançável por TECLADO (02/09)
+
+- Linha que responde a clique precisa de caminho por teclado: `tabIndex`
+  próprio com Enter/Espaço **ou** um controle focável dentro dela (link ou
+  botão) que faça a mesma ação. Foco visível é obrigatório.
+- **Por que virou item da DoD**: a migração do GestaoContratos removeu o
+  `tabIndex` da linha e ninguém percebeu — quem não usa mouse perdia a
+  ação inteira. Compilava, passava no validador, parecia certo.
+- **Onde NÃO vale**: tela sem linha acionável (N/A registrado na matriz).
+- Verificação: item **A1** da DoD, cobrado pelo harness em toda tela.
+
 ## Disciplina de regras (02/09 — vale para toda regra nova e existente)
 
 1. **Escopo explícito obrigatório**: toda regra declara onde vale, onde NÃO

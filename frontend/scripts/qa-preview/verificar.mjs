@@ -31,7 +31,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { TELAS, ITENS_DOD } from './telas.mjs';
-import { checksEstaticos, checkFaixaRolada, checksMobile } from './checks.mjs';
+import { checksEstaticos, checkFaixaRolada, checksMobile, checkStickyEAcessibilidade } from './checks.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ_FRONT = path.resolve(AQUI, '..', '..');
@@ -579,6 +579,7 @@ async function main() {
         if (bloqueada) throw new Error('tela bloqueada por permissão para o usuário de QA');
 
         fundir(resultado.itens, await page.evaluate(checksEstaticos, { tipo: tela.tipo }));
+        fundir(resultado.itens, await page.evaluate(checkStickyEAcessibilidade));
         await checarFaixa(page, resultado.itens);
         await checarAffordanceAlinhamento(page, resultado.itens);
         await checarEtiquetasFiltro(page, resultado.itens);

@@ -159,6 +159,11 @@ export function validarLayout() {
     }
   }
 
+  // R18 — overflow hidden mata sticky (decisão do cliente, 02/09).
+  const r18 = validarOverflow();
+  falhas.push(...r18.falhas);
+  avisos.push(...r18.avisos);
+
   // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
   // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a
   // lacuna reprova ANTES de chegar ao preview.
@@ -167,6 +172,62 @@ export function validarLayout() {
   avisos.push(...r17.avisos);
 
   return { falhas, avisos, telas: manifesto.telas.length, arquivosTabela: r17.arquivos };
+}
+
+/**
+ * R18 — `overflow: hidden` cria contexto de rolagem e MATA `position:
+ * sticky` de tudo que estiver dentro: faixa fixa do cabeçalho, coluna fixa
+ * de tabela, cabeçalho grudado. E mata em SILÊNCIO — sem erro de console,
+ * sem falhar build, sem aparecer em teste de unidade.
+ *
+ * Já aconteceu duas vezes: `.rhdp-page` derrubou a faixa do topo e
+ * `.ao-financial` derrubou a coluna fixa da auditoria. Quando é preciso
+ * cortar o que transborda, o certo é `overflow: clip` — corta igual e NÃO
+ * cria scrollport.
+ *
+ * Rede ESTÁTICA (o harness mede a cadeia real no DOM): reprova
+ * `overflow*: hidden` no CSS dos componentes padrão e dos módulos que
+ * hospedam tela reformada.
+ */
+function validarOverflow() {
+  const falhas = [];
+  const avisos = [];
+  const alvos = [path.join('src', 'styles', 'componentes-padrao.css')];
+
+  const varrer = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
+      const caminho = path.join(dir, item.name);
+      if (item.isDirectory()) varrer(caminho);
+      else if (item.name.endsWith('.css') && /governanca/.test(caminho)) {
+        alvos.push(path.relative(frontendRoot, caminho));
+      }
+    }
+  };
+  varrer(path.join(frontendRoot, 'src', 'modules'));
+
+  alvos.forEach((rel) => {
+    const caminho = path.join(frontendRoot, rel);
+    if (!fs.existsSync(caminho)) return;
+    const codigo = fs.readFileSync(caminho, 'utf8');
+
+    // O check olha o BLOCO da regra, não a linha solta: `overflow: hidden`
+    // junto de `text-overflow: ellipsis` (ou `white-space: nowrap`) é o
+    // IDIOMA DE TRUNCAGEM de texto — recorta a própria caixa e não é
+    // ancestral de sticky. Marcar isso seria ruído, e regra que vira ruído
+    // deixa de ser lida.
+    for (const bloco of codigo.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      const seletor = bloco[1].trim();
+      const corpo = bloco[2];
+      if (!/(^|[;{\s])overflow(-x|-y)?\s*:\s*hidden/.test(corpo)) continue;
+      const ehTruncagem = /text-overflow/.test(corpo) || /white-space\s*:\s*nowrap/.test(corpo);
+      if (ehTruncagem) continue;
+      const linha = codigo.slice(0, bloco.index).split('\n').length;
+      falhas.push(`${rel}:${linha} [R18] overflow hidden em "${seletor.split('\n').pop().trim().slice(0, 60)}" — cria contexto de rolagem e mata o position:sticky de faixa fixa, coluna fixa e cabeçalho de tabela dentro dele. Use \`overflow: clip\` (corta igual, sem criar scrollport); se for recorte de texto, acompanhe de text-overflow/white-space.`);
+    }
+  });
+
+  return { falhas, avisos };
 }
 
 /**

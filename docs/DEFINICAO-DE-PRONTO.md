@@ -94,6 +94,15 @@ elemento e a medida que reprovou.
 - **R2** Campos da mesma linha alinhados (mesma altura/baseline), largura
   por tipo de dado.
 
+## ESTRUTURA E ACESSIBILIDADE
+
+- **R18** Nenhum ancestral de faixa fixa, coluna fixa ou contêiner de
+  rolagem de tabela usa `overflow: hidden` (que mata o `position: sticky`
+  em silêncio). Corte com `overflow: clip`.
+- **A1** Toda linha acionável tem caminho por TECLADO: `tabIndex` com
+  Enter/Espaço, ou um link/botão focável dentro da linha que faça a mesma
+  ação. N/A só em tela sem linha acionável.
+
 ## MOBILE (390px)
 
 - **X1** Tabela vira cards legíveis (mesmas colunas, um markup).

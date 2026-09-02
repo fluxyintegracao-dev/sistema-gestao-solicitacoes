@@ -573,3 +573,84 @@ export function checksMobile() {
 
   return r;
 }
+
+/**
+ * R18 / A1 — checks que precisam do DOM real.
+ *
+ * R18: `overflow: hidden` em QUALQUER ancestral de tabela, faixa fixa ou
+ * coluna fixa cria um contexto de rolagem e MATA o `position: sticky` — em
+ * silêncio, sem erro no console e sem falhar build. Já derrubou a faixa do
+ * topo (.rhdp-page) e a coluna fixa da auditoria (.ao-financial). Quando é
+ * preciso cortar, o certo é `overflow: clip`, que corta sem criar
+ * scrollport. Este check anda a cadeia de ancestrais e nomeia o culpado.
+ *
+ * A1: toda linha acionável precisa de caminho por TECLADO — quem não usa
+ * mouse não pode perder a ação.
+ */
+export function checkStickyEAcessibilidade() {
+  const r = {};
+  const qa = (sel) => Array.from(document.querySelectorAll(sel));
+  const cssPath = (el) => {
+    if (!el) return '';
+    const partes = [];
+    let atual = el;
+    while (atual && atual !== document.documentElement && partes.length < 4) {
+      let p = atual.tagName.toLowerCase();
+      const cls = String(atual.className || '').split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+      if (cls) p += `.${cls}`;
+      partes.unshift(p);
+      atual = atual.parentElement;
+    }
+    return partes.join(' > ');
+  };
+
+  /* ---- R18: ancestral que sequestra o sticky ---- */
+  const fixos = [
+    ...qa('.layout-main .app-page-header'),
+    ...qa('.app-tabela td.celula-fixa'),
+    ...qa('.app-tabela .resizable-table-scroll')
+  ];
+  const culpados = [];
+  fixos.forEach((alvo) => {
+    let atual = alvo.parentElement;
+    while (atual && atual !== document.documentElement) {
+      const cs = getComputedStyle(atual);
+      const eixos = [cs.overflow, cs.overflowX, cs.overflowY];
+      // `hidden` e `auto`/`scroll` criam scrollport; `clip` e `visible` não.
+      // O PRÓPRIO contêiner de rolagem da tabela é legítimo — ele é o alvo.
+      const ehRolagemDaTabela = atual.classList.contains('resizable-table-scroll');
+      if (!ehRolagemDaTabela && eixos.includes('hidden')) {
+        culpados.push(`${cssPath(atual)} (overflow hidden) sobre ${cssPath(alvo)}`);
+        break;
+      }
+      atual = atual.parentElement;
+    }
+  });
+  r.R18 = fixos.length === 0
+    ? { estado: 'N/A', motivo: 'tela sem elemento fixo (faixa, tabela ou coluna fixa)' }
+    : culpados.length
+      ? { estado: 'FALHOU', motivo: `overflow hidden mata o sticky: ${culpados.slice(0, 2).join(' | ')} — use overflow: clip`, seletor: culpados[0] }
+      : { estado: 'PASSOU' };
+
+  /* ---- A1: linha acionável alcançável por teclado ---- */
+  const linhasClicaveis = qa('.app-tabela-linha--clicavel');
+  if (!linhasClicaveis.length) {
+    // Sem linha clicável: a tela ainda precisa ter os controles focáveis,
+    // mas isso já é coberto por M1/estrutura — aqui é N/A honesto.
+    r.A1 = { estado: 'N/A', motivo: 'tela sem linha acionável' };
+  } else {
+    const semFoco = linhasClicaveis.filter((tr) => {
+      const tabIndex = tr.getAttribute('tabindex');
+      const temFocoProprio = tabIndex !== null && Number(tabIndex) >= 0;
+      // Alternativa aceitável: um controle focável DENTRO da linha que faça
+      // a mesma ação (link ou botão de abrir).
+      const controleInterno = tr.querySelector('a[href], button:not([disabled])');
+      return !temFocoProprio && !controleInterno;
+    });
+    r.A1 = semFoco.length
+      ? { estado: 'FALHOU', motivo: `${semFoco.length} linha(s) acionável(is) sem caminho por teclado (sem tabindex e sem link/botão dentro)`, seletor: cssPath(semFoco[0]) }
+      : { estado: 'PASSOU' };
+  }
+
+  return r;
+}
