@@ -60,8 +60,64 @@
 }
 
 /* R4 — respiro entre a barra fixa e o primeiro conteúdo. */
+/* R13 — CABEÇALHO FIXO (02/09): título, contagem/apoio e ações permanecem
+   visíveis na rolagem, presos logo abaixo da topbar, numa superfície
+   própria (o apoio não flutua sobre o fundo). Ao rolar, compacta
+   (título menor), mas NUNCA some. --pos-cabecalho-fixo é calculada pelo
+   PageHeader a partir da altura real da topbar. */
 .layout-main .app-page-header {
   margin-top: var(--respiro-topbar);
+  position: sticky;
+  top: var(--pos-cabecalho-fixo, 96px);
+  z-index: 15;
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--raio-3);
+  box-shadow: var(--ui-shadow-sm);
+  padding: var(--esp-3) var(--esp-4);
+  transition: padding 0.15s ease;
+}
+
+.layout-main .app-page-header .page-title {
+  transition: font-size 0.15s ease;
+}
+
+/* Compacto (rolagem): paddings e título encolhem; as ações ficam. */
+.layout-main .app-page-header--compacto {
+  padding: var(--esp-2) var(--esp-4);
+}
+
+.layout-main .app-page-header--compacto .page-title {
+  font-size: var(--fonte-corpo);
+}
+
+.layout-main .app-page-header--compacto .app-page-lead {
+  font-size: var(--fonte-corpo);
+}
+
+/* R5 (02/09, revisto de novo): o apoio mora na FAIXA FIXA, com escala de
+   título — não é texto miúdo nem flutua: a faixa é a superfície dele.
+   UMA linha, com reticências (o texto completo vai no title/tooltip). */
+.app-page-lead {
+  margin: var(--esp-1) 0 0;
+  font-size: var(--fonte-bloco);
+  line-height: var(--lh-titulo);
+  font-weight: 500;
+  color: var(--c-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.app-page-lead strong {
+  color: var(--c-text);
+  font-weight: 700;
+}
+
+.app-page-header-row > div:first-child {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 /* R5 — texto de apoio DENTRO do bloco, ancorado ao título dele (regra do
@@ -445,6 +501,49 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--c-muted);
+  /* R14: o alinhamento do título é o MESMO do conteúdo — vem do wrapper. */
+  text-align: inherit;
+}
+
+/* R14 — título de coluna clicável: escolhe o alinhamento (esq/centro/dir),
+   aplicado a título E conteúdo, salvo por usuário e por lista. */
+.app-th-alinhavel {
+  display: block;
+  position: relative;
+  min-width: 0;
+}
+
+.app-th-botao {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+  /* R2: o título inteiro é o alvo do clique de alinhamento. */
+  display: block;
+  width: 100%;
+  min-height: var(--alvo-clique);
+  text-align: inherit;
+}
+
+.app-th-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: auto;
+  min-width: 140px;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+/* O rótulo do th não pode cortar o menu de alinhamento (overflow do label). */
+.app-tabela .resizable-th-label {
+  overflow: visible;
 }
 
 /* Colunas de dinheiro/número alinham à direita com dígito tabular. */

@@ -1,7 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  HiOutlineArrowLeft,
   HiOutlineBanknotes,
   HiOutlineBuildingOffice2,
   HiOutlineChartBar,
@@ -67,11 +66,12 @@ function DetailTableEmpty({ message }) {
   );
 }
 
-function KpiCard({ label, value, accentColor, helper }) {
+function KpiCard({ label, value, serie, helper }) {
+  const classeSerie = serie === 'prevista' ? ' texto-previsto' : serie === 'realizada' ? ' texto-realizado' : '';
   return (
     <div className="app-summary-card">
       <div className="app-summary-label">{label}</div>
-      <div className="app-summary-value" style={{ color: accentColor || 'var(--c-text)' }}>
+      <div className={`app-summary-value${classeSerie}`} style={classeSerie ? undefined : { color: 'var(--c-text)' }}>
         {value}
       </div>
       {helper ? <div className="app-summary-subvalue">{helper}</div> : null}
@@ -79,14 +79,15 @@ function KpiCard({ label, value, accentColor, helper }) {
   );
 }
 
-function CompactHeaderMetric({ label, value, accentColor }) {
+function CompactHeaderMetric({ label, value, serie }) {
+  const classeSerie = serie === 'prevista' ? ' texto-previsto' : serie === 'realizada' ? ' texto-realizado' : '';
   return (
     <div
       className="rounded-xl border px-3 py-2"
       style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}
     >
       <div className="text-xs font-medium" style={{ color: 'var(--c-muted)' }}>{label}</div>
-      <div className="mt-1 text-lg font-bold leading-none" style={{ color: accentColor || 'var(--c-text)' }}>
+      <div className={`mt-1 text-lg font-bold${classeSerie}`} style={classeSerie ? undefined : { color: 'var(--c-text)' }}>
         {value}
       </div>
     </div>
@@ -250,25 +251,20 @@ export default function ObraGestao() {
 
   return (
     <Pagina>
-      <section className="card px-4 py-4 md:px-6">
+      {/* R13: cabeçalho do registro é FAIXA FIXA — nome, métricas e abas
+          continuam visíveis na rolagem. */}
+      <section className="app-page-header">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex flex-1 items-start gap-4">
-            <button
-              type="button"
-              className="btn btn-outline mt-1 inline-flex items-center justify-center rounded-xl"
-              onClick={() => navigate('/obras')}
-            >
-              <HiOutlineArrowLeft aria-hidden="true" />
-            </button>
-
-            <div>
-              <div className="text-xs font-semibold uppercase" style={{ color: 'var(--c-muted)' }}>
-                {data.obra.codigo || `OBRA ${data.obra.id}`}
-              </div>
-              <h1 className="mt-1 text-lg font-bold uppercase" style={{ color: 'var(--c-text)' }}>
+            <div className="min-w-0">
+              {/* O NOME do registro é a informação principal do cabeçalho —
+                  peso e escala de título; código e localização são apoio. */}
+              <h1 className="page-title uppercase" style={{ color: 'var(--c-text)' }} title={data.obra.nome}>
                 {data.obra.nome}
               </h1>
               <div className="mt-1 inline-flex items-center gap-2 text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>
+                <span>{data.obra.codigo || `OBRA ${data.obra.id}`}</span>
+                <span aria-hidden="true">·</span>
                 <HiOutlineMapPin className="h-4 w-4" />
                 {data.obra.cidade || 'Cidade nao informada'}
               </div>
@@ -276,8 +272,8 @@ export default function ObraGestao() {
           </div>
 
           <div className="app-painel-lateral grid gap-3 sm:grid-cols-2">
-            <CompactHeaderMetric label="Custo pago" value={formatCurrency(kpis.custo_pago)} />
-            <CompactHeaderMetric label="Saldo projetado" value={formatCurrency(kpis.saldo_projetado)} accentColor="var(--accent-green)" />
+            <CompactHeaderMetric label="Custo pago" value={formatCurrency(kpis.custo_pago)} serie="realizada" />
+            <CompactHeaderMetric label="Saldo projetado" value={formatCurrency(kpis.saldo_projetado)} />
           </div>
         </div>
 
@@ -304,9 +300,9 @@ export default function ObraGestao() {
       {activeTab === 'dashboard' && (
         <>
           <section className="app-summary-grid">
-            <KpiCard label="Investimento total" value={formatCurrency(kpis.investimento_total)} />
-            <KpiCard label="Custo executado" value={formatCurrency(kpis.custo_executado)} accentColor="var(--accent-blue)" />
-            <KpiCard label="Diferenca / saldo" value={formatCurrency(kpis.diferenca_saldo)} accentColor="var(--accent-green)" />
+            <KpiCard label="Investimento total" value={formatCurrency(kpis.investimento_total)} serie="prevista" />
+            <KpiCard label="Custo executado" value={formatCurrency(kpis.custo_executado)} serie="realizada" />
+            <KpiCard label="Diferenca / saldo" value={formatCurrency(kpis.diferenca_saldo)} />
             <KpiCard label="Eficiencia" value={percent(kpis.eficiencia)} helper="do orcamento" />
           </section>
 
@@ -474,7 +470,7 @@ export default function ObraGestao() {
             </div>
             <div className="rounded-xl border px-3 py-2 text-right" style={{ borderColor: 'var(--ui-border)', background: 'var(--ui-canvas)' }}>
               <div className="text-xs font-medium uppercase" style={{ color: 'var(--c-muted)' }}>Total pago</div>
-              <div className="mt-1 text-lg font-bold obra-accent-blue">{formatCurrency(data.custos.total_pago)}</div>
+              <div className="mt-1 text-lg font-bold texto-realizado">{formatCurrency(data.custos.total_pago)}</div>
             </div>
           </div>
 

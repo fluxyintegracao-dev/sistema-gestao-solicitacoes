@@ -163,6 +163,15 @@ if (fs.existsSync(distAssets)) {
   }
 }
 
+// R13 — o cabeçalho da tela é FAIXA FIXA: gruda abaixo da topbar na rolagem
+// (compacta, nunca some). A garantia estática é o sticky no CSS padrão; a
+// medição real (posição após rolar) é da auditoria runtime das capturas.
+const componentesPadraoCss = read('src/styles/componentes-padrao.css');
+if (!/\.layout-main \.app-page-header \{[^}]*position:\s*sticky/s.test(componentesPadraoCss)
+  || !/--pos-cabecalho-fixo/.test(componentesPadraoCss)) {
+  fail('o cabeçalho da tela precisa ser fixo na rolagem (.app-page-header sticky com --pos-cabecalho-fixo) — R13.');
+}
+
 // Regras mecânicas de layout (docs/REGRAS-LAYOUT.md) sobre as telas do
 // manifesto — reprovam a tela reformada que sair do padrão.
 const regrasLayout = validarLayout();

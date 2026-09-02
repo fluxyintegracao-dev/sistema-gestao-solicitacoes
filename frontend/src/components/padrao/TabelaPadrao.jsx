@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
+import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import EmptyState from '../ui/EmptyState';
 
 function useEhMovel() {
@@ -41,6 +42,27 @@ export function CelulaDupla({ principal, sub, title }) {
  */
 
 // Medidas por papel da coluna — pior caso real de cada dado (R1/R6/R7).
+// R14 (02/09): título e conteúdo da coluna compartilham o MESMO
+// alinhamento, definido pelo tipo — e o usuário pode trocar (esquerda/
+// centro/direita) clicando no cabeçalho; a escolha vale para os dois e é
+// salva por usuário e por lista, como largura.
+const ALINHAMENTO_POR_TIPO = {
+  texto: 'left',
+  identidade: 'left',
+  codigo: 'left',
+  data: 'left',
+  valor: 'right',
+  numero: 'right',
+  status: 'center',
+  badge: 'center'
+};
+
+const OPCOES_ALINHAMENTO = [
+  ['left', 'Esquerda'],
+  ['center', 'Centro'],
+  ['right', 'Direita']
+];
+
 const TIPOS_COLUNA = {
   texto:  { largura: 180, flexPadrao: true },        // conteúdo: recebe a sobra
   // Identificação (nome, razão social, obra, empresa, parceiro): como texto,
@@ -51,8 +73,8 @@ const TIPOS_COLUNA = {
   valor:  { largura: 190, alinhar: 'right', valor: true },
   numero: { largura: 120, alinhar: 'right', valor: true },
   data:   { largura: 110 },                          // 22/08/2026
-  status: { largura: 96 },
-  badge:  { largura: 120 }
+  status: { largura: 96, alinhar: 'center' },
+  badge:  { largura: 120, alinhar: 'center' }
 };
 
 function normalizarColuna(coluna) {
@@ -66,6 +88,53 @@ function normalizarColuna(coluna) {
     __valor: base.valor || undefined,
     __identidade: base.identidade || undefined
   };
+}
+
+function lerAlinhamentos(chave) {
+  if (!chave || typeof window === 'undefined') return {};
+  try {
+    return JSON.parse(window.localStorage.getItem(chave) || '{}');
+  } catch {
+    return {};
+  }
+}
+
+/* Menu do cabeçalho: o usuário escolhe o alinhamento da coluna (R14). */
+function TituloComAlinhamento({ coluna, alinhamento, aoAlinhar }) {
+  const [aberto, setAberto] = useState(false);
+  const ref = useRef(null);
+  useFecharAoSair(ref, aberto, () => setAberto(false));
+  return (
+    <span className="app-th-alinhavel" ref={ref} style={{ textAlign: alinhamento }}>
+      <button
+        type="button"
+        className="app-th-botao"
+        title="Clique para alinhar a coluna"
+        onClick={() => setAberto((atual) => !atual)}
+      >
+        {coluna.titulo}
+      </button>
+      {aberto && (
+        <span className="app-mais-menu app-th-menu" role="menu">
+          {OPCOES_ALINHAMENTO.map(([valor, rotulo]) => (
+            <button
+              key={valor}
+              type="button"
+              role="menuitem"
+              className="app-mais-item"
+              aria-pressed={alinhamento === valor}
+              onClick={() => {
+                setAberto(false);
+                aoAlinhar(coluna.id, valor);
+              }}
+            >
+              {alinhamento === valor ? '✓ ' : ''}{rotulo}
+            </button>
+          ))}
+        </span>
+      )}
+    </span>
+  );
 }
 
 function classeCelula(coluna) {
@@ -94,6 +163,23 @@ export default function TabelaPadrao({
 
   // A tela declara o papel (`tipo`); a medida vem da tabela de tipos.
   const colunasBase = colunas.map(normalizarColuna);
+
+  // R14 — alinhamento escolhido pelo usuário, salvo por lista (como largura).
+  const chaveAlinhar = storageKey ? `${storageKey}:alinhar` : null;
+  const [alinhamentos, setAlinhamentos] = useState(() => lerAlinhamentos(chaveAlinhar));
+  const definirAlinhamento = (colunaId, valor) => {
+    setAlinhamentos((atuais) => {
+      const proximos = { ...atuais, [colunaId]: valor };
+      if (chaveAlinhar) {
+        try { window.localStorage.setItem(chaveAlinhar, JSON.stringify(proximos)); } catch { /* sem storage */ }
+      }
+      return proximos;
+    });
+  };
+  const alinhamentoDe = (coluna) => alinhamentos[coluna.id]
+    || coluna.alinhar
+    || ALINHAMENTO_POR_TIPO[coluna.tipo]
+    || 'left';
 
   // R1 (docs/REGRAS-LAYOUT.md): ação no máximo 320px; a sobra do card vai
   // SEMPRE para a coluna de conteúdo (flex) — medida uma vez no mount.
@@ -206,7 +292,15 @@ export default function TabelaPadrao({
           <tr>
             {colunasTabela.map((coluna) => (
               <ResizableTh key={coluna.id} columnKey={coluna.id}>
-                {coluna.titulo}
+                {coluna.id === '__acoes' ? (
+                  coluna.titulo
+                ) : (
+                  <TituloComAlinhamento
+                    coluna={coluna}
+                    alinhamento={alinhamentoDe(coluna)}
+                    aoAlinhar={definirAlinhamento}
+                  />
+                )}
               </ResizableTh>
             ))}
           </tr>
@@ -229,7 +323,7 @@ export default function TabelaPadrao({
                   <td
                     key={coluna.id}
                     className={classeCelula(coluna)}
-                    style={coluna.alinhar ? { textAlign: coluna.alinhar } : undefined}
+                    style={{ textAlign: alinhamentoDe(coluna) }}
                   >
                     {coluna.render(item)}
                   </td>

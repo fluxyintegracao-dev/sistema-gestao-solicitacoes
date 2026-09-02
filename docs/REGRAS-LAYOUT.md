@@ -47,18 +47,20 @@ automaticamente se sair do padrão.
   da página, aplicado no `.app-page-header` (margin-top). A auditoria runtime
   mede o vão real e reprova < 24px.
 
-## R5 — Texto de apoio DENTRO do bloco (revisto em 02/09)
+## R5 — Texto de apoio na FAIXA FIXA do topo (revisão final, 02/09)
 
-- Texto de apoio e contagem vivem **DENTRO do bloco de conteúdo a que se
-  referem**, ancorados ao título do bloco: props **`contagem`** e
-  **`descricao`** do `BlocoConteudo` (`.app-bloco-lead`: contagem em
-  `<strong>`, apoio muted, máx 78ch). **Nada de texto solto na faixa entre
-  a topbar e o primeiro bloco** — se um texto não pertence a nenhum bloco,
-  ele não deveria existir na tela.
-- O `PageHeader` NÃO renderiza mais subtítulo/contagem (só o h1 de
-  acessibilidade e as ações). `subtitulo=`/`contagem=` no PageHeader e
-  `page-subtitle` solto são REPROVADOS pelo verificador; a auditoria
-  runtime reprova parágrafo visível na faixa do topo.
+- O incômodo original era o apoio parecer texto sem estilo flutuando sobre
+  o fundo — não a posição. Forma final: **contagem + apoio voltam ao topo**,
+  nas props **`contagem`/`descricao` do `PageHeader`**, com:
+  - **escala de título** (18px, peso 500; contagem em `<strong>`), não
+    texto miúdo;
+  - **superfície própria**: a faixa fixa do cabeçalho (R13) tem fundo,
+    contorno e sombra — nada flutua sobre o canvas;
+  - **UMA linha só**: trunca com reticências e o texto completo vai no
+    tooltip (a auditoria runtime reprova quebra de linha).
+- `BlocoConteudo` mantém `contagem`/`descricao` para apoio DE BLOCO
+  específico (ex.: regra de um bloco secundário); o apoio DA TELA mora no
+  cabeçalho. A prop antiga `subtitulo` não existe — o verificador reprova.
 
 ## R6 — Campo monetário dimensionado pelo pior caso
 
@@ -85,6 +87,11 @@ automaticamente se sair do padrão.
 - Classes utilitárias: `.serie-prevista`/`.serie-realizada` (fundos de
   barra) e `.texto-previsto`/`.texto-realizado` (números e legendas — a
   legenda carrega a MESMA cor da série).
+- **A cor é da SÉRIE, não do componente** (02/09): dentro da mesma tela,
+  KPI, gráfico, tabela e legenda que representam a mesma série compartilham
+  a mesma cor — um card azul e a tabela vermelha para o MESMO custo é
+  defeito. KPI que não pertence a nenhuma série (eficiência, saldo
+  derivado) fica NEUTRO (cor de texto).
 
 ## R9 — Cadastro raro abre em MODAL
 
@@ -144,6 +151,34 @@ automaticamente se sair do padrão.
 - Select de FORMULÁRIO (entrada de dado) e seletor de CONTEXTO (escolher
   QUAL registro/conjunto se edita, quando novos registros herdam a escolha)
   continuam legítimos.
+
+## R13 — Cabeçalho FIXO na rolagem (02/09)
+
+- O cabeçalho da tela (título, contagem/apoio e ações) **permanece fixo**
+  logo abaixo da topbar durante a rolagem, numa superfície própria (fundo,
+  contorno, sombra). Ao rolar ele **compacta** (título menor, paddings
+  menores, ações intactas) — **nunca some**. Em página longa, a ação
+  principal está sempre a um clique.
+- Implementação: `.app-page-header` sticky com `--pos-cabecalho-fixo`
+  (altura real da topbar, medida pelo `Pagina`); compactação por sentinela
+  no `PageHeader`. Cabeçalho custom de tela de registro usa a MESMA classe
+  (ex.: gestão da obra). Verificador estático garante o sticky no CSS;
+  a auditoria runtime rola a página e mede a faixa.
+- **Tela de REGISTRO** (detalhe): o cabeçalho exibe o **NOME/identificação
+  do registro com destaque** (peso e escala de título); código e
+  localização são informação secundária ao lado ou abaixo. Número sem nome
+  é defeito.
+
+## R14 — Alinhamento de coluna: por tipo, e do usuário (02/09)
+
+- **Título e conteúdo da coluna compartilham o MESMO alinhamento**, por
+  padrão definido pelo tipo: texto/identidade/código/data à esquerda,
+  valor/número à direita, status/badge centralizados. Título centralizado
+  sobre conteúdo à esquerda é defeito (auditoria runtime compara th × td).
+- O usuário pode trocar o alinhamento de qualquer coluna **clicando no
+  título** (esquerda/centro/direita); a escolha aplica a título E conteúdo
+  e é salva por usuário e por lista (localStorage, como a largura). O
+  alinhamento-check do roteiro de capturas prova aplicação e persistência.
 
 ## Verificação
 

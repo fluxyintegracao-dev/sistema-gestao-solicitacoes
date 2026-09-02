@@ -232,7 +232,10 @@ export default function Layout() {
   return (
     <AtalhosProvider>
     <div className={theme === 'dark' ? 'dark' : ''}>
-      <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-hidden ${nativeApp ? 'layout-shell-native' : ''} ${custosRecebiveisResponsiveRoute ? 'custos-recebiveis-layout-scope' : ''}`}>
+      {/* overflow-x-CLIP, não hidden: hidden acopla overflow-y:auto e o shell
+          vira um scrollport que nunca rola — a topbar e o cabeçalho fixo
+          (R13) "grudavam" nele em vez de grudar na janela (defeito 02/09). */}
+      <div className={`layout-shell fluxy-app-shell flex min-h-screen overflow-x-clip ${nativeApp ? 'layout-shell-native' : ''} ${custosRecebiveisResponsiveRoute ? 'custos-recebiveis-layout-scope' : ''}`}>
         <OperationalAuditTracker />
         <div className="layout-shell-backdrop" aria-hidden="true" />
 

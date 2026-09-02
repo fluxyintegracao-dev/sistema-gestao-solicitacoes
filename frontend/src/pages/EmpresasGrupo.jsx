@@ -213,10 +213,12 @@ export default function EmpresasGrupo() {
 
   return (
     <Pagina>
-      {/* R11: "Voltar para Configurações" saiu do menu de ações —
-          navegação pertence ao breadcrumb, não ao "⋯". */}
+      {/* R5 (piloto 02/09): contagem + apoio na FAIXA FIXA do topo, com
+          escala de título, superfície própria e uma linha só. */}
       <PageHeader
         titulo="Empresas do Grupo"
+        contagem={carregando ? null : `${empresas.length} empresa(s)`}
+        descricao="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
         acaoPrincipal={{ rotulo: 'Nova empresa', onClick: abrirNovaEmpresa }}
       />
 
@@ -383,8 +385,6 @@ export default function EmpresasGrupo() {
 
       <BlocoConteudo
         titulo="Empresas cadastradas"
-        contagem={carregando ? null : `${empresas.length} empresa(s)`}
-        descricao="Cadastro central usado por financeiro, pagamentos, RH/DP e demais modulos multiempresa."
         variante="primario"
         cor="var(--c-primary)"
       >

@@ -126,13 +126,12 @@ export function validarLayout() {
 
     const linhaDe = (indice) => codigo.slice(0, indice).split('\n').length;
 
-    // R5 (02/09) — texto de apoio NÃO mora no PageHeader: ancora no
-    // BlocoConteudo a que se refere (props contagem/descricao). Nada de
-    // texto solto na faixa entre a topbar e o primeiro bloco.
+    // R5 (02/09, revisto) — o apoio mora na FAIXA FIXA do topo, nas props
+    // contagem/descricao do PageHeader (uma linha, escala de título). A
+    // prop antiga `subtitulo` não existe mais — usá-la some com o texto.
     for (const bloco of codigo.matchAll(/<PageHeader\b[\s\S]*?>/g)) {
-      const prop = bloco[0].match(/\b(subtitulo|contagem)=/);
-      if (prop) {
-        aponta(linhaDe(bloco.index) - 1, 'R5', `${prop[1]} no PageHeader — o texto de apoio vive DENTRO do bloco de conteúdo (BlocoConteudo contagem/descricao), nunca solto na faixa do topo.`);
+      if (/\bsubtitulo=/.test(bloco[0])) {
+        aponta(linhaDe(bloco.index) - 1, 'R5', 'prop subtitulo não existe mais no PageHeader — use descricao (e contagem), que rendem na faixa fixa do topo.');
       }
     }
 
