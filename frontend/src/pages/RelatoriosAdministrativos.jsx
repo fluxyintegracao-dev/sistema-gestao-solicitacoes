@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import {
+  Avisos,
+  BarraFiltros,
+  BlocoConteudo,
+  CelulaDupla,
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  useAvisos
+} from '../components/padrao';
 import { listarAuditoriaItensPedidoCompra } from '../services/compras';
 import { getMinhasObras } from '../services/obras';
 
@@ -12,8 +23,10 @@ const DEFAULT_FILTERS = {
   q: ''
 };
 
+// Sem a linha "Todas as acoes": no padrao de marcacao (R12) "todas" e a
+// AUSENCIA de marca, e a etiqueta some junto. Uma opcao chamada "todas"
+// dentro do menu voltaria a ser o select disfarcado.
 const ACTION_OPTIONS = [
-  { value: '', label: 'Todas as acoes' },
   { value: 'AJUSTE_MANUAL', label: 'Ajuste manual' },
   { value: 'ITEM_ADICIONADO', label: 'Item adicionado' },
   { value: 'ITEM_ADICIONADO_FORNECEDOR', label: 'Item adicionado do fornecedor' },
@@ -23,7 +36,7 @@ const ACTION_OPTIONS = [
 ];
 
 const ACTION_LABELS = Object.fromEntries(
-  ACTION_OPTIONS.filter((item) => item.value).map((item) => [item.value, item.label])
+  ACTION_OPTIONS.map((item) => [item.value, item.label])
 );
 
 function formatMoney(value) {
@@ -102,14 +115,16 @@ function buildSearchParams(filters) {
   return params;
 }
 
+// M1/R10: o tom da acao vem do token semantico (badge-info/muted/success),
+// nunca de paleta escrita no className — cor de tela nao acompanha tema.
 function actionClassName(value) {
   switch (String(value || '').toUpperCase()) {
     case 'AJUSTE_MANUAL':
-      return 'app-status-pill bg-blue-100 text-blue-700';
+      return 'badge badge-info';
     case 'REMOVIDO':
-      return 'app-status-pill bg-slate-100 text-slate-700';
+      return 'badge badge-muted';
     default:
-      return 'app-status-pill bg-emerald-100 text-emerald-700';
+      return 'badge badge-success';
   }
 }
 
@@ -175,6 +190,18 @@ function normalizeAuditErrorMessage(error) {
   return message || 'Erro ao carregar auditoria de compras';
 }
 
+/**
+ * TELA COMPARTILHADA — duas rotas servem este mesmo componente:
+ * `/compras/relatorios/auditoria` (card "Auditoria de compras" da
+ * ModuloRelatorios) e `/relatorios/administrativos` (destino do botao de
+ * auditoria do PedidoCompraDetalhe). As duas passam pelos MESMOS guardas e
+ * carregam os MESMOS dados: a tela nao le a rota nem muda de comportamento
+ * conforme a origem — nada aqui supoe "vim de Compras".
+ *
+ * O que a faixa precisa dizer, entao, e o ASSUNTO — auditoria dos itens de
+ * pedidos de compra —, porque NENHUMA das duas rotas tem no de menu, e o
+ * breadcrumb para nas duas em "Inicio". Ver o relatorio da leva.
+ */
 export default function RelatoriosAdministrativos() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [filtros, setFiltros] = useState(() => readFilters(searchParams));
@@ -182,6 +209,7 @@ export default function RelatoriosAdministrativos() {
   const [registros, setRegistros] = useState([]);
   const [loading, setLoading] = useState(false);
   const [erroCarregamento, setErroCarregamento] = useState('');
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     let ativo = true;
@@ -221,7 +249,12 @@ export default function RelatoriosAdministrativos() {
         console.error(error);
         if (ativo) {
           setRegistros([]);
-          setErroCarregamento(normalizeAuditErrorMessage(error));
+          const mensagem = normalizeAuditErrorMessage(error);
+          setErroCarregamento(mensagem);
+          // R3: a falha da consulta e EVENTO — faixa do sistema, com o tom
+          // semantico e fechavel. O cartao vazio abaixo continua sendo a
+          // CONDICAO (fecha e o problema continua), e por isso nao vira aviso.
+          avisar.erro(mensagem);
         }
       } finally {
         if (ativo) {
@@ -235,7 +268,7 @@ export default function RelatoriosAdministrativos() {
     return () => {
       ativo = false;
     };
-  }, [searchParams]);
+  }, [searchParams, avisar]);
 
   const resumo = useMemo(() => {
     const pedidos = new Set();
@@ -258,8 +291,44 @@ export default function RelatoriosAdministrativos() {
     };
   }, [registros]);
 
-  function aplicarFiltros(event) {
-    event.preventDefault();
+  /*
+    R12/R15: obra e acao sao recortes ENUMERAVEIS, entao viram marcacao com
+    etiqueta removivel. `unico: true` nas duas porque o servico recebe UM
+    valor por chave (`obra_id=`, `acao=`): a marca fica REDONDA e marcar
+    outra substitui, em vez de prometer soma que o endpoint nao aceita.
+  */
+  const dimensoes = useMemo(() => [
+    {
+      id: 'obra_id',
+      rotulo: 'Obra',
+      unico: true,
+      opcoes: obras.map((obra) => ({ valor: String(obra.id), rotulo: obra.nome }))
+    },
+    {
+      id: 'acao',
+      rotulo: 'Acao',
+      unico: true,
+      opcoes: ACTION_OPTIONS.map((opcao) => ({ valor: opcao.value, rotulo: opcao.label }))
+    }
+  ], [obras]);
+
+  const ativos = useMemo(() => ({
+    obra_id: new Set(filtros.obra_id ? [String(filtros.obra_id)] : []),
+    acao: new Set(filtros.acao ? [String(filtros.acao)] : [])
+  }), [filtros]);
+
+  function atualizarFiltro(campo, valor) {
+    setFiltros((atual) => ({ ...atual, [campo]: valor }));
+  }
+
+  function alternarFiltro(dimensao, valor) {
+    setFiltros((atual) => ({
+      ...atual,
+      [dimensao]: String(atual[dimensao]) === String(valor) ? '' : String(valor)
+    }));
+  }
+
+  function aplicarFiltros() {
     setSearchParams(buildSearchParams(filtros));
   }
 
@@ -269,152 +338,86 @@ export default function RelatoriosAdministrativos() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Relatorios Administrativos</h1>
-            <p className="page-subtitle">
-              Painel central do ADMINISTRADOR para auditoria e relatorios da operacao. A primeira entrega concentra a
-              auditoria dos itens de pedidos de compra.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/pedidos-compra" className="btn btn-outline">
-              Voltar aos pedidos
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        C2/R5: titulo em 22px e o apoio em UMA linha, na propria faixa.
+        R23 (excecao declarada): quatro recortes combinaveis — obra, acao,
+        pedido e item — passam do criterio de "consulta cara", entao a marca
+        e RASCUNHO ate o clique em Buscar. A regra exige que a tela AVISE
+        isso; sem o aviso a etiqueta apareceria antes de a lista mudar.
+        D6/R11: o "Voltar aos pedidos" saiu — era navegacao disfarcada de
+        acao na barra do cabecalho de uma LISTAGEM.
+      */}
+      <PageHeader
+        titulo="Relatorios Administrativos"
+        descricao="Auditoria dos itens de pedidos de compra: marque o recorte e clique em Buscar."
+        acaoPrincipal={{
+          rotulo: loading ? 'Buscando...' : 'Buscar',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar filtros', onClick: limparFiltros }]}
+      />
 
-      <div className="mt-4 card sol-surface-card solicitacoes-filtros app-filters-card">
-        <div className="sol-filtros-head">
-          <div>
-            <h2 className="font-semibold text-[var(--c-text)]">Auditoria de compras</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Consulte alteracoes por obra, pedido, item, acao ou qualquer termo do historico registrado.
-            </p>
-          </div>
-        </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-        <form className="grid gap-4" onSubmit={aplicarFiltros}>
-          <div className="app-filters-grid">
-            <label className="app-filter-field">
-              <span className="app-filter-label">Obra</span>
-              <select
-                className="input"
-                value={filtros.obra_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, obra_id: event.target.value }))}
-              >
-                <option value="">Todas as obras</option>
-                {obras.map((obra) => (
-                  <option key={obra.id} value={obra.id}>
-                    {obra.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
+      {/* Bloco 1 — ACAO: montar o recorte. */}
+      <BlocoConteudo variante="secundario">
+        {/*
+          F1/R16: UMA busca, ocupando a largura da faixa. Pedido e item sao
+          identificadores digitados (nao ha lista fechada), entao vao em
+          `campos`; obra e acao ficam na marcacao.
+        */}
+        <BarraFiltros
+          busca={{
+            valor: filtros.q,
+            aoMudar: (valor) => atualizarFiltro('q', valor),
+            placeholder: 'Pedido, item, obra, usuario ou descricao'
+          }}
+          campos={[
+            {
+              id: 'pedido_id',
+              rotulo: 'Pedido',
+              tipo: 'number',
+              valor: filtros.pedido_id,
+              aoMudar: (valor) => atualizarFiltro('pedido_id', valor)
+            },
+            {
+              id: 'item_id',
+              rotulo: 'Item',
+              tipo: 'number',
+              valor: filtros.item_id,
+              aoMudar: (valor) => atualizarFiltro('item_id', valor)
+            }
+          ]}
+          filtros={dimensoes}
+          ativos={ativos}
+          aoAlternar={alternarFiltro}
+          /* R16: UM dono para "limpar" — o botao do cabecalho. O "Limpar
+             tudo" da barra seria o segundo, com o mesmo efeito. As etiquetas
+             seguem removiveis uma a uma (F3). */
+        />
+      </BlocoConteudo>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Pedido</span>
-              <input
-                className="input"
-                inputMode="numeric"
-                placeholder="Ex.: 12"
-                value={filtros.pedido_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, pedido_id: event.target.value }))}
-              />
-            </label>
+      {/* Bloco 2 — CONTEXTO: o que o recorte devolveu. */}
+      <StatGrid>
+        <StatTile label="Registros" valor={resumo.total} sub="Movimentacoes listadas" />
+        <StatTile label="Pedidos afetados" valor={resumo.pedidos} sub="Pedidos com log visivel" />
+        <StatTile label="Itens afetados" valor={resumo.itens} sub="Itens com historico no filtro" />
+        <StatTile
+          label="Ultima movimentacao"
+          valor={formatDateTime(resumo.ultimaMovimentacao)}
+          sub="Ordenacao decrescente por data"
+        />
+      </StatGrid>
 
-            <label className="app-filter-field">
-              <span className="app-filter-label">Item</span>
-              <input
-                className="input"
-                inputMode="numeric"
-                placeholder="Ex.: 381"
-                value={filtros.item_id}
-                onChange={(event) => setFiltros((current) => ({ ...current, item_id: event.target.value }))}
-              />
-            </label>
-
-            <label className="app-filter-field">
-              <span className="app-filter-label">Acao</span>
-              <select
-                className="input"
-                value={filtros.acao}
-                onChange={(event) => setFiltros((current) => ({ ...current, acao: event.target.value }))}
-              >
-                {ACTION_OPTIONS.map((option) => (
-                  <option key={option.value || 'ALL'} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="app-filter-field">
-              <span className="app-filter-label">Busca geral</span>
-              <input
-                className="input"
-                placeholder="Pedido, item, obra, usuario ou descricao"
-                value={filtros.q}
-                onChange={(event) => setFiltros((current) => ({ ...current, q: event.target.value }))}
-              />
-            </label>
-          </div>
-
-          <div className="app-page-actions justify-end">
-            <button type="button" className="btn btn-outline" onClick={limparFiltros}>
-              Limpar filtros
-            </button>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              {loading ? 'Buscando...' : 'Buscar'}
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <div className="mt-4 app-summary-grid">
-        <div className="app-summary-card">
-          <span className="app-summary-label">Registros</span>
-          <strong className="app-summary-value">{resumo.total}</strong>
-          <span className="app-summary-subvalue">Movimentacoes listadas</span>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Pedidos afetados</span>
-          <strong className="app-summary-value">{resumo.pedidos}</strong>
-          <span className="app-summary-subvalue">Pedidos com log visivel</span>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Itens afetados</span>
-          <strong className="app-summary-value">{resumo.itens}</strong>
-          <span className="app-summary-subvalue">Itens com historico no filtro</span>
-        </div>
-        <div className="app-summary-card">
-          <span className="app-summary-label">Ultima movimentacao</span>
-          <strong className="app-summary-value text-base">{formatDateTime(resumo.ultimaMovimentacao)}</strong>
-          <span className="app-summary-subvalue">Ordenacao decrescente por data</span>
-        </div>
-      </div>
-
-      <div className="mt-4 card sol-surface-card">
-        <div className="card-header flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold">Historico de alteracoes</h2>
-            <p className="text-sm text-[var(--c-muted)]">
-              Esta area sera expandida para relatorios operacionais, de compras e financeiros sem misturar o fluxo
-              transacional das telas operacionais.
-            </p>
-          </div>
-          <span className="text-sm text-[var(--c-muted)]">{registros.length} registro(s)</span>
-        </div>
-
-        {erroCarregamento ? (
-          <div className="app-alert mb-4">
-            {erroCarregamento}
-          </div>
-        ) : null}
-
+      {/* Bloco 3 — HISTORICO, por ultimo (ordem de blocos decidida pelo cliente). */}
+      <BlocoConteudo
+        titulo="Historico de alteracoes"
+        descricao="Esta area sera expandida para relatorios operacionais, de compras e financeiros sem misturar o fluxo transacional das telas operacionais."
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         {erroCarregamento && !loading ? (
           <div className="app-empty-card">
             A tela esta pronta, mas a consulta depende do backend com a rota de auditoria ativa.
@@ -484,6 +487,8 @@ export default function RelatoriosAdministrativos() {
             storageKey="tabela:relatorios-administrativos:auditoria"
             rotuloRolagem="Historico de alteracoes"
             vazio="Nenhum registro de auditoria encontrado para os filtros informados."
+            /* A1: a acao da linha e um link focavel — quem nao usa mouse
+               chega nela pelo teclado sem depender do clique na linha. */
             acoesLinha={(registro) => (
               registro.pedido?.id ? (
                 <Link to={`/pedidos-compra/${registro.pedido.id}`} className="btn btn-outline">
@@ -496,7 +501,7 @@ export default function RelatoriosAdministrativos() {
             larguraAcoes={160}
           />
         )}
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

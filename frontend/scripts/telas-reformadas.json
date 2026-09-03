@@ -31,7 +31,11 @@
     "src/pages/RhDpDocumentos.jsx",
     "src/pages/RhDpImportacoes.jsx",
     "src/pages/RhDpFechamentos.jsx",
-    "src/pages/RhDpRelatorioOperacional.jsx"
+    "src/pages/RhDpRelatorioOperacional.jsx",
+    "src/pages/ModuloRelatorios.jsx",
+    "src/pages/RelatoriosAdministrativos.jsx",
+    "src/pages/ComunicacaoInterna.jsx",
+    "src/pages/ConfiguracoesContratoAlertasEFormas.jsx"
   ],
   "excecoes_medidas": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
@@ -46,25 +50,25 @@
       {
         "arquivo": "src/pages/ModuloRelatorios.jsx",
         "modulos": 9,
-        "migrada": false,
+        "migrada": true,
         "dono": "leva-compartilhadas"
       },
       {
         "arquivo": "src/pages/RelatoriosAdministrativos.jsx",
         "modulos": 2,
-        "migrada": false,
+        "migrada": true,
         "dono": "leva-compartilhadas"
       }
     ],
     "duas_familias_de_rota": [
       {
         "arquivo": "src/pages/ComunicacaoInterna.jsx",
-        "migrada": false,
+        "migrada": true,
         "dono": "leva-compartilhadas"
       },
       {
         "arquivo": "src/pages/ConfiguracoesContratoAlertasEFormas.jsx",
-        "migrada": false,
+        "migrada": true,
         "dono": "leva-compartilhadas"
       }
     ],
