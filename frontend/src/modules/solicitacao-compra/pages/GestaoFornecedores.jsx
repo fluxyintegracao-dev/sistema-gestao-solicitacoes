@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
+import { Avisos, useAvisos, TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import {
   listarFornecedoresCompra,
   criarFornecedorCompra,
@@ -51,7 +51,7 @@ function whatsappLink(numero, mensagem) {
   return `https://wa.me/55${digits}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
 }
 
-function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
+function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando, faixaAvisos }) {
   const [form, setForm] = useState({
     nome: '',
     cnpj: '',
@@ -127,6 +127,7 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
         </div>
 
         <div className="px-6 py-5 grid gap-4">
+          {faixaAvisos}
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="app-filter-label">Nome *</label>
@@ -235,6 +236,7 @@ function ModalFornecedor({ fornecedor, onSalvar, onFechar, salvando }) {
 export default function GestaoFornecedores() {
   const { user } = useAuth();
   const canManage = canManageComprasFornecedores(user);
+  const { avisos, avisar, fechar } = useAvisos();
 
   const [fornecedores, setFornecedores] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -271,7 +273,7 @@ export default function GestaoFornecedores() {
   async function handleSalvar(form) {
     const documentoErro = getCpfCnpjError(form.cnpj, { label: 'CPF/CNPJ do fornecedor' });
     if (documentoErro) {
-      alert(documentoErro);
+      avisar.alerta(documentoErro);
       return;
     }
     try {
@@ -307,6 +309,10 @@ export default function GestaoFornecedores() {
     }
   }
 
+  // A faixa tem um dono so: com o modal aberto ela vive dentro dele (senao o
+  // aviso ficaria atras do fundo escuro); com o modal fechado, abaixo do cabecalho.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     <div className="page solicitacoes-page w-full min-w-0 max-w-full overflow-x-hidden">
       <div className="card sol-surface-card app-toolbar-card min-w-0 max-w-full">
@@ -328,6 +334,8 @@ export default function GestaoFornecedores() {
           )}
         </div>
       </div>
+
+      {!modalAberto && faixaAvisos}
 
       {/* Filtros */}
       <div className="card sol-surface-card solicitacoes-filtros app-filters-card mt-4 min-w-0 max-w-full">
@@ -491,6 +499,7 @@ export default function GestaoFornecedores() {
           onSalvar={handleSalvar}
           onFechar={() => { setModalAberto(false); setFornecedorEditando(null); }}
           salvando={salvando}
+          faixaAvisos={faixaAvisos}
         />
       )}
     </div>

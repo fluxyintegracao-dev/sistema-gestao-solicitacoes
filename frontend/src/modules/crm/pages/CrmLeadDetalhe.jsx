@@ -18,6 +18,7 @@ import {
   concluirTarefa,
   cancelarTarefa
 } from '../../../services/crm';
+import { Avisos, useAvisos } from '../../../components/padrao';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canRedistributeCrmLeads } from '../../../utils/acessoProduto';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
@@ -61,6 +62,7 @@ export default function CrmLeadDetalhe() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { avisos, avisar, fechar } = useAvisos();
   const [lead, setLead] = useState(null);
   const [pipelines, setPipelines] = useState([]);
   const [motivosPerda, setMotivosPerda] = useState([]);
@@ -184,7 +186,7 @@ export default function CrmLeadDetalhe() {
   async function salvarEdicao() {
     const documentoErro = getCpfCnpjError(form.documento);
     if (documentoErro) {
-      alert(documentoErro);
+      avisar.alerta(documentoErro);
       return;
     }
     try {
@@ -344,6 +346,8 @@ export default function CrmLeadDetalhe() {
           </div>
         </div>
       </div>
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Coluna principal */}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { criarLead } from '../../../services/crm';
+import { Avisos, useAvisos } from '../../../components/padrao';
 import { getCpfCnpjError, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../../../utils/formatters';
 
 const SOURCE_OPTIONS = [
@@ -14,6 +15,7 @@ const SOURCE_OPTIONS = [
 
 export default function CrmNovoLead() {
   const navigate = useNavigate();
+  const { avisos, avisar, fechar } = useAvisos();
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     nome: '',
@@ -39,7 +41,10 @@ export default function CrmNovoLead() {
     e.preventDefault();
     if (!form.nome.trim()) return alert('Nome e obrigatorio');
     const documentoErro = getCpfCnpjError(form.documento);
-    if (documentoErro) return alert(documentoErro);
+    if (documentoErro) {
+      avisar.alerta(documentoErro);
+      return;
+    }
     try {
       setSaving(true);
       const lead = await criarLead({
@@ -72,6 +77,8 @@ export default function CrmNovoLead() {
           <Link to="/crm/leads" className="btn btn-secondary text-sm">Cancelar</Link>
         </div>
       </div>
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <form onSubmit={handleSubmit} className="mt-4 space-y-4">
         <div className="card sol-surface-card p-5">
