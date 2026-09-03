@@ -96,6 +96,15 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: false,
         defaultValue: false
       },
+      cadastro_incompleto: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      origem_cadastro: {
+        type: DataTypes.STRING(40),
+        allowNull: true
+      },
       // Nome de fachada. A razao social identifica a empresa no papel; quem trabalha na obra
       // conhece o fornecedor por este. Sem o campo, os dois brigavam dentro de `nome`.
       nome_fantasia: {

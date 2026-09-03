@@ -56,6 +56,7 @@ function defaultParceiroForm() {
     cliente: true,
     fornecedor: true,
     corretor: false,
+    cadastro_incompleto: false,
     ativo: true,
     categoria_ids: []
   };
@@ -103,6 +104,7 @@ function pickParceiroFormData(parceiro = {}) {
     cliente: parceiro.cliente !== false,
     fornecedor: parceiro.fornecedor !== false,
     corretor: parceiro.corretor === true,
+    cadastro_incompleto: parceiro.cadastro_incompleto === true,
     ativo: parceiro.ativo !== false,
     categoria_ids: Array.isArray(parceiro.categorias)
       ? parceiro.categorias.map((categoria) => categoria.id)
@@ -354,7 +356,16 @@ export default function Parceiros() {
       // Nome de parceiro é identificação: exibido em maiúsculas (só exibição).
       tipo: 'identidade',
       noCard: 'titulo',
-      render: (p) => <CelulaDupla principal={p.nome} sub={p.municipio || null} />
+      render: (p) => (
+        <div>
+          <CelulaDupla principal={p.nome} sub={p.municipio || null} />
+          {p.cadastro_incompleto && (
+            <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+              CADASTRO INCOMPLETO
+            </span>
+          )}
+        </div>
+      )
     },
     {
       id: 'documento',
@@ -580,6 +591,21 @@ export default function Parceiros() {
                   )}
                 </div>
               </FormSecao>
+
+              {parceiroForm.id && parceiroForm.cadastro_incompleto && (
+                <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                  <input
+                    className="mt-0.5"
+                    type="checkbox"
+                    checked={!parceiroForm.cadastro_incompleto}
+                    onChange={(event) => setParceiroForm((current) => ({ ...current, cadastro_incompleto: !event.target.checked }))}
+                  />
+                  <span>
+                    <strong>Cadastro conferido e completo</strong>
+                    <span className="mt-0.5 block text-xs">Marque depois de revisar os dados trazidos pela importacao do Sienge.</span>
+                  </span>
+                </label>
+              )}
 
               <BlocoConteudo
                 titulo="Chaves PIX (uso financeiro)"
