@@ -6,9 +6,9 @@
 > capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
 > · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-03 21:01** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `ee05a75b016072def2a78a92840e1645176870fe`
+- Verificação: **2026-09-03 21:16** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `9befdbb9355f64232a4b3de6abc2ea82540c89fa`
 - Telas verificadas: 36 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1
-- **Células FALHOU: 10** (justificativas abaixo)
+- **Células FALHOU: 4** (justificativas abaixo)
 - **Células SEM DADO: 36** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 |
@@ -18,11 +18,11 @@
 | parceiros | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | parceiro-categorias | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | financeiro-titulo-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | obra-gestao | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | obra-tipo-apropriacao | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| tipos-solicitacao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| tipos-solicitacao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | tipos-sub-contrato | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | empresas-grupo | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | areas-obra | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
@@ -31,9 +31,9 @@
 | tipos-compartilhados-setor | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-criacao-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-acesso-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | usuarios-permissoes-rh-dp | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ❌ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
@@ -43,7 +43,7 @@
 | rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | modulo-relatorios | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | relatorios-administrativos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | config-contrato-alertas-formas | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
 | login | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
 | recuperar-senha | — | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
@@ -52,16 +52,10 @@
 
 ## FALHOU — cada célula, justificada
 
-- **obras · T4**: a tabela encolheu 259px mas parou em 1522px num contêiner de 1239px (283px fora), acima do piso dos mínimos (0px) — ainda havia espaço para redistribuir
-- **setores · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 130px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **tipos-solicitacao · T6**: palavra QUEBRADA ao meio: "DESPESA_ADMINISTRATIVA" — td 180px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **usuarios-envio-qualquer-setor · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-acesso-financeiro · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-acesso-prioridade-diretoria · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **setores · T6**: palavra QUEBRADA ao meio: "QAENG-MTJLBFMT4DL0" — td 130px, white-space:normal, overflow-wrap:normal, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
 - **rhdp-pessoal · T3**: ao recarregar, a tabela voltou com nenhuma coluna(s) contra 6 antes — não dá para comparar a persistência
-- **relatorios-administrativos · T7**: valor truncado: "quantidade_pedido: - -> 10 | preco_unitario: - -> R$ 5,00" (largura 156px < conteúdo 300px) _(seletor: `tbody > tr.app-tabela-linha > td > div.app-celula-dupla > span.app-celula-dupla-sub`)_
-- **comunicacao-interna · B2**: 0 bloco(s) primário(s) visível(is) (esperado 1)
-- **login · C5**: secundário sem contorno: div.login-card > form.login-form > div.login-field > div.login-pw-wrap > button.btn.login-eye-btn
+- **relatorios-administrativos · T7**: valor truncado: "Quantidade definida como 10 | Preço unitário definida como R$ 5,00" (largura 156px < conteúdo 364px) _(seletor: `tbody > tr.app-tabela-linha > td > div.app-celula-dupla > span.app-celula-dupla-sub`)_
+- **login · C5**: secundário sem contorno: div.login-content-wrap > div.login-card > form.login-form > div.login-form-meta > button.btn.login-forgot
 
 ## SEM DADO — capacidades que NÃO foram provadas
 

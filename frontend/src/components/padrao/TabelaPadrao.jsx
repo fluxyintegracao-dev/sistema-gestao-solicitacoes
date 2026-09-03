@@ -124,18 +124,6 @@ const TIPOS_COLUNA = {
 const LARGURA_CONTROLES_TH = 54;
 const LARGURA_CARACTERE_TH = 7.3;
 
-/*
-  Tooltip da célula de texto simples (T6). Devolve `undefined` para
-  qualquer coisa que não seja string ou número: JSX tem o próprio `title`
-  quando precisa, e um `title` no td venceria o dele.
-*/
-function tituloDaCelula(coluna, item) {
-  const conteudo = coluna.render(item);
-  if (typeof conteudo === 'string') return conteudo.trim() || undefined;
-  if (typeof conteudo === 'number') return String(conteudo);
-  return undefined;
-}
-
 function larguraMinimaDoTitulo(titulo) {
   const texto = String(titulo ?? '').trim();
   if (!texto) return 0;
@@ -639,10 +627,46 @@ export default function TabelaPadrao({
           (filho) => filho.scrollWidth > filho.clientWidth + 2
         );
       if (cortado) td.title = td.innerText.replace(/\s+/g, ' ').trim();
+
+      /*
+        T6 — CÉLULA DE TOKEN ÚNICO TRUNCA, NÃO QUEBRA (03/09).
+
+        Tirar o `overflow-wrap: anywhere` resolveu "ADMINISTRATIVO", mas não
+        "QAENG-MTJLBFMT4DL0": o hífen é uma oportunidade de quebra legítima
+        para o navegador, e o código virava dois códigos em duas linhas.
+        Não existe propriedade CSS que proíba a quebra no hífen sem proibir
+        também a quebra entre palavras — que a gente QUER, para nome de
+        pessoa e descrição caberem em duas linhas.
+
+        Então a decisão é por conteúdo: célula cujo texto não tem espaço
+        nenhum é um token (código, matrícula, chave), e token se lê inteiro
+        ou não se lê. Ela passa a `nowrap` e trunca com reticências, com o
+        valor completo no `title` — que é exatamente o que a T6 chama de
+        aceitável. Célula com espaço continua quebrando entre palavras.
+      */
+      const texto = td.innerText.trim();
+      td.classList.toggle('app-celula-token', texto.length > 0 && !/\s/.test(texto));
     });
   });
 
   const indiceFlex = (() => {
+    /*
+      `flex` era lido como SIM/NÃO, e a primeira coluna marcada levava a
+      sobra. Só que `tipo: 'texto'` e `tipo: 'identidade'` já nascem com
+      `flexPadrao`, então numa tabela com vários textos a sobra ia para o
+      primeiro deles — não para o mais comprido. Foi o que segurou a coluna
+      "Detalhes" da auditoria em 156px com 364px de conteúdo, mesmo depois
+      de a tela pedir `flex: 3`.
+
+      Agora um número explícito maior que 1 vence: a tela consegue dizer
+      QUAL coluna é a de conteúdo. Sem número, o comportamento antigo.
+    */
+    const comPeso = colunasBase
+      .map((c, i) => ({ i, peso: Number(c.flex) }))
+      .filter(({ peso }) => Number.isFinite(peso) && peso > 1);
+    if (comPeso.length) {
+      return comPeso.reduce((a, b) => (b.peso > a.peso ? b : a)).i;
+    }
     const marcada = colunasBase.findIndex((c) => c.flex);
     if (marcada >= 0) return marcada;
     const titulo = colunasBase.findIndex((c) => c.noCard === 'titulo');
@@ -860,17 +884,6 @@ export default function TabelaPadrao({
             key={coluna.id}
             className={classeCelula(coluna)}
             style={{ textAlign: alinhamentoDe(coluna) }}
-            /*
-              T6: texto que não cabe é cortado — e corte SEM tooltip é
-              defeito. A `CelulaDupla` já traz o seu `title`; a célula de
-              texto simples não trazia nenhum, então o nome comprido sumia
-              sem o usuário ter como ler o inteiro.
-
-              Só entra quando o `render` devolve texto puro: com JSX dentro
-              (badge, botão, ícone) o `title` do td cobriria o do filho e
-              trocaria uma dica útil por outra genérica.
-            */
-            title={tituloDaCelula(coluna, item)}
           >
             {coluna.render(item)}
           </td>

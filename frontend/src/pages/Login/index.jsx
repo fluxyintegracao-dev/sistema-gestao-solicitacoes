@@ -356,9 +356,17 @@ export default function Login() {
                   <span className="login-security-dot" aria-hidden="true" />
                   <span>Acesso corporativo protegido.</span>
                 </div>
+                {/*
+                  `btn-ghost`, não contorno: a C5 classifica AÇÕES, e este
+                  controle NAVEGA — é o único caminho para fora da tela de
+                  login, pelo escopo declarado da C6/R11. Desenhar contorno
+                  em volta dele o promoveria a ação secundária e competiria
+                  com "Entrar". O `.btn` continua ali só pelo alvo de
+                  clique (M1): sem ele, o alvo tinha 19px de altura.
+                */}
                 <button
                   type="button"
-                  className="btn login-forgot"
+                  className="btn btn-ghost login-forgot"
                   onClick={() => navigate('/recuperar-senha', { state: { email: email.trim() } })}
                 >
                   Esqueci minha senha

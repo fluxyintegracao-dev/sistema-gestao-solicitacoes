@@ -589,6 +589,17 @@
   overflow-wrap: normal;
 }
 
+/*
+  Célula de TOKEN ÚNICO (sem nenhum espaço no texto): código, matrícula,
+  chave. A classe é posta pela TabelaPadrao, que é quem enxerga o conteúdo.
+  Token se lê inteiro ou não se lê — então trunca com reticências e o valor
+  completo vai para o `title`, em vez de quebrar no hífen e virar dois
+  tokens. Ver o comentário longo na TabelaPadrao.
+*/
+.app-tabela .resizable-table td.app-celula-token {
+  white-space: nowrap;
+}
+
 .app-tabela .resizable-table th {
   font-size: var(--fonte-detalhe);
   letter-spacing: 0.04em;

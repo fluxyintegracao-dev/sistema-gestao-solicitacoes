@@ -103,7 +103,13 @@ compartilhado — mas é decisão de negócio, não de layout.
    quase certamente o mesmo formulário em dois arquivos. Se forem, a leva
    pode unificá-los — mas confirmo antes de propor.
 3. **`FinanceiroConciliacao` (3.341 linhas)** é a maior tela do sistema.
-   Merece leitura própria antes de qualquer mexida.
+   Merece leitura própria antes de qualquer mexida. **Decidido em 03/09
+   (D1): a leva NÃO unifica o fluxo — aplica o padrão na tela como ela
+   está.** A unificação, e o alerta de conflito entre duas pessoas
+   conciliando o mesmo extrato, ficam em
+   `docs/PROPOSTA-UNIFICACAO-CONCILIACAO.md`, para decisão própria. O
+   alerta foi deliberadamente NÃO construído: meia solução ensina o usuário
+   a confiar num aviso que só cobre parte dos casos.
 4. **`FinanceiroBancos` com 7 tabelas e 42 cores fixas** e
    **`FinanceiroBoletos` com 49 cores fixas** são os dois piores casos de
    medida/cor à mão do módulo.

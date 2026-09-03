@@ -9,7 +9,7 @@
 // Uso: node scripts/validarNavegacao.mjs  (sai com código 1 se falhar)
 // =====================================================================
 import { createServer } from 'vite';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -197,6 +197,93 @@ try {
       if (!front.has(id)) {
         falhas += 1;
         console.error(`CATÁLOGO DE BLOCOS divergente ('${tela}'): '${id}' existe no DetalheLayoutController e não no frontend`);
+      }
+    }
+  }
+
+  /* ==================================================================
+     CARD OU LINK DE MÓDULO QUE NÃO VEM DA FONTE ÚNICA (03/09)
+
+     Achado da leva das telas compartilhadas: existem telas que montam
+     LISTAS DE DESTINO à mão — cartão de módulo, hub de configuração —
+     sem passar pelo `navigationConfig`. Consequências reais, já medidas:
+
+       - o título ficava fora da D7 porque ninguém sabia que aquela lista
+         existia;
+       - a permissão era reavaliada por conta própria, com regra própria;
+       - destino renomeado na fonte única continuava velho ali, e ninguém
+         via até alguém clicar.
+
+     O problema não são os arquivos de hoje: é o PRÓXIMO que alguém
+     escrever. Por isso o check é TRINCO — congela o passivo conhecido, na
+     data, e reprova arquivo NOVO ou contagem que SOBE. Cada leva que
+     passar por um deles zera o seu.
+
+     Sinal usado: arquivo FORA de `src/navigation/` que lista TRÊS ou mais
+     destinos absolutos distintos e NÃO importa a fonte única. Três porque
+     uma tela de detalhe legitimamente aponta para uma ou duas rotas
+     vizinhas; três ou mais já é um índice, e índice é papel da fonte
+     única.
+     ================================================================== */
+  {
+    const trincoPath = path.join(raiz, 'scripts', 'trinco-navegacao.json');
+    const trinco = JSON.parse(readFileSync(trincoPath, 'utf8'));
+    const arquivosFront = [];
+    const varrer = (dir) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) { varrer(p); continue; }
+        if (/\.jsx?$/.test(e.name)) arquivosFront.push(p);
+      }
+    };
+    varrer(path.join(raiz, 'src'));
+
+    const atual = {};
+    for (const arquivo of arquivosFront) {
+      const rel = path.relative(raiz, arquivo).replace(/\\/g, '/');
+      if (rel.startsWith('src/navigation/')) continue;
+      // O roteador e os guardas de rota NÃO são índices de navegação: o
+      // App.jsx existe para declarar todas as rotas, e um guarda existe
+      // para mandar o usuário embora. Contá-los faria o check gritar sobre
+      // a infraestrutura e não sobre o que a regra quer proteger.
+      if (rel === 'src/App.jsx' || /Route\.jsx$/.test(rel)) continue;
+      let codigo = readFileSync(arquivo, 'utf8');
+      if (/navigationConfig/.test(codigo)) continue;
+      // `<Navigate to="/">` é REDIRECIONAMENTO, não link oferecido ao
+      // usuário — sai da conta antes de medir.
+      codigo = codigo.replace(/<Navigate\b[^>]*>/g, '');
+      const destinos = new Set(
+        [...codigo.matchAll(/(?:\bto=\{?["'`]|\bto:\s*["'`])(\/[^"'`\s{}]*)/g)].map((m) => m[1])
+      );
+      if (destinos.size >= 3) atual[rel] = destinos.size;
+    }
+
+    // `--gravar-trinco` congela o passivo ATUAL. Existe para o dia em que
+    // a regra nasce e para a leva que zera um arquivo — nunca para calar o
+    // check depois de alguém acrescentar destino à mão.
+    if (process.argv.includes('--gravar-trinco')) {
+      const ordenado = Object.fromEntries(Object.entries(atual).sort(([a], [b]) => a.localeCompare(b)));
+      writeFileSync(trincoPath, `${JSON.stringify({ ...trinco, arquivos: ordenado }, null, 2)}\n`);
+      console.log(`[fonte única] trinco gravado: ${Object.keys(ordenado).length} arquivo(s), ${Object.values(ordenado).reduce((a, b) => a + b, 0)} destinos à mão.`);
+    }
+
+    const congelado = trinco.arquivos || {};
+    for (const [arquivo, quantos] of Object.entries(atual)) {
+      const antes = congelado[arquivo];
+      if (antes === undefined) {
+        falhas += 1;
+        console.error(`FONTE ÚNICA: ${arquivo} monta ${quantos} destinos à mão e não importa o navigationConfig. Índice de destinos é papel da fonte única — card e link de módulo saem de lá, senão a próxima renomeação não chega aqui.`);
+      } else if (quantos > antes) {
+        falhas += 1;
+        console.error(`FONTE ÚNICA: ${arquivo} subiu de ${antes} para ${quantos} destinos à mão. O trinco só desce: mova os novos para o navigationConfig.`);
+      }
+    }
+    for (const [arquivo, antes] of Object.entries(congelado)) {
+      const agora = atual[arquivo];
+      if (agora === undefined) {
+        console.log(`AVISO FONTE ÚNICA: ${arquivo} zerou os destinos à mão — remova a linha de scripts/trinco-navegacao.json.`);
+      } else if (agora < antes) {
+        console.log(`AVISO FONTE ÚNICA: ${arquivo} caiu de ${antes} para ${agora} destinos à mão — atualize scripts/trinco-navegacao.json.`);
       }
     }
   }

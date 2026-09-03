@@ -435,11 +435,28 @@ async function checarRedimensionamento(page, tela, resultado) {
   await page.evaluate(() => {
     document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
   });
-  await page.waitForTimeout(500);
+  /*
+    ESPERA A TABELA VOLTAR ANTES DE MEDIR (03/09).
+
+    O check dava 500ms fixos depois do reload e media. Na `rhdp-pessoal` a
+    tabela ainda estava carregando — a `TabelaPadrao` mostra o `.empty-state`
+    de "Carregando…" nesse intervalo, sem `.resizable-table` no DOM — e o
+    check leu "voltou com nenhuma coluna" e reprovou a persistência.
+
+    Não era a tela: era o relógio do harness. Agora espera o cabeçalho
+    reaparecer, e só desiste com prazo — aí o motivo diz que a tabela não
+    voltou, que é outra coisa e merece outro texto.
+  */
+  const voltou = await page.locator('.resizable-table thead th').first()
+    .waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
+  await page.waitForTimeout(400);
+  if (!voltou) {
+    problemas.push('depois de recarregar, a tabela não voltou a aparecer em 15s — a persistência da largura não pôde ser medida');
+  }
   const recarregado = (await medir())?.colunas;
-  if (!recarregado || recarregado.length !== depois.length) {
+  if (voltou && (!recarregado || recarregado.length !== depois.length)) {
     problemas.push(`ao recarregar, a tabela voltou com ${recarregado?.length ?? 'nenhuma'} coluna(s) contra ${depois.length} antes — não dá para comparar a persistência`);
-  } else if (Math.abs(recarregado[idx] - depois[idx]) > 4) {
+  } else if (voltou && recarregado && Math.abs(recarregado[idx] - depois[idx]) > 4) {
     problemas.push(`largura não persistiu ao recarregar (${depois[idx]}→${recarregado[idx]}px)`);
   }
   resultado.T3 = problemas.length

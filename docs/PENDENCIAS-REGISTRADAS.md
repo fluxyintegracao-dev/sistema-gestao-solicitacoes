@@ -528,3 +528,119 @@ contrato de componente quebra.
 - As 8 colunas editáveis da Cotação Pública usam `tipo: 'valor'`/`'numero'`
   com `<input>` dentro do `render`. Funciona, mas o tipo descreve o dado
   exibido, não um campo.
+
+---
+
+## Família "existia e ninguém sabia" — índices de navegação fora da fonte única
+
+Terceiro achado da mesma família (os dois primeiros: as telas compartilhadas
+órfãs e as rotas sem porta de entrada). O padrão se repete: **um pedaço da
+interface existe, funciona, e nenhum processo o alcança porque ninguém sabe
+que ele está ali.**
+
+### V1 — 26 arquivos montam lista de destino à mão, sem passar pelo `navigationConfig`
+
+Medido em 03/09 pelo `frontend/scripts/validarNavegacao.mjs`. São **176
+destinos** escritos à mão fora da fonte única. Os maiores:
+
+- `src/pages/ModuloRelatorios.jsx` — **54** destinos
+- `src/pages/Configuracoes.jsx` — **43** destinos
+- `src/pages/FinanceiroTitulos.jsx` — **7** destinos
+- `src/modules/crm/pages/CrmDashboardGerencial.jsx` — **4** destinos
+- `src/modules/crm/pages/CrmDashboardSla.jsx` — **4** destinos
+- `src/pages/FinanceiroTituloDetalhe.jsx` — **4** destinos
+- `src/modules/crm/pages/CrmCarteira.jsx` — **3** destinos
+- `src/modules/crm/pages/CrmDashboardDistribuicao.jsx` — **3** destinos
+- `src/modules/crm/pages/CrmKanban.jsx` — **3** destinos
+- `src/modules/crm/pages/CrmLeads.jsx` — **3** destinos
+- `src/modules/fiscal/pages/FiscalDashboard.jsx` — **3** destinos
+- `src/modules/fiscal/pages/FiscalOperationalReport.jsx` — **3** destinos
+- `src/modules/provisionamento-financeiro/pages/ProvisionamentoRelatorioOperacional.jsx` — **3** destinos
+- `src/pages/ComercialRelatorioOperacional.jsx` — **3** destinos
+- `src/pages/ComprasRelatorioComprasDiretas.jsx` — **3** destinos
+- `src/pages/ComprasRelatorioComprasFornecedor.jsx` — **3** destinos
+- `src/pages/ComprasRelatorioDemandaPedidos.jsx` — **3** destinos
+- `src/pages/CrmRelatorioExecutivo.jsx` — **3** destinos
+- `src/pages/Dashboard.jsx` — **3** destinos
+- `src/pages/FinanceiroBaixas.jsx` — **3** destinos
+- `src/pages/FinanceiroConciliacao.jsx` — **3** destinos
+- `src/pages/FinanceiroFaturasCartao.jsx` — **3** destinos
+- `src/pages/FinanceiroFinanciamentosBancarios.jsx` — **3** destinos
+- `src/pages/FinanceiroPagamentos.jsx` — **3** destinos
+- `src/pages/FinanceiroRelatorios.jsx` — **3** destinos
+- `src/pages/SolicitacoesRelatorioOperacional.jsx` — **3** destinos
+
+**Por que importa, com consequência já medida:**
+
+- **A D7 não chegou lá.** Os nove títulos "Relatórios de X" da
+  `ModuloRelatorios` sobreviveram à decisão do cliente por uma leva inteira,
+  porque a lista estava dentro do arquivo e ninguém sabia que existia.
+- **A permissão é reavaliada por conta própria.** Cada uma dessas listas
+  refaz o cálculo de visibilidade com regra local. Duas fontes de verdade
+  para "esta pessoa pode ver isto" divergem em silêncio, e o sintoma é a
+  pessoa clicar e levar "acesso negado" — ou pior, ver o que não devia.
+- **Renomeação não propaga.** Destino renomeado na fonte única continua
+  velho na lista à mão. Ninguém vê até alguém clicar e cair em tela branca:
+  a aplicação não tem rota curinga.
+
+**O que foi feito**: um check no `validarNavegacao.mjs`, em forma de
+**trinco** (`frontend/scripts/trinco-navegacao.json`). Ele reprova arquivo
+NOVO que monte três ou mais destinos sem importar a fonte única, e reprova
+contagem que SOBE num arquivo já congelado. O número só desce.
+
+Três ou mais porque uma tela de detalhe legitimamente aponta para uma ou
+duas rotas vizinhas; três já é um índice, e índice é papel da fonte única.
+O roteador (`App.jsx`) e os guardas de rota ficam de fora — eles existem
+para declarar rota e para mandar o usuário embora, não para oferecer
+caminho.
+
+**Decisão pendente**: os 26 não foram migrados. O trinco garante que o
+problema não cresça; esvaziá-lo é trabalho de leva, módulo por módulo,
+conforme cada um for reformado.
+
+**Provado que morde** (03/09): um arquivo novo com três `<Link>` reprova; e
+acrescentar dois destinos ao `Dashboard.jsx`, já congelado em 3, reprova com
+"subiu de 3 para 5".
+
+---
+
+## Varredura do cancelamento — o que a medição disse, contra a suspeita
+
+Pedido do cliente em 03/09: varrer todo o frontend atrás do idioma
+`if (!confirm(...)) return;`, para listar **onde o cancelamento não
+cancela**. A premissa era que o defeito ainda existisse nas telas não
+migradas, já que restavam ~700 chamadas congeladas.
+
+**A medição diz que não existe nenhum.** Ferramenta:
+`frontend/scripts/varreduraCancelamento.mjs` (AST, não grep), rodando em
+todo o `src/`.
+
+O que explica a diferença entre a suspeita e o número:
+
+- O passivo congelado de **726** chamadas é `alert` + `confirm` + `prompt`
+  somados. A quebra real é **643 `alert`**, **64 `confirm`** e **19
+  `prompt`**. `alert()` não tem cancelamento para quebrar.
+- Os **64 `confirm()`** restantes são todos NATIVOS, e todos no idioma
+  `if (!window.confirm(...)) return;` — que está **correto**: o `confirm`
+  nativo devolve booleano de verdade. É feio (é caixa do navegador, R19),
+  mas o "Cancelar" cancela.
+- Os quatro casos quebrados que existiram eram do `confirmar()` do
+  `useConfirmacao`, que devolve `{ ok, texto }` — e existiram porque a leva
+  trocou o contrato de retorno no meio do caminho. Foi o que deu origem à
+  R21.
+
+**A varredura ficou como porta permanente**, dentro do
+`npm run test:responsive`. Ela distingue duas famílias e não mistura: (A) o
+`confirmar()` do sistema lido como booleano; (B) `confirm()` nativo com o
+retorno ignorado. O idioma nativo correto NÃO entra na lista — misturá-lo
+faria o defeito real se perder no meio de setenta linhas certas.
+
+**Provada contra caso conhecido** antes de se acreditar no zero: uma
+fixture com quatro formas ruins e duas corretas. A primeira versão da
+varredura pegou três das quatro e **deixou passar justamente a que causou o
+estorno** — `const ok = await confirmar(...)` seguido de `if (!ok) return;`
+duas linhas abaixo — porque olhava só o pai imediato da chamada. Passou a
+seguir a ligação da variável. Um scanner que só olha o pai pega as formas
+espalhafatosas e deixa passar a discreta, que é a que aparece no código de
+verdade.
+
