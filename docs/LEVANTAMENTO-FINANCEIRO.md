@@ -1,138 +1,136 @@
-# Etapa B — Levantamento do módulo FINANCEIRO (03/09)
+# LEVANTAMENTO — módulo FINANCEIRO
 
-Levantamento antes de qualquer código. Nada foi alterado.
+> **Medido em 03/09** contra o código atual, não contra o levantamento
+> anterior. Números conferidos por script, não por leitura de memória.
+> Levantamento antes de qualquer código, como em todas as levas.
 
-**Tamanho:** 32 rotas, **30 telas distintas**, ~30.000 linhas. É o maior
-módulo do sistema — quase quatro vezes o RH/DP (7.580 linhas).
+## 1. O tamanho real
 
-**Telas compartilhadas que o Financeiro usa: ZERO.** Conferido na varredura
-de `docs/TELAS-COMPARTILHADAS.md`: o Financeiro é o único módulo com
-relatórios que **não** usa a `ModuloRelatorios` — tem hub próprio
-(`FinanceiroRelatorios`) e 11 relatórios só dele. A contagem de 30 fecha
-sem dívida com outra leva.
+| | |
+|---|---|
+| Telas servidas por rota `/financeiro/*`, `/comprovantes/*` e `/custos-recebiveis` | **32** |
+| Linhas de código somadas | **29.091** |
+| Já migradas e no manifesto | **2** (`FinanceiroTituloDetalhe`, `UsuariosAcessoFinanceiro`) |
+| Faltam | **30** |
 
-**Estado de cobertura hoje:** só **1** das 30 está no manifesto do harness
-(`financeiro-titulo-detalhe`, que entrou na Etapa A). As outras 29 nunca
-foram medidas contra a DoD.
+É o maior módulo do sistema. Para comparação: o RH/DP tinha **9** telas e
+levou **cinco** rodadas de revisão até o revisor aprovar.
 
----
+## 2. O que JÁ está pronto — e é muito
 
-## 1. As telas
+Esta é a diferença mais importante em relação ao RH/DP, e ela muda o
+tamanho do trabalho:
 
-### Núcleo de títulos (5 telas, 9.593 linhas)
-| Tela | Rota | Linhas |
+- **23 das 32 telas já usam `TabelaPadrao`.** Vieram da leva de migração de
+  tabelas, que passou pelo sistema inteiro. As sete capacidades T1–T7 já
+  estão lá.
+- **Só 1 tela tem `<table>` cru**: `FinanceiroDre.jsx`. Uma, não trinta.
+- **Cores cruas em hexadecimal: 47 no módulo inteiro**, quase todas
+  concentradas. O levantamento anterior falava em "42 cores fixas na
+  `FinanceiroBancos` e 49 na `FinanceiroBoletos`" — **estava errado**: eram
+  classes `slate`, não hexadecimais. `FinanceiroBoletos` tem **1** hex e 49
+  `slate`; `FinanceiroBancos` tem **0** hex e 42 `slate`. A correção muda o
+  tipo de trabalho: trocar classe por token é mecânico e verificável; caçar
+  hexadecimal espalhado, não.
+
+**O que falta é o cabeçalho e a moldura**: apenas **2 das 32** usam
+`<Pagina>`. As outras 30 escrevem a própria estrutura de página. É aí que
+está o grosso da leva.
+
+## 3. Passivo medido
+
+| Item | Quantidade | Onde dói mais |
 |---|---|---|
-| FinanceiroTitulos | `/financeiro/titulos`, `/contas-a-receber`, `/contas-a-pagar` | **3.554** |
-| FinanceiroTituloNovo | `/financeiro/titulos/novo` | 2.625 |
-| FinanceiroTituloDetalhe | `/financeiro/titulos/:id` | 1.793 |
-| FinanceiroTituloEditar | `/financeiro/titulos/:id/editar` | 1.621 |
+| Caixas do navegador (`alert`/`confirm`/`prompt`) | **22** | `ComprovantesPendentes` (8), `FinanceiroConciliacao` (4), `FinanceiroTitulos` (3), `FinanceiroPagamentos` (3) |
+| Classes `slate` cruas | **306** | `FinanceiroBoletos` (49), `FinanceiroBancos` (42), `FinanceiroTituloDetalhe` (35), `FinanceiroTitulos` (26) |
+| Cores em hexadecimal | **47** | espalhadas |
+| Destinos de navegação à mão | **29** | `FinanceiroTitulos` (7), `FinanceiroTituloDetalhe` (4), `FinanceiroConciliacao` (3) |
+| Telas sem `<Pagina>` | **30** | todas menos as 2 já migradas |
 
-### Operação (9 telas, 9.404 linhas)
-Pagamentos (1.515), Conciliação OFX (**3.341**), Boletos (1.371), Bancos
-Enterprise (729), Financiamentos (751), Caixas e Contas (541), Cheques de
-Terceiros (598), Baixas Realizadas (483), Baixas Compostas (171), DDA (325),
-Faturas de Cartão (311 + detalhe 333).
+## 4. ACHADO QUE NÃO É DO FINANCEIRO — e é o mais grave deste levantamento
 
-### Relatórios (12 telas, 5.913 linhas)
-Hub próprio (1.497) + Grupo Consolidado, Fluxo Consolidado, DRE (816),
-Diagnóstico do DRE, Intercompany, Endividamento, Analítico, Financeiro de
-Obras (801), Resultado de Obras, Centros de Custo.
+**`FinanceiroTituloDetalhe.jsx` está no manifesto, com matriz fechada, e tem
+35 classes `slate` cruas.** Entre elas `text-slate-500`, que é `#64748b` —
+**a mesma cor que reprovou AA na `DefinirSenha`** (4,34:1 sobre fundo claro,
+contra o mínimo de 4,5:1).
 
-### Cadastros e comprovantes (3 telas, 2.143 linhas)
-Cadastros Financeiros (1.725), Upload Comprovantes (148), Comprovantes
-Pendentes (270).
+Como isso passou: **o `validarLayout.mjs` não checa `slate`.** A M2 e a M3
+existem na DoD, o harness mede contraste no preview real — mas o check
+estático nunca olhou a classe. Durante as levas eu conferia `slate` por
+`grep` manual, agente por agente; o que não é conferido por check não é
+conferido.
 
----
+Varri as 39 telas do manifesto: **2 têm cor crua** —
+`FinanceiroTituloDetalhe` (35) e `ObraGestao` (1). Está contido, mas está lá.
 
-## 2. O que está fora do padrão
+**É a mesma família de "existia e ninguém sabia"**, e é a terceira vez que
+ela aparece: o processo dependia de um passo humano que ninguém tinha
+declarado como obrigatório.
 
-| Sintoma | Quantas telas |
-|---|---|
-| **Não usam `PageHeader`** | **29 de 30** (só `FinanceiroTituloDetalhe` usa) |
-| Copiam `.app-page-header` na mão | 12 |
-| **Não usam `BarraFiltros`** | **30 de 30** |
-| Cor `slate` fixa | 21 telas, **245 ocorrências** |
-| Caixas do navegador (R19) | 50 chamadas em 15 arquivos |
-| Tabela crua (`<table>`) | 1 — `FinanceiroDre` |
+**Proposta**: acrescentar `slate` (e as outras paletas cruas do Tailwind) ao
+`validarLayout.mjs`, com trinco, ANTES de abrir a leva. E corrigir as duas
+telas do manifesto, que são entrega antiga com defeito.
 
-**Tabelas já estão majoritariamente no `TabelaPadrao`** (55 usos), herança
-da Etapa A. Como no RH/DP, o trabalho é cabeçalho, filtros e blocos.
+## 5. Telas compartilhadas que o Financeiro usa
 
-**Três padrões de campo convivem**: `input w-full` (325), `app-filter-field`
-(133), `form-control` (15) e `input input-sm` (10). Nenhuma tela usa a
-`BarraFiltros` — o módulo inteiro é grade crua de campos.
+Contadas de propósito, para não repetirmos o ponto cego de 03/09. **As oito
+já foram migradas** na leva das compartilhadas, então nenhuma entra como
+trabalho — mas ficam declaradas:
 
----
+- `ComunicacaoInterna` — alcançável de dentro do Financeiro pelo menu.
+- `Configuracoes` e as telas de configuração que ela indexa.
+- `Login`, `RecuperarSenha`, `DefinirSenha` — todo usuário do Financeiro
+  passa por elas.
+- **O Financeiro NÃO usa a `ModuloRelatorios`**: tem hub próprio
+  (`FinanceiroRelatorios`, 1.498 linhas). É a única exceção entre os módulos
+  com relatórios, e continua verdadeira.
 
-## 3. Repetição de informação
+## 6. As três maiores, e o que fazer com elas
 
-**a) O mesmo recorte redigitado em até 23 telas.**
+1. **`FinanceiroTitulos` (3.555 linhas)** — serve **três** rotas de menu
+   (contas a receber, contas a pagar e uma terceira). Um arquivo, três
+   entradas iguais.
+2. **`FinanceiroConciliacao` (3.342 linhas)** — a maior tela do sistema.
+   **Decidido (D1, 03/09): a leva NÃO unifica o fluxo**, aplica o padrão
+   como está. A unificação e o alerta de conflito estão em
+   `docs/PROPOSTA-UNIFICACAO-CONCILIACAO.md`, para decisão própria.
+3. **`FinanceiroTituloNovo` (2.626) + `FinanceiroTituloEditar` (1.622)** —
+   4.248 linhas em dois arquivos que são quase certamente o mesmo
+   formulário. **Ainda não confirmei**: confirmo antes de propor qualquer
+   unificação, e mesmo confirmado ela seria proposta separada, pela D1.
 
-| Filtro | Telas |
-|---|---|
-| status | **23** |
-| obra | 13 |
-| parceiro | 13 |
-| competência | 10 |
-| data inicial/final | 10 |
+## 7. O que precisa de decisão sua
 
-**b) Uma tela servindo três rotas com nomes de negócio diferentes.**
-`FinanceiroTitulos` (3.554 linhas) atende `/financeiro/titulos`,
-`/contas-a-receber` e `/contas-a-pagar`. São três itens de menu distintos
-para o mesmo arquivo, discriminados por `useLocation`. Precisa de decisão:
-são três telas na matriz (com recorte próprio) ou uma com três entradas?
+**D1 — Fatiar a leva.** 30 telas não cabem numa leva só. Proponho **quatro**,
+cada uma com matriz e revisor próprios:
 
-**c) Doze relatórios, um hub, e o hub tem tabela própria.**
-`FinanceiroRelatorios` (1.497 linhas) não é só um mural de cartões como o
-`ModuloRelatorios` — tem três `TabelaPadrao` dentro. Ou seja, é hub **e**
-relatório ao mesmo tempo.
+| | Recorte | Telas | Linhas aprox. |
+|---|---|---|---|
+| (a) | Núcleo de títulos | 5 | 11.100 |
+| (b) | Operação (conciliação, pagamentos, baixas, boletos, DDA, cheques, caixas) | 9 | 8.300 |
+| (c) | Relatórios e visões | 12 | 6.100 |
+| (d) | Cadastros e comprovantes | 4 | 2.300 |
 
-**d) Quatro telas de resultado com recorte quase igual.**
-Financeiro de Obras, Resultado de Obras, Resultado por Centros de Custo e
-Analítico partem do mesmo par obra × período. Candidatas a um recorte
-compartilhado — mas é decisão de negócio, não de layout.
+Aprova esse corte, ou prefere outro?
 
----
+**D2 — `FinanceiroTitulos` em três rotas.** Vira uma tela com recorte
+declarado (como Pessoal virou porta única), ou continuam três entradas?
 
-## 4. Candidatos a recolhimento
+**D3 — Novo × Editar título.** Se eu confirmar que são o mesmo formulário,
+registro como proposta separada ou você quer decidir na hora?
 
-1. **Filtros → `BarraFiltros`** nas 30. É o maior ganho isolado do módulo:
-   hoje são centenas de campos em grade crua, nenhum com etiqueta do que
-   está aplicado.
-2. **`FinanceiroTituloNovo` (2.625) e `FinanceiroTituloEditar` (1.621)** são
-   quase certamente o mesmo formulário em dois arquivos. Se forem, a leva
-   pode unificá-los — mas confirmo antes de propor.
-3. **`FinanceiroConciliacao` (3.341 linhas)** é a maior tela do sistema.
-   Merece leitura própria antes de qualquer mexida. **Decidido em 03/09
-   (D1): a leva NÃO unifica o fluxo — aplica o padrão na tela como ela
-   está.** A unificação, e o alerta de conflito entre duas pessoas
-   conciliando o mesmo extrato, ficam em
-   `docs/PROPOSTA-UNIFICACAO-CONCILIACAO.md`, para decisão própria. O
-   alerta foi deliberadamente NÃO construído: meia solução ensina o usuário
-   a confiar num aviso que só cobre parte dos casos.
-4. **`FinanceiroBancos` com 7 tabelas e 42 cores fixas** e
-   **`FinanceiroBoletos` com 49 cores fixas** são os dois piores casos de
-   medida/cor à mão do módulo.
+**D4 — O check de `slate` antes da leva.** Proponho fechar essa porta antes
+de abrir o módulo, porque 306 ocorrências entram na leva e sem check elas
+saem por conferência manual — que é exatamente o que falhou.
 
----
+## 8. Como as decisões anteriores se aplicam aqui
 
-## 5. O que precisa de decisão sua
+Já decididas, não precisam voltar:
 
-**D1 — Fatiar a leva.** 30 telas e 30 mil linhas não cabem numa leva só; o
-RH/DP tinha 9 telas e levou cinco rodadas de revisão. Proponho **quatro
-levas**: (a) núcleo de títulos, 5 telas; (b) operação, 9; (c) relatórios,
-12; (d) cadastros e comprovantes, 3. Cada uma com matriz e revisor
-próprios. Aprova esse corte, ou prefere outro?
-
-**D2 — `FinanceiroTitulos` em três rotas.** Três itens de menu, um arquivo.
-Vira uma tela com recorte declarado (como Pessoal virou porta única), ou
-continuam três entradas iguais?
-
-**D3 — Novo × Editar título.** Se forem o mesmo formulário em dois arquivos
-(4.246 linhas somadas), unifico? É mudança estrutural, não de layout.
-
-**D4 — Ordem.** O núcleo de títulos é o que o usuário mais vê, e também o
-mais arriscado (dinheiro, baixa, conciliação). Começo por ele, ou pela
-operação, que é mais isolada e serve de aquecimento para o padrão?
-
-**Parado aguardando seu ok.** Nenhuma linha de código de tela foi escrita.
+- **D2 do Financeiro (03/09)**: telas de detalhe seguem ação → contexto →
+  histórico.
+- **D3**: todas as ações visíveis, com os três pesos.
+- **D4**: em conflito entre densidade e conforto de leitura, vence a leitura.
+- **R21**: nenhuma mudança de contrato de componente no meio da leva.
+- **R23**: filtro aplica ao marcar; consulta cara (>3 requisições OU >2s)
+  confirma com botão explícito.
