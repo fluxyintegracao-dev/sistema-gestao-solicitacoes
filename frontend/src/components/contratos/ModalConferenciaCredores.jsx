@@ -5,6 +5,7 @@ import {
   conferirCredoresContrato,
   consultarCnpjCredor
 } from '../../services/contratos';
+import { getCpfCnpjError, maskCpfCnpj } from '../../utils/formatters';
 
 /**
  * Conferência do cadastro dos contratados antes de criar o contrato acima do limite (20/08).
@@ -127,6 +128,11 @@ export default function ModalConferenciaCredores({
 
   async function salvar() {
     setErro('');
+    const documentoErro = getCpfCnpjError(formulario.cpf_cnpj, { required: true });
+    if (documentoErro) {
+      setErro(documentoErro);
+      return;
+    }
     setSalvando(true);
     try {
       const atualizado = await completarCadastroCredor(editandoId, formulario);
@@ -198,7 +204,10 @@ export default function ModalConferenciaCredores({
                         name={`credor_${campo.chave}`}
                         value={formulario[campo.chave] ?? ''}
                         maxLength={campo.chave === 'estado' ? 2 : undefined}
-                        onChange={(e) => setFormulario((a) => ({ ...a, [campo.chave]: e.target.value }))}
+                        onChange={(e) => setFormulario((a) => ({
+                          ...a,
+                          [campo.chave]: campo.chave === 'cpf_cnpj' ? maskCpfCnpj(e.target.value) : e.target.value
+                        }))}
                         disabled={salvando}
                       />
                     </label>

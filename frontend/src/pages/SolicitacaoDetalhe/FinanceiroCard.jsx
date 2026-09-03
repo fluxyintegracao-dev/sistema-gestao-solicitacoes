@@ -7,7 +7,7 @@ import { buscarParceiroPorId, buscarParceiros } from '../../services/parceiros';
 import { cadastrarCredorSolicitacao, updateCredorSolicitacao } from '../../services/solicitacoes';
 import { getEmpresasGrupo } from '../../services/empresasGrupo';
 import { getObras } from '../../services/obras';
-import { formatCurrencyInput, normalizeCurrencyTyping } from '../../utils/formatters';
+import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping } from '../../utils/formatters';
 import {
   categoriaFinanceiraMatchesAutocomplete,
   categoriaFinanceiraMatchesSearch
@@ -1342,6 +1342,13 @@ export default function FinanceiroCard({
       if (!paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
         return 'Preencha os dados PIX do favorecido para pagamento em massa.';
       }
+      const documentoErro = getCpfCnpjError(paymentDraft.cpf_cnpj, {
+        required: true,
+        label: 'CPF/CNPJ do favorecido'
+      });
+      if (documentoErro) return documentoErro;
+      const pixErro = getPixDocumentError(paymentDraft.pix_chave, paymentDraft.pix_tipo_chave);
+      if (pixErro) return pixErro;
     }
 
     if (valorSolicitacao <= 0) {
@@ -1451,7 +1458,7 @@ export default function FinanceiroCard({
     const beneficiaryPayload = {
       parceiro_id: Number(parceiroPagamentoId),
       nome: paymentDraft.nome,
-      cpf_cnpj: paymentDraft.cpf_cnpj,
+      cpf_cnpj: onlyDigits(paymentDraft.cpf_cnpj),
       metodo_preferencial: 'PIX_CHAVE',
       pix_tipo_chave: paymentDraft.pix_tipo_chave,
       pix_chave: paymentDraft.pix_chave,
@@ -1592,7 +1599,7 @@ export default function FinanceiroCard({
     const { name, value } = event.target;
     setCadastroCredorForm((current) => ({
       ...current,
-      [name]: value
+      [name]: ['cpf_cnpj', 'representante_cpf'].includes(name) ? maskCpfCnpj(value) : value
     }));
   }
 
@@ -1603,6 +1610,25 @@ export default function FinanceiroCard({
   }
 
   async function handleCadastrarCredor() {
+    const documentoErro = getCpfCnpjError(cadastroCredorForm.cpf_cnpj, {
+      required: true,
+      label: 'CPF/CNPJ do credor'
+    });
+    if (documentoErro) {
+      setErro(documentoErro);
+      return;
+    }
+    if (onlyDigits(cadastroCredorForm.cpf_cnpj).length === 14) {
+      const representanteErro = getCpfCnpjError(cadastroCredorForm.representante_cpf, {
+        required: true,
+        type: 'cpf',
+        label: 'CPF do representante legal'
+      });
+      if (representanteErro) {
+        setErro(representanteErro);
+        return;
+      }
+    }
     try {
       setCadastroCredorSaving(true);
       setErro('');
@@ -2430,8 +2456,10 @@ export default function FinanceiroCard({
                         <span className="app-filter-label">CPF/CNPJ</span>
                         <input
                           className="input w-full"
-                          value={paymentDraft.cpf_cnpj}
-                          onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: event.target.value }))}
+                          value={maskCpfCnpj(paymentDraft.cpf_cnpj)}
+                          onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(event.target.value) }))}
+                          inputMode="numeric"
+                          maxLength={18}
                           required
                         />
                       </label>

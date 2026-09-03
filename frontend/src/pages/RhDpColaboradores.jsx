@@ -38,7 +38,7 @@ import {
   canManageRhDpColaboradores,
   canManageRhDpDocumentos
 } from '../utils/acessoProduto';
-import { formatCurrencyInput, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
+import { formatCurrencyInput, getCpfCnpjError, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 
 function emptyForm() {
   return {
@@ -453,6 +453,18 @@ export default function RhDpColaboradores() {
   async function salvar(e) {
     e.preventDefault();
     if (!podeEditar) {
+      return;
+    }
+    const cpfErro = getCpfCnpjError(form.cpf, { required: true, type: 'cpf' });
+    if (cpfErro) {
+      avisar.erro(cpfErro);
+      return;
+    }
+    const favorecidoErro = getCpfCnpjError(form.pagamento?.favorecido_documento, {
+      label: 'CPF/CNPJ do favorecido'
+    });
+    if (favorecidoErro) {
+      avisar.erro(favorecidoErro);
       return;
     }
 

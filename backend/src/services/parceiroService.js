@@ -1,5 +1,6 @@
 const { Op, col, fn, where: sequelizeWhere } = require('sequelize');
 const { Parceiro, ParceiroCategoria, FornecedorCompra } = require('../models');
+const { isValidCpf: isValidCpfCentral } = require('../utils/cpfCnpj');
 
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
 
@@ -249,7 +250,7 @@ function normalizeParceiroPayload(payload = {}, { partial = false, exigirCadastr
         throw new Error('Informe o nome do representante legal da empresa.');
       }
       const cpfRepresentante = normalizarCpfCnpj(payload.representante_cpf);
-      if (!cpfRepresentante || !isValidCpfCnpj(cpfRepresentante)) {
+      if (!cpfRepresentante || !isValidCpfCentral(cpfRepresentante)) {
         throw new Error('Informe um CPF valido para o representante legal.');
       }
     }

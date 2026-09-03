@@ -17,6 +17,7 @@ import { getMinhasObras } from '../../../services/obras';
 import { TabelaPadrao } from '../../../components/padrao';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import {
@@ -795,12 +796,20 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       alert('Informe o nome do credor.');
       return;
     }
+    const documentoErro = getCpfCnpjError(novoCredor.cpf_cnpj, {
+      required: true,
+      label: 'CPF/CNPJ do credor'
+    });
+    if (documentoErro) {
+      alert(documentoErro);
+      return;
+    }
 
     setSalvandoCredor(true);
     try {
       const parceiro = await criarCredorCompraDireta({
         ...novoCredor,
-        cpf_cnpj: novoCredor.cpf_cnpj.replace(/\D/g, ''),
+        cpf_cnpj: onlyDigits(novoCredor.cpf_cnpj),
         telefone: novoCredor.telefone.replace(/\D/g, '')
       });
       selecionarCredorCompraDireta(parceiro);
@@ -2208,7 +2217,9 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 <input
                   className="input"
                   value={novoCredor.cpf_cnpj}
-                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, cpf_cnpj: event.target.value }))}
+                  onChange={(event) => setNovoCredor((atual) => ({ ...atual, cpf_cnpj: maskCpfCnpj(event.target.value) }))}
+                  inputMode="numeric"
+                  maxLength={18}
                 />
               </label>
               <label className="grid gap-2 text-sm">

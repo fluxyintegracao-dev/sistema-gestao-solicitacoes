@@ -8,7 +8,7 @@ import {
 } from '../../../services/compras';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canManageComprasFornecedores } from '../../../utils/acessoProduto';
-import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
+import { getCpfCnpjError, maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../../../utils/formatters';
 
 const ESTADOS_BR = [
   'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS',
@@ -269,6 +269,11 @@ export default function GestaoFornecedores() {
   useEffect(() => { carregar(); }, []);
 
   async function handleSalvar(form) {
+    const documentoErro = getCpfCnpjError(form.cnpj, { label: 'CPF/CNPJ do fornecedor' });
+    if (documentoErro) {
+      alert(documentoErro);
+      return;
+    }
     try {
       setSalvando(true);
       const payload = {

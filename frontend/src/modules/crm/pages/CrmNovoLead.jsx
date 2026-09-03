@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { criarLead } from '../../../services/crm';
-import { maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../../../utils/formatters';
+import { getCpfCnpjError, maskCpfCnpj, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../../../utils/formatters';
 
 const SOURCE_OPTIONS = [
   { value: 'MANUAL', label: 'Manual' },
@@ -38,6 +38,8 @@ export default function CrmNovoLead() {
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.nome.trim()) return alert('Nome e obrigatorio');
+    const documentoErro = getCpfCnpjError(form.documento);
+    if (documentoErro) return alert(documentoErro);
     try {
       setSaving(true);
       const lead = await criarLead({

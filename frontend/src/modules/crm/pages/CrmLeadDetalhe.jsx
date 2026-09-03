@@ -20,6 +20,7 @@ import {
 } from '../../../services/crm';
 import { useAuth } from '../../../contexts/AuthContext';
 import { canRedistributeCrmLeads } from '../../../utils/acessoProduto';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 
 const LIFECYCLE_MAP = {
   NOVO:        { label: 'Novo',         cls: 'app-status-pill bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300' },
@@ -181,9 +182,14 @@ export default function CrmLeadDetalhe() {
   }
 
   async function salvarEdicao() {
+    const documentoErro = getCpfCnpjError(form.documento);
+    if (documentoErro) {
+      alert(documentoErro);
+      return;
+    }
     try {
       setSaving(true);
-      const updated = await atualizarLead(id, form);
+      const updated = await atualizarLead(id, { ...form, documento: onlyDigits(form.documento) });
       setLead(updated);
       setEditando(false);
     } catch (err) {
@@ -365,7 +371,10 @@ export default function CrmLeadDetalhe() {
                       type={type || 'text'}
                       value={form[key] || ''}
                       maxLength={maxLength}
-                      onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                      onChange={(e) => setForm((f) => ({
+                        ...f,
+                        [key]: key === 'documento' ? maskCpfCnpj(e.target.value) : e.target.value
+                      }))}
                     />
                   </label>
                 ))}

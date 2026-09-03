@@ -1,4 +1,5 @@
 const { ensureAllowedKeys, sanitizeString, ValidationError } = require('../middlewares/validation');
+const { onlyDigits, isValidCnpj, isValidCpfCnpj, isValidPixDocument } = require('../utils/cpfCnpj');
 
 function isBlank(value) {
   return value == null || String(value).trim() === '';
@@ -55,6 +56,16 @@ function cleanUndefined(data) {
   return Object.fromEntries(Object.entries(data).filter(([, value]) => value !== undefined));
 }
 
+function parseCpfCnpj(value, fieldName, { required = false, cnpjOnly = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError(`${fieldName} e obrigatorio.`);
+    return undefined;
+  }
+  const valid = cnpjOnly ? isValidCnpj(value) : isValidCpfCnpj(value);
+  if (!valid) throw new ValidationError(`${fieldName} invalido.`);
+  return onlyDigits(value);
+}
+
 function validatePaymentBeneficiaryCreateBody(payload = {}) {
   ensureAllowedKeys(payload, [
     'parceiro_id',
@@ -72,13 +83,20 @@ function validatePaymentBeneficiaryCreateBody(payload = {}) {
     'ativo'
   ], 'Favorecido bancario');
 
+  const pixTipoChave = parseEnum(payload.pix_tipo_chave, 'Tipo de chave PIX', ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'], { required: true });
+  let pixChave = sanitizeString(payload.pix_chave, 'Chave PIX', { required: true, max: 180 });
+  if (!isValidPixDocument(pixChave, pixTipoChave)) {
+    throw new ValidationError(`Chave PIX ${pixTipoChave} invalida.`);
+  }
+  if (['CPF', 'CNPJ'].includes(pixTipoChave)) pixChave = onlyDigits(pixChave);
+
   return cleanUndefined({
     parceiro_id: parseInteger(payload.parceiro_id, 'Parceiro', { required: true }),
     nome: sanitizeString(payload.nome, 'Nome favorecido', { required: true, max: 180 }),
-    cpf_cnpj: sanitizeString(payload.cpf_cnpj, 'CPF/CNPJ favorecido', { required: true, max: 20 }),
+    cpf_cnpj: parseCpfCnpj(payload.cpf_cnpj, 'CPF/CNPJ favorecido', { required: true }),
     metodo_preferencial: parseEnum(payload.metodo_preferencial || 'PIX_CHAVE', 'Metodo preferencial', ['PIX_CHAVE'], { required: true }),
-    pix_tipo_chave: parseEnum(payload.pix_tipo_chave, 'Tipo de chave PIX', ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'], { required: true }),
-    pix_chave: sanitizeString(payload.pix_chave, 'Chave PIX', { required: true, max: 180 }),
+    pix_tipo_chave: pixTipoChave,
+    pix_chave: pixChave,
     banco_codigo: parseOptionalText(payload.banco_codigo, 'Codigo do banco', 10),
     agencia: parseOptionalText(payload.agencia, 'Agencia', 20),
     agencia_digito: parseOptionalText(payload.agencia_digito, 'Digito da agencia', 5),
@@ -164,6 +182,10 @@ function validatePaymentAccountBody(payload = {}) {
     ...payload,
     conta_bancaria_id: parseInteger(payload.conta_bancaria_id, 'Conta bancaria', { required: payload.conta_bancaria_id !== undefined }),
     empresa_id: payload.empresa_id ? parseInteger(payload.empresa_id, 'Empresa') : payload.empresa_id,
+    cnpj_pagador: parseCpfCnpj(payload.cnpj_pagador, 'CNPJ pagador', {
+      required: payload.cnpj_pagador !== undefined,
+      cnpjOnly: true
+    }),
     provider_id: payload.provider_id ? parseInteger(payload.provider_id, 'Provider') : payload.provider_id,
     ambiente: payload.ambiente ? parseEnum(payload.ambiente, 'Ambiente', ['HOMOLOGACAO', 'PRODUCAO']) : payload.ambiente,
     ativo: parseBoolean(payload.ativo)

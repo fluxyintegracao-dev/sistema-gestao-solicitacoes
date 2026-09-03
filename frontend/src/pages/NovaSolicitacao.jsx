@@ -30,7 +30,7 @@ import {
   normalizarConfigAutomacaoDestinoNovaSolicitacao,
   obterRegraAutomacaoDestinoNovaSolicitacao
 } from '../utils/novaSolicitacaoAutomacaoDestino';
-import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
+import { getCpfCnpjError, getPixDocumentError, maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 import {
   UPLOAD_DOCUMENT_ACCEPT,
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
@@ -461,6 +461,20 @@ export default function NovaSolicitacao() {
 
       if (faltando.length > 0) {
         alert(`Complete o cadastro do credor. Falta: ${faltando.join(', ')}.`);
+        return;
+      }
+      const documentoErro = getCpfCnpjError(novoParceiro.cpf_cnpj, { required: true });
+      if (documentoErro) {
+        alert(documentoErro);
+        return;
+      }
+      const pixErro = [
+        ['pix_chave_fixa_1_tipo', 'pix_chave_fixa_1', 'Chave PIX fixa 1'],
+        ['pix_chave_fixa_2_tipo', 'pix_chave_fixa_2', 'Chave PIX fixa 2'],
+        ['pix_chave_variavel_tipo', 'pix_chave_variavel', 'Chave PIX variavel']
+      ].map(([tipo, chave, label]) => getPixDocumentError(novoParceiro[chave], novoParceiro[tipo], label)).find(Boolean);
+      if (pixErro) {
+        alert(pixErro);
         return;
       }
 
@@ -1529,6 +1543,14 @@ export default function NovaSolicitacao() {
         if (qualificacaoFaltante.length > 0) {
           alert(`Complete a qualificacao do representante legal: ${qualificacaoFaltante.join(', ')}.`); return;
         }
+        const cpfRepresentanteErro = getCpfCnpjError(qualificacao.cpf, {
+          required: true,
+          type: 'cpf',
+          label: 'CPF do representante legal'
+        });
+        if (cpfRepresentanteErro) {
+          alert(cpfRepresentanteErro); return;
+        }
         if (qualificacao.estado_civil === 'CASADO') {
           const conjuge = qualificacao.conjuge || {};
           const camposConjuge = [
@@ -1544,6 +1566,14 @@ export default function NovaSolicitacao() {
             .map(([nome]) => nome);
           if (dadosConjugeFaltantes.length > 0) {
             alert(`Complete os dados do conjuge: ${dadosConjugeFaltantes.join(', ')}.`); return;
+          }
+          const cpfConjugeErro = getCpfCnpjError(conjuge.cpf, {
+            required: true,
+            type: 'cpf',
+            label: 'CPF do conjuge'
+          });
+          if (cpfConjugeErro) {
+            alert(cpfConjugeErro); return;
           }
         }
       }

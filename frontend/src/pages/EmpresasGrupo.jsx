@@ -15,6 +15,7 @@ import {
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
 import OverlayModal from '../components/ui/OverlayModal';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../utils/formatters';
 
 function emptyForm() {
   return {
@@ -123,13 +124,18 @@ export default function EmpresasGrupo() {
 
   async function salvar(event) {
     event.preventDefault();
+    const documentoErro = getCpfCnpjError(form.cnpj, { type: 'cnpj' });
+    if (documentoErro) {
+      avisar.erro(documentoErro);
+      return;
+    }
     try {
       setSalvando(true);
       const payload = {
         codigo: form.codigo || undefined,
         nome: form.nome,
         razao_social: form.razao_social || undefined,
-        cnpj: form.cnpj || undefined,
+        cnpj: onlyDigits(form.cnpj) || undefined,
         tipo_empresa: form.tipo_empresa || 'OPERACIONAL',
         tipo_gerencial: form.tipo_gerencial || 'OPERACIONAL',
         empresa_caixa: Boolean(form.empresa_caixa),
@@ -286,7 +292,9 @@ export default function EmpresasGrupo() {
                   <input
                     className="input w-full"
                     value={form.cnpj}
-                    onChange={(event) => setForm((prev) => ({ ...prev, cnpj: event.target.value }))}
+                    onChange={(event) => setForm((prev) => ({ ...prev, cnpj: maskCpfCnpj(event.target.value) }))}
+                    inputMode="numeric"
+                    maxLength={18}
                   />
                 </CampoForm>
               </FormSecao>
