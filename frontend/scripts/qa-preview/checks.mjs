@@ -56,6 +56,80 @@ export function checksEstaticos({ tipo }) {
       return 1;
     }
   };
+  /*
+    QUANTAS LINHAS UM MESMO TEXTO OCUPA — que é o que "quebrou" quer dizer.
+
+    `linhasDeTexto` acima soma os topos de TODOS os nós de texto da célula,
+    então uma célula com dois textos EMPILHADOS DE PROPÓSITO devolve 2. E é
+    exatamente isso que a `.app-celula-dupla` é: `display: flex;
+    flex-direction: column` com principal e sublinha, ambos `white-space:
+    nowrap`. Ou seja: em TODA tabela do sistema com coluna de identidade, o
+    sinal "quebrou" era CONSTANTE VERDADEIRO — não media nada (03/09).
+
+    Empilhar duas linhas por decisão de layout não é quebra; quebra é UM
+    texto que não coube e virou duas linhas. Esta função mede isso: o
+    máximo de linhas que um ÚNICO nó de texto ocupa.
+  */
+  const linhasDoMesmoTexto = (el) => {
+    if (!el) return 0;
+    try {
+      const percorrer = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+      let maior = 0;
+      let no = percorrer.nextNode();
+      while (no) {
+        if (no.nodeValue && no.nodeValue.trim()) {
+          const intervalo = document.createRange();
+          intervalo.selectNodeContents(no);
+          const topos = [];
+          Array.from(intervalo.getClientRects())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .forEach((r) => {
+              if (!topos.some((t) => Math.abs(t - r.top) <= 3)) topos.push(r.top);
+            });
+          maior = Math.max(maior, topos.length);
+        }
+        no = percorrer.nextNode();
+      }
+      return maior;
+    } catch (_) {
+      return 1;
+    }
+  };
+
+  /*
+    QUANTO ESPAÇO O CONTEÚDO DA CÉLULA PEDE.
+
+    Era `(td.firstElementChild || td).scrollWidth`, e `scrollWidth` de um
+    elemento INLINE não substituído é ZERO. A coluna comum do sistema
+    renderiza justamente isso — `render: (u) => <span title={…}>{texto}</span>`
+    (Usuarios, Parceiros, Obras…) —, então o conteúdo media 0 e a coluna
+    aparecia com folga igual à LARGURA INTEIRA. Combinado com o sinal de
+    quebra que era sempre verdadeiro, o segundo critério da T4 acusava (ou
+    absolvia) por números que não descreviam a tabela (03/09).
+
+    A medida honesta é a extensão do texto: um Range sobre o conteúdo da
+    célula devolve a largura que o texto ocupa mesmo quando o filho é
+    inline, e mais o padding da célula, que também é espaço que a coluna
+    precisa ter.
+  */
+  const larguraDoConteudo = (celula) => {
+    if (!celula) return 0;
+    const cs = getComputedStyle(celula);
+    const respiro = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+    let extensao = 0;
+    try {
+      const intervalo = document.createRange();
+      intervalo.selectNodeContents(celula);
+      const r = intervalo.getBoundingClientRect();
+      if (r && r.width > 0) extensao = r.width;
+    } catch (_) { /* segue para o fallback */ }
+    Array.from(celula.children).forEach((filho) => {
+      extensao = Math.max(extensao, filho.scrollWidth || 0);
+    });
+    if (!extensao) extensao = Math.max(0, celula.scrollWidth - respiro);
+    return extensao + respiro;
+  };
+
   const visivel = (el) => {
     if (!el) return false;
     const cs = getComputedStyle(el);
@@ -96,8 +170,22 @@ export function checksEstaticos({ tipo }) {
       if (fs < 21 || fs > 23.5) problemas.push(`título em ${fs}px (esperado 22px)`);
     }
     const lead = q('.app-page-lead', faixa);
+    /*
+      O APOIO NÃO PODE SER O EMBRULHO DO PRÓPRIO TÍTULO (03/09).
+
+      O ramo alternativo existe para telas cujo apoio não usa
+      `.app-page-lead`. Só que o `<div>` que o PageHeader põe em volta do
+      `<h1>` casava com todos os critérios (texto > 3 chars, fonte herdada
+      de 14px, ≤ 3 filhos, sem botão dentro) — então uma faixa SEM apoio
+      nenhum era aprovada, com o contêiner do título fazendo as vezes de
+      apoio. Provado com fixture: remover o apoio inteiro devolvia PASSOU.
+
+      Apoio é o que vem ALÉM do título; quem contém o título está descrito
+      pelo próprio título.
+    */
     const apoioAlt = lead || qa('div,p,span', faixa).find((el) => el !== titulo
       && visivel(el) && !el.closest('.app-actionbar')
+      && !(titulo && el.contains(titulo))
       && el.textContent.trim().length > 3
       && parseFloat(getComputedStyle(el).fontSize) <= 19
       && el.children.length <= 3 && !el.querySelector('button, .btn'));
@@ -357,9 +445,10 @@ export function checksEstaticos({ tipo }) {
         let maiorConteudo = 0;
         let quebra = false;
         celulas.forEach((td) => {
-          const alvo = td.firstElementChild || td;
-          maiorConteudo = Math.max(maiorConteudo, alvo.scrollWidth);
-          if (linhasDeTexto(td) > 1) quebra = true;
+          maiorConteudo = Math.max(maiorConteudo, larguraDoConteudo(td));
+          // "Quebrou" é UM texto que não coube — não duas linhas empilhadas
+          // de propósito pela .app-celula-dupla (ver linhasDoMesmoTexto).
+          if (linhasDoMesmoTexto(td) > 1) quebra = true;
         });
         return { indice: i, titulo: th.innerText.trim(), folga: largura - maiorConteudo, quebra };
       });
@@ -479,11 +568,32 @@ export function checksEstaticos({ tipo }) {
         .filter((el) => el.children.length === 0 && /R\$\s?[\d.]+/.test(el.textContent))
         .filter(visivel);
       const cortados = moedas.filter((el) => el.scrollWidth > el.clientWidth + 1);
+      /*
+        O CORTE HORIZONTAL NÃO É A FORMA COMUM DO DEFEITO (03/09, fixture).
+
+        `scrollWidth > clientWidth` só acontece quando o texto NÃO PODE
+        quebrar. E a célula de dinheiro do sistema pode: a coluna de valor
+        é `td.celula-valor` com texto puro (as telas fazem
+        `render: (i) => formatMoney(i.valor)`), e `responsive-system.css`
+        dá `overflow-wrap: anywhere` a todo `td` dentro do `.layout-main`.
+        Quando o valor não cabe, ele QUEBRA — "R$" numa linha e
+        "12.345.678,90" na outra, ou o próprio número partido ao meio — e o
+        scrollWidth continua igual ao clientWidth. Ou seja: na forma em que
+        o defeito de fato aparece, a condição antiga era inalcançável.
+
+        A T7 diz "nenhum valor monetário trunca OU VAZA". Valor partido em
+        duas linhas é o "vaza": o olho lê dois números onde há um. Mesmo
+        remendo que a T6 recebeu em 02/09 pela mesma cegueira.
+      */
+      const partidosEmLinhas = moedas.filter((el) => linhasDoMesmoTexto(el) > 1);
+      const problemaT7 = cortados[0] || partidosEmLinhas[0];
       r.T7 = moedas.length === 0
         ? { estado: 'N/A', motivo: 'nenhum valor monetário na tela' }
         : cortados.length
           ? { estado: 'FALHOU', motivo: `valor truncado: "${cortados[0].textContent.trim()}" (largura ${Math.round(cortados[0].clientWidth)}px < conteúdo ${cortados[0].scrollWidth}px)`, seletor: cssPath(cortados[0]) }
-          : { estado: 'PASSOU' };
+          : partidosEmLinhas.length
+            ? { estado: 'FALHOU', motivo: `valor monetário QUEBRADO em ${linhasDoMesmoTexto(problemaT7)} linhas: "${problemaT7.textContent.trim()}" (${Math.round(problemaT7.getBoundingClientRect().width)}px de largura)`, seletor: cssPath(problemaT7) }
+            : { estado: 'PASSOU' };
     }
   }
 
@@ -542,20 +652,42 @@ export function checksEstaticos({ tipo }) {
     if (!bloco) {
       r.B1 = { estado: 'FALHOU', motivo: 'nenhum bloco na tela' };
     } else {
-      // O canvas é o primeiro fundo OPACO atrás do bloco (o layout-main pode
-      // ser transparente sobre o shell).
-      let atras = bloco.parentElement;
-      let cCanvas = '';
-      while (atras && atras !== document.documentElement) {
-        const c = getComputedStyle(atras).backgroundColor;
-        if (c && c !== 'rgba(0, 0, 0, 0)' && !/rgba\([\d ,.]+, 0\)/.test(c)) { cCanvas = c; break; }
-        atras = atras.parentElement;
-      }
-      if (!cCanvas) cCanvas = getComputedStyle(document.body).backgroundColor;
-      const cBloco = getComputedStyle(bloco).backgroundColor;
+      /*
+        A COR DO BLOCO É A QUE SE VÊ, NÃO A QUE ESTÁ DECLARADA (03/09).
+
+        A versão anterior lia `getComputedStyle(bloco).backgroundColor`
+        cru. Bloco que PERDEU a superfície — `background: transparent`, o
+        jeito mais comum de a regressão acontecer — devolvia
+        "rgba(0, 0, 0, 0)", que é diferente da cor do canvas por
+        comparação de texto, e o check aprovava. Só que na tela o canvas
+        aparece ATRAVÉS dele: o bloco é o canvas. Provado com fixture.
+
+        Agora as duas pontas usam a mesma régua: a primeira cor OPACA a
+        partir do elemento (para o bloco, incluindo ele; para o canvas,
+        começando no pai). Bloco transparente cai na cor do canvas e as
+        duas coincidem — que é exatamente o defeito.
+      */
+      const primeiraCorOpaca = (partida) => {
+        let atual = partida;
+        while (atual && atual !== document.documentElement) {
+          const c = getComputedStyle(atual).backgroundColor;
+          if (c && c !== 'rgba(0, 0, 0, 0)' && !/rgba\([\d ,.]+, 0\)/.test(c)) return c;
+          atual = atual.parentElement;
+        }
+        return getComputedStyle(document.body).backgroundColor;
+      };
+      const cBloco = primeiraCorOpaca(bloco);
+      const cCanvas = primeiraCorOpaca(bloco.parentElement);
+      const proprio = getComputedStyle(bloco).backgroundColor;
+      const transparente = !proprio || proprio === 'rgba(0, 0, 0, 0)' || /rgba\([\d ,.]+, 0\)/.test(proprio);
       r.B1 = cCanvas && cCanvas !== cBloco
         ? { estado: 'PASSOU' }
-        : { estado: 'FALHOU', motivo: `canvas (${cCanvas || 'transparente'}) não se distingue do bloco (${cBloco})` };
+        : {
+          estado: 'FALHOU',
+          motivo: transparente
+            ? `bloco SEM superfície própria (background transparente): o canvas (${cCanvas}) aparece através dele`
+            : `canvas (${cCanvas || 'transparente'}) não se distingue do bloco (${cBloco})`
+        };
     }
   }
 
@@ -793,20 +925,64 @@ export function checksMobile() {
       : { estado: 'PASSOU' };
   }
 
-  /* X3: nada estoura a largura */
+  /* X3: nada estoura a largura.
+
+     A CONDIÇÃO ANTIGA ERA IMPOSSÍVEL (03/09, achado por fixture).
+     Ela abria com `document.scrollingElement.scrollWidth > innerWidth`, e
+     `styles/responsive-system.css` declara, de propósito:
+
+         html, body, #root { overflow-x: clip }
+
+     com o comentário "as tabelas deliberadamente largas continuam largas,
+     mas passam a rolar dentro do próprio bloco em vez de deslocar o
+     documento inteiro". Com `clip` no documento, o transbordo é RECORTADO:
+     o `scrollWidth` do documento NUNCA passa da janela. O ramo de dentro —
+     que já sabia procurar o elemento culpado — só rodava depois de uma
+     porta que não abre. Resultado: X3 verde em toda tela, sem nunca ter
+     olhado nada. É o mesmo defeito da R18 que varria só CSS.
+
+     A medida honesta é a GEOMETRIA DOS ELEMENTOS: alguém desenhado além da
+     borda direita da janela estoura a largura, esteja o transbordo
+     recortado ou não — recortado é pior, porque o conteúdo some sem deixar
+     rolagem. Rolagem horizontal continua permitida onde é projetada: um
+     scrollport de verdade (`overflow-x: auto|scroll`), como o
+     `.resizable-table-scroll` da tabela. */
   const doc = document.scrollingElement || document.documentElement;
-  if (doc.scrollWidth > innerWidth + 1) {
-    let culpado = '';
-    qa('body *').some((el) => {
-      const rect = el.getBoundingClientRect();
-      if (rect.right > innerWidth + 2 && rect.width > 40 && visivel(el)
-        && !el.closest('.resizable-table-scroll')) {
-        culpado = el.tagName + '.' + String(el.className).split(/\s+/).filter(Boolean).slice(0, 2).join('.');
-        return true;
-      }
-      return false;
-    });
-    r.X3 = { estado: 'FALHOU', motivo: `página com ${doc.scrollWidth}px em viewport de ${innerWidth}px${culpado ? ` (estoura: ${culpado})` : ''}` };
+  const dentroDeScrollportHorizontal = (el) => {
+    let atual = el.parentElement;
+    while (atual && atual !== document.documentElement) {
+      const cs = getComputedStyle(atual);
+      if (cs.overflowX === 'auto' || cs.overflowX === 'scroll') return true;
+      atual = atual.parentElement;
+    }
+    return false;
+  };
+  const estourando = qa('body *').filter((el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.right <= innerWidth + 2 || rect.width <= 40) return false;
+    if (!visivel(el)) return false;
+    return !dentroDeScrollportHorizontal(el);
+  });
+  if (estourando.length || doc.scrollWidth > innerWidth + 1) {
+    /* Nomear o CULPADO, não o primeiro atingido: um filho de largura fixa
+       estica os pais E os irmãos (num grid, a faixa do topo passa a ter a
+       largura da trilha), e apontar o `<header>` esticado manda o conserto
+       para o lugar errado. Entre os que não contêm nenhum outro faltoso —
+       as folhas do transbordo — vale o que vai MAIS LONGE: é ele quem
+       define a largura de todos os outros. */
+    const folhas = estourando.filter((el) => !estourando.some((outro) => outro !== el && el.contains(outro)));
+    const alvo = folhas.sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)[0]
+      || estourando[0];
+    const nome = alvo
+      ? alvo.tagName + '.' + String(alvo.className).split(/\s+/).filter(Boolean).slice(0, 2).join('.')
+      : '';
+    r.X3 = {
+      estado: 'FALHOU',
+      motivo: alvo
+        ? `${nome} vai até ${Math.round(alvo.getBoundingClientRect().right)}px numa viewport de ${innerWidth}px`
+        + `${doc.scrollWidth <= innerWidth + 1 ? ' — o transbordo é RECORTADO por overflow-x: clip, então some sem rolagem' : ''}`
+        : `página com ${doc.scrollWidth}px em viewport de ${innerWidth}px`
+    };
   } else {
     r.X3 = { estado: 'PASSOU' };
   }
