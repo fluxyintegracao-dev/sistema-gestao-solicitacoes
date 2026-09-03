@@ -34,7 +34,6 @@
     "src/modules/provisionamento-financeiro/pages/ProvisionamentoFinanceiroDetalhe.jsx": 8,
     "src/modules/provisionamento-financeiro/pages/ProvisionamentosFinanceiros.jsx": 2,
     "src/modules/solicitacao-compra/pages/ComprasDelegacao.jsx": 5,
-    "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx": 14,
     "src/modules/solicitacao-compra/pages/GerenciarCotacaoSolicitacao.jsx": 60,
     "src/modules/solicitacao-compra/pages/GestaoApropriacoes.jsx": 17,
     "src/modules/solicitacao-compra/pages/GestaoCategorias.jsx": 10,

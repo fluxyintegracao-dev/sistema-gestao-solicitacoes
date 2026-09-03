@@ -35,7 +35,11 @@
     "src/pages/ModuloRelatorios.jsx",
     "src/pages/RelatoriosAdministrativos.jsx",
     "src/pages/ComunicacaoInterna.jsx",
-    "src/pages/ConfiguracoesContratoAlertasEFormas.jsx"
+    "src/pages/ConfiguracoesContratoAlertasEFormas.jsx",
+    "src/pages/Login/index.jsx",
+    "src/pages/RecuperarSenha.jsx",
+    "src/pages/DefinirSenha.jsx",
+    "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx"
   ],
   "excecoes_medidas": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
@@ -75,13 +79,14 @@
     "fora_do_shell": {
       "observacao": "Renderizam fora do Layout (sem topbar, menu ou breadcrumb). Precisam de DoD propria ANTES de entrar no manifesto: a regua atual pressupoe o shell.",
       "arquivos": [
-        "src/pages/Login.jsx",
+        "src/pages/Login/index.jsx",
         "src/pages/RecuperarSenha.jsx",
         "src/pages/DefinirSenha.jsx",
         "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx"
       ],
       "dono": "leva-compartilhadas",
-      "dod": "docs/DEFINICAO-DE-PRONTO.md, secao \"TELAS FORA DO SHELL\" (03/09)"
+      "dod": "docs/DEFINICAO-DE-PRONTO.md, secao \"TELAS FORA DO SHELL\" (03/09)",
+      "migrada": true
     },
     "dono": "Leva das telas compartilhadas. NAO pertencem a leva de modulo nenhuma - e esse era o ponto cego. Toda leva de modulo declara na abertura quais compartilhadas o modulo usa, mas NENHUMA leva de modulo as reforma.",
     "entrada_no_manifesto": "Cada tela entra na lista `telas` QUANDO for migrada, nao antes. Adicionar as oito de uma vez deixa o validador vermelho (221 violacoes em 03/09) e bloqueia quem esta empurrando em paralelo no mesmo branch. A posse ja esta declarada aqui; a entrada no manifesto acompanha a migracao.",
