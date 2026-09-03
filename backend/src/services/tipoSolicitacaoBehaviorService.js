@@ -56,7 +56,7 @@ function getDefaultTipoSolicitacaoBehavior() {
     mostrar_itens_apropriacao: false,
     exige_itens_apropriacao: false,
     exige_apropriacoes_contrato: false,
-    // ADM Local e Locacao recebem a apropriacao pelo vinculo obra + tipo. A flag permite que
+    // ADM Local, Locacao e Pre-Obra recebem a apropriacao pelo vinculo obra + tipo. A flag permite que
     // frontend e backend escondam os campos manuais sem depender do nome exibido na tela.
     usa_apropriacao_automatica_obra: false,
     // Fluxo novo de contratos (D38): chave de comportamento de primeira classe — o
@@ -153,6 +153,10 @@ function inferLegacyTipoBehavior(tipo) {
     behavior.usa_apropriacao_automatica_obra = true;
   }
 
+  if (codigoInterno === 'PRE_OBRA') {
+    behavior.usa_apropriacao_automatica_obra = true;
+  }
+
   if (codigoInterno === 'ABERTURA_DE_CONTRATO') {
     behavior.mostrar_ref_contrato_abertura = true;
     behavior.exige_ref_contrato_abertura = true;
@@ -192,6 +196,11 @@ function normalizeTipoSolicitacaoBehavior(tipo) {
   merged.finalidade_data_vencimento = normalizarFinalidadeDataSolicitacao(
     merged.finalidade_data_vencimento
   );
+
+  const codigoInterno = normalizeTipoSolicitacaoCodigo(tipo?.codigo_interno, tipo?.nome);
+  if (['ADM_LOCAL_DE_OBRA', 'LOCACAO_DE_MAQ_EQ', 'PRE_OBRA'].includes(codigoInterno)) {
+    merged.usa_apropriacao_automatica_obra = true;
+  }
 
   return merged;
 }

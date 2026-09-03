@@ -40,6 +40,7 @@
     "reconcile:recarga-prestacoes": "node scripts/reconciliarPrestacoesRecargaEnviadas.js",
     "test:importacao-apropriacoes": "node scripts/validarImportacaoApropriacoes.js",
     "test:obra-gestao-apropriacoes": "node scripts/validarObraGestaoApropriacoes.js",
+    "test:obra-apropriacoes-padrao": "node scripts/validarApropriacoesPadraoNovaObra.js",
     "auditoria-operacional:retencao:simular": "node scripts/limparAuditoriaOperacional.js",
     "auditoria-operacional:retencao:aplicar": "node scripts/limparAuditoriaOperacional.js --confirm",
     "audit:legacy-uploads": "node scripts/auditarUploadsLegados.js",

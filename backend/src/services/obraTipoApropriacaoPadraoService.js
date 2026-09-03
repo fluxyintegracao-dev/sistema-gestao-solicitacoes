@@ -8,14 +8,22 @@ const {
 
 const PADROES_APROPRIACAO_AUTOMATICA = Object.freeze([
   Object.freeze({
+    chave: 'ADM_LOCAL_DE_OBRA',
     tipo_codigo: 'ADM_LOCAL_DE_OBRA',
     codigo: '1',
     descricao: 'ADM LOCAL DE OBRA'
   }),
   Object.freeze({
+    chave: 'LOCACAO_DE_MAQ_EQ',
     tipo_codigo: 'LOCACAO_DE_MAQ_EQ',
     codigo: '2',
     descricao: 'LOCAÇÃO DE MAQ. e EQ.'
+  }),
+  Object.freeze({
+    chave: 'PRE_OBRA',
+    tipo_codigo: 'PRE_OBRA',
+    codigo: '3',
+    descricao: 'PRÉ-OBRA'
   })
 ]);
 
@@ -182,7 +190,7 @@ async function garantirApropriacoesPadraoNovaObra({ obra, usuarioId = null, tran
         throw criarErroRegra(
           409,
           'APROPRIACOES_PADRAO_DEVEM_SER_DISTINTAS',
-          'ADM Local de Obra e Locacao de Maq. e Eq. precisam usar apropriacoes distintas.'
+          'As apropriacoes padrao da obra precisam ser distintas.'
         );
       }
       apropriacoesUsadas.add(Number(resolvido.apropriacao.id));
@@ -231,7 +239,7 @@ async function garantirApropriacoesPadraoNovaObra({ obra, usuarioId = null, tran
       throw criarErroRegra(
         409,
         'APROPRIACOES_PADRAO_DEVEM_SER_DISTINTAS',
-        'ADM Local de Obra e Locacao de Maq. e Eq. precisam usar apropriacoes distintas.'
+        'As apropriacoes padrao da obra precisam ser distintas.'
       );
     }
 

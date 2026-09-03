@@ -147,6 +147,10 @@ export function inferLegacyTipoSolicitacaoBehavior(tipo) {
     behavior.usa_apropriacao_automatica_obra = true;
   }
 
+  if (token === 'PRE_OBRA') {
+    behavior.usa_apropriacao_automatica_obra = true;
+  }
+
   if (token === 'ABERTURA_DE_CONTRATO') {
     behavior.mostrar_ref_contrato_abertura = true;
     behavior.exige_ref_contrato_abertura = true;
@@ -179,5 +183,11 @@ export function getTipoSolicitacaoBehavior(tipo) {
   behavior.finalidade_data_vencimento = normalizarFinalidadeDataSolicitacao(
     behavior.finalidade_data_vencimento
   );
+
+  const token = normalizeTipoToken(tipo?.codigo_interno || tipo?.nome);
+  if (['ADM_LOCAL_DE_OBRA', 'LOCACAO_DE_MAQ_EQ', 'PRE_OBRA'].includes(token)) {
+    behavior.usa_apropriacao_automatica_obra = true;
+  }
+
   return behavior;
 }
