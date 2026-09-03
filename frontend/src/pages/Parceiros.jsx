@@ -593,7 +593,18 @@ export default function Parceiros() {
               </FormSecao>
 
               {parceiroForm.id && parceiroForm.cadastro_incompleto && (
-                <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                <label
+                  className="flex items-start gap-2 rounded-xl border p-3 text-sm"
+                  /* R25: a faixa de atenção usa a família semântica de
+                     aviso (--sem-warning), que tem par definido no tema
+                     escuro e passa pelo piso de contraste do ThemeContext.
+                     A paleta amber crua não tinha nem um nem outro. */
+                  style={{
+                    borderColor: 'var(--sem-warning)',
+                    background: 'var(--sem-warning-bg)',
+                    color: 'var(--sem-warning)'
+                  }}
+                >
                   <input
                     className="mt-1"
                     type="checkbox"

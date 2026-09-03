@@ -186,6 +186,10 @@ export function validarLayout() {
   const r22 = validarImportesDeHooks();
   falhas.push(...r22.falhas);
 
+  // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
+  const r25 = validarCoresForaDoToken();
+  falhas.push(...r25.falhas);
+
   return {
     falhas,
     avisos,
@@ -194,6 +198,97 @@ export function validarLayout() {
     dialogosDoNavegador: r19.total,
     dialogosNoTrinco: r19.noTrinco
   };
+}
+
+/*
+ * R25 — COR FORA DO SISTEMA DE TOKENS (03/09).
+ *
+ * Por que esta regra nasceu tarde, e o que isso custou: a M2 e a M3 existem
+ * na DoD desde o começo, e o harness mede contraste no preview real. Mas
+ * NENHUM check estático olhava a CLASSE de cor. Durante as levas eu conferia
+ * `slate` por grep manual, agente por agente — e passo de verificação que
+ * vive no hábito de alguém não é verificação.
+ *
+ * O resultado: a `FinanceiroTituloDetalhe` entrou no manifesto, fechou
+ * matriz e ficou com 35 classes `slate` cruas, entre elas `text-slate-500`
+ * (#64748b) — a MESMA cor que reprovou AA na `DefinirSenha`, 4,34:1 contra o
+ * mínimo de 4,5:1.
+ *
+ * A regra fecha a família inteira, não só o `slate`: paleta crua do
+ * Tailwind, hexadecimal, `rgb()`/`rgba()`/`hsl()` e cor arbitrária entre
+ * colchetes. Cor de tela vem de token, ponto.
+ *
+ * O que continua permitido, e por quê:
+ *  - `var(--...)` — é o token.
+ *  - `currentColor`, `transparent`, `inherit` — herdam de quem já é token.
+ *  - `text-white` / `bg-black` sobre superfície semântica declarada NÃO
+ *    entram aqui: as classes sem número de paleta ficam de fora do padrão,
+ *    porque `-white`/`-black` não são degraus de paleta e o uso legítimo
+ *    delas é sobre fundo semântico.
+ */
+const PALETAS_CRUAS = [
+  'slate', 'gray', 'grey', 'zinc', 'neutral', 'stone',
+  'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal',
+  'cyan', 'sky', 'blue', 'indigo', 'violet', 'purple', 'fuchsia', 'pink', 'rose'
+].join('|');
+const PROPRIEDADES_DE_COR = ['text', 'bg', 'border', 'ring', 'divide', 'from', 'via', 'to', 'fill', 'stroke', 'shadow', 'outline', 'decoration', 'accent', 'caret', 'placeholder'].join('|');
+
+function validarCoresForaDoToken() {
+  const falhas = [];
+  // Lê o manifesto aqui: `manifesto` é local da validarLayout(), e a raiz
+  // se chama `frontendRoot`. A primeira versão desta função usava os dois
+  // nomes errados e NUNCA RODOU — deu zero achado num arquivo com 35
+  // classes cruas. Foi pega porque o resultado foi conferido contra dado
+  // conhecido antes de ser aceito; sozinho, o zero parecia aprovação.
+  const manifesto = JSON.parse(
+    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
+  );
+  const classeCrua = new RegExp(`\\b(?:${PROPRIEDADES_DE_COR})-(?:${PALETAS_CRUAS})-\\d{2,3}\\b`, 'g');
+  const arbitraria = new RegExp(`\\b(?:${PROPRIEDADES_DE_COR})-\\[(#[0-9a-fA-F]{3,8}|rgba?\\(|hsla?\\()`, 'g');
+  const hexSolto = /#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?(?:[0-9a-fA-F]{2})?\b/g;
+  const funcaoDeCor = /\b(?:rgba?|hsla?)\s*\(/g;
+
+  for (const tela of manifesto.telas) {
+    const caminho = path.join(frontendRoot, tela);
+    if (!fs.existsSync(caminho)) continue;
+    const codigo = fs.readFileSync(caminho, 'utf8');
+    /*
+      COMENTÁRIO NÃO É CÓDIGO — e aqui o corte tem de ser no ARQUIVO
+      INTEIRO, não linha a linha.
+
+      A R19 e a R21 já tinham essa correção, mas linha a linha. Não basta:
+      o comentário que explica a R25 é um bloco JSX de VÁRIAS LINHAS e cita
+      as classes que a regra proíbe. Cortando só dentro da linha, o bloco
+      sobrevive e o arquivo reprova por causa da própria explicação da
+      regra. Aconteceu na ObraGestao em 03/09.
+
+      (Este comentário não escreve o delimitador de fechamento de bloco
+      como exemplo — escrevê-lo aqui fecharia ESTE comentário no meio e
+      quebraria o arquivo. Foi o que aconteceu na primeira tentativa.)
+
+      Os comentários viram espaço em branco preservando as quebras de
+      linha, para o número da linha continuar batendo com o arquivo real.
+    */
+    const semComentarios = codigo
+      .replace(/\/\*[\s\S]*?\*\//g, (bloco) => bloco.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (linha) => ' '.repeat(linha.length));
+    const linhas = semComentarios.split('\n');
+    linhas.forEach((semComentario, i) => {
+      if (!semComentario.trim()) return;
+      const registrar = (achado, tipo) => falhas.push(
+        `${tela}:${i + 1} [R25] ${tipo}: "${achado}" — cor de tela vem de token (--c-*, --ui-*, --sem-*) ou de classe do sistema (text-muted, badge-*, btn-*). Paleta crua não acompanha o tema escuro e não passa pelo piso de contraste do ThemeContext.`
+      );
+      for (const m of semComentario.matchAll(classeCrua)) registrar(m[0], 'classe de paleta crua');
+      for (const m of semComentario.matchAll(arbitraria)) registrar(m[0], 'cor arbitrária em classe');
+      // Hex e rgb() fora de classe: só reprova quando não está dentro de
+      // um `var(...)` de fallback, que é uso legítimo.
+      if (!/var\(\s*--/.test(semComentario)) {
+        for (const m of semComentario.matchAll(hexSolto)) registrar(m[0], 'cor em hexadecimal');
+        for (const m of semComentario.matchAll(funcaoDeCor)) registrar(m[0].trim(), 'cor em função rgb/hsl');
+      }
+    });
+  }
+  return { falhas };
 }
 
 /**

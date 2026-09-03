@@ -552,3 +552,25 @@ sem ninguém saber dizer por quê.
 3. Capturas de leva: SEMPRE em 1920/1366/390, com dados de pior caso (nome
    60+ chars, razão social longa, valor em bilhões com centavos, linha com
    todos os campos e o máximo de botões), e o resultado da auditoria junto.
+
+## R25 — Cor de tela vem de TOKEN, nunca de paleta crua (03/09)
+
+- **O que reprova**: classe de paleta crua do Tailwind com degrau numérico
+  (`text-slate-500`, `bg-emerald-100`, `border-amber-200`…), cor em
+  hexadecimal, `rgb()`/`rgba()`/`hsl()`, e cor arbitrária entre colchetes
+  (`text-[#64748b]`). Vale para toda tela do manifesto, sem trinco.
+- **De onde a cor vem**: token (`--c-*`, `--ui-*`, `--sem-*`) ou classe do
+  sistema que aponta para token (`text-muted`, `badge-*`, `btn-*`,
+  `StatusBadge`).
+- **Por que**: paleta crua não tem par definido no tema escuro e **não passa
+  pelo piso de contraste** que o `ThemeContext` aplica (R24). `text-slate-500`
+  é `#64748b`: **4,34:1** sobre fundo claro, contra o mínimo AA de 4,5:1.
+- **O que continua permitido**: `var(--...)`, `currentColor`, `transparent`,
+  `inherit`, e as classes sem degrau de paleta (`text-white`, `bg-black`),
+  cujo uso legítimo é sobre superfície semântica já declarada.
+- **Por que nasceu tarde, e o que isso custou**: a M2 e a M3 existem na DoD
+  desde o começo e o harness mede contraste no preview real — mas **nenhum
+  check estático olhava a CLASSE de cor**. Durante as levas isso era
+  conferido por `grep` manual, agente por agente. A `FinanceiroTituloDetalhe`
+  entrou no manifesto, fechou matriz e ficou com **64 cores cruas**,
+  incluindo a que reprova AA.

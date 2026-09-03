@@ -755,3 +755,69 @@ a pessoa cancelar no meio de um lote, o que já foi descartado **fica
 descartado** — não se tenta desfazer. E o texto da confirmação declara a
 irreversibilidade antes, não depois.
 
+---
+
+## Quarto caso de "existia e ninguém sabia": o passo que só existia no hábito
+
+Os três primeiros foram telas: as compartilhadas órfãs, as rotas sem porta de
+entrada, os índices de navegação fora da fonte única. **Este é um passo do
+PROCESSO**, e por isso é o mais incômodo dos quatro.
+
+### O que aconteceu
+
+Durante todas as levas eu conferia cor crua por `grep`, agente por agente:
+`grep -E "text-slate-|bg-slate-|border-slate-"` entrava na lista de gates de
+cada agente e no meu relatório. Funcionou — enquanto eu lembrei.
+
+A `FinanceiroTituloDetalhe` entrou no manifesto, fechou matriz de cobertura,
+foi entregue — e carrega **64 cores cruas**. Entre elas 29 `text-slate-500`,
+que é `#64748b`: **4,34:1** de contraste sobre fundo claro, contra o mínimo
+AA de 4,5:1. **A mesma cor que a leva das telas fora do shell mediu e
+reprovou na `DefinirSenha`** — corrigida lá, intacta aqui.
+
+Nada falhou. O `validarLayout` passou, o harness passou, a matriz fechou. O
+passo que teria pegado isso **não estava em lugar nenhum a não ser no meu
+hábito de rodar um grep**.
+
+### A regra
+
+> **O que não é conferido por check não é conferido.** Passo de verificação
+> que existe só no hábito de alguém não existe: ele funciona até a primeira
+> vez que a pessoa está cansada, com pressa, ou delegando — e falha em
+> silêncio, porque não há nada para ficar vermelho.
+
+E o corolário, que vale para a leitura do revisor tanto quanto para o grep:
+**se um passo é obrigatório, ele é escrito e é executável.** Se não puder ser
+executável, é escrito como item explícito da DoD, com nome, para poder ser
+cobrado. Um passo que depende de alguém lembrar é uma promessa, não um
+processo.
+
+### O que foi feito
+
+- **R25** no `validarLayout.mjs`, sem trinco: paleta crua, hexadecimal,
+  `rgb()`/`hsl()` e cor arbitrária reprovam em qualquer tela do manifesto.
+  Fecha a família inteira, não só o `slate` — decisão do cliente.
+- **Provado nos dois sentidos**: com o código limpo passa; com um
+  `text-slate-500` e um `#ff0000` plantados numa tela do manifesto, reprova
+  as duas coisas e o validador sai com código 1.
+- As três telas devedoras: `Parceiros` (3, faixa de atenção em amber cru →
+  família semântica `--sem-warning`), `ObraGestao` (1, fundo de modal em
+  `bg-slate-950/45` → `--modal-overlay`, o mesmo do `OverlayModal` e da
+  paleta de comandos) e `FinanceiroTituloDetalhe` (64).
+
+### Dois defeitos do próprio check, achados antes de confiar nele
+
+1. **Ele nunca rodou.** A primeira versão usava `manifesto` e `RAIZ`, nomes
+   que não existem naquele escopo — e devolveu **zero achados** num arquivo
+   com 35 classes cruas. Foi pego porque o resultado foi conferido contra
+   dado conhecido antes de ser aceito. Sozinho, o zero parecia aprovação.
+2. **O comentário que explicava a regra reprovava o arquivo.** A remoção de
+   comentários era linha a linha, e o comentário da R25 numa tela é um bloco
+   JSX de várias linhas que cita as classes proibidas. Passou a cortar
+   comentários no arquivo inteiro, trocando-os por espaço para o número da
+   linha continuar batendo.
+
+   E a primeira tentativa desse conserto **quebrou o validador**: o
+   comentário que explicava o problema dos comentários escrevia o
+   delimitador de fechamento de bloco como exemplo, e fechou a si mesmo.
+

@@ -794,7 +794,14 @@ export default function ObraGestao() {
       )}
 
       {novoItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          /* R25: o fundo escurecido do modal vem do token do sistema
+             (--modal-overlay), o mesmo do OverlayModal e da paleta de
+             comandos. `bg-slate-950/45` era cor crua: não muda no tema
+             escuro e não acompanha nenhuma decisão futura de opacidade. */
+          style={{ background: 'var(--modal-overlay)' }}
+        >
           <div className="card w-full max-w-xl px-6 py-4">
             <div className="flex items-start justify-between gap-4">
               <div>
