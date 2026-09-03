@@ -697,11 +697,11 @@ export default function RhDpColaboradores() {
             },
             {
               id: 'tipo_vinculo',
-              rotulo: 'Vinculo',
+              rotulo: 'Vínculo',
               unico: true,
               opcoes: [
                 { valor: 'CLT', rotulo: 'CLT' },
-                { valor: 'NAO_CLT', rotulo: 'Nao CLT' }
+                { valor: 'NAO_CLT', rotulo: 'Não CLT' }
               ]
             },
             {
@@ -758,7 +758,7 @@ export default function RhDpColaboradores() {
             },
             {
               id: 'vinculo',
-              titulo: 'Vinculo',
+              titulo: 'Vínculo',
               tipo: 'badge',
               render: (item) => (item.tipo_vinculo === 'NAO_CLT' ? 'Nao CLT' : item.tipo_vinculo)
             },
@@ -894,7 +894,7 @@ export default function RhDpColaboradores() {
                     disabled={!podeEditar}
                   />
                 </CampoForm>
-                <CampoForm label="Tipo de vinculo">
+                <CampoForm label="Tipo de vínculo">
                   <select
                     className="form-control"
                     value={form.tipo_vinculo}

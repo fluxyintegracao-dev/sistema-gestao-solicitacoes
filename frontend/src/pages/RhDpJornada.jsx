@@ -102,7 +102,7 @@ export default function RhDpJornada() {
         const listaObras = await getObras();
         setObras(Array.isArray(listaObras) ? listaObras : []);
       } catch (error) {
-        avisar.erro(error.message || 'Nao foi possivel carregar as obras.');
+        avisar.erro(error.message || 'Não foi possível carregar as obras.');
       }
 
       /**
@@ -146,7 +146,7 @@ export default function RhDpJornada() {
         avisar.alerta('Nenhum colaborador esteve nesta obra nesta competencia.');
       }
     } catch (error) {
-      avisar.erro(error.message || 'Nao foi possivel montar a lista.');
+      avisar.erro(error.message || 'Não foi possível montar a lista.');
       setLinhas([]);
     } finally {
       setCarregando(false);
@@ -267,10 +267,10 @@ export default function RhDpJornada() {
       await carregar();
       avisar.sucesso(
         `Jornada de ${preenchidas.length} colaborador(es) registrada. `
-        + 'O Departamento Pessoal pode gerar a apuracao desta competencia.'
+        + 'O Departamento Pessoal pode gerar a apuração desta competência.'
       );
     } catch (error) {
-      avisar.erro(error.message || 'Nao foi possivel registrar a jornada.');
+      avisar.erro(error.message || 'Não foi possível registrar a jornada.');
     } finally {
       setSalvando(false);
     }
@@ -303,7 +303,7 @@ export default function RhDpJornada() {
           campos={[
             {
               id: 'competencia',
-              rotulo: 'Competencia',
+              rotulo: 'Competência',
               tipo: 'month',
               valor: competencia,
               aoMudar: setCompetencia
@@ -342,8 +342,8 @@ export default function RhDpJornada() {
               validador reprova (R5). E informacao util e continua visivel,
               agora ancorada ao bloco a que pertence e com token de cor. */}
           <p className="app-bloco-lead">
-            Os eventos recorrentes — vale alimentacao, desconto de adiantamento, pensao — sao
-            aplicados sozinhos quando o Departamento Pessoal gerar a apuracao. Nao precisam ser
+            Os eventos recorrentes — vale alimentação, desconto de adiantamento, pensão — são
+            aplicados sozinhos quando o Departamento Pessoal gerar a apuração. Não precisam ser
             digitados aqui.
           </p>
         </div>
@@ -383,7 +383,7 @@ export default function RhDpJornada() {
                 },
                 {
                   id: 'vinculo',
-                  titulo: 'Vinculo',
+                  titulo: 'Vínculo',
                   tipo: 'badge',
                   render: (linha) => linha.tipo_vinculo
                 },

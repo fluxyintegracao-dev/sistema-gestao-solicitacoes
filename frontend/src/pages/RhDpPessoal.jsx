@@ -998,7 +998,7 @@ export default function RhDpPessoal() {
             },
             {
               id: 'vinculo',
-              titulo: 'Vinculo',
+              titulo: 'Vínculo',
               tipo: 'badge',
               render: (colaborador) => colaborador.tipo_vinculo
             },

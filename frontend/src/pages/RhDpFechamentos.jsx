@@ -314,7 +314,7 @@ export default function RhDpFechamentos() {
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Competencias fechadas"
+        titulo="Competências fechadas"
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -325,7 +325,7 @@ export default function RhDpFechamentos() {
         <BarraFiltros
           campos={[{
             id: 'competencia',
-            rotulo: 'Competencia',
+            rotulo: 'Competência',
             tipo: 'month',
             valor: filtros.competencia,
             aoMudar: (valor) => setFiltros((atuais) => ({ ...atuais, competencia: valor }))
@@ -349,7 +349,7 @@ export default function RhDpFechamentos() {
           colunas={[
             {
               id: 'competencia',
-              titulo: 'Competencia',
+              titulo: 'Competência',
               tipo: 'codigo',
               render: (item) => item.apuracao?.competencia || '-'
             },
@@ -375,7 +375,7 @@ export default function RhDpFechamentos() {
             },
             {
               id: 'titulos',
-              titulo: 'Titulos',
+              titulo: 'Títulos',
               tipo: 'numero',
               render: (item) => item.total_titulos || 0
             },
@@ -435,7 +435,7 @@ export default function RhDpFechamentos() {
                   ladrilho como o resto do resumo do lote — mesma informacao,
                   em superficie. */}
               <StatGrid colunas={3}>
-                <StatTile label="Titulos gerados" valor={detalhe.total_titulos || 0} />
+                <StatTile label="Títulos gerados" valor={detalhe.total_titulos || 0} />
                 <StatTile label="Valor total" valor={formatCurrency(detalhe.total_valor)} />
                 <StatTile label="Categoria financeira" valor={detalhe.categoriaFinanceira?.nome || 'Nao informada'} />
                 <StatTile label="Fechado em" valor={formatDate(detalhe.data_fechamento)} />
@@ -465,7 +465,7 @@ export default function RhDpFechamentos() {
                   },
                   {
                     id: 'vinculo',
-                    titulo: 'Vinculo',
+                    titulo: 'Vínculo',
                     tipo: 'badge',
                     render: (item) => item.itemApuracao?.colaborador?.tipo_vinculo || '-'
                   },
@@ -506,7 +506,7 @@ export default function RhDpFechamentos() {
                 ]}
                 itens={detalhe.titulos || []}
                 storageKey="tabela:rh-dp-fechamentos:titulos"
-                rotuloRolagem="Titulos do fechamento"
+                rotuloRolagem="Títulos do fechamento"
                 vazio="Nenhum titulo foi vinculado a este fechamento."
               />
             </>

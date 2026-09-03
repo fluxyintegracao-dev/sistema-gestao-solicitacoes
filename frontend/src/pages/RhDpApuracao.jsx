@@ -232,7 +232,7 @@ export default function RhDpApuracao() {
       setObras(Array.isArray(listaObras) ? listaObras : []);
     } catch (error) {
       console.error(error);
-      avisar.erro(error?.message || 'Erro ao carregar base da apuracao RH/DP');
+      avisar.erro(error?.message || 'Erro ao carregar base da apuração RH/DP');
     } finally {
       setCarregandoBase(false);
     }
@@ -280,7 +280,7 @@ export default function RhDpApuracao() {
       setDetalhe(data);
     } catch (error) {
       console.error(error);
-      avisar.erro(error?.message || 'Erro ao carregar detalhe da apuracao RH/DP');
+      avisar.erro(error?.message || 'Erro ao carregar detalhe da apuração RH/DP');
     }
   }
 
@@ -344,9 +344,9 @@ export default function RhDpApuracao() {
     if (!detalhe?.id) return;
 
     const { ok } = await confirmar({
-      titulo: 'Concluir conferencia',
+      titulo: 'Concluir conferência',
       mensagem: 'Concluir a conferencia desta apuracao? Todos os itens precisam estar marcados como conferidos.',
-      rotuloConfirmar: 'Concluir conferencia'
+      rotuloConfirmar: 'Concluir conferência'
     });
     if (!ok) return;
 
@@ -372,7 +372,7 @@ export default function RhDpApuracao() {
     // Fechar e irreversivel pelo caminho normal (so o estorno desfaz, e so
     // enquanto nenhum titulo estiver baixado): confirmacao destrutiva.
     const { ok } = await confirmar({
-      titulo: 'Fechar competencia',
+      titulo: 'Fechar competência',
       mensagem: `Fechar a competencia ${detalhe.competencia} e gerar os titulos a pagar no financeiro central? Depois de fechada, so um estorno reabre a apuracao — e apenas enquanto nenhum titulo estiver baixado.`,
       rotuloConfirmar: 'Fechar e gerar titulos',
       destrutiva: true
@@ -475,11 +475,11 @@ export default function RhDpApuracao() {
     },
     {
       id: 'tipo_vinculo',
-      rotulo: 'Vinculo',
+      rotulo: 'Vínculo',
       unico: true,
       opcoes: [
         { valor: 'CLT', rotulo: 'CLT' },
-        { valor: 'NAO_CLT', rotulo: 'Nao CLT' }
+        { valor: 'NAO_CLT', rotulo: 'Não CLT' }
       ]
     },
     {
@@ -499,15 +499,15 @@ export default function RhDpApuracao() {
 
       {/* Formulario de ACAO, nao filtro: e daqui que a pre-folha nasce. */}
       <BlocoConteudo
-        titulo="Gerar apuracao"
-        descricao="A pre-folha da competencia sai das obras informadas nas importacoes confirmadas; depois revise por colaborador e registre os ajustes auditados."
+        titulo="Gerar apuração"
+        descricao="A pré-folha da competência sai das obras informadas nas importações confirmadas; depois revise por colaborador e registre os ajustes auditados."
       >
         <form className="space-y-4" onSubmit={onGerarApuracao}>
           {/* Três controles curtos + a observação, que toma a linha (tipo
               "observacao"). Com `colunas={2}` sobrava uma célula vazia no meio
               da grade; com 3 a linha fecha exata. */}
-          <FormSecao legenda="Recorte da apuracao" colunas={3}>
-            <CampoForm label="Competencia">
+          <FormSecao legenda="Recorte da apuração" colunas={3}>
+            <CampoForm label="Competência">
               <input
                 type="month"
                 className="input w-full"
@@ -516,7 +516,7 @@ export default function RhDpApuracao() {
                 disabled={!podeEditar}
               />
             </CampoForm>
-            <CampoForm label="Base para diaria">
+            <CampoForm label="Base para diária">
               <select
                 className="input w-full"
                 value={form.dias_base}
@@ -528,7 +528,7 @@ export default function RhDpApuracao() {
                 <option value="20">20 dias - escala operacional</option>
               </select>
             </CampoForm>
-            <CampoForm label="Tipo de vinculo">
+            <CampoForm label="Tipo de vínculo">
               <select
                 className="input w-full"
                 value={form.tipo_vinculo}
@@ -540,11 +540,11 @@ export default function RhDpApuracao() {
                 <option value="NAO_CLT">Nao CLT</option>
               </select>
             </CampoForm>
-            <CampoForm label="Observacoes do recorte" tipo="observacao">
+            <CampoForm label="Observações do recorte" tipo="observacao">
               <textarea
                 className="input w-full"
                 rows={3}
-                placeholder="Observacoes do recorte"
+                placeholder="Observações do recorte"
                 value={form.observacoes}
                 onChange={(event) => setForm((current) => ({ ...current, observacoes: event.target.value }))}
                 disabled={!podeEditar}
@@ -563,9 +563,9 @@ export default function RhDpApuracao() {
       </BlocoConteudo>
 
       <StatGrid colunas={4}>
-        <StatTile label="Apuracoes" valor={resumoLista.quantidade} />
+        <StatTile label="Apurações" valor={resumoLista.quantidade} />
         <StatTile label="Bruto filtrado" valor={formatCurrency(resumoLista.totalBruto)} />
-        <StatTile label="Liquido filtrado" valor={formatCurrency(resumoLista.totalLiquido)} />
+        <StatTile label="Líquido filtrado" valor={formatCurrency(resumoLista.totalLiquido)} />
         <StatTile
           label="Status"
           valor={`${resumoLista.rascunhos} rascunho(s)`}
@@ -575,7 +575,7 @@ export default function RhDpApuracao() {
       </StatGrid>
 
       <BlocoConteudo
-        titulo="Apuracoes"
+        titulo="Apurações"
         variante="primario"
         cor="var(--c-primary)"
       >
@@ -587,7 +587,7 @@ export default function RhDpApuracao() {
         <BarraFiltros
           campos={[{
             id: 'competencia',
-            rotulo: 'Competencia',
+            rotulo: 'Competência',
             tipo: 'month',
             valor: filtros.competencia,
             aoMudar: (valor) => setFiltros((atuais) => ({ ...atuais, competencia: valor }))
@@ -607,7 +607,7 @@ export default function RhDpApuracao() {
           colunas={[
             {
               id: 'competencia',
-              titulo: 'Competencia',
+              titulo: 'Competência',
               tipo: 'codigo',
               render: (item) => item.competencia
             },
@@ -643,7 +643,7 @@ export default function RhDpApuracao() {
             },
             {
               id: 'vinculo',
-              titulo: 'Vinculo',
+              titulo: 'Vínculo',
               tipo: 'badge',
               render: (item) => item.tipo_vinculo || 'Misto'
             },
@@ -661,7 +661,7 @@ export default function RhDpApuracao() {
             },
             {
               id: 'liquido',
-              titulo: 'Liquido',
+              titulo: 'Líquido',
               tipo: 'valor',
               render: (item) => formatCurrency(item.total_liquido)
             },
@@ -682,7 +682,7 @@ export default function RhDpApuracao() {
           ]}
           itens={apuracoes}
           storageKey="tabela:rh-dp-apuracao:lista"
-          rotuloRolagem="Apuracoes RH/DP"
+          rotuloRolagem="Apurações RH/DP"
           carregando={carregandoBase || carregandoLista}
           vazio="Nenhuma apuracao encontrada para os filtros atuais."
           acoesLinha={(item) => (
@@ -860,7 +860,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'vinculo',
-                titulo: 'Vinculo',
+                titulo: 'Vínculo',
                 tipo: 'badge',
                 render: (item) => item.colaborador?.tipo_vinculo || '-'
               },
@@ -890,7 +890,7 @@ export default function RhDpApuracao() {
               },
               {
                 id: 'liquido',
-                titulo: 'Liquido',
+                titulo: 'Líquido',
                 tipo: 'valor',
                 render: (item) => (
                   <CelulaDupla
