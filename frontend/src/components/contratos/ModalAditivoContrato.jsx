@@ -36,6 +36,21 @@ import { formatCurrencyBRL, normalizeCurrencyTyping, parseCurrencyInput } from '
 
 const moeda = (v) => formatCurrencyBRL(v);
 
+function formatarDataContrato(valor) {
+  const partes = String(valor || '').slice(0, 10).split('-');
+  if (partes.length !== 3 || partes.some((parte) => !parte)) return '';
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function rotuloVigenciaAtual(contrato) {
+  const inicio = formatarDataContrato(contrato?.vigencia_inicio);
+  const fim = formatarDataContrato(contrato?.vigencia_fim);
+  if (inicio && fim) return `${inicio} a ${fim}`;
+  if (fim) return `Até ${fim}`;
+  if (inicio) return `Desde ${inicio}`;
+  return 'Não informada';
+}
+
 // `tipo` comeca VAZIO de proposito: o cliente pediu que informar seja OBRIGATORIO, e um padrao
 // escolhido pela tela seria a decisao sendo tomada por quem nao devia. E ele que decide o que a
 // aprovacao faz — uma parcela com o vencimento antigo, ou varias ate um prazo novo.
@@ -217,6 +232,20 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               <span><strong>Limite de {teto.percentual_maximo}%:</strong> {moeda(teto.teto)}</span>
               <span><strong>Já aprovado:</strong> {moeda(teto.usado)}</span>
               <span><strong>Disponível:</strong> {moeda(teto.disponivel)}</span>
+            </div>
+          )}
+
+          {teto && (
+            <div
+              className="text-sm"
+              style={{
+                borderTop: '1px solid var(--c-border)',
+                borderBottom: '1px solid var(--c-border)',
+                padding: '8px 0'
+              }}
+            >
+              <strong>Vigência atual:</strong>{' '}
+              <span style={{ color: 'var(--c-muted)' }}>{rotuloVigenciaAtual(teto.contrato)}</span>
             </div>
           )}
 

@@ -134,7 +134,18 @@ async function calcularTetoAditivo(contratoId, transaction) {
   const contrato = await Contrato.findByPk(contratoId, {
     // `ativo` e `status_contrato` vem junto para a guarda de contrato encerrado nao precisar de
     // uma segunda consulta — e para a tela poder desabilitar o botao pelo mesmo dado.
-    attributes: ['id', 'codigo', 'obra_id', 'responsavel_id', 'valor_total', 'ativo', 'status_contrato', 'fluxo_novo'],
+    attributes: [
+      'id',
+      'codigo',
+      'obra_id',
+      'responsavel_id',
+      'valor_total',
+      'vigencia_inicio',
+      'vigencia_fim',
+      'ativo',
+      'status_contrato',
+      'fluxo_novo'
+    ],
     transaction
   });
   if (!contrato) throw erro('Contrato nao encontrado.', 404);
@@ -158,7 +169,9 @@ async function calcularTetoAditivo(contratoId, transaction) {
       status_contrato: contrato.status_contrato || null,
       fluxo_novo: Boolean(contrato.fluxo_novo),
       obra_id: contrato.obra_id,
-      responsavel_id: contrato.responsavel_id || null
+      responsavel_id: contrato.responsavel_id || null,
+      vigencia_inicio: contrato.vigencia_inicio || null,
+      vigencia_fim: contrato.vigencia_fim || null
     },
     aceita_aditivo: contratoAceitaAditivo(contrato),
     percentual_maximo: PERCENTUAL_MAXIMO,
