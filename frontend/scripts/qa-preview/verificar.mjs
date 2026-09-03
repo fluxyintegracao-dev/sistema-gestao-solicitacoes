@@ -825,7 +825,34 @@ async function main() {
         await esperarCarregar(page);
 
         // Checagem de acesso: redirecionada ou tela de erro/permissão?
-        const rotaAtual = new URL(page.url()).pathname;
+        let rotaAtual = new URL(page.url()).pathname;
+        /*
+          SESSÃO QUE CAI NO MEIO DA VARREDURA (03/09).
+
+          Numa corrida de 36 telas a sessão de QA expira. Quando isso
+          acontece, TODA tela seguinte é redirecionada para /login, e o
+          harness escrevia 34 células FALHOU em cada uma com o motivo
+          "acesso/política bloqueando o usuário de QA" — o que é uma
+          afirmação FALSA: o usuário tem acesso, a sessão é que morreu.
+          Seis telas já tinham sido caluniadas assim antes de a corrida ser
+          interrompida.
+
+          É a mesma família da morte do navegador, que já tinha guarda: o
+          verificador não pode transformar "não consegui medir" em "a tela
+          está errada". Aqui dá para recuperar — refaz o login UMA vez e
+          repete a tela. Se nem assim, aborta a corrida inteira, e a matriz
+          do disco não é sobrescrita.
+        */
+        if (rotaAtual.startsWith('/login') && !tela.semSessao) {
+          console.log(`[qa-preview]   sessão caiu — refazendo login e repetindo ${tela.id}`);
+          await login(page);
+          await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
+          await esperarCarregar(page);
+          rotaAtual = new URL(page.url()).pathname;
+          if (rotaAtual.startsWith('/login')) {
+            throw new Error(`BLOQUEIO: a sessão de QA caiu e o novo login não segurou (tela "${tela.id}"). A corrida foi abortada e a matriz NÃO foi regravada — o que estava no disco continua valendo.`);
+          }
+        }
         if (rotaAtual !== rota) {
           throw new Error(`redirecionada de ${rota} para ${rotaAtual} — acesso/política bloqueando o usuário de QA`);
         }
@@ -1107,6 +1134,10 @@ async function main() {
           Erro de CARGA da tela (redirect, permissão, rota quebrada) segue
           sendo FALHOU: isso é defeito da tela, e é o que se quer ver.
         */
+        if (/^BLOQUEIO:/.test(resultado.erro)) {
+          console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);
+          throw new Error(resultado.erro);
+        }
         if (/Target page, context or browser has been closed|Browser has been closed|browserContext\.close|Target closed/i.test(resultado.erro)) {
           console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);
           throw new Error(`BLOQUEIO: o navegador morreu durante a varredura (na tela "${tela.id}"). A corrida foi abortada e a matriz NÃO foi regravada — o que estava no disco continua valendo. Rode de novo.`);
