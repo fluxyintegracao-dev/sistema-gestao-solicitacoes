@@ -40,6 +40,11 @@ elemento e a medida que reprovou.
   contorno, destrutiva apartada.
 - **C6** Nenhum link de navegação disfarçado de ação (menu "⋯" e barra de
   ações sem navigate/Link de "ir para" — R11).
+  **Escopo declarado**: a C6 pressupõe o shell (menu, breadcrumb, Ctrl+K).
+  Em tela que renderiza FORA do `Layout` ela **se inverte** — o link de
+  navegação é a única saída e é obrigatório. Ver a seção "TELAS FORA DO
+  SHELL" abaixo e a R11 em `docs/REGRAS-LAYOUT.md`. Não é exceção de tela:
+  é escopo da regra, e vale para qualquer tela futura fora do shell.
 
 ## TABELAS
 
@@ -141,6 +146,11 @@ seção declara o que vale, o que NÃO vale, e o que se INVERTE.
   existem.** O link "Esqueci minha senha" no Login e o "Voltar ao login" no
   Recuperar Senha são a ÚNICA navegação disponível — são obrigatórios, não
   redundantes. Remover é deixar a pessoa presa.
+  **Registrado como ESCOPO da R11, não como exceção destas quatro telas**
+  (decisão do cliente, 03/09): qualquer tela futura que renderize fora do
+  `Layout` já nasce sob esta leitura, sem precisar pedir exceção. Exceção é
+  permissão que alguém tem de lembrar de pedir, e o que não é pedido escapa
+  — foi assim que a R11 comeu a seta de voltar em 02/09.
 
 **Vale integralmente, e sem desconto:**
 - **M1–M4** (medidas, cores por token, contraste AA, alvo de clique) —

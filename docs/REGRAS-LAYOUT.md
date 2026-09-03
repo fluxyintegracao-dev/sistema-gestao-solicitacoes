@@ -132,7 +132,7 @@ automaticamente se sair do padrão.
   (`telas-reformadas.json`), com justificativa — o verificador rebaixa para
   AVISO e o aviso aparece em todo teste.
 
-## R11 — Navegação não é ação (02/09; ESCOPO corrigido em 02/09 após defeito)
+## R11 — Navegação não é ação (02/09; ESCOPO corrigido em 02/09 e ampliado em 03/09)
 
 - **Onde vale**: menus de ações (MenuMais "⋯", barra de ações do PageHeader)
   e botões "Voltar" REDUNDANTES em telas de LISTAGEM (onde menu, breadcrumb
@@ -145,8 +145,28 @@ automaticamente se sair do padrão.
   defeito de 02/09: generalização sem julgamento.
 - Padrão: prop `voltar` do `PageHeader` (ou botão `.app-voltar` em cabeçalho
   custom).
+- **Onde se INVERTE — telas fora do shell (03/09)**: nas telas que renderizam
+  **sem o `Layout`** (Login, Recuperar Senha, Definir Senha, Cotação Pública
+  do fornecedor) **não existe menu, não existe breadcrumb e não existe
+  Ctrl+K**. O pressuposto inteiro da regra — "o shell já resolve o retorno" —
+  é falso ali. Então o link de navegação **não é redundante: é a única saída,
+  e é obrigatório**. O "Esqueci minha senha" no Login e o "Voltar ao login"
+  no Recuperar Senha **têm de existir**; removê-los por esta regra deixa a
+  pessoa presa na tela.
+  Isto é **escopo declarado da regra**, não exceção de tela: qualquer tela
+  futura que renderize fora do `Layout` nasce sob esta leitura, sem precisar
+  pedir exceção. A lista de telas fora do shell vive em
+  `frontend/scripts/telas-reformadas.json`, em `telas_compartilhadas.fora_do_shell`.
+- **Por que escopo e não exceção** (Parte 5): exceção é permissão pontual que
+  alguém precisa lembrar de pedir — e o que não é pedido escapa. Escopo é
+  parte da regra: quem ler a R11 lê junto onde ela não vale. O defeito de
+  02/09 (a seta de voltar comida pela regra) nasceu exatamente de uma regra
+  sem escopo declarado, aplicada ao pé da letra.
 - O verificador reprova item de `mais`/`itens` com `navigate(`/`to:`/`Link` —
-  e o harness reprova tela de detalhe SEM a seta (DoD C3).
+  e o harness reprova tela de detalhe SEM a seta (DoD C3). **Nas telas fora
+  do shell o harness NÃO reprova o link de navegação**, porque a DoD própria
+  delas (`docs/DEFINICAO-DE-PRONTO.md`, seção "TELAS FORA DO SHELL") declara
+  a inversão.
 
 ## R12 — Filtro é marcação, nunca lista suspensa (02/09)
 
