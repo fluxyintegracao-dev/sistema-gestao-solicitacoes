@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Avisos, useAvisos } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -184,6 +185,7 @@ export default function NovaSolicitacao() {
   const [parceiroBuscando, setParceiroBuscando] = useState(false);
   const [parceiroBuscaExecutada, setParceiroBuscaExecutada] = useState(false);
   const [modalParceiroAberto, setModalParceiroAberto] = useState(false);
+  const { avisos, avisar, fechar } = useAvisos();
   const [modalCredoresContratoAberto, setModalCredoresContratoAberto] = useState(false);
   const [credorContratoSugestoesAbertas, setCredorContratoSugestoesAbertas] = useState(false);
   const [credorContratoModalBusca, setCredorContratoModalBusca] = useState('');
@@ -469,7 +471,7 @@ export default function NovaSolicitacao() {
       }
       const documentoErro = getCpfCnpjError(novoParceiro.cpf_cnpj, { required: true });
       if (documentoErro) {
-        alert(documentoErro);
+        avisar.alerta(documentoErro);
         return;
       }
       const pixErro = [
@@ -478,7 +480,7 @@ export default function NovaSolicitacao() {
         ['pix_chave_variavel_tipo', 'pix_chave_variavel', 'Chave PIX variavel']
       ].map(([tipo, chave, label]) => getPixDocumentError(novoParceiro[chave], novoParceiro[tipo], label)).find(Boolean);
       if (pixErro) {
-        alert(pixErro);
+        avisar.alerta(pixErro);
         return;
       }
 
@@ -1556,7 +1558,7 @@ export default function NovaSolicitacao() {
           label: 'CPF do representante legal'
         });
         if (cpfRepresentanteErro) {
-          alert(cpfRepresentanteErro); return;
+          avisar.alerta(cpfRepresentanteErro); return;
         }
         if (qualificacao.estado_civil === 'CASADO') {
           const conjuge = qualificacao.conjuge || {};
@@ -1580,7 +1582,7 @@ export default function NovaSolicitacao() {
             label: 'CPF do conjuge'
           });
           if (cpfConjugeErro) {
-            alert(cpfConjugeErro); return;
+            avisar.alerta(cpfConjugeErro); return;
           }
         }
       }
@@ -2260,6 +2262,10 @@ export default function NovaSolicitacao() {
     tipos
   ]);
 
+  // A faixa tem um dono so: com o modal de credor aberto ela vive dentro dele
+  // (senao o aviso ficaria atras do fundo escuro); fora dele, no topo da pagina.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     <div className="page solicitacoes-page solicitacao-nova-page max-w-6xl mx-auto">
       <h1 className="page-title">Nova Solicitação</h1>
@@ -2267,6 +2273,8 @@ export default function NovaSolicitacao() {
       <p className="page-subtitle">
         Preencha os dados essenciais da solicitação com um fluxo mais direto e operacional.
       </p>
+
+      {!(exibirCadastroCredor && modalParceiroAberto) && faixaAvisos}
 
       <form
         onSubmit={handleSubmit}
@@ -3396,6 +3404,7 @@ export default function NovaSolicitacao() {
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              {faixaAvisos}
               <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <label className="grid gap-1 text-sm">

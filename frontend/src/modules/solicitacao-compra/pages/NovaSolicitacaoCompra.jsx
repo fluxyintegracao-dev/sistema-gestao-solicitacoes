@@ -14,7 +14,7 @@ import {
 import { buscarParceiros, criarCredorCompraDireta } from '../../../services/parceiros';
 import { listarApropriacoes } from '../../../services/apropriacoes';
 import { getMinhasObras } from '../../../services/obras';
-import { TabelaPadrao } from '../../../components/padrao';
+import { Avisos, useAvisos, TabelaPadrao } from '../../../components/padrao';
 import ApropriacaoAutocomplete from '../../../components/ui/ApropriacaoAutocomplete';
 import { useAuth } from '../../../contexts/AuthContext';
 import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
@@ -222,6 +222,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
   const [credorAtivoIndex, setCredorAtivoIndex] = useState(0);
   const [erroBuscaCredor, setErroBuscaCredor] = useState('');
   const [modalCredorAberto, setModalCredorAberto] = useState(false);
+  const { avisos, avisar, fechar } = useAvisos();
   const [novoCredor, setNovoCredor] = useState(criarNovoCredorPadrao);
   const [salvandoCredor, setSalvandoCredor] = useState(false);
   const [buscaInsumo, setBuscaInsumo] = useState('');
@@ -801,7 +802,7 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
       label: 'CPF/CNPJ do credor'
     });
     if (documentoErro) {
-      alert(documentoErro);
+      avisar.alerta(documentoErro);
       return;
     }
 
@@ -1399,8 +1400,13 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
     }
   }
 
+  // A faixa tem um dono so: com o modal de credor aberto ela vive dentro dele
+  // (senao o aviso ficaria atras do fundo escuro); fora dele, no topo da pagina.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     <div className="page solicitacoes-page page-compra-nova">
+      {!modalCredorAberto && faixaAvisos}
       <div>
         <h1 className="page-title">{modoCompraDireta ? 'Compra Direta' : 'Nova Solicitação de Compra'}</h1>
         <p className="page-subtitle">
@@ -2210,6 +2216,8 @@ export default function NovaSolicitacaoCompra({ modoCompraDireta = false }) {
                 Fechar
               </button>
             </div>
+
+            {faixaAvisos}
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-2 text-sm">

@@ -44,7 +44,7 @@ import {
 import CompraPreviewModal from '../components/CompraPreviewModal';
 import { criarPreviewCompra } from '../utils/preview';
 import { montarLinhasResumoApropriacao } from '../utils/apropriacoes';
-import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
+import { Avisos, useAvisos, TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 
 // helpers
 
@@ -297,7 +297,8 @@ function ModalRespostaInternaCotacao({
   onSalvar,
   onUploadArquivos,
   onAbrirArquivo,
-  onFechar
+  onFechar,
+  faixaAvisos
 }) {
   const [condicoesAbertas, setCondicoesAbertas] = useState(false);
   if (!cotacao || !form) return null;
@@ -375,6 +376,7 @@ function ModalRespostaInternaCotacao({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+          {faixaAvisos}
           {solicitacaoEncerrada ? (
             <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
               Esta cotacao esta encerrada. Ao salvar, ela sera reaberta somente se a edicao criar nova disponibilidade para este fornecedor. A quantidade originalmente solicitada permanece inalterada.
@@ -2328,6 +2330,7 @@ export default function GerenciarCotacaoSolicitacao() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { avisos, avisar, fechar } = useAvisos();
   const [solicitacao, setSolicitacao] = useState(null);
   const [erroCarregamento, setErroCarregamento] = useState('');
   const [fornecedores, setFornecedores] = useState([]);
@@ -2841,7 +2844,7 @@ export default function GerenciarCotacaoSolicitacao() {
       label: 'CPF/CNPJ do transportador'
     });
     if (transportadorErro) {
-      alert(transportadorErro);
+      avisar.alerta(transportadorErro);
       return;
     }
 
@@ -2929,7 +2932,7 @@ export default function GerenciarCotacaoSolicitacao() {
         required: true,
         label: 'CPF/CNPJ do fornecedor'
       });
-      if (documentoErro) { alert(documentoErro); return; }
+      if (documentoErro) { avisar.alerta(documentoErro); return; }
       if (!String(novoFornecedor.whatsapp || '').trim()) { alert('Informe o WhatsApp/telefone do fornecedor.'); return; }
       const fornecedor = await criarFornecedorCompra({ ...novoFornecedor, cnpj: onlyDigits(novoFornecedor.cnpj) });
       const fornecedorFormatado = {
@@ -3274,8 +3277,14 @@ export default function GerenciarCotacaoSolicitacao() {
     && cotacoesAtivas.length > 0
     && !temPedidoAtivo;
 
+  // A faixa tem um dono so: com o modal de resposta interna aberto ela vive
+  // dentro dele (senao o aviso ficaria atras do fundo escuro); fora dele, no
+  // topo da pagina.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+
   return (
     <div className="page solicitacoes-page page-compra-nova cotacao-gestao-page">
+      {!cotacaoRespostaInterna && faixaAvisos}
       {/* Header */}
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">
@@ -3716,6 +3725,7 @@ export default function GerenciarCotacaoSolicitacao() {
         onSalvar={handleSalvarRespostaInterna}
         onUploadArquivos={handleUploadArquivosRespostaInterna}
         onAbrirArquivo={handleAbrirArquivoRespostaInterna}
+        faixaAvisos={faixaAvisos}
         onFechar={() => {
           if (salvandoRespostaInterna || enviandoArquivosRespostaInterna) return;
           setCotacaoRespostaInterna(null);
