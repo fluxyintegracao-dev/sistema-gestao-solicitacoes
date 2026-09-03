@@ -360,8 +360,8 @@ export default function Parceiros() {
         <div>
           <CelulaDupla principal={p.nome} sub={p.municipio || null} />
           {p.cadastro_incompleto && (
-            <span className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-              CADASTRO INCOMPLETO
+            <span className="mt-1 inline-flex">
+              <StatusBadge status="Cadastro incompleto" kind="warning" />
             </span>
           )}
         </div>
@@ -595,14 +595,14 @@ export default function Parceiros() {
               {parceiroForm.id && parceiroForm.cadastro_incompleto && (
                 <label className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
                   <input
-                    className="mt-0.5"
+                    className="mt-1"
                     type="checkbox"
                     checked={!parceiroForm.cadastro_incompleto}
                     onChange={(event) => setParceiroForm((current) => ({ ...current, cadastro_incompleto: !event.target.checked }))}
                   />
                   <span>
                     <strong>Cadastro conferido e completo</strong>
-                    <span className="mt-0.5 block text-xs">Marque depois de revisar os dados trazidos pela importacao do Sienge.</span>
+                    <span className="mt-1 block text-xs">Marque depois de revisar os dados trazidos pela importação do Sienge.</span>
                   </span>
                 </label>
               )}
