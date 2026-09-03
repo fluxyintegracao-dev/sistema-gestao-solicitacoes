@@ -16,6 +16,10 @@ const {
 } = require('./authorizationService');
 const { criarNotificacao } = require('./notificacoes');
 const { publishSolicitacaoRealtimeEvent } = require('./solicitacaoRealtimeService');
+const {
+  bloquearTitulosVinculados,
+  sincronizarAposEncerramentoPedido
+} = require('./tituloBloqueioRetornoObraService');
 
 const STATUS = Object.freeze({
   PENDENTE: 'PENDENTE',
@@ -302,7 +306,16 @@ async function solicitarRetorno(req, solicitacaoId, motivo) {
       transaction,
       lock: transaction.LOCK.UPDATE
     });
-    if (existente) return { solicitacao, pedido: existente, duplicado: true };
+    if (existente) {
+      // Tambem funciona como reparo idempotente caso o pedido tenha sido criado antes de o
+      // bloqueio financeiro estar disponivel.
+      await bloquearTitulosVinculados({
+        solicitacaoId: solicitacao.id,
+        pedido: existente,
+        transaction
+      });
+      return { solicitacao, pedido: existente, duplicado: true };
+    }
 
     const pedido = await SolicitacaoPedidoRetorno.create({
       solicitacao_id: solicitacao.id,
@@ -313,13 +326,22 @@ async function solicitarRetorno(req, solicitacaoId, motivo) {
       status: STATUS.PENDENTE
     }, { transaction });
 
+    const titulosBloqueados = await bloquearTitulosVinculados({
+      solicitacaoId: solicitacao.id,
+      pedido,
+      transaction
+    });
+
     await Historico.create({
       solicitacao_id: solicitacao.id,
       usuario_responsavel_id: req.user.id,
       setor: contexto.setorUsuario,
       acao: 'RETORNO_SOLICITADO',
       descricao: `${contexto.setorUsuario} solicitou o retorno da solicitacao que esta em ${solicitacao.area_responsavel}. Motivo: ${motivoLimpo}`,
-      metadata: JSON.stringify({ pedido_retorno_id: pedido.id })
+      metadata: JSON.stringify({
+        pedido_retorno_id: pedido.id,
+        titulos_financeiros_bloqueados: titulosBloqueados
+      })
     }, { transaction });
 
     return { solicitacao, pedido, duplicado: false };
@@ -435,6 +457,11 @@ async function decidirRetorno(req, pedidoId, { aprovar, motivoDecisao }) {
         descricao: `Pedido de retorno para ${pedido.setor_solicitante} rejeitado. Motivo: ${motivoLimpo}`,
         metadata: JSON.stringify({ pedido_retorno_id: pedido.id })
       }, { transaction });
+      await sincronizarAposEncerramentoPedido({
+        solicitacaoId: solicitacao.id,
+        pedidoId: pedido.id,
+        transaction
+      });
     }
     return { solicitacao, pedido, solicitanteId: pedido.solicitado_por };
   });
@@ -484,6 +511,11 @@ async function cancelarRetorno(req, pedidoId) {
         descricao: `Pedido de retorno para ${pedido.setor_solicitante} cancelado pelo solicitante.`,
         metadata: JSON.stringify({ pedido_retorno_id: pedido.id })
       }, { transaction });
+      await sincronizarAposEncerramentoPedido({
+        solicitacaoId: solicitacao.id,
+        pedidoId: pedido.id,
+        transaction
+      });
     }
     return { solicitacao, pedido };
   });

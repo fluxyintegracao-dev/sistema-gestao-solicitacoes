@@ -15,6 +15,7 @@ const { carregarContaBancaria, obterSessaoAbertaParaConta } = require('./finance
 const { registrarEventoSeguranca } = require('./securityLogService');
 const { normalizeTipoIntercompany } = require('../constants/intercompany');
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
+const { assertTituloDisponivelParaBaixa } = require('./tituloBloqueioRetornoObraService');
 
 function createHttpError(statusCode, message) {
   const error = new Error(message);
@@ -185,6 +186,7 @@ async function confirmBaixaFromPaymentIntent(req, id, payload = {}) {
       lock: transaction.LOCK.UPDATE
     });
     if (!titulo) throw createHttpError(404, 'Titulo financeiro nao encontrado.');
+    assertTituloDisponivelParaBaixa(titulo);
     if (!['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase())) {
       throw createHttpError(400, 'Titulo nao permite baixa neste status.');
     }

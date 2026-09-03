@@ -241,6 +241,23 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
       type: DataTypes.INTEGER,
       allowNull: true
     },
+    bloqueado_retorno_obra: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    bloqueio_retorno_pedido_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true
+    },
+    bloqueio_retorno_motivo: {
+      type: DataTypes.STRING(255),
+      allowNull: true
+    },
+    bloqueio_retorno_em: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
     deleted_at: {
       type: DataTypes.DATE,
       allowNull: true
@@ -259,6 +276,22 @@ module.exports = (sequelize, DataTypes) => sequelize.define(
     defaultScope: {
       where: {
         deleted_at: null
+      }
+    },
+    hooks: {
+      beforeUpdate(titulo) {
+        if (!titulo.bloqueado_retorno_obra || !titulo.changed('valor_baixado')) return;
+        const valorAnterior = Number(titulo.previous('valor_baixado') || 0);
+        const novoValor = Number(titulo.valor_baixado || 0);
+        if (novoValor <= valorAnterior) return;
+
+        const error = new Error(
+          titulo.bloqueio_retorno_motivo
+          || 'Baixa bloqueada: a Obra solicitou o retorno da solicitacao vinculada a este titulo.'
+        );
+        error.statusCode = 409;
+        error.code = 'TITULO_BLOQUEADO_RETORNO_OBRA';
+        throw error;
       }
     },
     timestamps: true

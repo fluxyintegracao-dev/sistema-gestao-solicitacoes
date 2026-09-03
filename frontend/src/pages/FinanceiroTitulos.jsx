@@ -702,7 +702,13 @@ function getCartaoLabel(cartao) {
 }
 
 function isTituloBaixavel(titulo) {
-  return ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase()) && Number(titulo?.valor_saldo || 0) > 0;
+  return !isTituloBloqueadoRetornoObra(titulo)
+    && ['ABERTO', 'PARCIAL'].includes(String(titulo?.status || '').trim().toUpperCase())
+    && Number(titulo?.valor_saldo || 0) > 0;
+}
+
+function isTituloBloqueadoRetornoObra(titulo) {
+  return titulo?.bloqueado_retorno_obra === true || Number(titulo?.bloqueado_retorno_obra) === 1;
 }
 
 function isTituloExcluivel(titulo) {
@@ -2736,9 +2742,21 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 id: 'status',
                 titulo: 'Status',
                 tipo: 'status',
-                render: (titulo) => (isOverdue(titulo)
-                  ? <StatusBadge status={`${titulo.status} · VENCIDO`} kind="danger" />
-                  : <StatusBadge status={titulo.status} />)
+                render: (titulo) => (
+                  <div className="flex flex-col items-start gap-1">
+                    {isOverdue(titulo)
+                      ? <StatusBadge status={`${titulo.status} · VENCIDO`} kind="danger" />
+                      : <StatusBadge status={titulo.status} />}
+                    {isTituloBloqueadoRetornoObra(titulo) ? (
+                      <span
+                        className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800"
+                        title={titulo.bloqueio_retorno_motivo || 'Baixa bloqueada por pedido de retorno da Obra'}
+                      >
+                        Retorno solicitado pela Obra
+                      </span>
+                    ) : null}
+                  </div>
+                )
               },
               ...(showTipoColumn ? [{
                 id: 'tipo',
@@ -2844,7 +2862,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 title: 'Nenhum filtro aplicado',
                 message: 'A tabela fica vazia ate voce consultar os titulos com os filtros desejados.'
               }}
-            urgencia={(titulo) => (isOverdue(titulo) ? 'danger' : null)}
+            urgencia={(titulo) => (isTituloBloqueadoRetornoObra(titulo) ? 'warning' : isOverdue(titulo) ? 'danger' : null)}
             colunasConfiguraveis
             aoMudarColunas={aoMudarColunas}
             storageKey={tabelaStorageKey}

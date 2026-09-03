@@ -458,6 +458,8 @@ export default function FinanceiroTituloDetalhe() {
     && Number(titulo?.valor_baixado || 0) === 0
     && movimentosAtivosCount === 0
     && pagamentosAtivosCount === 0;
+  const bloqueadoPorRetornoObra = titulo?.bloqueado_retorno_obra === true
+    || Number(titulo?.bloqueado_retorno_obra) === 1;
 
   const contasBancariasBaixa = useMemo(() => {
     if (!baixaForm.empresa_id) return [];
@@ -564,6 +566,10 @@ export default function FinanceiroTituloDetalhe() {
 
   async function handleBaixaSubmit(event) {
     event.preventDefault();
+    if (bloqueadoPorRetornoObra) {
+      setError(titulo?.bloqueio_retorno_motivo || 'Baixa bloqueada por pedido de retorno da Obra.');
+      return;
+    }
     if (!baixaForm.empresa_id) {
       setError('Informe a empresa pagadora da baixa.');
       return;
@@ -699,7 +705,11 @@ export default function FinanceiroTituloDetalhe() {
           voltar={{ to: '/financeiro/titulos', title: 'Voltar para títulos' }}
           acaoPrincipal={{
             rotulo: 'Registrar baixa',
-            desabilitada: !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase()),
+            desabilitada: bloqueadoPorRetornoObra
+              || !['ABERTO', 'PARCIAL'].includes(String(titulo.status || '').toUpperCase()),
+            title: bloqueadoPorRetornoObra
+              ? (titulo.bloqueio_retorno_motivo || 'Baixa bloqueada por pedido de retorno da Obra')
+              : undefined,
             onClick: () => {
               setError('');
               setCorrigindoMovimentoId(null);
@@ -728,6 +738,14 @@ export default function FinanceiroTituloDetalhe() {
         {error && (
           <div className="app-alert app-alert--error">
             {error}
+          </div>
+        )}
+
+        {bloqueadoPorRetornoObra && (
+          <div className="app-alert app-alert--warning" role="status">
+            <strong>Baixa temporariamente bloqueada.</strong>{' '}
+            {titulo.bloqueio_retorno_motivo || 'A Obra solicitou o retorno da solicitacao vinculada a este titulo.'}
+            {' '}O bloqueio sera removido quando a solicitacao voltar ao Financeiro.
           </div>
         )}
 
@@ -1748,6 +1766,7 @@ export default function FinanceiroTituloDetalhe() {
                   className="btn btn-primary"
                   disabled={
                     savingBaixa ||
+                    bloqueadoPorRetornoObra ||
                     !baixaForm.empresa_id ||
                     !baixaForm.forma_recebimento ||
                     (baixaUsaCartao && !baixaForm.cartao_id) ||

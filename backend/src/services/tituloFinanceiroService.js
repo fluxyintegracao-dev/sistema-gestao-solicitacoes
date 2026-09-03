@@ -53,6 +53,7 @@ const {
 } = require('./tituloIntercompanyCartaoHelper');
 const { sincronizarStatusSolicitacaoPorBaixaTitulos } = require('./solicitacaoFinanceiroStatusService');
 const { reabrirConciliacoesPorMovimentos } = require('./conciliacaoEstornoService');
+const { assertTituloDisponivelParaBaixa } = require('./tituloBloqueioRetornoObraService');
 
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
 const STATUS_COBRANCA = ['NAO_APLICAVEL', 'PENDENTE_EMISSAO', 'EMITIDO', 'PAGO_BANCO', 'CONCILIADO', 'CANCELADO'];
@@ -1935,6 +1936,7 @@ async function carregarTituloParaBaixaComLock(req, tituloId, transaction) {
   if (!titulo) {
     throw createHttpError(404, 'Titulo financeiro nao encontrado');
   }
+  assertTituloDisponivelParaBaixa(titulo);
 
   await assertObraScope(
     req,
