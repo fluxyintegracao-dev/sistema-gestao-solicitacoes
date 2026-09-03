@@ -16,6 +16,11 @@ Obras e dono do cadastro da obra, classificacao, dimensoes financeiras da obra e
 - previsto vem de titulos em aberto ou parciais;
 - estornos financeiros devem refletir imediatamente no resultado da obra;
 - pedidos representam compromisso operacional e nao substituem realizado financeiro.
+- novas obras classificadas como `OBRA` recebem, na mesma transacao da criacao, as apropriacoes analiticas `1 — ADM LOCAL DE OBRA`, `2 — LOCAÇÃO DE MAQ. e EQ.` e `3 — PRÉ-OBRA`, todas ativas, sem apropriacao pai e com valor orcado inicial zero;
+- cada apropriacao automatica e vinculada ao tipo de solicitacao correspondente por `codigo_interno`: `ADM_LOCAL_DE_OBRA`, `LOCACAO_DE_MAQ_EQ` e `PRE_OBRA`;
+- o tipo `PRE_OBRA` precisa existir e estar ativo antes da criacao da obra. Seu nome visivel pode ser alterado, mas o `codigo_interno` deve permanecer `PRE_OBRA` para preservar o vinculo automatico;
+- a pagina `Apropriacao padrao por obra` exibe `PRE_OBRA` junto de `ADM_LOCAL_DE_OBRA` e `LOCACAO_DE_MAQ_EQ`, permitindo definir ou corrigir qual apropriacao corresponde a cada etapa em cada obra, inclusive nas obras anteriores a esta automacao;
+- centros de custo do tipo `CENTRO_CUSTO` nao recebem essas apropriacoes automaticas.
 
 ## Consumidores
 

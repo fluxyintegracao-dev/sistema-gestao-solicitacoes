@@ -9,8 +9,8 @@ import {
 /**
  * Mapeamento da apropriacao padrao por obra e tipo de solicitacao.
  *
- * As apropriacoes de administracao local nao seguem codigo nem descricao padronizados
- * entre as obras, entao o vinculo precisa ser definido manualmente obra a obra.
+ * As apropriacoes das etapas automaticas podem variar entre obras, entao o vinculo
+ * precisa permanecer visivel e editavel obra a obra, inclusive para PRE_OBRA.
  */
 
 // Nomes de obra usam acento ("GUAÇUÍ"), mas quem filtra costuma digitar sem.
@@ -180,7 +180,7 @@ export default function ObraTipoApropriacao() {
         <BlocoConteudo titulo="Novas obras recebem automaticamente" variante="secundario" recolhivel>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 text-sm">
             {padroesNovaObra.map((padrao) => (
-              <span key={padrao.tipo_codigo} className="text-[var(--c-muted)]">
+              <span key={padrao.chave || `${padrao.tipo_codigo || 'APROPRIACAO'}-${padrao.codigo}`} className="text-[var(--c-muted)]">
                 <strong className="text-[var(--c-text)]">{padrao.codigo}</strong> — {padrao.descricao}
               </span>
             ))}
@@ -218,6 +218,11 @@ export default function ObraTipoApropriacao() {
                 {tipos.map((tipo) => (
                   <th key={tipo.id} style={{ minWidth: 240 }}>
                     <div>{tipo.nome}</div>
+                    {tipo.apropriacao_automatica_obra && (
+                      <div className="text-xs" style={{ color: 'var(--c-muted)', fontWeight: 400 }}>
+                        Etapa com apropriacao automatica
+                      </div>
+                    )}
                     <div className="text-xs" style={{ color: 'var(--c-muted)', fontWeight: 400 }}>
                       {obras.filter((obra) => !obra.vinculos?.[String(tipo.id)]).length} pendente(s)
                     </div>

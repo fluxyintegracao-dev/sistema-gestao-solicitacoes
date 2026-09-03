@@ -17,8 +17,7 @@ const {
 // Tipos que recebem apropriacao automatica na nova solicitacao.
 // Identificados por codigo_interno para nao depender de id fixo entre ambientes.
 const TIPOS_COM_APROPRIACAO_PADRAO = [
-  'ADM_LOCAL_DE_OBRA',
-  'LOCACAO_DE_MAQ_EQ',
+  ...TIPOS_APROPRIACAO_AUTOMATICA,
   'DESPESAS_DE_MARKETING'
 ];
 
@@ -56,6 +55,13 @@ module.exports = {
         attributes: ['id', 'nome', 'codigo_interno'],
         order: [['nome', 'ASC']]
       });
+      const ordemTipos = new Map(
+        TIPOS_COM_APROPRIACAO_PADRAO.map((codigo, indice) => [codigo, indice])
+      );
+      tipos.sort((a, b) => (
+        (ordemTipos.get(a.codigo_interno) ?? Number.MAX_SAFE_INTEGER)
+        - (ordemTipos.get(b.codigo_interno) ?? Number.MAX_SAFE_INTEGER)
+      ));
 
       const obras = await Obra.findAll({
         attributes: ['id', 'nome', 'codigo'],
@@ -85,7 +91,12 @@ module.exports = {
 
       return res.json({
         padroes_nova_obra: listarPadroesNovaObra(),
-        tipos: tipos.map((t) => ({ id: t.id, nome: t.nome, codigo_interno: t.codigo_interno })),
+        tipos: tipos.map((t) => ({
+          id: t.id,
+          nome: t.nome,
+          codigo_interno: t.codigo_interno,
+          apropriacao_automatica_obra: tipoUsaApropriacaoAutomatica(t.codigo_interno)
+        })),
         obras: obras.map((o) => ({
           id: o.id,
           nome: o.nome,
@@ -272,7 +283,7 @@ module.exports = {
         });
         if (vinculoDuplicado) {
           return res.status(409).json({
-            error: 'ADM Local de Obra e Locacao de Maq. e Eq. precisam usar apropriacoes distintas.'
+            error: 'As etapas com apropriacao automatica precisam usar apropriacoes distintas.'
           });
         }
       }
@@ -308,7 +319,7 @@ module.exports = {
           });
           if (vinculoDuplicado) {
             const erro = new Error(
-              'ADM Local de Obra e Locacao de Maq. e Eq. precisam usar apropriacoes distintas.'
+              'As etapas com apropriacao automatica precisam usar apropriacoes distintas.'
             );
             erro.statusCode = 409;
             throw erro;
