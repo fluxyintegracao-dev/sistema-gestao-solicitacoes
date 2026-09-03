@@ -9,7 +9,7 @@ import {
   importarParceiros,
   listarCategoriasParceiro
 } from '../services/parceiros';
-import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
+import { getPixDocumentError, isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, maskRg, onlyDigits } from '../utils/formatters';
 import {
   Pagina,
   PageHeader,
@@ -239,6 +239,15 @@ export default function Parceiros() {
     event.preventDefault();
     if (!isValidCpfCnpj(parceiroForm.cpf_cnpj)) {
       setError('Informe um CPF/CNPJ valido.');
+      return;
+    }
+    const pixErro = [
+      ['pix_chave_fixa_1_tipo', 'pix_chave_fixa_1', 'Chave PIX fixa 1'],
+      ['pix_chave_fixa_2_tipo', 'pix_chave_fixa_2', 'Chave PIX fixa 2'],
+      ['pix_chave_variavel_tipo', 'pix_chave_variavel', 'Chave PIX variavel']
+    ].map(([tipo, chave, label]) => getPixDocumentError(parceiroForm[chave], parceiroForm[tipo], label)).find(Boolean);
+    if (pixErro) {
+      setError(pixErro);
       return;
     }
 

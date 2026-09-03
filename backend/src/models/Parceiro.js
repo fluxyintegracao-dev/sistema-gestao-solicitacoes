@@ -9,7 +9,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       cpf_cnpj: {
         type: DataTypes.STRING(20),
-        allowNull: false,
+        allowNull: true,
         unique: true
       },
       nome: {
@@ -74,7 +74,7 @@ module.exports = (sequelize, DataTypes) => {
       },
       tipo_pessoa: {
         type: DataTypes.STRING(1),
-        allowNull: false
+        allowNull: true
       },
       cliente: {
         type: DataTypes.BOOLEAN,
@@ -151,6 +151,16 @@ module.exports = (sequelize, DataTypes) => {
       pix_chave_variavel: {
         type: DataTypes.STRING(255),
         allowNull: true
+      },
+      cadastro_simplificado_favorecido: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+      },
+      pix_chave_canonica: {
+        type: DataTypes.STRING(300),
+        allowNull: true,
+        unique: true
       },
       ativo: {
         type: DataTypes.BOOLEAN,

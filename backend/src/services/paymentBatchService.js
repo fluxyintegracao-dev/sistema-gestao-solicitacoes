@@ -31,7 +31,8 @@ const {
   validateBeneficiaryComplete,
   validatePaymentAccount,
   validateTituloEligibleForPayment,
-  validateUserCanPrepareBatch
+  validateUserCanPrepareBatch,
+  tituloEstaBloqueado
 } = require('./paymentEligibilityService');
 
 function createHttpError(statusCode, message) {
@@ -210,6 +211,9 @@ async function listarTitulosElegiveis(req, filters = {}) {
     const pendencias = [];
 
     if (activeIntent) pendencias.push('Titulo ja possui pagamento ativo.');
+    if (tituloEstaBloqueado(plain)) {
+      pendencias.push(plain.bloqueio_retorno_motivo || 'Baixa bloqueada por pedido de retorno da Obra.');
+    }
     if (!beneficiary) pendencias.push('Favorecido bancario nao cadastrado.');
     if (beneficiary && (!beneficiary.pix_tipo_chave || !beneficiary.pix_chave)) {
       pendencias.push('Favorecido sem chave PIX completa.');

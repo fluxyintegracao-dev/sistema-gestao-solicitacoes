@@ -8,6 +8,7 @@ const { TIPOS_INTERCOMPANY } = require('../constants/intercompany');
 const {
   CLASSIFICACOES_GERENCIAIS_FINANCEIRAS
 } = require('../constants/categoriaFinanceiraGerencial');
+const { onlyDigits, isValidCpfCnpj } = require('../utils/cpfCnpj');
 
 const CATEGORIAS_BEM = ['VEICULO', 'IMOVEL', 'TERRENO', 'SERVICO', 'MATERIAL', 'CREDITO', 'OUTROS'];
 const FORMAS_COBRANCA = ['BOLETO', 'PIX', 'OUTROS'];
@@ -113,6 +114,12 @@ function parseOptionalText(value, fieldName, max, { required = false } = {}) {
     required,
     max
   });
+}
+
+function parseOptionalCpfCnpj(value, fieldName) {
+  if (isBlank(value)) return undefined;
+  if (!isValidCpfCnpj(value)) throw new ValidationError(`${fieldName} invalido.`);
+  return onlyDigits(value);
 }
 
 function parseNullableText(value, fieldName, max) {
@@ -1595,7 +1602,7 @@ function validateFinanceTituloBaixaBody(body = {}) {
     cheque_banco: parseOptionalText(body.cheque_banco, 'Banco do cheque', 120),
     cheque_agencia: parseOptionalText(body.cheque_agencia, 'Agencia do cheque', 40),
     cheque_conta: parseOptionalText(body.cheque_conta, 'Conta do cheque', 60),
-    titular_documento: parseOptionalText(body.titular_documento, 'Documento do titular do cheque', 40),
+    titular_documento: parseOptionalCpfCnpj(body.titular_documento, 'CPF/CNPJ do titular do cheque'),
     data_emissao: parseDateOnly(body.data_emissao, 'Data de emissao do cheque'),
     data_vencimento: parseDateOnly(body.data_vencimento, 'Data de vencimento do cheque'),
     intercompany: parseBoolean(body.intercompany, 'Entre Empresas'),
@@ -1702,7 +1709,7 @@ function validateFinanceTituloBaixaParceladaBody(body = {}) {
       cheque_banco: parseOptionalText(item?.cheque_banco, `Banco do cheque da parcela ${index + 1}`, 120),
       cheque_agencia: parseOptionalText(item?.cheque_agencia, `Agencia do cheque da parcela ${index + 1}`, 40),
       cheque_conta: parseOptionalText(item?.cheque_conta, `Conta do cheque da parcela ${index + 1}`, 60),
-      titular_documento: parseOptionalText(item?.titular_documento, `Documento do titular do cheque da parcela ${index + 1}`, 40),
+      titular_documento: parseOptionalCpfCnpj(item?.titular_documento, `CPF/CNPJ do titular do cheque da parcela ${index + 1}`),
       data_emissao: parseDateOnly(item?.data_emissao, `Data de emissao do cheque da parcela ${index + 1}`),
       data_vencimento: parseDateOnly(item?.data_vencimento, `Data de vencimento do cheque da parcela ${index + 1}`),
       usar_cheque_terceiro: usarChequeTerceiro,

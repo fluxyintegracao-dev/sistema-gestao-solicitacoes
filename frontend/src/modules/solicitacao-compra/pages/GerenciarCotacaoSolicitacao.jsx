@@ -31,6 +31,7 @@ import {
 } from '../../../services/compras';
 import { buscarParceiros, listarCategoriasParceiro } from '../../../services/parceiros';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 import ModalPortal from '../../../components/ui/ModalPortal';
 import {
   canEncerrarComprasCotacoes,
@@ -482,7 +483,7 @@ function ModalRespostaInternaCotacao({
                   </label>
                   <label className="app-filter-field md:col-start-2 lg:col-start-4">
                     <span className="app-filter-label">CPF/CNPJ (opcional)</span>
-                    <input className="input" inputMode="numeric" value={form.frete_transportador_cpf_cnpj} onChange={(e) => onChange('frete_transportador_cpf_cnpj', e.target.value.replace(/\D/g, '').slice(0, 14))} />
+                    <input className="input" inputMode="numeric" maxLength={18} value={maskCpfCnpj(form.frete_transportador_cpf_cnpj)} onChange={(e) => onChange('frete_transportador_cpf_cnpj', maskCpfCnpj(e.target.value))} />
                   </label>
                 </>
               ) : null}
@@ -1628,7 +1629,7 @@ function SecaoEnvioFornecedores({
               </label>
               <label className="grid gap-1 text-sm">
                 <span className="text-xs font-semibold text-[var(--c-muted)]">CPF/CNPJ</span>
-                <input className="input" placeholder="CPF ou CNPJ do fornecedor" value={novoFornecedor.cnpj} onChange={(e) => onChangeNovoFornecedor('cnpj', e.target.value)} />
+                <input className="input" placeholder="CPF ou CNPJ do fornecedor" value={maskCpfCnpj(novoFornecedor.cnpj)} onChange={(e) => onChangeNovoFornecedor('cnpj', maskCpfCnpj(e.target.value))} inputMode="numeric" maxLength={18} />
               </label>
               <label className="grid gap-1 text-sm">
                 <span className="text-xs font-semibold text-[var(--c-muted)]">WhatsApp</span>
@@ -2836,6 +2837,13 @@ export default function GerenciarCotacaoSolicitacao() {
       alert('Informe a data para pagamento do frete pago a terceiro.');
       return;
     }
+    const transportadorErro = getCpfCnpjError(formRespostaInterna.frete_transportador_cpf_cnpj, {
+      label: 'CPF/CNPJ do transportador'
+    });
+    if (transportadorErro) {
+      alert(transportadorErro);
+      return;
+    }
 
     const itemQuantidadeInvalida = formRespostaInterna.itens.find((item) => {
       const quantidade = parseNumeroCompraDigitado(item.quantidade_solicitada);
@@ -2878,7 +2886,7 @@ export default function GerenciarCotacaoSolicitacao() {
           ? formRespostaInterna.frete_data_vencimento
           : null,
         frete_transportador_nome: formRespostaInterna.frete_transportador_nome,
-        frete_transportador_cpf_cnpj: formRespostaInterna.frete_transportador_cpf_cnpj,
+        frete_transportador_cpf_cnpj: onlyDigits(formRespostaInterna.frete_transportador_cpf_cnpj) || null,
         observacao_resposta: formRespostaInterna.observacao_resposta,
         nova_oferta_saldo: formRespostaInterna.nova_oferta_saldo === true,
         finalizar,
@@ -2917,8 +2925,13 @@ export default function GerenciarCotacaoSolicitacao() {
     try {
       if (!String(novoFornecedor.nome || '').trim()) { alert('Informe o nome do fornecedor.'); return; }
       if (!String(novoFornecedor.cnpj || '').trim()) { alert('Informe o CPF/CNPJ do fornecedor.'); return; }
+      const documentoErro = getCpfCnpjError(novoFornecedor.cnpj, {
+        required: true,
+        label: 'CPF/CNPJ do fornecedor'
+      });
+      if (documentoErro) { alert(documentoErro); return; }
       if (!String(novoFornecedor.whatsapp || '').trim()) { alert('Informe o WhatsApp/telefone do fornecedor.'); return; }
-      const fornecedor = await criarFornecedorCompra(novoFornecedor);
+      const fornecedor = await criarFornecedorCompra({ ...novoFornecedor, cnpj: onlyDigits(novoFornecedor.cnpj) });
       const fornecedorFormatado = {
         ...fornecedor,
         fornecedor_compra_id: fornecedor.id,

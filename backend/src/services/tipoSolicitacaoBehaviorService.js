@@ -8,8 +8,29 @@ function normalizeToken(value) {
     .replace(/^_+|_+$/g, '');
 }
 
+const FINALIDADES_DATA_SOLICITACAO = Object.freeze({
+  RESPOSTA: 'RESPOSTA',
+  PAGAMENTO: 'PAGAMENTO'
+});
+
+function normalizarFinalidadeDataSolicitacao(value) {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized === FINALIDADES_DATA_SOLICITACAO.PAGAMENTO
+    ? FINALIDADES_DATA_SOLICITACAO.PAGAMENTO
+    : FINALIDADES_DATA_SOLICITACAO.RESPOSTA;
+}
+
+function obterRotuloDataSolicitacao(behavior, { recargaCartao = false } = {}) {
+  if (recargaCartao) return 'Data prevista para recarga';
+  return normalizarFinalidadeDataSolicitacao(behavior?.finalidade_data_vencimento)
+    === FINALIDADES_DATA_SOLICITACAO.PAGAMENTO
+    ? 'Data de Pagamento'
+    : 'Data de Resposta';
+}
+
 function getDefaultTipoSolicitacaoBehavior() {
   return {
+    finalidade_data_vencimento: FINALIDADES_DATA_SOLICITACAO.RESPOSTA,
     mostrar_valor: true,
     exige_valor: true,
     mostrar_descricao: true,
@@ -161,10 +182,16 @@ function normalizeTipoSolicitacaoBehavior(tipo) {
   if (parsed && typeof parsed === 'object') {
     Object.entries(parsed).forEach(([key, value]) => {
       if (Object.prototype.hasOwnProperty.call(base, key)) {
-        merged[key] = Boolean(value);
+        merged[key] = key === 'finalidade_data_vencimento'
+          ? normalizarFinalidadeDataSolicitacao(value)
+          : Boolean(value);
       }
     });
   }
+
+  merged.finalidade_data_vencimento = normalizarFinalidadeDataSolicitacao(
+    merged.finalidade_data_vencimento
+  );
 
   return merged;
 }
@@ -186,11 +213,14 @@ function enrichTipoSolicitacao(tipo) {
 }
 
 module.exports = {
+  FINALIDADES_DATA_SOLICITACAO,
   applyTipoSolicitacaoModuleAvailability,
   enrichTipoSolicitacao,
   getDefaultTipoSolicitacaoBehavior,
   inferLegacyTipoBehavior,
+  normalizarFinalidadeDataSolicitacao,
   normalizeTipoSolicitacaoBehavior,
   normalizeTipoSolicitacaoCodigo,
+  obterRotuloDataSolicitacao,
   serializeTipoSolicitacaoBehavior
 };

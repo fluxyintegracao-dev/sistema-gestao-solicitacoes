@@ -311,6 +311,74 @@ db.GovernancaSnapshot = require('../modules/governanca/models/GovernancaSnapshot
 db.GovernancaAccessLog = require('../modules/governanca/models/GovernancaAccessLog')(sequelize, Sequelize);
 db.GovernancaEventoOperacional = require('../modules/governanca/models/GovernancaEventoOperacional')(sequelize, Sequelize);
 
+/* =====================
+   CPF / CNPJ
+===================== */
+const { ValidationError } = require('../middlewares/validation');
+const { onlyDigits, isValidCpf, isValidCnpj, isValidCpfCnpj, isValidPixDocument } = require('../utils/cpfCnpj');
+
+function protectDocumentField(model, field, label, validator) {
+  if (!model?.rawAttributes?.[field]) return;
+
+  model.beforeValidate(`validar${model.name}${field}`, (instance) => {
+    if (!instance.isNewRecord && !instance.changed(field)) return;
+
+    const currentValue = instance.getDataValue(field);
+    if (currentValue == null || String(currentValue).trim() === '') return;
+    if (!validator(currentValue)) {
+      throw new ValidationError(`${label} invalido.`);
+    }
+    instance.setDataValue(field, onlyDigits(currentValue));
+  });
+}
+
+function protectPixDocumentField(model, typeField, keyField, label) {
+  if (!model?.rawAttributes?.[typeField] || !model?.rawAttributes?.[keyField]) return;
+
+  model.beforeValidate(`validar${model.name}${keyField}`, (instance) => {
+    if (!instance.isNewRecord && !instance.changed(typeField) && !instance.changed(keyField)) return;
+
+    const type = String(instance.getDataValue(typeField) || '').trim().toUpperCase();
+    const key = instance.getDataValue(keyField);
+    if (key == null || String(key).trim() === '' || !['CPF', 'CNPJ'].includes(type)) return;
+    if (!isValidPixDocument(key, type)) {
+      throw new ValidationError(`${label} ${type} invalida.`);
+    }
+    instance.setDataValue(keyField, onlyDigits(key));
+  });
+}
+
+[
+  [db.Parceiro, 'cpf_cnpj', 'CPF/CNPJ', isValidCpfCnpj],
+  [db.Parceiro, 'representante_cpf', 'CPF do representante', isValidCpf],
+  [db.EmpresaGrupo, 'cnpj', 'CNPJ', isValidCnpj],
+  [db.RhEmpresaGrupo, 'cnpj', 'CNPJ', isValidCnpj],
+  [db.RhColaborador, 'cpf', 'CPF', isValidCpf],
+  [db.RhColaboradorPagamento, 'favorecido_documento', 'CPF/CNPJ do favorecido', isValidCpfCnpj],
+  [db.ContratoComercial, 'testemunha_1_cpf', 'CPF da testemunha 1', isValidCpf],
+  [db.ContratoComercial, 'testemunha_2_cpf', 'CPF da testemunha 2', isValidCpf],
+  [db.FornecedorCompra, 'cnpj', 'CPF/CNPJ do fornecedor', isValidCpfCnpj],
+  [db.SolicitacaoCompraFornecedor, 'frete_transportador_cpf_cnpj', 'CPF/CNPJ do transportador', isValidCpfCnpj],
+  [db.PedidoCompra, 'frete_transportador_cpf_cnpj', 'CPF/CNPJ do transportador', isValidCpfCnpj],
+  [db.PaymentAccount, 'cnpj_pagador', 'CNPJ pagador', isValidCnpj],
+  [db.PaymentBeneficiary, 'cpf_cnpj', 'CPF/CNPJ do favorecido', isValidCpfCnpj],
+  [db.BoletoCaixaConvenio, 'beneficiario_cpf_cnpj', 'CPF/CNPJ do beneficiario', isValidCpfCnpj],
+  [db.CaixaPagamentoConvenio, 'empresa_cpf_cnpj', 'CPF/CNPJ da empresa', isValidCpfCnpj],
+  [db.ChequeTerceiro, 'titular_documento', 'CPF/CNPJ do titular do cheque', isValidCpfCnpj],
+  [db.BaixaFinanceiraComponente, 'cheque_titular_documento', 'CPF/CNPJ do titular do cheque', isValidCpfCnpj],
+  [db.MovimentoFinanceiro, 'cheque_titular_documento', 'CPF/CNPJ do titular do cheque', isValidCpfCnpj],
+  [db.CrmLead, 'documento', 'CPF/CNPJ do lead', isValidCpfCnpj],
+  [db.FiscalCompany, 'cnpj', 'CNPJ da empresa fiscal', isValidCnpj],
+  [db.SstExposicao, 'responsavel_tecnico_cpf', 'CPF do responsavel tecnico', isValidCpf]
+].forEach(([model, field, label, validator]) => protectDocumentField(model, field, label, validator));
+
+[
+  [db.Parceiro, 'pix_chave_fixa_1_tipo', 'pix_chave_fixa_1', 'Chave PIX fixa 1'],
+  [db.Parceiro, 'pix_chave_fixa_2_tipo', 'pix_chave_fixa_2', 'Chave PIX fixa 2'],
+  [db.Parceiro, 'pix_chave_variavel_tipo', 'pix_chave_variavel', 'Chave PIX variavel'],
+  [db.PaymentBeneficiary, 'pix_tipo_chave', 'pix_chave', 'Chave PIX']
+].forEach(([model, typeField, keyField, label]) => protectPixDocumentField(model, typeField, keyField, label));
+
 const TITULO_FINANCEIRO_SEQUENCE_KEY = 'GLOBAL';
 
 function formatTituloFinanceiroCodigo(numero) {

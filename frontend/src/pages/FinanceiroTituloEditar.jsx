@@ -12,7 +12,7 @@ import {
   getTituloFinanceiroById
 } from '../services/financeiro';
 import { listarApropriacoes } from '../services/apropriacoes';
-import { formatCurrencyInput, normalizeCurrencyTyping } from '../utils/formatters';
+import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   categoriaFinanceiraMatchesAutocomplete,
   categoriaFinanceiraMatchesSearch
@@ -801,11 +801,18 @@ export default function FinanceiroTituloEditar() {
         if (!form.parceiro_id || !paymentDraft.nome || !paymentDraft.cpf_cnpj || !paymentDraft.pix_tipo_chave || !paymentDraft.pix_chave) {
           throw new Error('Preencha os dados PIX do favorecido para pagamento em massa.');
         }
+        const documentoErro = getCpfCnpjError(paymentDraft.cpf_cnpj, {
+          required: true,
+          label: 'CPF/CNPJ do favorecido'
+        });
+        if (documentoErro) throw new Error(documentoErro);
+        const pixErro = getPixDocumentError(paymentDraft.pix_chave, paymentDraft.pix_tipo_chave);
+        if (pixErro) throw new Error(pixErro);
 
         const beneficiaryPayload = {
           parceiro_id: Number(form.parceiro_id),
           nome: paymentDraft.nome,
-          cpf_cnpj: paymentDraft.cpf_cnpj,
+          cpf_cnpj: onlyDigits(paymentDraft.cpf_cnpj),
           metodo_preferencial: 'PIX_CHAVE',
           pix_tipo_chave: paymentDraft.pix_tipo_chave,
           pix_chave: paymentDraft.pix_chave,
@@ -1379,7 +1386,9 @@ export default function FinanceiroTituloEditar() {
                   <span>CPF/CNPJ</span>
                   <input
                     value={paymentDraft.cpf_cnpj}
-                    onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: event.target.value }))}
+                    onChange={(event) => setPaymentDraft((current) => ({ ...current, cpf_cnpj: maskCpfCnpj(event.target.value) }))}
+                    inputMode="numeric"
+                    maxLength={18}
                     disabled={Boolean(bloqueio)}
                     required={paymentDraft.preparar_pagamento_pix}
                   />

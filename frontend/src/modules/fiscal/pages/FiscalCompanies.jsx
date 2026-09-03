@@ -8,6 +8,7 @@ import {
   updateFiscalCompany,
   validateFiscalCertificate
 } from '../services/fiscalApi';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 
 const EMPTY_FORM = {
   razao_social: '',
@@ -117,15 +118,20 @@ export default function FiscalCompanies() {
 
   const submit = async (event) => {
     event.preventDefault();
+    const documentoErro = getCpfCnpjError(form.cnpj, { required: true, type: 'cnpj' });
+    if (documentoErro) {
+      setError(documentoErro);
+      return;
+    }
     setSaving(true);
     setError('');
     setMessage('');
     try {
       if (editingId) {
-        await updateFiscalCompany(editingId, form);
+        await updateFiscalCompany(editingId, { ...form, cnpj: onlyDigits(form.cnpj) });
         setMessage('Empresa fiscal atualizada.');
       } else {
-        await createFiscalCompany(form);
+        await createFiscalCompany({ ...form, cnpj: onlyDigits(form.cnpj) });
         setMessage('Empresa fiscal cadastrada.');
       }
       resetForm();
@@ -194,7 +200,7 @@ export default function FiscalCompanies() {
         </label>
         <label>
           <span className="text-sm font-medium text-slate-600 dark:text-slate-300">CNPJ</span>
-          <input className="input mt-1" value={form.cnpj} onChange={(e) => updateField('cnpj', e.target.value)} required />
+          <input className="input mt-1" value={form.cnpj} onChange={(e) => updateField('cnpj', maskCpfCnpj(e.target.value))} inputMode="numeric" maxLength={18} required />
         </label>
         <label>
           <span className="text-sm font-medium text-slate-600 dark:text-slate-300">UF</span>

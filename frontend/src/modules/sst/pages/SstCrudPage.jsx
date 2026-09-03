@@ -18,6 +18,7 @@ import {
 } from '../services/sst';
 import { isSstResourceVisible, SST_RESOURCES } from '../constants/sstResources';
 import { TabelaPadrao } from '../../../components/padrao';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 
 function getValue(row, path) {
   return String(path).split('.').reduce((acc, key) => acc?.[key], row) ?? '';
@@ -196,14 +197,25 @@ export default function SstCrudPage() {
 
   const submit = async (event) => {
     event.preventDefault();
+    const cpfErro = getCpfCnpjError(form.responsavel_tecnico_cpf, {
+      type: 'cpf',
+      label: 'CPF do responsavel tecnico'
+    });
+    if (cpfErro) {
+      setError(cpfErro);
+      return;
+    }
+    const payload = form.responsavel_tecnico_cpf
+      ? { ...form, responsavel_tecnico_cpf: onlyDigits(form.responsavel_tecnico_cpf) }
+      : form;
     setSaving(true);
     try {
       if (resource === 'documentos' && file && !editing) {
-        await uploadDocumentoSst(form, file);
+        await uploadDocumentoSst(payload, file);
       } else if (editing) {
-        await atualizarSst(resource, editing.id, form);
+        await atualizarSst(resource, editing.id, payload);
       } else {
-        await criarSst(resource, form);
+        await criarSst(resource, payload);
       }
       resetForm();
       load();
@@ -358,7 +370,14 @@ export default function SstCrudPage() {
                     type={field.type || 'text'}
                     value={form[field.key] || ''}
                     required={field.required}
-                    onChange={(event) => setForm((current) => ({ ...current, [field.key]: event.target.value }))}
+                    inputMode={field.key === 'responsavel_tecnico_cpf' ? 'numeric' : undefined}
+                    maxLength={field.key === 'responsavel_tecnico_cpf' ? 14 : undefined}
+                    onChange={(event) => setForm((current) => ({
+                      ...current,
+                      [field.key]: field.key === 'responsavel_tecnico_cpf'
+                        ? maskCpfCnpj(event.target.value)
+                        : event.target.value
+                    }))}
                     className="mt-1 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm text-[var(--c-text)] outline-none focus:border-sky-300 focus:ring-2 focus:ring-sky-100"
                   />
                 )}

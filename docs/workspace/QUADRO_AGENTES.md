@@ -6,6 +6,21 @@ Nao ha trabalho ativo desta sessao.
 
 ## Trabalho concluido aguardando publicacao
 
+- id: 2026-09-03-aditivo-direto-juridico
+  sessao: codex-aditivo-direto-juridico-2026-09-03
+  responsavel: Codex / sessao atual
+  status: finalizado
+  escopo: Encaminhar diretamente ao Juridico o aditivo de contrato cujo valor original ultrapassa o limite configuravel.
+  feito:
+    - Regra restrita ao termo aditivo; aprovacao inicial do contrato permaneceu inalterada.
+    - Somente o valor original decide o destino; valores de aditivos nao entram na soma.
+    - Exatamente no limite permanece GEO; contrato original acima segue para JURIDICO.
+    - Historicos registram limite, valor original e destino calculado.
+  pendencias:
+    - Atualizar e reiniciar somente o backend dev para homologacao funcional.
+  validacao:
+    - Sintaxe, carregamento do servico, prova pura em quatro cenarios e diff check aprovados.
+
 - id: 2026-08-27-auditoria-permissoes-granulares
   sessao: codex-auditoria-permissoes-granulares-2026-08-27
   responsavel: Codex / sessao atual

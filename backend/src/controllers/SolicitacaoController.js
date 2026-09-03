@@ -56,7 +56,8 @@ const {
 } = require('../services/setorCapabilityService');
 const {
   applyTipoSolicitacaoModuleAvailability,
-  normalizeTipoSolicitacaoBehavior
+  normalizeTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao
 } = require('../services/tipoSolicitacaoBehaviorService');
 const { isModuleEnabled } = require('../services/moduleConfigService');
 const {
@@ -2994,6 +2995,9 @@ module.exports = {
         contratos: contratosDisponiveis,
         apropriacoes: apropriacoesDisponiveis
       });
+      const rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoTipo, {
+        recargaCartao: usaFluxoRecargaCartao
+      });
       const configCamposNovaSolicitacao = await obterConfigCamposNovaSolicitacao();
       const camposNovaSolicitacao = resolverCamposNovaSolicitacao(
         comportamentoTipo,
@@ -3128,7 +3132,7 @@ module.exports = {
       }
       if (campoObrigatorio('data_vencimento') && !data_vencimento) {
         return res.status(400).json({
-          error: 'Informe a Data Resposta/Pagamento.'
+          error: `Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`
         });
       }
       if (usaFluxoRecargaCartao && !cartao_recarga_id) {
@@ -3143,7 +3147,7 @@ module.exports = {
         const vencimentoStr = String(data_vencimento).trim();
         if (!/^\d{4}-\d{2}-\d{2}$/.test(vencimentoStr)) {
           return res.status(400).json({
-            error: 'Data Resposta/Pagamento invalida. Use o formato YYYY-MM-DD.'
+            error: `${rotuloDataSolicitacao} invalida. Use o formato YYYY-MM-DD.`
           });
         }
 
@@ -3152,7 +3156,7 @@ module.exports = {
 
         if (vencimentoStr < hojeStr) {
           return res.status(400).json({
-            error: 'A Data Resposta/Pagamento nao pode ser menor que a data atual.'
+            error: `A ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')} nao pode ser menor que a data atual.`
           });
         }
       }

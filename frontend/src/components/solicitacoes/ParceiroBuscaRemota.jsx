@@ -8,13 +8,22 @@ function rotuloParceiro(parceiro) {
     : (parceiro.nome || 'Sem nome');
 }
 
+function detalheParceiro(parceiro) {
+  return parceiro?.cpf_cnpj
+    || parceiro?.telefone
+    || parceiro?.pix_chave_fixa_1
+    || parceiro?.pix_chave_fixa_2
+    || parceiro?.pix_chave_variavel
+    || '';
+}
+
 export default function ParceiroBuscaRemota({
   label,
   selecionado,
   onSelecionar,
   obrigatorio = false,
   somenteFornecedor = false,
-  placeholder = 'Digite nome ou CPF/CNPJ',
+  placeholder = 'Digite nome, telefone, CPF/CNPJ ou PIX',
   className = ''
 }) {
   const inputId = useId();
@@ -126,7 +135,7 @@ export default function ParceiroBuscaRemota({
               onClick={() => selecionar(parceiro)}
             >
               <span className="block text-sm font-medium text-[var(--c-text)]">{parceiro.nome || 'Sem nome'}</span>
-              {parceiro.cpf_cnpj && <span className="block text-xs text-[var(--c-muted)]">{parceiro.cpf_cnpj}</span>}
+              {detalheParceiro(parceiro) && <span className="block text-xs text-[var(--c-muted)]">{detalheParceiro(parceiro)}</span>}
             </button>
           ))}
         </div>

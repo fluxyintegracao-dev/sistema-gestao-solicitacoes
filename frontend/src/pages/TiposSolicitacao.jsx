@@ -12,7 +12,12 @@ import {
   getTiposSolicitacaoPorSetor,
   salvarTiposSolicitacaoPorSetor
 } from '../services/configuracoesSistema';
-import { getDefaultTipoSolicitacaoBehavior, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import {
+  FINALIDADES_DATA_SOLICITACAO,
+  getDefaultTipoSolicitacaoBehavior,
+  getTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao
+} from '../utils/tipoSolicitacao';
 import {
   Pagina,
   PageHeader,
@@ -297,7 +302,21 @@ export default function TiposSolicitacao() {
       tipo: 'badge',
       render: (t) => (
         editId === t.id ? (
-          <div className="grid gap-1 md:grid-cols-2">
+          <div className="grid gap-2 md:grid-cols-2">
+            <label className="grid gap-1 text-xs md:col-span-2">
+              <span className="font-semibold text-[var(--c-text)]">Finalidade da data</span>
+              <select
+                className="select select-sm w-full"
+                value={editComportamento.finalidade_data_vencimento}
+                onChange={e => setEditComportamento(prev => ({
+                  ...prev,
+                  finalidade_data_vencimento: e.target.value
+                }))}
+              >
+                <option value={FINALIDADES_DATA_SOLICITACAO.RESPOSTA}>Data de Resposta</option>
+                <option value={FINALIDADES_DATA_SOLICITACAO.PAGAMENTO}>Data de Pagamento</option>
+              </select>
+            </label>
             {BEHAVIOR_FIELDS.map(field => (
               <label key={field.key} className="flex items-center gap-2 text-xs">
                 <input
@@ -311,6 +330,9 @@ export default function TiposSolicitacao() {
           </div>
         ) : (
           <div className="flex flex-wrap gap-1">
+            <span className="fx-badge fx-badge--neutral">
+              {obterRotuloDataSolicitacao(getTipoSolicitacaoBehavior(t))}
+            </span>
             {formatarRegrasTipo(t).length > 0 ? formatarRegrasTipo(t).map(label => (
               <span key={label} className="fx-badge fx-badge--neutral">
                 {label}
@@ -384,6 +406,22 @@ export default function TiposSolicitacao() {
                 recolhivel
                 recolhidoPadrao
               >
+                <CampoForm
+                  label="Finalidade da data"
+                  hint="Define o nome exibido na abertura da solicitação; a gravação e as regras permanecem as mesmas."
+                >
+                  <select
+                    className="select w-full"
+                    value={comportamento.finalidade_data_vencimento}
+                    onChange={e => setComportamento(prev => ({
+                      ...prev,
+                      finalidade_data_vencimento: e.target.value
+                    }))}
+                  >
+                    <option value={FINALIDADES_DATA_SOLICITACAO.RESPOSTA}>Data de Resposta</option>
+                    <option value={FINALIDADES_DATA_SOLICITACAO.PAGAMENTO}>Data de Pagamento</option>
+                  </select>
+                </CampoForm>
                 <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
                   {BEHAVIOR_FIELDS.map(field => (
                     <label key={field.key} className="flex items-center gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] px-3 py-2 text-sm">

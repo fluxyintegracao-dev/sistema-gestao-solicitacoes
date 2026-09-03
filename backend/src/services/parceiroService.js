@@ -1,5 +1,6 @@
-const { Op } = require('sequelize');
+const { Op, col, fn, where: sequelizeWhere } = require('sequelize');
 const { Parceiro, ParceiroCategoria, FornecedorCompra } = require('../models');
+const { isValidCpf: isValidCpfCentral } = require('../utils/cpfCnpj');
 
 const PIX_TIPOS_CHAVE = ['CPF', 'CNPJ', 'EMAIL', 'TELEFONE', 'ALEATORIA'];
 
@@ -86,6 +87,78 @@ function sanitizePixTipo(value, fieldName) {
 function sanitizePixChave(value) {
   const text = String(value || '').trim();
   return text ? text.slice(0, 255) : null;
+}
+
+function normalizarTelefone(value) {
+  return String(value || '').replace(/\D/g, '');
+}
+
+function colunaSomenteDigitos(nomeColuna) {
+  return [' ', '(', ')', '-', '.', '/', '+'].reduce(
+    (expressao, caractere) => fn('REPLACE', expressao, caractere, ''),
+    col(nomeColuna)
+  );
+}
+
+function inferirTipoChavePix(chave, telefone = '') {
+  const texto = String(chave || '').trim();
+  const minusculo = texto.toLowerCase();
+  const digitos = normalizarCpfCnpj(texto);
+  const telefoneDigitos = normalizarTelefone(telefone);
+  const telefoneSemPais = telefoneDigitos.startsWith('55') && telefoneDigitos.length > 11
+    ? telefoneDigitos.slice(2)
+    : telefoneDigitos;
+  const chaveSemPais = digitos.startsWith('55') && digitos.length > 11 ? digitos.slice(2) : digitos;
+
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(minusculo)) return 'EMAIL';
+  if (/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(texto)) {
+    return 'ALEATORIA';
+  }
+  if (telefoneSemPais && chaveSemPais === telefoneSemPais) return 'TELEFONE';
+  if (isValidCpf(digitos)) return 'CPF';
+  if (isValidCnpj(digitos)) return 'CNPJ';
+  if (digitos.length >= 10 && digitos.length <= 13) return 'TELEFONE';
+  return 'ALEATORIA';
+}
+
+function normalizarChavePix(tipo, chave) {
+  const tipoNormalizado = String(tipo || '').trim().toUpperCase();
+  const texto = String(chave || '').trim();
+  if (['CPF', 'CNPJ', 'TELEFONE'].includes(tipoNormalizado)) {
+    return normalizarCpfCnpj(texto);
+  }
+  if (tipoNormalizado === 'EMAIL') return texto.toLowerCase();
+  return texto.toLowerCase();
+}
+
+function normalizarFavorecidoSimplificado(payload = {}) {
+  const nome = String(payload.nome || '').trim();
+  const telefone = normalizarTelefone(payload.telefone);
+  const chaveInformada = String(payload.chave_pix || '').trim();
+  const tipoPix = String(payload.tipo_chave_pix || inferirTipoChavePix(chaveInformada, telefone))
+    .trim()
+    .toUpperCase();
+
+  if (!nome) throw new Error('Informe o nome do favorecido.');
+  if (nome.length > 255) throw new Error('O nome do favorecido deve ter no maximo 255 caracteres.');
+  if (telefone.length < 10 || telefone.length > 13) {
+    throw new Error('Informe um telefone valido para o favorecido.');
+  }
+  if (!PIX_TIPOS_CHAVE.includes(tipoPix)) throw new Error('Tipo de chave PIX invalido.');
+
+  const chavePix = normalizarChavePix(tipoPix, chaveInformada);
+  if (!chavePix) throw new Error('Informe a chave PIX do favorecido.');
+  if (chavePix.length > 255) throw new Error('A chave PIX deve ter no maximo 255 caracteres.');
+  if (tipoPix === 'CPF' && !isValidCpf(chavePix)) throw new Error('Informe uma chave PIX CPF valida.');
+  if (tipoPix === 'CNPJ' && !isValidCnpj(chavePix)) throw new Error('Informe uma chave PIX CNPJ valida.');
+
+  return {
+    nome,
+    telefone,
+    tipoPix,
+    chavePix,
+    chaveCanonica: `${tipoPix}:${chavePix}`
+  };
 }
 
 function sanitizeDateOnly(value) {
@@ -177,7 +250,7 @@ function normalizeParceiroPayload(payload = {}, { partial = false, exigirCadastr
         throw new Error('Informe o nome do representante legal da empresa.');
       }
       const cpfRepresentante = normalizarCpfCnpj(payload.representante_cpf);
-      if (!cpfRepresentante || !isValidCpfCnpj(cpfRepresentante)) {
+      if (!cpfRepresentante || !isValidCpfCentral(cpfRepresentante)) {
         throw new Error('Informe um CPF valido para o representante legal.');
       }
     }
@@ -375,6 +448,12 @@ async function buscarParceiros({
           [Op.like]: `%${termoNome}%`
         }
       });
+      or.push(
+        { telefone: { [Op.like]: `%${termoNome}%` } },
+        { pix_chave_fixa_1: { [Op.like]: `%${termoNome}%` } },
+        { pix_chave_fixa_2: { [Op.like]: `%${termoNome}%` } },
+        { pix_chave_variavel: { [Op.like]: `%${termoNome}%` } }
+      );
     }
 
     if (documento) {
@@ -383,6 +462,17 @@ async function buscarParceiros({
           [Op.like]: `%${documento}%`
         }
       });
+      or.push(
+        { telefone: { [Op.like]: `%${documento}%` } },
+        { pix_chave_fixa_1: { [Op.like]: `%${documento}%` } },
+        { pix_chave_fixa_2: { [Op.like]: `%${documento}%` } },
+        { pix_chave_variavel: { [Op.like]: `%${documento}%` } }
+      );
+      or.push(
+        sequelizeWhere(colunaSomenteDigitos('telefone'), { [Op.like]: `%${documento}%` }),
+        sequelizeWhere(colunaSomenteDigitos('pix_chave_fixa_1'), { [Op.like]: `%${documento}%` }),
+        sequelizeWhere(colunaSomenteDigitos('pix_chave_fixa_2'), { [Op.like]: `%${documento}%` })
+      );
     }
 
     filtros.push({ [Op.or]: or });
@@ -437,6 +527,77 @@ async function buscarParceiros({
   return Parceiro.findAll(options);
 }
 
+async function criarFavorecidoSimplificado(payload = {}, options = {}) {
+  const dados = normalizarFavorecidoSimplificado(payload);
+  const valoresChave = Array.from(new Set([
+    String(payload.chave_pix || '').trim(),
+    dados.chavePix
+  ].filter(Boolean)));
+  const whereChaveExistente = {
+    [Op.or]: [
+      { pix_chave_canonica: dados.chaveCanonica },
+      ...(['CPF', 'CNPJ'].includes(dados.tipoPix)
+        ? [{ cpf_cnpj: { [Op.in]: valoresChave } }]
+        : []),
+      { pix_chave_fixa_1: { [Op.in]: valoresChave } },
+      { pix_chave_fixa_2: { [Op.in]: valoresChave } },
+      { pix_chave_variavel: { [Op.in]: valoresChave } }
+    ]
+  };
+
+  const existente = await Parceiro.findOne({
+    where: whereChaveExistente,
+    transaction: options.transaction,
+    ...(options.transaction ? { lock: options.transaction.LOCK.UPDATE } : {})
+  });
+
+  if (existente) {
+    if (existente.ativo === false) {
+      const error = new Error('Esta chave PIX pertence a um favorecido inativo. Solicite a reativacao do cadastro.');
+      error.statusCode = 409;
+      throw error;
+    }
+    return { parceiro: existente, reutilizado: true, chavePix: dados.chavePix };
+  }
+
+  const chaveFixa = dados.tipoPix === 'ALEATORIA' ? {} : {
+    pix_chave_fixa_1_tipo: dados.tipoPix,
+    pix_chave_fixa_1: dados.chavePix
+  };
+  const chaveVariavel = dados.tipoPix === 'ALEATORIA' ? {
+    pix_chave_variavel_tipo: dados.tipoPix,
+    pix_chave_variavel: dados.chavePix
+  } : {};
+
+  try {
+    const parceiro = await Parceiro.create({
+      cpf_cnpj: ['CPF', 'CNPJ'].includes(dados.tipoPix) ? dados.chavePix : null,
+      tipo_pessoa: dados.tipoPix === 'CPF' ? 'F' : dados.tipoPix === 'CNPJ' ? 'J' : null,
+      nome: dados.nome,
+      telefone: dados.telefone,
+      cliente: false,
+      fornecedor: false,
+      corretor: false,
+      testemunha: false,
+      cadastro_simplificado_favorecido: true,
+      pix_chave_canonica: dados.chaveCanonica,
+      ...chaveFixa,
+      ...chaveVariavel,
+      ativo: true
+    }, { transaction: options.transaction });
+
+    return { parceiro, reutilizado: false, chavePix: dados.chavePix };
+  } catch (error) {
+    if (error?.name !== 'SequelizeUniqueConstraintError') throw error;
+    const concorrente = await Parceiro.findOne({
+      where: { pix_chave_canonica: dados.chaveCanonica },
+      transaction: options.transaction
+    });
+    if (!concorrente) throw error;
+    return { parceiro: concorrente, reutilizado: true, chavePix: dados.chavePix };
+  }
+}
+
 /**
  * `exigirCadastroCompleto` liga a regra PF/PJ de 23/08 (nome fantasia e representante legal na PJ).
  *
@@ -487,7 +648,12 @@ async function atualizarParceiro(id, payload, options = {}) {
   const fornecedorResolvido = data.fornecedor !== undefined ? data.fornecedor : parceiro.fornecedor;
   const corretorResolvido = data.corretor !== undefined ? data.corretor : parceiro.corretor;
 
-  if (clienteResolvido === false && fornecedorResolvido === false && corretorResolvido === false) {
+  if (
+    clienteResolvido === false &&
+    fornecedorResolvido === false &&
+    corretorResolvido === false &&
+    parceiro.cadastro_simplificado_favorecido !== true
+  ) {
     data.cliente = true;
     data.fornecedor = true;
   }
@@ -505,7 +671,11 @@ async function atualizarParceiro(id, payload, options = {}) {
 module.exports = {
   atualizarParceiro,
   buscarParceiros,
+  criarFavorecidoSimplificado,
   criarParceiro,
+  inferirTipoChavePix,
   isValidCpfCnpj,
+  normalizarChavePix,
+  normalizarFavorecidoSimplificado,
   normalizarCpfCnpj
 };

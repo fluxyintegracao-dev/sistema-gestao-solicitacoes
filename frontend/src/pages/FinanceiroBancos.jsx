@@ -20,6 +20,7 @@ import {
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { TabelaPadrao } from '../components/padrao';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../utils/formatters';
 
 function formatCurrency(value) {
   return Number(value || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -206,11 +207,19 @@ function CaixaPagamentosPanel() {
 
   async function submitConvenio(event) {
     event.preventDefault();
+    const documentoErro = getCpfCnpjError(form.empresa_cpf_cnpj, {
+      required: true,
+      label: 'CPF/CNPJ da empresa'
+    });
+    if (documentoErro) {
+      setError(documentoErro);
+      return;
+    }
     setLoading(true);
     setMessage('');
     setError('');
     try {
-      await salvarCaixaPagamentoConvenio(form);
+      await salvarCaixaPagamentoConvenio({ ...form, empresa_cpf_cnpj: onlyDigits(form.empresa_cpf_cnpj) });
       setForm(convenioInicial);
       setMessage('Convenio Caixa de pagamentos salvo.');
       await loadBase();
@@ -350,7 +359,7 @@ function CaixaPagamentosPanel() {
               </label>
               <label className="text-xs font-semibold text-slate-600">
                 CNPJ/CPF da empresa
-                <input className="app-input mt-1" value={form.empresa_cpf_cnpj} onChange={(e) => setForm({ ...form, empresa_cpf_cnpj: e.target.value })} required />
+                <input className="app-input mt-1" value={maskCpfCnpj(form.empresa_cpf_cnpj)} onChange={(e) => setForm({ ...form, empresa_cpf_cnpj: maskCpfCnpj(e.target.value) })} inputMode="numeric" maxLength={18} required />
               </label>
               <label className="flex items-center gap-2 pt-6 text-xs font-semibold text-slate-700">
                 <input type="checkbox" checked={form.homologado} onChange={(e) => setForm({ ...form, homologado: e.target.checked })} />

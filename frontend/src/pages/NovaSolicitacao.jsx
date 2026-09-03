@@ -18,18 +18,23 @@ import { useAuth } from '../contexts/AuthContext';
 import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import ParceiroBuscaRemota from '../components/solicitacoes/ParceiroBuscaRemota';
+import CadastroRapidoFavorecidoButton from '../components/solicitacoes/CadastroRapidoFavorecidoButton';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import RecargaCartaoFields from '../components/recarga-cartao/RecargaCartaoFields';
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
-import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import {
+  applyTipoSolicitacaoModuleAvailability,
+  getTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao
+} from '../utils/tipoSolicitacao';
 import { obterOpcoesNovaSolicitacaoFrontend, resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
 import {
   normalizarConfigAutomacaoDestinoNovaSolicitacao,
   obterRegraAutomacaoDestinoNovaSolicitacao
 } from '../utils/novaSolicitacaoAutomacaoDestino';
-import { maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
+import { getCpfCnpjError, getPixDocumentError, maskCep, maskCpfCnpj, maskPhone, onlyDigits } from '../utils/formatters';
 import {
   UPLOAD_DOCUMENT_ACCEPT,
   UPLOAD_MAX_FILE_SIZE_MB_PADRAO,
@@ -462,6 +467,20 @@ export default function NovaSolicitacao() {
         alert(`Complete o cadastro do credor. Falta: ${faltando.join(', ')}.`);
         return;
       }
+      const documentoErro = getCpfCnpjError(novoParceiro.cpf_cnpj, { required: true });
+      if (documentoErro) {
+        alert(documentoErro);
+        return;
+      }
+      const pixErro = [
+        ['pix_chave_fixa_1_tipo', 'pix_chave_fixa_1', 'Chave PIX fixa 1'],
+        ['pix_chave_fixa_2_tipo', 'pix_chave_fixa_2', 'Chave PIX fixa 2'],
+        ['pix_chave_variavel_tipo', 'pix_chave_variavel', 'Chave PIX variavel']
+      ].map(([tipo, chave, label]) => getPixDocumentError(novoParceiro[chave], novoParceiro[tipo], label)).find(Boolean);
+      if (pixErro) {
+        alert(pixErro);
+        return;
+      }
 
       const payload = {
         ...novoParceiro,
@@ -597,6 +616,9 @@ export default function NovaSolicitacao() {
   const usaFluxoDespesaEventual = tipoConfiguradoComoDespesaEventual;
   const usaFluxoRecargaCartao = tipoConfiguradoComoRecargaCartao;
   const usaApropriacaoAutomaticaObra = Boolean(comportamentoTipo.usa_apropriacao_automatica_obra);
+  const rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoTipo, {
+    recargaCartao: usaFluxoRecargaCartao
+  });
   const rotuloContratoVinculado = tipoEhDeMedicao ? 'Título do Contrato' : 'Ref. do Contrato';
   const placeholderContratoVinculado = tipoEhDeMedicao
     ? 'Buscar pelo título do contrato'
@@ -1292,7 +1314,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (dataVencimentoExigida && !form.data_vencimento) {
-      alert(usaFluxoRecargaCartao ? 'Informe a data prevista para recarga.' : 'Informe a Data Resposta/Pagamento.');
+      alert(`Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`);
       return;
     }
     if (dataDemissaoObrigatoria && !form.data_demissao) {
@@ -1345,7 +1367,7 @@ export default function NovaSolicitacao() {
     }
 
     if (exibirCampoDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
-      alert('Data Resposta/Pagamento não pode ser menor que a data atual.');
+      alert(`${rotuloDataSolicitacao} não pode ser menor que a data atual.`);
       return;
     }
 
@@ -1528,6 +1550,14 @@ export default function NovaSolicitacao() {
         if (qualificacaoFaltante.length > 0) {
           alert(`Complete a qualificacao do representante legal: ${qualificacaoFaltante.join(', ')}.`); return;
         }
+        const cpfRepresentanteErro = getCpfCnpjError(qualificacao.cpf, {
+          required: true,
+          type: 'cpf',
+          label: 'CPF do representante legal'
+        });
+        if (cpfRepresentanteErro) {
+          alert(cpfRepresentanteErro); return;
+        }
         if (qualificacao.estado_civil === 'CASADO') {
           const conjuge = qualificacao.conjuge || {};
           const camposConjuge = [
@@ -1543,6 +1573,14 @@ export default function NovaSolicitacao() {
             .map(([nome]) => nome);
           if (dadosConjugeFaltantes.length > 0) {
             alert(`Complete os dados do conjuge: ${dadosConjugeFaltantes.join(', ')}.`); return;
+          }
+          const cpfConjugeErro = getCpfCnpjError(conjuge.cpf, {
+            required: true,
+            type: 'cpf',
+            label: 'CPF do conjuge'
+          });
+          if (cpfConjugeErro) {
+            alert(cpfConjugeErro); return;
           }
         }
       }
@@ -2644,21 +2682,37 @@ export default function NovaSolicitacao() {
           )}
 
           {exibirFavorecidoPagamento && !usarCredorComoFavorecido && (
-            <ParceiroBuscaRemota
-              className="lg:col-span-6"
-              label="Favorecido do pagamento"
-              selecionado={favorecidoSelecionado}
-              obrigatorio={favorecidoObrigatorio}
-              placeholder="Buscar favorecido por nome ou CPF/CNPJ"
-              onSelecionar={(parceiro) => {
-                setFavorecidoSelecionado(parceiro);
-                setForm((prev) => ({
-                  ...prev,
-                  favorecido_id: parceiro ? String(parceiro.id) : '',
-                  favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
-                }));
-              }}
-            />
+            <div className="grid gap-2 lg:col-span-6">
+              <ParceiroBuscaRemota
+                label="Favorecido do pagamento"
+                selecionado={favorecidoSelecionado}
+                obrigatorio={favorecidoObrigatorio}
+                placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
+                onSelecionar={(parceiro) => {
+                  setFavorecidoSelecionado(parceiro);
+                  setForm((prev) => ({
+                    ...prev,
+                    favorecido_id: parceiro ? String(parceiro.id) : '',
+                    favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
+                  }));
+                }}
+              />
+              <CadastroRapidoFavorecidoButton
+                tipoSolicitacaoId={form.tipo_solicitacao_id}
+                tipoSubId={form.tipo_sub_id}
+                areaResponsavel={form.area_responsavel}
+                onCadastrado={(parceiro) => {
+                  setFavorecidoSelecionado(parceiro);
+                  setForm((prev) => ({
+                    ...prev,
+                    favorecido_id: String(parceiro.id),
+                    favorecido_chave_pix: pagamentoViaPix
+                      ? (parceiro.chave_pix_selecionada || chavePixPreferencial(parceiro))
+                      : ''
+                  }));
+                }}
+              />
+            </div>
           )}
 
           {exibirFormaPagamento && pagamentoViaPix && (
@@ -2911,6 +2965,9 @@ export default function NovaSolicitacao() {
         {usaMedicaoFluxoNovo && !contratoSelecionadoMedicaoBloqueada && (
           <BlocoMedicaoContrato
             contratoId={Number(form.contrato_id)}
+            tipoSolicitacaoId={form.tipo_solicitacao_id}
+            tipoSubId={form.tipo_sub_id}
+            areaResponsavel={form.area_responsavel}
             onChange={setMedicaoContratoDados}
             periodo={{ inicio: form.data_inicio_medicao, fim: form.data_fim_medicao }}
             periodoObrigatorio={medicaoObrigatoria}
@@ -3108,7 +3165,7 @@ export default function NovaSolicitacao() {
 
           {exibirCampoDataVencimento && (
           <label className="grid gap-1 text-sm">
-            {usaFluxoRecargaCartao ? 'Data prevista para recarga' : 'Data Resposta/Pagamento'}
+            {rotuloDataSolicitacao}
             <input
               name="data_vencimento"
               type="date"
@@ -3140,6 +3197,7 @@ export default function NovaSolicitacao() {
             uma coluna so, espremido, com metade da tela vazia ao lado. */}
         {usaFluxoContratoNovo && (
           <BlocoContratoFluxoNovo
+            obraId={form.obra_id}
             valorTotal={form.valor}
             contratadoPrincipal={parceiroSelecionado}
             limiteJuridico={limiteJuridico}

@@ -115,7 +115,14 @@ function validateFrontend() {
   assert(titles.includes("getChequesTerceiros({ status: 'EM_CARTEIRA', limit: 300 })"), 'Baixa composta deve carregar a mesma carteira exibida na gestao de cheques.');
   assert(custody.includes('Importar cheques'));
   assert(custody.includes('Confirmar importação'));
-  assert(custody.includes('max-h-[52vh] overflow-auto'), 'Preview da importacao deve permitir rolagem.');
+  assert(
+    custody.includes('min-h-0 flex-1 overflow-y-auto p-5'),
+    'O corpo do modal de importacao deve permitir rolagem sem ultrapassar a viewport.'
+  );
+  assert(
+    custody.includes('rotuloRolagem="Linhas do lote de importação"'),
+    'A tabela do preview deve manter a regiao de rolagem identificada.'
+  );
   assert(!custody.includes("['data_emissao', 'Data de emissão'"), 'Data de emissao nao deve aparecer no cadastro de custodia.');
   assert(custody.includes('PessoaChequeAutocomplete'), 'Cadastro deve usar a consulta central de pessoas.');
   assert(custody.includes('titular_parceiro_id'), 'Cadastro manual deve exigir o titular selecionado.');

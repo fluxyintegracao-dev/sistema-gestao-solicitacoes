@@ -3,9 +3,28 @@ const {
   ValidationError,
   sanitizeString
 } = require('../middlewares/validation');
+const { onlyDigits, isValidCpfCnpj, isValidPixDocument } = require('../utils/cpfCnpj');
 
 function isBlank(value) {
   return value == null || String(value).trim() === '';
+}
+
+function parseCpfCnpj(value, fieldName, { required = false } = {}) {
+  if (isBlank(value)) {
+    if (required) throw new ValidationError(`${fieldName} e obrigatorio.`);
+    return undefined;
+  }
+  if (!isValidCpfCnpj(value)) throw new ValidationError(`${fieldName} invalido.`);
+  return onlyDigits(value);
+}
+
+function parsePixDocument(value, type, fieldName = 'Chave PIX', { required = false } = {}) {
+  const parsed = parseOptionalText(value, fieldName, 180, { required });
+  const normalizedType = String(type || '').trim().toUpperCase();
+  if (parsed && !isValidPixDocument(parsed, normalizedType)) {
+    throw new ValidationError(`${fieldName} ${normalizedType} invalida.`);
+  }
+  return parsed && ['CPF', 'CNPJ'].includes(normalizedType) ? onlyDigits(parsed) : parsed;
 }
 
 function parseInteger(value, fieldName, { required = false, positiveOnly = true } = {}) {
@@ -532,7 +551,7 @@ function validateCompraEnviarBody(body = {}) {
     const fornecedorId = parseInteger(entry.fornecedor_id, 'Fornecedor', { positiveOnly: true });
     const parceiroId = parseInteger(entry.parceiro_id, 'Parceiro', { positiveOnly: true });
     const nome = parseOptionalText(entry.nome, 'Nome do fornecedor', 255);
-    const cnpj = parseOptionalText(entry.cnpj || entry.documento, 'CPF/CNPJ do fornecedor', 30);
+    const cnpj = parseCpfCnpj(entry.cnpj || entry.documento, 'CPF/CNPJ do fornecedor');
     const email = parseOptionalText(entry.email, 'Email do fornecedor', 255);
     const whatsapp = parseOptionalText(entry.whatsapp, 'WhatsApp do fornecedor', 100);
     const contato = parseOptionalText(entry.contato, 'Contato do fornecedor', 255);
@@ -738,7 +757,7 @@ function validateCompraCotacaoRespostaInternaBody(body = {}) {
     }) || 0,
     frete_data_vencimento: parseDateOnly(body.frete_data_vencimento, 'Data para pagamento do frete'),
     frete_transportador_nome: parseOptionalText(body.frete_transportador_nome, 'Transportador', 255),
-    frete_transportador_cpf_cnpj: parseOptionalText(body.frete_transportador_cpf_cnpj, 'CPF/CNPJ do transportador', 30),
+    frete_transportador_cpf_cnpj: parseCpfCnpj(body.frete_transportador_cpf_cnpj, 'CPF/CNPJ do transportador'),
     observacao_resposta: parseOptionalText(body.observacao_resposta, 'Observacao da resposta', 5000),
     finalizar: body.finalizar !== false
   };
@@ -1383,7 +1402,7 @@ function validateCompraPedidoFreteBody(body = {}) {
   const novoFornecedor = body.novo_fornecedor && typeof body.novo_fornecedor === 'object'
     ? {
         nome: parseOptionalText(body.novo_fornecedor.nome, 'Nome do fornecedor', 160),
-        cpf_cnpj: parseOptionalText(body.novo_fornecedor.cpf_cnpj, 'CPF/CNPJ do fornecedor', 32),
+        cpf_cnpj: parseCpfCnpj(body.novo_fornecedor.cpf_cnpj, 'CPF/CNPJ do fornecedor'),
         whatsapp: parseOptionalText(body.novo_fornecedor.whatsapp, 'WhatsApp do fornecedor', 32),
         telefone: parseOptionalText(body.novo_fornecedor.telefone, 'Telefone do fornecedor', 32),
         email: parseOptionalText(body.novo_fornecedor.email, 'Email do fornecedor', 160),
@@ -1404,13 +1423,13 @@ function validateCompraPedidoFreteBody(body = {}) {
 
   const dadosPagamento = body.dados_pagamento && typeof body.dados_pagamento === 'object'
     ? {
-        pix: parseOptionalText(body.dados_pagamento.pix, 'PIX', 180),
+        pix: parsePixDocument(body.dados_pagamento.pix, body.dados_pagamento.tipo_chave_pix),
         tipo_chave_pix: parseOptionalText(body.dados_pagamento.tipo_chave_pix, 'Tipo da chave PIX', 30),
         banco: parseOptionalText(body.dados_pagamento.banco, 'Banco', 120),
         agencia: parseOptionalText(body.dados_pagamento.agencia, 'Agencia', 60),
         conta: parseOptionalText(body.dados_pagamento.conta, 'Conta', 80),
         favorecido: parseOptionalText(body.dados_pagamento.favorecido, 'Favorecido', 160),
-        documento: parseOptionalText(body.dados_pagamento.documento, 'Documento', 60),
+        documento: parseCpfCnpj(body.dados_pagamento.documento, 'CPF/CNPJ do favorecido'),
         observacoes: parseOptionalText(body.dados_pagamento.observacoes, 'Observacoes de pagamento', 1000)
       }
     : parseOptionalText(body.dados_pagamento, 'Dados de pagamento', 1000);
@@ -1584,7 +1603,7 @@ function validateSolicitacaoCreateBody(body = {}) {
     diretoria_fluxo_codigo: parseOptionalText(body.diretoria_fluxo_codigo, 'Diretoria de aprovacao', 120),
     codigo_contrato: parseOptionalText(body.codigo_contrato, 'Codigo do contrato', 255),
     contrato_id: parseInteger(body.contrato_id, 'Contrato'),
-    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data Resposta/Pagamento'),
+    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data da solicitacao'),
     data_demissao: parseDateOnly(body.data_demissao, 'Data de demissao'),
     data_inicio_medicao: parseDateOnly(body.data_inicio_medicao, 'Data inicial da medicao'),
     data_fim_medicao: parseDateOnly(body.data_fim_medicao, 'Data final da medicao'),
@@ -1655,7 +1674,7 @@ function validateSolicitacaoDataVencimentoBody(body = {}) {
   ensureAllowedKeys(body, ['data_vencimento'], 'Atualizacao de data de vencimento');
 
   return {
-    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data Resposta/Pagamento')
+    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data da solicitacao')
   };
 }
 
@@ -1678,9 +1697,29 @@ function validateSolicitacaoCredorCreateBody(body = {}) {
 
   return {
     nome: sanitizeString(body.nome, 'Nome do credor', { required: true, max: 255 }),
-    cpf_cnpj: sanitizeString(body.cpf_cnpj, 'CPF/CNPJ', { required: true, max: 32 }),
+    cpf_cnpj: parseCpfCnpj(body.cpf_cnpj, 'CPF/CNPJ', { required: true }),
     telefone: sanitizeString(body.telefone, 'Telefone', { required: true, max: 32 }),
     email: sanitizeString(body.email, 'Email', { max: 255 })
+  };
+}
+
+function validateSolicitacaoFavorecidoCreateBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['nome', 'telefone', 'chave_pix', 'tipo_chave_pix', 'area_responsavel', 'tipo_solicitacao_id', 'tipo_sub_id'],
+    'Cadastro rapido de favorecido'
+  );
+
+  const tipoChavePix = sanitizeString(body.tipo_chave_pix, 'Tipo da chave PIX', { max: 20 });
+
+  return {
+    nome: sanitizeString(body.nome, 'Nome do favorecido', { required: true, max: 255 }),
+    telefone: sanitizeString(body.telefone, 'Telefone do favorecido', { required: true, max: 32 }),
+    chave_pix: parsePixDocument(body.chave_pix, tipoChavePix, 'Chave PIX do favorecido', { required: true }),
+    tipo_chave_pix: tipoChavePix,
+    area_responsavel: sanitizeString(body.area_responsavel, 'Area responsavel', { required: true, max: 120 }),
+    tipo_solicitacao_id: parseInteger(body.tipo_solicitacao_id, 'Tipo de solicitacao', { required: true }),
+    tipo_sub_id: parseInteger(body.tipo_sub_id, 'Subtipo de solicitacao')
   };
 }
 
@@ -1798,6 +1837,7 @@ module.exports = {
   validateSolicitacaoApropriacoesBody,
   validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
+  validateSolicitacaoFavorecidoCreateBody,
   validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
   validateSolicitacaoEnviarSetorMassaBody,

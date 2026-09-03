@@ -27,7 +27,7 @@ import {
   getTarifasBancariasAtalhos
 } from '../services/financeiro';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
-import { maskCpfCnpj } from '../utils/formatters';
+import { getCpfCnpjError, getPixDocumentError, maskCpfCnpj, onlyDigits } from '../utils/formatters';
 import { categoriaFinanceiraMatchesSearch } from '../utils/categoriaFinanceira';
 
 function defaultContaForm() {
@@ -510,6 +510,15 @@ export default function FinanceiroCadastros() {
 
   async function handleSalvarPaymentAccount(event) {
     event.preventDefault();
+    const documentoErro = getCpfCnpjError(paymentAccountForm.cnpj_pagador, {
+      required: true,
+      type: 'cnpj',
+      label: 'CNPJ pagador'
+    });
+    if (documentoErro) {
+      setError(documentoErro);
+      return;
+    }
     try {
       setSavingPaymentAccount(true);
       setError('');
@@ -530,6 +539,7 @@ export default function FinanceiroCadastros() {
       }
       const cleanPayload = {
         ...payload,
+        cnpj_pagador: onlyDigits(payload.cnpj_pagador),
         conta_bancaria_id: Number(payload.conta_bancaria_id),
         empresa_id: Number(payload.empresa_id)
       };
@@ -705,13 +715,26 @@ export default function FinanceiroCadastros() {
 
   async function handleSalvarFavorecido(event) {
     event.preventDefault();
+    const documentoErro = getCpfCnpjError(favorecidoForm.cpf_cnpj, {
+      required: true,
+      label: 'CPF/CNPJ do favorecido'
+    });
+    if (documentoErro) {
+      setError(documentoErro);
+      return;
+    }
+    const pixErro = getPixDocumentError(favorecidoForm.pix_chave, favorecidoForm.pix_tipo_chave);
+    if (pixErro) {
+      setError(pixErro);
+      return;
+    }
     try {
       setSavingFavorecido(true);
       setError('');
       const payload = {
         parceiro_id: Number(favorecidoForm.parceiro_id),
         nome: favorecidoForm.nome,
-        cpf_cnpj: favorecidoForm.cpf_cnpj,
+        cpf_cnpj: onlyDigits(favorecidoForm.cpf_cnpj),
         metodo_preferencial: 'PIX_CHAVE',
         pix_tipo_chave: favorecidoForm.pix_tipo_chave,
         pix_chave: favorecidoForm.pix_chave,
@@ -1527,7 +1550,7 @@ export default function FinanceiroCadastros() {
             </label>
             <label className="sol-filter-field xl:col-span-2">
               <span className="sol-filter-label">CPF/CNPJ</span>
-              <input className="input w-full" value={favorecidoForm.cpf_cnpj} onChange={(e) => setFavorecidoForm((c) => ({ ...c, cpf_cnpj: e.target.value }))} required />
+              <input className="input w-full" value={maskCpfCnpj(favorecidoForm.cpf_cnpj)} onChange={(e) => setFavorecidoForm((c) => ({ ...c, cpf_cnpj: maskCpfCnpj(e.target.value) }))} inputMode="numeric" maxLength={18} required />
             </label>
             <label className="sol-filter-field xl:col-span-2">
               <span className="sol-filter-label">Tipo chave</span>

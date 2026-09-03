@@ -203,22 +203,17 @@ module.exports = {
    * OBRA, que e justamente quem abre contrato, nao tem nenhuma das duas: os dois selects vinham
    * VAZIOS, e vazios em silencio, porque a tela engolia o 403 num `.catch(() => [])`.
    *
-   * Autenticacao basta: sao nomes de usuarios ativos (a mesma lista que `/usuarios-lista` ja
-   * expoe a qualquer autenticado) e formas de pagamento. Nao ha dado sensivel novo aqui —
-   * exigir permissao administrativa para PREENCHER um formulario e que estava errado.
+   * Autenticacao basta: sao nomes de usuarios ativos, agora restritos aos vinculos da obra
+   * informada, e formas de pagamento. Nao ha dado sensivel novo aqui — exigir permissao
+   * administrativa para PREENCHER um formulario e que estava errado.
    */
   async opcoesDoFormulario(req, res) {
     try {
-      const { User } = require('../models');
       const { listarFormasDosFluxos } = require('../services/formasPagamentoMedicaoService');
-      const { Op } = require('sequelize');
+      const { listarResponsaveisVinculadosObra } = require('../services/contratoResponsavelService');
 
       const [usuarios, formasConfiguradas] = await Promise.all([
-        User.findAll({
-          where: { ativo: true, perfil: { [Op.ne]: 'SUPERADMIN' } },
-          attributes: ['id', 'nome'],
-          order: [['nome', 'ASC']]
-        }),
+        listarResponsaveisVinculadosObra(req.query?.obra_id),
         listarFormasDosFluxos()
       ]);
 

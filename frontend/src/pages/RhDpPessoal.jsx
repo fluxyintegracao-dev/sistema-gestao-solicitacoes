@@ -41,7 +41,7 @@ import RhDpPessoalSolicitacoes from './RhDpPessoalSolicitacoes';
 import RhDpJornada from './RhDpJornada';
 import RhDpApuracao from './RhDpApuracao';
 import { canViewRhDpApuracao, hasAnyExplicitPermissao } from '../utils/acessoProduto';
-import { formatCurrencyInput, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
+import { formatCurrencyInput, getCpfCnpjError, getPixDocumentError, maskCpfCnpj, normalizeCurrencyTyping } from '../utils/formatters';
 
 /**
  * A TELA CONSOLIDADA DO DP (Fase 6 do modulo DP, 26/08).
@@ -480,6 +480,18 @@ export default function RhDpPessoal() {
     limpar();
 
     const f = formulario;
+    if (f.tipo === 'ADMISSAO') {
+      const cpfErro = getCpfCnpjError(f.cpf, { required: true, type: 'cpf' });
+      if (cpfErro) {
+        setRetorno({ tipo: 'erro', texto: cpfErro });
+        return;
+      }
+      const pixErro = getPixDocumentError(f.pix_chave, f.pix_chave_tipo);
+      if (pixErro) {
+        setRetorno({ tipo: 'erro', texto: pixErro });
+        return;
+      }
+    }
     const dados = {};
 
     if (f.tipo === 'ADMISSAO') {

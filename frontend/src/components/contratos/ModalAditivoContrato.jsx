@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getOpcoesFormularioContrato, getTetoAditivo, solicitarAditivoContrato } from '../../services/contratos';
+import { formatCurrencyBRL, normalizeCurrencyTyping, parseCurrencyInput } from '../../utils/formatters';
 
 /**
  * Modal do TERMO ADITIVO (PI-15).
  *
  * O aditivo deixou de ser um subtipo da Nova Solicitacao e virou uma ACAO sobre o contrato:
- * um botao na tela de medicao abre este modal. Vale para contrato do fluxo ANTIGO e do NOVO —
- * nada aqui olha `fluxo_novo`, porque a regra do aditivo e a mesma nos dois.
+ * um botao na tela de medicao abre este modal. Vale para contrato do fluxo ANTIGO e do NOVO.
+ * No novo, o cronograma financeiro e montado linha a linha; no legado, a quantidade numerica e
+ * preservada porque esse contrato nao possui registros de parcelas para reaproveitar.
  *
  * O teto de 25% e calculado no BACKEND e apenas exibido aqui: a tela nao recalcula regra de
  * dinheiro. O backend reconfere na solicitacao e de novo na aprovacao, e e ele quem decide.
@@ -33,14 +35,107 @@ import { getOpcoesFormularioContrato, getTetoAditivo, solicitarAditivoContrato }
  * utilitario, para a largura nao voltar a depender de quem e importado por ultimo.
  */
 
-const moeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moeda = (v) => formatCurrencyBRL(v);
+
+function formatarDataContrato(valor) {
+  const partes = String(valor || '').slice(0, 10).split('-');
+  if (partes.length !== 3 || partes.some((parte) => !parte)) return '';
+  return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
+
+function rotuloVigenciaAtual(contrato) {
+  const inicio = formatarDataContrato(contrato?.vigencia_inicio);
+  const fim = formatarDataContrato(contrato?.vigencia_fim);
+  if (inicio && fim) return `${inicio} a ${fim}`;
+  if (fim) return `Até ${fim}`;
+  if (inicio) return `Desde ${inicio}`;
+  return 'Não informada';
+}
+
+function hojeLocalIso() {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, '0');
+  const dia = String(agora.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function adicionarUmDiaIso(valor) {
+  const partes = String(valor || '').slice(0, 10).split('-').map(Number);
+  if (partes.length !== 3 || partes.some((parte) => !Number.isInteger(parte))) return '';
+  const data = new Date(Date.UTC(partes[0], partes[1] - 1, partes[2] + 1));
+  return data.toISOString().slice(0, 10);
+}
+
+function dataMinimaNovaVigencia(contrato) {
+  const hoje = hojeLocalIso();
+  const fimAtual = String(contrato?.vigencia_fim || '').slice(0, 10);
+  if (!fimAtual || fimAtual < hoje) return hoje;
+  return adicionarUmDiaIso(fimAtual);
+}
+
+function mensagemNovaVigencia(valor, contrato) {
+  if (!valor) return '';
+  const hoje = hojeLocalIso();
+  const fimAtual = String(contrato?.vigencia_fim || '').slice(0, 10);
+  if (valor < hoje) return `A nova vigência não pode ser anterior a hoje (${formatarDataContrato(hoje)}).`;
+  if (fimAtual && valor === fimAtual) {
+    return 'A data é igual à vigência atual e não altera o prazo. Para acrescentar apenas valor, use Somente valor.';
+  }
+  if (fimAtual && valor < fimAtual) {
+    return `Este fluxo aceita apenas prorrogação. Informe uma data posterior à vigência atual (${formatarDataContrato(fimAtual)}).`;
+  }
+  return '';
+}
+
+function proximoVencimento(ultimoVencimento) {
+  const base = /^\d{4}-\d{2}-\d{2}$/.test(String(ultimoVencimento || ''))
+    ? (() => { const [a, m, d] = ultimoVencimento.split('-').map(Number); return new Date(a, m - 1, d); })()
+    : new Date();
+  const dia = base.getDate();
+  const alvo = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+  const ultimoDia = new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate();
+  alvo.setDate(Math.min(dia, ultimoDia));
+  return `${alvo.getFullYear()}-${String(alvo.getMonth() + 1).padStart(2, '0')}-${String(alvo.getDate()).padStart(2, '0')}`;
+}
+
+function paraCentavosCronograma(valor) {
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? Math.round(numero * 100) : NaN;
+}
+
+function redistribuirCronograma(lista, valorTotal) {
+  const totalCent = paraCentavosCronograma(valorTotal);
+  if (!Number.isFinite(totalCent) || totalCent <= 0 || lista.length === 0) return lista;
+  const travadasCent = lista
+    .filter((parcela) => parcela.travada)
+    .reduce((soma, parcela) => soma + (paraCentavosCronograma(parcela.valor) || 0), 0);
+  const livres = lista.filter((parcela) => !parcela.travada);
+  if (livres.length === 0 || travadasCent > totalCent) return lista;
+  const restanteCent = totalCent - travadasCent;
+  const baseCent = Math.floor(restanteCent / livres.length);
+  const sobraCent = restanteCent - baseCent * livres.length;
+  let indiceLivre = 0;
+  return lista.map((parcela) => {
+    if (parcela.travada) return parcela;
+    indiceLivre += 1;
+    const valorCent = indiceLivre === livres.length ? baseCent + sobraCent : baseCent;
+    return { ...parcela, valor: valorCent / 100 };
+  });
+}
 
 // `tipo` comeca VAZIO de proposito: o cliente pediu que informar seja OBRIGATORIO, e um padrao
 // escolhido pela tela seria a decisao sendo tomada por quem nao devia. E ele que decide o que a
-// aprovacao faz — uma parcela com o vencimento antigo, ou varias ate um prazo novo.
-const CAMPOS_VAZIOS = {
-  tipo: '', valor: '', nova_vigencia_fim: '', qtde_parcelas: '', justificativa: '', responsavel_id: ''
-};
+// aprovacao faz — uma parcela com o vencimento antigo ou um cronograma financeiro independente.
+const criarCamposVazios = () => ({
+  tipo: '',
+  valor: '',
+  nova_vigencia_fim: '',
+  qtde_parcelas: '',
+  parcelas: [],
+  justificativa: '',
+  responsavel_id: ''
+});
 
 export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaResponsavel, aberto, onFechar, onSolicitado }) {
   const [teto, setTeto] = useState(null);
@@ -48,18 +143,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
   const [carregando, setCarregando] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [usuarios, setUsuarios] = useState([]);
-  const [campos, setCampos] = useState(CAMPOS_VAZIOS);
-
-  useEffect(() => {
-    if (!aberto) return undefined;
-    let cancelado = false;
-    // Mesma correcao do bloco de contrato: `/usuarios` e rota ADMINISTRATIVA e o usuario da obra
-    // tomava 403, ficando com o select de responsavel vazio e sem aviso.
-    getOpcoesFormularioContrato()
-      .then((r) => { if (!cancelado) setUsuarios(Array.isArray(r?.usuarios) ? r.usuarios : []); })
-      .catch(() => { if (!cancelado) setUsuarios([]); });
-    return () => { cancelado = true; };
-  }, [aberto]);
+  const [campos, setCampos] = useState(criarCamposVazios);
 
   // Recarrega o teto toda vez que abre: entre uma abertura e outra outro aditivo pode ter sido
   // aprovado, e mostrar um disponivel velho induziria a pessoa a pedir um valor que sera negado.
@@ -67,17 +151,50 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
     if (!aberto || !contratoId) return undefined;
     let cancelado = false;
     setErro('');
-    setCampos(CAMPOS_VAZIOS);
+    setCampos(criarCamposVazios());
     setTeto(null);
     setCarregando(true);
 
     getTetoAditivo(contratoId)
-      .then((r) => { if (!cancelado) setTeto(r); })
+      .then(async (r) => {
+        if (cancelado) return;
+        setTeto(r);
+
+        try {
+          const opcoes = await getOpcoesFormularioContrato({ obraId: r?.contrato?.obra_id });
+          if (cancelado) return;
+          const lista = Array.isArray(opcoes?.usuarios) ? opcoes.usuarios : [];
+          const responsavelContratoId = r?.contrato?.responsavel_id;
+          setUsuarios(lista);
+          setCampos((atuais) => ({
+            ...atuais,
+            responsavel_id: lista.some((u) => String(u.id) === String(responsavelContratoId))
+              ? String(responsavelContratoId)
+              : ''
+          }));
+        } catch (e) {
+          if (!cancelado) {
+            setUsuarios([]);
+            setErro(e.message || 'Erro ao carregar os responsaveis vinculados a obra.');
+          }
+        }
+      })
       .catch((e) => { if (!cancelado) setErro(e.message || 'Erro ao carregar o limite de aditivo.'); })
       .finally(() => { if (!cancelado) setCarregando(false); });
 
     return () => { cancelado = true; };
   }, [aberto, contratoId]);
+
+  const valorCronograma = campos.tipo === 'PRAZO'
+    ? Number(teto?.saldo_livre || 0)
+    : parseCurrencyInput(campos.valor);
+
+  useEffect(() => {
+    if (!aberto || !teto?.contrato?.fluxo_novo) return;
+    setCampos((atuais) => (atuais.parcelas.length === 0
+      ? atuais
+      : { ...atuais, parcelas: redistribuirCronograma(atuais.parcelas, valorCronograma) }));
+  }, [aberto, teto?.contrato?.fluxo_novo, valorCronograma]);
 
   // Centralizar na viewport deixa o modal visualmente A ESQUERDA, porque o menu ocupa ~286px que
   // nao sao area util. Entao o overlay cobre a tela inteira (escurece o menu e bloqueia o clique
@@ -99,7 +216,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
 
   if (!aberto) return null;
 
-  const valorNumero = Number(String(campos.valor).replace(',', '.')) || 0;
+  const valorNumero = parseCurrencyInput(campos.valor);
   const passaDoTeto = Boolean(teto) && campos.tipo !== 'PRAZO' && valorNumero > Number(teto.disponivel);
   // O backend informa se o contrato aceita aditivo (encerrado ou inativo nao aceita). A tela
   // obedece esse campo em vez de reimplementar a regra.
@@ -109,20 +226,113 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
   // ninguem mediu. O campo Valor some, e o teto de 25% deixa de valer para ele.
   const soPrazo = campos.tipo === 'PRAZO';
   const qtdeParcelas = Number(campos.qtde_parcelas) || 0;
-  // Aditivo de vigencia exige o prazo novo E quantas parcelas criar: sem os dois o sistema nao tem
-  // como distribuir o valor no tempo, e foi o cliente quem pediu que a pessoa informasse.
-  const vigenciaCompleta = !ehVigencia || (Boolean(campos.nova_vigencia_fim) && qtdeParcelas >= 1);
+  const usaCronogramaManual = ehVigencia && Boolean(teto?.contrato?.fluxo_novo);
+  const parcelasCronograma = Array.isArray(campos.parcelas) ? campos.parcelas : [];
+  const parcelasExistentes = Number(teto?.parcelas_existentes || 0);
+  const parcelasLivres = Number(teto?.parcelas_livres || 0);
+  const parcelasComprometidas = Math.max(parcelasExistentes - parcelasLivres, 0);
+  const maximoCronograma = soPrazo
+    ? Math.max(24 - parcelasComprometidas, 0)
+    : Math.max(24 - parcelasExistentes, 0);
+  const totalCronogramaCent = paraCentavosCronograma(valorCronograma) || 0;
+  const somaCronogramaCent = parcelasCronograma.reduce(
+    (soma, parcela) => soma + (paraCentavosCronograma(parcela.valor) || 0),
+    0
+  );
+  const cronogramaCompleto = parcelasCronograma.length >= 1
+    && parcelasCronograma.length <= maximoCronograma
+    && parcelasCronograma.every((parcela) => (
+      paraCentavosCronograma(parcela.valor) > 0
+      && /^\d{4}-\d{2}-\d{2}$/.test(String(parcela.vencimento || ''))
+    ))
+    && somaCronogramaCent === totalCronogramaCent;
+  const dataMinimaVigencia = dataMinimaNovaVigencia(teto?.contrato);
+  const erroNovaVigencia = ehVigencia ? mensagemNovaVigencia(campos.nova_vigencia_fim, teto?.contrato) : '';
+  // No fluxo novo a pessoa monta o cronograma financeiro linha a linha. Em contratos legados,
+  // preservamos o campo numerico antigo porque eles nao possuem `contrato_parcelas`.
+  const vigenciaCompleta = !ehVigencia || (
+    Boolean(campos.nova_vigencia_fim)
+    && (usaCronogramaManual ? cronogramaCompleto : qtdeParcelas >= 1)
+  );
 
   const podeEnviar = Boolean(teto)
     && contratoAceita
     && Boolean(campos.tipo)
     && vigenciaCompleta
+    && !erroNovaVigencia
     && (soPrazo || valorNumero > 0)
     && String(campos.justificativa || '').trim().length > 0
     && !passaDoTeto
     && !enviando;
 
   const campo = (k) => (e) => setCampos((c) => ({ ...c, [k]: e.target.value }));
+
+  function alterarTipo(e) {
+    const tipo = e.target.value;
+    setErro('');
+    setCampos((atuais) => ({ ...atuais, tipo, parcelas: [], qtde_parcelas: '' }));
+  }
+
+  function adicionarParcela() {
+    if (totalCronogramaCent <= 0) {
+      setErro(soPrazo
+        ? 'Nao ha saldo livre para distribuir neste aditivo de prazo.'
+        : 'Informe o valor do aditivo antes de adicionar parcelas.');
+      return;
+    }
+    setCampos((atuais) => {
+      if (atuais.parcelas.length >= maximoCronograma) {
+        setErro(`O contrato aceita no maximo mais ${maximoCronograma} parcela(s) neste cronograma.`);
+        return atuais;
+      }
+      setErro('');
+      const ultima = atuais.parcelas[atuais.parcelas.length - 1];
+      const vencimentoBase = ultima?.vencimento || teto?.contrato?.ultima_parcela_vencimento;
+      const nova = {
+        numero: atuais.parcelas.length + 1,
+        valor: 0,
+        vencimento: proximoVencimento(vencimentoBase),
+        travada: false
+      };
+      return {
+        ...atuais,
+        parcelas: redistribuirCronograma([...atuais.parcelas, nova], valorCronograma)
+      };
+    });
+  }
+
+  function editarValorParcela(numero, texto) {
+    const digitos = String(texto || '').replace(/\D/g, '');
+    const valor = digitos ? Number(digitos) / 100 : 0;
+    setCampos((atuais) => {
+      const editadas = atuais.parcelas.map((parcela) => (parcela.numero === numero
+        ? { ...parcela, valor, travada: true }
+        : parcela));
+      return { ...atuais, parcelas: redistribuirCronograma(editadas, valorCronograma) };
+    });
+  }
+
+  function editarVencimentoParcela(numero, vencimento) {
+    setCampos((atuais) => ({
+      ...atuais,
+      parcelas: atuais.parcelas.map((parcela) => (parcela.numero === numero
+        ? { ...parcela, vencimento }
+        : parcela))
+    }));
+  }
+
+  function removerParcela(numero) {
+    setErro('');
+    setCampos((atuais) => ({
+      ...atuais,
+      parcelas: redistribuirCronograma(
+        atuais.parcelas
+          .filter((parcela) => parcela.numero !== numero)
+          .map((parcela, indice) => ({ ...parcela, numero: indice + 1 })),
+        valorCronograma
+      )
+    }));
+  }
 
   async function enviar() {
     if (!podeEnviar) return;
@@ -134,7 +344,12 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
         valor: soPrazo ? 0 : valorNumero,
         // Aditivo so de valor nao manda prazo nem quantidade: o prazo final nao mudou.
         nova_vigencia_fim: ehVigencia ? campos.nova_vigencia_fim : null,
-        qtde_parcelas: ehVigencia ? qtdeParcelas : null,
+        qtde_parcelas: ehVigencia
+          ? (usaCronogramaManual ? parcelasCronograma.length : qtdeParcelas)
+          : null,
+        parcelas: usaCronogramaManual
+          ? parcelasCronograma.map(({ numero, valor, vencimento }) => ({ numero, valor, vencimento }))
+          : null,
         justificativa: String(campos.justificativa).trim(),
         responsavel_id: campos.responsavel_id ? Number(campos.responsavel_id) : null,
         // PI-16: no contrato LEGADO o aditivo abre uma solicitacao propria, e ela precisa de um
@@ -208,6 +423,20 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
             </div>
           )}
 
+          {teto && (
+            <div
+              className="text-sm"
+              style={{
+                borderTop: '1px solid var(--c-border)',
+                borderBottom: '1px solid var(--c-border)',
+                padding: '8px 0'
+              }}
+            >
+              <strong>Vigência atual:</strong>{' '}
+              <span style={{ color: 'var(--c-muted)' }}>{rotuloVigenciaAtual(teto.contrato)}</span>
+            </div>
+          )}
+
           {passaDoTeto && (
             <div className="app-alert app-alert--error">
               O valor do aditivo passa do limite disponível ({moeda(teto.disponivel)}).
@@ -225,7 +454,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                   name="aditivo_tipo"
                   value="VALOR"
                   checked={campos.tipo === 'VALOR'}
-                  onChange={campo('tipo')}
+                  onChange={alterarTipo}
                   disabled={!contratoAceita}
                 />
                 <span>Somente valor</span>
@@ -236,7 +465,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                   name="aditivo_tipo"
                   value="VALOR_E_VIGENCIA"
                   checked={campos.tipo === 'VALOR_E_VIGENCIA'}
-                  onChange={campo('tipo')}
+                  onChange={alterarTipo}
                   disabled={!contratoAceita}
                 />
                 <span>Valor e nova vigência</span>
@@ -247,7 +476,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                   name="aditivo_tipo"
                   value="PRAZO"
                   checked={campos.tipo === 'PRAZO'}
-                  onChange={campo('tipo')}
+                  onChange={alterarTipo}
                   disabled={!contratoAceita}
                 />
                 <span>Somente prazo</span>
@@ -257,10 +486,10 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               {campos.tipo === 'VALOR'
                 ? 'O prazo final do contrato nao muda. O valor entra na ultima parcela ainda livre; se ela ja foi medida, nasce uma parcela nova com o mesmo vencimento da ultima.'
                 : campos.tipo === 'VALOR_E_VIGENCIA'
-                  ? 'Informe o novo prazo e quantas parcelas devem ser criadas. Os vencimentos podem ser ajustados depois, conforme a necessidade de medicao.'
+                  ? 'Informe a nova vigência do serviço e monte o cronograma de pagamento. Os vencimentos são independentes e podem ocorrer depois da vigência.'
                   : campos.tipo === 'PRAZO'
-                    ? 'Sem dinheiro novo: o saldo que ainda nao foi medido e redistribuido nas parcelas que voce pedir, ate o novo prazo. Use quando o contrato venceu e ainda ha saldo a medir.'
-                    : 'Escolha uma das opcoes: e por aqui que o sistema sabe quantas parcelas criar quando o aditivo for aprovado.'}
+                    ? 'Sem dinheiro novo: o saldo ainda não medido é redistribuído no cronograma informado. As datas de pagamento podem ultrapassar a nova vigência.'
+                    : 'Escolha uma opção para definir se o aditivo altera valor, vigência ou ambos.'}
             </span>
           </fieldset>
 
@@ -269,18 +498,21 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               <label className="text-sm">Valor do aditivo *
                 <input
                   className="input"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  type="text"
+                  inputMode="numeric"
                   name="aditivo_valor"
                   value={campos.valor}
-                  onChange={campo('valor')}
+                  onChange={(e) => setCampos((atuais) => ({
+                    ...atuais,
+                    valor: normalizeCurrencyTyping(e.target.value)
+                  }))}
+                  placeholder="R$ 0,00"
                   disabled={!contratoAceita}
                 />
               </label>
             )}
-            {/* Prazo e quantidade so aparecem no aditivo de vigencia: no de valor o prazo final
-                nao mudou, e pedir a data ali era o que fazia a intencao ficar ambigua. */}
+            {/* A nova vigencia representa a execucao do servico. O cronograma financeiro fica
+                separado logo abaixo e pode ultrapassar essa data. */}
             {ehVigencia && (
               <label className="text-sm">Prazo (nova vigência final) *
                 <input
@@ -289,11 +521,22 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                   name="aditivo_nova_vigencia_fim"
                   value={campos.nova_vigencia_fim}
                   onChange={campo('nova_vigencia_fim')}
+                  min={dataMinimaVigencia}
+                  aria-invalid={Boolean(erroNovaVigencia)}
                   disabled={!contratoAceita}
                 />
+                {erroNovaVigencia ? (
+                  <span className="text-xs" style={{ color: 'var(--c-danger, #b91c1c)' }}>
+                    {erroNovaVigencia}
+                  </span>
+                ) : (
+                  <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    Data mínima: {formatarDataContrato(dataMinimaVigencia)}. Redução de prazo exige um fluxo específico.
+                  </span>
+                )}
               </label>
             )}
-            {ehVigencia && (
+            {ehVigencia && !usaCronogramaManual && (
               <label className="text-sm">Parcelas a criar *
                 <input
                   className="input"
@@ -318,19 +561,109 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                 <option value="">Selecione</option>
                 {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
-            </label>
-            <label className="text-sm" style={{ gridColumn: '1 / -1' }}>Justificativa do aditivo *
-              <textarea
-                className="input"
-                rows={3}
-                name="aditivo_justificativa"
-                value={campos.justificativa}
-                onChange={campo('justificativa')}
-                placeholder="Por que este aditivo e necessario"
-                disabled={!contratoAceita}
-              />
+              {usuarios.length === 0 && (
+                <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                  Nenhum usuario ativo esta vinculado a obra/centro de custo deste contrato.
+                </span>
+              )}
             </label>
           </div>
+
+          {usaCronogramaManual && (
+            <section
+              className="space-y-2"
+              aria-label="Cronograma financeiro do aditivo"
+              style={{ borderTop: '1px solid var(--c-border)', paddingTop: 12 }}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold">Cronograma de pagamento *</div>
+                  <div className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    Distribuir {moeda(valorCronograma)} em até {maximoCronograma} parcela(s). As datas não limitam a vigência do serviço.
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={adicionarParcela}
+                  disabled={!contratoAceita || parcelasCronograma.length >= maximoCronograma}
+                >
+                  + Adicionar parcela
+                </button>
+              </div>
+
+              {parcelasCronograma.length === 0 ? (
+                <p className="text-sm" style={{ color: 'var(--c-muted)' }}>
+                  Adicione as parcelas. O sistema distribui o valor automaticamente e permite ajustar cada valor e vencimento.
+                </p>
+              ) : (
+                <div className="overflow-x-auto" style={{ border: '1px solid var(--c-border)', borderRadius: 10 }}>
+                  <div
+                    className="grid min-w-[560px] items-end gap-2 px-3 py-2 text-xs font-semibold uppercase"
+                    style={{ gridTemplateColumns: '48px minmax(150px, 1fr) minmax(160px, 1fr) 92px', color: 'var(--c-muted)', background: 'var(--c-surface-soft, #f8fafc)' }}
+                  >
+                    <span>#</span><span>Valor</span><span>Vencimento</span><span>Ação</span>
+                  </div>
+                  {parcelasCronograma.map((parcela) => (
+                    <div
+                      key={parcela.numero}
+                      className="grid min-w-[560px] items-center gap-2 border-t border-[var(--c-border)] px-3 py-2"
+                      style={{ gridTemplateColumns: '48px minmax(150px, 1fr) minmax(160px, 1fr) 92px' }}
+                    >
+                      <strong className="text-sm">{parcela.numero}</strong>
+                      <input
+                        className="input input-sm"
+                        type="text"
+                        inputMode="numeric"
+                        aria-label={`Valor da parcela ${parcela.numero}`}
+                        value={moeda(parcela.valor)}
+                        onChange={(e) => editarValorParcela(parcela.numero, e.target.value)}
+                        disabled={!contratoAceita}
+                      />
+                      <input
+                        className="input input-sm"
+                        type="date"
+                        aria-label={`Vencimento da parcela ${parcela.numero}`}
+                        value={parcela.vencimento || ''}
+                        onChange={(e) => editarVencimentoParcela(parcela.numero, e.target.value)}
+                        disabled={!contratoAceita}
+                      />
+                      <button
+                        type="button"
+                        className="btn btn-outline btn-sm"
+                        onClick={() => removerParcela(parcela.numero)}
+                        disabled={!contratoAceita}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {parcelasCronograma.length > 0 && (
+                <div className="flex flex-wrap gap-x-5 gap-y-1 text-xs">
+                  <span>Total: <strong>{moeda(valorCronograma)}</strong></span>
+                  <span>Distribuído: <strong>{moeda(somaCronogramaCent / 100)}</strong></span>
+                  <span style={{ color: somaCronogramaCent === totalCronogramaCent ? 'var(--c-success, #047857)' : 'var(--c-danger, #b91c1c)' }}>
+                    Diferença: <strong>{moeda((totalCronogramaCent - somaCronogramaCent) / 100)}</strong>
+                  </span>
+                </div>
+              )}
+            </section>
+          )}
+
+          <label className="block text-sm">Justificativa do aditivo *
+            <textarea
+              className="input"
+              rows={3}
+              name="aditivo_justificativa"
+              value={campos.justificativa}
+              onChange={campo('justificativa')}
+              placeholder="Por que este aditivo e necessario"
+              disabled={!contratoAceita}
+            />
+          </label>
 
           <p className="text-xs" style={{ color: 'var(--c-muted)' }}>
             O aditivo entra como pendente: o valor só é somado ao contrato quando for aprovado.

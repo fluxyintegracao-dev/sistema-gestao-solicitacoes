@@ -4,6 +4,7 @@ const {
   sanitizeString
 } = require('../middlewares/validation');
 const { TIPOS_GERENCIAIS_EMPRESA_GRUPO } = require('../constants/empresaGrupo');
+const { onlyDigits, isValidCpf, isValidCnpj, isValidCpfCnpj } = require('../utils/cpfCnpj');
 
 const RH_TIPOS_VINCULO = ['CLT', 'NAO_CLT'];
 const RH_STATUS_COLABORADOR = ['ATIVO', 'INATIVO', 'AFASTADO'];
@@ -173,7 +174,7 @@ function parseEnum(value, fieldName, allowedValues = [], { required = false } = 
 }
 
 function normalizeDigits(value) {
-  return String(value || '').replace(/\D+/g, '');
+  return onlyDigits(value);
 }
 
 function parseCpf(value, fieldName, { required = false } = {}) {
@@ -185,19 +186,19 @@ function parseCpf(value, fieldName, { required = false } = {}) {
   }
 
   const digits = normalizeDigits(value);
-  if (digits.length !== 11) {
+  if (!isValidCpf(digits)) {
     throw new ValidationError(`${fieldName} invalido.`);
   }
   return digits;
 }
 
-function parseCpfCnpj(value, fieldName) {
+function parseCpfCnpj(value, fieldName, { cnpjOnly = false } = {}) {
   if (isBlank(value)) {
     return undefined;
   }
 
   const digits = normalizeDigits(value);
-  if (![11, 14].includes(digits.length)) {
+  if (cnpjOnly ? !isValidCnpj(digits) : !isValidCpfCnpj(digits)) {
     throw new ValidationError(`${fieldName} invalido.`);
   }
   return digits;
@@ -236,7 +237,7 @@ function validateRhEmpresaGrupoCreateBody(body = {}) {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
     nome: parseOptionalText(body.nome, 'Nome', 160, { required: true }),
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
-    cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
+    cnpj: parseCpfCnpj(body.cnpj, 'CNPJ', { cnpjOnly: true }),
     tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
     tipo_gerencial: parseEnum(body.tipo_gerencial, 'Tipo gerencial', TIPOS_GERENCIAIS_EMPRESA_GRUPO),
     empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),
@@ -268,7 +269,7 @@ function validateRhEmpresaGrupoUpdateBody(body = {}) {
     codigo: parseOptionalText(body.codigo, 'Codigo', 60),
     nome: parseOptionalText(body.nome, 'Nome', 160),
     razao_social: parseOptionalText(body.razao_social, 'Razao social', 200),
-    cnpj: parseCpfCnpj(body.cnpj, 'CNPJ'),
+    cnpj: parseCpfCnpj(body.cnpj, 'CNPJ', { cnpjOnly: true }),
     tipo_empresa: parseEnum(body.tipo_empresa, 'Tipo de empresa', ['HOLDING', 'OPERACIONAL']),
     tipo_gerencial: parseEnum(body.tipo_gerencial, 'Tipo gerencial', TIPOS_GERENCIAIS_EMPRESA_GRUPO),
     empresa_caixa: parseBoolean(body.empresa_caixa, 'Empresa caixa'),

@@ -7,6 +7,7 @@ import {
   salvarRascunhoCotacaoPublica,
   uploadArquivosCotacaoPublica
 } from '../../../services/compras';
+import { getCpfCnpjError, maskCpfCnpj, onlyDigits } from '../../../utils/formatters';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -361,6 +362,10 @@ export default function CotacaoFornecedorPublica() {
   }
 
   function montarPayloadResposta({ finalizar = false } = {}) {
+    const documentoErro = getCpfCnpjError(freteTransportadorCpfCnpj, {
+      label: 'CPF/CNPJ do transportador'
+    });
+    if (documentoErro) throw new Error(documentoErro);
     const normalizarNumeroResposta = (value) => {
       if (value === '' || value === null || value === undefined) return null;
       const raw = String(value).trim();
@@ -408,7 +413,7 @@ export default function CotacaoFornecedorPublica() {
       frete_valor: freteTipo === 'SEM_FRETE' || freteModo === 'POR_ITEM' ? 0 : freteValor,
       frete_data_vencimento: freteTipo === 'TERCEIRO' ? freteDataVencimento : null,
       frete_transportador_nome: freteTransportadorNome,
-      frete_transportador_cpf_cnpj: freteTransportadorCpfCnpj,
+      frete_transportador_cpf_cnpj: onlyDigits(freteTransportadorCpfCnpj) || null,
       observacao_resposta: observacaoResposta
     };
   }
@@ -694,7 +699,7 @@ export default function CotacaoFornecedorPublica() {
                     </label>
                     <label className="grid gap-1 text-[10px] uppercase tracking-wide text-[var(--sol-text-soft)] sm:col-start-2 lg:col-start-4">
                       CPF/CNPJ (opcional)
-                      <input className="input h-7 px-2 text-xs normal-case" inputMode="numeric" value={freteTransportadorCpfCnpj} disabled={formularioBloqueado} onChange={(event) => setFreteTransportadorCpfCnpj(event.target.value.replace(/\D/g, '').slice(0, 14))} />
+                      <input className="input h-7 px-2 text-xs normal-case" inputMode="numeric" maxLength={18} value={maskCpfCnpj(freteTransportadorCpfCnpj)} disabled={formularioBloqueado} onChange={(event) => setFreteTransportadorCpfCnpj(maskCpfCnpj(event.target.value))} />
                     </label>
                   </>
                 ) : null}
