@@ -195,8 +195,30 @@ export function checksEstaticos({ tipo }) {
   const norm = (a) => (a === 'start' ? 'left' : a === 'end' ? 'right' : a);
 
   if (!tabelas.length) {
+    /*
+      ATENÇÃO — duas coisas MUITO diferentes caíam aqui como N/A, e o
+      cliente pegou isso em 03/09 na `rhdp-documentos`:
+
+        (a) a tela não tem tabela nenhuma (um formulário, um hub de
+            cartões). A regra realmente NÃO SE APLICA → N/A.
+        (b) a tela TEM tabela, e a base do preview não devolveu linha
+            nenhuma. A `TabelaPadrao` troca a tabela pelo `.empty-state`
+            quando não há registro, então some do DOM e o check antigo
+            lia "tela sem tabela visível".
+
+      No caso (b) escrever N/A é MENTIRA por omissão: sugere que a régua
+      não vale ali, quando o que houve é que as sete capacidades de tabela
+      NÃO FORAM PROVADAS. Agora isso vira estado próprio, SEM DADO, e a
+      matriz o mostra separado do N/A — não-provado nunca vira aprovado
+      por equivalência.
+    */
+    const vazia = qa('.empty-state').filter(visivel).filter(foraDeModal)[0];
+    const estadoSemTabela = vazia ? 'SEM DADO' : 'N/A';
+    const motivoSemTabela = vazia
+      ? `a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "${(vazia.innerText || '').trim().replace(/\s+/g, ' ').slice(0, 70)}") — capacidade NÃO PROVADA`
+      : 'tela sem tabela visível';
     ['T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].forEach((k) => {
-      r[k] = { estado: 'N/A', motivo: 'tela sem tabela visível' };
+      r[k] = { estado: estadoSemTabela, motivo: motivoSemTabela };
     });
   } else {
     /* T1: th × td com o mesmo alinhamento por coluna */
@@ -679,7 +701,11 @@ export function checksMobile() {
   const cards = qa('.app-tabela-cards').filter(visivel);
   const laCards = qa('.la-cards, .la-card').filter(visivel);
   if (!tabelas.length && !cards.length && !laCards.length) {
-    r.X1 = { estado: 'N/A', motivo: 'tela sem tabela/lista tabular' };
+    // Mesma distinção da T1–T7 (03/09): base vazia é NÃO-PROVADO, não N/A.
+    const vazia = qa('.empty-state').filter(visivel)[0];
+    r.X1 = vazia
+      ? { estado: 'SEM DADO', motivo: 'a tela TEM lista, mas a base do preview não devolveu linha — a virada para cards em 390px NÃO FOI PROVADA' }
+      : { estado: 'N/A', motivo: 'tela sem tabela/lista tabular' };
   } else {
     r.X1 = tabelas.length
       ? { estado: 'FALHOU', motivo: 'tabela desktop ainda visível em 390px (não virou cards)' }

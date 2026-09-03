@@ -12,6 +12,13 @@
  * - tipo: 'listagem' | 'detalhe' | 'form' | 'mista' | 'pivo'
  *   (detalhe/form exigem C3/C4; listagem reprova seta de voltar)
  * - naoAplica: { ITEM: 'motivo' } — N/A registrado, nunca silencioso.
+ * - semDado: { ITEM: 'motivo' } — SEM DADO registrado (03/09): a tela TEM a
+ *   capacidade e o harness a exercitaria, mas o ambiente compartilhado não
+ *   oferece o registro necessário e o harness é SOMENTE LEITURA (não cria,
+ *   não altera, não apaga). NÃO É APROVAÇÃO e não vira aprovação por
+ *   equivalência com outra tela — é lacuna de evidência, declarada.
+ * - semSessao: true — medida em contexto anônimo, sem login. É o caso das
+ *   telas fora do shell, que existem justamente para quem não está logado.
  */
 export const TELAS = [
   {
@@ -248,6 +255,165 @@ export const TELAS = [
     arquivo: 'src/pages/RhDpRelatorioOperacional.jsx',
     rota: '/rh-dp/relatorios/operacional',
     tipo: 'listagem'
+  },
+
+  /* =================================================================
+     TELAS COMPARTILHADAS (leva de 03/09) — categoria própria.
+     Servidas por VÁRIOS módulos, ou por nenhum. Não pertencem a leva de
+     módulo nenhuma e por isso escapavam de todas — o ponto cego exposto
+     quando a ModuloRelatorios entrou por engano no manifesto do RH/DP.
+     Dono: leva-compartilhadas. Ver docs/TELAS-COMPARTILHADAS.md.
+     ================================================================= */
+
+  {
+    id: 'modulo-relatorios',
+    arquivo: 'src/pages/ModuloRelatorios.jsx',
+    // Um arquivo, nove módulos. A rota do RH/DP é a que o usuário de QA
+    // alcança; as outras oito renderizam o MESMO componente com outro
+    // bloco de configuração.
+    rota: '/rh-dp/relatorios',
+    tipo: 'mista',
+    naoAplica: {
+      F1: 'hub de cartões: não há listagem com recorte',
+      F2: 'idem F1',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'hub de entrada do módulo, não é tela de detalhe',
+      C4: 'idem C3'
+    }
+  },
+  {
+    id: 'relatorios-administrativos',
+    arquivo: 'src/pages/RelatoriosAdministrativos.jsx',
+    rota: '/relatorios/administrativos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'comunicacao-interna',
+    arquivo: 'src/pages/ComunicacaoInterna.jsx',
+    rota: '/comunicacao-interna',
+    tipo: 'mista',
+    naoAplica: {
+      C3: 'painel de trabalho em duas colunas, não é tela de detalhe com retorno hierárquico',
+      C4: 'idem C3'
+    }
+  },
+  {
+    id: 'config-contrato-alertas-formas',
+    arquivo: 'src/pages/ConfiguracoesContratoAlertasEFormas.jsx',
+    // A rota do MENU. A irmã (/configuracoes-contrato-alertas) não tem
+    // entrada nenhuma na interface — registrado como E2 em
+    // docs/PENDENCIAS-REGISTRADAS.md.
+    rota: '/configuracoes-formas-pagamento-solicitacao',
+    tipo: 'form',
+    naoAplica: {
+      F1: 'tela de configuração: não há listagem com recorte',
+      F2: 'idem F1',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'configuração de sistema, não é tela de detalhe de registro',
+      C4: 'idem C3'
+    }
+  },
+
+  /* =================================================================
+     FORA DO SHELL — renderizam sem o Layout: sem topbar, sem menu, sem
+     breadcrumb. Medidas em SESSÃO ANÔNIMA (semSessao), porque é assim
+     que o usuário real as vê. DoD própria: docs/DEFINICAO-DE-PRONTO.md,
+     seção "TELAS FORA DO SHELL".
+
+     O que sai (C1/C2/C3/X2/F1–F4) sai porque pressupõe o shell. O que
+     INVERTE (C6/R11) está declarado como ESCOPO da regra, não exceção:
+     ali o link de navegação é a única saída e é obrigatório.
+     ================================================================= */
+
+  {
+    id: 'login',
+    arquivo: 'src/pages/Login/index.jsx',
+    rota: '/login',
+    tipo: 'form',
+    semSessao: true,
+    naoAplica: {
+      C1: 'fora do shell: não há topbar para a faixa grudar',
+      C2: 'idem C1',
+      C3: 'não é tela de detalhe',
+      C4: 'idem C3',
+      C6: 'ESCOPO da R11 (03/09): sem menu e sem breadcrumb, "Esqueci minha senha" é a única navegação e é obrigatória',
+      X2: 'idem C1',
+      F1: 'não há listagem', F2: 'não há listagem', F3: 'não há listagem', F4: 'não há listagem'
+    }
+  },
+  {
+    id: 'recuperar-senha',
+    arquivo: 'src/pages/RecuperarSenha.jsx',
+    rota: '/recuperar-senha',
+    tipo: 'form',
+    semSessao: true,
+    naoAplica: {
+      C1: 'fora do shell: não há topbar para a faixa grudar',
+      C2: 'idem C1',
+      C3: 'não é tela de detalhe',
+      C4: 'idem C3',
+      C6: 'ESCOPO da R11 (03/09): "Voltar ao login" é a única navegação disponível e é obrigatória',
+      X2: 'idem C1',
+      F1: 'não há listagem', F2: 'não há listagem', F3: 'não há listagem', F4: 'não há listagem'
+    }
+  },
+  {
+    id: 'definir-senha',
+    arquivo: 'src/pages/DefinirSenha.jsx',
+    // SEM token na URL — de propósito. O harness é SOMENTE LEITURA e não
+    // dispara e-mail de recuperação para conseguir um token válido. Então
+    // o que se mede aqui é o estado "endereço veio sem o código do link",
+    // que é um estado REAL e importante. O formulário preenchido fica
+    // NÃO PROVADO, e isso está declarado abaixo — não vira PASSOU por
+    // equivalência com a tela irmã.
+    rota: '/definir-senha',
+    tipo: 'form',
+    semSessao: true,
+    naoAplica: {
+      C1: 'fora do shell: não há topbar para a faixa grudar',
+      C2: 'idem C1',
+      C3: 'não é tela de detalhe',
+      C4: 'idem C3',
+      X2: 'idem C1',
+      F1: 'não há listagem', F2: 'não há listagem', F3: 'não há listagem', F4: 'não há listagem'
+    },
+    semDado: {
+      R1: 'medida SEM token na URL: o harness não dispara e-mail de recuperação no ambiente compartilhado (somente leitura). O formulário de senha habilitado, as etiquetas de requisito ao vivo e o caminho de sucesso NÃO FORAM PROVADOS',
+      R2: 'idem R1: os campos de senha ficam desabilitados no estado sem token',
+      A1: 'idem R1: o percurso de teclado pelo formulário habilitado não foi exercitado'
+    }
+  },
+  {
+    id: 'cotacao-publica',
+    arquivo: 'src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx',
+    // Token inválido de propósito, pelo mesmo motivo da definir-senha: um
+    // token válido só existe criando/abrindo cotação no ambiente
+    // compartilhado, e o harness não cria registro. O estado medido é o
+    // "este link não abre mais uma cotação em aberto" — que é justamente
+    // o texto que esta leva reescreveu, e o que mais aparece na vida real
+    // (link copiado pela metade, prazo vencido).
+    rota: '/cotacao/harness-sem-token-valido',
+    tipo: 'form',
+    semSessao: true,
+    naoAplica: {
+      C1: 'fora do shell: não há topbar para a faixa grudar',
+      C2: 'idem C1',
+      C3: 'não é tela de detalhe',
+      C4: 'idem C3',
+      X2: 'idem C1',
+      F1: 'não há listagem com recorte', F2: 'idem F1', F3: 'idem F1', F4: 'idem F1'
+    },
+    semDado: {
+      T1: 'medida com token INVÁLIDO: um token válido só existe criando ou abrindo cotação no ambiente compartilhado, e o harness não cria registro. A tabela de itens NÃO FOI PROVADA',
+      T2: 'idem T1', T3: 'idem T1', T4: 'idem T1', T5: 'idem T1', T6: 'idem T1', T7: 'idem T1',
+      X1: 'idem T1: a virada da tabela para cards em 390px não foi exercitada',
+      R1: 'idem T1: o formulário de proposta não renderiza sem cotação carregada',
+      R2: 'idem T1',
+      A1: 'idem T1: o percurso de teclado pelo formulário e pelo anexo não foi exercitado',
+      B4: 'idem T1: os campos de contexto (fornecedor, obra, situação) não renderizam sem cotação'
+    }
   }
 ];
 

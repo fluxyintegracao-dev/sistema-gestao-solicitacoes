@@ -567,12 +567,22 @@ function escreverSaidas(resultados, meta) {
   linhas.push('');
   linhas.push('> **GERADA AUTOMATICAMENTE** pelo harness `frontend/scripts/qa-preview/verificar.mjs`');
   linhas.push('> contra o PREVIEW PUBLICADO. Nunca editar à mão — só verificação na tela real');
-  linhas.push('> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · — N/A (motivo registrado).');
+  linhas.push('> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · ⚠ SEM DADO (a tela tem a');
+  linhas.push('> capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)');
+  linhas.push('> · — N/A (a regra não se aplica; motivo registrado).');
   linhas.push('');
   linhas.push(`- Verificação: **${meta.quando}** · preview: ${meta.base} · build servido: \`${meta.build || 'sem marca'}\``);
   linhas.push(`- Telas verificadas: ${resultados.length} · Itens: ${ITENS_DOD.join(', ')}`);
   const totalFalhas = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'FALHOU').length, 0);
-  linhas.push(`- **Células FALHOU: ${totalFalhas}**${totalFalhas === 0 ? ' — matriz 100% PASSOU' : ' (justificativas abaixo)'}`);
+  const totalSemDado = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'SEM DADO').length, 0);
+  linhas.push(`- **Células FALHOU: ${totalFalhas}**${totalFalhas === 0 ? '' : ' (justificativas abaixo)'}`);
+  /*
+    SEM DADO ao lado do FALHOU, e não escondido no rodapé: uma matriz sem
+    falha nenhuma mas com capacidade não exercitada NÃO é "100% PASSOU".
+    Ler assim foi o defeito da `rhdp-documentos` em 03/09.
+  */
+  linhas.push(`- **Células SEM DADO: ${totalSemDado}**${totalSemDado === 0 ? '' : ' — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)'}`);
+  if (totalFalhas === 0 && totalSemDado === 0) linhas.push('- Matriz 100% PASSOU, sem lacuna de evidência.');
   linhas.push('');
   linhas.push(`| Tela | ${ITENS_DOD.join(' | ')} |`);
   linhas.push(`|---|${ITENS_DOD.map(() => '---').join('|')}|`);
@@ -582,6 +592,7 @@ function escreverSaidas(resultados, meta) {
       if (!c) return '·';
       if (c.estado === 'PASSOU') return '✅';
       if (c.estado === 'FALHOU') return '❌';
+      if (c.estado === 'SEM DADO') return '⚠';
       return '—';
     });
     linhas.push(`| ${r.tela} | ${celulas.join(' | ')} |`);
@@ -600,6 +611,24 @@ function escreverSaidas(resultados, meta) {
     });
   });
   if (!houveFalha) linhas.push('_Nenhuma célula FALHOU nesta verificação._');
+
+  linhas.push('');
+  linhas.push('## SEM DADO — capacidades que NÃO foram provadas');
+  linhas.push('');
+  linhas.push('A tela tem a capacidade e o harness a exercitaria; a base do preview não');
+  linhas.push('devolveu registro para exercitá-la. **Não é aprovação e não vira aprovação');
+  linhas.push('por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,');
+  linhas.push('é preciso registro na base — o harness é SOMENTE LEITURA e não cria nenhum.');
+  linhas.push('');
+  let houveSemDado = false;
+  resultados.forEach((r) => {
+    const sd = Object.entries(r.itens).filter(([, c]) => c.estado === 'SEM DADO');
+    if (sd.length) {
+      houveSemDado = true;
+      linhas.push(`- **${r.tela}** — ${sd.map(([item]) => item).join(', ')}: ${sd[0][1].motivo || 's/ motivo'}`);
+    }
+  });
+  if (!houveSemDado) linhas.push('_Nenhuma lacuna de evidência nesta verificação._');
 
   linhas.push('');
   linhas.push('## N/A — motivos');
@@ -641,12 +670,13 @@ async function main() {
     // (reset em todo host); limitar a TLS 1.2 destrava — só no modo proxy.
     args: proxyEnv ? ['--ssl-version-max=tls1.2'] : []
   });
-  const contexto = await navegador.newContext({
+  const abrirContexto = () => navegador.newContext({
     viewport: { width: 1920, height: 1080 },
     locale: 'pt-BR',
     timezoneId: 'America/Sao_Paulo',
     ignoreHTTPSErrors: Boolean(proxyEnv)
   });
+  const contexto = await abrirContexto();
   const page = await contexto.newPage();
 
   /*
@@ -679,10 +709,38 @@ async function main() {
     const telas = filtroTelas ? TELAS.filter((t) => filtroTelas.includes(t.id)) : TELAS;
     const resultados = [];
 
+    /*
+      SESSÃO ANÔNIMA — as telas FORA DO SHELL (Login, Recuperar Senha,
+      Definir Senha, Cotação Pública) existem justamente para quem NÃO está
+      logado. Medi-las na sessão autenticada seria medir outra coisa: o
+      Login redireciona, e a Cotação Pública é usada por um fornecedor que
+      não tem conta nenhuma no sistema.
+
+      Contexto separado, sem cookie e sem storage — é o que o usuário real
+      tem. Criado uma vez, sob demanda, e fechado no fim.
+    */
+    const sessaoLogada = { page, contexto };
+    let sessaoSemLogin = null;
+    const obterSessaoSemLogin = async () => {
+      if (!sessaoSemLogin) {
+        const ctx = await abrirContexto();
+        const pg = await ctx.newPage();
+        pg.on('dialog', async (dialog) => {
+          caixasDoNavegador.push({ tipo: dialog.type(), mensagem: dialog.message() });
+          await dialog.dismiss().catch(() => {});
+        });
+        sessaoSemLogin = { page: pg, contexto: ctx };
+      }
+      return sessaoSemLogin;
+    };
+
     for (const tela of telas) {
+      // Sombreia `page`/`contexto` só dentro do laço: tela fora do shell é
+      // medida sem sessão, todas as outras seguem na sessão de QA.
+      const { page, contexto } = tela.semSessao ? await obterSessaoSemLogin() : sessaoLogada;
       const resultado = { tela: tela.id, arquivo: tela.arquivo, itens: {}, url: '' };
       resultados.push(resultado);
-      console.log(`[qa-preview] ▶ ${tela.id}`);
+      console.log(`[qa-preview] ▶ ${tela.id}${tela.semSessao ? ' (sem sessão)' : ''}`);
       try {
         let rota = tela.rota;
         if (tela.resolver) rota = await RESOLVEDORES[tela.resolver](page);
@@ -888,6 +946,16 @@ async function main() {
         Object.entries(tela.naoAplica || {}).forEach(([item, motivo]) => {
           resultado.itens[item] = { estado: 'N/A', motivo };
         });
+        /*
+          SEM DADO declarado vence DEPOIS do N/A, e de propósito: quando o
+          ambiente não oferece o registro, o check automático costuma cair
+          num N/A por ausência do elemento ("tela sem tabela visível") — e
+          esse N/A lê como "a regra não se aplica", que é falso. Aqui a
+          tela declara, item a item, o que o harness NÃO CONSEGUIU provar.
+        */
+        Object.entries(tela.semDado || {}).forEach(([item, motivo]) => {
+          resultado.itens[item] = { estado: 'SEM DADO', motivo };
+        });
       } catch (erro) {
         resultado.erro = String(erro.message || erro);
         ITENS_DOD.forEach((item) => {
@@ -901,7 +969,13 @@ async function main() {
 
     escreverSaidas(resultados, { quando: agora(), base: BASE, build });
     const totalFalhas = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'FALHOU').length, 0);
-    console.log(`\n[qa-preview] matriz gravada em docs/MATRIZ-COBERTURA.md — ${totalFalhas} célula(s) FALHOU`);
+    const semDado = resultados.reduce((s, r) => s + Object.values(r.itens).filter((i) => i.estado === 'SEM DADO').length, 0);
+    /*
+      SEM DADO não derruba o código de saída — não é falha da tela, é falta
+      de registro na base. Mas é impresso junto e vai para a matriz, porque
+      "0 FALHOU" com lacuna de evidência NÃO é entrega fechada.
+    */
+    console.log(`\n[qa-preview] matriz gravada em docs/MATRIZ-COBERTURA.md — ${totalFalhas} célula(s) FALHOU, ${semDado} SEM DADO (não provadas)`);
     process.exit(totalFalhas === 0 ? 0 : 1);
   } finally {
     await navegador.close();
