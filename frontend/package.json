@@ -8,14 +8,15 @@
     "gerar:navegacao": "node scripts/gerarCatalogoNavegacaoBackend.mjs",
     "prebuild": "npm run gerar:navegacao",
     "build": "vite build",
-    "test:responsive": "node scripts/validarResponsividadeFrontend.mjs && node scripts/validarNavegacao.mjs",
+    "test:responsive": "node scripts/validarResponsividadeFrontend.mjs && node scripts/validarNavegacao.mjs && node scripts/provas/larguraDeColuna.mjs",
     "preview": "vite preview",
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:android:add": "npx cap add android",
     "mobile:android:open": "npx cap open android",
     "mobile:ios:add": "npx cap add ios",
     "mobile:ios:open": "npx cap open ios",
-    "test:navegacao": "node scripts/validarNavegacao.mjs"
+    "test:navegacao": "node scripts/validarNavegacao.mjs",
+    "provas": "node scripts/provas/larguraDeColuna.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.0",

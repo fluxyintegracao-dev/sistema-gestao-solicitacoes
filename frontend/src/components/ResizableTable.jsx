@@ -93,9 +93,14 @@ export function ResizableTable({
     STATUS e AÇÕES fora da borda do cartão, para sempre. Só um remount
     (passar pelo estado "Carregando") corrigia.
 
-    O que NÃO pode ser sobrescrito é a largura que o USUÁRIO arrastou: essa
-    é escolha dele e o `usuarioRedimensionouRef` a protege — mesma razão por
-    que os defaults não são persistidos no mount.
+    O que NÃO pode ser sobrescrito é a largura que o USUÁRIO arrastou. Quem
+    protege isso é o `colunasDoUsuarioRef` — o conjunto de chaves semeado do
+    `localStorage` no mount e acrescido a cada arrasto. NÃO é o
+    `usuarioRedimensionouRef`: aquele é um booleano por MONTAGEM, nasce
+    `false` a cada recarga, e usá-lo como guarda aqui foi exatamente o que
+    apagou o arrasto do usuário em 03/09. Ele continua existindo, mas só
+    para o que é papel dele: não gravar no localStorage antes do primeiro
+    arrasto de verdade.
   */
   useEffect(() => {
     setWidths((current) => {
