@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { HiOutlineArrowUturnLeft, HiOutlineClock, HiOutlineMagnifyingGlass, HiPaperClip } from 'react-icons/hi2';
 import ApropriacaoAutocomplete from '../components/ui/ApropriacaoAutocomplete';
 import ParceiroBuscaRemota from '../components/solicitacoes/ParceiroBuscaRemota';
+import CadastroRapidoFavorecidoButton from '../components/solicitacoes/CadastroRapidoFavorecidoButton';
 import RateioApropriacoesContrato, { numeroDoCampo } from '../components/contratos/RateioApropriacoesContrato';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import RecargaCartaoFields from '../components/recarga-cartao/RecargaCartaoFields';
@@ -2644,21 +2645,37 @@ export default function NovaSolicitacao() {
           )}
 
           {exibirFavorecidoPagamento && !usarCredorComoFavorecido && (
-            <ParceiroBuscaRemota
-              className="lg:col-span-6"
-              label="Favorecido do pagamento"
-              selecionado={favorecidoSelecionado}
-              obrigatorio={favorecidoObrigatorio}
-              placeholder="Buscar favorecido por nome ou CPF/CNPJ"
-              onSelecionar={(parceiro) => {
-                setFavorecidoSelecionado(parceiro);
-                setForm((prev) => ({
-                  ...prev,
-                  favorecido_id: parceiro ? String(parceiro.id) : '',
-                  favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
-                }));
-              }}
-            />
+            <div className="grid gap-2 lg:col-span-6">
+              <ParceiroBuscaRemota
+                label="Favorecido do pagamento"
+                selecionado={favorecidoSelecionado}
+                obrigatorio={favorecidoObrigatorio}
+                placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
+                onSelecionar={(parceiro) => {
+                  setFavorecidoSelecionado(parceiro);
+                  setForm((prev) => ({
+                    ...prev,
+                    favorecido_id: parceiro ? String(parceiro.id) : '',
+                    favorecido_chave_pix: pagamentoViaPix ? chavePixPreferencial(parceiro) : ''
+                  }));
+                }}
+              />
+              <CadastroRapidoFavorecidoButton
+                tipoSolicitacaoId={form.tipo_solicitacao_id}
+                tipoSubId={form.tipo_sub_id}
+                areaResponsavel={form.area_responsavel}
+                onCadastrado={(parceiro) => {
+                  setFavorecidoSelecionado(parceiro);
+                  setForm((prev) => ({
+                    ...prev,
+                    favorecido_id: String(parceiro.id),
+                    favorecido_chave_pix: pagamentoViaPix
+                      ? (parceiro.chave_pix_selecionada || chavePixPreferencial(parceiro))
+                      : ''
+                  }));
+                }}
+              />
+            </div>
           )}
 
           {exibirFormaPagamento && pagamentoViaPix && (
@@ -2911,6 +2928,9 @@ export default function NovaSolicitacao() {
         {usaMedicaoFluxoNovo && !contratoSelecionadoMedicaoBloqueada && (
           <BlocoMedicaoContrato
             contratoId={Number(form.contrato_id)}
+            tipoSolicitacaoId={form.tipo_solicitacao_id}
+            tipoSubId={form.tipo_sub_id}
+            areaResponsavel={form.area_responsavel}
             onChange={setMedicaoContratoDados}
             periodo={{ inicio: form.data_inicio_medicao, fim: form.data_fim_medicao }}
             periodoObrigatorio={medicaoObrigatoria}

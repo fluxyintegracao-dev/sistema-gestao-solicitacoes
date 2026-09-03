@@ -1684,6 +1684,24 @@ function validateSolicitacaoCredorCreateBody(body = {}) {
   };
 }
 
+function validateSolicitacaoFavorecidoCreateBody(body = {}) {
+  ensureAllowedKeys(
+    body,
+    ['nome', 'telefone', 'chave_pix', 'tipo_chave_pix', 'area_responsavel', 'tipo_solicitacao_id', 'tipo_sub_id'],
+    'Cadastro rapido de favorecido'
+  );
+
+  return {
+    nome: sanitizeString(body.nome, 'Nome do favorecido', { required: true, max: 255 }),
+    telefone: sanitizeString(body.telefone, 'Telefone do favorecido', { required: true, max: 32 }),
+    chave_pix: sanitizeString(body.chave_pix, 'Chave PIX do favorecido', { required: true, max: 255 }),
+    tipo_chave_pix: sanitizeString(body.tipo_chave_pix, 'Tipo da chave PIX', { max: 20 }),
+    area_responsavel: sanitizeString(body.area_responsavel, 'Area responsavel', { required: true, max: 120 }),
+    tipo_solicitacao_id: parseInteger(body.tipo_solicitacao_id, 'Tipo de solicitacao', { required: true }),
+    tipo_sub_id: parseInteger(body.tipo_sub_id, 'Subtipo de solicitacao')
+  };
+}
+
 function validateSolicitacaoResponsavelBody(body = {}) {
   ensureAllowedKeys(body, ['usuario_responsavel_id', 'prazo_compra'], 'Atribuicao de responsavel');
 
@@ -1798,6 +1816,7 @@ module.exports = {
   validateSolicitacaoApropriacoesBody,
   validateSolicitacaoCredorCreateBody,
   validateSolicitacaoCredorBody,
+  validateSolicitacaoFavorecidoCreateBody,
   validateSolicitacaoDataVencimentoBody,
   validateSolicitacaoEnviarSetorBody,
   validateSolicitacaoEnviarSetorMassaBody,

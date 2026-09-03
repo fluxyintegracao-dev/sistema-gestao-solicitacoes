@@ -101,6 +101,19 @@ export async function criarCredorNovaSolicitacao(data) {
   return parseJson(response, 'Erro ao cadastrar credor');
 }
 
+export async function criarFavorecidoNovaSolicitacao(data, { idempotencyKey } = {}) {
+  const response = await fetch(`${API_URL}/solicitacoes/favorecidos`, {
+    method: 'POST',
+    headers: authHeaders({
+      'Content-Type': 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {})
+    }),
+    body: JSON.stringify(data)
+  });
+
+  return parseJson(response, 'Erro ao cadastrar favorecido');
+}
+
 export async function criarCredorCompraDireta(data) {
   const response = await fetch(`${API_URL}/compras/solicitacoes-diretas/credores`, {
     method: 'POST',

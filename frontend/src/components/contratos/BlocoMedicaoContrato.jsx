@@ -6,6 +6,7 @@ import { paraCentavosContrato } from './BlocoContratoFluxoNovo';
 import { HiPaperClip } from 'react-icons/hi2';
 import { chavePixPreferencial, formaPagamentoEhBoleto, formaPagamentoEhPix } from '../../utils/formaPagamento';
 import DateInputBR from '../DateInputBR';
+import CadastroRapidoFavorecidoButton from '../solicitacoes/CadastroRapidoFavorecidoButton';
 
 /**
  * Bloco de MEDICAO (wireframe 2), montado dentro da Nova Solicitacao quando o contrato
@@ -74,6 +75,9 @@ export function projetarValoresRedistribuidos(parcelas, selecao) {
 
 export default function BlocoMedicaoContrato({
   contratoId,
+  tipoSolicitacaoId,
+  tipoSubId,
+  areaResponsavel,
   onChange,
   // O periodo da medicao subiu para ca (pedido do cliente, 20/08): ele data a tabela de parcelas e
   // ficava solto no meio do formulario, longe dela. O ESTADO continua sendo o da Nova Solicitacao —
@@ -247,7 +251,7 @@ export default function BlocoMedicaoContrato({
     setBuscaFavorecido(p.nome);
     // A chave vem preenchida do cadastro quando existir, e continua editavel: e ela que sera
     // COPIADA para a medicao, e a do cadastro pode mudar depois.
-    setChavePix(chavePixPreferencial(p));
+    setChavePix(p.chave_pix_selecionada || chavePixPreferencial(p));
   }
 
   function alternar(parcela) {
@@ -496,13 +500,13 @@ export default function BlocoMedicaoContrato({
             </label>
 
             {(!usarCredor || !credorDoContrato) && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 <div className="relative">
                   <input
                     className="input input-sm"
                     style={{ width: '100%' }}
                     name="busca_favorecido"
-                    placeholder="Buscar favorecido por nome ou CPF/CNPJ"
+                    placeholder="Buscar por nome, telefone, CPF/CNPJ ou PIX"
                     value={buscaFavorecido}
                     autoComplete="off"
                     role="combobox"
@@ -529,11 +533,19 @@ export default function BlocoMedicaoContrato({
                       <button key={p.id} type="button" role="option" aria-selected={false}
                         className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-[var(--c-surface-subtle)]"
                         onClick={() => escolherFavorecido(p)}>
-                        {p.nome}{p.cpf_cnpj ? ` — ${p.cpf_cnpj}` : ''}
+                        {p.nome}{(p.cpf_cnpj || p.telefone || p.pix_chave_fixa_1 || p.pix_chave_fixa_2 || p.pix_chave_variavel)
+                          ? ` — ${p.cpf_cnpj || p.telefone || p.pix_chave_fixa_1 || p.pix_chave_fixa_2 || p.pix_chave_variavel}`
+                          : ''}
                       </button>
                     ))}
                   </div>
                 )}
+                <CadastroRapidoFavorecidoButton
+                  tipoSolicitacaoId={tipoSolicitacaoId}
+                  tipoSubId={tipoSubId}
+                  areaResponsavel={areaResponsavel}
+                  onCadastrado={escolherFavorecido}
+                />
               </div>
             )}
 
