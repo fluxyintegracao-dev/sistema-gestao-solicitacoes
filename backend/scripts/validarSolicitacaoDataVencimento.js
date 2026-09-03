@@ -3,6 +3,12 @@ const {
   validateSolicitacaoCreateBody,
   validateSolicitacaoDataVencimentoBody
 } = require('../src/validators/operationalValidators');
+const {
+  FINALIDADES_DATA_SOLICITACAO,
+  normalizeTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao,
+  serializeTipoSolicitacaoBehavior
+} = require('../src/services/tipoSolicitacaoBehaviorService');
 
 function formatDateOnly(date) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -45,6 +51,30 @@ function run() {
   assert.strictEqual(
     validateSolicitacaoDataVencimentoBody({ data_vencimento: future }).data_vencimento,
     future
+  );
+
+  const comportamentoPadrao = normalizeTipoSolicitacaoBehavior({ comportamento: null });
+  assert.strictEqual(
+    comportamentoPadrao.finalidade_data_vencimento,
+    FINALIDADES_DATA_SOLICITACAO.RESPOSTA
+  );
+  assert.strictEqual(obterRotuloDataSolicitacao(comportamentoPadrao), 'Data de Resposta');
+
+  const comportamentoPagamento = normalizeTipoSolicitacaoBehavior({
+    comportamento: { finalidade_data_vencimento: 'pagamento' }
+  });
+  assert.strictEqual(
+    comportamentoPagamento.finalidade_data_vencimento,
+    FINALIDADES_DATA_SOLICITACAO.PAGAMENTO
+  );
+  assert.strictEqual(obterRotuloDataSolicitacao(comportamentoPagamento), 'Data de Pagamento');
+  assert.strictEqual(
+    obterRotuloDataSolicitacao(comportamentoPagamento, { recargaCartao: true }),
+    'Data prevista para recarga'
+  );
+  assert.strictEqual(
+    JSON.parse(serializeTipoSolicitacaoBehavior(comportamentoPagamento)).finalidade_data_vencimento,
+    FINALIDADES_DATA_SOLICITACAO.PAGAMENTO
   );
 
   console.log('Validacao de vencimento de solicitacoes concluida com sucesso.');

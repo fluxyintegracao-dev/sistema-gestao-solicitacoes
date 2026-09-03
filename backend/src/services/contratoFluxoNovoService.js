@@ -3,7 +3,10 @@
 const { Op } = require('sequelize');
 const { sequelize, Anexo, CategoriaFinanceira, Contrato, ContratoAnexo, ContratoParcela, ContratoApropriacao, ContratoCredor, Apropriacao, ConfiguracaoSistema, FormaPagamentoFinanceira, Historico, Parceiro, Setor, TipoSubContrato, TipoSolicitacao, TituloFinanceiro, User, Solicitacao } = require('../models');
 const { codigoDoSetor } = require('../utils/codigoDoSetor');
-const { normalizeTipoSolicitacaoBehavior } = require('./tipoSolicitacaoBehaviorService');
+const {
+  normalizeTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao
+} = require('./tipoSolicitacaoBehaviorService');
 const {
   obterConfigCamposNovaSolicitacao,
   resolverCamposNovaSolicitacao
@@ -825,6 +828,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     );
   }
 
+  let rotuloDataSolicitacao = 'Data de Resposta';
   if (tipoMacroId) {
     if (!Number.isInteger(Number(tipoMacroId))) {
       throw Object.assign(new Error('Tipo de solicitacao invalido.'), { statusCode: 400 });
@@ -836,6 +840,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     }
 
     const comportamentoMacro = normalizeTipoSolicitacaoBehavior(tipoMacro);
+    rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoMacro);
     if (!comportamentoMacro.usa_fluxo_contrato_novo) {
       throw Object.assign(
         new Error('O tipo de solicitacao informado nao usa o fluxo novo de contratos.'),
@@ -858,7 +863,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     const campoObrigatorio = (campoId) => Boolean(camposResolvidos?.[campoId]?.obrigatorio);
     const exigencias = [
       ['descricao', descricao, 'Informe o titulo do contrato.'],
-      ['data_vencimento', dataRespostaPagamento, 'Informe a Data Resposta/Pagamento.'],
+      ['data_vencimento', dataRespostaPagamento, `Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`],
       ['contrato_objeto', objeto, 'Informe o objeto do contrato.'],
       ['contrato_justificativa', justificativa, 'Informe a justificativa da contratacao.'],
       ['contrato_responsavel', responsavelId, 'Selecione o responsavel pela contratacao.'],
@@ -909,7 +914,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
   if (dataRespostaPagamentoPersistida) {
     const dataNormalizada = somenteData(dataRespostaPagamentoPersistida);
     if (!dataNormalizada) {
-      throw Object.assign(new Error('Data Resposta/Pagamento invalida.'), { statusCode: 400 });
+      throw Object.assign(new Error(`${rotuloDataSolicitacao} invalida.`), { statusCode: 400 });
     }
     dataRespostaPagamentoPersistida = formatarISO(dataNormalizada);
 
@@ -923,7 +928,7 @@ async function criarContrato(dados, { usuarioId } = {}) {
     const hojeIso = `${hoje.year}-${hoje.month}-${hoje.day}`;
     if (dataRespostaPagamentoPersistida < hojeIso) {
       throw Object.assign(
-        new Error('Data Resposta/Pagamento nao pode ser anterior a data atual.'),
+        new Error(`${rotuloDataSolicitacao} nao pode ser anterior a data atual.`),
         { statusCode: 400 }
       );
     }

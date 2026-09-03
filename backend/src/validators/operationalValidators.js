@@ -1603,7 +1603,7 @@ function validateSolicitacaoCreateBody(body = {}) {
     diretoria_fluxo_codigo: parseOptionalText(body.diretoria_fluxo_codigo, 'Diretoria de aprovacao', 120),
     codigo_contrato: parseOptionalText(body.codigo_contrato, 'Codigo do contrato', 255),
     contrato_id: parseInteger(body.contrato_id, 'Contrato'),
-    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data Resposta/Pagamento'),
+    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data da solicitacao'),
     data_demissao: parseDateOnly(body.data_demissao, 'Data de demissao'),
     data_inicio_medicao: parseDateOnly(body.data_inicio_medicao, 'Data inicial da medicao'),
     data_fim_medicao: parseDateOnly(body.data_fim_medicao, 'Data final da medicao'),
@@ -1674,7 +1674,7 @@ function validateSolicitacaoDataVencimentoBody(body = {}) {
   ensureAllowedKeys(body, ['data_vencimento'], 'Atualizacao de data de vencimento');
 
   return {
-    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data Resposta/Pagamento')
+    data_vencimento: parseCurrentOrFutureDateOnly(body.data_vencimento, 'Data da solicitacao')
   };
 }
 

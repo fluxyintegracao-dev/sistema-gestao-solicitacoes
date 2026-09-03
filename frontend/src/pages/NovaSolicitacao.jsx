@@ -24,7 +24,11 @@ import PendingAttachmentsList from '../components/attachments/PendingAttachments
 import RecargaCartaoFields from '../components/recarga-cartao/RecargaCartaoFields';
 import { userHasSetorCapability } from '../utils/setor';
 import { hasEnabledModule } from '../utils/acessoProduto';
-import { applyTipoSolicitacaoModuleAvailability, getTipoSolicitacaoBehavior } from '../utils/tipoSolicitacao';
+import {
+  applyTipoSolicitacaoModuleAvailability,
+  getTipoSolicitacaoBehavior,
+  obterRotuloDataSolicitacao
+} from '../utils/tipoSolicitacao';
 import { obterOpcoesNovaSolicitacaoFrontend, resolverCamposNovaSolicitacaoFrontend } from '../utils/novaSolicitacaoCampos';
 import {
   normalizarConfigAutomacaoDestinoNovaSolicitacao,
@@ -612,6 +616,9 @@ export default function NovaSolicitacao() {
   const usaFluxoDespesaEventual = tipoConfiguradoComoDespesaEventual;
   const usaFluxoRecargaCartao = tipoConfiguradoComoRecargaCartao;
   const usaApropriacaoAutomaticaObra = Boolean(comportamentoTipo.usa_apropriacao_automatica_obra);
+  const rotuloDataSolicitacao = obterRotuloDataSolicitacao(comportamentoTipo, {
+    recargaCartao: usaFluxoRecargaCartao
+  });
   const rotuloContratoVinculado = tipoEhDeMedicao ? 'Título do Contrato' : 'Ref. do Contrato';
   const placeholderContratoVinculado = tipoEhDeMedicao
     ? 'Buscar pelo título do contrato'
@@ -1307,7 +1314,7 @@ export default function NovaSolicitacao() {
       return;
     }
     if (dataVencimentoExigida && !form.data_vencimento) {
-      alert(usaFluxoRecargaCartao ? 'Informe a data prevista para recarga.' : 'Informe a Data Resposta/Pagamento.');
+      alert(`Informe a ${rotuloDataSolicitacao.toLocaleLowerCase('pt-BR')}.`);
       return;
     }
     if (dataDemissaoObrigatoria && !form.data_demissao) {
@@ -1360,7 +1367,7 @@ export default function NovaSolicitacao() {
     }
 
     if (exibirCampoDataVencimento && form.data_vencimento && String(form.data_vencimento) < String(hojeInput)) {
-      alert('Data Resposta/Pagamento não pode ser menor que a data atual.');
+      alert(`${rotuloDataSolicitacao} não pode ser menor que a data atual.`);
       return;
     }
 
@@ -3158,7 +3165,7 @@ export default function NovaSolicitacao() {
 
           {exibirCampoDataVencimento && (
           <label className="grid gap-1 text-sm">
-            {usaFluxoRecargaCartao ? 'Data prevista para recarga' : 'Data Resposta/Pagamento'}
+            {rotuloDataSolicitacao}
             <input
               name="data_vencimento"
               type="date"
