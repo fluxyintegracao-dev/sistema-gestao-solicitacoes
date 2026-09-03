@@ -6,6 +6,24 @@ function getColumnKey(column) {
   return column.key || column.id;
 }
 
+/*
+  DE QUEM É CADA LARGURA (03/09)
+
+  Duas fontes disputam a mesma propriedade e a diferença precisa ser
+  PERSISTENTE, não por montagem:
+   - o COMPONENTE calcula a largura a partir do tipo da coluna e distribui a
+     sobra do contêiner (muda com o tamanho da janela);
+   - o USUÁRIO arrasta a alça e espera que aquilo fique.
+
+  A primeira tentativa guardou "o usuário arrastou" num `useRef`, que nasce
+  `false` a cada montagem. Resultado medido em 03/09: arrastar, recarregar e
+  o arrasto sumia — o efeito de sincronia sobrescrevia a largura restaurada
+  do localStorage. Foram 16 telas reprovando no T3, uma regressão nova.
+
+  Então quem manda é o localStorage: chave gravada lá é chave DO USUÁRIO, e
+  o cálculo do componente nunca a substitui. Chave ausente é do componente,
+  e acompanha a janela.
+*/
 function getInitialWidths(columns, storageKey) {
   const defaults = Object.fromEntries(
     columns.map((column) => {
@@ -15,12 +33,15 @@ function getInitialWidths(columns, storageKey) {
   );
 
   if (!storageKey || typeof window === 'undefined') {
-    return defaults;
+    return { widths: defaults, doUsuario: new Set() };
   }
 
   try {
     const stored = JSON.parse(window.localStorage.getItem(storageKey) || '{}');
-    return Object.fromEntries(
+    const doUsuario = new Set(
+      columns.map(getColumnKey).filter((key) => Number.isFinite(Number(stored[key])))
+    );
+    const widths = Object.fromEntries(
       columns.map((column) => {
         const key = getColumnKey(column);
         const minWidth = Number(column.minWidth || 72);
@@ -29,8 +50,9 @@ function getInitialWidths(columns, storageKey) {
         return [key, Math.max(minWidth, width)];
       })
     );
+    return { widths, doUsuario };
   } catch (_) {
-    return defaults;
+    return { widths: defaults, doUsuario: new Set() };
   }
 }
 
@@ -47,12 +69,16 @@ export function ResizableTable({
     () => (columns || []).filter((column) => getColumnKey(column)),
     [columns]
   );
-  const [widths, setWidths] = useState(() => getInitialWidths(normalizedColumns, storageKey));
+  const inicial = useState(() => getInitialWidths(normalizedColumns, storageKey))[0];
+  const [widths, setWidths] = useState(inicial.widths);
   const resizingRef = useRef(null);
   // Persistir SÓ depois de um redimensionamento real do usuário: gravar os
   // defaults no mount congelava a tabela nas larguras iniciais e engolia a
   // distribuição de sobra da TabelaPadrao (defeito de 02/09).
   const usuarioRedimensionouRef = useRef(false);
+  // Chaves cuja largura é DO USUÁRIO — semeadas do localStorage (portanto
+  // sobrevivem a recarga) e acrescidas a cada arrasto novo.
+  const colunasDoUsuarioRef = useRef(inicial.doUsuario);
 
   /*
     A largura vinda das colunas tem de SUBSTITUIR a atual, não só preencher
@@ -77,11 +103,10 @@ export function ResizableTable({
       normalizedColumns.forEach((column) => {
         const key = getColumnKey(column);
         const proposta = Number(column.width || column.defaultWidth || 140);
-        if (!next[key]) {
-          next[key] = proposta;
-        } else if (!usuarioRedimensionouRef.current && next[key] !== proposta) {
-          next[key] = proposta;
-        }
+        // Largura do USUÁRIO não é tocada — nem no mount, nem quando a
+        // janela muda. O resto acompanha o cálculo do componente.
+        if (colunasDoUsuarioRef.current.has(key)) return;
+        if (next[key] !== proposta) next[key] = proposta;
       });
       Object.keys(next).forEach((key) => {
         if (!normalizedColumns.some((column) => getColumnKey(column) === key)) {
@@ -96,7 +121,16 @@ export function ResizableTable({
     if (!storageKey || typeof window === 'undefined' || !usuarioRedimensionouRef.current) {
       return;
     }
-    window.localStorage.setItem(storageKey, JSON.stringify(widths));
+    /*
+      Grava APENAS as colunas que o usuário arrastou. A versão anterior
+      gravava o mapa inteiro, e aí um único arrasto congelava a distribuição
+      de TODAS as colunas para sempre — a tabela deixava de acompanhar a
+      janela porque tudo virava "escolha do usuário".
+    */
+    const apenasDoUsuario = Object.fromEntries(
+      Object.entries(widths).filter(([key]) => colunasDoUsuarioRef.current.has(key))
+    );
+    window.localStorage.setItem(storageKey, JSON.stringify(apenasDoUsuario));
   }, [storageKey, widths]);
 
   useEffect(() => {
@@ -106,6 +140,8 @@ export function ResizableTable({
       }
       const { key, startX, startWidth, minWidth } = resizingRef.current;
       const nextWidth = Math.max(minWidth, startWidth + event.clientX - startX);
+      // A partir daqui esta coluna é do usuário e o cálculo não a substitui.
+      colunasDoUsuarioRef.current.add(key);
       setWidths((current) => ({ ...current, [key]: nextWidth }));
     }
 

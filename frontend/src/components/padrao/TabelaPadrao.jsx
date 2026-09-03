@@ -600,8 +600,10 @@ export default function TabelaPadrao({
     let observador = null;
     if (typeof ResizeObserver !== 'undefined') {
       observador = new ResizeObserver(medir);
-      const rolagem = el.querySelector('.resizable-table-scroll');
-      observador.observe(rolagem || el);
+      // Observa o SHELL, que é o nó com ref e nunca é recriado. Observar o
+      // `.resizable-table-scroll` (filho) deixava o observador órfão assim
+      // que a tabela remontava por qualquer motivo — defeito de 03/09.
+      observador.observe(el);
     } else {
       window.addEventListener('resize', medir);
     }
@@ -856,8 +858,21 @@ export default function TabelaPadrao({
         </div>
       ) : null}
 
+      {/*
+        SEM `key` de remontagem (03/09). Havia um
+        `key={`medida:${larguraDisponivel}:...`}` que remontava a
+        ResizableTable a cada medição nova. Ele existia para forçar a adoção
+        da largura recalculada — e cobrava caro por isso:
+         - destruía o `.resizable-table-scroll` que o ResizeObserver estava
+           observando, deixando o observador preso a um nó morto. A largura
+           passava a nunca mais ser remedida (13 telas reprovando no T4);
+         - re-semeava as larguras do localStorage a cada medição.
+        A adoção agora acontece pelo caminho certo: a ResizableTable aceita a
+        largura proposta para toda coluna que não seja do usuário. Sem
+        remontagem, o nó observado é estável.
+      */}
       <ResizableTable
-        key={`medida:${larguraDisponivel ?? 'auto'}:${colunasTabela.map((c) => c.id).join(',')}`}
+        key={colunasTabela.map((c) => c.id).join(',')}
         columns={colunasTabela.map((c) => ({
           id: c.id,
           width: c.largura,

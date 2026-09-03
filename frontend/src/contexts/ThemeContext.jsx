@@ -256,7 +256,7 @@ function coletarTemaVars(tema) {
   setCssVar(root, '--modal-border', cards?.border || palette.border);
   setCssVar(root, '--premium-panel-bg', cards?.bg || palette.surface);
   setCssVar(root, '--premium-panel-border', cards?.border || palette.border);
-  setCssVar(root, '--premium-panel-muted', cards?.muted || palette.muted);
+  setCssVar(root, '--premium-panel-muted', garantirContraste(cards?.muted || palette.muted, superficieDeTexto));
   setCssVar(root, '--premium-glass-bg', cards?.summaryBg || cards?.bg || palette.surface);
   setCssVar(root, '--premium-glass-border', cards?.summaryBorder || cards?.border || palette.border);
   setCssVar(root, '--premium-action-bg', buttons?.primaryBg || palette.primary);
@@ -290,10 +290,10 @@ function coletarTemaVars(tema) {
   setCssVar(root, '--card-soft-bg', cards?.softBg);
   setCssVar(root, '--card-border', cards?.border);
   setCssVar(root, '--card-text', cards?.text);
-  setCssVar(root, '--card-muted', cards?.muted);
+  setCssVar(root, '--card-muted', garantirContraste(cards?.muted, superficieDeTexto));
   setCssVar(root, '--app-summary-bg', cards?.summaryBg);
   setCssVar(root, '--app-summary-border', cards?.summaryBorder);
-  setCssVar(root, '--app-summary-label', cards?.summaryLabel);
+  setCssVar(root, '--app-summary-label', garantirContraste(cards?.summaryLabel, superficieDeTexto));
   setCssVar(root, '--app-summary-value', cards?.summaryValue);
   setCssVar(root, '--app-summary-subvalue', cards?.summarySubvalue);
 
@@ -308,7 +308,7 @@ function coletarTemaVars(tema) {
   setCssVar(root, '--app-number-negative', numbers?.negative);
   setCssVar(root, '--app-number-warning', numbers?.warning);
   setCssVar(root, '--app-number-info', numbers?.info);
-  setCssVar(root, '--app-number-muted', numbers?.muted);
+  setCssVar(root, '--app-number-muted', garantirContraste(numbers?.muted, superficieDeTexto));
 
   Object.entries(statusBadges || {}).forEach(([key, config]) => {
     const cssKey = key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);

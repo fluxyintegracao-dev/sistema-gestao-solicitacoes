@@ -65,7 +65,7 @@
   --card-muted: #64748b;
   --app-summary-bg: #ffffff;
   --app-summary-border: #d8e2f1;
-  --app-summary-label: #64748b;
+  --app-summary-label: #5f6e83;  /* AA sobre --ui-surface-2 (03/09) */
   --app-summary-value: #0f1c2e;
   --app-summary-subvalue: #64748b;
   --module-solicitacoes: #3a5f9e;

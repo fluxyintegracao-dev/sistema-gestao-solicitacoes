@@ -13,6 +13,43 @@ export function checksEstaticos({ tipo }) {
   const r = {};
   const q = (sel, raiz) => (raiz || document).querySelector(sel);
   const qa = (sel, raiz) => Array.from((raiz || document).querySelectorAll(sel));
+
+  /*
+    QUANTAS LINHAS O TEXTO OCUPA — medindo o TEXTO, não a caixa.
+
+    Duas versões anteriores erraram, cada uma de um jeito, e as duas custaram
+    caro:
+     1. `scrollHeight > lineHeight * 1.6`: `scrollHeight` inclui o PADDING,
+        então toda célula parecia quebrada — 18 falsos positivos.
+     2. `clientHeight - padding`: numa TABELA, `td.clientHeight` é a altura
+        da LINHA (a célula estica até a mais alta). Se uma célula da linha
+        quebra, TODAS reportam duas linhas — e uma célula com três linhas
+        reportava duas. Errava para o alarme e para o silêncio ao mesmo
+        tempo.
+
+    A medida honesta é a do próprio texto: um `Range` sobre o conteúdo
+    devolve um retângulo por LINHA DE TEXTO renderizada. Nada de inferir
+    altura a partir de caixa que pertence a outro elemento.
+  */
+  const linhasDeTexto = (el) => {
+    if (!el || !el.firstChild) return 0;
+    try {
+      const intervalo = document.createRange();
+      intervalo.selectNodeContents(el);
+      const retangulos = Array.from(intervalo.getClientRects())
+        .filter((r) => r.width > 0 && r.height > 0);
+      if (!retangulos.length) return el.innerText.trim() ? 1 : 0;
+      // Retângulos na MESMA linha compartilham o topo (com folga de 2px
+      // para sub/sobrescrito e ícones inline).
+      const topos = [];
+      retangulos.forEach((r) => {
+        if (!topos.some((t) => Math.abs(t - r.top) <= 2)) topos.push(r.top);
+      });
+      return topos.length;
+    } catch (_) {
+      return 1;
+    }
+  };
   const visivel = (el) => {
     if (!el) return false;
     const cs = getComputedStyle(el);
@@ -226,26 +263,6 @@ export function checksEstaticos({ tipo }) {
          comportamento CORRETO (R18 permite, e é o scrollport a que a coluna
          fixa gruda). O que importa medir é a DISTRIBUIÇÃO, logo abaixo. */
 
-      /*
-        Quantas LINHAS a célula realmente tem.
-
-        A primeira versão comparava `scrollHeight > lineHeight * 1.6` — e
-        `scrollHeight` INCLUI o padding. Com 12px em cima e 12 embaixo sobre
-        uma linha de 21px, toda célula dá 45 e passa de 33,6: TODA célula
-        "quebrava". Custou 18 células FALHOU numa matriz de 28 telas, em
-        cima de textos como "-", "CLT" e "147". Regra que erra para o alarme
-        custa a mesma confiança que a que erra para o silêncio — e esta
-        custou mais caro, porque apagou o sinal das 4 falhas reais.
-      */
-      const contarLinhas = (el) => {
-        const cs = getComputedStyle(el);
-        const alturaLinha = parseFloat(cs.lineHeight);
-        if (!alturaLinha) return 1;
-        const alturaConteudo = el.clientHeight
-          - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
-        return Math.max(1, Math.round(alturaConteudo / alturaLinha));
-      };
-
       // Folga POR COLUNA: quanto a coluna tem além do que seu conteúdo usa.
       const cabecalhos = Array.from(tab.querySelectorAll('thead th'));
       const folgaPorColuna = cabecalhos.map((th, i) => {
@@ -257,9 +274,7 @@ export function checksEstaticos({ tipo }) {
         celulas.forEach((td) => {
           const alvo = td.firstElementChild || td;
           maiorConteudo = Math.max(maiorConteudo, alvo.scrollWidth);
-          // Duas linhas ou mais de texto na célula.
-          const alturaLinha = parseFloat(getComputedStyle(td).lineHeight) || 20;
-          if (td.scrollHeight > alturaLinha * 1.6) quebra = true;
+          if (linhasDeTexto(td) > 1) quebra = true;
         });
         return { indice: i, titulo: th.innerText.trim(), folga: largura - maiorConteudo, quebra };
       });
@@ -316,24 +331,12 @@ export function checksEstaticos({ tipo }) {
         2) O CABEÇALHO nunca era medido. "COMPETÊNCIA" cortava sem tooltip e
            nenhum check olhava `th`.
       */
-      // Linhas de verdade: clientHeight MENOS padding, dividido pela altura
-      // de linha. `scrollHeight` inclui o padding e fazia toda célula
-      // parecer quebrada (18 falsos positivos em 02/09).
-      const linhasDe = (el) => {
-        const cs = getComputedStyle(el);
-        const alturaLinha = parseFloat(cs.lineHeight);
-        if (!alturaLinha) return 1;
-        const alturaConteudo = el.clientHeight
-          - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
-        return Math.max(1, Math.round(alturaConteudo / alturaLinha));
-      };
-
       const partidos = qa('.resizable-table td').filter(visivel).filter(foraDeModal)
         .filter((td) => {
           if (getComputedStyle(td).whiteSpace.includes('nowrap')) return false;
           const texto = td.innerText.trim();
           // Uma palavra só (sem espaço) ocupando mais de uma linha = partiu.
-          return texto.length > 0 && !/\s/.test(texto) && linhasDe(td) > 1;
+          return texto.length > 0 && !/\s/.test(texto) && linhasDeTexto(td) > 1;
         });
 
       /*
@@ -346,10 +349,16 @@ export function checksEstaticos({ tipo }) {
       const cabecalhosCortados = qa('.resizable-table th').filter(visivel).filter(foraDeModal)
         .filter((th) => {
           const rotulo = th.querySelector('.resizable-th-label, .app-th-titulo') || th;
-          if (rotulo.scrollWidth <= rotulo.clientWidth + 2) return false;
+          /*
+            O corte do cabeçalho é QUEBRA DE LINHA, não overflow horizontal:
+            `.app-tabela .resizable-th-label` tem `overflow: visible`, então
+            `scrollWidth === clientWidth` SEMPRE e a versão anterior deste
+            ramo nunca chegava a olhar o title. Contar linhas de texto é o
+            que enxerga o defeito real (COMPETÊNCIA quebrando em três).
+          */
+          if (linhasDeTexto(rotulo) <= 1) return false;
           const dica = th.getAttribute('title') || th.closest('[title]')?.getAttribute('title') || '';
-          const completo = soTexto(dica).includes(soTexto(rotulo.innerText).slice(0, 20));
-          return !completo;
+          return !soTexto(dica).includes(soTexto(rotulo.innerText).slice(0, 20));
         });
 
       const problemasT6 = [];

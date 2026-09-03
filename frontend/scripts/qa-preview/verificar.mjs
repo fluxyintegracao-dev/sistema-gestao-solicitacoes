@@ -830,12 +830,17 @@ async function main() {
         });
         if (aposEncolher) {
           const excesso = aposEncolher.tabela - aposEncolher.contêiner;
-          if (excesso > 24) {
-            resultado.itens.T4 = {
+          // Registra os DOIS lados: só escrever FALHOU deixava a matriz com
+          // ✅ herdado do check estático em tela que nem foi exercitada.
+          resultado.itens.T4 = excesso > 24
+            ? {
               estado: 'FALHOU',
               motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve ${aposEncolher.tabela}px num contêiner de ${aposEncolher.contêiner}px (${excesso}px fora) — a largura não é remedida`
+            }
+            : {
+              estado: 'PASSOU',
+              motivo: `sobra distribuída e tabela remedida ao encolher para 1366 (${aposEncolher.tabela}px em ${aposEncolher.contêiner}px)`
             };
-          }
         }
         await page.setViewportSize({ width: 1920, height: 1080 });
         await page.waitForTimeout(400);
