@@ -821,3 +821,57 @@ processo.
    comentário que explicava o problema dos comentários escrevia o
    delimitador de fechamento de bloco como exemplo, e fechou a si mesmo.
 
+### O que a R25 destravou: um defeito de contraste no tema escuro, no SISTEMA
+
+Assim que a `FinanceiroTituloDetalhe` saiu da paleta crua e passou a usar as
+famílias semânticas, apareceu um defeito que estava atrás dela: **três pares
+do tema escuro reprovavam AA**.
+
+O cabeçalho do `frontend/src/styles/design-tokens.css` afirmava que "todos os
+pares texto/fundo foram validados WCAG AA nos dois temas". Medido em 03/09:
+
+| Par (escuro) | Medido | |
+|---|---|---|
+| `--sem-danger` sobre `--sem-danger-bg` | **4,42:1** | reprova |
+| `--sem-success` sobre `--sem-success-bg` | **4,46:1** | reprova |
+| `--sem-info` sobre `--sem-info-bg` | **4,49:1** | reprova por 0,01 |
+
+Atinge o sistema inteiro — o `StatusBadge`, as `.fx-badge--*`, toda etiqueta
+de estado no tema escuro — não só a tela que expôs.
+
+**A afirmação estava no comentário; a verificação não estava em lugar
+nenhum.** É a mesma família, de novo, e desta vez num arquivo que se
+declarava validado.
+
+**Corrigido**: os três clareados um passo, com folga deliberada até 4,6:1
+para não voltarem a raspar o limite — `danger` 4,42→**4,65**, `success`
+4,46→**4,62**, `info` 4,49→**4,66**. O comentário do arquivo também estava
+errado no MÉTODO: dizia medir contra a superfície escura da página, quando o
+texto aparece sobre o fundo da própria família.
+
+**E virou prova executável**: `frontend/scripts/provas/contrasteDosTokens.mjs`,
+dentro do `test:responsive`. Mede os 10 pares nos dois temas e reprova
+qualquer um abaixo de 4,5:1. Provada nos dois sentidos — com os valores
+corrigidos passa; devolvendo `--sem-info` ao valor antigo, reprova com o
+número na tela e sai com código 1.
+
+### Pendências que a leva do Financeiro herda desta tela
+
+1. **`StatusBadge` seria o destino certo em três selos** da
+   `FinanceiroTituloDetalhe` (status da intenção de pagamento, do lote e do
+   evento de auditoria). Ficaram com token porque a troca mexeria na
+   marcação além de cor, e num deles o texto é `Lote {status}` — prefixo que
+   o `StatusBadge` não aceita sem mudança de contrato (R21). **Consequência
+   aceita e registrada: nesses três a cor continua sozinha, sem ícone — não
+   comunicam para daltônico.**
+2. **`bg-white` cru dentro de painéis semânticos** (9 campos e uma faixa a
+   70% na mesma tela). A R25 permite `-white` por não ser degrau de paleta,
+   mas no tema escuro esses campos ficam brancos dentro de painel escuro, e
+   a faixa a 70% combina fundo branco com `--c-muted`, que no escuro é
+   claro — contraste desprezível. É defeito de tema, não de paleta crua.
+3. **`garantirContraste()` do `ThemeContext` NÃO cobre os `--sem-*`.** Ele
+   aplica piso em `--c-muted`, `--input-placeholder`, `--card-muted` e
+   afins, mas as famílias semânticas passam direto. Hoje elas estão certas
+   no arquivo e a prova nova as segura; mas um tema customizado por setor
+   que sobrescreva um `--sem-*` não passa por piso nenhum.
+

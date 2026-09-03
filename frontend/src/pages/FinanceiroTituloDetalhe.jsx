@@ -260,17 +260,17 @@ function buildCobrancaForm(titulo) {
 
 function auditStatusClass(status) {
   const normalized = String(status || '').toUpperCase();
-  if (normalized === 'SUCCESS') return 'bg-emerald-100 text-emerald-700';
-  if (normalized === 'DENIED') return 'bg-rose-100 text-rose-700';
-  return 'bg-slate-100 text-slate-700';
+  if (normalized === 'SUCCESS') return 'bg-[var(--sem-success-bg)] text-[var(--sem-success)]';
+  if (normalized === 'DENIED') return 'bg-[var(--sem-danger-bg)] text-[var(--sem-danger)]';
+  return 'bg-[var(--sem-neutral-bg)] text-[var(--sem-neutral)]';
 }
 
 function paymentStatusClass(status) {
   const normalized = String(status || '').trim().toUpperCase();
-  if (['APROVADO', 'CONFIRMADO_BANCO', 'BAIXADO'].includes(normalized)) return 'bg-emerald-100 text-emerald-700';
-  if (['PENDENTE_APROVACAO', 'ENVIADO_AO_BANCO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(normalized)) return 'bg-amber-100 text-amber-700';
-  if (['REJEITADO_BANCO', 'FALHA_INTEGRACAO', 'CANCELADO'].includes(normalized)) return 'bg-rose-100 text-rose-700';
-  return 'bg-slate-100 text-slate-700';
+  if (['APROVADO', 'CONFIRMADO_BANCO', 'BAIXADO'].includes(normalized)) return 'bg-[var(--sem-success-bg)] text-[var(--sem-success)]';
+  if (['PENDENTE_APROVACAO', 'ENVIADO_AO_BANCO', 'AGUARDANDO_CONFIRMACAO_BAIXA'].includes(normalized)) return 'bg-[var(--sem-warning-bg)] text-[var(--sem-warning)]';
+  if (['REJEITADO_BANCO', 'FALHA_INTEGRACAO', 'CANCELADO'].includes(normalized)) return 'bg-[var(--sem-danger-bg)] text-[var(--sem-danger)]';
+  return 'bg-[var(--sem-neutral-bg)] text-[var(--sem-neutral)]';
 }
 
 function formatAuditMetadata(metadata, { hideFinancialReferenceIds = false } = {}) {
@@ -856,7 +856,7 @@ export default function FinanceiroTituloDetalhe() {
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Forma de cobranca</span>
+                <span className="mb-1 block text-muted">Forma de cobranca</span>
                 <select
                   className="input w-full"
                   value={cobrancaForm.forma_cobranca}
@@ -874,7 +874,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Status da cobranca</span>
+                <span className="mb-1 block text-muted">Status da cobranca</span>
                 <select
                   className="input w-full"
                   value={cobrancaForm.status_cobranca}
@@ -888,7 +888,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Codigo do banco</span>
+                <span className="mb-1 block text-muted">Codigo do banco</span>
                 <input
                   className="input w-full"
                   inputMode="numeric"
@@ -901,7 +901,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Emitido em</span>
+                <span className="mb-1 block text-muted">Emitido em</span>
                 <input
                   type="date"
                   className="input w-full"
@@ -911,7 +911,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Nosso numero</span>
+                <span className="mb-1 block text-muted">Nosso numero</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.nosso_numero}
@@ -920,7 +920,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Identificador externo</span>
+                <span className="mb-1 block text-muted">Identificador externo</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.identificador_externo}
@@ -929,7 +929,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-2">
-                <span className="mb-1 block text-slate-500">Linha digitavel</span>
+                <span className="mb-1 block text-muted">Linha digitavel</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.linha_digitavel}
@@ -938,7 +938,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-4">
-                <span className="mb-1 block text-slate-500">Codigo de barras</span>
+                <span className="mb-1 block text-muted">Codigo de barras</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.codigo_barras}
@@ -971,7 +971,7 @@ export default function FinanceiroTituloDetalhe() {
 
             <form className="grid gap-3 md:grid-cols-4" onSubmit={handleSalvarCobranca}>
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Codigo do banco</span>
+                <span className="mb-1 block text-muted">Codigo do banco</span>
                 <input
                   className="input w-full"
                   inputMode="numeric"
@@ -984,7 +984,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm md:col-span-2">
-                <span className="mb-1 block text-slate-500">Linha digitavel</span>
+                <span className="mb-1 block text-muted">Linha digitavel</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.linha_digitavel}
@@ -993,7 +993,7 @@ export default function FinanceiroTituloDetalhe() {
               </label>
 
               <label className="text-sm">
-                <span className="mb-1 block text-slate-500">Codigo de barras</span>
+                <span className="mb-1 block text-muted">Codigo de barras</span>
                 <input
                   className="input w-full"
                   value={cobrancaForm.codigo_barras}
@@ -1246,7 +1246,7 @@ export default function FinanceiroTituloDetalhe() {
                             {metadata.map((item) => (
                               <span
                                 key={`${evento.id}-${item.key}`}
-                                className="rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
+                                className="rounded-full bg-[var(--ui-surface-2)] px-2 py-1 text-xs text-[var(--c-text)]"
                               >
                                 {item.label}: {item.value}
                               </span>
@@ -1295,7 +1295,7 @@ export default function FinanceiroTituloDetalhe() {
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">{baixaFormaLabel}</span>
+                  <span className="mb-1 block text-muted">{baixaFormaLabel}</span>
                   <select
                     className="input w-full"
                     value={baixaForm.forma_recebimento}
@@ -1324,7 +1324,7 @@ export default function FinanceiroTituloDetalhe() {
                 </label>
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Empresa pagadora/recebedora</span>
+                  <span className="mb-1 block text-muted">Empresa pagadora/recebedora</span>
                   <select
                     className="input w-full"
                     value={baixaForm.empresa_id}
@@ -1357,7 +1357,7 @@ export default function FinanceiroTituloDetalhe() {
 
                 {baixaUsaCartao ? (
                   <label className="text-sm md:col-span-2">
-                    <span className="mb-1 block text-slate-500">Cartao utilizado</span>
+                    <span className="mb-1 block text-muted">Cartao utilizado</span>
                     <select
                       className="input w-full"
                       value={baixaForm.cartao_id}
@@ -1388,7 +1388,7 @@ export default function FinanceiroTituloDetalhe() {
                 ) : null}
 
                 {baixaUsaCheque && tituloTipo === 'PAGAR' ? (
-                  <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-sm text-amber-900 md:col-span-2">
+                  <div className="rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] p-3 text-sm text-[var(--sem-warning)] md:col-span-2">
                     <label className="flex items-start gap-2">
                       <input
                         type="checkbox"
@@ -1407,14 +1407,14 @@ export default function FinanceiroTituloDetalhe() {
                       />
                       <span>
                         <span className="block font-semibold">Usar cheque de terceiro em carteira</span>
-                        <span className="block text-xs text-amber-700">
+                        <span className="block text-xs text-[var(--sem-warning)]">
                           Use quando o pagamento for feito com um cheque recebido anteriormente de cliente ou parceiro.
                         </span>
                       </span>
                     </label>
                     {baixaPagaComChequeTerceiro ? (
                       <label className="mt-3 block text-sm">
-                        <span className="mb-1 block text-amber-800">Cheque disponivel</span>
+                        <span className="mb-1 block text-[var(--sem-warning)]">Cheque disponivel</span>
                         <select
                           className="input w-full bg-white"
                           value={baixaForm.cheque_terceiro_id || ''}
@@ -1429,11 +1429,11 @@ export default function FinanceiroTituloDetalhe() {
                           ))}
                         </select>
                         {loadingChequesTerceiros ? (
-                          <span className="mt-1 block text-xs text-amber-700">
+                          <span className="mt-1 block text-xs text-[var(--sem-warning)]">
                             Consultando cheques em carteira...
                           </span>
                         ) : !chequesTerceirosDisponiveis.length ? (
-                          <span className="mt-1 block text-xs text-amber-700">
+                          <span className="mt-1 block text-xs text-[var(--sem-warning)]">
                             Nenhum cheque de terceiro em carteira foi encontrado.
                           </span>
                         ) : null}
@@ -1443,15 +1443,15 @@ export default function FinanceiroTituloDetalhe() {
                 ) : null}
 
                 {baixaUsaCheque && !baixaPagaComChequeTerceiro ? (
-                  <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-900 md:col-span-2">
-                    <div className="mb-3 text-xs text-emerald-700">
+                  <div className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-3 text-sm text-[var(--sem-info)] md:col-span-2">
+                    <div className="mb-3 text-xs text-[var(--sem-info)]">
                       {baixaRecebeChequeTerceiro
                         ? 'Ao confirmar um recebimento por cheque, o sistema registra automaticamente o documento na carteira de cheques de terceiros.'
                         : 'Informe os dados do cheque emitido para identificar e auditar o pagamento deste titulo.'}
                     </div>
                     <div className="grid gap-3 md:grid-cols-2">
                       <label>
-                        <span className="mb-1 block text-emerald-800">Numero do cheque</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Numero do cheque</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_numero}
@@ -1460,7 +1460,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Emitente / titular</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Emitente / titular</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_emitente}
@@ -1469,7 +1469,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">CPF/CNPJ do titular</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">CPF/CNPJ do titular</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.titular_documento}
@@ -1477,7 +1477,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Banco</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Banco</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_banco}
@@ -1485,7 +1485,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Agencia</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Agencia</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_agencia}
@@ -1493,7 +1493,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Conta</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Conta</span>
                         <input
                           className="input w-full bg-white"
                           value={baixaForm.cheque_conta}
@@ -1501,7 +1501,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Emissao</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Emissao</span>
                         <input
                           className="input w-full bg-white"
                           type="date"
@@ -1510,7 +1510,7 @@ export default function FinanceiroTituloDetalhe() {
                         />
                       </label>
                       <label>
-                        <span className="mb-1 block text-emerald-800">Vencimento</span>
+                        <span className="mb-1 block text-[var(--sem-info)]">Vencimento</span>
                         <input
                           className="input w-full bg-white"
                           type="date"
@@ -1523,7 +1523,7 @@ export default function FinanceiroTituloDetalhe() {
                 ) : null}
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">
+                  <span className="mb-1 block text-muted">
                     {baixaUsaDinheiro ? 'Caixa fisico *' : 'Conta bancaria'}
                   </span>
                   <select
@@ -1545,7 +1545,7 @@ export default function FinanceiroTituloDetalhe() {
                     ))}
                   </select>
                   {baixaUsaDinheiro ? (
-                    <span className="mt-1 block text-xs text-slate-500">
+                    <span className="mt-1 block text-xs text-muted">
                       {contasFinanceirasCompativeisBaixa.length
                         ? 'O caixa precisa estar aberto e incluir a data deste movimento.'
                         : 'Nenhuma conta de caixa fisico com controle diario foi encontrada para esta empresa.'}
@@ -1554,7 +1554,7 @@ export default function FinanceiroTituloDetalhe() {
                 </label>
 
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Data do movimento</span>
+                  <span className="mb-1 block text-muted">Data do movimento</span>
                   <input
                     className="input w-full"
                     type="date"
@@ -1601,7 +1601,7 @@ export default function FinanceiroTituloDetalhe() {
                 {mostrarIntercompanyBaixa && (
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="text-sm md:col-span-2">
-                      <span className="mb-1 block text-slate-500">Natureza da baixa</span>
+                      <span className="mb-1 block text-muted">Natureza da baixa</span>
                       <select
                         className="input w-full"
                         value={baixaForm.natureza_intercompany_baixa || 'OPERACIONAL_TERCEIRO'}
@@ -1617,7 +1617,7 @@ export default function FinanceiroTituloDetalhe() {
                       </span>
                     </label>
                     <label className="text-sm md:col-span-2">
-                      <span className="mb-1 block text-slate-500">Motivo</span>
+                      <span className="mb-1 block text-muted">Motivo</span>
                       <input
                         className="input w-full"
                         value={baixaForm.motivo_intercompany}
@@ -1643,7 +1643,7 @@ export default function FinanceiroTituloDetalhe() {
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Tipo de permuta</span>
+                  <span className="mb-1 block text-muted">Tipo de permuta</span>
                   <input
                     className="input w-full"
                     value={baixaForm.tipo_permuta}
@@ -1652,7 +1652,7 @@ export default function FinanceiroTituloDetalhe() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Categoria do bem</span>
+                  <span className="mb-1 block text-muted">Categoria do bem</span>
                   <select
                     className="input w-full"
                     value={baixaForm.categoria_bem}
@@ -1665,7 +1665,7 @@ export default function FinanceiroTituloDetalhe() {
                   </select>
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Bem / descricao</span>
+                  <span className="mb-1 block text-muted">Bem / descricao</span>
                   <input
                     className="input w-full"
                     value={baixaForm.descricao_bem}
@@ -1674,7 +1674,7 @@ export default function FinanceiroTituloDetalhe() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Valor referencia</span>
+                  <span className="mb-1 block text-muted">Valor referencia</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1686,7 +1686,7 @@ export default function FinanceiroTituloDetalhe() {
               </div>
 
               <label className="text-sm block">
-                <span className="mb-1 block text-slate-500">Documento de referencia</span>
+                <span className="mb-1 block text-muted">Documento de referencia</span>
                 <input
                   className="input w-full"
                   value={baixaForm.documento_referencia}
@@ -1697,7 +1697,7 @@ export default function FinanceiroTituloDetalhe() {
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Valor base</span>
+                  <span className="mb-1 block text-muted">Valor base</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1708,7 +1708,7 @@ export default function FinanceiroTituloDetalhe() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Juros</span>
+                  <span className="mb-1 block text-muted">Juros</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1718,7 +1718,7 @@ export default function FinanceiroTituloDetalhe() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Multa</span>
+                  <span className="mb-1 block text-muted">Multa</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1728,7 +1728,7 @@ export default function FinanceiroTituloDetalhe() {
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="mb-1 block text-slate-500">Desconto</span>
+                  <span className="mb-1 block text-muted">Desconto</span>
                   <input
                     className="input input-moeda w-full"
                     inputMode="decimal"
@@ -1740,7 +1740,7 @@ export default function FinanceiroTituloDetalhe() {
               </div>
 
               <label className="text-sm block">
-                <span className="mb-1 block text-slate-500">Observacoes</span>
+                <span className="mb-1 block text-muted">Observacoes</span>
                 <textarea
                   className="input min-h-24 w-full"
                   value={baixaForm.observacoes}

@@ -58,17 +58,29 @@
 
 .dark {
   /* --- Semânticas (escuro) — derivadas dos tons claros, clareadas até
-     atingir AA sobre a superfície escura (#152136). */
-  --sem-danger: #ce6e6e;
+     atingir AA sobre o PRÓPRIO FUNDO SEMÂNTICO, não sobre a superfície.
+
+     O comentário antigo dizia "sobre a superfície escura (#152136)" e
+     afirmava que os pares estavam validados. Medido em 03/09: três não
+     estavam. `danger` dava 4,42:1, `success` 4,46:1 e `info` 4,49:1 sobre
+     os respectivos `-bg` — todos abaixo dos 4,5:1 de AA, o último por
+     0,01. A conta certa é contra o fundo em que o texto de fato aparece
+     (o `-bg` da própria família), não contra a superfície da página.
+
+     Os três foram clareados um passo, com folga deliberada até 4,6:1 para
+     não voltarem a raspar o limite. Medidas em
+     `scripts/provas/contrasteDosTokens.mjs`, que roda no test:responsive
+     e reprova se qualquer par cair abaixo de 4,5:1. */
+  --sem-danger: #d47171;
   --sem-danger-bg: #2d2133;
   --sem-danger-border: #51212e;
   --sem-warning: #bd945d;
   --sem-warning-bg: #292a2f;
   --sem-warning-border: #483724;
-  --sem-success: #649889;
+  --sem-success: #669b8c;
   --sem-success-bg: #142b39;
   --sem-success-border: #13393d;
-  --sem-info: #788db1;
+  --sem-info: #7a90b5;
   --sem-info-bg: #172641;
   --sem-info-border: #1a2e52;
   --sem-neutral: #949aa3;

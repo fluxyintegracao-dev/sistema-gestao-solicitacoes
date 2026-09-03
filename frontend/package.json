@@ -16,7 +16,7 @@
     "mobile:ios:add": "npx cap add ios",
     "mobile:ios:open": "npx cap open ios",
     "test:navegacao": "node scripts/validarNavegacao.mjs",
-    "provas": "node scripts/provas/larguraDeColuna.mjs && node scripts/provas/contagemDeLinhas.mjs",
+    "provas": "node scripts/provas/larguraDeColuna.mjs && node scripts/provas/contagemDeLinhas.mjs && node scripts/provas/contrasteDosTokens.mjs",
     "cancelamento": "node scripts/varreduraCancelamento.mjs"
   },
   "dependencies": {
