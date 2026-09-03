@@ -5,6 +5,7 @@ const { codigoDoSetor } = require('../utils/codigoDoSetor');
 const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 const { paraCentavos, somenteData, formatarISO } = require('./contratoParcelasService');
 const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
+const { validarResponsavelVinculadoObra } = require('./contratoResponsavelService');
 const {
   calcularRoteamentoSolicitacaoAditivo,
   SETOR_GERENCIA_PROCESSOS,
@@ -133,7 +134,7 @@ async function calcularTetoAditivo(contratoId, transaction) {
   const contrato = await Contrato.findByPk(contratoId, {
     // `ativo` e `status_contrato` vem junto para a guarda de contrato encerrado nao precisar de
     // uma segunda consulta — e para a tela poder desabilitar o botao pelo mesmo dado.
-    attributes: ['id', 'codigo', 'valor_total', 'ativo', 'status_contrato', 'fluxo_novo'],
+    attributes: ['id', 'codigo', 'obra_id', 'responsavel_id', 'valor_total', 'ativo', 'status_contrato', 'fluxo_novo'],
     transaction
   });
   if (!contrato) throw erro('Contrato nao encontrado.', 404);
@@ -155,7 +156,9 @@ async function calcularTetoAditivo(contratoId, transaction) {
       codigo: contrato.codigo,
       ativo: contrato.ativo !== false,
       status_contrato: contrato.status_contrato || null,
-      fluxo_novo: Boolean(contrato.fluxo_novo)
+      fluxo_novo: Boolean(contrato.fluxo_novo),
+      obra_id: contrato.obra_id,
+      responsavel_id: contrato.responsavel_id || null
     },
     aceita_aditivo: contratoAceitaAditivo(contrato),
     percentual_maximo: PERCENTUAL_MAXIMO,
@@ -261,9 +264,14 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     garantirContratoAceitaAditivo(teto.contrato);
     const contrato = await Contrato.findByPk(contratoId, {
       attributes: ['id', 'codigo', 'obra_id', 'valor_total', 'fluxo_novo', 'solicitacao_id',
-        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id'],
+        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id', 'responsavel_id'],
       transaction
     });
+    const responsavelAditivoId = await validarResponsavelVinculadoObra(
+      responsavelId || contrato.responsavel_id || null,
+      contrato.obra_id,
+      { transaction }
+    );
     // O teto de 25% e sobre VALOR. Aditivo de prazo nao tem valor e por isso nao entra na conta —
     // travar por teto um aditivo que nao acrescenta dinheiro seria barrar pelo motivo errado.
     if (!semValor && valorCent > teto.disponivel_cent) {
@@ -360,7 +368,8 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       tipo: tipoNormalizado,
       qtde_parcelas: quantidadeParcelas,
       justificativa: String(justificativa).trim(),
-      responsavel_id: responsavelId || null,
+      // Se a tela nao trocar o responsavel, o aditivo preserva o responsavel do contrato.
+      responsavel_id: responsavelAditivoId,
       status: STATUS.PENDENTE,
       criado_por: usuarioId || null
     }, { transaction });

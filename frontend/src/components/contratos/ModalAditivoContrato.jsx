@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getOpcoesFormularioContrato, getTetoAditivo, solicitarAditivoContrato } from '../../services/contratos';
+import { formatCurrencyBRL, normalizeCurrencyTyping, parseCurrencyInput } from '../../utils/formatters';
 
 /**
  * Modal do TERMO ADITIVO (PI-15).
@@ -33,7 +34,7 @@ import { getOpcoesFormularioContrato, getTetoAditivo, solicitarAditivoContrato }
  * utilitario, para a largura nao voltar a depender de quem e importado por ultimo.
  */
 
-const moeda = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const moeda = (v) => formatCurrencyBRL(v);
 
 // `tipo` comeca VAZIO de proposito: o cliente pediu que informar seja OBRIGATORIO, e um padrao
 // escolhido pela tela seria a decisao sendo tomada por quem nao devia. E ele que decide o que a
@@ -50,17 +51,6 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
   const [usuarios, setUsuarios] = useState([]);
   const [campos, setCampos] = useState(CAMPOS_VAZIOS);
 
-  useEffect(() => {
-    if (!aberto) return undefined;
-    let cancelado = false;
-    // Mesma correcao do bloco de contrato: `/usuarios` e rota ADMINISTRATIVA e o usuario da obra
-    // tomava 403, ficando com o select de responsavel vazio e sem aviso.
-    getOpcoesFormularioContrato()
-      .then((r) => { if (!cancelado) setUsuarios(Array.isArray(r?.usuarios) ? r.usuarios : []); })
-      .catch(() => { if (!cancelado) setUsuarios([]); });
-    return () => { cancelado = true; };
-  }, [aberto]);
-
   // Recarrega o teto toda vez que abre: entre uma abertura e outra outro aditivo pode ter sido
   // aprovado, e mostrar um disponivel velho induziria a pessoa a pedir um valor que sera negado.
   useEffect(() => {
@@ -72,7 +62,29 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
     setCarregando(true);
 
     getTetoAditivo(contratoId)
-      .then((r) => { if (!cancelado) setTeto(r); })
+      .then(async (r) => {
+        if (cancelado) return;
+        setTeto(r);
+
+        try {
+          const opcoes = await getOpcoesFormularioContrato({ obraId: r?.contrato?.obra_id });
+          if (cancelado) return;
+          const lista = Array.isArray(opcoes?.usuarios) ? opcoes.usuarios : [];
+          const responsavelContratoId = r?.contrato?.responsavel_id;
+          setUsuarios(lista);
+          setCampos((atuais) => ({
+            ...atuais,
+            responsavel_id: lista.some((u) => String(u.id) === String(responsavelContratoId))
+              ? String(responsavelContratoId)
+              : ''
+          }));
+        } catch (e) {
+          if (!cancelado) {
+            setUsuarios([]);
+            setErro(e.message || 'Erro ao carregar os responsaveis vinculados a obra.');
+          }
+        }
+      })
       .catch((e) => { if (!cancelado) setErro(e.message || 'Erro ao carregar o limite de aditivo.'); })
       .finally(() => { if (!cancelado) setCarregando(false); });
 
@@ -99,7 +111,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
 
   if (!aberto) return null;
 
-  const valorNumero = Number(String(campos.valor).replace(',', '.')) || 0;
+  const valorNumero = parseCurrencyInput(campos.valor);
   const passaDoTeto = Boolean(teto) && campos.tipo !== 'PRAZO' && valorNumero > Number(teto.disponivel);
   // O backend informa se o contrato aceita aditivo (encerrado ou inativo nao aceita). A tela
   // obedece esse campo em vez de reimplementar a regra.
@@ -269,12 +281,15 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
               <label className="text-sm">Valor do aditivo *
                 <input
                   className="input"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
+                  type="text"
+                  inputMode="numeric"
                   name="aditivo_valor"
                   value={campos.valor}
-                  onChange={campo('valor')}
+                  onChange={(e) => setCampos((atuais) => ({
+                    ...atuais,
+                    valor: normalizeCurrencyTyping(e.target.value)
+                  }))}
+                  placeholder="R$ 0,00"
                   disabled={!contratoAceita}
                 />
               </label>
@@ -318,6 +333,11 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                 <option value="">Selecione</option>
                 {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
+              {usuarios.length === 0 && (
+                <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                  Nenhum usuario ativo esta vinculado a obra/centro de custo deste contrato.
+                </span>
+              )}
             </label>
             <label className="text-sm" style={{ gridColumn: '1 / -1' }}>Justificativa do aditivo *
               <textarea

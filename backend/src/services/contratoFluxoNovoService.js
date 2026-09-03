@@ -18,6 +18,7 @@ const { gerarParcelas, paraCentavos, somenteData, formatarISO } = require('./con
 const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
 const { formaPagamentoEhBoleto } = require('./formasPagamentoMedicaoService');
 const { isValidCpfCnpj, normalizarCpfCnpj } = require('./parceiroService');
+const { validarResponsavelVinculadoObra } = require('./contratoResponsavelService');
 const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 
 /**
@@ -935,6 +936,13 @@ async function criarContrato(dados, { usuarioId } = {}) {
   } else {
     dataRespostaPagamentoPersistida = null;
   }
+
+  // A lista da tela ja vem filtrada pela obra, mas a regra precisa existir tambem na gravacao:
+  // um payload manual nao pode atribuir o contrato a usuario de outra obra.
+  responsavelIdPersistido = await validarResponsavelVinculadoObra(
+    responsavelIdPersistido,
+    obraId
+  );
 
   // Calcula as parcelas antes de abrir a transacao: erro de regra nao deve consumir
   // numero da sequencia nem manter transacao aberta. Erros destas funcoes trazem `code`

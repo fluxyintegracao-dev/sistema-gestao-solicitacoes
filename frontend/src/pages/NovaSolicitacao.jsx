@@ -3197,6 +3197,7 @@ export default function NovaSolicitacao() {
             uma coluna so, espremido, com metade da tela vazia ao lado. */}
         {usaFluxoContratoNovo && (
           <BlocoContratoFluxoNovo
+            obraId={form.obra_id}
             valorTotal={form.valor}
             contratadoPrincipal={parceiroSelecionado}
             limiteJuridico={limiteJuridico}

@@ -202,6 +202,7 @@ function AnexoJuridicoObrigatorio({ id, titulo, arquivo, onSelecionar, onRemover
 }
 
 export default function BlocoContratoFluxoNovo({
+  obraId,
   valorTotal,
   contratadoPrincipal,
   limiteJuridico,
@@ -228,6 +229,7 @@ export default function BlocoContratoFluxoNovo({
     responsavel_id: ''
   });
   const [usuarios, setUsuarios] = useState([]);
+  const [erroUsuarios, setErroUsuarios] = useState('');
   const [parcelas, setParcelas] = useState([]);
   const [erroLocal, setErroLocal] = useState('');
 
@@ -238,19 +240,32 @@ export default function BlocoContratoFluxoNovo({
   //
   // Agora o erro APARECE. Falha silenciosa que apaga opcao ja reprovou este projeto antes.
   useEffect(() => {
+    if (!obraId) {
+      setUsuarios([]);
+      setErroUsuarios('');
+      setCampos((atuais) => ({ ...atuais, responsavel_id: '' }));
+      return undefined;
+    }
+
     let cancelado = false;
-    getOpcoesFormularioContrato()
+    setErroUsuarios('');
+    getOpcoesFormularioContrato({ obraId })
       .then((r) => {
         if (cancelado) return;
-        setUsuarios(Array.isArray(r?.usuarios) ? r.usuarios : []);
+        const lista = Array.isArray(r?.usuarios) ? r.usuarios : [];
+        setUsuarios(lista);
+        setCampos((atuais) => (lista.some((u) => String(u.id) === String(atuais.responsavel_id))
+          ? atuais
+          : { ...atuais, responsavel_id: '' }));
       })
       .catch((e) => {
         if (cancelado) return;
         setUsuarios([]);
-        setErroLocal(e.message || 'Nao foi possivel carregar os responsaveis pela contratacao.');
+        setCampos((atuais) => ({ ...atuais, responsavel_id: '' }));
+        setErroUsuarios(e.message || 'Nao foi possivel carregar os responsaveis pela contratacao.');
       });
     return () => { cancelado = true; };
-  }, []);
+  }, [obraId]);
 
   // Previa regenerada quando valor (externo), qtde ou vencimento mudam.
   useEffect(() => {
@@ -406,6 +421,7 @@ export default function BlocoContratoFluxoNovo({
       <div className="text-sm" style={{ fontWeight: 700 }}>Detalhamento</div>
 
       {erroLocal && <div className="app-alert app-alert--error">{erroLocal}</div>}
+      {erroUsuarios && <div className="app-alert app-alert--error">{erroUsuarios}</div>}
       {avisoQtde && <div className="app-alert app-alert--error">{avisoQtde}</div>}
 
       {/* Ordem da tela: O QUE se contrata -> documentos -> cronograma financeiro. Os dados
@@ -427,10 +443,15 @@ export default function BlocoContratoFluxoNovo({
           {exibirResponsavel && <label className="grid gap-1 text-sm">
             Responsável pela contratação{campoObrigatorio('contrato_responsavel') ? ' *' : ''}
             <select className="input input-sm" value={campos.responsavel_id} onChange={campo('responsavel_id')}
-              required={campoObrigatorio('contrato_responsavel')}>
-              <option value="">Selecione</option>
+              required={campoObrigatorio('contrato_responsavel')} disabled={!obraId}>
+              <option value="">{obraId ? 'Selecione' : 'Selecione a obra primeiro'}</option>
               {usuarios.map((u) => <option key={u.id} value={u.id}>{u.nome}</option>)}
             </select>
+            {obraId && usuarios.length === 0 && !erroUsuarios && (
+              <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                Nenhum usuario ativo esta vinculado a esta obra/centro de custo.
+              </span>
+            )}
           </label>}
           {exibirVigenciaInicio && <label className="grid gap-1 text-sm">
             Vigência inicial{campoObrigatorio('contrato_vigencia_inicio') ? ' *' : ''}

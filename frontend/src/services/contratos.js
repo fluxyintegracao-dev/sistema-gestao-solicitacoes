@@ -347,8 +347,11 @@ export async function solicitarAditivoContrato(contratoId, dados) {
 // Opcoes do formulario de contrato. Rota propria porque as antigas (`/usuarios` e
 // `/financeiro/formas-pagamento`) sao ADMINISTRATIVAS: o usuario da obra, que e quem abre
 // contrato, tomava 403 nas duas e ficava com os selects vazios, sem aviso nenhum.
-export async function getOpcoesFormularioContrato() {
-  const res = await fetch(`${API_URL}/contratos/fluxo-novo/opcoes`, { headers: authHeaders() });
+export async function getOpcoesFormularioContrato({ obraId } = {}) {
+  const search = new URLSearchParams();
+  if (obraId) search.set('obra_id', String(obraId));
+  const params = search.toString() ? `?${search.toString()}` : '';
+  const res = await fetch(`${API_URL}/contratos/fluxo-novo/opcoes${params}`, { headers: authHeaders() });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.error || 'Erro ao carregar as opcoes do formulario de contrato');
   return json;
