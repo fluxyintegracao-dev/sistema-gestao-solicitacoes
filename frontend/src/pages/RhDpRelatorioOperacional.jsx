@@ -212,7 +212,11 @@ export default function RhDpRelatorioOperacional() {
       <PageHeader
         titulo="Relatório Operacional"
         contagem={periodoTexto ? `Período ${periodoTexto}` : null}
-        descricao="Colaboradores, documentos, apurações e fechamentos com base nos cadastros reais do módulo."
+        /* R23: esta tela é a EXCEÇÃO declarada (6 dimensões, agregação
+           pesada), então o recorte é rascunho até o clique. A regra exige
+           que a tela AVISE isso — sem o aviso, a etiqueta aparece ao marcar
+           e o usuário lê como filtro já aplicado, o que é mentira. */
+        descricao="Marque o recorte e clique em Atualizar relatório: com seis filtros, a consulta só roda no clique."
         acaoPrincipal={{ rotulo: 'Atualizar relatório', onClick: aplicarFiltros }}
         secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
       />

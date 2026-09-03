@@ -216,16 +216,35 @@ export function checksEstaticos({ tipo }) {
       if (!scroll) return;
       const folga = scroll.clientWidth - tab.getBoundingClientRect().width;
       if (folga > 40) t4.push(`${cssPath(tab)}: ${Math.round(folga)}px de sobra não distribuída`);
-      /* Folga NEGATIVA é transbordo: a tabela pede mais largura do que o
-         contêiner tem, e a última coluna aparece cortada na borda do cartão.
-         O check só olhava sobra positiva e passava calado justamente no caso
-         pior — foi assim que a coluna "Resultado" das Importações chegou
-         cortada à matriz com ✅. Rolagem horizontal do contêiner é legítima
-         (R18 permite overflow-x: auto), mas só quando o contêiner ROLA de
-         verdade; aqui a tabela transborda um cartão que não rola. */
-      if (folga < -8 && scroll.scrollWidth <= scroll.clientWidth + 8) {
-        t4.push(`${cssPath(tab)}: tabela TRANSBORDA ${Math.abs(Math.round(folga))}px do contêiner, que não rola — a última coluna fica cortada na borda`);
-      }
+      /* NÃO existe ramo de "transbordo" aqui, e a ausência é deliberada.
+         Uma versão anterior tentou reprovar folga negativa exigindo
+         `scroll.scrollWidth <= scroll.clientWidth`, e essa condição é
+         IMPOSSÍVEL: `.resizable-table-scroll` é `overflow-x: auto`, então
+         tabela mais larga sempre aumenta o scrollWidth. Era um ramo que
+         nunca dispararia — pior que ramo nenhum, porque dava a impressão de
+         cobertura. E a premissa estava errada: rolagem horizontal ali é o
+         comportamento CORRETO (R18 permite, e é o scrollport a que a coluna
+         fixa gruda). O que importa medir é a DISTRIBUIÇÃO, logo abaixo. */
+
+      /*
+        Quantas LINHAS a célula realmente tem.
+
+        A primeira versão comparava `scrollHeight > lineHeight * 1.6` — e
+        `scrollHeight` INCLUI o padding. Com 12px em cima e 12 embaixo sobre
+        uma linha de 21px, toda célula dá 45 e passa de 33,6: TODA célula
+        "quebrava". Custou 18 células FALHOU numa matriz de 28 telas, em
+        cima de textos como "-", "CLT" e "147". Regra que erra para o alarme
+        custa a mesma confiança que a que erra para o silêncio — e esta
+        custou mais caro, porque apagou o sinal das 4 falhas reais.
+      */
+      const contarLinhas = (el) => {
+        const cs = getComputedStyle(el);
+        const alturaLinha = parseFloat(cs.lineHeight);
+        if (!alturaLinha) return 1;
+        const alturaConteudo = el.clientHeight
+          - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
+        return Math.max(1, Math.round(alturaConteudo / alturaLinha));
+      };
 
       // Folga POR COLUNA: quanto a coluna tem além do que seu conteúdo usa.
       const cabecalhos = Array.from(tab.querySelectorAll('thead th'));
@@ -297,22 +316,40 @@ export function checksEstaticos({ tipo }) {
         2) O CABEÇALHO nunca era medido. "COMPETÊNCIA" cortava sem tooltip e
            nenhum check olhava `th`.
       */
+      // Linhas de verdade: clientHeight MENOS padding, dividido pela altura
+      // de linha. `scrollHeight` inclui o padding e fazia toda célula
+      // parecer quebrada (18 falsos positivos em 02/09).
+      const linhasDe = (el) => {
+        const cs = getComputedStyle(el);
+        const alturaLinha = parseFloat(cs.lineHeight);
+        if (!alturaLinha) return 1;
+        const alturaConteudo = el.clientHeight
+          - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
+        return Math.max(1, Math.round(alturaConteudo / alturaLinha));
+      };
+
       const partidos = qa('.resizable-table td').filter(visivel).filter(foraDeModal)
         .filter((td) => {
-          const estilo = getComputedStyle(td);
-          if (estilo.whiteSpace.includes('nowrap')) return false;
-          const alturaLinha = parseFloat(estilo.lineHeight) || 20;
-          // Mais de uma linha E uma palavra só (sem espaço) = partiu a palavra.
+          if (getComputedStyle(td).whiteSpace.includes('nowrap')) return false;
           const texto = td.innerText.trim();
-          return td.scrollHeight > alturaLinha * 1.6 && texto.length > 0 && !/\s/.test(texto);
+          // Uma palavra só (sem espaço) ocupando mais de uma linha = partiu.
+          return texto.length > 0 && !/\s/.test(texto) && linhasDe(td) > 1;
         });
 
+      /*
+        Cabeçalho cortado: a `TabelaPadrao` põe `title` em TODO `th`, então
+        perguntar "existe title?" nunca reprova — foi um ramo morto na
+        primeira versão. O que vale perguntar é se o title DIZ a mesma coisa
+        que o rótulo cortado; tooltip que não contém o texto completo é
+        tooltip que não resolve.
+      */
       const cabecalhosCortados = qa('.resizable-table th').filter(visivel).filter(foraDeModal)
         .filter((th) => {
           const rotulo = th.querySelector('.resizable-th-label, .app-th-titulo') || th;
           if (rotulo.scrollWidth <= rotulo.clientWidth + 2) return false;
-          const tooltip = th.closest('[title]') || th.querySelector('[title]');
-          return !tooltip;
+          const dica = th.getAttribute('title') || th.closest('[title]')?.getAttribute('title') || '';
+          const completo = soTexto(dica).includes(soTexto(rotulo.innerText).slice(0, 20));
+          return !completo;
         });
 
       const problemasT6 = [];

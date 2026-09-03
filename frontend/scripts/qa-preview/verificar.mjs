@@ -805,6 +805,41 @@ async function main() {
         // medido, para ninguém ler como "não existe mais nenhuma".
         resultado.itens.R3 = r3Para(tela.arquivo, validador, caixasDoNavegador);
 
+        /*
+          T4 (redimensionamento) — a tabela tem de REAGIR ao contêiner
+          encolhendo, SEM recarregar.
+
+          O harness reduzia a janela e fotografava, e a captura saía certa;
+          por isso ele não via que a `TabelaPadrao` media a largura uma vez e
+          nunca aplicava a nova (defeito achado por revisão em 03/09: janela
+          reduzida de 1920 para 1366 deixava quatro colunas fora da borda do
+          cartão, para sempre). A prova tem de ser esta: encolher e MEDIR,
+          não encolher e fotografar.
+        */
+        await page.setViewportSize({ width: 1366, height: 900 });
+        await page.waitForTimeout(800);
+        const aposEncolher = await page.evaluate(() => {
+          const tabela = document.querySelector('.layout-main .resizable-table');
+          if (!tabela) return null;
+          const rolagem = tabela.closest('.resizable-table-scroll');
+          if (!rolagem) return null;
+          return {
+            tabela: Math.round(tabela.getBoundingClientRect().width),
+            contêiner: Math.round(rolagem.clientWidth)
+          };
+        });
+        if (aposEncolher) {
+          const excesso = aposEncolher.tabela - aposEncolher.contêiner;
+          if (excesso > 24) {
+            resultado.itens.T4 = {
+              estado: 'FALHOU',
+              motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve ${aposEncolher.tabela}px num contêiner de ${aposEncolher.contêiner}px (${excesso}px fora) — a largura não é remedida`
+            };
+          }
+        }
+        await page.setViewportSize({ width: 1920, height: 1080 });
+        await page.waitForTimeout(400);
+
         if (capturar) {
           fs.mkdirSync(path.join(CAPTURAS, tela.id), { recursive: true });
           await page.evaluate(() => window.scrollTo(0, 0));

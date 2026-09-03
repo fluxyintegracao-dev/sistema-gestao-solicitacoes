@@ -378,6 +378,30 @@ automaticamente se sair do padrão.
   prova de runtime no harness (item **R3** da matriz): um spy de `dialog` na
   página real reprova a tela em que qualquer caixa dispara.
 
+## R24 — token que o tema sobrescreve não se corrige na folha (03/09)
+
+- **O problema**: o `ThemeContext` escreve dezenas de variáveis como estilo
+  INLINE no `:root` (`setCssVar(root, '--c-muted', palette.muted)`). Estilo
+  inline vence qualquer folha de estilo. Corrigir o valor no `index.css`
+  **não chega à tela** — e nada avisa.
+- **O que aconteceu (é o motivo da regra)**: em 02/09 corrigi o contraste do
+  texto secundário no `index.css`, publiquei, e escrevi no commit "4,92:1
+  com folga". O valor efetivo continuou `#5f7496` = **4,50:1**, idêntico ao
+  que a matriz reprovava antes. O número que eu afirmei era o do token que
+  nunca chega à tela. Uma correção publicada, uma afirmação falsa no
+  registro, e a mesma célula reprovando.
+- **A regra**: antes de corrigir um token, verifique se o `ThemeContext` o
+  escreve. Se escreve, o conserto é lá — no ponto em que o valor é DECIDIDO,
+  não onde ele está declarado.
+- **E, para os tons de texto, o conserto certo não é trocar a cor**: é um
+  PISO. O tom é configurável pelo tenant, então o sistema garante o mínimo
+  (`garantirContraste` no ThemeContext escurece/clareia até passar do AA e
+  deixa intacta a cor que já passa). O tenant escolhe; o sistema garante que
+  é legível.
+- **Lição de método, que vale além do contraste**: uma correção só está
+  provada quando é medida ONDE O USUÁRIO VÊ. "Editei o token" não é prova;
+  "medi a cor computada no preview" é.
+
 ## R23 — filtro aplica ao marcar; consulta cara confirma (02/09)
 
 Decisão do cliente, com critério explícito **de propósito**: sem número, isso

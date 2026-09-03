@@ -280,9 +280,20 @@ export default function RhDpJornada() {
     <div className="app-pagina">
       <Avisos avisos={avisos} aoFechar={fechar} />
 
+      {/*
+        B2 — um primário por tela, e a hierarquia SEGUE O FOCO (mesmo padrão
+        do piloto aprovado em Parceiros). Enquanto a lista não foi montada, o
+        trabalho é escolher obra e competência: o recorte é o bloco primário.
+        Montada a lista, o primário passa para ela (abaixo) e este volta a
+        secundário. Antes o recorte nunca era primário, e a aba abria sem
+        bloco primário nenhum — o revisor pegou isso justamente porque as
+        variantes passaram a ser medidas.
+      */}
       <BlocoConteudo
         titulo="Jornada da obra"
-        descricao="A obra informa dias trabalhados, faltas, horas extras, acrescimos e descontos. O sistema calcula o pagamento."
+        descricao="A obra informa dias trabalhados, faltas, horas extras, acréscimos e descontos. O sistema calcula o pagamento."
+        variante={linhas.length ? undefined : 'primario'}
+        cor={linhas.length ? undefined : 'var(--c-primary)'}
       >
         {/* R12/R16: o cartao de filtros com grade de select saiu inteiro.
             Competencia e dias base sao CONTINUOS e vao em `campos`; obra e

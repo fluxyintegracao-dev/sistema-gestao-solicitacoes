@@ -10,7 +10,7 @@ export const TEMA_PADRAO = {
     surface: '#ffffff',
     border: '#e4e9f0',
     text: '#0f1c2e',
-    muted: '#64748b',
+    muted: '#5f6e83',
     primary: '#3b5bdb',
     primary600: '#2f4ac0',
     secondary: '#7c3aed',
@@ -45,7 +45,7 @@ export const TEMA_PADRAO = {
     softBg: '#eef2f7',
     border: '#e4e9f0',
     text: '#0f1c2e',
-    muted: '#64748b',
+    muted: '#5f6e83',
     summaryBg: '#ffffff',
     summaryBorder: '#d8e2f1',
     summaryLabel: '#64748b',
@@ -55,7 +55,7 @@ export const TEMA_PADRAO = {
   text: {
     heading: '#0f1c2e',
     body: '#0f1c2e',
-    muted: '#64748b',
+    muted: '#5f6e83',
     subtle: '#74808f',
     link: '#2563eb',
     inverse: '#ffffff'
@@ -66,7 +66,7 @@ export const TEMA_PADRAO = {
     negative: '#b32020',
     warning: '#9a5b06',
     info: '#22447f',
-    muted: '#64748b'
+    muted: '#5f6e83'
   },
   moduleAccents: {
     painel: '#2d5c8f',
@@ -143,6 +143,83 @@ function mergeTema(base, override) {
   return output;
 }
 
+/* ------------------------------------------------------------------ *
+ * PISO DE CONTRASTE (M3 da DoD, 03/09)
+ *
+ * O tom de texto secundário é CONFIGURÁVEL pelo tenant, e nada garantia o
+ * mínimo. O tema deste ambiente traz `muted: #5f7496`, que dá 4,50:1 sobre
+ * a superfície clara — abaixo do AA (4,5 exato não passa; o critério é
+ * "pelo menos"). Como o ThemeContext escreve a variável como estilo INLINE
+ * no `:root`, ele vence qualquer folha: corrigir o token no `index.css` não
+ * chega à tela. Foi exatamente o que aconteceu em 02/09 — a correção foi
+ * publicada, a matriz continuou reprovando com o MESMO número, e o commit
+ * afirmava uma folga que nunca existiu.
+ *
+ * Então o piso mora aqui, onde o valor de fato é decidido: qualquer tom de
+ * texto secundário é escurecido (ou clareado, no tema escuro) até passar do
+ * mínimo. O tenant continua escolhendo a cor; o sistema garante que ela é
+ * legível.
+ * ------------------------------------------------------------------ */
+const CONTRASTE_MINIMO = 4.6; // margem sobre o 4,5 do AA, para arredondamento
+
+function paraRgb(cor) {
+  const texto = String(cor || '').trim();
+  const hex = texto.replace('#', '');
+  if (/^[0-9a-f]{6}$/i.test(hex)) {
+    return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  }
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    return [0, 1, 2].map((i) => parseInt(hex[i] + hex[i], 16));
+  }
+  const rgb = texto.match(/rgba?\(([^)]+)\)/i);
+  if (rgb) {
+    const partes = rgb[1].split(',').map((n) => parseFloat(n));
+    if (partes.length >= 3) return partes.slice(0, 3).map((n) => Math.round(n));
+  }
+  return null;
+}
+
+function paraHex([r, g, b]) {
+  const dois = (n) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
+  return `#${dois(r)}${dois(g)}${dois(b)}`;
+}
+
+function luminancia([r, g, b]) {
+  const canal = (v) => {
+    const x = v / 255;
+    return x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(r) + 0.7152 * canal(g) + 0.0722 * canal(b);
+}
+
+function razaoContraste(a, b) {
+  const la = luminancia(a);
+  const lb = luminancia(b);
+  return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+}
+
+/**
+ * Devolve a cor original quando ela já passa; senão, caminha em direção ao
+ * preto (fundo claro) ou ao branco (fundo escuro) até passar. Passo pequeno
+ * para mexer o mínimo no tom que o tenant escolheu.
+ */
+function garantirContraste(cor, fundo, minimo = CONTRASTE_MINIMO) {
+  const rgb = paraRgb(cor);
+  const rgbFundo = paraRgb(fundo);
+  if (!rgb || !rgbFundo) return cor;
+  if (razaoContraste(rgb, rgbFundo) >= minimo) return cor;
+
+  const fundoClaro = luminancia(rgbFundo) > 0.5;
+  const alvo = fundoClaro ? [0, 0, 0] : [255, 255, 255];
+  let atual = rgb;
+  for (let passo = 1; passo <= 20; passo += 1) {
+    const t = passo / 20;
+    atual = rgb.map((c, i) => c + (alvo[i] - c) * t);
+    if (razaoContraste(atual, rgbFundo) >= minimo) return paraHex(atual);
+  }
+  return paraHex(alvo);
+}
+
 // Coleta todas as variaveis CSS derivadas de um tema (sem aplicar).
 function coletarTemaVars(tema) {
   const vars = {};
@@ -156,7 +233,9 @@ function coletarTemaVars(tema) {
   setCssVar(root, '--c-surface', palette.surface);
   setCssVar(root, '--c-border', palette.border);
   setCssVar(root, '--c-text', palette.text);
-  setCssVar(root, '--c-muted', palette.muted);
+  // M3: piso de contraste sobre a superfície onde o texto de fato aparece.
+  const superficieDeTexto = cards?.softBg || palette.surface || palette.bg;
+  setCssVar(root, '--c-muted', garantirContraste(palette.muted, superficieDeTexto));
   setCssVar(root, '--c-primary', palette.primary);
   setCssVar(root, '--c-primary-600', palette.primary600);
   setCssVar(root, '--c-secondary', palette.secondary);
@@ -172,7 +251,7 @@ function coletarTemaVars(tema) {
   setCssVar(root, '--input-bg-soft', cards?.softBg || palette.bg);
   setCssVar(root, '--input-border', palette.border);
   setCssVar(root, '--input-text', palette.text);
-  setCssVar(root, '--input-placeholder', text?.subtle || palette.muted);
+  setCssVar(root, '--input-placeholder', garantirContraste(text?.subtle || palette.muted, superficieDeTexto));
   setCssVar(root, '--modal-bg', cards?.bg || palette.surface);
   setCssVar(root, '--modal-border', cards?.border || palette.border);
   setCssVar(root, '--premium-panel-bg', cards?.bg || palette.surface);
@@ -220,8 +299,8 @@ function coletarTemaVars(tema) {
 
   setCssVar(root, '--app-heading-color', text?.heading);
   setCssVar(root, '--app-body-color', text?.body);
-  setCssVar(root, '--app-muted-color', text?.muted);
-  setCssVar(root, '--app-subtle-color', text?.subtle);
+  setCssVar(root, '--app-muted-color', garantirContraste(text?.muted, superficieDeTexto));
+  setCssVar(root, '--app-subtle-color', garantirContraste(text?.subtle, superficieDeTexto));
   setCssVar(root, '--app-link-color', text?.link);
   setCssVar(root, '--app-inverse-color', text?.inverse);
   setCssVar(root, '--app-number-color', numbers?.default);

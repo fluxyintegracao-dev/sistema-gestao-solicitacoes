@@ -165,7 +165,12 @@
 .la-btn:focus-visible,
 .la-visao:focus-visible { outline: 2px solid var(--c-primary); outline-offset: 2px; }
 
+/* "Limpar tudo" é BOTÃO, e alvo de clique tem mínimo (32px; 44 em toque).
+   Media 84×27. O × da etiqueta ao lado foi corrigido em 02/09 e este ficou:
+   correção pela metade é correção que o próximo check pega. */
 .la-link {
+  display: inline-flex;
+  align-items: center;
   border: none;
   background: none;
   color: var(--app-link-color);
@@ -173,6 +178,17 @@
   font-weight: 600;
   cursor: pointer;
   padding: 4px 6px;
+  min-height: 32px;
+}
+
+@media (pointer: coarse) {
+  .la-link { min-height: 44px; }
+}
+
+.la-link:focus-visible {
+  outline: 2px solid var(--c-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 /* ---------- NÍVEL 2: visões — o maior destaque depois da busca ----- */

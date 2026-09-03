@@ -54,13 +54,33 @@ export function ResizableTable({
   // distribuição de sobra da TabelaPadrao (defeito de 02/09).
   const usuarioRedimensionouRef = useRef(false);
 
+  /*
+    A largura vinda das colunas tem de SUBSTITUIR a atual, não só preencher
+    chave ausente.
+
+    A versão anterior só preenchia o que faltava (`if (!next[key])`). Isso
+    fez o `ResizeObserver` que a TabelaPadrao ganhou em 02/09 virar um
+    conserto pela metade: ela remedia o contêiner e recalculava a
+    distribuição, e a nova largura nunca chegava ao DOM. Medido no preview
+    em 03/09: a tabela montada em 1920 e a janela reduzida para 1366
+    continuava com 1805px de largura e o NOME com 813px — OBRA, VÍNCULO,
+    STATUS e AÇÕES fora da borda do cartão, para sempre. Só um remount
+    (passar pelo estado "Carregando") corrigia.
+
+    O que NÃO pode ser sobrescrito é a largura que o USUÁRIO arrastou: essa
+    é escolha dele e o `usuarioRedimensionouRef` a protege — mesma razão por
+    que os defaults não são persistidos no mount.
+  */
   useEffect(() => {
     setWidths((current) => {
       const next = { ...current };
       normalizedColumns.forEach((column) => {
         const key = getColumnKey(column);
+        const proposta = Number(column.width || column.defaultWidth || 140);
         if (!next[key]) {
-          next[key] = Number(column.width || column.defaultWidth || 140);
+          next[key] = proposta;
+        } else if (!usuarioRedimensionouRef.current && next[key] !== proposta) {
+          next[key] = proposta;
         }
       });
       Object.keys(next).forEach((key) => {

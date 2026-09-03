@@ -299,14 +299,17 @@ export default function RhDpFechamentos() {
           /rh-dp/apuracao hoje redireciona para a aba de Apuracao do Pessoal. */}
       <PageHeader
         titulo="Fechamentos"
-        descricao="Competencias fechadas, titulos gerados no financeiro central e o detalhe do lote."
+        contagem={`${resumo.quantidade} fechamento${resumo.quantidade === 1 ? '' : 's'}`}
+        descricao="Competências fechadas, títulos gerados no financeiro central e o detalhe do lote."
       />
 
       <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <StatGrid colunas={3}>
-        <StatTile label="Fechamentos" valor={resumo.quantidade} />
-        <StatTile label="Titulos gerados" valor={resumo.totalTitulos} />
+      {/* B3: a contagem de fechamentos subiu para o cabeçalho (C2) e sai
+          daqui — a mesma informação em dois lugares faz o olho conferir se
+          são a mesma coisa. Ficam os dois números que o cabeçalho não diz. */}
+      <StatGrid colunas={2}>
+        <StatTile label="Títulos gerados" valor={resumo.totalTitulos} />
         <StatTile label="Valor total" valor={formatCurrency(resumo.totalValor)} />
       </StatGrid>
 
