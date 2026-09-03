@@ -51,6 +51,47 @@ function rotuloVigenciaAtual(contrato) {
   return 'Não informada';
 }
 
+function hojeLocalIso() {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, '0');
+  const dia = String(agora.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function adicionarUmDiaIso(valor) {
+  const partes = String(valor || '').slice(0, 10).split('-').map(Number);
+  if (partes.length !== 3 || partes.some((parte) => !Number.isInteger(parte))) return '';
+  const data = new Date(Date.UTC(partes[0], partes[1] - 1, partes[2] + 1));
+  return data.toISOString().slice(0, 10);
+}
+
+function dataMinimaNovaVigencia(contrato) {
+  const hoje = hojeLocalIso();
+  const fimAtual = String(contrato?.vigencia_fim || '').slice(0, 10);
+  const ultimaParcela = String(contrato?.ultima_parcela_vencimento || '').slice(0, 10);
+  const limiteOperacional = [fimAtual, ultimaParcela].filter(Boolean).sort().at(-1) || '';
+  if (!limiteOperacional || limiteOperacional < hoje) return hoje;
+  return adicionarUmDiaIso(limiteOperacional);
+}
+
+function mensagemNovaVigencia(valor, contrato) {
+  if (!valor) return '';
+  const hoje = hojeLocalIso();
+  const fimAtual = String(contrato?.vigencia_fim || '').slice(0, 10);
+  const ultimaParcela = String(contrato?.ultima_parcela_vencimento || '').slice(0, 10);
+  const limiteOperacional = [fimAtual, ultimaParcela].filter(Boolean).sort().at(-1) || '';
+  if (valor < hoje) return `A nova vigência não pode ser anterior a hoje (${formatarDataContrato(hoje)}).`;
+  if (fimAtual && valor === fimAtual && (!ultimaParcela || ultimaParcela <= fimAtual)) {
+    return 'A data é igual à vigência atual e não altera o prazo. Para acrescentar apenas valor, use Somente valor.';
+  }
+  if (limiteOperacional && valor <= limiteOperacional) {
+    const referencia = ultimaParcela && ultimaParcela > fimAtual ? 'ao último vencimento existente' : 'à vigência atual';
+    return `Este fluxo aceita apenas prorrogação. Informe uma data posterior ${referencia} (${formatarDataContrato(limiteOperacional)}).`;
+  }
+  return '';
+}
+
 // `tipo` comeca VAZIO de proposito: o cliente pediu que informar seja OBRIGATORIO, e um padrao
 // escolhido pela tela seria a decisao sendo tomada por quem nao devia. E ele que decide o que a
 // aprovacao faz — uma parcela com o vencimento antigo, ou varias ate um prazo novo.
@@ -136,6 +177,13 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
   // ninguem mediu. O campo Valor some, e o teto de 25% deixa de valer para ele.
   const soPrazo = campos.tipo === 'PRAZO';
   const qtdeParcelas = Number(campos.qtde_parcelas) || 0;
+  const dataMinimaVigencia = dataMinimaNovaVigencia(teto?.contrato);
+  const erroNovaVigencia = ehVigencia ? mensagemNovaVigencia(campos.nova_vigencia_fim, teto?.contrato) : '';
+  const fimVigenciaAtual = String(teto?.contrato?.vigencia_fim || '').slice(0, 10);
+  const ultimoVencimentoAtual = String(teto?.contrato?.ultima_parcela_vencimento || '').slice(0, 10);
+  const cronogramaUltrapassaVigencia = Boolean(
+    fimVigenciaAtual && ultimoVencimentoAtual && ultimoVencimentoAtual > fimVigenciaAtual
+  );
   // Aditivo de vigencia exige o prazo novo E quantas parcelas criar: sem os dois o sistema nao tem
   // como distribuir o valor no tempo, e foi o cliente quem pediu que a pessoa informasse.
   const vigenciaCompleta = !ehVigencia || (Boolean(campos.nova_vigencia_fim) && qtdeParcelas >= 1);
@@ -144,6 +192,7 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
     && contratoAceita
     && Boolean(campos.tipo)
     && vigenciaCompleta
+    && !erroNovaVigencia
     && (soPrazo || valorNumero > 0)
     && String(campos.justificativa || '').trim().length > 0
     && !passaDoTeto
@@ -249,6 +298,13 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
             </div>
           )}
 
+          {cronogramaUltrapassaVigencia && (
+            <div className="app-alert app-alert--warning">
+              Há parcelas com vencimento até {formatarDataContrato(ultimoVencimentoAtual)}, depois da vigência cadastrada.
+              Para evitar novos vencimentos retroativos, uma prorrogação deverá terminar após essa data.
+            </div>
+          )}
+
           {passaDoTeto && (
             <div className="app-alert app-alert--error">
               O valor do aditivo passa do limite disponível ({moeda(teto.disponivel)}).
@@ -333,8 +389,19 @@ export default function ModalAditivoContrato({ contratoId, contratoRotulo, areaR
                   name="aditivo_nova_vigencia_fim"
                   value={campos.nova_vigencia_fim}
                   onChange={campo('nova_vigencia_fim')}
+                  min={dataMinimaVigencia}
+                  aria-invalid={Boolean(erroNovaVigencia)}
                   disabled={!contratoAceita}
                 />
+                {erroNovaVigencia ? (
+                  <span className="text-xs" style={{ color: 'var(--c-danger, #b91c1c)' }}>
+                    {erroNovaVigencia}
+                  </span>
+                ) : (
+                  <span className="text-xs" style={{ color: 'var(--c-muted)' }}>
+                    Data mínima: {formatarDataContrato(dataMinimaVigencia)}. Redução de prazo exige um fluxo específico.
+                  </span>
+                )}
               </label>
             )}
             {ehVigencia && (

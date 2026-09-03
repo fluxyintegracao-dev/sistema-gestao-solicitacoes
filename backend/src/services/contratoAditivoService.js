@@ -6,6 +6,7 @@ const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 const { paraCentavos, somenteData, formatarISO } = require('./contratoParcelasService');
 const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
 const { validarResponsavelVinculadoObra } = require('./contratoResponsavelService');
+const { validarNovaVigencia } = require('./contratoAditivoVigencia');
 const {
   calcularRoteamentoSolicitacaoAditivo,
   SETOR_GERENCIA_PROCESSOS,
@@ -150,6 +151,13 @@ async function calcularTetoAditivo(contratoId, transaction) {
   });
   if (!contrato) throw erro('Contrato nao encontrado.', 404);
 
+  // A referencia operacional tambem considera as parcelas. Isso protege contratos antigos que
+  // tenham vigencia_fim nula ou, por dado historico, vencimento posterior ao fim cadastrado.
+  const ultimaParcelaVencimento = await ContratoParcela.max('data_vencimento', {
+    where: { contrato_id: Number(contratoId) },
+    transaction
+  });
+
   const aprovados = await ContratoAditivo.findAll({
     where: { contrato_id: contratoId, status: STATUS.APROVADO },
     attributes: ['valor'],
@@ -171,7 +179,8 @@ async function calcularTetoAditivo(contratoId, transaction) {
       obra_id: contrato.obra_id,
       responsavel_id: contrato.responsavel_id || null,
       vigencia_inicio: contrato.vigencia_inicio || null,
-      vigencia_fim: contrato.vigencia_fim || null
+      vigencia_fim: contrato.vigencia_fim || null,
+      ultima_parcela_vencimento: ultimaParcelaVencimento || null
     },
     aceita_aditivo: contratoAceitaAditivo(contrato),
     percentual_maximo: PERCENTUAL_MAXIMO,
@@ -262,6 +271,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
   }
 
   let quantidadeParcelas = null;
+  let novaVigenciaNormalizada = null;
   if (tipoNormalizado === TIPO.VALOR_E_VIGENCIA || tipoNormalizado === TIPO.PRAZO) {
     if (!novaVigenciaFim) {
       throw erro('Aditivo de vigencia exige a nova data final do contrato.');
@@ -277,9 +287,19 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     garantirContratoAceitaAditivo(teto.contrato);
     const contrato = await Contrato.findByPk(contratoId, {
       attributes: ['id', 'codigo', 'obra_id', 'valor_total', 'fluxo_novo', 'solicitacao_id',
-        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id', 'responsavel_id'],
+        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id', 'responsavel_id', 'vigencia_fim'],
       transaction
     });
+    const exigeNovaVigencia = tipoNormalizado === TIPO.VALOR_E_VIGENCIA || tipoNormalizado === TIPO.PRAZO;
+    if (exigeNovaVigencia) {
+      const validacaoVigencia = validarNovaVigencia({
+        novaVigenciaFim,
+        vigenciaAtualFim: contrato.vigencia_fim,
+        ultimaParcelaVencimento: teto.contrato.ultima_parcela_vencimento
+      });
+      if (!validacaoVigencia.valida) throw erro(validacaoVigencia.mensagem);
+      novaVigenciaNormalizada = validacaoVigencia.nova_vigencia_fim;
+    }
     const responsavelAditivoId = await validarResponsavelVinculadoObra(
       responsavelId || contrato.responsavel_id || null,
       contrato.obra_id,
@@ -377,7 +397,9 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       contrato_id: contratoId,
       solicitacao_id: solicitacaoId || solicitacaoDoAditivo || null,
       valor: valorCent / 100,
-      nova_vigencia_fim: novaVigenciaFim ? formatarISO(somenteData(novaVigenciaFim)) : null,
+      // Tipo VALOR ignora qualquer data indevidamente enviada pelo cliente. A vigencia so pode
+      // mudar pelos dois tipos que passam pela validacao de prorrogacao acima.
+      nova_vigencia_fim: novaVigenciaNormalizada,
       tipo: tipoNormalizado,
       qtde_parcelas: quantidadeParcelas,
       justificativa: String(justificativa).trim(),
@@ -826,6 +848,26 @@ async function decidirAditivo(aditivoId, { usuario, req, aprovar, motivo } = {})
       lock: transaction.LOCK.UPDATE,
       transaction
     });
+    // Compatibilidade com pedidos antigos, criados antes de `tipo` ser obrigatorio: a presenca
+    // de nova vigencia identifica o mesmo caminho que o gerador de parcelas ja usa.
+    const tipoAditivo = normalizarTipo(aditivo.tipo)
+      || (aditivo.nova_vigencia_fim ? TIPO.VALOR_E_VIGENCIA : TIPO.VALOR);
+    if (tipoAditivo === TIPO.VALOR_E_VIGENCIA || tipoAditivo === TIPO.PRAZO) {
+      // Reconfere sob lock: outro aditivo pode ter prorrogado o contrato enquanto este aguardava
+      // aprovacao, ou a data pode ter se tornado retroativa durante uma analise demorada.
+      const ultimaParcelaVencimento = await ContratoParcela.max('data_vencimento', {
+        where: { contrato_id: contrato.id },
+        transaction
+      });
+      const validacaoVigencia = validarNovaVigencia({
+        novaVigenciaFim: aditivo.nova_vigencia_fim,
+        vigenciaAtualFim: contrato.vigencia_fim,
+        ultimaParcelaVencimento
+      });
+      if (!validacaoVigencia.valida) {
+        throw erro(`Nao e possivel aprovar: ${validacaoVigencia.mensagem}`, 409);
+      }
+    }
     const acrescidoCent = paraCentavos(contrato.valor_aditivos || 0) + valorCent;
     // Guardado ANTES do update: e a partir do fim ANTIGO que as datas do novo prazo comecam. Depois
     // do update `contrato.vigencia_fim` ja e o fim novo, e as parcelas nasceriam todas em cima dele.
