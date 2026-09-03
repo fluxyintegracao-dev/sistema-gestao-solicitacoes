@@ -4,7 +4,7 @@
  * Prova pura do roteamento do pedido de aditivo pelo limite juridico.
  *
  * Nao abre conexao nem grava no banco. O limite entra como dado para provar a fronteira exata e
- * evitar que uma alteracao futura volte a comparar somente o valor isolado do aditivo.
+ * evitar que uma alteracao futura passe a somar aditivos ao valor original.
  */
 
 const {
@@ -19,8 +19,8 @@ function conferir(cenario, entrada, esperado) {
   const resultado = calcularRoteamentoSolicitacaoAditivo(entrada);
 
   garantir(
-    resultado.valorTotalAposPedidoCent === esperado.valorTotalAposPedidoCent,
-    `${cenario}: total esperado ${esperado.valorTotalAposPedidoCent}; recebido ${resultado.valorTotalAposPedidoCent}.`
+    resultado.valorOriginalCent === esperado.valorOriginalCent,
+    `${cenario}: original esperado ${esperado.valorOriginalCent}; recebido ${resultado.valorOriginalCent}.`
   );
   garantir(
     resultado.setorDestino === esperado.setorDestino,
@@ -41,10 +41,10 @@ function conferir(cenario, entrada, esperado) {
 const limiteCent = 5_000_000;
 
 conferir(
-  'total exatamente no limite permanece na GEO',
-  { valorOriginal: 45000, valorAditivosAprovados: 0, valorSolicitado: 5000, limiteCent },
+  'valor original exatamente no limite permanece na GEO',
+  { valorOriginal: 50000, limiteCent },
   {
-    valorTotalAposPedidoCent: limiteCent,
+    valorOriginalCent: limiteCent,
     setorDestino: 'GEO',
     statusDestino: 'PED. ADITIVO',
     encaminharDiretoAoJuridico: false
@@ -52,10 +52,10 @@ conferir(
 );
 
 conferir(
-  'um centavo acima do limite segue direto ao Juridico',
-  { valorOriginal: 45000, valorAditivosAprovados: 0, valorSolicitado: 5000.01, limiteCent },
+  'contrato original um centavo acima segue direto ao Juridico',
+  { valorOriginal: 50000.01, limiteCent },
   {
-    valorTotalAposPedidoCent: limiteCent + 1,
+    valorOriginalCent: limiteCent + 1,
     setorDestino: 'JURIDICO',
     statusDestino: 'PENDENTE',
     encaminharDiretoAoJuridico: true
@@ -63,21 +63,21 @@ conferir(
 );
 
 conferir(
-  'aditivos anteriores entram no compromisso total',
-  { valorOriginal: 40000, valorAditivosAprovados: 8000, valorSolicitado: 2000.01, limiteCent },
+  'contrato original de 49 mil permanece na GEO mesmo com aditivo de 2 mil',
+  { valorOriginal: 49000, valorAditivosAprovados: 0, valorSolicitado: 2000, limiteCent },
   {
-    valorTotalAposPedidoCent: limiteCent + 1,
-    setorDestino: 'JURIDICO',
-    statusDestino: 'PENDENTE',
-    encaminharDiretoAoJuridico: true
+    valorOriginalCent: 4_900_000,
+    setorDestino: 'GEO',
+    statusDestino: 'PED. ADITIVO',
+    encaminharDiretoAoJuridico: false
   }
 );
 
 conferir(
-  'aditivo de prazo de contrato ja acima do limite segue ao Juridico',
-  { valorOriginal: 50000.01, valorAditivosAprovados: 0, valorSolicitado: 0, limiteCent },
+  'contrato original acima do limite segue ao Juridico independentemente do aditivo',
+  { valorOriginal: 60000, valorAditivosAprovados: 12000, valorSolicitado: 0, limiteCent },
   {
-    valorTotalAposPedidoCent: limiteCent + 1,
+    valorOriginalCent: 6_000_000,
     setorDestino: 'JURIDICO',
     statusDestino: 'PENDENTE',
     encaminharDiretoAoJuridico: true

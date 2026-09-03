@@ -8,24 +8,21 @@ const STATUS_SOLICITACAO_PEDIDO_ADITIVO = 'PED. ADITIVO';
 const STATUS_SOLICITACAO_JURIDICO = 'PENDENTE';
 
 /**
- * Decide a fila do pedido pelo compromisso total que existira depois da aprovacao.
+ * Decide a fila do pedido exclusivamente pelo valor original do contrato.
  *
  * Funcao pura para a fronteira monetaria ser testada sem banco: exatamente no limite permanece na
- * GEO; somente um total superior segue diretamente ao Juridico.
+ * GEO; somente um contrato originalmente superior segue diretamente ao Juridico. Aditivos ja
+ * aprovados e o valor deste novo pedido deliberadamente nao participam da decisao.
  */
 function calcularRoteamentoSolicitacaoAditivo({
   valorOriginal,
-  valorAditivosAprovados = 0,
-  valorSolicitado = 0,
   limiteCent
 }) {
-  const valorTotalAposPedidoCent = paraCentavos(valorOriginal)
-    + paraCentavos(valorAditivosAprovados)
-    + paraCentavos(valorSolicitado);
-  const encaminharDiretoAoJuridico = valorTotalAposPedidoCent > Number(limiteCent || 0);
+  const valorOriginalCent = paraCentavos(valorOriginal);
+  const encaminharDiretoAoJuridico = valorOriginalCent > Number(limiteCent || 0);
 
   return {
-    valorTotalAposPedidoCent,
+    valorOriginalCent,
     encaminharDiretoAoJuridico,
     setorDestino: encaminharDiretoAoJuridico ? SETOR_JURIDICO : SETOR_GERENCIA_PROCESSOS,
     statusDestino: encaminharDiretoAoJuridico

@@ -261,7 +261,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     garantirContratoAceitaAditivo(teto.contrato);
     const contrato = await Contrato.findByPk(contratoId, {
       attributes: ['id', 'codigo', 'obra_id', 'valor_total', 'fluxo_novo', 'solicitacao_id',
-        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id', 'valor_aditivos'],
+        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id'],
       transaction
     });
     // O teto de 25% e sobre VALOR. Aditivo de prazo nao tem valor e por isso nao entra na conta —
@@ -274,21 +274,20 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       );
     }
 
-    // O corte juridico considera o compromisso total que existira se este pedido for aprovado:
-    // valor original + aditivos ja aprovados + valor agora solicitado. Comparar apenas o novo
-    // aditivo permitiria que varios pedidos menores mantivessem acima do limite um contrato sem
-    // revisao juridica. Aditivo somente de prazo soma zero, mas um contrato que ja ultrapassa o
-    // limite continua seguindo diretamente ao Juridico.
+    // Regra exclusiva do pedido de ADITIVO. A aprovacao inicial do contrato continua na maquina de
+    // estados de `contratoFluxoNovoService` e nao e alterada aqui.
+    //
+    // O corte juridico do aditivo considera somente o valor ORIGINAL do contrato. Nem os aditivos
+    // ja aprovados nem o valor deste pedido participam da decisao: contrato originalmente ate o
+    // limite passa pela GEO; contrato originalmente acima dele vai direto ao Juridico.
     const { limite_cent: limiteJuridicoCent } = await obterLimiteJuridico();
     const {
-      valorTotalAposPedidoCent,
+      valorOriginalCent,
       encaminharDiretoAoJuridico,
       setorDestino,
       statusDestino
     } = calcularRoteamentoSolicitacaoAditivo({
       valorOriginal: contrato.valor_total,
-      valorAditivosAprovados: contrato.valor_aditivos || 0,
-      valorSolicitado: valorCent / 100,
       limiteCent: limiteJuridicoCent
     });
 
@@ -413,7 +412,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
           valor: valorCent / 100,
           disponivel_antes: teto.disponivel,
           limite_juridico: limiteJuridicoCent / 100,
-          valor_total_apos_pedido: valorTotalAposPedidoCent / 100,
+          valor_original_contrato: valorOriginalCent / 100,
           encaminhado_direto_ao_juridico: encaminharDiretoAoJuridico,
           area_anterior: areaAnterior,
           area_nova: areaAtual
@@ -436,7 +435,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
             aditivo_id: aditivo.id,
             contrato_id: contratoId,
             limite_juridico: limiteJuridicoCent / 100,
-            valor_total_apos_pedido: valorTotalAposPedidoCent / 100,
+            valor_original_contrato: valorOriginalCent / 100,
             encaminhado_direto_ao_juridico: encaminharDiretoAoJuridico
           })
         }, { transaction });

@@ -9,17 +9,19 @@ O pedido de aditivo tinha o setor `GEO` fixado em `contratoAditivoService.js`. A
 
 ## Regra entregue
 
+- Esta alteracao e exclusiva do pedido de termo aditivo. O fluxo de criacao e aprovacao inicial do
+  contrato permanece inalterado.
 - O corte usa a configuracao `CONTRATO_LIMITE_JURIDICO`; o fallback continua R$ 50.000,00.
-- O valor comparado e o compromisso total depois do pedido:
-  - valor original do contrato;
-  - mais aditivos ja aprovados;
-  - mais o valor do novo aditivo.
+- O valor comparado e exclusivamente o valor original do contrato.
+- Aditivos ja aprovados e o valor do novo pedido nao participam do roteamento.
 - Exatamente no limite, o pedido continua em `GEO / PED. ADITIVO`.
 - Acima do limite, segue diretamente para `JURIDICO / PENDENTE`.
-- Aditivo somente de prazo soma zero, mas segue ao Juridico quando o contrato ja esta acima do
-  limite.
+- Um contrato original de R$ 49.000,00 continua em GEO tanto com aditivo de R$ 1.000,00 quanto de
+  R$ 2.000,00.
+- Um contrato cujo valor original seja superior ao limite segue diretamente ao Juridico,
+  independentemente do tipo ou valor do aditivo.
 - O historico `ADITIVO_SOLICITADO` e o envio `ENVIADA_SETOR` registram o destino calculado, o limite
-  aplicado e o total considerado.
+  aplicado e o valor original considerado.
 - Contratos do fluxo novo e legados usam o mesmo calculo. No legado, o status historico de abertura
   da solicitacao propria permanece `PENDENTE`.
 
@@ -35,8 +37,8 @@ O pedido de aditivo tinha o setor `GEO` fixado em `contratoAditivoService.js`. A
 - Prova pura, sem conexao nem escrita no banco: aprovada em quatro cenarios.
   - total exatamente no limite;
   - um centavo acima;
-  - acumulacao de aditivos anteriores;
-  - aditivo de prazo em contrato ja acima do limite.
+  - contrato de R$ 49.000,00 com aditivo que ultrapassaria o limite pela soma;
+  - contrato original acima do limite, independentemente do aditivo.
 - `git diff --check`: aprovado.
 
 ## Banco e deploy

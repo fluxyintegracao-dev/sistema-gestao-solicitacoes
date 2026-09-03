@@ -1,5 +1,8 @@
 # Sessoes Ativas
 
+Sessao `codex-correcao-regra-aditivo-juridico-2026-09-03` concluida. Confirmado que a mudanca e
+exclusiva do termo aditivo e que somente o valor original do contrato decide seu destino.
+
 Sessao `codex-aditivo-direto-juridico-2026-09-03` concluida. O pedido de aditivo acima do limite
 juridico configuravel segue diretamente ao Juridico; validacao pura concluida sem escrita no banco.
 

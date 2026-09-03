@@ -9,9 +9,9 @@ Quando houver uma sessao explicitamente autorizada, registrar data, repositorios
 - Sessao: `codex-aditivo-direto-juridico-2026-09-03`
 - Status: finalizado e validado sem escrita no banco
 - Handoff: `docs/handoffs/CONTRATO_ADITIVO_DIRETO_JURIDICO_2026-09-03.md`
-- Regra: o compromisso total posterior ao pedido decide entre `GEO / PED. ADITIVO` e
-  `JURIDICO / PENDENTE`, usando `CONTRATO_LIMITE_JURIDICO`.
-- Validacoes: sintaxe, fronteira monetaria e acumulacao de aditivos aprovadas.
+- Regra exclusiva do termo aditivo: somente o valor original do contrato decide entre `GEO / PED. ADITIVO` e
+  `JURIDICO / PENDENTE`, usando `CONTRATO_LIMITE_JURIDICO`; os aditivos nao entram na soma.
+- Validacoes: sintaxe, fronteira monetaria e independencia do valor do aditivo aprovadas.
 - Proximo passo: atualizar e reiniciar somente o backend dev para homologacao funcional.
 
 ## 2026-08-26 — Nova Solicitacao: favorecido, PIX e boleto
