@@ -2,12 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { HiOutlineEye, HiOutlinePencilSquare, HiPlus, HiXMark } from 'react-icons/hi2';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ComercialContratoImportacaoPanel from '../components/comercial/ComercialContratoImportacaoPanel';
 import { buscarParceiros, criarParceiro } from '../services/parceiros';
 import ParceiroAutocomplete from '../components/ui/ParceiroAutocomplete';
 import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { canImportComercialContratos } from '../utils/acessoProduto';
 import { isValidCpfCnpj, maskCep, maskCpfCnpj, maskCreci, maskPhone, normalizeCurrencyTyping, onlyDigits } from '../utils/formatters';
 import {
   atualizarContratoComercial,
+  anexarContratoAssinadoComercial,
   criarContratoComercial,
   distratarContratoComercial,
   excluirDocumentoContratoComercial,
@@ -34,7 +37,8 @@ const PARCELA_REAJUSTE_TIPOS = [
   { value: 'REAJUSTAVEL', label: 'Reajustavel', resumo: 'R' }
 ];
 const TIPOS_DOCUMENTO_MODELO = [
-  { value: 'CONTRATO', label: 'Contrato padrao' }
+  { value: 'CONTRATO', label: 'Contrato padrao' },
+  { value: 'CONTRATO_ASSINADO', label: 'Contrato assinado' }
 ];
 const MODOS_COMPOSICAO = [
   { value: 'ENTRADA', label: 'Entrada' },
@@ -108,11 +112,63 @@ function buildUnidadeOptionLabel(unidade) {
   return `${identificacao || unidade?.nome || 'Unidade'}${vendida ? ' - vendida' : ''}`;
 }
 
+function getContratoUnidadesLabel(contrato) {
+  const source = Array.isArray(contrato?.unidades) && contrato.unidades.length
+    ? contrato.unidades.map((item) => item.unidade).filter(Boolean)
+    : [contrato?.unidadeComercial].filter(Boolean);
+  return source
+    .map((item) => [item.torre, item.codigo].filter(Boolean).join(' - ') || item.nome)
+    .filter(Boolean)
+    .join(' + ');
+}
+
+function getUnidadeValorReferencia(unidade) {
+  return Number(unidade?.valor_base_venda || unidade?.valor_tabela || 0);
+}
+
+function defaultContratoUnidade() {
+  return {
+    unidade_comercial_id: '',
+    valor_cadastro_referencia: '',
+    valor_atribuido: '',
+    principal: true
+  };
+}
+
+function normalizeContratoUnidadesForm(contrato = {}) {
+  const source = Array.isArray(contrato.unidades) && contrato.unidades.length
+    ? contrato.unidades
+    : (contrato.unidade_comercial_id ? [{
+      unidade_comercial_id: contrato.unidade_comercial_id,
+      valor_cadastro_referencia: contrato.unidadeComercial?.valor_base_venda || contrato.unidadeComercial?.valor_tabela,
+      valor_atribuido: contrato.valor_total,
+      principal: true
+    }] : []);
+  const normalized = source.map((item, index) => ({
+    unidade_comercial_id: String(item.unidade_comercial_id || item.unidade?.id || ''),
+    valor_cadastro_referencia: formatCurrencyInput(item.valor_cadastro_referencia ?? getUnidadeValorReferencia(item.unidade)),
+    valor_atribuido: formatCurrencyInput(item.valor_atribuido),
+    principal: Boolean(item.principal) || (index === 0 && !source.some((row) => row.principal))
+  }));
+  return normalized.length ? normalized : [defaultContratoUnidade()];
+}
+
+function buildContratoNumeroMulti(empreendimento, unidadesSelecionadas = []) {
+  const codigos = unidadesSelecionadas
+    .map((unidade) => [unidade?.torre, unidade?.codigo].filter(Boolean).join('-'))
+    .filter(Boolean);
+  return [empreendimento?.codigo, codigos.join(' + ')]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .join(' - ');
+}
+
 function defaultForm() {
   return {
     id: null,
     empreendimento_id: '',
     unidade_comercial_id: '',
+    unidades: [defaultContratoUnidade()],
     parceiro_id: '',
     compradores: [],
     corretor_parceiro_id: '',
@@ -179,6 +235,7 @@ function defaultDistratoForm() {
 
 function defaultTrocaForm() {
   return {
+    unidade_comercial_origem_id: '',
     unidade_comercial_destino_id: '',
     novo_valor_total: '',
     data_efetiva: today(),
@@ -473,6 +530,7 @@ function pickEditForm(contrato = {}) {
     id: contrato.id || null,
     empreendimento_id: contrato.empreendimento_id ? String(contrato.empreendimento_id) : '',
     unidade_comercial_id: contrato.unidade_comercial_id ? String(contrato.unidade_comercial_id) : '',
+    unidades: normalizeContratoUnidadesForm(contrato),
     parceiro_id: contrato.parceiro_id ? String(contrato.parceiro_id) : '',
     compradores,
     corretor_parceiro_id: contrato.corretor_parceiro_id ? String(contrato.corretor_parceiro_id) : '',
@@ -674,7 +732,14 @@ function gerarParcelasDoBloco(plano = {}, planoId = '', periodicidades = PERIODI
 export default function ComercialContratos() {
   const { user } = useAuth();
   const [draftLoaded] = useState(() => getStoredContratoDraft());
-  const [form, setForm] = useState(() => draftLoaded?.form || defaultForm());
+  const [form, setForm] = useState(() => {
+    if (!draftLoaded?.form) return defaultForm();
+    return {
+      ...defaultForm(),
+      ...draftLoaded.form,
+      unidades: normalizeContratoUnidadesForm(draftLoaded.form)
+    };
+  });
   const [generator, setGenerator] = useState(() => draftLoaded?.generator || defaultGenerator());
   const [paymentPlans, setPaymentPlans] = useState(() => (
     Array.isArray(draftLoaded?.paymentPlans) ? draftLoaded.paymentPlans : []
@@ -712,6 +777,7 @@ export default function ComercialContratos() {
   const [testemunhaRapidaSlot, setTestemunhaRapidaSlot] = useState(null);
   const [distratoForm, setDistratoForm] = useState(defaultDistratoForm());
   const [trocaForm, setTrocaForm] = useState(defaultTrocaForm());
+  const [contratoAssinadoArquivo, setContratoAssinadoArquivo] = useState(null);
   const [error, setError] = useState('');
 
   async function carregar() {
@@ -779,24 +845,26 @@ export default function ComercialContratos() {
 
     return unidadesBase.filter((item) => {
       const situacao = String(item.situacao || '').trim().toUpperCase();
-      const unidadeAtualDoContrato = form.id && String(item.id) === String(form.unidade_comercial_id);
+      const unidadeAtualDoContrato = form.id && (form.unidades || []).some((row) => String(item.id) === String(row.unidade_comercial_id));
       return unidadeAtualDoContrato || situacao !== 'VENDIDA';
     });
-  }, [form.empreendimento_id, form.id, form.unidade_comercial_id, unidades]);
+  }, [form.empreendimento_id, form.id, form.unidades, unidades]);
 
   const empreendimentoSelecionado = useMemo(
     () => empreendimentos.find((item) => String(item.id) === String(form.empreendimento_id)),
     [empreendimentos, form.empreendimento_id]
   );
 
-  const unidadeSelecionada = useMemo(
-    () => unidades.find((item) => String(item.id) === String(form.unidade_comercial_id)),
-    [form.unidade_comercial_id, unidades]
+  const unidadesSelecionadas = useMemo(
+    () => (form.unidades || [])
+      .map((row) => unidades.find((item) => String(item.id) === String(row.unidade_comercial_id)))
+      .filter(Boolean),
+    [form.unidades, unidades]
   );
 
   const numeroContratoCalculado = useMemo(
-    () => buildContratoNumero(empreendimentoSelecionado, unidadeSelecionada),
-    [empreendimentoSelecionado, unidadeSelecionada]
+    () => buildContratoNumeroMulti(empreendimentoSelecionado, unidadesSelecionadas),
+    [empreendimentoSelecionado, unidadesSelecionadas]
   );
 
   useEffect(() => {
@@ -910,7 +978,7 @@ export default function ComercialContratos() {
       const blob = normalizeSearch([
         item.numero,
         item.cliente?.nome,
-        item.unidadeComercial?.codigo,
+        getContratoUnidadesLabel(item),
         item.empreendimento?.nome,
         item.corretor_nome
       ].filter(Boolean).join(' '));
@@ -937,12 +1005,15 @@ export default function ComercialContratos() {
 
   const unidadesElegiveisTroca = useMemo(() => {
     if (!contratoSelecionado?.unidade_comercial_id) return [];
+    const idsAtuais = new Set((contratoSelecionado.unidades || [])
+      .map((item) => String(item.unidade_comercial_id)));
+    if (!idsAtuais.size && contratoSelecionado.unidade_comercial_id) idsAtuais.add(String(contratoSelecionado.unidade_comercial_id));
     return unidades.filter((item) =>
-      Number(item.id) !== Number(contratoSelecionado.unidade_comercial_id)
+      !idsAtuais.has(String(item.id))
       && String(item.ativo) !== 'false'
       && !['VENDIDA', 'BLOQUEADA'].includes(String(item.situacao || '').toUpperCase())
     );
-  }, [contratoSelecionado?.unidade_comercial_id, unidades]);
+  }, [contratoSelecionado?.unidade_comercial_id, contratoSelecionado?.unidades, unidades]);
 
   const modelosDoContratoSelecionado = useMemo(() => {
     if (!contratoSelecionado?.empreendimento_id) return [];
@@ -961,7 +1032,7 @@ export default function ComercialContratos() {
   }, [contratoSelecionado?.empreendimento_id, modelosContrato]);
 
   const documentosContratoPadrao = useMemo(
-    () => documentosContrato.filter((item) => String(item.tipo_documento || '').toUpperCase() === 'CONTRATO'),
+    () => documentosContrato.filter((item) => ['CONTRATO', 'CONTRATO_ASSINADO'].includes(String(item.tipo_documento || '').toUpperCase())),
     [documentosContrato]
   );
 
@@ -973,6 +1044,13 @@ export default function ComercialContratos() {
   const isSuperadmin = useMemo(
     () => String(user?.perfil || '').trim().toUpperCase() === 'SUPERADMIN',
     [user?.perfil]
+  );
+
+  const podeImportarSienge = useMemo(() => canImportComercialContratos(user), [user]);
+
+  const totalValorUnidades = useMemo(
+    () => roundCurrency((form.unidades || []).reduce((sum, item) => sum + toNumber(item.valor_atribuido), 0)),
+    [form.unidades]
   );
 
   function aplicarPlanosAoContrato(planos) {
@@ -1027,9 +1105,49 @@ export default function ComercialContratos() {
       ...current,
       empreendimento_id: empreendimentoId,
       unidade_comercial_id: '',
+      unidades: [defaultContratoUnidade()],
       obra_id: empreendimento?.obra_id ? String(empreendimento.obra_id) : '',
       numero: ''
     }));
+  }
+
+  function atualizarUnidadeContrato(index, unidadeId) {
+    const unidade = unidades.find((item) => String(item.id) === String(unidadeId));
+    const referencia = getUnidadeValorReferencia(unidade);
+    setForm((current) => {
+      const proximas = (current.unidades || []).map((item, itemIndex) => itemIndex === index ? {
+        ...item,
+        unidade_comercial_id: unidadeId,
+        valor_cadastro_referencia: referencia ? formatCurrencyInput(referencia) : '',
+        valor_atribuido: item.valor_atribuido || ((current.unidades || []).length === 1 && current.valor_total ? current.valor_total : '')
+      } : item);
+      const principal = proximas.find((item) => item.principal) || proximas[0];
+      return { ...current, unidades: proximas, unidade_comercial_id: principal?.unidade_comercial_id || '' };
+    });
+  }
+
+  function adicionarUnidadeContrato() {
+    setForm((current) => ({
+      ...current,
+      unidades: [...(current.unidades || []), { ...defaultContratoUnidade(), principal: false }]
+    }));
+  }
+
+  function removerUnidadeContrato(index) {
+    setForm((current) => {
+      let proximas = (current.unidades || []).filter((_, itemIndex) => itemIndex !== index);
+      if (!proximas.length) proximas = [defaultContratoUnidade()];
+      if (!proximas.some((item) => item.principal)) proximas = proximas.map((item, itemIndex) => ({ ...item, principal: itemIndex === 0 }));
+      const principal = proximas.find((item) => item.principal) || proximas[0];
+      return { ...current, unidades: proximas, unidade_comercial_id: principal?.unidade_comercial_id || '' };
+    });
+  }
+
+  function definirUnidadePrincipal(index) {
+    setForm((current) => {
+      const proximas = (current.unidades || []).map((item, itemIndex) => ({ ...item, principal: itemIndex === index }));
+      return { ...current, unidades: proximas, unidade_comercial_id: proximas[index]?.unidade_comercial_id || '' };
+    });
   }
 
   function adicionarFormaPagamento() {
@@ -1269,6 +1387,14 @@ export default function ComercialContratos() {
 
   async function handleTrocaUnidadeContrato() {
     if (!contratoSelecionado?.id) return;
+    if ((contratoSelecionado.unidades || []).length > 1 && !trocaForm.unidade_comercial_origem_id) {
+      setError('Selecione qual unidade do contrato sera trocada.');
+      return;
+    }
+    if (!trocaForm.unidade_comercial_destino_id) {
+      setError('Selecione a nova unidade.');
+      return;
+    }
     const novoValor = toNumber(trocaForm.novo_valor_total);
     const valorAtual = toNumber(contratoSelecionado.valor_total);
     if (novoValor > valorAtual && !hasText(trocaForm.competencia_data)) {
@@ -1367,6 +1493,21 @@ export default function ComercialContratos() {
       window.alert('Documento gerado excluido com sucesso.');
     } catch (err) {
       setError(err?.message || 'Erro ao excluir documento do contrato');
+    } finally {
+      setProcessingAction('');
+    }
+  }
+
+  async function handleAnexarContratoAssinado() {
+    if (!contratoSelecionado?.id || !contratoAssinadoArquivo) return;
+    try {
+      setProcessingAction('anexar-assinado');
+      setError('');
+      await anexarContratoAssinadoComercial(contratoSelecionado.id, contratoAssinadoArquivo);
+      setContratoAssinadoArquivo(null);
+      await carregarDocumentosContrato(contratoSelecionado.id);
+    } catch (err) {
+      setError(err?.message || 'Erro ao anexar contrato assinado');
     } finally {
       setProcessingAction('');
     }
@@ -1530,7 +1671,8 @@ export default function ComercialContratos() {
     const camposFaltando = [];
 
     if (!hasText(form.empreendimento_id)) camposFaltando.push('Empreendimento');
-    if (!hasText(form.unidade_comercial_id)) camposFaltando.push('Unidade');
+    if (!(form.unidades || []).length || (form.unidades || []).some((item) => !hasText(item.unidade_comercial_id))) camposFaltando.push('Unidades');
+    if ((form.unidades || []).some((item) => toNumber(item.valor_atribuido) <= 0)) camposFaltando.push('Valor real de cada unidade');
     if (!hasText(form.parceiro_id)) camposFaltando.push('Cliente');
     if (!hasText(form.obra_id) || !empreendimentoSelecionado?.obra_id) camposFaltando.push('Obra vinculada ao empreendimento');
     if (!hasText(numeroContratoCalculado)) camposFaltando.push('Contrato');
@@ -1580,14 +1722,33 @@ export default function ComercialContratos() {
       return 'A composicao das formas de pagamento precisa fechar exatamente o valor total do contrato.';
     }
 
+    const unidadeIds = (form.unidades || []).map((item) => String(item.unidade_comercial_id));
+    if (new Set(unidadeIds).size !== unidadeIds.length) {
+      return 'A mesma unidade nao pode ser vinculada mais de uma vez ao contrato.';
+    }
+
+    if (Math.abs(totalValorUnidades - valorTotalContrato) > 0.02) {
+      return 'A soma dos valores reais das unidades precisa fechar o valor total do contrato, com tolerancia de R$ 0,02.';
+    }
+
+    return '';
+  }
+
+  function validarUnidadesContrato() {
+    const linhas = form.unidades || [];
+    if (!linhas.length || linhas.some((item) => !hasText(item.unidade_comercial_id))) return 'Selecione todas as unidades do contrato.';
+    if (linhas.some((item) => toNumber(item.valor_atribuido) <= 0)) return 'Informe o valor real de cada unidade antes de salvar.';
+    const ids = linhas.map((item) => String(item.unidade_comercial_id));
+    if (new Set(ids).size !== ids.length) return 'A mesma unidade nao pode ser vinculada mais de uma vez ao contrato.';
+    if (Math.abs(totalValorUnidades - valorTotalContrato) > 0.02) return 'A soma dos valores reais das unidades precisa fechar o valor total do contrato, com tolerancia de R$ 0,02.';
     return '';
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
     if (submitInFlightRef.current) return;
-    if (!form.id) {
-      const validationMessage = validarCriacaoContrato();
+    {
+      const validationMessage = form.id ? validarUnidadesContrato() : validarCriacaoContrato();
       if (validationMessage) {
         setError(validationMessage);
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1616,6 +1777,13 @@ export default function ComercialContratos() {
       if (form.id) {
         await atualizarContratoComercial(form.id, {
           status: form.status,
+          unidades: form.unidades.map((item, index) => ({
+            unidade_comercial_id: Number(item.unidade_comercial_id),
+            valor_cadastro_referencia: toNumber(item.valor_cadastro_referencia) || undefined,
+            valor_atribuido: toNumber(item.valor_atribuido),
+            principal: Boolean(item.principal),
+            ordem: index + 1
+          })),
           compradores: compradoresContrato.map((item) => ({
             parceiro_id: Number(item.parceiro_id),
             principal: Boolean(item.principal),
@@ -1639,6 +1807,13 @@ export default function ComercialContratos() {
         await criarContratoComercial({
           empreendimento_id: Number(form.empreendimento_id),
           unidade_comercial_id: Number(form.unidade_comercial_id),
+          unidades: form.unidades.map((item, index) => ({
+            unidade_comercial_id: Number(item.unidade_comercial_id),
+            valor_cadastro_referencia: toNumber(item.valor_cadastro_referencia) || undefined,
+            valor_atribuido: toNumber(item.valor_atribuido),
+            principal: Boolean(item.principal),
+            ordem: index + 1
+          })),
           parceiro_id: Number(form.parceiro_id),
           compradores: compradoresContrato.map((item) => ({
             parceiro_id: Number(item.parceiro_id),
@@ -1715,6 +1890,8 @@ export default function ComercialContratos() {
 
       {error && <div className="app-alert app-alert--error">{error}</div>}
 
+      {podeImportarSienge && <ComercialContratoImportacaoPanel onImported={carregar} />}
+
       <section className="sol-surface-card rounded-2xl p-4 md:p-5 space-y-4">
         <div className="sol-filtros-head">
           <div>
@@ -1733,32 +1910,71 @@ export default function ComercialContratos() {
                 {empreendimentos.map((item) => <option key={item.id} value={item.id}>{item.nome}</option>)}
               </select>
             </label>
-            <label className="sol-filter-field">
-              <span className="sol-filter-label">Unidade</span>
-              <select
-                className="input w-full"
-                value={form.unidade_comercial_id}
-                onChange={(e) => {
-                  const unidadeId = e.target.value;
-                  const unidade = unidades.find((u) => String(u.id) === String(unidadeId));
-                  const emp = empreendimentos.find((em) => String(em.id) === String(form.empreendimento_id));
-                  const autoNumero = buildContratoNumero(emp, unidade);
-                  setForm((c) => ({ ...c, unidade_comercial_id: unidadeId, numero: autoNumero }));
-                }}
-                required
-                disabled={Boolean(form.id)}
-              >
-                <option value="">Selecione</option>
-                {unidadesDoEmpreendimento.map((item) => (
-                  <option key={item.id} value={item.id}>{buildUnidadeOptionLabel(item)}</option>
-                ))}
-              </select>
-              {!form.id && form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
-                <span className="mt-1 text-xs text-[var(--c-muted)]">
-                  Nenhuma unidade disponivel para contrato neste empreendimento.
-                </span>
+            <div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3 xl:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <div className="sol-filter-label">Unidades do contrato</div>
+                  <div className="text-xs text-[var(--c-muted)]">O valor do cadastro e apenas referencia. Informe o valor real atribuido a cada unidade.</div>
+                </div>
+                <button type="button" className="btn btn-outline btn-sm" onClick={adicionarUnidadeContrato} disabled={!form.empreendimento_id}>
+                  <HiPlus className="h-4 w-4" /> Adicionar unidade
+                </button>
+              </div>
+              <div className="mt-3 space-y-2">
+                {(form.unidades || []).map((linha, index) => {
+                  const unidade = unidades.find((item) => String(item.id) === String(linha.unidade_comercial_id));
+                  const selecionadasEmOutrasLinhas = new Set((form.unidades || [])
+                    .filter((_, itemIndex) => itemIndex !== index)
+                    .map((item) => String(item.unidade_comercial_id)));
+                  return (
+                    <div key={`${index}-${linha.unidade_comercial_id}`} className="grid gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)] p-2 md:grid-cols-[minmax(190px,1fr)_150px_170px_auto_auto] md:items-end">
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Unidade</span>
+                        <select className="input w-full" value={linha.unidade_comercial_id} onChange={(event) => atualizarUnidadeContrato(index, event.target.value)} required>
+                          <option value="">Selecione</option>
+                          {unidadesDoEmpreendimento
+                            .filter((item) => !selecionadasEmOutrasLinhas.has(String(item.id)))
+                            .map((item) => <option key={item.id} value={item.id}>{buildUnidadeOptionLabel(item)}</option>)}
+                        </select>
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Valor cadastrado</span>
+                        <input className="input w-full" value={linha.valor_cadastro_referencia || (unidade ? formatCurrencyInput(getUnidadeValorReferencia(unidade)) : '')} disabled />
+                      </label>
+                      <label className="sol-filter-field">
+                        <span className="sol-filter-label">Valor real *</span>
+                        <input
+                          className="input w-full"
+                          inputMode="decimal"
+                          value={linha.valor_atribuido}
+                          onChange={(event) => setForm((current) => ({
+                            ...current,
+                            unidades: current.unidades.map((item, itemIndex) => itemIndex === index ? { ...item, valor_atribuido: normalizeCurrencyTyping(event.target.value) } : item)
+                          }))}
+                          onBlur={(event) => setForm((current) => ({
+                            ...current,
+                            unidades: current.unidades.map((item, itemIndex) => itemIndex === index ? { ...item, valor_atribuido: formatCurrencyInput(event.target.value) } : item)
+                          }))}
+                          placeholder="R$ 0,00"
+                        />
+                      </label>
+                      <label className="inline-flex h-10 items-center gap-2 text-xs text-[var(--c-text)]">
+                        <input type="radio" name="unidade-principal" checked={Boolean(linha.principal)} onChange={() => definirUnidadePrincipal(index)} /> Principal
+                      </label>
+                      <button type="button" className="btn btn-outline btn-sm h-10" onClick={() => removerUnidadeContrato(index)} disabled={(form.unidades || []).length === 1} title="Remover unidade">
+                        <HiXMark className="h-4 w-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className={`mt-2 text-xs font-medium ${Math.abs(totalValorUnidades - valorTotalContrato) <= 0.02 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                Soma das unidades: {formatCurrency(totalValorUnidades)} · Valor do contrato: {formatCurrency(valorTotalContrato)}
+              </div>
+              {form.empreendimento_id && unidadesDoEmpreendimento.length === 0 && (
+                <div className="mt-2 text-xs text-[var(--c-muted)]">Nenhuma unidade disponivel para contrato neste empreendimento.</div>
               )}
-            </label>
+            </div>
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="sol-filter-label">Comprador principal</span>
@@ -2799,6 +3015,20 @@ export default function ComercialContratos() {
             </div>
           </div>
 
+          <div className="mt-4 overflow-hidden rounded-xl border border-[var(--c-border)]">
+            <div className="bg-[var(--c-bg)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--c-muted)]">Unidades vinculadas</div>
+            <div className="divide-y divide-[var(--c-border)]">
+              {(contratoSelecionado.unidades || []).map((item) => (
+                <div key={item.unidade_comercial_id} className="grid gap-1 px-3 py-2 text-sm md:grid-cols-[minmax(0,1fr)_170px_170px_auto]">
+                  <span className="font-medium text-[var(--c-text)]">{buildUnidadeOptionLabel(item.unidade)}</span>
+                  <span className="text-[var(--c-muted)]">Cadastro: {formatCurrency(item.valor_cadastro_referencia)}</span>
+                  <span className="text-[var(--c-text)]">Real: {formatCurrency(item.valor_atribuido)}</span>
+                  <span className="text-xs text-[var(--c-muted)]">{item.principal ? 'Principal' : ''}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-4">
               <div className="text-xs uppercase tracking-[0.18em] text-[var(--c-muted)]">Corretor</div>
@@ -2889,7 +3119,16 @@ export default function ComercialContratos() {
             </div>
 
             {showTroca && (
-              <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-5">
+              <div className="grid gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-4 md:grid-cols-6">
+                {(contratoSelecionado.unidades || []).length > 1 && (
+                  <label className="sol-filter-field">
+                    <span className="sol-filter-label">Unidade que sera trocada</span>
+                    <select className="input w-full" value={trocaForm.unidade_comercial_origem_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_origem_id: e.target.value }))}>
+                      <option value="">Selecione</option>
+                      {(contratoSelecionado.unidades || []).map((item) => <option key={item.unidade_comercial_id} value={item.unidade_comercial_id}>{buildUnidadeOptionLabel(item.unidade)}</option>)}
+                    </select>
+                  </label>
+                )}
                 <label className="sol-filter-field">
                   <span className="sol-filter-label">Nova unidade</span>
                   <select className="input w-full" value={trocaForm.unidade_comercial_destino_id} onChange={(e) => setTrocaForm((current) => ({ ...current, unidade_comercial_destino_id: e.target.value }))}>
@@ -2965,6 +3204,24 @@ export default function ComercialContratos() {
                   }
                 >
                   {processingAction === 'gerar-documento' ? 'Gerando PDF...' : 'Gerar PDF completo'}
+                </button>
+                <label className="btn btn-outline cursor-pointer">
+                  <input
+                    className="sr-only"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    disabled={possuiContratoAssinado}
+                    onChange={(event) => setContratoAssinadoArquivo(event.target.files?.[0] || null)}
+                  />
+                  {contratoAssinadoArquivo ? contratoAssinadoArquivo.name : 'Selecionar contrato assinado'}
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={handleAnexarContratoAssinado}
+                  disabled={possuiContratoAssinado || !contratoAssinadoArquivo || processingAction === 'anexar-assinado'}
+                >
+                  {processingAction === 'anexar-assinado' ? 'Anexando...' : 'Anexar PDF assinado'}
                 </button>
               </div>
             </div>
