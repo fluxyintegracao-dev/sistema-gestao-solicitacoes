@@ -4,6 +4,14 @@ const { sequelize, Contrato, ContratoAditivo, ContratoParcela, ConfiguracaoSiste
 const { codigoDoSetor } = require('../utils/codigoDoSetor');
 const gerarCodigoSolicitacao = require('./solicitacao/gerarCodigo');
 const { paraCentavos, somenteData, formatarISO } = require('./contratoParcelasService');
+const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
+const {
+  calcularRoteamentoSolicitacaoAditivo,
+  SETOR_GERENCIA_PROCESSOS,
+  SETOR_JURIDICO,
+  STATUS_SOLICITACAO_PEDIDO_ADITIVO,
+  STATUS_SOLICITACAO_JURIDICO
+} = require('./contratoAditivoRoteamento');
 
 /**
  * Termo aditivo de contrato (escopo 3.1.1 / 3.2.1, regra PI-12).
@@ -174,11 +182,10 @@ async function calcularTetoAditivo(contratoId, transaction) {
  */
 const CHAVE_TIPO_ADITIVO_LEGADO = 'CONTRATO_ADITIVO_TIPO_SOLICITACAO';
 
-// Setor que recebe todo pedido de aditivo: GERENCIA DE PROCESSOS. Codigo do setor, nunca o nome:
-// o nome tem espaco no fim no banco. No legado nasce uma solicitacao nesta fila; no fluxo novo a
-// solicitacao-mae e encaminhada para ela.
-const SETOR_GERENCIA_PROCESSOS = 'GEO';
-const STATUS_SOLICITACAO_PEDIDO_ADITIVO = 'PED. ADITIVO';
+// Destinos do pedido de aditivo. Os codigos, nunca os nomes, alimentam a fila: ha setor com espaco
+// no fim do nome no banco. Ate o limite, a decisao continua na Gerencia de Processos; se o valor
+// total do contrato depois do pedido ultrapassar o limite juridico configuravel, o pedido vai
+// diretamente ao Juridico.
 const SETOR_OBRA = 'OBRA';
 const STATUS_SOLICITACAO_ADITIVO_APROVADO = 'APROVADA';
 
@@ -254,7 +261,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     garantirContratoAceitaAditivo(teto.contrato);
     const contrato = await Contrato.findByPk(contratoId, {
       attributes: ['id', 'codigo', 'obra_id', 'valor_total', 'fluxo_novo', 'solicitacao_id',
-        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id'],
+        'tipo_macro_id', 'tipo_sub_id', 'favorecido_id', 'valor_aditivos'],
       transaction
     });
     // O teto de 25% e sobre VALOR. Aditivo de prazo nao tem valor e por isso nao entra na conta —
@@ -266,6 +273,24 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
         + `disponivel R$ ${teto.disponivel.toFixed(2)}).`
       );
     }
+
+    // O corte juridico considera o compromisso total que existira se este pedido for aprovado:
+    // valor original + aditivos ja aprovados + valor agora solicitado. Comparar apenas o novo
+    // aditivo permitiria que varios pedidos menores mantivessem acima do limite um contrato sem
+    // revisao juridica. Aditivo somente de prazo soma zero, mas um contrato que ja ultrapassa o
+    // limite continua seguindo diretamente ao Juridico.
+    const { limite_cent: limiteJuridicoCent } = await obterLimiteJuridico();
+    const {
+      valorTotalAposPedidoCent,
+      encaminharDiretoAoJuridico,
+      setorDestino,
+      statusDestino
+    } = calcularRoteamentoSolicitacaoAditivo({
+      valorOriginal: contrato.valor_total,
+      valorAditivosAprovados: contrato.valor_aditivos || 0,
+      valorSolicitado: valorCent / 100,
+      limiteCent: limiteJuridicoCent
+    });
 
     // PI-16: o aditivo entra na solicitacao QUE JA EXISTE quando o contrato e do fluxo novo, e
     // abre uma NOVA quando o contrato e legado — porque la nao existe solicitacao-mae onde
@@ -294,10 +319,11 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
         codigo_contrato: contrato.codigo,
         descricao: `Termo aditivo do contrato ${contrato.codigo}`,
         valor: valorCent / 100,
-        // Fixo, nao herdado da tela: o aditivo do legado sempre cai na Gerencia de Processos.
-        area_responsavel: SETOR_GERENCIA_PROCESSOS,
+        // Calculado pelo mesmo limite juridico usado na abertura de contrato; nunca herdado da tela.
+        area_responsavel: setorDestino,
         criado_por: usuarioId || null,
-        status_global: 'PENDENTE'
+        // No legado o pedido nasce em uma solicitacao propria e preserva o status historico.
+        status_global: STATUS_SOLICITACAO_JURIDICO
       }, { transaction });
       solicitacaoDoAditivo = nova.id;
       criouSolicitacao = true;
@@ -356,24 +382,25 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       const encaminhouFluxoNovo = Boolean(contrato?.fluxo_novo && alvo);
 
       // O contrato do fluxo novo reutiliza a solicitacao-mae. Ao pedir um aditivo, ela precisa
-      // reaparecer na fila de quem decide, com um status que explique o motivo do retorno. Fazer o
-      // update aqui, na mesma transacao do aditivo, impede existir pedido sem fila (ou fila sem
-      // pedido) quando alguma gravacao falhar.
+      // reaparecer na fila de quem decide, com um status que explique o motivo do retorno. Acima do
+      // limite configuravel, essa fila e diretamente o Juridico; nos demais casos continua GEO.
+      // Fazer o update aqui, na mesma transacao do aditivo, impede existir pedido sem fila (ou fila
+      // sem pedido) quando alguma gravacao falhar.
       if (encaminhouFluxoNovo) {
         await alvo.update({
-          area_responsavel: SETOR_GERENCIA_PROCESSOS,
-          status_global: STATUS_SOLICITACAO_PEDIDO_ADITIVO
+          area_responsavel: setorDestino,
+          status_global: statusDestino
         }, { transaction });
       }
 
-      const areaAtual = encaminhouFluxoNovo ? SETOR_GERENCIA_PROCESSOS : areaAnterior;
-      const statusAtual = encaminhouFluxoNovo ? STATUS_SOLICITACAO_PEDIDO_ADITIVO : statusAnterior;
+      const areaAtual = encaminhouFluxoNovo ? setorDestino : areaAnterior;
+      const statusAtual = encaminhouFluxoNovo ? statusDestino : statusAnterior;
 
       await Historico.create({
         solicitacao_id: solicitacaoDoAditivo,
         usuario_responsavel_id: usuarioId || null,
         setor: encaminhouFluxoNovo
-          ? SETOR_GERENCIA_PROCESSOS
+          ? setorDestino
           : String(areaResponsavel || '').trim() || areaAtual || '-',
         acao: 'ADITIVO_SOLICITADO',
         descricao: `Termo aditivo de R$ ${(valorCent / 100).toFixed(2)} solicitado no contrato ${contrato.codigo} `
@@ -385,6 +412,9 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
           contrato_id: contratoId,
           valor: valorCent / 100,
           disponivel_antes: teto.disponivel,
+          limite_juridico: limiteJuridicoCent / 100,
+          valor_total_apos_pedido: valorTotalAposPedidoCent / 100,
+          encaminhado_direto_ao_juridico: encaminharDiretoAoJuridico,
           area_anterior: areaAnterior,
           area_nova: areaAtual
         })
@@ -393,16 +423,22 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       // O formato exato de ENVIADA_SETOR e consumido pelas regras de visibilidade por historico.
       // Sem esta linha, a solicitacao some do setor anterior, mas a Gerencia pode nao encontra-la
       // pelas consultas que verificam por onde ela passou.
-      if (encaminhouFluxoNovo && areaAnterior !== SETOR_GERENCIA_PROCESSOS) {
+      if (encaminhouFluxoNovo && areaAnterior !== setorDestino) {
         await Historico.create({
           solicitacao_id: solicitacaoDoAditivo,
           usuario_responsavel_id: usuarioId || null,
-          setor: SETOR_GERENCIA_PROCESSOS,
+          setor: setorDestino,
           acao: 'ENVIADA_SETOR',
-          descricao: `De ${areaAnterior || '-'} para ${SETOR_GERENCIA_PROCESSOS}`,
+          descricao: `De ${areaAnterior || '-'} para ${setorDestino}`,
           status_anterior: statusAnterior,
-          status_novo: STATUS_SOLICITACAO_PEDIDO_ADITIVO,
-          metadata: JSON.stringify({ aditivo_id: aditivo.id, contrato_id: contratoId })
+          status_novo: statusDestino,
+          metadata: JSON.stringify({
+            aditivo_id: aditivo.id,
+            contrato_id: contratoId,
+            limite_juridico: limiteJuridicoCent / 100,
+            valor_total_apos_pedido: valorTotalAposPedidoCent / 100,
+            encaminhado_direto_ao_juridico: encaminharDiretoAoJuridico
+          })
         }, { transaction });
       }
     }
@@ -411,6 +447,9 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       aditivo: { id: aditivo.id, valor: valorCent / 100, status: STATUS.PENDENTE },
       solicitacao_id: solicitacaoDoAditivo,
       criou_solicitacao: criouSolicitacao,
+      setor_destino: setorDestino,
+      status_destino: statusDestino,
+      encaminhado_direto_ao_juridico: encaminharDiretoAoJuridico,
       teto
     };
   });

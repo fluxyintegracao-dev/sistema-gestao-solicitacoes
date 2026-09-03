@@ -6,6 +6,20 @@ Nao ha trabalho ativo desta sessao.
 
 ## Trabalho concluido aguardando publicacao
 
+- id: 2026-09-03-aditivo-direto-juridico
+  sessao: codex-aditivo-direto-juridico-2026-09-03
+  responsavel: Codex / sessao atual
+  status: finalizado
+  escopo: Encaminhar diretamente ao Juridico o aditivo que ultrapassa o limite juridico configuravel.
+  feito:
+    - Roteamento passou a considerar valor original, aditivos aprovados e novo pedido.
+    - Exatamente no limite permanece GEO; acima segue para JURIDICO.
+    - Historicos registram limite, total e destino calculado.
+  pendencias:
+    - Atualizar e reiniciar somente o backend dev para homologacao funcional.
+  validacao:
+    - Sintaxe, carregamento do servico, prova pura em quatro cenarios e diff check aprovados.
+
 - id: 2026-08-27-auditoria-permissoes-granulares
   sessao: codex-auditoria-permissoes-granulares-2026-08-27
   responsavel: Codex / sessao atual

@@ -4,51 +4,6 @@
 
 Antes de trabalho paralelo, registrar agente, escopo, arquivos reservados e horario de inicio. Remover a reserva ao concluir o handoff.
 
-### codex-data-resposta-pagamento-2026-08-31
-- Escopo: separar a data operacional da solicitacao dos vencimentos das parcelas no fluxo novo de CONTRATO, padronizar o rotulo "Data Resposta/Pagamento" e concluir os ajustes operacionais da medicao (autocomplete de favorecido, datas DD/MM/AAAA, roteamento GEO, preview/download, recuperacao controlada de anexos ausentes, bloqueio de aprovacao sem arquivo, imutabilidade apos aprovacao, consulta financeira pelo credor contratual ou favorecido efetivo, busca rapida equivalente, navegacao parcela-titulo, limpeza visual da documentacao juridica, assinatura contratual por link com minuta disponivel no card, contratos visiveis com medicao bloqueada/solicitacao de retorno quando estiverem em outro setor, revelacao progressiva dos campos por tipo/subtipo, rotulo de Titulo do Contrato em MEDICAO, visibilidade setorial equivalente entre GEO e GERENCIA DE PROCESSOS, alinhamento da leitura da Recarga de Cartao com o setor atual e com mencoes, responsividade da prestacao de contas e retorno automatico ao setor criador apos quitacao de titulo).
-- Inicio: 2026-08-31
-- Arquivos reservados:
-  - `frontend/src/pages/NovaSolicitacao.jsx`
-  - `frontend/src/components/contratos/BlocoMedicaoContrato.jsx`
-  - `frontend/src/components/DateInputBR.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/ModalMedicao.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/FinanceiroCard.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/PrevisoesContrato.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/AcoesContrato.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/PreviewAnexoModal.jsx`
-  - `frontend/src/components/contratos/BlocoContratoFluxoNovo.jsx`
-  - `frontend/src/utils/novaSolicitacaoCampos.js`
-  - `frontend/src/components/recarga-cartao/RecargaCartaoFields.jsx`
-  - `frontend/src/components/recarga-cartao/PrestacaoRecargaCartao.jsx`
-  - `frontend/src/pages/Solicitacoes/TabelaSolicitacoes.jsx`
-  - `frontend/src/pages/Solicitacoes/index.jsx`
-  - `frontend/src/pages/Solicitacoes/Filtros.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/Header.jsx`
-  - `frontend/src/pages/SolicitacaoDetalhe/Timeline.jsx`
-  - `backend/src/services/novaSolicitacaoCamposConfig.js`
-  - `backend/src/services/contratoFluxoNovoService.js`
-  - `backend/src/controllers/ContratoFluxoNovoController.js`
-  - `backend/src/controllers/ContratoController.js`
-  - `backend/src/controllers/SolicitacaoController.js`
-  - `backend/src/controllers/RecargaCartaoController.js`
-  - `backend/src/services/recargaCartaoService.js`
-  - `backend/src/services/solicitacaoRetornoService.js`
-  - `backend/src/controllers/AnexoController.js`
-  - `backend/src/validators/operationalValidators.js`
-  - `backend/src/services/medicaoContratoService.js`
-  - `backend/src/services/tituloFinanceiroService.js`
-  - `backend/src/services/solicitacaoFinanceiroStatusService.js`
-  - `backend/scripts/validarRecargaCartao.js`
-  - `docs/handoffs/AJUSTES_OPERACIONAIS_MEDICAO_2026-08-31.md`
-  - `docs/handoffs/RECUPERACAO_ANEXOS_MEDICAO_2026-08-31.md`
-  - `docs/handoffs/FILTRO_CREDOR_PARCELAS_CONTRATO_2026-08-31.md`
-  - `docs/handoffs/ASSINATURA_CONTRATO_POR_LINK_2026-08-31.md`
-  - `docs/handoffs/MEDICAO_CONTRATO_FORA_SETOR_2026-08-31.md`
-  - `docs/handoffs/NOVA_SOLICITACAO_REVELACAO_PROGRESSIVA_2026-08-31.md`
-  - `docs/handoffs/RECARGA_CARTAO_VISIBILIDADE_GEO_2026-09-01.md`
-  - `docs/handoffs/RECARGA_CARTAO_ACESSO_FINANCEIRO_MENCAO_2026-09-01.md`
-  - `docs/handoffs/RECARGA_PRESTACAO_RESPONSIVA_RETORNO_QUITACAO_2026-09-01.md`
-
 Ownership da sessao `codex-snapshot-sanitizado-dev-v2-2026-08-29` liberado apos configurar
 `export-ignore` para QA, ambientes, uploads, artefatos locais e scripts de dados no pacote de deploy.
 
