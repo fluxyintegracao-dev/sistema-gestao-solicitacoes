@@ -163,6 +163,8 @@ export function validarLayout() {
   const r18 = validarOverflow();
   falhas.push(...r18.falhas);
   avisos.push(...r18.avisos);
+  // A R18 também no JSX: o CSS era só metade do problema.
+  falhas.push(...validarOverflowEmJsx().falhas);
 
   // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
   // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a
@@ -379,7 +381,32 @@ function validarUsoDaConfirmacao() {
   const falhas = [];
   // `const ok = await confirmar(` / `let x = await confirmar(` — qualquer
   // atribuição a um identificador simples. A forma correta desestrutura.
-  const padrao = /\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*await\s+confirmar\s*\(/g;
+  /*
+    DUAS FORMAS, não uma (03/09, achado da prova `regrasMordem.mjs`).
+
+    A primeira versão só pegava a atribuição a identificador simples
+    (`const ok = await confirmar(`). A prova de mordida plantou a NEGAÇÃO
+    DIRETA — `if (!await confirmar({...})) return;` — e a regra passou
+    batido. As duas quebram igual: objeto é sempre truthy, o `return` nunca
+    acontece e o "Cancelar" segue com a ação.
+
+    A regra existia, aparecia verde e cobria metade do que prometia. Só
+    apareceu quando o check foi testado no sentido de REPROVAR.
+  */
+  const padroes = [
+    {
+      re: /\b(?:const|let|var)\s+[A-Za-z_$][A-Za-z0-9_$]*\s*=\s*await\s+confirmar\s*\(/g,
+      motivo: 'retorno de confirmar() guardado numa variável e lido como booleano'
+    },
+    {
+      re: /!\s*await\s+confirmar\s*\(/g,
+      motivo: 'retorno de confirmar() negado direto (`!await confirmar(...)`)'
+    },
+    {
+      re: /\bif\s*\(\s*await\s+confirmar\s*\(/g,
+      motivo: 'retorno de confirmar() usado direto como condição de `if`'
+    }
+  ];
 
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -399,9 +426,11 @@ function validarUsoDaConfirmacao() {
       const codigo = original.replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g,
         (trecho) => trecho.replace(/[^\n]/g, ' '));
       const rel = path.relative(frontendRoot, caminho).split(path.sep).join('/');
-      for (const achado of codigo.matchAll(padrao)) {
-        const linha = codigo.slice(0, achado.index).split('\n').length;
-        falhas.push(`${rel}:${linha} [R21] retorno de confirmar() lido como booleano — objeto é sempre truthy, então "Cancelar" seguiria com a ação. Escreva: const { ok } = await confirmar({ ... }).`);
+      for (const { re, motivo } of padroes) {
+        for (const achado of codigo.matchAll(re)) {
+          const linha = codigo.slice(0, achado.index).split('\n').length;
+          falhas.push(`${rel}:${linha} [R21] ${motivo} — objeto é sempre truthy, então "Cancelar" seguiria com a ação. Escreva: const { ok } = await confirmar({ ... }).`);
+        }
       }
     }
   };
@@ -525,6 +554,46 @@ function validarDialogosDoNavegador() {
  * `overflow*: hidden` no CSS dos componentes padrão e dos módulos que
  * hospedam tela reformada.
  */
+/*
+  R18 EM JSX — a metade que faltava (03/09, achado da prova de mordida).
+
+  A R18 varria só ARQUIVOS CSS. `style={{ overflow: 'hidden' }}` escrito
+  direto na tela era invisível para ela — e é justamente assim que o defeito
+  aparece na prática: a raiz da ComunicacaoInterna tinha exatamente isso,
+  ancestral direto de tudo, matando faixa fixa e coluna fixa na tela
+  inteira. Foi achado por LEITURA, não pela regra que existia para pegá-lo.
+
+  A regra estava verde e cobria metade do problema.
+
+  Aqui vale a mesma distinção do lado CSS: `overflow: hidden` junto de
+  `textOverflow` ou `whiteSpace` é o IDIOMA DE TRUNCAGEM, recorta a própria
+  caixa e não sequestra sticky nenhum. Esse não reprova. O que reprova é o
+  `hidden` solto — para clipar sem criar scrollport existe `clip`.
+*/
+function validarOverflowEmJsx() {
+  const falhas = [];
+  const manifesto = JSON.parse(
+    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
+  );
+  for (const tela of manifesto.telas) {
+    const caminho = path.join(frontendRoot, tela);
+    if (!fs.existsSync(caminho)) continue;
+    const codigo = fs.readFileSync(caminho, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (t) => t.replace(/[^\n]/g, ' '));
+    // Procura o objeto de estilo inteiro, para ver o `hidden` NO CONTEXTO
+    // dos vizinhos — é o que separa truncagem de scrollport.
+    for (const achado of codigo.matchAll(/\{\s*[^{}]*\boverflow(?:X|Y)?\s*:\s*'hidden'[^{}]*\}/g)) {
+      const bloco = achado[0];
+      if (/textOverflow|whiteSpace|WebkitLineClamp|lineClamp/.test(bloco)) continue;
+      // overflowX/overflowY sozinho não cria scrollport nos dois eixos.
+      if (/\boverflow(?:X|Y)\s*:\s*'hidden'/.test(bloco) && !/\boverflow\s*:\s*'hidden'/.test(bloco)) continue;
+      const linha = codigo.slice(0, achado.index).split('\n').length;
+      falhas.push(`${tela}:${linha} [R18] \`overflow: 'hidden'\` em estilo inline — cria scrollport e MATA \`position: sticky\` de qualquer descendente (faixa fixa, coluna fixa), em silêncio. Para clipar sem criar scrollport use \`clip\`; para truncar texto, pareie com \`textOverflow\`.`);
+    }
+  }
+  return { falhas };
+}
+
 function validarOverflow() {
   const falhas = [];
   const avisos = [];

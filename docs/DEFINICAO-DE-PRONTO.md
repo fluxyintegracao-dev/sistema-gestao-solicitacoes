@@ -159,6 +159,47 @@ chamadas que a varredura nem olhava), a correção do falso positivo em
 `if (!motivo?.trim())`, o check bloqueante de família D e a terceira classe
 de defeito acima.
 
+### TODA REGRA NASCE COM PROVA NOS DOIS SENTIDOS (03/09)
+
+Prática obrigatória, e ela é a resposta à pergunta que mais custou nesta
+reforma: **verde significa "o código está certo" ou "o check não olha"?**
+De fora, as duas leituras são idênticas.
+
+> **Regra sem prova de que REPROVA é regra não verificada.** Toda regra nova
+> nasce com dois testes: um caso que ela tem de reprovar, e um caso limpo
+> que ela não pode acusar. Regra antiga sem essa prova entra na fila para
+> ganhá-la.
+
+O instrumento é `frontend/scripts/provas/regrasMordem.mjs`, dentro do
+`test:responsive`: ele planta uma violação mínima de cada regra estática
+numa tela temporária do manifesto e exige que o validador a reprove. Se uma
+regra deixar de morder — reescrita, seletor mudado, variável fora de escopo
+— a prova reprova ANTES de a regra ser usada como garantia.
+
+**O que a primeira execução encontrou, e é o argumento inteiro:** das 8
+regras estáticas, **2 não mordiam**.
+
+| Regra | O que ela prometia | O que ela cobria de verdade |
+|---|---|---|
+| **R21** | "`confirmar()` lido como booleano reprova" | só a forma `const ok = await confirmar(...)`. A negação direta, `if (!await confirmar(...)) return;`, passava batido — e quebra igual. |
+| **R18** | "`overflow: hidden` em ancestral de sticky reprova" | só ARQUIVOS CSS. `style={{ overflow: 'hidden' }}` no JSX era invisível — e é assim que o defeito aparece na prática: a raiz da `ComunicacaoInterna` tinha exatamente isso, ancestral de tudo. |
+
+As duas estavam verdes. As duas cobriam metade do que prometiam. E as duas
+só apareceram **quando o check foi testado no sentido de reprovar** — não
+por defeito em tela nenhuma.
+
+Repare no que isso significa para a R18: ela nasceu justamente para pegar o
+defeito das nove telas de detalhe com a faixa fixa quebrada. Depois disso,
+o mesmo defeito reapareceu na `ComunicacaoInterna` — e foi achado por
+LEITURA, com a regra criada para pegá-lo passando verde ao lado.
+
+**Lacuna declarada**: os 27 itens da DoD medidos no navegador (C*, T*, F*,
+B*, M*, X*, A1) **ainda não têm prova de mordida**. Eles rodam contra o
+preview publicado e precisam de uma tela-fixture com violações plantadas
+para serem provados do mesmo jeito. Até lá, nenhum deles pode ser tratado
+como verificado só por aparecer verde. Está registrado como lacuna, não
+como cobertura.
+
 ### O corolário incômodo
 
 Quando um check vira verde, a pergunta certa não é "acabou?". É **"o que
