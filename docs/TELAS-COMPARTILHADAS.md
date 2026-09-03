@@ -25,9 +25,11 @@ prefixo de mais de um módulo, ou fora de qualquer prefixo de módulo.
 **`ModuloRelatorios` é o caso-testemunha.** Um arquivo, um bloco de
 configuração por módulo, nove entradas. Reescrevê-la muda a cara dos
 relatórios de nove módulos ao mesmo tempo — e por isso ela nunca coube em
-leva de módulo nenhuma. Ainda não migrada: não usa `Pagina`, `PageHeader`
-nem `.app-bloco`; é Tailwind à mão, a faixa não gruda, e o título mantém o
-prefixo do módulo que a D7 mandou tirar.
+leva de módulo nenhuma.
+
+**Migrada em 03/09.** `Pagina` + `PageHeader`, cartões em `BlocoConteudo`,
+etiqueta com ícone além de cor, e a **D7 aplicada nos nove títulos de uma
+vez** — o prefixo do módulo saiu de todos. Está no manifesto.
 
 **Nota para o Financeiro:** o Financeiro **NÃO** usa a `ModuloRelatorios` —
 tem hub próprio (`FinanceiroRelatorios`) e 11 relatórios só dele. É a única
@@ -45,6 +47,25 @@ reivindicaria**: a segunda rota de cada uma está fora do menu, e a leva do
 módulo dono olharia só a primeira. A `ConfiguracoesContratoAlertasEFormas`
 serve dois assuntos diferentes (alertas de contrato e formas de pagamento de
 solicitação) a partir de Configurações.
+
+**As duas migradas em 03/09**, e a suspeita que justificou a categoria se
+confirmou nas duas — em ambas a segunda rota estava quebrada, e o dono
+aparente nunca teria olhado:
+
+- A `ConfiguracoesContratoAlertasEFormas` tinha o `<h1>` **fixo** em "Formas
+  de pagamento da Nova Solicitação". Quem entrava pela rota dos alertas de
+  contrato lia o título da outra configuração, sem nenhum sinal de qual
+  assunto estava aberto. E ela serve **quatro** assuntos, não dois: limite
+  jurídico do contrato, alerta de saldo, limites da Despesa Eventual e formas
+  de pagamento.
+- A `ComunicacaoInterna` **ignora o `:id`** de `/conversas/:id` — não importa
+  `useLocation`, `useParams` nem `useNavigate`. Abrir `/conversas/123` mostra
+  a caixa vazia. Entrada e saída são idênticas entre si. Registrado como E3 e
+  E4 em `docs/PENDENCIAS-REGISTRADAS.md`, junto com três telas de conversa
+  órfãs que navegam para essa rota quebrada.
+
+Nenhuma dessas duas quebras é de layout, e nenhuma delas apareceria numa leva
+de módulo. É o argumento da categoria, provado.
 
 ## C. Fora do shell da aplicação — sem módulo nenhum (4)
 
