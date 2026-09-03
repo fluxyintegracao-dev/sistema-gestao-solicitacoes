@@ -2,75 +2,91 @@
 
 > **GERADA AUTOMATICAMENTE** pelo harness `frontend/scripts/qa-preview/verificar.mjs`
 > contra o PREVIEW PUBLICADO. Nunca editar à mão — só verificação na tela real
-> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · — N/A (motivo registrado).
+> altera célula. Legenda: ✅ PASSOU · ❌ FALHOU · ⚠ SEM DADO (a tela tem a
+> capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
+> · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-03 02:46** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `8e55ea13528ad203a31dfbac2c427f75e5a24c1c`
-- Telas verificadas: 28 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1
-- **Células FALHOU: 30** (justificativas abaixo)
+- Verificação: **2026-09-03 20:43** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `a7d274dc449a39c6eb9f25cc027b2d759ddac549`
+- Telas verificadas: 36 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1
+- **Células FALHOU: 22** (justificativas abaixo)
+- **Células SEM DADO: 36** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| usuarios | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| usuarios | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | usuario-novo | ✅ | ✅ | ✅ | — | — | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| parceiros | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| parceiro-categorias | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| parceiros | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| parceiro-categorias | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | financeiro-titulo-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| obra-gestao | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ❌ | — | ❌ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| obra-gestao | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ❌ | ✅ | — | ✅ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | obra-tipo-apropriacao | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| setores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| tipos-solicitacao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| tipos-sub-contrato | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| empresas-grupo | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| setores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| tipos-solicitacao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| tipos-sub-contrato | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
+| empresas-grupo | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | areas-obra | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-visiveis-usuario | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | tipos-solicitacao-por-setor | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | tipos-compartilhados-setor | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-criacao-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-acesso-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | usuarios-permissoes-rh-dp | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ❌ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ❌ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
+| rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
+| rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| modulo-relatorios | ✅ | ❌ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| relatorios-administrativos | ✅ | ❌ | — | — | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| config-contrato-alertas-formas | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
+| login | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ❌ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
+| recuperar-senha | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
+| definir-senha | — | — | — | — | ❌ | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | — | — | ✅ | — | ⚠ |
+| cotacao-publica | — | — | — | — | ❌ | ✅ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | — | — | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | ⚠ | — | ✅ | — | ⚠ |
 
 ## FALHOU — cada célula, justificada
 
-- **usuarios · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **usuarios · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Inativo" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **parceiros · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **parceiros · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Credor" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **parceiro-categorias · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **parceiro-categorias · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Ativa" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **obras · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **obras · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Ativa" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **obra-gestao · T4**: [?aba=arquivos] section.card.px-4 > div.mt-3 > div.app-table-shell.app-tabela > div.resizable-table-scroll > table.resizable-table: "AÇÕES" quebra em duas linhas enquanto "ARQUIVO" tem 1294px de folga — a sobra foi para a coluna errada (confira o `tipo` declarado, R17)
-- **obra-gestao · T6**: [?aba=arquivos] palavra QUEBRADA ao meio (célula sem nowrap): "Abrir" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **setores · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
+- **obras · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1522px num contêiner de 1239px (283px fora) — a largura não é remedida
+- **obra-gestao · T3**: [?aba=arquivos] coluna 3 mudou junto (1294→1230px) — arrasto deve mudar SÓ a arrastada
 - **setores · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **tipos-solicitacao · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
 - **tipos-solicitacao · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "DESPESA_ADMINISTRATIVA" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **empresas-grupo · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **empresas-grupo · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Ativa" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **usuarios-envio-qualquer-setor · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1291px num contêiner de 1239px (52px fora) — a largura não é remedida
-- **usuarios-envio-qualquer-setor · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Inativo" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-acesso-financeiro · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1291px num contêiner de 1239px (52px fora) — a largura não é remedida
+- **usuarios-envio-qualquer-setor · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **usuarios-envio-qualquer-setor · T3**: coluna 2 mudou junto (1277→1213px) — arrasto deve mudar SÓ a arrastada
 - **usuarios-acesso-financeiro · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-acesso-prioridade-diretoria · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **usuarios-acesso-prioridade-diretoria · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Inativo" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **rhdp-pessoal · T6**: [?aba=colaboradores] palavra QUEBRADA ao meio (célula sem nowrap): "ATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **rhdp-colaboradores · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **rhdp-colaboradores · T3**: coluna 8 mudou junto (120→96px) — arrasto deve mudar SÓ a arrastada
-- **rhdp-importacoes · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "Confirmada" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **rhdp-fechamentos · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1291px num contêiner de 1239px (52px fora) — a largura não é remedida
-- **rhdp-fechamentos · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "FECHADO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **rhdp-relatorio-operacional · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1845px num contêiner de 1239px (606px fora) — a largura não é remedida
-- **rhdp-relatorio-operacional · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **usuarios-acesso-financeiro · T3**: coluna 2 mudou junto (1267→1203px) — arrasto deve mudar SÓ a arrastada
+- **usuarios-acesso-prioridade-diretoria · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **rhdp-pessoal · T3**: coluna 2 mudou junto (922→858px) — arrasto deve mudar SÓ a arrastada; largura não persistiu ao recarregar (184→undefinedpx)
+- **rhdp-fechamentos · T3**: coluna 2 mudou junto (777→713px) — arrasto deve mudar SÓ a arrastada
+- **modulo-relatorios · C2**: contagem ausente no apoio _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell > div.page.solicitacoes-page > header.app-page-header`)_
+- **relatorios-administrativos · C2**: contagem ausente no apoio _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page > header.app-page-header`)_
+- **relatorios-administrativos · C6**: link de navegação como ação: "Abrir pedido" → /pedidos-compra/21 _(seletor: `tbody > tr.app-tabela-linha > td > div.app-actionbar > a.btn.btn-outline`)_
+- **relatorios-administrativos · T7**: valor truncado: "quantidade_pedido: - -> 10 | preco_unitario: - -> R$ 5,00" (largura 156px < conteúdo 300px) _(seletor: `tbody > tr.app-tabela-linha > td > div.app-celula-dupla > span.app-celula-dupla-sub`)_
+- **relatorios-administrativos · T3**: coluna 3 mudou junto (478→414px) — arrasto deve mudar SÓ a arrastada
+- **comunicacao-interna · B1**: nenhum bloco na tela
+- **login · C5**: faixa ausente
+- **login · B1**: nenhum bloco na tela
+- **recuperar-senha · C5**: faixa ausente
+- **definir-senha · C5**: faixa ausente
+- **cotacao-publica · C5**: faixa ausente
+
+## SEM DADO — capacidades que NÃO foram provadas
+
+A tela tem a capacidade e o harness a exercitaria; a base do preview não
+devolveu registro para exercitá-la. **Não é aprovação e não vira aprovação
+por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
+é preciso registro na base — o harness é SOMENTE LEITURA e não cria nenhum.
+
+- **tipos-sub-contrato** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum subtipo cadastrado para este recorte") — capacidade NÃO PROVADA
+- **rhdp-pessoal** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhuma solicitacao neste filtro.") — capacidade NÃO PROVADA
+- **rhdp-documentos** — T1, T2, T4, T5, T6, T7, X1: a tela TEM tabela, mas a base do preview não devolveu nenhuma linha (mostrou "Nenhum documento localizado") — capacidade NÃO PROVADA
+- **definir-senha** — R2, A1, R1: idem R1: os campos de senha ficam desabilitados no estado sem token
+- **cotacao-publica** — T1, T2, T3, T4, T5, T6, T7, B4, R2, A1, R1, X1: medida com token INVÁLIDO: um token válido só existe criando ou abrindo cotação no ambiente compartilhado, e o harness não cria registro. A tabela de itens NÃO FOI PROVADA
 
 ## N/A — motivos
 
@@ -84,7 +100,7 @@
 - **obra-tipo-apropriacao**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (pivô de colunas dinâmicas — exceção registrada no manifesto (decisão do cliente pendente)); T3 (pivô de colunas dinâmicas — exceção registrada no manifesto (decisão do cliente pendente)); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **setores**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); F3 (tela sem filtros marcáveis)
 - **tipos-solicitacao**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); F3 (tela sem filtros marcáveis)
-- **tipos-sub-contrato**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); X1 (tela sem tabela/lista tabular)
+- **tipos-sub-contrato**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T3 (tabela com menos de 2 colunas); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis)
 - **empresas-grupo**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado)
 - **areas-obra**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar")); X1 (tela sem tabela/lista tabular)
 - **setores-visiveis-usuario**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar")); X1 (tela sem tabela/lista tabular)
@@ -96,9 +112,17 @@
 - **usuarios-acesso-financeiro**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); F4 (tela sem linha de filtros); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar"))
 - **usuarios-acesso-prioridade-diretoria**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar configuracao"))
 - **usuarios-permissoes-rh-dp**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (tela sem filtros marcáveis); R1 (ação principal não é cadastro ("Salvar matriz de permissoes")); X1 (tela sem tabela/lista tabular)
-- **rhdp-pessoal**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
-- **rhdp-colaboradores**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável)
-- **rhdp-documentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
+- **rhdp-pessoal**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
+- **rhdp-colaboradores**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); T3 (tabela com menos de 2 colunas)
+- **rhdp-documentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); T3 (tabela com menos de 2 colunas); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
 - **rhdp-importacoes**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); T7 (nenhum valor monetário na tela); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Selecionar planilha"))
 - **rhdp-fechamentos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); C5 (tela sem ações no cabeçalho); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (tela sem ação principal de cadastro)
 - **rhdp-relatorio-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório"))
+- **modulo-relatorios**: C3 (hub de entrada do módulo, não é tela de detalhe); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (hub de cartões: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
+- **relatorios-administrativos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Buscar"))
+- **comunicacao-interna**: C3 (painel de trabalho em duas colunas, não é tela de detalhe com retorno hierárquico); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); X1 (tela sem tabela/lista tabular)
+- **config-contrato-alertas-formas**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela de configuração: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
+- **login**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); C6 (ESCOPO da R11 (03/09): sem menu e sem breadcrumb, "Esqueci minha senha" é a única navegação e é obrigatória); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); A1 (tela sem linha acionável); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); X2 (idem C1)
+- **recuperar-senha**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); C6 (ESCOPO da R11 (03/09): "Voltar ao login" é a única navegação disponível e é obrigatória); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); A1 (tela sem linha acionável); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); X2 (idem C1)
+- **definir-senha**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); X1 (tela sem tabela/lista tabular); X2 (idem C1)
+- **cotacao-publica**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); F1 (não há listagem com recorte); F2 (idem F1); F4 (idem F1); M4 (tela sem comparação previsto × realizado); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); C1 (fora do shell: não há topbar para a faixa grudar); F3 (idem F1); X2 (idem C1)

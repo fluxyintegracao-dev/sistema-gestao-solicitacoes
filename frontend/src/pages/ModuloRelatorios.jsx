@@ -360,6 +360,14 @@ export default function ModuloRelatorios({ modulo }) {
     return true;
   };
 
+  // Quantas visões ESTE usuário pode abrir. Conta os itens visíveis de
+  // todas as seções, não o total do arquivo: quem não tem o acesso não
+  // deve ler um número que não corresponde ao que a tela mostra.
+  const visoesDisponiveis = hub.secoes.reduce(
+    (soma, secao) => soma + secao.itens.filter(podeVerItem).length,
+    0
+  );
+
   return (
     <Pagina>
       {/*
@@ -372,10 +380,19 @@ export default function ModuloRelatorios({ modulo }) {
         rolagem e sem gastar uma segunda linha (C2). Proposta registrada no
         relato: sair de vez, por ser exatamente o que o breadcrumb mostra.
       */}
+      {/*
+        `contagem` recebia o NOME DO MÓDULO — e a C2 reprovou, com razão:
+        contagem é quanta coisa a tela tem, e o usuário lê ali para saber o
+        tamanho do que veio. Texto no lugar do número esvazia o sinal. Agora
+        conta as visões que ESTE usuário pode abrir (não o total do
+        arquivo): duas pessoas com acessos diferentes veem números
+        diferentes, e é assim que tem de ser. O nome do módulo foi para a
+        descrição, onde continua visível.
+      */}
       <PageHeader
         titulo={hub.titulo}
-        contagem={hub.modulo}
-        descricao={hub.descricao}
+        contagem={`${visoesDisponiveis} visão${visoesDisponiveis === 1 ? '' : 'ões'} disponível${visoesDisponiveis === 1 ? '' : 'eis'}`}
+        descricao={`${hub.modulo} · ${hub.descricao}`}
       />
 
       {hub.secoes.map((secao, indice) => {

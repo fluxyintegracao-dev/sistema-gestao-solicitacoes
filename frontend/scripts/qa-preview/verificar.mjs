@@ -337,12 +337,51 @@ async function checarAffordanceAlinhamento(page, resultado) {
 
 async function checarRedimensionamento(page, tela, resultado) {
   if (resultado.T3?.estado === 'N/A') return;
+  /*
+    O QUE A T3 MEDE, E POR QUE MUDOU EM 03/09.
+
+    A versão antiga exigia: "arrastar a coluna 1 não pode mexer em NENHUMA
+    outra". Isso CONTRADIZ a regra de leitura acordada e provada em
+    `scripts/provas/larguraDeColuna.mjs`: a coluna arrastada passa a ser DO
+    USUÁRIO e fica; as demais continuam livres e ACOMPANHAM — absorvem a
+    sobra. Alargar a coluna 1 em 64px dentro de um contêiner de largura fixa
+    OBRIGA as livres a devolverem 64px, senão a tabela estoura a borda.
+
+    E aqui está o que isso escondia: a T3 antiga PASSAVA porque a tabela não
+    redistribuía coisa nenhuma — que era exatamente o defeito que a T4
+    apontava ("a largura não é remedida"). Um check verde provando que o
+    outro estava certo. Depois do conserto da redistribuição, a T3 começou a
+    reprovar em seis telas por fazer a coisa CERTA.
+
+    O invariante verdadeiro de "só a arrastada" não está na largura das
+    vizinhas na tela — está em QUEM é dona da largura. O `ResizableTable`
+    grava no localStorage apenas as colunas do usuário, então uma arrastada
+    tem de deixar exatamente UMA chave gravada. É isso que se mede agora.
+  */
   const medir = () => page.evaluate(() => {
     const tab = document.querySelector('.resizable-table');
     if (!tab) return null;
-    return Array.from(tab.querySelectorAll('thead th')).map((th) => Math.round(th.getBoundingClientRect().width));
+    const rol = tab.closest('.resizable-table-scroll');
+    return {
+      colunas: Array.from(tab.querySelectorAll('thead th')).map((th) => Math.round(th.getBoundingClientRect().width)),
+      tabela: Math.round(tab.getBoundingClientRect().width),
+      conteiner: rol ? Math.round(rol.clientWidth) : null,
+      rolagem: rol ? Math.round(rol.scrollWidth) : null
+    };
   });
-  const antes = await medir();
+  const chavesGravadas = () => page.evaluate(() => {
+    const chaves = Object.keys(window.localStorage).filter((k) => /larguras|colunas/i.test(k));
+    const mapa = {};
+    chaves.forEach((k) => {
+      try {
+        const v = JSON.parse(window.localStorage.getItem(k) || '{}');
+        if (v && typeof v === 'object') mapa[k] = Object.keys(v);
+      } catch { /* chave que não é JSON não interessa */ }
+    });
+    return mapa;
+  });
+  const medidaAntes = await medir();
+  const antes = medidaAntes?.colunas;
   if (!antes || antes.length < 2) {
     resultado.T3 = { estado: 'N/A', motivo: 'tabela com menos de 2 colunas' };
     return;
@@ -363,15 +402,31 @@ async function checarRedimensionamento(page, tela, resultado) {
   await page.mouse.move(caixa.x + caixa.width / 2 + 64, caixa.y + caixa.height / 2, { steps: 6 });
   await page.mouse.up();
   await page.waitForTimeout(300);
-  const depois = await medir();
+  const medidaDepois = await medir();
+  const depois = medidaDepois?.colunas || [];
   const problemas = [];
-  const delta = depois[idx] - antes[idx];
+  const delta = (depois[idx] ?? 0) - antes[idx];
   if (Math.abs(delta - 64) > 12) problemas.push(`coluna arrastada mudou ${delta}px (esperado ~64px)`);
-  for (let i = 1; i < antes.length; i += 1) {
-    if (Math.abs(depois[i] - antes[i]) > 2) {
-      problemas.push(`coluna ${i + 1} mudou junto (${antes[i]}→${depois[i]}px) — arrasto deve mudar SÓ a arrastada`);
-      break;
+
+  /* A tabela não pode ESTOURAR por causa do arrasto: ou as livres absorvem
+     a sobra, ou a tabela já está no mínimo e passa a rolar DENTRO do próprio
+     contêiner (X3). O que não pode é transbordar sem rolagem. */
+  if (medidaDepois?.conteiner != null) {
+    const excesso = medidaDepois.tabela - medidaDepois.conteiner;
+    const rola = medidaDepois.rolagem > medidaDepois.conteiner + 4;
+    if (excesso > 24 && !rola) {
+      problemas.push(`o arrasto empurrou a tabela para ${medidaDepois.tabela}px num contêiner de ${medidaDepois.conteiner}px (${excesso}px fora) SEM rolagem própria`);
     }
+  }
+
+  /* O invariante de posse: uma arrastada = UMA chave gravada. Se o arrasto
+     congelasse as vizinhas, elas apareceriam aqui — e aí sim a próxima
+     janela menor não conseguiria mais redistribuir nada. */
+  const gravadas = await chavesGravadas();
+  const daTabela = Object.entries(gravadas).filter(([, v]) => v.length > 0);
+  const demais = daTabela.flatMap(([chave, v]) => (v.length > 1 ? [`${chave}: ${v.length} colunas (${v.join(', ')})`] : []));
+  if (demais.length) {
+    problemas.push(`um arrasto gravou mais de uma coluna como DO USUÁRIO — ${demais[0]}; as vizinhas ficariam congeladas e a tabela pararia de acompanhar a janela`);
   }
   // Persistência: recarrega e mede de novo. Blocos recolhidos voltam
   // fechados no reload — reabre para a tabela deles seguir mensurável.
@@ -381,9 +436,11 @@ async function checarRedimensionamento(page, tela, resultado) {
     document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
   });
   await page.waitForTimeout(500);
-  const recarregado = await medir();
-  if (!recarregado || Math.abs(recarregado[idx] - depois[idx]) > 4) {
-    problemas.push(`largura não persistiu ao recarregar (${depois?.[idx]}→${recarregado?.[idx]}px)`);
+  const recarregado = (await medir())?.colunas;
+  if (!recarregado || recarregado.length !== depois.length) {
+    problemas.push(`ao recarregar, a tabela voltou com ${recarregado?.length ?? 'nenhuma'} coluna(s) contra ${depois.length} antes — não dá para comparar a persistência`);
+  } else if (Math.abs(recarregado[idx] - depois[idx]) > 4) {
+    problemas.push(`largura não persistiu ao recarregar (${depois[idx]}→${recarregado[idx]}px)`);
   }
   resultado.T3 = problemas.length
     ? { estado: 'FALHOU', motivo: problemas.join('; ') }
@@ -898,31 +955,70 @@ async function main() {
           cartão, para sempre). A prova tem de ser esta: encolher e MEDIR,
           não encolher e fotografar.
         */
-        await page.setViewportSize({ width: 1366, height: 900 });
-        await page.waitForTimeout(800);
-        const aposEncolher = await page.evaluate(() => {
+        const medirTabela = () => page.evaluate(() => {
           const tabela = document.querySelector('.layout-main .resizable-table');
           if (!tabela) return null;
           const rolagem = tabela.closest('.resizable-table-scroll');
           if (!rolagem) return null;
+          const ths = Array.from(tabela.querySelectorAll('thead th'));
           return {
             tabela: Math.round(tabela.getBoundingClientRect().width),
-            contêiner: Math.round(rolagem.clientWidth)
+            conteiner: Math.round(rolagem.clientWidth),
+            rolagem: Math.round(rolagem.scrollWidth),
+            // Soma dos mínimos declarados: abaixo disto a tabela NÃO PODE
+            // encolher, e insistir seria pedir dado espremido.
+            minimos: ths.reduce((soma, th) => soma + (parseFloat(getComputedStyle(th).minWidth) || 0), 0)
           };
         });
+        const antesDeEncolher = await medirTabela();
+        await page.setViewportSize({ width: 1366, height: 900 });
+        await page.waitForTimeout(800);
+        const aposEncolher = await medirTabela();
         if (aposEncolher) {
-          const excesso = aposEncolher.tabela - aposEncolher.contêiner;
-          // Registra os DOIS lados: só escrever FALHOU deixava a matriz com
-          // ✅ herdado do check estático em tela que nem foi exercitada.
-          resultado.itens.T4 = excesso > 24
-            ? {
-              estado: 'FALHOU',
-              motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve ${aposEncolher.tabela}px num contêiner de ${aposEncolher.contêiner}px (${excesso}px fora) — a largura não é remedida`
-            }
-            : {
+          /*
+            O QUE A T4 MEDE, E POR QUE MUDOU EM 03/09.
+
+            A versão antiga reprovava qualquer tabela mais larga que o
+            contêiner depois de encolher a janela. Só que existem dois casos
+            MUITO diferentes por trás disso:
+
+              (a) a tabela nem tentou: manteve a largura antiga porque a
+                  medida não é refeita. É o defeito de verdade.
+              (b) a tabela encolheu até o mínimo das colunas e ainda não
+                  cabe. Espremer mais seria cortar dado — o certo é ROLAR
+                  DENTRO do próprio contêiner, que é o que a X3 manda.
+
+            Tratar (b) como falha empurra para a correção errada: apertar
+            coluna até o conteúdo truncar. Então agora a T4 exige que a
+            tabela TENHA ENCOLHIDO ao acompanhar a janela, e aceita a sobra
+            só quando ela está no piso dos mínimos e rola no contêiner.
+          */
+          const excesso = aposEncolher.tabela - aposEncolher.conteiner;
+          const encolheu = antesDeEncolher ? antesDeEncolher.tabela - aposEncolher.tabela : 0;
+          const noPiso = aposEncolher.tabela <= Math.ceil(aposEncolher.minimos) + 24;
+          const rolaNoConteiner = aposEncolher.rolagem > aposEncolher.conteiner + 4;
+
+          if (excesso <= 24) {
+            resultado.itens.T4 = {
               estado: 'PASSOU',
-              motivo: `sobra distribuída e tabela remedida ao encolher para 1366 (${aposEncolher.tabela}px em ${aposEncolher.contêiner}px)`
+              motivo: `sobra distribuída e tabela remedida ao encolher para 1366 (${aposEncolher.tabela}px em ${aposEncolher.conteiner}px)`
             };
+          } else if (encolheu < 8) {
+            resultado.itens.T4 = {
+              estado: 'FALHOU',
+              motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela NÃO ENCOLHEU NADA (${antesDeEncolher?.tabela}px → ${aposEncolher.tabela}px) num contêiner de ${aposEncolher.conteiner}px — a largura não é remedida`
+            };
+          } else if (noPiso && rolaNoConteiner) {
+            resultado.itens.T4 = {
+              estado: 'PASSOU',
+              motivo: `tabela acompanhou a janela (${antesDeEncolher?.tabela}→${aposEncolher.tabela}px) e parou no piso dos mínimos das colunas (${Math.round(aposEncolher.minimos)}px); a sobra de ${excesso}px rola DENTRO do contêiner, como manda a X3 — espremer mais truncaria dado`
+            };
+          } else {
+            resultado.itens.T4 = {
+              estado: 'FALHOU',
+              motivo: `a tabela encolheu ${encolheu}px mas parou em ${aposEncolher.tabela}px num contêiner de ${aposEncolher.conteiner}px (${excesso}px fora), ${noPiso ? 'no piso dos mínimos porém SEM rolagem própria' : `acima do piso dos mínimos (${Math.round(aposEncolher.minimos)}px) — ainda havia espaço para redistribuir`}`
+            };
+          }
         }
         await page.setViewportSize({ width: 1920, height: 1080 });
         await page.waitForTimeout(400);

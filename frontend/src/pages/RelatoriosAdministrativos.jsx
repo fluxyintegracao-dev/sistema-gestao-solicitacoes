@@ -348,8 +348,15 @@ export default function RelatoriosAdministrativos() {
         D6/R11: o "Voltar aos pedidos" saiu — era navegacao disfarcada de
         acao na barra do cabecalho de uma LISTAGEM.
       */}
+      {/*
+        C2: numa listagem, o apoio da faixa tem de dizer QUANTO veio — sem
+        isso o usuário só descobre o tamanho do resultado rolando. Aqui vale
+        dobrado, porque o recorte só é aplicado no clique em Buscar (R23):
+        a contagem é o retorno visível de que a busca rodou.
+      */}
       <PageHeader
-        titulo="Relatorios Administrativos"
+        titulo="Relatórios Administrativos"
+        contagem={`${registros.length} ${registros.length === 1 ? 'item' : 'itens'}`}
         descricao="Auditoria dos itens de pedidos de compra: marque o recorte e clique em Buscar."
         acaoPrincipal={{
           rotulo: loading ? 'Buscando...' : 'Buscar',

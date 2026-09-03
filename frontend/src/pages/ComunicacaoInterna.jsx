@@ -71,15 +71,22 @@ const DIMENSAO_SITUACAO = {
   ]
 };
 
-// Superfície dos dois painéis: mesma linguagem do .app-bloco (fundo, borda,
-// raio e sombra por token), sem o padding do bloco — a lista e o chat rolam
-// coladas na borda. R18: `clip`, NUNCA `hidden` (hidden cria scrollport e
-// mata sticky em silêncio).
+/*
+  Superfície dos dois painéis. Ela era uma CÓPIA à mão do `.app-bloco`
+  (fundo, borda, raio e sombra, token por token) — e a B1 reprovou a tela
+  com "nenhum bloco na tela", corretamente: o que existia era um bloco no
+  visual e nada no DOM, então nenhum check conseguia enxergá-lo. É a mesma
+  família do defeito de 02/09, código certo sem o elemento no DOM.
+
+  Agora o painel É `.app-bloco`, e o inline se resume ao que o bloco não
+  tem: padding zero (a lista e o chat rolam coladas na borda) e `clip`.
+  R18: `clip`, NUNCA `hidden` — `hidden` cria scrollport e mata sticky em
+  silêncio.
+*/
+// `p-0` como CLASSE, não medida em style: o degrau 0 é da escala, e a R10
+// quer o ritmo vindo de classe/componente.
+const CLASSE_PAINEL = 'app-bloco p-0';
 const ESTILO_PAINEL = {
-  background: 'var(--ui-surface)',
-  border: '1px solid var(--ui-border)',
-  borderRadius: 'var(--raio-3)',
-  boxShadow: 'var(--ui-shadow-sm)',
   overflow: 'clip'
 };
 
@@ -742,6 +749,7 @@ export default function ComunicacaoInterna() {
         {/* === PAINEL ESQUERDO — lista === */}
         <section
           aria-label="Conversas"
+          className={CLASSE_PAINEL}
           style={{
             ...ESTILO_PAINEL,
             display: mostrarLista ? 'grid' : 'none',
@@ -832,6 +840,7 @@ export default function ComunicacaoInterna() {
         {/* === PAINEL DIREITO — chat === */}
         <section
           aria-label="Conversa"
+          className={CLASSE_PAINEL}
           style={{
             ...ESTILO_PAINEL,
             display: mostrarChat ? 'grid' : 'none',

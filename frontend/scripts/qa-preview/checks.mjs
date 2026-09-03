@@ -165,7 +165,36 @@ export function checksEstaticos({ tipo }) {
         : { estado: 'PASSOU' };
     }
   } else {
-    r.C5 = { estado: 'FALHOU', motivo: 'faixa ausente' };
+    /*
+      SEM FAIXA, A REGRA CONTINUA VALENDO — só o lugar de medir muda (03/09).
+
+      Fora do shell (Login, Recuperar Senha, Definir Senha, Cotação Pública)
+      não existe `.app-page-header`: a C1/C2 são N/A pela DoD própria dessas
+      telas. A versão antiga do check devolvia FALHOU "faixa ausente" nas
+      quatro — reprovando-as por NÃO TEREM algo que a DoD dispensa.
+
+      Mas a C5 não é sobre a faixa: é sobre UM primário sólido e os
+      secundários em contorno. Isso vale ali igual, e é medido na tela
+      inteira. Só vira N/A quando não há botão nenhum para medir.
+    */
+    const botoes = qa('.btn').filter(visivel).filter((b) => !b.closest('.app-mais-wrap'));
+    if (!botoes.length) {
+      r.C5 = { estado: 'N/A', motivo: 'tela sem faixa e sem botões a medir' };
+    } else {
+      const primarios = botoes.filter((b) => b.classList.contains('btn-primary'));
+      const semContorno = botoes.filter((b) => (
+        !b.classList.contains('btn-primary')
+        && !b.classList.contains('btn-outline')
+        && !b.classList.contains('btn-ghost')
+        && !b.classList.contains('app-voltar')
+      ));
+      const problemas = [];
+      if (primarios.length > 1) problemas.push(`${primarios.length} botões primários na tela (máx 1) — medido fora da faixa, que não existe aqui`);
+      if (semContorno.length) problemas.push(`secundário sem contorno: ${cssPath(semContorno[0])}`);
+      r.C5 = problemas.length
+        ? { estado: 'FALHOU', motivo: problemas.join('; ') }
+        : { estado: 'PASSOU', motivo: 'tela fora do shell: um primário sólido, medido na tela inteira (não há faixa)' };
+    }
   }
 
   /* ---- C6: navegação disfarçada de ação (distinção do cliente, 02/09):
@@ -176,8 +205,27 @@ export function checksEstaticos({ tipo }) {
      registro (ex.: /titulos/9/editar dentro de /titulos/9) é ação. ---- */
   {
     const rotaAtual = location.pathname.replace(/\/$/, '');
+    /*
+      A BARRA DE AÇÕES DA TELA, NÃO A DA LINHA (03/09).
+
+      O seletor `.app-actionbar` casa com DOIS lugares: o cabeçalho da tela
+      e a barra de ações dentro de um `<td>`. São coisas diferentes.
+
+      Na `relatorios-administrativos` o check reprovou "Abrir pedido" →
+      /pedidos-compra/21, que é a ação de ABRIR O REGISTRO DAQUELA LINHA —
+      o motivo de a listagem existir. A C6 proíbe navegação disfarçada de
+      ação onde o usuário procura o que fazer NESTA tela: o cabeçalho e o
+      menu "⋯". Abrir o registro da linha é o oposto disso: é o destino
+      esperado, e é o único caminho para o detalhe.
+
+      Aplicar a C6 à linha empurraria para remover o link e deixar a
+      listagem sem saída — a mesma classe de erro da seta de voltar comida
+      pela R11 em 02/09, que foi o que deu origem ao escopo declarado.
+    */
+    const naLinha = (el) => Boolean(el.closest('td, tr'));
     const suspeitos = qa('.app-actionbar a[href], .app-mais-menu a[href]')
       .filter(visivel)
+      .filter((el) => !naLinha(el))
       .filter((el) => !el.classList.contains('app-voltar'))
       .filter((el) => {
         const destino = new URL(el.getAttribute('href'), location.origin).pathname.replace(/\/$/, '');
@@ -388,7 +436,26 @@ export function checksEstaticos({ tipo }) {
 
       const problemasT6 = [];
       if (pior) problemasT6.push(`texto cortado sem tooltip: "${pior.textContent.trim().slice(0, 50)}…"`);
-      if (partidos.length) problemasT6.push(`palavra QUEBRADA ao meio (célula sem nowrap): "${partidos[0].innerText.trim().slice(0, 40)}"`);
+      if (partidos.length) {
+        /*
+          O motivo tem de dizer a CAUSA, não só o sintoma (03/09). "célula
+          sem nowrap" mandava mexer no `white-space` — e nas cinco telas em
+          que isto reprovou o `td` já tinha `overflow: hidden` com
+          `text-overflow: ellipsis`, então o palpite estava errado e teria
+          levado ao conserto errado. Agora o check registra o estilo
+          computado de quem QUEBROU e a geometria, para o conserto sair da
+          medida e não do palpite.
+        */
+        const alvo = partidos[0];
+        const cs = getComputedStyle(alvo);
+        const dono = alvo.firstElementChild ? getComputedStyle(alvo.firstElementChild) : null;
+        const geo = alvo.getBoundingClientRect();
+        problemasT6.push(
+          `palavra QUEBRADA ao meio: "${alvo.innerText.trim().slice(0, 40)}" `
+          + `— td ${Math.round(geo.width)}px, white-space:${cs.whiteSpace}, overflow-wrap:${cs.overflowWrap}, word-break:${cs.wordBreak}, overflow:${cs.overflow}`
+          + (dono ? `; filho <${alvo.firstElementChild.tagName.toLowerCase()}${alvo.firstElementChild.className ? `.${String(alvo.firstElementChild.className).split(' ').join('.')}` : ''}> white-space:${dono.whiteSpace}, overflow-wrap:${dono.overflowWrap}, word-break:${dono.wordBreak}` : '')
+        );
+      }
       if (cabecalhosCortados.length) problemasT6.push(`cabeçalho cortado sem tooltip: "${cabecalhosCortados[0].innerText.trim().slice(0, 40)}"`);
 
       r.T6 = problemasT6.length
@@ -457,7 +524,12 @@ export function checksEstaticos({ tipo }) {
 
   /* ---- B1: canvas acinzentado + blocos brancos ---- */
   {
-    const bloco = qa('.app-bloco, .card').filter(visivel)[0];
+    /*
+      `.login-card` entra na lista (03/09): fora do shell, o cartão de marca
+      do Login É o bloco branco sobre o canvas — a B1 reprovava a tela por
+      ele não se chamar `.app-bloco`, medindo o NOME e não a coisa.
+    */
+    const bloco = qa('.app-bloco, .card, .login-card').filter(visivel)[0];
     if (!bloco) {
       r.B1 = { estado: 'FALHOU', motivo: 'nenhum bloco na tela' };
     } else {
