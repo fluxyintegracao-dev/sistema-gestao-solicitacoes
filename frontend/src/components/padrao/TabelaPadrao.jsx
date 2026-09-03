@@ -124,6 +124,18 @@ const TIPOS_COLUNA = {
 const LARGURA_CONTROLES_TH = 54;
 const LARGURA_CARACTERE_TH = 7.3;
 
+/*
+  Tooltip da célula de texto simples (T6). Devolve `undefined` para
+  qualquer coisa que não seja string ou número: JSX tem o próprio `title`
+  quando precisa, e um `title` no td venceria o dele.
+*/
+function tituloDaCelula(coluna, item) {
+  const conteudo = coluna.render(item);
+  if (typeof conteudo === 'string') return conteudo.trim() || undefined;
+  if (typeof conteudo === 'number') return String(conteudo);
+  return undefined;
+}
+
 function larguraMinimaDoTitulo(titulo) {
   const texto = String(titulo ?? '').trim();
   if (!texto) return 0;
@@ -848,6 +860,17 @@ export default function TabelaPadrao({
             key={coluna.id}
             className={classeCelula(coluna)}
             style={{ textAlign: alinhamentoDe(coluna) }}
+            /*
+              T6: texto que não cabe é cortado — e corte SEM tooltip é
+              defeito. A `CelulaDupla` já traz o seu `title`; a célula de
+              texto simples não trazia nenhum, então o nome comprido sumia
+              sem o usuário ter como ler o inteiro.
+
+              Só entra quando o `render` devolve texto puro: com JSX dentro
+              (badge, botão, ícone) o `title` do td cobriria o do filho e
+              trocaria uma dica útil por outra genérica.
+            */
+            title={tituloDaCelula(coluna, item)}
           >
             {coluna.render(item)}
           </td>

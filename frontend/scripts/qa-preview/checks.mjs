@@ -177,7 +177,16 @@ export function checksEstaticos({ tipo }) {
       secundários em contorno. Isso vale ali igual, e é medido na tela
       inteira. Só vira N/A quando não há botão nenhum para medir.
     */
-    const botoes = qa('.btn').filter(visivel).filter((b) => !b.closest('.app-mais-wrap'));
+    /*
+      Botão SÓ DE ÍCONE não é ação secundária (03/09): o olho que mostra a
+      senha no Login foi acusado de "secundário sem contorno", e contorná-lo
+      desenharia uma moldura em volta de um ícone dentro do campo. A C5
+      classifica AÇÕES, e ação se reconhece pelo rótulo — sem texto, não é
+      uma delas.
+    */
+    const botoes = qa('.btn').filter(visivel)
+      .filter((b) => !b.closest('.app-mais-wrap'))
+      .filter((b) => (b.innerText || '').trim().length > 0);
     if (!botoes.length) {
       r.C5 = { estado: 'N/A', motivo: 'tela sem faixa e sem botões a medir' };
     } else {

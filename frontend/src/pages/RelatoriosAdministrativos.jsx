@@ -144,6 +144,18 @@ function formatFieldValue(field, value) {
   return String(value);
 }
 
+/*
+  Rótulo humano do campo. O resumo saía com o nome da COLUNA DO BANCO —
+  "quantidade_pedido: - -> 10 | preco_unitario: - -> R$ 5,00". Além de
+  comprido (300px numa coluna de 156px, o que reprovou a T7), é linguagem
+  de tabela, não de quem lê auditoria de compra.
+*/
+const ROTULO_CAMPO = {
+  quantidade_pedido: 'Quantidade',
+  preco_unitario: 'Preço unitário',
+  observacoes: 'Observações'
+};
+
 function buildChangeSummary(registro) {
   const anteriores = parseJson(registro?.dados_anteriores);
   const novos = parseJson(registro?.dados_novos);
@@ -152,17 +164,25 @@ function buildChangeSummary(registro) {
   ['quantidade_pedido', 'preco_unitario', 'observacoes'].forEach((field) => {
     const before = anteriores?.[field];
     const after = novos?.[field];
+    const rotulo = ROTULO_CAMPO[field] || field;
 
     if (before == null && after == null) {
       return;
     }
 
     if (before === after) {
-      parts.push(`${field}: ${formatFieldValue(field, after)}`);
+      parts.push(`${rotulo}: ${formatFieldValue(field, after)}`);
       return;
     }
 
-    parts.push(`${field}: ${formatFieldValue(field, before)} -> ${formatFieldValue(field, after)}`);
+    // Campo que não existia antes é DEFINIÇÃO, não alteração: escrever
+    // "- → 10" faz o leitor procurar um valor anterior que nunca houve.
+    if (before == null || before === '') {
+      parts.push(`${rotulo} definida como ${formatFieldValue(field, after)}`);
+      return;
+    }
+
+    parts.push(`${rotulo}: ${formatFieldValue(field, before)} → ${formatFieldValue(field, after)}`);
   });
 
   if (!parts.length && novos?.resposta_item_id) {
@@ -480,6 +500,14 @@ export default function RelatoriosAdministrativos() {
                 id: 'detalhes',
                 titulo: 'Detalhes',
                 tipo: 'texto',
+                /*
+                  A coluna que ABSORVE a sobra. É a mais longa da tabela (o
+                  resumo da alteração) e era a que menos espaço recebia:
+                  156px para 300px de conteúdo. T4 manda a sobra ir para a
+                  coluna de conteúdo, e T7 não admite valor truncado — e
+                  aqui há dinheiro no resumo.
+                */
+                flex: 3,
                 render: (registro) => (
                   <CelulaDupla
                     principal={registro.descricao || '-'}

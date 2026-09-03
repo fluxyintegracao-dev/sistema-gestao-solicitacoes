@@ -965,15 +965,37 @@ async function main() {
             tabela: Math.round(tabela.getBoundingClientRect().width),
             conteiner: Math.round(rolagem.clientWidth),
             rolagem: Math.round(rolagem.scrollWidth),
-            // Soma dos mínimos declarados: abaixo disto a tabela NÃO PODE
-            // encolher, e insistir seria pedir dado espremido.
-            minimos: ths.reduce((soma, th) => soma + (parseFloat(getComputedStyle(th).minWidth) || 0), 0)
+            // `minWidth` do CSS não serve de piso: a TabelaPadrao impõe o
+            // mínimo em JS (160px por coluna), e o computado sai 0px. Medir
+            // por aqui dava "piso de 0px" e reprovava tabela no limite.
+            colunas: ths.length
           };
         });
         const antesDeEncolher = await medirTabela();
         await page.setViewportSize({ width: 1366, height: 900 });
         await page.waitForTimeout(800);
         const aposEncolher = await medirTabela();
+        /*
+          O PISO É MEDIDO, NÃO DEDUZIDO (03/09).
+
+          A primeira versão somava o `min-width` computado dos `th` — e dava
+          0px, porque a `TabelaPadrao` impõe o mínimo em JS, não em CSS. Com
+          piso zero, toda tabela que parasse acima do contêiner virava falha,
+          inclusive a que já estava no limite.
+
+          Então o piso é observado: encolhe MAIS (1100px) e vê se a tabela
+          continuou encolhendo. Se parou no mesmo número nas duas larguras,
+          ela chegou ao fundo — e aí a sobra tem de rolar, não sumir.
+        */
+        let noFundo = false;
+        if (aposEncolher) {
+          await page.setViewportSize({ width: 1100, height: 900 });
+          await page.waitForTimeout(700);
+          const maisEstreito = await medirTabela();
+          noFundo = Boolean(maisEstreito) && Math.abs(maisEstreito.tabela - aposEncolher.tabela) <= 8;
+          await page.setViewportSize({ width: 1366, height: 900 });
+          await page.waitForTimeout(500);
+        }
         if (aposEncolher) {
           /*
             O QUE A T4 MEDE, E POR QUE MUDOU EM 03/09.
@@ -995,7 +1017,7 @@ async function main() {
           */
           const excesso = aposEncolher.tabela - aposEncolher.conteiner;
           const encolheu = antesDeEncolher ? antesDeEncolher.tabela - aposEncolher.tabela : 0;
-          const noPiso = aposEncolher.tabela <= Math.ceil(aposEncolher.minimos) + 24;
+          const noPiso = noFundo;
           const rolaNoConteiner = aposEncolher.rolagem > aposEncolher.conteiner + 4;
 
           if (excesso <= 24) {
@@ -1011,12 +1033,12 @@ async function main() {
           } else if (noPiso && rolaNoConteiner) {
             resultado.itens.T4 = {
               estado: 'PASSOU',
-              motivo: `tabela acompanhou a janela (${antesDeEncolher?.tabela}→${aposEncolher.tabela}px) e parou no piso dos mínimos das colunas (${Math.round(aposEncolher.minimos)}px); a sobra de ${excesso}px rola DENTRO do contêiner, como manda a X3 — espremer mais truncaria dado`
+              motivo: `tabela acompanhou a janela (${antesDeEncolher?.tabela}→${aposEncolher.tabela}px) e parou no fundo: encolher a janela para 1100px não a estreitou mais, com ${aposEncolher.colunas} colunas no mínimo. A sobra de ${excesso}px rola DENTRO do contêiner, como manda a X3 — espremer mais truncaria dado`
             };
           } else {
             resultado.itens.T4 = {
               estado: 'FALHOU',
-              motivo: `a tabela encolheu ${encolheu}px mas parou em ${aposEncolher.tabela}px num contêiner de ${aposEncolher.conteiner}px (${excesso}px fora), ${noPiso ? 'no piso dos mínimos porém SEM rolagem própria' : `acima do piso dos mínimos (${Math.round(aposEncolher.minimos)}px) — ainda havia espaço para redistribuir`}`
+              motivo: `a tabela encolheu ${encolheu}px mas parou em ${aposEncolher.tabela}px num contêiner de ${aposEncolher.conteiner}px (${excesso}px fora), ${noPiso ? 'no fundo porém SEM rolagem própria — a sobra fica cortada' : 'e ainda encolhe se a janela diminuir mais, ou seja: havia espaço para redistribuir agora'}`
             };
           }
         }

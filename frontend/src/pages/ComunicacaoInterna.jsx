@@ -86,6 +86,15 @@ const DIMENSAO_SITUACAO = {
 // `p-0` como CLASSE, não medida em style: o degrau 0 é da escala, e a R10
 // quer o ritmo vindo de classe/componente.
 const CLASSE_PAINEL = 'app-bloco p-0';
+/*
+  B2 — um primário por tela, e aqui é o painel da CONVERSA.
+
+  A lista da esquerda é como se chega; a conversa é onde o trabalho
+  acontece — ler, responder, anexar. A barra de cor no painel direito
+  responde "o que esta tela é para fazer", que é a pergunta da B2. Marcar
+  a lista faria o olho parar no índice em vez do conteúdo.
+*/
+const CLASSE_PAINEL_PRIMARIO = 'app-bloco app-bloco--primario p-0';
 const ESTILO_PAINEL = {
   overflow: 'clip'
 };
@@ -840,7 +849,7 @@ export default function ComunicacaoInterna() {
         {/* === PAINEL DIREITO — chat === */}
         <section
           aria-label="Conversa"
-          className={CLASSE_PAINEL}
+          className={CLASSE_PAINEL_PRIMARIO}
           style={{
             ...ESTILO_PAINEL,
             display: mostrarChat ? 'grid' : 'none',

@@ -566,6 +566,29 @@
   vertical-align: middle;
 }
 
+/*
+  T6 — CÉLULA NÃO QUEBRA PALAVRA AO MEIO (03/09).
+
+  `responsive-system.css` aplica `overflow-wrap: anywhere` a TODO td e th
+  dentro de `.layout-main`. Numa página de texto isso é bom: evita que uma
+  URL enorme estoure a largura. Numa tabela é destrutivo — "ADMINISTRATIVO"
+  numa coluna de 120px virava "ADMINISTRA" + "TIVO", que são duas outras
+  palavras. Medido no preview em cinco telas.
+
+  A T6 da DoD é explícita: reticências no meio de palavra sem tooltip é
+  FALHOU; truncar com `title` completo é aceitável para texto. Então a
+  célula volta a `normal` — quebra ENTRE palavras, nunca DENTRO — e quem
+  não couber é cortado com o texto inteiro no `title` que a TabelaPadrao
+  põe em cada td.
+
+  Escopado em `.app-tabela`: fora da tabela padrão a regra geral continua
+  valendo, que é onde ela faz sentido.
+*/
+.app-tabela .resizable-table td,
+.app-tabela .resizable-table th {
+  overflow-wrap: normal;
+}
+
 .app-tabela .resizable-table th {
   font-size: var(--fonte-detalhe);
   letter-spacing: 0.04em;

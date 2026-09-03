@@ -6,9 +6,9 @@
 > capacidade, a base do preview não deu registro para exercitá-la — NÃO PROVADA)
 > · — N/A (a regra não se aplica; motivo registrado).
 
-- Verificação: **2026-09-03 20:43** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `a7d274dc449a39c6eb9f25cc027b2d759ddac549`
+- Verificação: **2026-09-03 21:01** · preview: https://refactor-dev.jrfluxy.com.br · build servido: `ee05a75b016072def2a78a92840e1645176870fe`
 - Telas verificadas: 36 · Itens: C1, C2, C3, C4, C5, C6, T1, T2, T3, T4, T5, T6, T7, F1, F2, F3, F4, B1, B2, B3, B4, B5, M1, M2, M3, M4, R1, R2, R3, X1, X2, X3, R18, A1
-- **Células FALHOU: 22** (justificativas abaixo)
+- **Células FALHOU: 10** (justificativas abaixo)
 - **Células SEM DADO: 36** — capacidade NÃO PROVADA por falta de registro na base (lista abaixo)
 
 | Tela | C1 | C2 | C3 | C4 | C5 | C6 | T1 | T2 | T3 | T4 | T5 | T6 | T7 | F1 | F2 | F3 | F4 | B1 | B2 | B3 | B4 | B5 | M1 | M2 | M3 | M4 | R1 | R2 | R3 | X1 | X2 | X3 | R18 | A1 |
@@ -19,7 +19,7 @@
 | parceiro-categorias | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | financeiro-titulo-detalhe | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | obras | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| obra-gestao | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ❌ | ✅ | — | ✅ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| obra-gestao | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | — | ✅ | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | obra-tipo-apropriacao | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | tipos-solicitacao | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -31,49 +31,37 @@
 | tipos-compartilhados-setor | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-criacao-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | setores-acesso-todas-obras | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-envio-qualquer-setor | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| usuarios-acesso-financeiro | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | — | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | usuarios-acesso-prioridade-diretoria | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | usuarios-permissoes-rh-dp | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | rhdp-pessoal | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | ❌ | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | rhdp-colaboradores | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | rhdp-documentos | ✅ | ✅ | — | — | — | ✅ | ⚠ | ⚠ | — | ⚠ | ⚠ | ⚠ | ⚠ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ⚠ | ✅ | ✅ | ✅ | — |
 | rhdp-importacoes | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| rhdp-fechamentos | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
 | rhdp-relatorio-operacional | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| modulo-relatorios | ✅ | ❌ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
-| relatorios-administrativos | ✅ | ❌ | — | — | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ❌ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| modulo-relatorios | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | ✅ | ✅ | ✅ | — |
+| relatorios-administrativos | ✅ | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — |
+| comunicacao-interna | ✅ | ✅ | — | — | ✅ | ✅ | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | — |
 | config-contrato-alertas-formas | ✅ | ✅ | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | ✅ | ✅ | — | ✅ | ✅ | ✅ | — |
-| login | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ❌ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
-| recuperar-senha | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
-| definir-senha | — | — | — | — | ❌ | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | — | — | ✅ | — | ⚠ |
-| cotacao-publica | — | — | — | — | ❌ | ✅ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | — | — | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | ⚠ | — | ✅ | — | ⚠ |
+| login | — | — | — | — | ❌ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | — | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
+| recuperar-senha | — | — | — | — | ✅ | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — | — | ✅ | — | — | ✅ | — | — |
+| definir-senha | — | — | — | — | ✅ | ✅ | — | — | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | — | — | ✅ | — | ⚠ |
+| cotacao-publica | — | — | — | — | ✅ | ✅ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | ⚠ | — | — | — | — | ✅ | ✅ | ✅ | ⚠ | ✅ | ✅ | ✅ | ✅ | — | ⚠ | ⚠ | ✅ | ⚠ | — | ✅ | — | ⚠ |
 
 ## FALHOU — cada célula, justificada
 
-- **obras · T4**: ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela manteve 1522px num contêiner de 1239px (283px fora) — a largura não é remedida
-- **obra-gestao · T3**: [?aba=arquivos] coluna 3 mudou junto (1294→1230px) — arrasto deve mudar SÓ a arrastada
-- **setores · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **tipos-solicitacao · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "DESPESA_ADMINISTRATIVA" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
-- **usuarios-envio-qualquer-setor · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-envio-qualquer-setor · T3**: coluna 2 mudou junto (1277→1213px) — arrasto deve mudar SÓ a arrastada
-- **usuarios-acesso-financeiro · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **usuarios-acesso-financeiro · T3**: coluna 2 mudou junto (1267→1203px) — arrasto deve mudar SÓ a arrastada
-- **usuarios-acesso-prioridade-diretoria · T6**: palavra QUEBRADA ao meio (célula sem nowrap): "ADMINISTRATIVO" _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
-- **rhdp-pessoal · T3**: coluna 2 mudou junto (922→858px) — arrasto deve mudar SÓ a arrastada; largura não persistiu ao recarregar (184→undefinedpx)
-- **rhdp-fechamentos · T3**: coluna 2 mudou junto (777→713px) — arrasto deve mudar SÓ a arrastada
-- **modulo-relatorios · C2**: contagem ausente no apoio _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell > div.page.solicitacoes-page > header.app-page-header`)_
-- **relatorios-administrativos · C2**: contagem ausente no apoio _(seletor: `div.layout-shell.fluxy-app-shell > main.layout-main.flex-1 > div.layout-content-shell.compras-responsive-scope > div.page.solicitacoes-page > header.app-page-header`)_
-- **relatorios-administrativos · C6**: link de navegação como ação: "Abrir pedido" → /pedidos-compra/21 _(seletor: `tbody > tr.app-tabela-linha > td > div.app-actionbar > a.btn.btn-outline`)_
+- **obras · T4**: a tabela encolheu 259px mas parou em 1522px num contêiner de 1239px (283px fora), acima do piso dos mínimos (0px) — ainda havia espaço para redistribuir
+- **setores · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 130px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
+- **tipos-solicitacao · T6**: palavra QUEBRADA ao meio: "DESPESA_ADMINISTRATIVA" — td 180px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha.app-tabela-linha--clicavel > td`)_
+- **usuarios-envio-qualquer-setor · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **usuarios-acesso-financeiro · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **usuarios-acesso-prioridade-diretoria · T6**: palavra QUEBRADA ao meio: "ADMINISTRATIVO" — td 120px, white-space:normal, overflow-wrap:anywhere, word-break:normal, overflow:hidden _(seletor: `div.resizable-table-scroll > table.resizable-table > tbody > tr.app-tabela-linha > td`)_
+- **rhdp-pessoal · T3**: ao recarregar, a tabela voltou com nenhuma coluna(s) contra 6 antes — não dá para comparar a persistência
 - **relatorios-administrativos · T7**: valor truncado: "quantidade_pedido: - -> 10 | preco_unitario: - -> R$ 5,00" (largura 156px < conteúdo 300px) _(seletor: `tbody > tr.app-tabela-linha > td > div.app-celula-dupla > span.app-celula-dupla-sub`)_
-- **relatorios-administrativos · T3**: coluna 3 mudou junto (478→414px) — arrasto deve mudar SÓ a arrastada
-- **comunicacao-interna · B1**: nenhum bloco na tela
-- **login · C5**: faixa ausente
-- **login · B1**: nenhum bloco na tela
-- **recuperar-senha · C5**: faixa ausente
-- **definir-senha · C5**: faixa ausente
-- **cotacao-publica · C5**: faixa ausente
+- **comunicacao-interna · B2**: 0 bloco(s) primário(s) visível(is) (esperado 1)
+- **login · C5**: secundário sem contorno: div.login-card > form.login-form > div.login-field > div.login-pw-wrap > button.btn.login-eye-btn
 
 ## SEM DADO — capacidades que NÃO foram provadas
 
@@ -120,7 +108,7 @@ por equivalência com outra tela** (decisão do cliente, 03/09). Para fechar,
 - **rhdp-relatorio-operacional**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); F1 (tela sem busca); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Atualizar relatório"))
 - **modulo-relatorios**: C3 (hub de entrada do módulo, não é tela de detalhe); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (hub de cartões: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **relatorios-administrativos**: C3 (listagem — seta só em detalhe/registro); C4 (não é tela de detalhe); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); R1 (ação principal não é cadastro ("Buscar"))
-- **comunicacao-interna**: C3 (painel de trabalho em duas colunas, não é tela de detalhe com retorno hierárquico); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); X1 (tela sem tabela/lista tabular)
+- **comunicacao-interna**: C3 (painel de trabalho em duas colunas, não é tela de detalhe com retorno hierárquico); C4 (idem C3); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); A1 (tela sem linha acionável); X1 (tela sem tabela/lista tabular)
 - **config-contrato-alertas-formas**: C3 (configuração de sistema, não é tela de detalhe de registro); C4 (idem C3); C5 (tela sem ações no cabeçalho); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (tela de configuração: não há listagem com recorte); F2 (idem F1); F4 (idem F1); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); A1 (tela sem linha acionável); F3 (idem F1); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular)
 - **login**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); C6 (ESCOPO da R11 (03/09): sem menu e sem breadcrumb, "Esqueci minha senha" é a única navegação e é obrigatória); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B2 (tela de registro com composição própria (sem blocos padrão)); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); A1 (tela sem linha acionável); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); X2 (idem C1)
 - **recuperar-senha**: C2 (idem C1); C3 (não é tela de detalhe); C4 (idem C3); C6 (ESCOPO da R11 (03/09): "Voltar ao login" é a única navegação disponível e é obrigatória); T1 (tela sem tabela visível); T2 (tela sem tabela visível); T3 (tela sem tabela visível); T4 (tela sem tabela visível); T5 (tela sem tabela visível); T6 (tela sem tabela visível); T7 (tela sem tabela visível); F1 (não há listagem); F2 (não há listagem); F4 (não há listagem); B4 (não é tela de detalhe); M4 (tela sem comparação previsto × realizado); R2 (tela sem formulário visível (cadastro em modal é medido ao abrir)); R18 (tela sem elemento fixo (faixa, tabela ou coluna fixa)); A1 (tela sem linha acionável); C1 (fora do shell: não há topbar para a faixa grudar); F3 (não há listagem); R1 (tela sem ação principal de cadastro); X1 (tela sem tabela/lista tabular); X2 (idem C1)
