@@ -94,6 +94,44 @@ não está revisando: está repetindo o que o harness já disse.
 DEPOIS — R21, R24 e R18 — e é assim que tem de ser: a leitura acha, e o
 check impede a volta. O caminho nunca é o inverso.
 
+### Uma terceira categoria, pior que as duas: CONSENTIMENTO
+
+Forma e significado não esgotam o problema. Existe uma classe acima das
+duas, e ela apareceu nesta reforma:
+
+| Classe | O que quebra | Exemplo | Quem pega |
+|---|---|---|---|
+| **Forma** | o elemento não está certo | palavra quebrada ao meio | check |
+| **Significado** | o código faz o oposto do que promete | "Cancelar" estorna o título | leitura |
+| **Consentimento** | a pessoa autoriza uma coisa e outra acontece | pergunta sobre 3, apaga 47 | leitura |
+
+Na classe de **consentimento** o cancelamento FUNCIONA. Clicar em
+"Cancelar" cancela. A confirmação aparece, com o texto certo, no lugar
+certo — e cita um número que **não vem da coleção que a ação percorre**. A
+pessoa lê, entende, autoriza. E o estrago é outro.
+
+É a pior das três porque **não deixa rastro de erro**: a trilha de auditoria
+registra um consentimento válido para uma ação que ninguém autorizou. Nem o
+usuário sabe que foi enganado.
+
+Há um check para a forma detectável dela (família D da
+`varreduraCancelamento.mjs`, bloqueante: o número citado tem de vir da
+coleção que a ação percorre). Mas ele é análise de **nome**, e três casos
+reais escapam dele por construção: mesmo nome com conteúdo diferente,
+mensagem sem número, e critério de filtro divergente. Esses três são
+**leitura obrigatória do revisor**:
+
+> Em toda confirmação de ação destrutiva, ler os dois lados juntos: **o que
+> a mensagem promete é exatamente o que a ação faz?** Não basta a coleção
+> ter o mesmo nome — tem de ser o mesmo conjunto, no mesmo momento, com o
+> mesmo critério.
+
+E a regra de escrita que vem junto: **toda confirmação destrutiva declara a
+irreversibilidade no próprio texto** ("Descartar 3 rascunhos? Esta ação não
+pode ser desfeita."). "Descartar" sozinho deixa a pessoa supor que dá para
+recuperar. Se um lote for interrompido no meio, o que já foi feito fica
+feito — não se tenta desfazer, e o texto avisa disso antes.
+
 ### O corolário incômodo
 
 Quando um check vira verde, a pergunta certa não é "acabou?". É **"o que

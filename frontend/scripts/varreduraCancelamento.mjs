@@ -73,6 +73,47 @@ function ehPromptNativo(no) {
     && no.callee.property?.name === 'prompt';
 }
 
+/*
+  FAMÍLIA D — A CONFIRMAÇÃO E A AÇÃO OPERAM SOBRE COLEÇÕES DIFERENTES.
+
+  Classe de defeito distinta de todas as outras deste arquivo, e mais
+  grave: aqui o cancelamento FUNCIONA. O usuário lê "Descartar 3
+  rascunhos?", clica em Confirmar — e o sistema apaga 47, porque a
+  mensagem cita `selecionados.length` e a ação percorre `todos`.
+
+  Não é cancelamento ignorado. É o sistema MENTINDO sobre o que vai
+  fazer. O usuário autoriza uma coisa e outra acontece, e ele não tem como
+  saber: a confirmação apareceu, ele leu, ele consentiu.
+
+  O que o check mede: numa função que contém uma confirmação cuja mensagem
+  cita `ALGUMA_COISA.length`, a ação que vem DEPOIS do guarda tem de
+  percorrer ou receber essa MESMA coleção. Se ela toca outra coleção do
+  escopo e não toca a citada, reprova.
+
+  Limite honesto e declarado: isto é análise estática de nome, não de
+  valor. Ela pega o caso em que os identificadores diferem — que é o caso
+  real e o que dá para provar. NÃO pega o caso em que os dois nomes são
+  iguais e o CONTEÚDO diverge (a coleção foi refiltrada entre a pergunta e
+  a ação). Esse fica como item de leitura obrigatória do revisor, e está
+  registrado como tal na DoD.
+*/
+function colecoesCitadasNaMensagem(no) {
+  const nomes = new Set();
+  const visitar = (n) => {
+    if (!n || typeof n !== 'object') return;
+    if (n.type === 'MemberExpression' && n.property?.name === 'length' && n.object?.type === 'Identifier') {
+      nomes.add(n.object.name);
+    }
+    for (const chave of Object.keys(n)) {
+      const v = n[chave];
+      if (Array.isArray(v)) v.forEach(visitar);
+      else if (v && typeof v === 'object' && v.type) visitar(v);
+    }
+  };
+  visitar(no);
+  return nomes;
+}
+
 const achados = [];
 
 for (const arquivo of arquivos(SRC)) {
@@ -110,6 +151,79 @@ for (const arquivo of arquivos(SRC)) {
       const linha = no.loc?.start.line || 0;
       const trecho = codigo.split('\n')[linha - 1]?.trim().slice(0, 130) || '';
       const rel = path.relative(RAIZ, arquivo);
+
+      /* ---- Família D: confirmação e ação sobre coleções diferentes ---- */
+      if (doSistema || nativo) {
+        const citadas = colecoesCitadasNaMensagem(no);
+        const fn = caminho.getFunctionParent();
+        if (citadas.size && fn) {
+          // Identificadores usados DEPOIS desta chamada, dentro da mesma
+          // função — é ali que a ação acontece.
+          const linhaDaPergunta = no.loc?.end.line || 0;
+          const usadasDepois = new Set();
+          fn.traverse({
+            Identifier(ref) {
+              const l = ref.node.loc?.start.line || 0;
+              if (l <= linhaDaPergunta) return;
+              if (ref.parentPath?.node.type === 'MemberExpression'
+                && ref.parentPath.node.property === ref.node) return; // .length, .map
+              usadasDepois.add(ref.node.name);
+            }
+          });
+          /*
+            SEGUE UM NÍVEL DE CHAMADA (03/09).
+
+            A primeira versão exigia que a coleção citada aparecesse
+            LITERALMENTE depois do guarda — e acusou a Cotação Pública, onde
+            a confirmação cita `itens.length` e a ação chama
+            `montarPayloadResposta()`, que percorre `itens` lá dentro.
+            Falso positivo: a coleção é a mesma, só está a uma chamada de
+            distância.
+
+            Numa lista de defeito destrutivo, falso positivo é caro: manda
+            conferir código correto e corrói a confiança no resto. Então o
+            check olha também o corpo das funções do próprio arquivo que a
+            ação chama.
+          */
+          const funcoesDoArquivo = new Map();
+          traverse(ast, {
+            'FunctionDeclaration|FunctionExpression|ArrowFunctionExpression'(f) {
+              const nome = f.node.id?.name
+                || (f.parentPath?.node.type === 'VariableDeclarator' ? f.parentPath.node.id?.name : null);
+              if (nome) funcoesDoArquivo.set(nome, f);
+            }
+          });
+          const chamadasDepois = [...usadasDepois].filter((nome) => funcoesDoArquivo.has(nome));
+          const citadaEmChamada = chamadasDepois.some((nome) => {
+            let achou = false;
+            funcoesDoArquivo.get(nome).traverse({
+              Identifier(ref) { if (citadas.has(ref.node.name)) achou = true; }
+            });
+            return achou;
+          });
+          const citadaSegueUsada = [...citadas].some((c) => usadasDepois.has(c)) || citadaEmChamada;
+          if (!citadaSegueUsada) {
+            // Alguma OUTRA coleção do escopo é percorrida depois?
+            const outrasColecoes = [...usadasDepois].filter((nome) => {
+              if (citadas.has(nome)) return false;
+              const b = fn.scope.getBinding(nome);
+              if (!b) return false;
+              return b.referencePaths.some((r) => {
+                const m = r.parentPath?.node;
+                return m?.type === 'MemberExpression'
+                  && ['map', 'forEach', 'filter', 'length', 'join', 'reduce'].includes(m.property?.name);
+              });
+            });
+            achados.push({
+              arquivo: rel,
+              linha,
+              familia: 'D',
+              problema: `a confirmação cita "${[...citadas].join(', ')}.length", e essa coleção NÃO é usada pela ação que vem depois${outrasColecoes.length ? ` — o que aparece depois é "${outrasColecoes.slice(0, 3).join(', ')}"` : ''}. O usuário autoriza um número e outro acontece`,
+              trecho
+            });
+          }
+        }
+      }
 
       if (doSistema) {
         const reprovar = (motivo) => achados.push({
@@ -254,15 +368,16 @@ if (comoJson) {
 } else if (!achados.length) {
   console.log('[cancelamento] nenhum ponto em que o "Cancelar" deixa de cancelar.');
 } else {
-  const porFamilia = { A: [], B: [], C: [], ERRO: [] };
+  const porFamilia = { A: [], B: [], C: [], D: [], ERRO: [] };
   achados.forEach((a) => porFamilia[a.familia].push(a));
   const rotulo = {
     A: 'A — confirmar() do sistema lido como booleano (R21)',
     B: 'B — confirm()/prompt() nativo com retorno ignorado',
     C: 'C — prompt() guardado e nunca testado (null segue para a ação)',
+    D: 'D — a confirmação pergunta sobre uma coleção e a ação percorre outra',
     ERRO: 'ERRO — arquivo não analisado'
   };
-  for (const familia of ['A', 'B', 'C', 'ERRO']) {
+  for (const familia of ['D', 'A', 'B', 'C', 'ERRO']) {
     const lista = porFamilia[familia];
     if (!lista.length) continue;
     console.log(`\n## ${rotulo[familia]} — ${lista.length} ocorrência(s)\n`);

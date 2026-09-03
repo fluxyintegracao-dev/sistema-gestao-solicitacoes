@@ -446,7 +446,12 @@ export default function CrPlanejamentoView({
   }, [competencia, data, draftKeys.measurement, isPublic, measurementJustification, measurements, obra?.id, permissions.measurement, refreshDraftPresence, step, userId]);
 
   async function discardLocalDraft() {
-    if (!window.confirm('Descartar as alterações não salvas desta obra e competência?')) return;
+    // O texto diz o ESCOPO e diz que não volta atrás. Regra do cliente
+    // (03/09): confirmação de ação destrutiva declara a irreversibilidade,
+    // porque "descartar" sozinho deixa a pessoa supor que dá para recuperar.
+    // Aqui são as três seções — custos, medição prevista e medição aprovada —
+    // desta obra e competência, e nenhuma outra.
+    if (!window.confirm('Descartar as alterações não salvas de custos, medição prevista e medição aprovada desta obra e competência? Esta ação não pode ser desfeita.')) return;
     draftReadyRef.current = false;
     allDraftKeys.forEach(removePlanningDraft);
     setHasLocalDraft(false);

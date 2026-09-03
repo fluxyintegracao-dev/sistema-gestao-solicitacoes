@@ -671,3 +671,87 @@ seguir a ligação da variável. Um scanner que só olha o pai pega as formas
 espalhafatosas e deixa passar a discreta, que é a que aparece no código de
 verdade.
 
+---
+
+## A classe de defeito mais grave: consentimento obtido sob informação falsa
+
+Registro próprio, a pedido do cliente (03/09), porque **não é a mesma coisa
+que cancelamento ignorado** e merece nome separado.
+
+### O que é
+
+A confirmação e a ação operam sobre **coleções diferentes**. O sistema
+pergunta "Descartar 3 rascunhos?", a pessoa lê, entende, clica em
+Confirmar — e o sistema apaga 47, porque a mensagem cita
+`selecionados.length` e a ação percorre `todos`.
+
+**Aqui o cancelamento FUNCIONA.** Clicar em "Cancelar" cancela. O defeito é
+outro e é pior: o sistema **mente sobre o que vai fazer**, e a pessoa
+autoriza uma coisa enquanto outra acontece. Ela não tem como perceber — a
+confirmação apareceu, ela leu, ela consentiu. A trilha de auditoria vai
+registrar um consentimento válido para um estrago que ninguém autorizou.
+
+### O check (família D da varredura)
+
+`frontend/scripts/varreduraCancelamento.mjs`, bloqueante como o resto.
+Numa função que contém confirmação cuja mensagem cita `ALGO.length`, a ação
+depois do guarda tem de percorrer ou receber essa **mesma** coleção. Se ela
+toca outra do escopo e não toca a citada, reprova.
+
+**Provado nos dois sentidos** (03/09): pega uma fixture que pergunta sobre
+`selecionados` e apaga `todos`; e libera as duas formas corretas — a que
+percorre a coleção citada diretamente, e a que a passa por uma chamada
+(`apagarLote(montarLote(selecionados))`).
+
+Ele segue **um nível de chamada** dentro do arquivo. Sem isso ele acusava a
+Cotação Pública, onde a mensagem cita `itens.length` e a ação chama
+`montarPayloadResposta()`, que percorre `itens` lá dentro — falso positivo.
+Numa lista de defeito destrutivo, falso positivo é caro: manda conferir
+código correto e corrói a confiança no resto da lista.
+
+### O LIMITE do check, declarado — e o que fica com o revisor
+
+Isto é análise estática de **nome**, não de **valor**. Ela pega o caso em
+que os identificadores diferem, que é o caso real e o que dá para provar.
+
+**Ela NÃO pega**, e nenhuma análise estática razoável pegaria:
+
+1. **Mesmo nome, conteúdo diferente.** A coleção foi refiltrada, reordenada
+   ou recarregada entre a pergunta e a ação. Os dois lados se chamam
+   `selecionados`; o conteúdo mudou.
+2. **Mensagem sem número.** "Descartar os rascunhos desta obra?" seguido de
+   uma ação que apaga os de todas as obras. Não há `.length` para o check
+   ancorar.
+3. **A coleção certa, o critério errado.** A ação percorre a coleção citada
+   e aplica um filtro diferente do que a mensagem descreve.
+
+**Item de leitura obrigatória do revisor** — entra na DoD:
+
+> Em toda confirmação de ação destrutiva, ler os dois lados juntos e
+> responder: **o que a mensagem promete é exatamente o que a ação faz?**
+> Não basta a coleção ter o mesmo nome — é preciso ser o mesmo conjunto, no
+> mesmo momento, com o mesmo critério. Um número na mensagem que não venha
+> da coleção que a ação percorre é reprovação imediata.
+
+### O que a varredura encontrou hoje
+
+**Nada.** As duas telas suspeitas foram lidas linha a linha:
+
+- **`ObraTipoApropriacao.jsx`** — a confirmação nomeia um tipo e uma obra, e
+  a ação chama `salvarObraTipoApropriacao({ obra_id, tipo_solicitacao_id })`
+  com exatamente esses dois. É um vínculo, não uma lista. **Correto.**
+- **`CrPlanejamentoView.discardLocalDraft`** — a confirmação fala "desta obra
+  e competência" e a ação percorre `allDraftKeys`. O nome assusta, mas
+  `allDraftKeys` é `Object.values(draftKeys)`, e `draftKeys` é construído com
+  `(userId, obra.id, competencia)`: são as **três seções** desta obra e
+  competência, e nenhuma outra. **Correto.**
+
+O texto dessa confirmação **foi ajustado** pela regra do cliente: passou a
+nomear as três seções e a dizer que a ação não pode ser desfeita. "Descartar"
+sozinho deixa a pessoa supor que dá para recuperar.
+
+**Regra do cliente que vale para todo lote destrutivo, registrada aqui**: se
+a pessoa cancelar no meio de um lote, o que já foi descartado **fica
+descartado** — não se tenta desfazer. E o texto da confirmação declara a
+irreversibilidade antes, não depois.
+
