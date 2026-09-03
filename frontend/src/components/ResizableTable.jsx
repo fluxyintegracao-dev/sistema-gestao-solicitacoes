@@ -59,6 +59,7 @@ function getInitialWidths(columns, storageKey) {
 export function ResizableTable({
   columns,
   storageKey,
+  aoMudarLarguras,
   className = '',
   minColumnWidth = 72,
   scrollLabel = 'Tabela com rolagem horizontal',
@@ -121,6 +122,22 @@ export function ResizableTable({
       return next;
     });
   }, [normalizedColumns]);
+
+  /*
+    Reporta para cima as larguras que o USUÁRIO escolheu — são as únicas que
+    a TabelaPadrao não conhece, e sem elas a distribuição da sobra somava a
+    largura PROPOSTA de uma coluna que já não tinha esse tamanho: a tabela
+    passava a transbordar o contêiner de forma permanente depois de qualquer
+    arrasto (78px medidos em 03/09).
+    Só as do usuário sobem: as calculadas vêm da própria TabelaPadrao, e
+    devolvê-las fecharia um laço.
+  */
+  useEffect(() => {
+    if (typeof aoMudarLarguras !== 'function') return;
+    aoMudarLarguras(Object.fromEntries(
+      Object.entries(widths).filter(([key]) => colunasDoUsuarioRef.current.has(key))
+    ));
+  }, [widths, aoMudarLarguras]);
 
   useEffect(() => {
     if (!storageKey || typeof window === 'undefined' || !usuarioRedimensionouRef.current) {
@@ -188,6 +205,15 @@ export function ResizableTable({
     const column = normalizedColumns.find((item) => getColumnKey(item) === columnKey);
     const minWidth = Number(column?.minWidth || minColumnWidth);
     usuarioRedimensionouRef.current = true;
+    /*
+      A alça também é operável por TECLADO (seta esquerda/direita), e esse
+      caminho existe por acessibilidade. Sem marcar a coluna como do
+      usuário, o ajuste por teclado era desfeito pelo efeito de sincronia e
+      nunca chegava ao localStorage: medido em 03/09, 130 → 226px na tela e
+      130px de volta ao recarregar. Ajuste por teclado é ajuste do usuário
+      exatamente como o arrasto.
+    */
+    colunasDoUsuarioRef.current.add(columnKey);
     setWidths((current) => ({
       ...current,
       [columnKey]: Math.max(minWidth, Number(current[columnKey] || column?.width || 140) + delta)

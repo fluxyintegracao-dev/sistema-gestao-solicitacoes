@@ -15,36 +15,42 @@ export function checksEstaticos({ tipo }) {
   const qa = (sel, raiz) => Array.from((raiz || document).querySelectorAll(sel));
 
   /*
-    QUANTAS LINHAS O TEXTO OCUPA — medindo o TEXTO, não a caixa.
+    QUANTAS LINHAS O TEXTO OCUPA — medindo os NÓS DE TEXTO, um a um.
 
-    Duas versões anteriores erraram, cada uma de um jeito, e as duas custaram
-    caro:
-     1. `scrollHeight > lineHeight * 1.6`: `scrollHeight` inclui o PADDING,
-        então toda célula parecia quebrada — 18 falsos positivos.
-     2. `clientHeight - padding`: numa TABELA, `td.clientHeight` é a altura
-        da LINHA (a célula estica até a mais alta). Se uma célula da linha
-        quebra, TODAS reportam duas linhas — e uma célula com três linhas
-        reportava duas. Errava para o alarme e para o silêncio ao mesmo
-        tempo.
+    Três gerações erradas, cada uma custando ~15 falsos positivos:
+     1. `scrollHeight > lineHeight*1.6` — `scrollHeight` inclui o PADDING,
+        então toda célula parecia quebrada.
+     2. `clientHeight - padding` — numa TABELA, `td.clientHeight` é a altura
+        da LINHA: se uma célula quebra, todas as vizinhas reportam quebra.
+     3. `Range.selectNodeContents(el).getClientRects()` — o Range devolve um
+        retângulo para a CAIXA de cada elemento filho ALÉM do texto dentro
+        dela. Célula com selo (`.fx-badge`, inline-flex com 3px de padding)
+        devolvia dois retângulos com 6px de diferença: caixa e texto. Todo
+        selo e todo botão viravam "duas linhas".
 
-    A medida honesta é a do próprio texto: um `Range` sobre o conteúdo
-    devolve um retângulo por LINHA DE TEXTO renderizada. Nada de inferir
-    altura a partir de caixa que pertence a outro elemento.
+    A medida honesta ignora caixas e olha só TEXTO: percorre os nós de texto
+    e mede o retângulo de cada um. Assim o padding de um selo não inventa
+    linha, e uma palavra que de fato quebra continua devolvendo dois
+    retângulos com topos diferentes.
   */
   const linhasDeTexto = (el) => {
-    if (!el || !el.firstChild) return 0;
+    if (!el) return 0;
     try {
-      const intervalo = document.createRange();
-      intervalo.selectNodeContents(el);
-      const retangulos = Array.from(intervalo.getClientRects())
-        .filter((r) => r.width > 0 && r.height > 0);
-      if (!retangulos.length) return el.innerText.trim() ? 1 : 0;
-      // Retângulos na MESMA linha compartilham o topo (com folga de 2px
-      // para sub/sobrescrito e ícones inline).
+      const percorrer = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
       const topos = [];
-      retangulos.forEach((r) => {
-        if (!topos.some((t) => Math.abs(t - r.top) <= 2)) topos.push(r.top);
-      });
+      let no = percorrer.nextNode();
+      while (no) {
+        if (no.nodeValue && no.nodeValue.trim()) {
+          const intervalo = document.createRange();
+          intervalo.selectNodeContents(no);
+          Array.from(intervalo.getClientRects())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .forEach((r) => {
+              if (!topos.some((t) => Math.abs(t - r.top) <= 3)) topos.push(r.top);
+            });
+        }
+        no = percorrer.nextNode();
+      }
       return topos.length;
     } catch (_) {
       return 1;
@@ -340,26 +346,23 @@ export function checksEstaticos({ tipo }) {
         });
 
       /*
-        Cabeçalho cortado: a `TabelaPadrao` põe `title` em TODO `th`, então
-        perguntar "existe title?" nunca reprova — foi um ramo morto na
-        primeira versão. O que vale perguntar é se o title DIZ a mesma coisa
-        que o rótulo cortado; tooltip que não contém o texto completo é
-        tooltip que não resolve.
+        NÃO existe mais ramo de "cabeçalho cortado", e a ausência é honesta.
+
+        Ele nasceu morto DUAS vezes: a primeira perguntava se o `th` tem
+        `title` — e a TabelaPadrao põe `title` em TODOS; a segunda mediu
+        quebra de linha no rótulo, e a revisão de 03/09 não achou NENHUMA
+        largura alcançável em que um rótulo quebre (o piso do `th` é 90px, o
+        rótulo tem `overflow-wrap: anywhere` e cabe). Ou seja: exigia rótulo
+        quebrado E sem tooltip — combinação que nenhuma coluna real produz.
+
+        Ramo que não dispara é PIOR que ramo nenhum: aparece no código como
+        cobertura e não cobre nada. O que de fato protege o cabeçalho é o
+        piso de largura pelo título (TabelaPadrao), que dimensiona a coluna
+        para o rótulo caber, mais o `title` em todo th. Se um dia um rótulo
+        cortar de novo, o caminho é PROVAR o caso primeiro e só então
+        escrever o ramo — nunca o contrário.
       */
-      const cabecalhosCortados = qa('.resizable-table th').filter(visivel).filter(foraDeModal)
-        .filter((th) => {
-          const rotulo = th.querySelector('.resizable-th-label, .app-th-titulo') || th;
-          /*
-            O corte do cabeçalho é QUEBRA DE LINHA, não overflow horizontal:
-            `.app-tabela .resizable-th-label` tem `overflow: visible`, então
-            `scrollWidth === clientWidth` SEMPRE e a versão anterior deste
-            ramo nunca chegava a olhar o title. Contar linhas de texto é o
-            que enxerga o defeito real (COMPETÊNCIA quebrando em três).
-          */
-          if (linhasDeTexto(rotulo) <= 1) return false;
-          const dica = th.getAttribute('title') || th.closest('[title]')?.getAttribute('title') || '';
-          return !soTexto(dica).includes(soTexto(rotulo.innerText).slice(0, 20));
-        });
+      const cabecalhosCortados = [];
 
       const problemasT6 = [];
       if (pior) problemasT6.push(`texto cortado sem tooltip: "${pior.textContent.trim().slice(0, 50)}…"`);

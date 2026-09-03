@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ResizableTable, ResizableTh } from '../ResizableTable';
 import { useFecharAoSair } from '../../hooks/useFecharAoSair';
 import EmptyState from '../ui/EmptyState';
@@ -637,10 +637,36 @@ export default function TabelaPadrao({
     return titulo >= 0 ? titulo : 0;
   })();
 
+  /*
+    As larguras que o USUÁRIO escolheu, reportadas pela ResizableTable. A
+    distribuição da sobra precisa delas: somar a proposta de uma coluna que
+    o usuário já redimensionou fazia a conta errar exatamente pelo tamanho
+    do arrasto, e a tabela transbordava o contêiner para sempre.
+  */
+  const [largurasDoUsuario, setLargurasDoUsuario] = useState({});
+  const receberLarguras = useCallback((mapa) => {
+    setLargurasDoUsuario((atual) => {
+      const mudou = Object.keys(mapa).length !== Object.keys(atual).length
+        || Object.entries(mapa).some(([k, v]) => atual[k] !== v);
+      return mudou ? mapa : atual;
+    });
+  }, []);
+  const larguraReal = useCallback(
+    (coluna) => largurasDoUsuario[coluna.id] ?? coluna.largura,
+    [largurasDoUsuario]
+  );
+
   const colunasComFlex = colunasBase.map((coluna, i) => {
     if (i !== indiceFlex || !larguraDisponivel) return coluna;
+    /*
+      A soma usa a largura REAL de cada coluna — a arrastada pelo usuário
+      quando existe, a proposta quando não. Somar sempre a proposta fazia a
+      tabela transbordar 78px de forma permanente depois de qualquer
+      arrasto (medido em 03/09), porque a conta ignorava exatamente o que o
+      usuário tinha acabado de mudar.
+    */
     const fixas = colunasBase.reduce(
-      (soma, c, j) => (j === indiceFlex ? soma : soma + Number(c.largura || 140)),
+      (soma, c, j) => (j === indiceFlex ? soma : soma + Number(larguraReal(c) || 140)),
       (acoesLinha ? larguraAcoesEfetiva : 0)
         + (selecao ? LARGURA_SELECAO : 0)
         + (linhaExpansivel ? LARGURA_EXPANDIR : 0)
@@ -878,9 +904,20 @@ export default function TabelaPadrao({
           width: c.largura,
           minWidth: c.minWidth || 90
         }))}
-        // ":v2" descarta as larguras que o defeito do persist-no-mount
-        // gravou como se fossem escolha do usuário (02/09).
-        storageKey={storageKey ? `${storageKey}:v2` : undefined}
+        /*
+          ":v3" — a chave TEM de virar quando a REGRA DE LEITURA do que está
+          guardado muda, não só quando o valor muda.
+
+          O ":v2" guardava o MAPA INTEIRO de larguras. A regra nova lê
+          "chave presente = largura escolhida pelo usuário". Lendo um mapa
+          v2 com a regra v3, TODAS as colunas viram "do usuário" e a tabela
+          congela para sempre — medido em 03/09: 1805px num contêiner de
+          1239px, 566px fora, sem nunca remedir. E isso não aconteceria em
+          nenhum harness: ele nasce com localStorage limpo. Só quem usou o
+          build anterior é atingido, que é justamente quem não pode ser.
+        */
+        storageKey={storageKey ? `${storageKey}:v3` : undefined}
+        aoMudarLarguras={receberLarguras}
         scrollLabel={rotuloRolagem}
       >
         <thead>

@@ -388,6 +388,30 @@ async function checarRedimensionamento(page, tela, resultado) {
   resultado.T3 = problemas.length
     ? { estado: 'FALHOU', motivo: problemas.join('; ') }
     : { estado: 'PASSOU' };
+
+  /*
+    LIMPA O ARRASTO ANTES DE SAIR.
+
+    Este check ARRASTA uma coluna e a largura fica gravada no localStorage —
+    de propósito, é assim que ele prova a persistência. Só que os checks
+    seguintes rodam na MESMA sessão, e o T4 passava a medir uma tabela que
+    o T3 tinha acabado de alargar em 64px: treze telas reprovaram com o
+    motivo "a largura não é remedida", quando o que havia era o arrasto do
+    próprio harness. Check que mede o estado que ele mesmo criou, e não diz
+    isso, é pior que check nenhum — ele acusa a tela de um defeito do
+    verificador.
+  */
+  await page.evaluate(() => {
+    Object.keys(window.localStorage)
+      .filter((chave) => chave.includes(':v3'))
+      .forEach((chave) => window.localStorage.removeItem(chave));
+  });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await esperarCarregar(page);
+  await page.evaluate(() => {
+    document.querySelectorAll('.app-bloco-recolher[aria-expanded="false"]').forEach((b) => b.click());
+  });
+  await page.waitForTimeout(400);
 }
 
 async function checarEtiquetasFiltro(page, resultado) {
