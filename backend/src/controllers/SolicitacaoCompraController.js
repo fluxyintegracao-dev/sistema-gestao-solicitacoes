@@ -75,6 +75,7 @@ const {
   canAccessCompras,
   canAccessSolicitacaoCompraByScope,
   canAlterarQuantidadeSolicitacaoCompra,
+  canEditarItensSolicitacaoCompra,
   canEditarApropriacoesItemCompraDireta,
   canEditarApropriacoesItemSolicitacaoCompra,
   canEncaminharCompraSolicitacoes,
@@ -436,11 +437,11 @@ async function buscarSetorGerenciaProcessos(transaction) {
 }
 
 async function montarFluxoAprovacaoCompra({ transaction }) {
-  const setorCompras = await buscarSetorCompras(transaction);
+  const setorGerenciaProcessos = await buscarSetorGerenciaProcessos(transaction);
 
   return {
     usaFluxoDiretoria: false,
-    areaResponsavel: setorCompras,
+    areaResponsavel: setorGerenciaProcessos,
     diretoriaFluxoCodigo: null,
     setorDestinoPosAprovacao: null
   };
@@ -519,6 +520,12 @@ function isStatusSolicitacaoCompraLiberadoParaCompras(status) {
   return normalizado.startsWith('PEDIDO_');
 }
 
+function isStatusSolicitacaoCompraAguardandoRevisaoGeo(status) {
+  return ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE'].includes(
+    normalizeFluxoTokenCompra(status)
+  );
+}
+
 function isSolicitacaoCompraCancelada(solicitacao) {
   return ['CANCELADA', 'CANCELADO'].includes(normalizeTextCompra(solicitacao?.status));
 }
@@ -593,6 +600,54 @@ async function podeAcompanharCompraAntesLiberacao(usuario, solicitacao, transact
     ? contexto.ehSetorCompras
     : await userHasSetorCapability(usuario, 'eh_setor_compras');
   return !ehSetorCompras;
+}
+
+async function podeGerenciarCompraNaFilaGeo(usuario, solicitacao, transaction = null) {
+  if (!solicitacao || isSolicitacaoCompraDireta(solicitacao)) return false;
+  if (!isStatusSolicitacaoCompraAguardandoRevisaoGeo(solicitacao.status)) return false;
+  if (!(await userHasSetorCapability(usuario, 'eh_setor_geo'))) return false;
+
+  const possuiPermissao = (
+    await canEditarItensSolicitacaoCompra(usuario)
+    || await canEncaminharCompraSolicitacoes(usuario)
+  );
+  if (!possuiPermissao) return false;
+
+  const principal = solicitacao.solicitacaoPrincipal || (
+    Number(solicitacao.solicitacao_principal_id || 0) > 0
+      ? await Solicitacao.findByPk(solicitacao.solicitacao_principal_id, {
+          attributes: ['id', 'area_responsavel', 'status_global'],
+          transaction
+        })
+      : null
+  );
+  if (!principal) return false;
+
+  const setorGeo = await buscarSetorGerenciaProcessos(transaction);
+  return normalizeFluxoTokenCompra(principal.area_responsavel) === normalizeFluxoTokenCompra(setorGeo);
+}
+
+async function validarEtapaGerenciamentoItens(usuario, solicitacao, res, transaction = null) {
+  if (isBusinessAdmin(usuario)) return true;
+
+  const [ehSetorGeo, ehSetorCompras] = await Promise.all([
+    userHasSetorCapability(usuario, 'eh_setor_geo'),
+    userHasSetorCapability(usuario, 'eh_setor_compras')
+  ]);
+
+  if (!ehSetorGeo && !ehSetorCompras) {
+    res.status(403).json({ error: 'Apenas GEO ou Compras pode gerenciar os itens da solicitacao de compra.' });
+    return false;
+  }
+
+  if (ehSetorGeo && !ehSetorCompras && !(await podeGerenciarCompraNaFilaGeo(usuario, solicitacao, transaction))) {
+    res.status(403).json({
+      error: 'GEO pode gerenciar os itens somente enquanto a solicitacao aguarda revisao no proprio setor.'
+    });
+    return false;
+  }
+
+  return true;
 }
 
 async function carregarSolicitacaoCompra(id) {
@@ -1960,6 +2015,10 @@ async function anexarArquivosCabecalhoSolicitacao({ anexos = [], solicitacaoPrin
 }
 
 async function validarEscopoSolicitacaoCompra(usuario, solicitacao, res, transaction = null) {
+  if (await podeGerenciarCompraNaFilaGeo(usuario, solicitacao, transaction)) {
+    return true;
+  }
+
   if (await canAccessSolicitacaoCompraByScope(usuario, solicitacao)) {
     return true;
   }
@@ -2009,9 +2068,15 @@ async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario
   }
 
   const statusAtual = normalizeTextCompra(solicitacao.status);
-  if (['INATIVA', 'ENCERRADO', 'FINALIZADA'].includes(statusAtual) || statusAtual.startsWith('PEDIDO_')) {
+  if (isStatusSolicitacaoCompraLiberadoParaCompras(statusAtual)) {
     const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
-    const error = new Error(`${codigo} nao pode ser encaminhada para Compras no status atual.`);
+    const error = new Error(`${codigo} ja foi liberada para o setor de Compras.`);
+    error.statusCode = 400;
+    throw error;
+  }
+  if (!isStatusSolicitacaoCompraAguardandoRevisaoGeo(statusAtual)) {
+    const codigo = `SC-${String(solicitacao.id).padStart(5, '0')}`;
+    const error = new Error(`${codigo} nao esta pendente de revisao do GEO.`);
     error.statusCode = 400;
     throw error;
   }
@@ -2022,23 +2087,19 @@ async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario
     throw error;
   }
 
+  if (!isBusinessAdmin(usuario)) {
+    const ehSetorGeo = await userHasSetorCapability(usuario, 'eh_setor_geo');
+    if (!ehSetorGeo) {
+      const error = new Error('Apenas GEO pode concluir a revisao e encaminhar a solicitacao para Compras.');
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
   const setorCompras = await buscarSetorCompras(transaction);
+  const setorGeo = await buscarSetorGerenciaProcessos(transaction);
   const liberadoEm = solicitacao.liberado_para_compra_em || new Date();
   const statusAnteriorCompra = solicitacao.status;
-
-  await solicitacao.update(
-    {
-      status: 'LIBERADO_PARA_COMPRA',
-      liberado_para_compra_em: liberadoEm,
-      comprador_responsavel_id: null,
-      prazo_compra: null,
-      delegado_por: null,
-      delegado_em: null,
-      motivo_atraso: null,
-      motivo_atraso_em: null
-    },
-    { transaction }
-  );
 
   let historicoPrincipal = null;
   if (Number(solicitacao.solicitacao_principal_id || 0) > 0) {
@@ -2051,7 +2112,8 @@ async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario
         'fluxo_aprovacao_diretoria',
         'aprovada_diretoria_em'
       ],
-      transaction
+      transaction,
+      lock: transaction.LOCK.UPDATE
     });
 
     if (principal?.fluxo_aprovacao_diretoria && !principal.aprovada_diretoria_em) {
@@ -2061,6 +2123,15 @@ async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario
     }
 
     if (principal) {
+      if (
+        !isBusinessAdmin(usuario)
+        && normalizeFluxoTokenCompra(principal.area_responsavel) !== normalizeFluxoTokenCompra(setorGeo)
+      ) {
+        const error = new Error('A solicitacao principal nao esta mais no setor GEO para ser encaminhada.');
+        error.statusCode = 400;
+        throw error;
+      }
+
       const statusAnteriorPrincipal = principal.status_global;
       const areaAnteriorPrincipal = principal.area_responsavel;
       await principal.update(
@@ -2084,13 +2155,36 @@ async function encaminharSolicitacaoCompraParaFilaCompras({ solicitacao, usuario
             solicitacao_compra_id: solicitacao.id,
             area_anterior: areaAnteriorPrincipal,
             area_nova: setorCompras,
-            origem: 'AJUSTE_MANUAL_FILA_COMPRAS'
+            origem: 'REVISAO_GEO'
           })
+        },
+        { transaction }
+      );
+
+      await StatusArea.create(
+        {
+          solicitacao_id: principal.id,
+          setor: setorCompras,
+          status: 'LIBERADO',
+          observacao: 'Solicitacao de compra revisada pelo GEO e encaminhada para Compras'
         },
         { transaction }
       );
     }
   }
+  await solicitacao.update(
+    {
+      status: 'LIBERADO_PARA_COMPRA',
+      liberado_para_compra_em: liberadoEm,
+      comprador_responsavel_id: null,
+      prazo_compra: null,
+      delegado_por: null,
+      delegado_em: null,
+      motivo_atraso: null,
+      motivo_atraso_em: null
+    },
+    { transaction }
+  );
 
   await PedidoCompra.update(
     {
@@ -2474,6 +2568,14 @@ module.exports = {
 
       const { obra_id, contexto, visao } = req.query;
       const statusOcultos = ['INATIVA'];
+      const [ehSetorGeo, ehSetorCompras, podeEditarItens, podeEncaminharCompras, podeVisualizarEscopoCompleto] = await Promise.all([
+        userHasSetorCapability(usuario, 'eh_setor_geo'),
+        userHasSetorCapability(usuario, 'eh_setor_compras'),
+        canEditarItensSolicitacaoCompra(usuario),
+        canEncaminharCompraSolicitacoes(usuario),
+        canViewAllComprasScope(usuario)
+      ]);
+      const podeRevisarFilaGeo = ehSetorGeo && (podeEditarItens || podeEncaminharCompras);
       const where = {
         origem: { [Op.ne]: 'COMPRA_DIRETA' },
         status: {
@@ -2489,10 +2591,30 @@ module.exports = {
         : false;
       if (contextoDelegacao && !podeGerenciarDelegacao) {
         where.comprador_responsavel_id = usuario.id;
-      } else if (!contextoDelegacao && !(await canViewAllComprasScope(usuario))) {
-        where[Op.or] = [
+      } else if (!contextoDelegacao && !podeVisualizarEscopoCompleto) {
+        const escopoRestrito = [
           { comprador_responsavel_id: usuario.id },
           { solicitante_id: usuario.id }
+        ];
+        if (podeRevisarFilaGeo) {
+          const setorGeo = await buscarSetorGerenciaProcessos();
+          escopoRestrito.push({ '$solicitacaoPrincipal.area_responsavel$': setorGeo });
+        }
+        where[Op.or] = escopoRestrito;
+      }
+
+      if (!isSuperadmin(usuario) && ehSetorCompras && !ehSetorGeo) {
+        where[Op.and] = [
+          {
+            [Op.or]: [
+              {
+                status: {
+                  [Op.notIn]: ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE']
+                }
+              },
+              { solicitante_id: usuario.id }
+            ]
+          }
         ];
       }
       const obraIdsEscopo = Array.isArray(req.compraScopeObraIds)
@@ -2572,10 +2694,6 @@ module.exports = {
       });
 
       const solicitacoesVisiveis = [];
-      const [ehSetorGeo, ehSetorCompras] = await Promise.all([
-        userHasSetorCapability(usuario, 'eh_setor_geo'),
-        userHasSetorCapability(usuario, 'eh_setor_compras')
-      ]);
       const contextoAcompanhamento = {
         superadmin: isSuperadmin(usuario),
         ehSetorGeo,
@@ -2954,7 +3072,8 @@ module.exports = {
 
       const solicitacoes = await SolicitacaoCompra.findAll({
         where: { id: { [Op.in]: solicitacaoIds } },
-        transaction
+        transaction,
+        lock: transaction.LOCK.UPDATE
       });
 
       if (solicitacoes.length !== solicitacaoIds.length) {
@@ -2974,6 +3093,14 @@ module.exports = {
       }
 
       await transaction.commit();
+
+      solicitacaoIds.forEach((solicitacaoCompraId) => {
+        void publishComprasRealtimeEventSafe({
+          action: 'SOLICITACAO_ENCAMINHADA_COMPRAS',
+          solicitacaoCompraId,
+          actor: usuario
+        });
+      });
 
       if (solicitacaoIds.length === 1) {
         const atualizada = await carregarSolicitacaoCompra(solicitacaoIds[0]);
@@ -3067,7 +3194,7 @@ module.exports = {
 
       if (!(await canAlterarQuantidadeSolicitacaoCompra(usuario))) {
         await transaction.rollback();
-        return res.status(403).json({ error: 'Apenas compras pode alterar itens da solicitacao de compra' });
+        return res.status(403).json({ error: 'Acesso negado para gerenciar itens da solicitacao de compra.' });
       }
 
       const solicitacao = await carregarSolicitacaoCompra(req.params.id);
@@ -3079,6 +3206,11 @@ module.exports = {
       if (isSolicitacaoCompraDireta(solicitacao)) {
         await transaction.rollback();
         return responderCompraDiretaForaDoFluxoCompras(res);
+      }
+
+      if (!(await validarEtapaGerenciamentoItens(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
       }
 
       if (['CANCELADA', 'CANCELADO'].includes(String(solicitacao.status || '').toUpperCase())) {
@@ -3238,6 +3370,10 @@ module.exports = {
       if (!podeEditar) {
         await transaction.rollback();
         return res.status(403).json({ error: 'Acesso negado para alterar apropriacoes dos itens.' });
+      }
+      if (!compraDireta && !(await validarEtapaGerenciamentoItens(usuario, solicitacao, res, transaction))) {
+        await transaction.rollback();
+        return;
       }
 
       if (!compraDireta && isCompraAguardandoDiretoria(solicitacao)) {
@@ -3713,7 +3849,7 @@ module.exports = {
         : await montarFluxoAprovacaoCompra({
             transaction
           });
-      const statusInicialCompra = compraDireta ? 'ENVIADO' : 'LIBERADO_PARA_COMPRA';
+      const statusInicialCompra = compraDireta ? 'ENVIADO' : 'PENDENTE';
 
       const solicitacaoCompra = await SolicitacaoCompra.create(
         {
@@ -3894,7 +4030,9 @@ module.exports = {
           status: 'PENDENTE',
           observacao: fluxoCompra.usaFluxoDiretoria
             ? `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} aguardando aprovacao da diretoria`
-            : `${compraDireta ? 'Compra direta' : 'Solicitacao de compra'} criada`
+            : compraDireta
+              ? 'Compra direta criada'
+              : 'Solicitacao de compra criada e aguardando revisao do GEO'
         },
         { transaction }
       );

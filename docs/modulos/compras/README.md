@@ -63,10 +63,12 @@ Endpoint protegido: `POST /compras/solicitacoes/:id/itens-manuais/:itemId/catalo
 
 1. usuario cria a compra;
 2. itens e apropriacoes sao validados;
-3. compra normal nasce em `LIBERADO_PARA_COMPRA` e segue diretamente para Compras;
-4. compra direta nasce em `ENVIADO` e segue para Gerencia de Processos;
-5. nao existe aprovacao previa por diretoria para novos registros;
-6. cancelamento posterior precisa verificar cotacoes, pedidos, fiscal e financeiro.
+3. compra normal nasce `PENDENTE` em GEO para revisao de quantidades e apropriacoes;
+4. `compras.solicitacoes.editar_itens` permite gerenciar esses dois dados somente enquanto a solicitacao esta no GEO;
+5. `compras.solicitacoes.encaminhar_compras` conclui a revisao, move a solicitacao para Compras e altera o registro operacional para `LIBERADO_PARA_COMPRA`;
+6. compra direta nasce em `ENVIADO` e segue para Gerencia de Processos;
+7. nao existe aprovacao previa por diretoria para novos registros;
+8. cancelamento posterior precisa verificar cotacoes, pedidos, fiscal e financeiro.
 
 Campos e rotas de diretoria ainda presentes no backend atendem somente compras antigas formalmente marcadas com esse fluxo e nao definem a criacao vigente.
 
@@ -87,7 +89,7 @@ As rotas antigas `PATCH /compras/solicitacoes/:id/integrar` e `PATCH /compras/so
 - parceiro fornece solicitante/fornecedor quando aplicavel;
 - Obras fornece apropriacoes;
 - Solicitacoes pode ser origem, sem perder sua propria trilha;
-- Cotacoes consome a compra normal liberada diretamente para Compras;
+- Cotacoes consome a compra normal somente depois da revisao GEO e do encaminhamento para Compras;
 - Fiscal e Financeiro consomem pedidos e obrigacoes posteriores, nao o rascunho da compra.
 
 ## Delegacao de compras

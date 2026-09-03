@@ -143,6 +143,7 @@ export function canAccessCompras(user) {
       'compras.solicitacoes.encaminhar_compras',
       'compras.solicitacoes.editar_itens',
       'compras.solicitacoes.editar_quantidade',
+      'compras.solicitacoes.editar_apropriacoes_itens',
       'compras.solicitacoes.gerar_pedidos',
       'compras.pedidos.visualizar',
       'compras.pedidos.criar',
@@ -198,6 +199,7 @@ export function canViewCompraSolicitacoes(user) {
       'compras.solicitacoes.encaminhar_compras',
       'compras.solicitacoes.editar_itens',
       'compras.solicitacoes.editar_quantidade',
+      'compras.solicitacoes.editar_apropriacoes_itens',
       'compras.solicitacoes.gerar_pedidos',
       'compras.delegacao.visualizar',
       'compras.delegacao.gerenciar'
@@ -267,7 +269,12 @@ export function canEditarApropriacoesItemSolicitacaoCompra(user) {
   if (!hasEnabledModule(user, 'COMPRAS')) return false;
   if (isBusinessAdmin(user)) return true;
   if (hasConfiguredAreaPermissions(user)) {
-    return hasPermissao(user, 'compras.solicitacoes.editar_apropriacoes_itens');
+    return hasAnyPermissao(user, [
+      'compras.solicitacoes.editar_apropriacoes_itens',
+      'compras.solicitacoes.editar_itens',
+      'compras.solicitacoes.gerenciar',
+      'compras.solicitacoes.gerar_pedidos'
+    ]);
   }
   return false;
 }

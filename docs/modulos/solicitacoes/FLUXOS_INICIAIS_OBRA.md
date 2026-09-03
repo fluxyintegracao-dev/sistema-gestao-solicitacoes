@@ -68,7 +68,7 @@ flowchart LR
     I -->|"Compra direta"| K["Nova Compra Direta"]
     H --> L["Backend valida obra, area, tipo, campos e permissao"]
     L --> M["Nasce PENDENTE diretamente no setor escolhido"]
-    J --> N["Nasce LIBERADO PARA COMPRA em Compras"]
+    J --> N["Nasce PENDENTE em GEO para revisao dos itens"]
     K --> O["Nasce ENVIADO na Gerencia de Processos"]
 ```
 
@@ -102,7 +102,7 @@ Observacao: a data de demissao esta visivel, mas nao esta configurada como obrig
 | Medicao | Admin primeiro | solicitacao geral | obra, area, contrato, rateio do contrato, valor, vencimento, inicio e fim da medicao | credor, descricao, anexos | `LIBERADO` envia ao Financeiro |
 | Outros assuntos | Admin primeiro | solicitacao geral | obra, area, vencimento, descricao | credor, cadastro de credor, valor, anexos | nenhuma |
 | Recarga de cartao | Admin primeiro | solicitacao geral | obra, area, valor, vencimento, descricao | credor, anexos | `LIBERADO` envia ao Financeiro |
-| Solicitacao de compra | Todos visiveis | `/solicitacoes-compra/nova` | obra, ao menos um item, quantidade, unidade, data necessaria e rateio valido | especificacao, link, itens manuais, importacao e anexos | nasce `LIBERADO PARA COMPRA` em Compras |
+| Solicitacao de compra | Todos visiveis | `/solicitacoes-compra/nova` | obra, ao menos um item, quantidade, unidade, data necessaria e rateio valido | especificacao, link, itens manuais, importacao e anexos | nasce `PENDENTE` em GEO; apos revisao, GEO envia para Compras |
 
 ### Juridico
 
@@ -212,13 +212,15 @@ flowchart LR
     A["OBRA escolhe Solicitacao de compra"] --> B["Redirecionamento para Nova Solicitacao de Compra"]
     B --> C["Preenche itens, quantidades, datas e rateios"]
     C --> D["Backend valida e cria de forma idempotente"]
-    D --> E["Compra nasce LIBERADO PARA COMPRA em Compras"]
-    E --> F["Delegacao e cotacao"]
-    F --> G["Respostas e comparativo"]
-    G --> H["Geracao de pedidos ou encerramento sem pedido"]
-    H --> I["Entrega total ou parcial para OBRA"]
-    I --> J["OBRA registra MERCADORIA ENTREGUE"]
-    J --> K["Envio automatico ao Financeiro"]
+    D --> E["Compra nasce PENDENTE em GEO"]
+    E --> F["GEO revisa quantidades e apropriacoes"]
+    F --> G["GEO envia para Compras"]
+    G --> H["Compra fica LIBERADO PARA COMPRA"]
+    H --> I["Delegacao, cotacao, respostas e comparativo"]
+    I --> J["Geracao de pedidos ou encerramento sem pedido"]
+    J --> K["Entrega total ou parcial para OBRA"]
+    K --> L["OBRA registra MERCADORIA ENTREGUE"]
+    L --> M["Envio automatico ao Financeiro"]
 ```
 
 ### Compra direta

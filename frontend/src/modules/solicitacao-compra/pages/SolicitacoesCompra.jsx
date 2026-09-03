@@ -11,7 +11,12 @@ import {
   listarSolicitacoesCompra
 } from '../../../services/compras';
 import { getMinhasObras } from '../../../services/obras';
-import { canDeleteCompraSolicitacoes, canEncaminharCompraSolicitacoes } from '../../../utils/acessoProduto';
+import {
+  canDeleteCompraSolicitacoes,
+  canEncaminharCompraSolicitacoes,
+  isBusinessAdmin
+} from '../../../utils/acessoProduto';
+import { userHasSetorCapability } from '../../../utils/setor';
 import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
 import useComprasRealtimeRefresh from '../hooks/useComprasRealtimeRefresh';
 
@@ -43,7 +48,7 @@ function formatarStatus(status) {
 function classNameStatus(status) {
   const valor = String(status || '').toUpperCase();
 
-  if (valor === 'ENVIADO' || valor === 'ABERTA') {
+  if (valor === 'PENDENTE' || valor === 'ENVIADO' || valor === 'ABERTA') {
     return 'app-status-pill compra-status-pill compra-status-blue bg-blue-100 text-blue-700';
   }
 
@@ -60,6 +65,12 @@ function classNameStatus(status) {
   }
 
   return 'app-status-pill compra-status-pill compra-status-default bg-indigo-100 text-indigo-700';
+}
+
+function estaAguardandoRevisaoGeo(status) {
+  return ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE'].includes(
+    String(status || '').trim().toUpperCase().replace(/[\s-]+/g, '_')
+  );
 }
 
 export default function SolicitacoesCompra() {
@@ -80,7 +91,10 @@ export default function SolicitacoesCompra() {
   const [filtrosVisiveis, setFiltrosVisiveis] = useState(false);
   const [selecionadas, setSelecionadas] = useState([]);
   const podeInativar = canDeleteCompraSolicitacoes(user);
-  const podeEncaminharCompras = canEncaminharCompraSolicitacoes(user);
+  const podeEncaminharCompras = (
+    canEncaminharCompraSolicitacoes(user)
+    && (userHasSetorCapability(user, 'eh_setor_geo') || isBusinessAdmin(user))
+  );
   const podeSelecionar = podeInativar || podeEncaminharCompras;
   async function carregarObras() {
     try {
@@ -147,6 +161,12 @@ export default function SolicitacoesCompra() {
     () => solicitacoesFiltradas.map((solicitacao) => Number(solicitacao.id)).filter(Boolean),
     [solicitacoesFiltradas]
   );
+  const idsSelecionadosEncaminhaveis = useMemo(() => {
+    const ids = new Set(selecionadas);
+    return solicitacoesFiltradas
+      .filter((solicitacao) => ids.has(Number(solicitacao.id)) && estaAguardandoRevisaoGeo(solicitacao.status))
+      .map((solicitacao) => Number(solicitacao.id));
+  }, [selecionadas, solicitacoesFiltradas]);
 
   const todasSelecionadas = useMemo(
     () => idsFiltrados.length > 0 && idsFiltrados.every((id) => selecionadas.includes(id)),
@@ -281,14 +301,14 @@ export default function SolicitacoesCompra() {
               {todasSelecionadas ? 'Desmarcar todas' : 'Selecionar todas'}
             </button>
           ) : null}
-          {podeEncaminharCompras && selecionadas.length > 0 ? (
+          {podeEncaminharCompras && idsSelecionadosEncaminhaveis.length > 0 ? (
             <button
               type="button"
               className="btn btn-outline"
-              onClick={() => handleEncaminharCompras(selecionadas)}
+              onClick={() => handleEncaminharCompras(idsSelecionadosEncaminhaveis)}
               disabled={encaminhando}
             >
-              {encaminhando ? 'Enviando...' : 'Enviar para Compras'}
+              {encaminhando ? 'Enviando...' : `Enviar para Compras (${idsSelecionadosEncaminhaveis.length})`}
             </button>
           ) : null}
           {podeInativar && selecionadas.length > 0 ? (
@@ -354,6 +374,7 @@ export default function SolicitacoesCompra() {
               <span className="sol-filter-label">Status</span>
               <select className="input" value={status} onChange={(event) => setStatus(event.target.value)}>
                 <option value="">Todos</option>
+                <option value="PENDENTE">Pendente</option>
                 <option value="ENVIADO">Enviado</option>
                 <option value="LIBERADO_PARA_COMPRA">Liberado para compra</option>
                 <option value="FECHAMENTO_PARCIAL">Fechamento parcial</option>
@@ -481,7 +502,7 @@ export default function SolicitacoesCompra() {
               >
                 <HiOutlineArrowDownTray />
               </button>
-              {podeEncaminharCompras ? (
+              {podeEncaminharCompras && estaAguardandoRevisaoGeo(solicitacao.status) ? (
                 <button
                   type="button"
                   className="compras-icon-action"

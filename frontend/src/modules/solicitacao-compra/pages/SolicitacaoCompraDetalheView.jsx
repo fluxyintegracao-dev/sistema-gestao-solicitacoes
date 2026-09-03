@@ -8,6 +8,7 @@ import {
   atualizarQuantidadeItemSolicitacaoCompra,
   baixarPdfSolicitacaoCompra,
   cancelarSolicitacaoCompra,
+  encaminharSolicitacaoCompraParaCompras,
   obterSolicitacaoCompra
 } from '../../../services/compras';
 import {
@@ -15,9 +16,12 @@ import {
   canCatalogarItensManuaisCompras,
   canDeleteCompraSolicitacoes,
   canEditarApropriacoesItemCompraDireta,
-  canEditarApropriacoesItemSolicitacaoCompra
+  canEditarApropriacoesItemSolicitacaoCompra,
+  canEncaminharCompraSolicitacoes,
+  isBusinessAdmin
 } from '../../../utils/acessoProduto';
 import { useSafeNavigateBack } from '../../../utils/navigation';
+import { userHasSetorCapability } from '../../../utils/setor';
 import {
   calcularResumoRateios,
   criarRateioBase,
@@ -29,7 +33,13 @@ import {
   validarRateiosItem
 } from '../utils/apropriacoes';
 import ItemCompraDetalhe, { statusCatalogacao } from '../components/ItemCompraDetalhe';
-import { TabelaPadrao, CelulaDupla } from '../../../components/padrao';
+import {
+  Avisos,
+  CelulaDupla,
+  TabelaPadrao,
+  useAvisos,
+  useConfirmacao
+} from '../../../components/padrao';
 
 function formatarData(data) {
   if (!data) return '-';
@@ -38,6 +48,14 @@ function formatarData(data) {
   if (match) return `${match[3]}/${match[2]}/${match[1]}`;
   const valor = new Date(data);
   return Number.isNaN(valor.getTime()) ? '-' : valor.toLocaleDateString('pt-BR');
+}
+
+function normalizarStatusCompra(status) {
+  return String(status || '').trim().toUpperCase().replace(/[\s-]+/g, '_');
+}
+
+function estaAguardandoRevisaoGeo(status) {
+  return ['PENDENTE', 'ENVIADO', 'INTEGRADO_SIENGE'].includes(normalizarStatusCompra(status));
 }
 
 function formatarStatus(status) {
@@ -133,11 +151,14 @@ export default function SolicitacaoCompraDetalheView() {
   const [salvandoApropriacaoId, setSalvandoApropriacaoId] = useState(null);
   const [modalCancelamentoAberto, setModalCancelamentoAberto] = useState(false);
   const [cancelandoSolicitacao, setCancelandoSolicitacao] = useState(false);
+  const [encaminhandoCompras, setEncaminhandoCompras] = useState(false);
   const [cancelamentoForm, setCancelamentoForm] = useState({
     motivo: '',
     cancelar_cotacao: true,
     cancelar_solicitacao_principal: false
   });
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     try {
@@ -195,10 +216,20 @@ export default function SolicitacaoCompraDetalheView() {
     };
   }, [solicitacao]);
 
-  const podeEditarQuantidadeItem = canAlterarQuantidadeSolicitacaoCompra(user);
+  const aguardandoRevisaoGeo = estaAguardandoRevisaoGeo(solicitacao?.status);
+  const usuarioEhGeo = userHasSetorCapability(user, 'eh_setor_geo');
+  const usuarioEhCompras = userHasSetorCapability(user, 'eh_setor_compras');
+  const edicaoGeoPermitidaNoEstagio = !usuarioEhGeo || usuarioEhCompras || aguardandoRevisaoGeo;
+  const podeEditarQuantidadeItem = canAlterarQuantidadeSolicitacaoCompra(user) && edicaoGeoPermitidaNoEstagio;
   const podeEditarApropriacoesItem =
-    canEditarApropriacoesItemSolicitacaoCompra(user) || canEditarApropriacoesItemCompraDireta(user);
+    (canEditarApropriacoesItemSolicitacaoCompra(user) || canEditarApropriacoesItemCompraDireta(user))
+    && edicaoGeoPermitidaNoEstagio;
   const podeCatalogarItensManuais = canCatalogarItensManuaisCompras(user);
+  const podeEncaminharCompras = (
+    canEncaminharCompraSolicitacoes(user)
+    && aguardandoRevisaoGeo
+    && (usuarioEhGeo || isBusinessAdmin(user))
+  );
 
   const resumoRateiosModal = modalApropriacaoItem
     ? calcularResumoRateios({ ...modalApropriacaoItem, apropriacoes: rateiosModal })
@@ -216,6 +247,28 @@ export default function SolicitacaoCompraDetalheView() {
       alert(error.message || 'Erro ao abrir PDF');
     } finally {
       setBaixando(false);
+    }
+  }
+
+  async function handleEncaminharCompras() {
+    const { ok } = await confirmar({
+      titulo: 'Enviar para Compras',
+      mensagem: 'Concluir a revisao GEO e enviar esta solicitacao para o setor de Compras?',
+      rotuloConfirmar: 'Enviar para Compras',
+      rotuloCancelar: 'Continuar revisando'
+    });
+    if (!ok) return;
+
+    try {
+      setEncaminhandoCompras(true);
+      const data = await encaminharSolicitacaoCompraParaCompras(id);
+      setSolicitacao(data || null);
+      avisar.sucesso('Solicitacao revisada e enviada para o setor de Compras.');
+    } catch (error) {
+      console.error(error);
+      avisar.erro(error.message || 'Erro ao enviar solicitacao para Compras');
+    } finally {
+      setEncaminhandoCompras(false);
     }
   }
 
@@ -414,6 +467,7 @@ export default function SolicitacaoCompraDetalheView() {
 
   return (
     <div className="page solicitacoes-page compra-detalhe-page">
+      <Avisos avisos={avisos} aoFechar={fechar} />
       <div className="card sol-surface-card app-toolbar-card">
         <div className="app-page-header-row">
           <div>
@@ -430,10 +484,24 @@ export default function SolicitacaoCompraDetalheView() {
               type="button"
               className="btn btn-outline"
               onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}
-              disabled={solicitacaoCompraCancelada}
+              disabled={solicitacaoCompraCancelada || aguardandoRevisaoGeo}
             >
-              {solicitacaoCompraCancelada ? 'Cotacao cancelada' : 'Gerenciar cotacao'}
+              {solicitacaoCompraCancelada
+                ? 'Cotacao cancelada'
+                : aguardandoRevisaoGeo
+                  ? 'Cotacao apos revisao GEO'
+                  : 'Gerenciar cotacao'}
             </button>
+            {podeEncaminharCompras && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleEncaminharCompras}
+                disabled={encaminhandoCompras}
+              >
+                {encaminhandoCompras ? 'Enviando...' : 'Enviar para Compras'}
+              </button>
+            )}
             {podeCancelarSolicitacaoCompra && (
               <button type="button" className="btn btn-danger" onClick={abrirModalCancelamento}>
                 Cancelar SC
@@ -489,6 +557,13 @@ export default function SolicitacaoCompraDetalheView() {
           </div>
         </div>
       </div>
+
+      {aguardandoRevisaoGeo && (
+        <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <strong>Aguardando revisao do GEO.</strong>{' '}
+          Usuarios autorizados podem conferir quantidades e apropriacoes. A cotacao sera liberada somente depois do envio para Compras.
+        </div>
+      )}
 
       <div className="mt-4 grid gap-4">
         <div className="card sol-surface-card compra-detalhe-itens-card">
@@ -604,9 +679,13 @@ export default function SolicitacaoCompraDetalheView() {
                 type="button"
                 className="btn btn-primary w-full"
                 onClick={() => navigate(`/solicitacoes-compra/${id}/cotacao`)}
-                disabled={solicitacaoCompraCancelada}
+                disabled={solicitacaoCompraCancelada || aguardandoRevisaoGeo}
               >
-                {solicitacaoCompraCancelada ? 'Cotacao cancelada' : 'Abrir gestao da cotacao'}
+                {solicitacaoCompraCancelada
+                  ? 'Cotacao cancelada'
+                  : aguardandoRevisaoGeo
+                    ? 'Aguardando envio para Compras'
+                    : 'Abrir gestao da cotacao'}
               </button>
             </div>
           </div>
@@ -851,6 +930,7 @@ export default function SolicitacaoCompraDetalheView() {
           />
         </div>
       )}
+      {elementoConfirmacao}
     </div>
   );
 }

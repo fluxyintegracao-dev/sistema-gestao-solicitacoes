@@ -150,6 +150,7 @@ const COMPRAS_SOLICITACOES_VIEW_KEYS = [
   'compras.solicitacoes.gerar_pedidos',
   'compras.solicitacoes.editar_itens',
   'compras.solicitacoes.editar_quantidade',
+  'compras.solicitacoes.editar_apropriacoes_itens',
   'compras.delegacao.visualizar',
   'compras.delegacao.gerenciar',
   'compras.delegacao.alterar_responsavel',
@@ -181,7 +182,8 @@ const SOLICITACOES_APROPRIACOES_EDIT_KEYS = [
 ];
 
 const COMPRAS_SOLICITACOES_EDIT_APROPRIACOES_KEYS = [
-  'compras.solicitacoes.editar_apropriacoes_itens'
+  'compras.solicitacoes.editar_apropriacoes_itens',
+  ...COMPRAS_SOLICITACOES_EDIT_ITEMS_KEYS
 ];
 
 const COMPRAS_COMPRA_DIRETA_EDIT_APROPRIACOES_KEYS = [

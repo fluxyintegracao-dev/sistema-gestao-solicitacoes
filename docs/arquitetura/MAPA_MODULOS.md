@@ -39,7 +39,8 @@ Este documento define as dependencias que precisam ser avaliadas antes de altera
 - `COTACOES` depende de `COMPRAS`.
 - `BOLETOS` depende de `FINANCEIRO`.
 - `PROVISOES` depende de `FINANCEIRO` e `OBRAS`.
-- solicitacao de compra aprovada segue diretamente para cotacao; integracao externa e liberacao manual nao sao pre-requisitos vigentes;
+- solicitacao de compra normal nasce `PENDENTE` em GEO para revisao de itens e apropriacoes e somente fica disponivel para cotacao depois do encaminhamento explicito para Compras;
+- integracao externa e aprovacao da diretoria nao sao pre-requisitos vigentes para novas solicitacoes de compra;
 - `fornecedores[].itens` define o escopo de cada link de cotacao e todo item precisa pertencer a mesma solicitacao de compra;
 - SST pode referenciar colaboradores de RH/DP e obras, sem sincronizacao ou automacao entre os modulos.
 - Um modulo consumidor nunca passa a ser dono do dado apenas porque o proprietario esta desabilitado.
