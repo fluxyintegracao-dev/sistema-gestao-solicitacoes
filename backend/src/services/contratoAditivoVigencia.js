@@ -42,12 +42,10 @@ function formatarDataBr(valor) {
  * Reducao de prazo e uma operacao diferente: precisa escolher explicitamente se compromissos
  * posteriores serao antecipados, cancelados ou mantidos. Ate esse fluxo existir, ela e bloqueada.
  */
-function validarNovaVigencia({ novaVigenciaFim, vigenciaAtualFim, ultimaParcelaVencimento, hoje } = {}) {
+function validarNovaVigencia({ novaVigenciaFim, vigenciaAtualFim, hoje } = {}) {
   const nova = normalizarDataIso(novaVigenciaFim);
   const atual = normalizarDataIso(vigenciaAtualFim);
-  const ultimaParcela = normalizarDataIso(ultimaParcelaVencimento);
   const referenciaHoje = normalizarDataIso(hoje) || dataHojeNoFuso();
-  const limiteOperacional = [atual, ultimaParcela].filter(Boolean).sort().at(-1) || null;
 
   if (!nova) {
     return {
@@ -65,7 +63,7 @@ function validarNovaVigencia({ novaVigenciaFim, vigenciaAtualFim, ultimaParcelaV
     };
   }
 
-  if (atual && nova === atual && (!ultimaParcela || ultimaParcela <= atual)) {
+  if (atual && nova === atual) {
     return {
       valida: false,
       codigo: 'SEM_ALTERACAO',
@@ -73,14 +71,11 @@ function validarNovaVigencia({ novaVigenciaFim, vigenciaAtualFim, ultimaParcelaV
     };
   }
 
-  if (limiteOperacional && nova <= limiteOperacional) {
-    const referencia = ultimaParcela && ultimaParcela > (atual || '')
-      ? `o ultimo vencimento existente (${formatarDataBr(ultimaParcela)})`
-      : `a vigencia atual (${formatarDataBr(atual)})`;
+  if (atual && nova < atual) {
     return {
       valida: false,
       codigo: 'REDUCAO_NAO_SUPORTADA',
-      mensagem: `Este fluxo aceita apenas prorrogacao. A nova vigencia deve ser posterior a ${referencia}. A reducao de prazo exige tratamento especifico das parcelas, medicoes e titulos posteriores.`
+      mensagem: `Este fluxo aceita apenas prorrogacao. A nova vigencia deve ser posterior a vigencia atual (${formatarDataBr(atual)}). A reducao de prazo exige tratamento especifico das parcelas, medicoes e titulos posteriores.`
     };
   }
 
@@ -89,8 +84,6 @@ function validarNovaVigencia({ novaVigenciaFim, vigenciaAtualFim, ultimaParcelaV
     codigo: 'PRORROGACAO_VALIDA',
     nova_vigencia_fim: nova,
     vigencia_atual_fim: atual,
-    ultima_parcela_vencimento: ultimaParcela,
-    limite_operacional: limiteOperacional,
     hoje: referenciaHoje
   };
 }

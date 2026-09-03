@@ -14,6 +14,9 @@ module.exports = (sequelize, DataTypes) => {
       // Quantas parcelas criar. So o aditivo de vigencia usa: no de valor o prazo nao mudou e a
       // regra e outra (ultima parcela livre, ou uma nova com o mesmo vencimento da ultima).
       qtde_parcelas: { type: DataTypes.INTEGER, allowNull: true },
+      // Fotografia do cronograma financeiro negociado. A data de vencimento e independente da
+      // vigencia do servico e pode ultrapassa-la.
+      cronograma_parcelas: { type: DataTypes.JSON, allowNull: true },
       justificativa: { type: DataTypes.TEXT, allowNull: false },
       responsavel_id: { type: DataTypes.INTEGER, allowNull: true },
       // So APROVADO consome o teto de 25% (PI-12): rejeitado libera o valor de volta.

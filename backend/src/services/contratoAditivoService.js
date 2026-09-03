@@ -7,6 +7,7 @@ const { paraCentavos, somenteData, formatarISO } = require('./contratoParcelasSe
 const { obterLimiteJuridico } = require('./contratoLimiteConfigService');
 const { validarResponsavelVinculadoObra } = require('./contratoResponsavelService');
 const { validarNovaVigencia } = require('./contratoAditivoVigencia');
+const { validarCronogramaParcelas } = require('./contratoAditivoCronograma');
 const {
   calcularRoteamentoSolicitacaoAditivo,
   SETOR_GERENCIA_PROCESSOS,
@@ -47,7 +48,8 @@ const STATUS = {
  * `VALOR`            : so dinheiro. O prazo final do contrato nao muda, entao nenhuma data nova
  *                      aparece: o valor cai na ultima parcela ainda livre ou, se ela ja estiver
  *                      comprometida, nasce UMA parcela com o MESMO vencimento da ultima.
- * `VALOR_E_VIGENCIA` : dinheiro e prazo. Nascem `qtde_parcelas` parcelas ate a nova vigencia.
+ * `VALOR_E_VIGENCIA` : dinheiro e prazo. Nascem as parcelas do cronograma financeiro informado;
+ *                      seus vencimentos nao precisam terminar dentro da vigencia do servico.
  *
  * Informado, nunca deduzido de "tem nova vigencia preenchida?": deduzir transformaria um campo
  * esquecido em decisao tomada.
@@ -151,12 +153,9 @@ async function calcularTetoAditivo(contratoId, transaction) {
   });
   if (!contrato) throw erro('Contrato nao encontrado.', 404);
 
-  // A referencia operacional tambem considera as parcelas. Isso protege contratos antigos que
-  // tenham vigencia_fim nula ou, por dado historico, vencimento posterior ao fim cadastrado.
-  const ultimaParcelaVencimento = await ContratoParcela.max('data_vencimento', {
-    where: { contrato_id: Number(contratoId) },
-    transaction
-  });
+  const resumoParcelas = contrato.fluxo_novo
+    ? await obterResumoParcelasLivres(contratoId, transaction)
+    : { saldoCent: 0, quantidadeLivres: 0, quantidadeTotal: 0, ultimaParcelaVencimento: null };
 
   const aprovados = await ContratoAditivo.findAll({
     where: { contrato_id: contratoId, status: STATUS.APROVADO },
@@ -180,7 +179,9 @@ async function calcularTetoAditivo(contratoId, transaction) {
       responsavel_id: contrato.responsavel_id || null,
       vigencia_inicio: contrato.vigencia_inicio || null,
       vigencia_fim: contrato.vigencia_fim || null,
-      ultima_parcela_vencimento: ultimaParcelaVencimento || null
+      // Usado somente como sugestao para o proximo vencimento financeiro. Nao limita vigencia:
+      // pagamento e execucao sao cronogramas independentes.
+      ultima_parcela_vencimento: resumoParcelas.ultimaParcelaVencimento || null
     },
     aceita_aditivo: contratoAceitaAditivo(contrato),
     percentual_maximo: PERCENTUAL_MAXIMO,
@@ -188,6 +189,10 @@ async function calcularTetoAditivo(contratoId, transaction) {
     teto: tetoCent / 100,
     usado: usadoCent / 100,
     disponivel: Math.max(tetoCent - usadoCent, 0) / 100,
+    saldo_livre: resumoParcelas.saldoCent / 100,
+    saldo_livre_cent: resumoParcelas.saldoCent,
+    parcelas_existentes: resumoParcelas.quantidadeTotal,
+    parcelas_livres: resumoParcelas.quantidadeLivres,
     teto_cent: tetoCent,
     usado_cent: usadoCent,
     disponivel_cent: Math.max(tetoCent - usadoCent, 0)
@@ -239,6 +244,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     // O que o aditivo muda, e quantas parcelas ele cria. Ver a constante TIPO.
     tipo,
     qtde_parcelas: qtdeParcelas,
+    parcelas: parcelasInformadas,
     responsavel_id: responsavelId,
     solicitacao_id: solicitacaoId,
     // PI-16: so usada no contrato LEGADO, que precisa de uma solicitacao nova e portanto de um
@@ -276,9 +282,11 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     if (!novaVigenciaFim) {
       throw erro('Aditivo de vigencia exige a nova data final do contrato.');
     }
-    quantidadeParcelas = Number(qtdeParcelas);
+    quantidadeParcelas = Array.isArray(parcelasInformadas)
+      ? parcelasInformadas.length
+      : Number(qtdeParcelas);
     if (!Number.isInteger(quantidadeParcelas) || quantidadeParcelas < 1) {
-      throw erro('Informe quantas parcelas devem ser criadas para o novo prazo.');
+      throw erro('Adicione ao menos uma parcela ao cronograma financeiro do aditivo.');
     }
   }
 
@@ -294,8 +302,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     if (exigeNovaVigencia) {
       const validacaoVigencia = validarNovaVigencia({
         novaVigenciaFim,
-        vigenciaAtualFim: contrato.vigencia_fim,
-        ultimaParcelaVencimento: teto.contrato.ultima_parcela_vencimento
+        vigenciaAtualFim: contrato.vigencia_fim
       });
       if (!validacaoVigencia.valida) throw erro(validacaoVigencia.mensagem);
       novaVigenciaNormalizada = validacaoVigencia.nova_vigencia_fim;
@@ -372,7 +379,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
     // Aditivo de PRAZO redistribui o saldo que JA existe. Sem saldo livre nao ha o que colocar nas
     // parcelas novas, e o pedido certo e outro — o de valor. Recusado aqui, com o nome do caminho.
     if (tipoNormalizado === TIPO.PRAZO && contrato?.fluxo_novo) {
-      const livreCent = await somarSaldoLivreDoContrato(contratoId, transaction);
+      const livreCent = teto.saldo_livre_cent;
       if (livreCent <= 0) {
         throw erro(
           'Nao ha saldo por medir neste contrato: o aditivo de prazo redistribui o que ja existe. '
@@ -381,14 +388,34 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       }
     }
 
+    let cronogramaParcelas = null;
+    if (exigeNovaVigencia && contrato?.fluxo_novo) {
+      const totalCronogramaCent = tipoNormalizado === TIPO.PRAZO ? teto.saldo_livre_cent : valorCent;
+      const parcelasComprometidas = teto.parcelas_existentes - teto.parcelas_livres;
+      const maximoCronograma = tipoNormalizado === TIPO.PRAZO
+        ? MAXIMO_PARCELAS - parcelasComprometidas
+        : MAXIMO_PARCELAS - teto.parcelas_existentes;
+      const validacaoCronograma = validarCronogramaParcelas({
+        parcelas: parcelasInformadas,
+        totalCent: totalCronogramaCent,
+        maximoParcelas: Math.max(maximoCronograma, 0)
+      });
+      if (!validacaoCronograma.valida) throw erro(validacaoCronograma.mensagem);
+      cronogramaParcelas = validacaoCronograma.parcelas;
+      quantidadeParcelas = cronogramaParcelas.length;
+    }
+
     // Teto de parcelas do contrato, conferido AQUI e nao na aprovacao: quem pede precisa saber na
     // hora que 30 parcelas nao cabem, e nao depois de a Gerencia analisar o pedido.
     if (contrato?.fluxo_novo && quantidadeParcelas) {
-      const existentes = await ContratoParcela.count({ where: { contrato_id: contratoId }, transaction });
-      if (existentes + quantidadeParcelas > MAXIMO_PARCELAS) {
+      const existentes = teto.parcelas_existentes;
+      const comprometidas = existentes - teto.parcelas_livres;
+      const totalDepois = tipoNormalizado === TIPO.PRAZO
+        ? comprometidas + quantidadeParcelas
+        : existentes + quantidadeParcelas;
+      if (totalDepois > MAXIMO_PARCELAS) {
         throw erro(
-          `O contrato ja tem ${existentes} parcela(s) e o teto e ${MAXIMO_PARCELAS}. `
-          + `Este aditivo cabe em no maximo ${Math.max(MAXIMO_PARCELAS - existentes, 0)} parcela(s).`
+          `O cronograma deixaria o contrato com ${totalDepois} parcela(s), acima do teto de ${MAXIMO_PARCELAS}.`
         );
       }
     }
@@ -402,6 +429,7 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
       nova_vigencia_fim: novaVigenciaNormalizada,
       tipo: tipoNormalizado,
       qtde_parcelas: quantidadeParcelas,
+      cronograma_parcelas: cronogramaParcelas,
       justificativa: String(justificativa).trim(),
       // Se a tela nao trocar o responsavel, o aditivo preserva o responsavel do contrato.
       responsavel_id: responsavelAditivoId,
@@ -505,15 +533,18 @@ async function solicitarAditivo(dados, { usuarioId } = {}) {
  * o mesmo criterio que tira a parcela da fila de medicao. Se divergisse, o aditivo redistribuiria
  * dinheiro que na verdade ja tem trabalho pedido.
  */
-async function somarSaldoLivreDoContrato(contratoId, transaction) {
+async function obterResumoParcelasLivres(contratoId, transaction) {
   const { MedicaoParcela } = require('../models');
 
   const parcelas = await ContratoParcela.findAll({
     where: { contrato_id: contratoId },
-    attributes: ['id', 'valor'],
+    attributes: ['id', 'numero', 'valor', 'data_vencimento'],
+    order: [['data_vencimento', 'ASC'], ['numero', 'ASC']],
     transaction
   });
-  if (parcelas.length === 0) return 0;
+  if (parcelas.length === 0) {
+    return { saldoCent: 0, quantidadeLivres: 0, quantidadeTotal: 0, ultimaParcelaVencimento: null };
+  }
 
   const medidas = new Set(
     (await MedicaoParcela.findAll({
@@ -523,9 +554,13 @@ async function somarSaldoLivreDoContrato(contratoId, transaction) {
     })).map((m) => Number(m.contrato_parcela_id))
   );
 
-  return parcelas
-    .filter((p) => !medidas.has(Number(p.id)))
-    .reduce((acc, p) => acc + paraCentavos(p.valor), 0);
+  const livres = parcelas.filter((p) => !medidas.has(Number(p.id)));
+  return {
+    saldoCent: livres.reduce((acc, p) => acc + paraCentavos(p.valor), 0),
+    quantidadeLivres: livres.length,
+    quantidadeTotal: parcelas.length,
+    ultimaParcelaVencimento: formatarISO(somenteData(parcelas[parcelas.length - 1].data_vencimento))
+  };
 }
 
 /**
@@ -543,8 +578,8 @@ async function somarSaldoLivreDoContrato(contratoId, transaction) {
  *                     Se ela ja esta comprometida, nasce UMA parcela com o MESMO vencimento da
  *                     ultima, exatamente porque o prazo final nao mudou.
  *
- *   VALOR_E_VIGENCIA  nascem `qtde_parcelas` parcelas, com o valor dividido em centavos inteiros e o
- *                     resto na ultima, e vencimentos distribuidos ate a nova vigencia.
+ *   VALOR_E_VIGENCIA  nascem as parcelas do cronograma financeiro informado no pedido. Os
+ *                     vencimentos sao independentes da vigencia do servico e podem ultrapassa-la.
  *
  * Contrato ATIVO ja tem titulo em todas as parcelas: a parcela nova nasce com titulo tambem, pela
  * MESMA rota de criacao usada na aprovacao do contrato (`criarTituloManual`), com a categoria
@@ -583,7 +618,7 @@ async function gerarParcelasDoAditivo(contrato, aditivo, { usuario, req, vigenci
   // ADITIVO DE PRAZO: o dinheiro ja esta no contrato, so falta prazo.
   //
   // Pega o saldo livre — o que esta em parcelas que ninguem mediu — e deixa esse mesmo saldo
-  // distribuido em EXATAMENTE `qtde_parcelas` parcelas, com vencimentos ate a nova vigencia.
+  // distribuido no cronograma financeiro informado. As datas nao dependem da nova vigencia.
   //
   // REAPROVEITA as parcelas livres que ja existem, criando so a diferenca. Zerar as antigas e criar
   // N do zero deixaria linhas de R$ 0,00 com titulo aberto de R$ 0 — lixo que alguem teria de
@@ -606,25 +641,49 @@ async function gerarParcelasDoAditivo(contrato, aditivo, { usuario, req, vigenci
       throw erro('Nao ha saldo por medir para redistribuir neste aditivo de prazo.', 409);
     }
 
-    const quantidade = Number(aditivo.qtde_parcelas) || 1;
-    const partes = dividirEmCentavos(saldoLivreCent, quantidade);
-    // O prazo antigo e o ponto de partida das novas datas: e a partir do fim que o contrato se
-    // estende. Sem vigencia gravada, cai no vencimento da ultima parcela.
-    const inicioDatas = vigenciaAnterior || ultima.data_vencimento;
-    const datas = vencimentosAteNovaVigencia(inicioDatas, aditivo.nova_vigencia_fim, quantidade);
+    const parcelasComprometidas = parcelas.length - livres.length;
+    const cronogramaSalvo = aditivo.cronograma_parcelas;
+    const quantidadeLegada = Number(aditivo.qtde_parcelas) || 1;
+    const cronograma = cronogramaSalvo
+      ? validarCronogramaParcelas({
+        parcelas: cronogramaSalvo,
+        totalCent: saldoLivreCent,
+        maximoParcelas: Math.max(MAXIMO_PARCELAS - parcelasComprometidas, 0)
+      })
+      : null;
+    if (cronograma && !cronograma.valida) {
+      throw erro(`O cronograma financeiro do aditivo ficou invalido: ${cronograma.mensagem}`, 409);
+    }
+
+    // Compatibilidade para pedidos pendentes anteriores a esta versao: so eles continuam usando o
+    // gerador antigo. Novos pedidos sempre chegam com a fotografia completa do cronograma.
+    const itensCronograma = cronograma?.parcelas || (() => {
+      const partes = dividirEmCentavos(saldoLivreCent, quantidadeLegada);
+      const inicioDatas = vigenciaAnterior || ultima.data_vencimento;
+      const datas = vencimentosAteNovaVigencia(inicioDatas, aditivo.nova_vigencia_fim, quantidadeLegada);
+      return partes.map((parte, indice) => ({ numero: indice + 1, valor: parte / 100, vencimento: datas[indice] }));
+    })();
+    const quantidade = itensCronograma.length;
 
     const reaproveitadas = livres.slice(0, quantidade);
     for (let i = 0; i < reaproveitadas.length; i += 1) {
+      const item = itensCronograma[i];
+      const itemValorCent = paraCentavos(item.valor);
       // eslint-disable-next-line no-await-in-loop
       await reaproveitadas[i].update(
-        { valor: partes[i] / 100, data_vencimento: datas[i], atualizado_por: usuario?.id || null },
+        { valor: itemValorCent / 100, data_vencimento: item.vencimento, atualizado_por: usuario?.id || null },
         { transaction }
       );
       if (reaproveitadas[i].titulo_financeiro_id) {
         const { sincronizarTituloDaParcela } = require('./medicaoContratoService');
         // eslint-disable-next-line no-await-in-loop
         await sincronizarTituloDaParcela(
-          { parcela: reaproveitadas[i], valorCent: partes[i], vencimento: datas[i], usuarioId: usuario?.id },
+          {
+            parcela: reaproveitadas[i],
+            valorCent: itemValorCent,
+            vencimento: item.vencimento,
+            usuarioId: usuario?.id
+          },
           transaction
         );
       }
@@ -656,7 +715,11 @@ async function gerarParcelasDoAditivo(contrato, aditivo, { usuario, req, vigenci
     }
 
     for (let i = reaproveitadas.length; i < quantidade; i += 1) {
-      novas.push({ numero: proximoNumero + (i - reaproveitadas.length), valorCent: partes[i], vencimento: datas[i] });
+      novas.push({
+        numero: proximoNumero + (i - reaproveitadas.length),
+        valorCent: paraCentavos(itensCronograma[i].valor),
+        vencimento: itensCronograma[i].vencimento
+      });
     }
   } else if (tipo === TIPO.VALOR) {
     if (jaMedida === 0) {
@@ -687,11 +750,28 @@ async function gerarParcelasDoAditivo(contrato, aditivo, { usuario, req, vigenci
       vencimento: formatarISO(somenteData(ultima.data_vencimento))
     });
   } else {
-    const quantidade = Number(aditivo.qtde_parcelas) || 1;
-    const partes = dividirEmCentavos(valorCent, quantidade);
-    const datas = vencimentosAteNovaVigencia(ultima.data_vencimento, aditivo.nova_vigencia_fim, quantidade);
-    partes.forEach((parte, i) => {
-      novas.push({ numero: proximoNumero + i, valorCent: parte, vencimento: datas[i] });
+    const quantidadeLegada = Number(aditivo.qtde_parcelas) || 1;
+    const cronograma = aditivo.cronograma_parcelas
+      ? validarCronogramaParcelas({
+        parcelas: aditivo.cronograma_parcelas,
+        totalCent: valorCent,
+        maximoParcelas: Math.max(MAXIMO_PARCELAS - parcelas.length, 0)
+      })
+      : null;
+    if (cronograma && !cronograma.valida) {
+      throw erro(`O cronograma financeiro do aditivo ficou invalido: ${cronograma.mensagem}`, 409);
+    }
+    const itensCronograma = cronograma?.parcelas || (() => {
+      const partes = dividirEmCentavos(valorCent, quantidadeLegada);
+      const datas = vencimentosAteNovaVigencia(ultima.data_vencimento, aditivo.nova_vigencia_fim, quantidadeLegada);
+      return partes.map((parte, indice) => ({ numero: indice + 1, valor: parte / 100, vencimento: datas[indice] }));
+    })();
+    itensCronograma.forEach((item, i) => {
+      novas.push({
+        numero: proximoNumero + i,
+        valorCent: paraCentavos(item.valor),
+        vencimento: item.vencimento
+      });
     });
   }
 
@@ -855,14 +935,9 @@ async function decidirAditivo(aditivoId, { usuario, req, aprovar, motivo } = {})
     if (tipoAditivo === TIPO.VALOR_E_VIGENCIA || tipoAditivo === TIPO.PRAZO) {
       // Reconfere sob lock: outro aditivo pode ter prorrogado o contrato enquanto este aguardava
       // aprovacao, ou a data pode ter se tornado retroativa durante uma analise demorada.
-      const ultimaParcelaVencimento = await ContratoParcela.max('data_vencimento', {
-        where: { contrato_id: contrato.id },
-        transaction
-      });
       const validacaoVigencia = validarNovaVigencia({
         novaVigenciaFim: aditivo.nova_vigencia_fim,
-        vigenciaAtualFim: contrato.vigencia_fim,
-        ultimaParcelaVencimento
+        vigenciaAtualFim: contrato.vigencia_fim
       });
       if (!validacaoVigencia.valida) {
         throw erro(`Nao e possivel aprovar: ${validacaoVigencia.mensagem}`, 409);
@@ -1056,6 +1131,7 @@ async function listarAditivosDoContrato(contratoId) {
     valor: Number(a.valor || 0),
     nova_vigencia_fim: a.nova_vigencia_fim,
     qtde_parcelas: a.qtde_parcelas,
+    cronograma_parcelas: a.cronograma_parcelas,
     justificativa: a.justificativa,
     status: a.status,
     motivo_rejeicao: a.motivo_rejeicao,
