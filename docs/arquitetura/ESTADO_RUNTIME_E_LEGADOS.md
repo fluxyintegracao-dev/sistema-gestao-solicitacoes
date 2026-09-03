@@ -27,7 +27,8 @@ No fluxo de Compras:
 
 - `PATCH /compras/solicitacoes/:id/integrar` retorna `410` antes de qualquer logica antiga;
 - `PATCH /compras/solicitacoes/:id/liberar` retorna `410` antes de qualquer logica antiga;
-- novas solicitacoes de compra nascem diretamente em `LIBERADO_PARA_COMPRA`; campos e regras de diretoria atendem somente registros antigos ja marcados com esse fluxo;
+- novas solicitacoes de compra normais nascem `PENDENTE` em GEO, onde usuarios com permissao granular revisam quantidades e apropriacoes; somente o encaminhamento explicito do GEO muda a compra para `LIBERADO_PARA_COMPRA` no setor de Compras;
+- campos e regras de diretoria atendem somente registros antigos ja marcados com esse fluxo;
 - campos como `numero_sienge`, `integrado_sienge` e `data_integracao_sienge` ainda existem e nao podem ser removidos sem migration e busca de consumidores;
 - `numero_sienge` ainda aparece em compatibilidades de numero da compra; renomear ou excluir exige migracao de dados e contrato.
 

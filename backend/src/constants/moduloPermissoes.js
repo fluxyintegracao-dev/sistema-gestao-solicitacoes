@@ -166,8 +166,8 @@ const MODULO_PERMISSION_GROUPS = [
           { key: 'compras.solicitacoes.criar', label: 'Criar solicitacao de compra', descricao: 'Acessar a pagina Nova Solicitacao de Compra e criar solicitacoes vinculadas a obra.' },
           { key: 'compras.solicitacoes.gerenciar', label: 'Gerenciar solicitacoes', descricao: 'Liberar, recusar, enviar para fornecedores, encerrar e comentar solicitacoes de compra.' },
           { key: 'compras.solicitacoes.excluir', label: 'Inativar solicitacoes', descricao: 'Inativar uma ou mais solicitacoes de compra na fila operacional.' },
-          { key: 'compras.solicitacoes.encaminhar_compras', label: 'Enviar para Compras', descricao: 'Encaminhar solicitacoes de compra antigas ou fora do fluxo para a fila do setor de Compras.' },
-          { key: 'compras.solicitacoes.editar_itens', label: 'Editar itens da solicitacao', descricao: 'Editar itens operacionais da solicitacao de compra sem encerrar cotacao.' },
+          { key: 'compras.solicitacoes.encaminhar_compras', label: 'Enviar para Compras', descricao: 'Concluir a revisao no GEO e encaminhar a solicitacao para a fila do setor de Compras.' },
+          { key: 'compras.solicitacoes.editar_itens', label: 'Gerenciar itens da solicitacao', descricao: 'Revisar quantidades e apropriacoes dos itens antes do envio para Compras, sem liberar cotacao ou pedido.' },
           { key: 'compras.solicitacoes.editar_quantidade', label: 'Alterar quantidade solicitada', descricao: 'Alterar quantidade solicitada dos itens com auditoria.' },
           { key: 'compras.solicitacoes.editar_apropriacoes_itens', label: 'Alterar apropriações dos itens', descricao: 'Alterar apropriações dos itens da solicitação de compra com auditoria, sem liberar encerramento da cotação.' },
           { key: 'compras.solicitacoes.gerar_pedidos', label: 'Gerar pedidos pela cotacao', descricao: 'Gerar pedidos de compra a partir da cotacao encerrada.' }

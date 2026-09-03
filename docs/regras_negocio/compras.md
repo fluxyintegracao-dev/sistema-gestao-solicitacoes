@@ -7,7 +7,9 @@
 - cada item precisa de apropriacao valida e o rateio deve fechar a quantidade solicitada;
 - apropriacoes pertencem a Obras e sao referenciadas por Compras;
 - alteracao de quantidade ou apropriacao depois da criacao exige permissao especifica, validacao de escopo e auditoria;
-- novas compras nao passam por aprovacao da diretoria: a normal nasce `LIBERADO_PARA_COMPRA` em Compras e a direta nasce `ENVIADO` em Gerencia de Processos;
+- novas compras nao passam por aprovacao da diretoria: a normal nasce `PENDENTE` em GEO para revisao de quantidades e apropriacoes e a direta nasce `ENVIADO` em Gerencia de Processos;
+- a permissao `compras.solicitacoes.editar_itens` autoriza o GEO a revisar quantidades e apropriacoes enquanto a solicitacao principal permanece no proprio setor;
+- o envio para Compras exige `compras.solicitacoes.encaminhar_compras`, muda o registro operacional para `LIBERADO_PARA_COMPRA` e libera a cotacao;
 - campos e endpoints de diretoria permanecem somente para compatibilidade de registros antigos ja marcados com esse fluxo;
 - os endpoints antigos de integracao e liberacao manual respondem `410` e nao fazem parte do fluxo vigente.
 
