@@ -132,6 +132,33 @@ pode ser desfeita."). "Descartar" sozinho deixa a pessoa supor que dá para
 recuperar. Se um lote for interrompido no meio, o que já foi feito fica
 feito — não se tenta desfazer, e o texto avisa disso antes.
 
+### Premissa afirmada não é premissa verificada (03/09)
+
+Regra permanente de processo, e ela nasceu de um caso concreto: o cliente
+afirmou que existiam 43 pontos com o cancelamento quebrado, e depois que a
+confirmação e a ação da `ObraTipoApropriacao` operavam sobre listas
+diferentes — "perguntava sobre 3 e apagava 47".
+
+**Os dois foram ao código antes de virar trabalho, e os dois não se
+confirmaram.** As 43 não existem: a varredura em todo o `src/` dá zero, e a
+quebra dos 726 diálogos congelados explica por quê (643 são `alert`, que não
+tem cancelamento). E a `ObraTipoApropriacao` confirma e age sobre um vínculo
+só, com o mesmo `obra_id` e o mesmo `tipo_solicitacao_id` nos dois lados.
+
+> **Quando alguém afirmar um defeito — o cliente, um agente, um relatório —
+> confira no código ANTES de agir. Premissa errada aceita produz trabalho
+> que parece certo e não é**: um diff plausível sobre código que já estava
+> correto, com mensagem de commit convincente e nenhum defeito resolvido.
+> Pior que não fazer nada, porque consome a revisão e cria a impressão de
+> que o problema foi tratado.
+
+Desmentir com evidência é parte do trabalho, não atrito. E o inverso também
+vale: **ir ao código quase sempre rende**, mesmo quando a premissa não se
+confirma. Destas duas verificações saíram a cobertura de `prompt()` (19
+chamadas que a varredura nem olhava), a correção do falso positivo em
+`if (!motivo?.trim())`, o check bloqueante de família D e a terceira classe
+de defeito acima.
+
 ### O corolário incômodo
 
 Quando um check vira verde, a pergunta certa não é "acabou?". É **"o que
