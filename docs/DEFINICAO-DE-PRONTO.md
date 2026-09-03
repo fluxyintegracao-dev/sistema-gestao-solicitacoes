@@ -18,10 +18,90 @@ PASSOU/FALHOU por item). Qualquer outra coisa é "em andamento".
 
 ## Como cada item é verificado
 
-Cada item recebe **PASSOU / FALHOU / N/A** por tela. N/A só quando o item
-não se aplica ao tipo da tela (ex.: C3 em listagem, X1 em tela sem tabela) —
-e o motivo do N/A é registrado pelo harness. FALHOU vem com o seletor do
-elemento e a medida que reprovou.
+Cada item recebe **PASSOU / FALHOU / SEM DADO / N/A** por tela. N/A só
+quando o item não se aplica ao tipo da tela (ex.: C3 em listagem, X1 em tela
+sem tabela) — e o motivo do N/A é registrado pelo harness. **SEM DADO** é
+quando a tela TEM a capacidade e a base do preview não devolveu registro
+para exercitá-la: não é aprovação, e não vira aprovação por equivalência com
+outra tela. FALHOU vem com o seletor do elemento e a medida que reprovou.
+
+---
+
+## O QUE A VERIFICAÇÃO AUTOMÁTICA NÃO ALCANÇA (03/09)
+
+**Esta é a seção mais importante deste documento, e ela existe porque um
+defeito destrutivo passou por tudo.**
+
+Todo check que construímos — os 34 itens desta DoD, o validador estático, o
+harness contra o preview — mede **FORMA**:
+
+- o elemento **existe** no DOM (C1, B1, A1);
+- a medida **está** num degrau da escala (R10, M1);
+- o alinhamento do `th` **é igual** ao do `td` (T1);
+- o contraste **atinge** 4,5:1 (M3);
+- a palavra **não** quebra ao meio (T6).
+
+Todas essas perguntas têm resposta observável: aponta-se para o elemento e
+mede-se. Um programa consegue fazer isso, e é por isso que conseguimos
+automatizá-las.
+
+**O defeito de 03/09 não era de forma. Era de SEMÂNTICA.**
+
+O código estava assim:
+
+```js
+const ok = await confirmar({ titulo: 'Estornar título?' });
+if (!ok) return;
+estornar();
+```
+
+Ele **compila**. Passa no `eslint`. Passa no `npm run build`. Passa nos 34
+itens da DoD. Passa no validador estático. Passa no harness contra o preview
+publicado. A tela **renderiza corretamente**: a caixa de confirmação aparece
+no lugar certo, com o texto certo, o botão "Cancelar" com o contorno certo e
+o alvo de clique certo.
+
+E faz **o oposto do que promete**: `confirmar()` devolve `{ ok, texto }`, e
+objeto é sempre truthy — então `!ok` é sempre falso, o `return` nunca
+acontece, e clicar em **"Cancelar" ESTORNA O TÍTULO**.
+
+Nenhum check pega isso, e não é por descuido de quem os escreveu. Para pegar,
+o verificador precisaria saber **o que a ação promete ao usuário** e
+comparar com **o que ela faz**. Isso não é medição: é leitura.
+
+### A regra que fica
+
+> **Verificação automática cobre FORMA. SEMÂNTICA exige LEITURA.**
+>
+> Nenhuma quantidade de check verde prova que a tela faz o que diz. O
+> revisor separado não é redundância nem cerimônia: é o único instrumento
+> que temos para a classe de defeito em que o código está formalmente
+> correto e semanticamente invertido.
+
+**Por isso o revisor separado existe, e por isso ele lê o código e as
+capturas — não os relatórios.** Um revisor que lê "34/34 PASSOU" e aprova
+não está revisando: está repetindo o que o harness já disse.
+
+### Os três defeitos graves desta reforma, e como cada um foi achado
+
+| Defeito | Consequência | Achado por |
+|---|---|---|
+| `confirmar()` lido como booleano | "Cancelar" estornava título financeiro | **Leitura** |
+| Contraste "4,92:1 com folga" que na tela era 4,50 | Texto no limite do ilegível, e um commit meu afirmando o contrário | **Leitura** (o token era sobrescrito em runtime) |
+| Faixa fixa quebrada em nove telas de detalhe | Ação principal sumia ao rolar | **Leitura** (`overflow: hidden` num ancestral) |
+
+**Nenhum dos três foi achado por check.** Todos os três viraram check
+DEPOIS — R21, R24 e R18 — e é assim que tem de ser: a leitura acha, e o
+check impede a volta. O caminho nunca é o inverso.
+
+### O corolário incômodo
+
+Quando um check vira verde, a pergunta certa não é "acabou?". É **"o que
+este check NÃO estava olhando?"**. Nesta reforma, sete pontos cegos do
+verificador foram achados assim — inclusive um caso em que **um check verde
+provava que o outro estava certo**: a T3 passava porque a tabela não
+redistribuía largura nenhuma, que era exatamente o defeito que a T4
+apontava.
 
 ## CABEÇALHO
 

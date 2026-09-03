@@ -58,6 +58,21 @@ function ehConfirmNativo(no) {
     && no.callee.property?.name === 'confirm';
 }
 
+/*
+  É o `prompt()` nativo? LACUNA DA PRIMEIRA VERSÃO (03/09): a varredura
+  cobria só `confirm`, e `prompt` é a MESMA classe de defeito com uma
+  diferença que piora as coisas — ele devolve `null` no "Cancelar" e a
+  STRING no "OK". Quem testa só `if (!valor) return;` trata cancelar e
+  vazio igual (aceitável); quem NÃO testa nada segue com `null` para o
+  serviço. Dezenove chamadas nunca tinham sido examinadas.
+*/
+function ehPromptNativo(no) {
+  if (no.callee?.type === 'Identifier' && no.callee.name === 'prompt') return true;
+  return no.callee?.type === 'MemberExpression'
+    && no.callee.object?.name === 'window'
+    && no.callee.property?.name === 'prompt';
+}
+
 const achados = [];
 
 for (const arquivo of arquivos(SRC)) {
@@ -82,7 +97,8 @@ for (const arquivo of arquivos(SRC)) {
       const no = caminho.node;
       const doSistema = ehConfirmarDoSistema(no);
       const nativo = ehConfirmNativo(no);
-      if (!doSistema && !nativo) return;
+      const promptNativo = ehPromptNativo(no);
+      if (!doSistema && !nativo && !promptNativo) return;
 
       // Onde o valor desta chamada é consumido: sobe pelo `await` e por
       // parênteses, que não mudam o valor.
@@ -170,9 +186,62 @@ for (const arquivo of arquivos(SRC)) {
       if (!consumido) {
         achados.push({
           arquivo: rel, linha, familia: 'B',
-          problema: 'confirm() nativo com o retorno IGNORADO — a caixa aparece, o usuário clica em "Cancelar" e a ação acontece assim mesmo',
+          problema: `${promptNativo ? 'prompt()' : 'confirm()'} nativo com o retorno IGNORADO — a caixa aparece, o usuário clica em "Cancelar" e a ação acontece assim mesmo`,
           trecho
         });
+        return;
+      }
+
+      /*
+        `prompt()` guardado numa variável: o "Cancelar" devolve `null` e o
+        "OK" vazio devolve `''`. Quem não testa a variável antes de usar
+        manda `null` para o serviço — o cancelamento não cancela, vira
+        gravação com valor nulo. Segue a ligação, igual à família A.
+      */
+      if (promptNativo && tipoPai === 'VariableDeclarator' && pai.node.id?.type === 'Identifier') {
+        const id = pai.node.id;
+        const ligacao = pai.scope.getBinding(id.name);
+        if (!ligacao) return;
+        /*
+          SOBE PELA CADEIA ANTES DE DECIDIR (03/09).
+
+          A primeira versão olhava só o pai imediato da referência — e
+          acusou `if (!motivo?.trim()) return;` como não testado, porque o
+          pai ali é um `OptionalMemberExpression`, não o `!`. Era falso
+          positivo, e falso positivo numa lista de defeito destrutivo é
+          caro: manda o leitor conferir código que está certo e corrói a
+          confiança no resto da lista.
+
+          Agora a referência sobe por acesso a membro e chamada — que não
+          mudam o QUE está sendo testado — até achar (ou não) um contexto
+          de teste.
+        */
+        const testado = ligacao.referencePaths.some((ref) => {
+          let atual = ref;
+          let acima = ref.parentPath;
+          while (acima && [
+            'MemberExpression', 'OptionalMemberExpression',
+            'CallExpression', 'OptionalCallExpression',
+            'AwaitExpression', 'ParenthesizedExpression', 'TSNonNullExpression'
+          ].includes(acima.node.type)) {
+            atual = acima;
+            acima = acima.parentPath;
+          }
+          if (!acima) return false;
+          const t = acima.node.type;
+          return (t === 'UnaryExpression' && acima.node.operator === '!')
+            || (t === 'IfStatement' && acima.node.test === atual.node)
+            || t === 'BinaryExpression'      // === null, == null, !== ''
+            || t === 'LogicalExpression'
+            || t === 'ConditionalExpression';
+        });
+        if (!testado) {
+          achados.push({
+            arquivo: rel, linha, familia: 'C',
+            problema: `"${id.name}" recebe o retorno de prompt() e NUNCA é testado — no "Cancelar" o valor é null e segue assim mesmo para a ação`,
+            trecho
+          });
+        }
       }
     }
   });
@@ -185,14 +254,15 @@ if (comoJson) {
 } else if (!achados.length) {
   console.log('[cancelamento] nenhum ponto em que o "Cancelar" deixa de cancelar.');
 } else {
-  const porFamilia = { A: [], B: [], ERRO: [] };
+  const porFamilia = { A: [], B: [], C: [], ERRO: [] };
   achados.forEach((a) => porFamilia[a.familia].push(a));
   const rotulo = {
     A: 'A — confirmar() do sistema lido como booleano (R21)',
-    B: 'B — confirm() nativo com retorno ignorado',
+    B: 'B — confirm()/prompt() nativo com retorno ignorado',
+    C: 'C — prompt() guardado e nunca testado (null segue para a ação)',
     ERRO: 'ERRO — arquivo não analisado'
   };
-  for (const familia of ['A', 'B', 'ERRO']) {
+  for (const familia of ['A', 'B', 'C', 'ERRO']) {
     const lista = porFamilia[familia];
     if (!lista.length) continue;
     console.log(`\n## ${rotulo[familia]} — ${lista.length} ocorrência(s)\n`);
@@ -204,3 +274,18 @@ if (comoJson) {
   }
   console.log(`\n[cancelamento] ${achados.length} ponto(s) em que o "Cancelar" NÃO cancela.`);
 }
+
+/*
+  CHECK BLOQUEANTE, SEM TRINCO (decisão do cliente, 03/09).
+
+  Os outros passivos herdados (R19, fonte única) são trincos: congelam o
+  que existe e proíbem crescer, porque ali o defeito é ESTILO — uma caixa
+  do navegador é feia, um índice à mão é frágil, e nenhum dos dois faz o
+  sistema mentir.
+
+  Aqui é diferente, e por isso não há trinco: o defeito é o código fazer o
+  OPOSTO do que promete. A tela pergunta "tem certeza?", a pessoa responde
+  "não", e a ação acontece. Não existe número aceitável disso; qualquer
+  ocorrência, em arquivo novo ou antigo, reprova.
+*/
+if (achados.length) process.exitCode = 1;

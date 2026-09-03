@@ -629,14 +629,41 @@ O que explica a diferença entre a suspeita e o número:
   trocou o contrato de retorno no meio do caminho. Foi o que deu origem à
   R21.
 
-**A varredura ficou como porta permanente**, dentro do
-`npm run test:responsive`. Ela distingue duas famílias e não mistura: (A) o
+**A varredura é CHECK BLOQUEANTE, sem trinco** (decisão do cliente, 03/09),
+dentro do `npm run test:responsive`. Sem trinco de propósito: os outros
+passivos herdados (R19, fonte única) são congelados porque ali o defeito é
+de ESTILO — caixa do navegador é feia, índice à mão é frágil, e nenhum dos
+dois faz o sistema mentir. Aqui o defeito é o código fazer o OPOSTO do que
+promete, e não existe número aceitável disso. Qualquer ocorrência, em
+arquivo novo ou antigo, reprova.
+
+**Provado nos dois sentidos** (03/09): com o código como está, sai 0; com um
+único `confirm('Apagar tudo?')` de retorno ignorado num arquivo de prova,
+sai 1, e o `test:responsive` inteiro reprova junto. Ela distingue duas famílias e não mistura: (A) o
 `confirmar()` do sistema lido como booleano; (B) `confirm()` nativo com o
 retorno ignorado. O idioma nativo correto NÃO entra na lista — misturá-lo
 faria o defeito real se perder no meio de setenta linhas certas.
 
+### Duas lacunas da própria varredura, achadas ao revisitá-la
+
+1. **Ela não cobria `prompt()`.** Só `confirm`. São 19 chamadas que nunca
+   tinham sido examinadas — e `prompt` é a mesma classe de defeito com um
+   agravante: devolve `null` no "Cancelar" e a string no "OK", então quem
+   não testa manda `null` para o serviço. Cobertas agora, em duas famílias
+   próprias (retorno ignorado; guardado e nunca testado).
+2. **Ela dava falso positivo em `if (!motivo?.trim()) return;`** — o pai
+   imediato da referência ali é um `OptionalMemberExpression`, não o `!`.
+   Falso positivo numa lista de defeito destrutivo é caro: manda o leitor
+   conferir código que está certo e corrói a confiança no resto da lista.
+   Passou a subir pela cadeia de acesso e chamada antes de julgar.
+
+Verificação extra, para o zero não depender de uma ferramenta só: as **82**
+chamadas nativas de `confirm`/`prompt` foram varridas atrás de guarda dentro
+de callback de iteração (`forEach`, `map`, `some`…), onde o `return` do
+guarda interrompe o callback e NÃO a ação de fora. **Nenhuma.**
+
 **Provada contra caso conhecido** antes de se acreditar no zero: uma
-fixture com quatro formas ruins e duas corretas. A primeira versão da
+fixture com cinco formas ruins e quatro corretas. A primeira versão da
 varredura pegou três das quatro e **deixou passar justamente a que causou o
 estorno** — `const ok = await confirmar(...)` seguido de `if (!ok) return;`
 duas linhas abaixo — porque olhava só o pai imediato da chamada. Passou a
