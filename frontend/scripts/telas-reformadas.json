@@ -46,22 +46,26 @@
       {
         "arquivo": "src/pages/ModuloRelatorios.jsx",
         "modulos": 9,
-        "migrada": false
+        "migrada": false,
+        "dono": "leva-compartilhadas"
       },
       {
         "arquivo": "src/pages/RelatoriosAdministrativos.jsx",
         "modulos": 2,
-        "migrada": false
+        "migrada": false,
+        "dono": "leva-compartilhadas"
       }
     ],
     "duas_familias_de_rota": [
       {
         "arquivo": "src/pages/ComunicacaoInterna.jsx",
-        "migrada": false
+        "migrada": false,
+        "dono": "leva-compartilhadas"
       },
       {
         "arquivo": "src/pages/ConfiguracoesContratoAlertasEFormas.jsx",
-        "migrada": false
+        "migrada": false,
+        "dono": "leva-compartilhadas"
       }
     ],
     "fora_do_shell": {
@@ -71,7 +75,22 @@
         "src/pages/RecuperarSenha.jsx",
         "src/pages/DefinirSenha.jsx",
         "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx"
-      ]
+      ],
+      "dono": "leva-compartilhadas",
+      "dod": "docs/DEFINICAO-DE-PRONTO.md, secao \"TELAS FORA DO SHELL\" (03/09)"
+    },
+    "dono": "Leva das telas compartilhadas. NAO pertencem a leva de modulo nenhuma - e esse era o ponto cego. Toda leva de modulo declara na abertura quais compartilhadas o modulo usa, mas NENHUMA leva de modulo as reforma.",
+    "entrada_no_manifesto": "Cada tela entra na lista `telas` QUANDO for migrada, nao antes. Adicionar as oito de uma vez deixa o validador vermelho (221 violacoes em 03/09) e bloqueia quem esta empurrando em paralelo no mesmo branch. A posse ja esta declarada aqui; a entrada no manifesto acompanha a migracao.",
+    "violacoes_em_03_09": {
+      "ComunicacaoInterna.jsx": 130,
+      "CotacaoFornecedorPublica.jsx": 62,
+      "ModuloRelatorios.jsx": 5,
+      "RelatoriosAdministrativos.jsx": 4,
+      "ConfiguracoesContratoAlertasEFormas.jsx": 6,
+      "DefinirSenha.jsx": 10,
+      "RecuperarSenha.jsx": 2,
+      "Login/index.jsx": 0,
+      "total": 221
     }
   }
 }

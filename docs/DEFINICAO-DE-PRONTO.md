@@ -116,6 +116,48 @@ elemento e a medida que reprovou.
   Enter/Espaço, ou um link/botão focável dentro da linha que faça a mesma
   ação. N/A só em tela sem linha acionável.
 
+## TELAS FORA DO SHELL — DoD própria (03/09)
+
+Quatro telas renderizam **sem o `Layout`**: sem topbar, sem menu lateral,
+sem breadcrumb — Login, Recuperar Senha, Definir Senha e a Cotação Pública
+do fornecedor (a única que alguém **de fora da empresa** usa, por link com
+token).
+
+Medi-las com a régua das telas internas produz FALHOU que não significa
+nada: metade dos itens pressupõe um shell que ali não existe. Então esta
+seção declara o que vale, o que NÃO vale, e o que se INVERTE.
+
+**Não se aplica (N/A registrado no manifesto, com este motivo):**
+- **C1/C2** — não há faixa fixa presa à topbar, porque não há topbar. O
+  título continua existindo e continua no degrau de 22px; o que sai é a
+  exigência de faixa grudada.
+- **C3** — não há tela de detalhe nem hierarquia de retorno.
+- **X2** — idem C1: sem topbar, não há o que grudar.
+- **F1–F4** — não há listagem com recorte.
+
+**Inverte-se, e esta é a diferença que importa:**
+- **C6 e R11** dizem que navegação não é ação e que "Voltar" redundante sai
+  da tela, porque o breadcrumb e o menu resolvem. **Aqui não resolvem: não
+  existem.** O link "Esqueci minha senha" no Login e o "Voltar ao login" no
+  Recuperar Senha são a ÚNICA navegação disponível — são obrigatórios, não
+  redundantes. Remover é deixar a pessoa presa.
+
+**Vale integralmente, e sem desconto:**
+- **M1–M4** (medidas, cores por token, contraste AA, alvo de clique) —
+  contraste importa MAIS aqui: a tela de login costuma ser vista em
+  monitor ruim, luz forte, celular na obra.
+- **R1–R3** (formulário; nenhuma caixa do navegador). A Cotação Pública tem
+  **14** delas hoje, e é a tela de um terceiro: `alert()` do Chrome numa
+  página que representa a empresa para o fornecedor é o pior lugar do
+  sistema para isso.
+- **B1–B5**, **X1**, **X3**, **R18**, **A1**, **T1–T7** onde houver tabela
+  (a Cotação Pública tem uma).
+
+**Uma exigência a mais, que só existe aqui:** estas telas são a primeira
+coisa que o usuário vê e, na Cotação, a única. Erro de rede, token
+inválido, sessão expirada e link vencido precisam de mensagem que diga **o
+que fazer**, não só o que falhou — não há menu para onde escapar.
+
 ## MOBILE (390px)
 
 - **X1** Tabela vira cards legíveis (mesmas colunas, um markup).
