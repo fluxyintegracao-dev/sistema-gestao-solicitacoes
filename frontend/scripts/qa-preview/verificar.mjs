@@ -958,6 +958,24 @@ async function main() {
         });
       } catch (erro) {
         resultado.erro = String(erro.message || erro);
+        /*
+          MORTE DO NAVEGADOR NÃO É FALHA DE TELA — e registrá-la como tal
+          FABRICA dado. Aconteceu em 03/09: o processo foi interrompido no
+          meio da varredura e o laço seguiu, escrevendo 34 células FALHOU
+          para 30 telas que nunca chegaram a abrir. Uma matriz assim tem
+          ~1000 "falhas" e nenhuma é real.
+
+          Quando o contexto ou o navegador morre, NADA depois é mensurável:
+          aborta a corrida inteira, e a matriz do disco NÃO é sobrescrita —
+          uma verificação pela metade nunca substitui uma boa.
+
+          Erro de CARGA da tela (redirect, permissão, rota quebrada) segue
+          sendo FALHOU: isso é defeito da tela, e é o que se quer ver.
+        */
+        if (/Target page, context or browser has been closed|Browser has been closed|browserContext\.close|Target closed/i.test(resultado.erro)) {
+          console.error(`[qa-preview]   ✖ ${tela.id}: ${resultado.erro}`);
+          throw new Error(`BLOQUEIO: o navegador morreu durante a varredura (na tela "${tela.id}"). A corrida foi abortada e a matriz NÃO foi regravada — o que estava no disco continua valendo. Rode de novo.`);
+        }
         ITENS_DOD.forEach((item) => {
           if (!resultado.itens[item]) resultado.itens[item] = { estado: 'FALHOU', motivo: `tela não verificada: ${resultado.erro}` };
         });

@@ -325,3 +325,206 @@ ganha entrada, ou a rota sai, ou vira redirecionamento (R20).
   janela": `BlocoConteudo` traz padding e não tem trilha de rolagem.
 - **Proposta**: vira um `PainelTrabalho` numa leva própria, com o check
   nascendo junto.
+
+---
+
+## Defeitos de CSS de SISTEMA — afetam tela que nenhuma leva tocou
+
+Achados de 03/09, nas telas fora do shell. Nenhum é do arquivo da tela: os
+três estão no CSS de sistema e a correção vale para o produto inteiro. Não
+foram corrigidos porque `src/index.css` não pertence a leva de tela nenhuma
+e mexer nele no meio de uma leva quebra a R21 pelo mesmo motivo que mudar
+contrato de componente quebra.
+
+### S1 — `Avisos` e `Alert` não têm superfície fora do `Layout`
+- **Onde**: `frontend/src/index.css`, blocos por volta de 6870–6960 e
+  9010–9040.
+- **O que acontece**: TODAS as regras de `.alert` (fundo, cor semântica,
+  raio, respiro, ícone) existem apenas sob `.layout-shell` ou `.login-card`.
+  **Não há regra `.alert` sem escopo.** Fora do `Layout`, `Avisos` renderiza
+  texto e ícone soltos — sem faixa, sem cor, sem respiro. O aviso existe no
+  DOM e quase não existe para o usuário, que é exatamente a R15.
+- **Por que é grave**: a DoD das telas fora do shell **obriga** a usar
+  `useAvisos`. O padrão manda usar uma peça que o CSS do padrão não veste.
+  Os dois agentes da leva chegaram, independentemente, ao mesmo contorno.
+- **Contorno em uso**: um `<div className="layout-shell">` envolvendo **só**
+  a pilha de avisos, em `RecuperarSenha.jsx`, `DefinirSenha.jsx` e
+  `CotacaoFornecedorPublica.jsx`, com comentário no código. **Efeito
+  colateral que sobra**: `.layout-shell` também pinta
+  `background: var(--ui-canvas)`, então os cantos arredondados da faixa
+  deixam ver um fio de canvas.
+- **Conserto certo**: desescopar `.alert*`, ou escopar para
+  `:where(.layout-shell, .login-card, .app-avisos)`.
+
+### S2 — Placeholder de campo reprova AA no sistema inteiro
+- **Onde**: `frontend/src/index.css:640-643` —
+  `:root:not(.dark) input::placeholder { color: #94a3b8 }`.
+- **Medido**: **2,56:1** sobre superfície branca. O mínimo AA é 4,5:1.
+- **Por que é a R24 ao contrário**: o sistema **já tem** o token certo
+  (`--input-placeholder`, com piso garantido pelo `garantirContraste` do
+  `ThemeContext`) aplicado em `.input::placeholder` na linha 619 — e essa
+  regra crua, mais específica, o anula. O token existe, tem piso, e não
+  chega à tela.
+- **Consequência**: em monitor ruim ou sob luz forte (obra), "seu@email.com.br"
+  e "Digite sua senha" somem. Vale para todo campo do sistema, não só as
+  telas de senha.
+
+### S3 — Placeholder do Login, mesmo defeito, mais escuro ainda
+- **Onde**: `frontend/src/index.css:7000-7010` —
+  `.login-input::placeholder { color: #8395b0 !important }`.
+- **Medido**: **2,94:1** sobre `#f8fbff`. O `!important` fecha a porta para
+  qualquer token.
+
+### S4 — CSS morto com uma bomba R18 armada
+- **Onde**: `frontend/src/index.css`, por volta de 4204–4400.
+- **O que acontece**: `.cotacao-publica-table-input`, `-textarea`, `-check`,
+  `-cell-ref`, `-table-shell`, `-context`, `-summary-*` e `-alert` ficaram
+  sem consumidor depois da migração da Cotação Pública.
+- **Por que registrar em vez de só apagar**: `.cotacao-publica-context` tem
+  `overflow: hidden` — quem reusar a classe volta a sequestrar faixa fixa e
+  coluna fixa sem saber por quê. É a R18 esperando a próxima vítima.
+
+---
+
+## Decisões do cliente sobre as telas fora do shell
+
+### F1 — Título do Login em 30–37px, não no degrau de 22px
+- **Onde**: `.login-heading` em `frontend/src/index.css:6851` —
+  `clamp(1.85rem, 3vw, 2.3rem)`.
+- **A DoD fora-do-shell diz** que o título continua no degrau de 22px. O
+  Login não está.
+- **Por que não corrigimos**: só dá para mexer no CSS de sistema ou
+  desmontando a intro da tela de marca — e o Login é a única tela com
+  identidade visual própria aprovada.
+- **Decisão pendente**: o Login mantém o título de marca como exceção
+  declarada, ou desce para 22px como as duas irmãs?
+
+### F2 — "2 horas" escrito na interface
+- **Onde**: constante `VALIDADE_DO_LINK` em `RecuperarSenha.jsx` e
+  `DefinirSenha.jsx`.
+- **O que acontece**: o prazo real vem de `DEFAULT_EXPIRES_HOURS`
+  (`backend/src/services/passwordResetService.js:13`) e **a API não o
+  devolve**. O número na tela está acoplado a uma constante do backend por
+  cópia — se mudar lá, a tela mente.
+- **Decisão pendente**: tirar o número da tela, ou o backend passar a
+  devolvê-lo.
+
+### F3 — Identidade visual da família de autenticação
+- O Login tem fundo escuro com skyline e cartão próprio; Recuperar e Definir
+  Senha ficaram no canvas claro do sistema, que é o que já eram.
+- **Decisão pendente**: unificar as três é decisão de design, não de layout.
+  A leva não fez por conta própria.
+
+### F4 — Senha fraca não bloqueia o envio
+- **Onde**: `frontend/src/pages/DefinirSenha.jsx`.
+- **O que acontece**: o botão "Definir senha" continua habilitado com senha
+  fraca; quem envia leva uma ida ao servidor para descobrir. As etiquetas já
+  mostram ao vivo o que falta, e o erro do servidor agora aponta para elas.
+- **Por que não corrigimos**: bloquear o envio é mudança de fluxo.
+
+---
+
+## Decisões do cliente sobre a Cotação Pública
+
+### G1 — Confirmação nova no "Enviar resposta"
+- **O que é**: acréscimo da leva, não substituiu diálogo nenhum. A ação é
+  irreversível para o fornecedor: depois do envio o formulário inteiro trava
+  e correção passa a depender da equipe de compras.
+- **Decisão pendente**: se o cliente preferir envio sem fricção, são 8 linhas
+  a remover.
+
+### G2 — O fornecedor não tem canal de socorro na tela
+- **O que acontece**: `serializarCotacaoPublica` **não traz nome, e-mail nem
+  telefone do comprador**. Por isso todo texto de erro manda "responda o
+  e-mail em que você recebeu este link" — é o único canal que o fornecedor
+  comprovadamente tem.
+- **Decisão pendente**: colocar telefone ou e-mail da equipe de compras
+  nesses textos exige campo novo no backend.
+
+### G3 — A tela estreitou de 1312px para 1100px
+- **Por quê**: o `Pagina` traz `.page { max-width: 1100px }` (a R10 manda o
+  ritmo vir do componente); o invólucro antigo dava `82rem`.
+- **Impacto medido**: a tabela tem 12 colunas e já rolava na horizontal
+  antes, então não há corte de dado — mas são 212px a menos.
+- **Conserto**: uma linha em `compras-responsive.css`, mesmo padrão do
+  `.rhdp-page { max-width: 1480px }`. É CSS de sistema, então é decisão.
+
+### G4 — Sem faixa fixa, o "Enviar resposta" só existe no topo
+- **O que acontece**: C1/C2 são N/A fora do shell, então não há cabeçalho
+  grudado. Numa cotação de 40 itens o fornecedor rola até o fim e precisa
+  voltar ao topo para enviar.
+- **Por que não inventamos um segundo botão**: a B3 proíbe a mesma ação duas
+  vezes na tela.
+
+---
+
+## Regra de negócio da Cotação Pública — para o responsável
+
+### H1 — Item com preço e sem quantidade vira "não tenho" EM SILÊNCIO
+- **Onde**: `CotacaoFornecedorPublica.jsx`, no monte do payload —
+  `disponivel = quantidadeDisponivel > 0 && preco > 0`.
+- **O que acontece**: o fornecedor que digita o preço e esquece a quantidade
+  tem o item enviado como **indisponível**, sem nenhum alerta.
+- **Por que é o mais grave da tela**: perde-se o item na concorrência e
+  **ninguém percebe dos dois lados** — nem o fornecedor, que acha que
+  cotou, nem o comprador, que acha que ele não tinha.
+
+### H2 — Erro de CPF/CNPJ do transportador mente sobre a causa
+- **O que acontece**: `getCpfCnpjError` lança de dentro do monte do payload.
+  O `Error` sai sem `status`, cai no ramo de rede, e o fornecedor lê *"o
+  navegador não conseguiu falar com o servidor"* quando o problema é o
+  documento que ele digitou.
+- **Por que não corrigimos**: a correção certa é validar o campo no
+  formulário, o que é mudança de fluxo — maquiar o `catch` esconderia o
+  defeito em vez de resolvê-lo.
+
+### H3 — O payload ignora se é rascunho ou envio final
+- **O que acontece**: `montarPayloadResposta` recebe `{ finalizar }` e nunca
+  usa. Rascunho e envio final montam payload idêntico.
+- **Consequência hoje**: nenhuma. Mas qualquer regra futura de "só valida no
+  envio" nasce quebrada.
+
+### H4 — `quantidade_minima_item` vai cru para o payload
+- Ao contrário de todos os campos vizinhos, não passa por
+  `sanitizarDecimalInput`.
+
+### H5 — `respostaFinalizada` pode não cobrir todos os estados
+- Olha só `RESPONDIDO` e `FINALIZADA`. O backend usa também `VISUALIZADO`, e
+  reescreve o status no `show`. O conjunto completo de estados não foi
+  auditado.
+
+---
+
+## Mais lacunas do padrão (R21: registradas, componente não estendido)
+
+### L4 — Não existe componente de campo de senha
+- Cada tela reinventa o par input + botão de olho. Falta um `CampoSenha` que
+  carregue o recuo do campo, o alvo de clique e o `aria-pressed`.
+
+### L5 — `Pagina` não serve tela fora do shell
+- Traz `.page` com `max-width: 1100px` e mede `.fx-topbar`, que não existe
+  ali. E como o degrau de 22px do título só sai de `.app-pagina > .page-title`,
+  cada agente teve de aplicar a classe direto no cartão. Falta uma variante
+  (`<Pagina foraDoShell>` ou um `MolduraPublica`).
+
+### L6 — `CampoForm` não aceita `placeholder` nem slot de sufixo
+- O botão do olho entra como filho dentro do `<label>`, o que não é o ideal
+  em acessibilidade.
+
+### L7 — Não existe etiqueta de "requisito atendido"
+- A `DefinirSenha` usou `fx-badge--success/--neutral`, que são etiquetas de
+  **status de registro**. Serve, mas o papel semântico é outro.
+
+### L8 — `useConfirmacao` não tem tom para ação irreversível não-destrutiva
+- O envio da cotação não é destruição, mas também não é rotina. Hoje só
+  existem `primary` e `btn-perigo-suave`.
+
+### L9 — `BlocoConteudo` não tem lugar para condição fixa
+- As faixas de "cotação encerrada" e "resposta já enviada" não são aviso (não
+  fecham) e não são `descricao`. A leva criou um `Condicao` local. Se
+  aparecer numa terceira tela, é candidato a componente padrão.
+
+### L10 — `TabelaPadrao` não tem coluna de formulário
+- As 8 colunas editáveis da Cotação Pública usam `tipo: 'valor'`/`'numero'`
+  com `<input>` dentro do `render`. Funciona, mas o tipo descreve o dado
+  exibido, não um campo.
