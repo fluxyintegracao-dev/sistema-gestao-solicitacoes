@@ -38,5 +38,40 @@
   },
   "excecoes_tabela_crua": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado"
+  },
+  "telas_compartilhadas": {
+    "porque": "Telas servidas por VARIOS modulos, ou por nenhum. Nao pertencem a leva de modulo nenhuma e por isso escapariam de todas - ponto cego exposto em 03/09, quando a ModuloRelatorios entrou por engano no manifesto do RH/DP. Ver docs/TELAS-COMPARTILHADAS.md.",
+    "criado_em": "2026-09-03",
+    "varios_modulos": [
+      {
+        "arquivo": "src/pages/ModuloRelatorios.jsx",
+        "modulos": 9,
+        "migrada": false
+      },
+      {
+        "arquivo": "src/pages/RelatoriosAdministrativos.jsx",
+        "modulos": 2,
+        "migrada": false
+      }
+    ],
+    "duas_familias_de_rota": [
+      {
+        "arquivo": "src/pages/ComunicacaoInterna.jsx",
+        "migrada": false
+      },
+      {
+        "arquivo": "src/pages/ConfiguracoesContratoAlertasEFormas.jsx",
+        "migrada": false
+      }
+    ],
+    "fora_do_shell": {
+      "observacao": "Renderizam fora do Layout (sem topbar, menu ou breadcrumb). Precisam de DoD propria ANTES de entrar no manifesto: a regua atual pressupoe o shell.",
+      "arquivos": [
+        "src/pages/Login.jsx",
+        "src/pages/RecuperarSenha.jsx",
+        "src/pages/DefinirSenha.jsx",
+        "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx"
+      ]
+    }
   }
 }

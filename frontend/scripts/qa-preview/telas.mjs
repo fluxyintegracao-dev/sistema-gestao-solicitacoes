@@ -210,7 +210,20 @@ export const TELAS = [
     tipo: 'listagem'
   },
   /*
-    RETIRADA DO MANIFESTO em 02/09, com justificativa (decisão do cliente).
+    CATEGORIA "TELAS COMPARTILHADAS" (03/09) — ver docs/TELAS-COMPARTILHADAS.md.
+
+    Oito telas do sistema não pertencem a leva de módulo nenhuma: duas são
+    servidas por VÁRIOS módulos (ModuloRelatorios por nove; Relatórios
+    Administrativos por dois), duas têm uma segunda família de rota fora do
+    menu, e quatro renderizam fora do shell (login, recuperação e definição
+    de senha, e a cotação pública do fornecedor). Organizado por módulo, o
+    inventário não reivindicava nenhuma delas — escapavam de todas as levas.
+    Entram no manifesto na leva própria; as de fora do shell só depois de
+    ganharem DoD própria, porque a régua atual pressupõe topbar, menu e
+    breadcrumb.
+
+    A primeira delas — retirada deste manifesto em 02/09, com justificativa
+    (decisão do cliente).
 
     `/rh-dp/relatorios` renderiza `ModuloRelatorios.jsx`, que é um hub
     COMPARTILHADO por seis módulos (solicitações, financeiro, CRM, SST,
