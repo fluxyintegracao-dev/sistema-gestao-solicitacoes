@@ -612,7 +612,29 @@ export function checksEstaticos({ tipo }) {
 
   /* ---- F1: UMA busca, ocupando a largura ---- */
   {
-    const buscas = qa('.la-busca, input[placeholder*="uscar"]').filter(visivel).filter(foraDeModal)
+    /*
+      "BUSCAR" NO PLACEHOLDER NÃO É BUSCA DE LISTAGEM (04/09).
+
+      É a lição do rótulo outra vez, já registrada na DoD: um check que
+      acha o alvo pelo TEXTO cobre o vocabulário que conhece, não o
+      comportamento. A F1 varria `input[placeholder*="uscar"]` e pegava os
+      AUTOCOMPLETES de formulário — "Digite para buscar a categoria",
+      "Digite para buscar o credor" —, que não filtram listagem nenhuma:
+      escolhem um registro para um campo. A `FinanceiroTituloNovo`
+      reprovou com "2 caixas de busca no mesmo contexto (R16)" tendo UMA
+      busca e dois campos de escolha.
+
+      A R16 fala da busca que RECORTA o que está na tela. Campo de
+      formulário — o que mora dentro de `.form-group`/`.form-campo`/
+      `label.field` — está fora do escopo por natureza, e a exclusão é
+      pelo PAPEL do elemento, não por mais uma palavra na lista.
+    */
+    const ehCampoDeFormulario = (el) => Boolean(
+      el.closest('.form-group, .form-campo, label.field, .campo-form')
+    );
+    const buscas = qa('.la-busca, .app-busca, input[placeholder*="uscar"]')
+      .filter(visivel).filter(foraDeModal)
+      .filter((el) => !ehCampoDeFormulario(el))
       .filter((el) => !el.closest('.la-busca') || el.classList.contains('la-busca'));
     if (!buscas.length) {
       r.F1 = { estado: 'N/A', motivo: 'tela sem busca' };

@@ -508,10 +508,29 @@ async function checarRedimensionamento(page, tela, resultado) {
     resultado.T3 = { estado: 'N/A', motivo: 'tabela com menos de 2 colunas' };
     return;
   }
-  const idx = 0; // arrasta a PRIMEIRA coluna: as demais não podem mudar
+  /*
+    ARRASTA A PRIMEIRA COLUNA DE CONTEÚDO, NÃO A PRIMEIRA COLUNA (04/09).
+
+    As colunas de CONTROLE — marcar (`celula-selecao`) e expandir
+    (`celula-expandir`) — são `<th>` simples, de largura fixa e SEM alça,
+    de propósito: não há o que redimensionar num botão de 44px. Quando a
+    `relatorios-administrativos` ganhou linha expansível, a coluna de
+    expandir virou a primeira, e o T3 leu "coluna sem alça de
+    redimensionamento" — reprovando a tela por uma ausência correta.
+
+    Ou seja: o próprio conserto de uma célula (T7, mover o resumo para a
+    linha expansível) acendeu outra, por um check que assumia que a
+    primeira coluna é sempre de conteúdo.
+  */
+  const idx = await page.evaluate(() => {
+    const ths = Array.from(document.querySelectorAll('.resizable-table thead th'));
+    const i = ths.findIndex((th) => !th.classList.contains('celula-selecao')
+      && !th.classList.contains('celula-expandir'));
+    return i < 0 ? 0 : i;
+  });
   const alca = page.locator('.resizable-table thead th').nth(idx).locator('.resizable-th-handle');
   if (!(await alca.count())) {
-    resultado.T3 = { estado: 'FALHOU', motivo: 'coluna sem alça de redimensionamento' };
+    resultado.T3 = { estado: 'FALHOU', motivo: `coluna de conteúdo (índice ${idx}) sem alça de redimensionamento` };
     return;
   }
   const caixa = await alca.boundingBox();
