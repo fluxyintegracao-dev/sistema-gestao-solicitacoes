@@ -5217,7 +5217,15 @@ input[type="file"]:disabled {
 
 .financeiro-relatorios-page {
   max-width: 100%;
-  overflow-x: hidden;
+  /*
+    R18 — `clip`, nunca `hidden`. Medido no preview em 04/09: com
+    `overflow-x: hidden` aqui, a faixa fixa desta tela SOBREPUNHA a topbar
+    em 492px e sumia na rolagem (C1/X2). O motivo é que `overflow-x:
+    hidden` faz o `overflow-y` computar `auto` — o elemento vira
+    scrollport e o `position: sticky` de dentro passa a se ancorar NELE,
+    não na janela. `clip` recorta sem criar scrollport.
+  */
+  overflow-x: clip;
 }
 
 .financeiro-relatorios-layout,
@@ -5228,7 +5236,9 @@ input[type="file"]:disabled {
 }
 
 .financeiro-relatorios-content {
-  overflow: hidden;
+  /* R18: mesmo motivo — este bloco é ancestral da tabela do relatório
+     embutido, e `hidden` aqui sequestrava a rolagem dela. */
+  overflow: clip;
 }
 
 .financeiro-relatorios-page--full .financeiro-relatorios-content {
@@ -5239,7 +5249,7 @@ input[type="file"]:disabled {
   width: 100% !important;
   max-width: 100% !important;
   margin-inline: 0 !important;
-  overflow: hidden;
+  overflow: clip; /* R18 */
 }
 
 .financeiro-conta-report-filter-grid {
@@ -5971,8 +5981,11 @@ input[type="file"]:disabled {
 }
 
 .finance-chart-toggle {
-  min-height: 26px;
-  padding: 0.2rem 0.65rem;
+  /* M1/R2 — alvo de clique tem piso: 32px no desktop. Estes botões vinham
+     com 26px e o preview mediu 93×26px. Alternador de gráfico é controle
+     de uso corriqueiro; miniaturizá-lo não economiza espaço que importe. */
+  min-height: var(--alvo-clique, 32px);
+  padding: 0.3rem 0.7rem;
   border: 0;
   border-radius: 999px;
   background: transparent;
