@@ -2644,6 +2644,24 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                   // R17: o credor do frete NOMEIA a linha pendente de titulo.
                   tipo: 'identidade',
                   noCard: 'titulo',
+                  /*
+                    A COLUNA DE CONTEUDO DESTA TABELA E O TRANSPORTADOR.
+
+                    Medido no preview: "TRANSPORTADOR" quebrava em duas
+                    linhas enquanto "OBRA" segurava 732px de folga. As duas
+                    nascem com `flexPadrao` (texto e identidade), e sem peso
+                    explicito a sobra vai para a PRIMEIRA — que aqui e a
+                    obra, e nao precisava de nada perto disso.
+
+                    A folga de 732px e o que da confianca na troca: e quatro
+                    vezes a largura-base da coluna, entao a obra continua
+                    folgada mesmo devolvendo tudo. (Na `RhDpApuracao` a folga
+                    era de 215px e a mesma troca INVERTEU o problema — ali as
+                    duas colunas precisavam de espaco, e o componente so sabe
+                    dar tudo a uma. Esse caso esta registrado para a leva do
+                    TabelaPadrao.)
+                  */
+                  flex: 2,
                   render: (frete) => (
                     <div>
                       <div className="font-medium text-[var(--c-text)]">
