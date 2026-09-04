@@ -118,6 +118,29 @@ pessoa abriu a tela é atrito, não organização.
 sobra tela? Se o que sobra é uma lista que ninguém abriria por si só, o
 formulário é a tela — fica inline.
 
+### Exceção registrada: `EmpresasGrupo.jsx` mantém o modal (04/09)
+
+Pelo critério acima ela provavelmente está do lado errado: uma tela chamada
+"Empresas do Grupo" existe para cadastrar empresas do grupo. **Fica como
+está, por decisão do responsável, e o motivo não é sobre esta tela.**
+
+Ela é o **molde** que todas as levas copiam — 93 telas foram escritas
+olhando para ela. Trocar o padrão de referência com o trabalho em andamento
+faz metade do sistema seguir um molde e a outra metade seguir outro, sem
+nada que aponte a divergência.
+
+É a **R21 aplicada ao design, não ao componente**. A R21 registra que mudar
+o contrato de retorno de um componente padrão no meio de uma leva não é
+mudança compatível — quem já escreveu continua compilando e passa a fazer
+outra coisa — e conclui: *ou o check nasce junto com a mudança, ou a mudança
+espera a leva acabar*. Molde é contrato também, só que lido por pessoas em
+vez de pelo compilador; e por isso a divergência é ainda mais silenciosa,
+porque não existe build para acusá-la.
+
+**Reavaliar quando as levas fecharem**, com o sistema inteiro no mesmo
+padrão. Aí a mudança é uma decisão sobre uma tela, e não um garfo no meio da
+referência.
+
 ### Como esta regra nasceu errada, e como foi corrigida
 
 A versão anterior dizia "cadastro de uso esporádico abre em modal", com a
