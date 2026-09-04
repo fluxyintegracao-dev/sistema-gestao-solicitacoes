@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArchiveBox,
   HiOutlineArrowUturnLeft,
@@ -234,6 +235,22 @@ export default function ComunicacaoInterna() {
   const [loadingLista, setLoadingLista] = useState(true);
   const [busca, setBusca] = useState('');
   const [filtrosAtivos, setFiltrosAtivos] = useState({});
+  /*
+    A TELA IGNORAVA O `:id` DA URL (04/09).
+
+    As tres rotas — conversas/entrada, conversas/saida e conversas/:id —
+    sempre apontaram para esta tela, e ela nunca chamou `useParams`. Clicar
+    numa conversa navegava para /conversas/123 e abria a lista DO ZERO,
+    como se nada tivesse sido pedido. Nao era tela branca: era uma tela que
+    carrega e ignora o pedido, o que engana mais — o usuario ve algo
+    plausivel e conclui que a conversa sumiu.
+
+    Eu mesmo registrei isso errado antes, como "rota quebrada" (E3). A rota
+    nunca esteve quebrada; quem estava surdo era a tela.
+  */
+  const { id: idDaUrl } = useParams();
+  const navigate = useNavigate();
+  const idJaAplicado = useRef(null);
   const [conversaAtiva, setConversaAtiva] = useState(null);
   const [detalhe, setDetalhe] = useState(null);
   const [mensagens, setMensagens] = useState([]);
@@ -412,7 +429,20 @@ export default function ComunicacaoInterna() {
     return () => clearInterval(interval);
   }, [carregarLista]);
 
+
+
   const abrirConversa = useCallback(async (conv) => {
+    /*
+      O ENDERECO PASSA A DIZER QUAL CONVERSA ESTA ABERTA.
+
+      Antes a URL ficava em /conversas/entrada qualquer que fosse a conversa
+      escolhida: recarregar a pagina perdia o lugar, e mandar o link para um
+      colega mandava ele para a lista. `replace` em vez de `push` para o
+      botao de voltar do navegador sair da tela, e nao percorrer uma a uma
+      as conversas que a pessoa abriu.
+    */
+    idJaAplicado.current = String(conv.id);
+    navigate(`/conversas/${conv.id}`, { replace: true });
     setConversaAtiva(conv.id);
     setMensagens([]);
     setTemMais(false);
@@ -444,6 +474,35 @@ export default function ComunicacaoInterna() {
       setTimeout(scrollChatToTop, 100);
     }
   }, [scrollChatToTop]);
+
+  /*
+    ESTE EFEITO FICA DEPOIS DO `abrirConversa` DE PROPOSITO.
+
+    Ele o cita na lista de dependencias, e `const` nao sofre hoisting: posto
+    antes, o componente estoura com "Cannot access 'abrirConversa' before
+    initialization" NA EXECUCAO — com o build passando. E a mesma classe de
+    defeito da R22 (hook usado sem import), e nenhum check estatico daqui a
+    pega. Escrevi assim na primeira versao e so vi relendo.
+  */
+  /*
+    ABRE A CONVERSA PEDIDA NA URL, uma vez, quando a lista chega.
+
+    `idJaAplicado` existe para o endereco nao reabrir a conversa a cada
+    recarga da lista (que roda em intervalo): sem ele, quem trocasse de
+    conversa seria puxado de volta para a da URL no proximo ciclo.
+
+    So numero: as rotas irmas sao `conversas/entrada` e `conversas/saida`, e
+    o React Router prefere o segmento estatico — mas se um dia a ordem das
+    rotas mudar, "entrada" nao pode virar id de conversa.
+  */
+  useEffect(() => {
+    if (!idDaUrl || !/^\d+$/.test(idDaUrl)) return;
+    if (idJaAplicado.current === idDaUrl) return;
+    const alvo = conversas.find((c) => String(c.id) === String(idDaUrl));
+    if (!alvo) return;
+    idJaAplicado.current = idDaUrl;
+    abrirConversa(alvo);
+  }, [idDaUrl, conversas, abrirConversa]);
 
   const carregarMais = useCallback(async () => {
     if (!conversaAtiva || !oldestId || loadingMais) return;
