@@ -110,7 +110,7 @@ comercial/relatorios          + /operacional
 ### Comunicação e conteúdo
 
 ```
-comunicacao-interna       conversas/entrada, /saida, /:id
+comunicacao-interna       conversas/:id
 arquivos-modelos          arquivos-modelos-config
 treinamento
 ```

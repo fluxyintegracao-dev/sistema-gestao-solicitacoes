@@ -876,8 +876,6 @@ export default function App() {
         <Route path="solicitacoes/:id" element={<SolicitacaoDetalhe />} />
         <Route path="prioridades-diretoria" element={<PrioridadesDiretoriaRoute><PrioridadesDiretoria /></PrioridadesDiretoriaRoute>} />
         <Route path="comunicacao-interna" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
-        <Route path="conversas/entrada" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
-        <Route path="conversas/saida" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
         <Route path="conversas/:id" element={<ComunicacaoRoute><ComunicacaoInterna /></ComunicacaoRoute>} />
         <Route path="arquivos-modelos" element={<BibliotecaRoute><ArquivosModelos /></BibliotecaRoute>} />
         <Route path="treinamento" element={<EnabledModuleRoute moduleKey="TREINAMENTO"><TreinamentoRoute><Treinamento /></TreinamentoRoute></EnabledModuleRoute>} />

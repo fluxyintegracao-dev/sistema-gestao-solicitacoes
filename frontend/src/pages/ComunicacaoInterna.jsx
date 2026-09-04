@@ -250,8 +250,8 @@ export default function ComunicacaoInterna() {
   /*
     A TELA IGNORAVA O `:id` DA URL (04/09).
 
-    As tres rotas — conversas/entrada, conversas/saida e conversas/:id —
-    sempre apontaram para esta tela, e ela nunca chamou `useParams`. Clicar
+    A rota conversas/:id sempre apontou para esta tela, e ela nunca chamou
+    `useParams`. Clicar
     numa conversa navegava para /conversas/123 e abria a lista DO ZERO,
     como se nada tivesse sido pedido. Nao era tela branca: era uma tela que
     carrega e ignora o pedido, o que engana mais — o usuario ve algo
@@ -447,8 +447,8 @@ export default function ComunicacaoInterna() {
     /*
       O ENDERECO PASSA A DIZER QUAL CONVERSA ESTA ABERTA.
 
-      Antes a URL ficava em /conversas/entrada qualquer que fosse a conversa
-      escolhida: recarregar a pagina perdia o lugar, e mandar o link para um
+      Antes a URL ficava parada na entrada da tela qualquer que fosse a
+      conversa escolhida: recarregar a pagina perdia o lugar, e mandar o link para um
       colega mandava ele para a lista. `replace` em vez de `push` para o
       botao de voltar do navegador sair da tela, e nao percorrer uma a uma
       as conversas que a pessoa abriu.
@@ -503,9 +503,9 @@ export default function ComunicacaoInterna() {
     recarga da lista (que roda em intervalo): sem ele, quem trocasse de
     conversa seria puxado de volta para a da URL no proximo ciclo.
 
-    So numero: as rotas irmas sao `conversas/entrada` e `conversas/saida`, e
-    o React Router prefere o segmento estatico — mas se um dia a ordem das
-    rotas mudar, "entrada" nao pode virar id de conversa.
+    So numero: hoje `conversas/:id` nao tem rota irma com segmento estatico
+    (as duas que existiam foram removidas em 04/09 por nao recortarem nada),
+    mas se alguem criar uma amanha, "entrada" nao pode virar id de conversa.
   */
   useEffect(() => {
     if (!idDaUrl || !/^\d+$/.test(idDaUrl)) return;

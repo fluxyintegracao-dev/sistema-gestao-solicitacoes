@@ -605,3 +605,76 @@ Não tem trinco de propósito. Trinco congela passivo herdado; aqui o passivo
 Uma tela entra nas **duas** listas na mesma leva em que é migrada. A entrada
 no manifesto estático sem a entrada na lista do preview é meia migração — e
 é a metade que não conta para "PRONTO".
+
+## ANTES DE QUALQUER NÚMERO: "DE QUANTOS JEITOS ISSO É FEITO AQUI?" (04/09)
+
+Regra permanente, aplicável a toda varredura, check ou levantamento deste
+projeto — e ela é maior que "o detector estava cego".
+
+Num sistema com anos de código, **a mesma coisa é feita de várias formas**,
+porque foi escrita por gente diferente em épocas diferentes. Qualquer
+varredura que assume UMA forma mede uma fração e devolve um número com cara
+de completo. O número parece pronto; a medição não está.
+
+Então a primeira pergunta nunca é "quantos casos existem?". É:
+
+> **De quantos jeitos isso é feito aqui?**
+
+A segunda só vale depois que a primeira tem resposta escrita.
+
+### O caso que gerou a regra: quatro números errados no mesmo dia
+
+A varredura de alcance ("existe caminho até esta tela?") nasceu errada
+quatro vezes seguidas, sempre pelo mesmo motivo:
+
+| Número | O que o detector conhecia | O que ele não via |
+|---|---|---|
+| 38 sem porta | `to="/rota"` (JSX) | tudo o resto |
+| 15 sem porta | + `to: '/rota'` (objeto) | os fluxos |
+| 13 sem porta | + `navigate('/rota')` | o ternário |
+| 14 sem porta | + `navigate(cond ? '/rota' : …)` | o catálogo |
+|  2 sem porta | + `route: '/rota'` em catálogo de painel | — |
+
+Em cada rodada eu ia "abrir portas" que já existiam. Na primeira, teria
+DUPLICADO 23 entradas na fonte única de navegação: o arquivo onde duplicata
+custa mais caro.
+
+### A cegueira reaparece no classificador, não só no detector
+
+Corrigido o detector, classifiquei como "porta" apenas o que estava no
+`navigationConfig`. Errado pelo mesmo motivo: **neste sistema hub é
+página**. `Configuracoes.jsx`, `ModuloRelatorios.jsx` e
+`FinanceiroRelatorios.jsx` são hubs de verdade, com lista de destinos. Pela
+regra nova, ~20 telas de configuração apareceriam como "sem porta" quando a
+porta é o hub de Configurações, que está no menu.
+
+Ou seja: consertar a ferramenta não basta se a mesma suposição estiver na
+régua que lê o resultado dela. A pergunta vale para os dois.
+
+### Terceira aparição: o recorte que esconde caminho
+
+Tirei as rotas `/:id` do grafo porque detalhe de registro não precisa de
+porta no hub — chega pela listagem. Mas tirar do grafo tirou também as
+portas que essas telas ABREM: `/financeiro/titulos` só tem link dentro de
+um card da tela de obra; `/relatorios/administrativos` só tem link na tela
+de pedido de compra. As duas apareceram como "só pela URL" por causa de um
+recorte meu, não por causa do sistema.
+
+**Não precisar de porta e não ser porta são coisas diferentes.**
+
+### O que a varredura mede hoje
+
+Grafo, não lista. Raiz = rotas do `navigationConfig` (que é também o índice
+do Ctrl+K). Aresta = a página da rota A, ou um componente que ela importa,
+cita a rota B em qualquer das 6 formas conhecidas. O resultado é distância:
+
+| nível | significado | veredito |
+|---|---|---|
+| 1 | destino do menu | porta |
+| 2 | dentro de um hub que está no menu | porta |
+| 3+ | só se alcança de dentro de outra tela | decidir caso a caso |
+| sem | nenhum caminho a partir do menu | porta ausente |
+
+Seleção por estado dentro de um painel conta como alcance legítimo: quem
+chega ao relatório pela lista lateral chegou, mesmo sem existir um
+`to="/rota"` escrito em lugar nenhum.
