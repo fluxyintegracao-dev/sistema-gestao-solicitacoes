@@ -875,3 +875,57 @@ número na tela e sai com código 1.
    no arquivo e a prova nova as segura; mas um tema customizado por setor
    que sobrescreva um `--sem-*` não passa por piso nenhum.
 
+---
+
+## SEXTA família: CAPACIDADE ÓRFÃ — viva, funcional e inalcançável
+
+Distinta das cinco anteriores, e vale nome próprio:
+
+- **não é código morto** — a tela existe, compila e funciona;
+- **não é capacidade sem sinal** (R15) — o sinal existiria, o *caminho* é que
+  não existe;
+- é **capacidade órfã**: código completo, condicionado a uma rota ou a um
+  ponto de entrada que sumiu do sistema.
+
+Apagar uma dessas é destruir capacidade por acidente de histórico. Mantê-las
+sem decidir é carregar código que ninguém sabe se deve existir.
+
+### A varredura (04/09)
+
+Critério: tela em `pages/` que exporta componente, **não é importada pelo
+`App.jsx`** (logo não tem rota própria) e **não é importada por nenhuma
+outra tela** (logo não é subcomponente).
+
+**30 telas não têm rota própria**; dessas, **20 são subcomponentes
+legítimos** (`SolicitacaoDetalhe/*`, `Solicitacoes/*`, `RhDpApuracao`…),
+importados por uma tela que tem rota. Sobram **10 verdadeiramente órfãs**:
+
+| Linhas | Arquivo |
+|---|---|
+| 573 | `modules/provisionamento-financeiro/pages/ConfiguracaoProvisionamentoFinanceiro.jsx` |
+| 487 | `pages/ConversasEntrada.jsx` |
+| 484 | `pages/ConversaDetalhe.jsx` |
+| 261 | `pages/ConversasSaida.jsx` |
+| 128 | `pages/SetoresSemAlteracaoStatus.jsx` |
+| 118 | `pages/AprovacaoDiretoria.jsx` |
+| 80 | `pages/SolicitacaoDetalhe/InfoCard.jsx` |
+| 55 | `pages/SolicitacaoDetalhe/Pedido.jsx` |
+| 16 | `pages/SolicitacaoDetalhe/StatusArea.jsx` |
+| 1 | `pages/EtapasSetor.jsx` (arquivo de 1 linha) |
+
+**2.203 linhas** nas seis maiores.
+
+As três de conversa já estavam registradas como E4 — e ali o diagnóstico
+ficou mais completo: elas navegam para `/conversas/:id`, que é a **rota
+quebrada** do E3. São capacidade órfã *e* apontam para caminho quebrado.
+
+**Decisão pendente, uma a uma**: cada arquivo desta lista ou **ganha rota e
+ponto de entrada**, ou é **removido com aprovação explícita**. Nenhum dos
+dois é decisão de leva de layout. O que a leva faz é não deixar a lista
+implícita.
+
+**O que este check ainda NÃO cobre**: tela que tem rota em `App.jsx` mas
+cuja rota não é alcançável por menu, hub ou link — essa é a família E1/E2
+(porta de entrada ausente), já registrada. As duas juntas descrevem o
+caminho inteiro: existe rota? existe caminho até a rota?
+
