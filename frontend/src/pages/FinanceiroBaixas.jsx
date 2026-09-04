@@ -435,13 +435,26 @@ export default function FinanceiroBaixas() {
               id: 'titulo',
               titulo: 'Titulo',
               tipo: 'codigo',
+              /*
+                A DESCRIÇÃO DO TÍTULO SAIU DA CÉLULA (04/09).
+
+                Ela vinha numa sublinha `truncate` de 106px para 494px de
+                conteúdo, e a descrição carrega DINHEIRO: "Valor total: R$
+                640,00 - Parcela 2/2" saía cortado no preview. Valor
+                monetário com reticências é o defeito que a T7 existe para
+                pegar.
+
+                Alargar a coluna não resolve — a descrição é texto livre e
+                não tem tamanho máximo — e deixar quebrar em duas linhas é o
+                outro lado da mesma T7 (o olho lê dois números onde há um).
+                Mesmo tratamento que a `RelatoriosAdministrativos` recebeu:
+                detalhe do registro vai para a linha expansível, onde tem a
+                largura da tabela inteira.
+              */
               render: (baixa) => (
-                <div>
-                  <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`}>
-                    {baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`}
-                  </Link>
-                  <div className="truncate text-xs text-[var(--c-muted)]">{baixa.titulo?.descricao || '-'}</div>
-                </div>
+                <Link className="font-semibold text-[var(--c-primary)] hover:underline" to={`/financeiro/titulos/${baixa.titulo_financeiro_id}`}>
+                  {baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`}
+                </Link>
               )
             },
             { id: 'tipo', titulo: 'Tipo', tipo: 'badge', render: (baixa) => baixa.titulo?.tipo || '-' },
@@ -470,6 +483,10 @@ export default function FinanceiroBaixas() {
           itens={loading ? [] : baixasPaginadas}
           carregando={loading}
           vazio="Nenhuma baixa encontrada."
+          /* A descrição completa do título, sem reticências (T7). */
+          linhaExpansivel={(baixa) => (baixa.titulo?.descricao
+            ? <p className="app-note">{baixa.titulo.descricao}</p>
+            : null)}
           storageKey="tabela:financeiro-baixas"
           rotuloRolagem="Baixas financeiras"
           larguraAcoes={140}
