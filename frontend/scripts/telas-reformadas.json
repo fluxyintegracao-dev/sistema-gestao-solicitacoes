@@ -43,7 +43,16 @@
     "src/pages/FinanceiroTitulos.jsx",
     "src/pages/FinanceiroTituloNovo.jsx",
     "src/pages/FinanceiroTituloEditar.jsx",
-    "src/pages/FinanceiroCadastros.jsx"
+    "src/pages/FinanceiroCadastros.jsx",
+    "src/pages/FinanceiroConciliacao.jsx",
+    "src/pages/FinanceiroPagamentos.jsx",
+    "src/pages/FinanceiroBaixas.jsx",
+    "src/pages/FinanceiroBaixasCompostas.jsx",
+    "src/pages/FinanceiroBoletos.jsx",
+    "src/pages/FinanceiroChequesTerceiros.jsx",
+    "src/pages/FinanceiroCaixas.jsx",
+    "src/pages/FinanceiroDda.jsx",
+    "src/pages/ComprovantesPendentes.jsx"
   ],
   "excecoes_medidas": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"

@@ -1,14 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  HiOutlineArrowDownCircle,
-  HiOutlineArrowUpCircle,
-  HiOutlineBanknotes,
-  HiOutlineCheckCircle,
-  HiOutlineClock,
   HiOutlineLockClosed,
   HiOutlineLockOpen,
   HiOutlinePlus,
-  HiOutlineScale,
   HiOutlineXMark
 } from 'react-icons/hi2';
 import {
@@ -21,7 +15,19 @@ import {
   getContasBancarias,
   registrarMovimentoCaixaFinanceiro
 } from '../services/financeiro';
-import { TabelaPadrao } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  BarraFiltros,
+  alternarValorFiltro,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { formatCurrencyInput, normalizeCurrencyTyping, parseCurrencyInput } from '../utils/formatters';
 
 function today() {
@@ -63,27 +69,14 @@ function empresaLabel(conta) {
   return conta?.empresa?.nome || conta?.empresa?.razao_social || 'Empresa não informada';
 }
 
+/* R25 — o par claro/escuro do status vinha de dez classes de paleta crua
+   (`bg-emerald-50 dark:bg-emerald-950/30`...). O sistema já tem o par
+   pronto no `badge-*`, que aponta para os tokens --sem-* e passa pelo piso
+   de contraste do ThemeContext (R24). */
 function statusClass(status) {
   return String(status || '').toUpperCase() === 'ABERTO'
-    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-300'
-    : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300';
-}
-
-function Metric({ label, value, icon: Icon, tone = 'default', hint }) {
-  const toneClass = {
-    default: 'text-[var(--c-text)]',
-    positive: 'text-emerald-600 dark:text-emerald-400',
-    negative: 'text-rose-600 dark:text-rose-400'
-  }[tone];
-  return (
-    <div className="min-w-0 rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-3.5 py-3">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--c-muted)]">
-        {Icon ? <Icon className="h-4 w-4 shrink-0" /> : null}<span>{label}</span>
-      </div>
-      <strong className={`mt-1 block break-words text-base leading-tight sm:text-lg ${toneClass}`} title={String(value)}>{value}</strong>
-      {hint ? <span className="mt-0.5 block text-xs text-[var(--c-muted)]">{hint}</span> : null}
-    </div>
-  );
+    ? 'badge badge-success'
+    : 'badge badge-muted';
 }
 
 export default function FinanceiroCaixas() {
@@ -94,8 +87,15 @@ export default function FinanceiroCaixas() {
   const [sessaoDetalhe, setSessaoDetalhe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  /*
+    R19 — as duas faixas de tom próprio (`.app-alert-error` e
+    `.app-alert-success`, DUAS classes que nunca existiram no CSS do
+    projeto: o estilo não chegava à tela) viraram a faixa do sistema.
+    Tudo o que passava por elas é EVENTO — abriu, registrou, fechou,
+    falhou agora — e evento é aviso empilhável e fechável (`useAvisos`),
+    com o sucesso sumindo sozinho em 6s.
+  */
+  const { avisos, avisar, fechar: fecharAviso, limpar: limparAvisos } = useAvisos();
   const carregamentoIdRef = useRef(0);
   const [abrirForm, setAbrirForm] = useState({ data_abertura: today(), saldo_abertura: '', observacoes: '' });
   const [movimentoForm, setMovimentoForm] = useState({ natureza: 'SAIDA', data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
@@ -113,7 +113,7 @@ export default function FinanceiroCaixas() {
         setContas(elegiveis);
         setContaSelecionadaId((current) => current || String(elegiveis[0]?.id || ''));
       })
-      .catch((err) => setError(err?.message || 'Erro ao carregar as contas configuradas para caixa.'));
+      .catch((err) => avisar.erro(err?.message || 'Erro ao carregar as contas configuradas para caixa.'));
     return () => { active = false; };
   }, []);
 
@@ -209,10 +209,9 @@ export default function FinanceiroCaixas() {
   }, []);
 
   useEffect(() => {
-    setError('');
     carregarControleCaixa().catch((err) => {
       if (!contaSelecionadaId) return;
-      setError(err?.message || 'Erro ao carregar o controle do caixa.');
+      avisar.erro(err?.message || 'Erro ao carregar o controle do caixa.');
       setSessoes([]);
       setSessaoDetalhe(null);
     });
@@ -250,12 +249,11 @@ export default function FinanceiroCaixas() {
   async function executar(acao, mensagemErro) {
     try {
       setSaving(true);
-      setError('');
-      setMessage('');
+      limparAvisos();
       const resultado = await acao();
       if (!resultado?.estadoAplicado) await carregarControleCaixa();
     } catch (err) {
-      setError(err?.message || mensagemErro);
+      avisar.erro(err?.message || mensagemErro);
     } finally {
       setSaving(false);
     }
@@ -265,7 +263,7 @@ export default function FinanceiroCaixas() {
     event.preventDefault();
     await executar(async () => {
       await abrirCaixaFinanceiro({ conta_bancaria_id: contaSelecionadaId, data_abertura: abrirForm.data_abertura, saldo_abertura: abrirForm.saldo_abertura === '' ? undefined : abrirForm.saldo_abertura, observacoes: abrirForm.observacoes });
-      setMessage('Caixa aberto com sucesso.');
+      avisar.sucesso('Caixa aberto com sucesso.');
       setAbrirForm({ data_abertura: today(), saldo_abertura: '', observacoes: '' });
     }, 'Erro ao abrir o caixa.');
   }
@@ -274,7 +272,7 @@ export default function FinanceiroCaixas() {
     await executar(async () => {
       const dataReferencia = addDays(abrirForm.data_abertura, -1);
       await confirmarConciliacaoDiaCaixa({ conta_bancaria_id: contaSelecionadaId, data_referencia: dataReferencia, observacoes: abrirForm.observacoes });
-      setMessage(`Conferência OFX de ${formatDate(dataReferencia)} confirmada.`);
+      avisar.sucesso(`Conferência OFX de ${formatDate(dataReferencia)} confirmada.`);
     }, 'Erro ao confirmar a conferência OFX.');
   }
 
@@ -283,7 +281,9 @@ export default function FinanceiroCaixas() {
     if (!sessaoAberta) return;
     const valorMovimento = parseCurrencyInput(movimentoForm.valor);
     if (valorMovimento <= 0) {
-      setError('Informe um valor maior que zero para registrar o movimento.');
+      // AVISO (alerta), não confirmação: não há ação a segurar — o clique
+      // de agora não tem valor válido para registrar.
+      avisar.alerta('Informe um valor maior que zero para registrar o movimento.');
       return;
     }
     await executar(async () => {
@@ -292,7 +292,7 @@ export default function FinanceiroCaixas() {
         valor: valorMovimento
       });
       const estadoAplicado = aplicarSessaoAtualizada(detalhe);
-      setMessage(`${movimentoForm.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso.`);
+      avisar.sucesso(`${movimentoForm.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'} registrada com sucesso.`);
       setMovimentoForm({ natureza: movimentoForm.natureza, data_movimento: today(), valor: '', descricao: '', documento_referencia: '' });
       return { estadoAplicado };
     }, 'Erro ao registrar o movimento.');
@@ -302,7 +302,7 @@ export default function FinanceiroCaixas() {
     event.preventDefault();
     if (!sessaoAberta) return;
     if (fecharForm.data_fechamento < dataMinimaFechamento) {
-      setError(`A data de fechamento nao pode ser anterior a ${formatDate(dataMinimaFechamento)}.`);
+      avisar.alerta(`A data de fechamento nao pode ser anterior a ${formatDate(dataMinimaFechamento)}.`);
       return;
     }
     await executar(async () => {
@@ -310,7 +310,7 @@ export default function FinanceiroCaixas() {
         ...fecharForm,
         saldo_informado: parseCurrencyInput(fecharForm.saldo_informado)
       });
-      setMessage('Caixa fechado e conferência registrada com sucesso.');
+      avisar.sucesso('Caixa fechado e conferência registrada com sucesso.');
     }, 'Erro ao fechar o caixa.');
   }
 
@@ -320,109 +320,161 @@ export default function FinanceiroCaixas() {
     await executar(async () => {
       const detalhe = await estornarMovimentoCaixaFinanceiro(sessaoAberta.id, estorno.movimento.id, { motivo: estorno.motivo });
       const estadoAplicado = aplicarSessaoAtualizada(detalhe);
-      setMessage('Movimento estornado com trilha de auditoria.');
+      avisar.sucesso('Movimento estornado com trilha de auditoria.');
       setEstorno({ movimento: null, motivo: '' });
       return { estadoAplicado };
     }, 'Erro ao estornar o movimento.');
   }
 
+  /*
+    R12/R23 — a EMPRESA era um `select` de escolha única filtrando a lista
+    de contas: estado invisível e não combinável. Virou marcação na
+    BarraFiltros, com etiqueta removível, e APLICA AO MARCAR — o recorte é
+    feito em memória sobre `contas`, zero requisição, muito longe do teto
+    de 3 e dos 2s da R23. Nada de rascunho, nada de botão.
+
+    O select de CAIXA/CONTA que ficou é seletor de CONTEXTO — escolhe QUAL
+    caixa está sendo operado, e todo lançamento herda a escolha. A R12
+    declara esse uso legítimo.
+  */
+  const filtrosAtivos = useMemo(
+    () => ({ empresa: new Set(empresaFiltro ? [String(empresaFiltro)] : []) }),
+    [empresaFiltro]
+  );
+
+  function alternarFiltro(dimensao, valor, opcoes) {
+    const proximo = alternarValorFiltro(filtrosAtivos, dimensao, valor, opcoes);
+    setEmpresaFiltro([...(proximo.empresa || [])][0] || '');
+  }
+
+  const diferencaRelevante = Math.abs(diferencaFechamento) > 0.009;
+
   return (
-    <div className="page solicitacoes-page mx-auto w-full max-w-[1600px]">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-primary)]">Financeiro · tesouraria</span>
-          <h1 className="mt-1 text-xl font-semibold text-[var(--c-text)] md:text-2xl">Caixas e Contas</h1>
-          <p className="mt-1 max-w-3xl text-sm text-[var(--c-muted)]">Abertura, movimentação e conferência do dinheiro físico em um único fluxo operacional.</p>
-        </div>
-      </div>
+    <Pagina>
+      {/* R13/C1/C2/R5 — faixa fixa do sistema: título em 22px, contagem e
+          apoio numa linha só, ações à direita. Antes era um <h1> em linha
+          solta que rolava para fora com a página. */}
+      <PageHeader
+        titulo="Caixas e contas"
+        contagem={contaSelecionada ? contaLabel(contaSelecionada) : 'Nenhuma conta selecionada'}
+        descricao="Abertura, movimentação e conferência do dinheiro físico em um único fluxo operacional."
+      />
 
-      {error ? <div className="app-alert app-alert-error mt-3">{error}</div> : null}
-      {message ? <div className="app-alert app-alert-success mt-3">{message}</div> : null}
+      <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
-      <section className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] p-3 shadow-sm sm:p-4">
-        <div className="grid gap-3 md:grid-cols-12 md:items-end">
-          <label className="sol-filter-field md:col-span-4">
-            <span className="sol-filter-label">Empresa</span>
-            <select className="input w-full" value={empresaFiltro} onChange={(event) => setEmpresaFiltro(event.target.value)}>
-              <option value="">Todas as empresas</option>
-              {empresas.map((empresa) => <option key={empresa.id} value={empresa.id}>{empresa.nome || empresa.razao_social}</option>)}
-            </select>
-          </label>
-          <label className="sol-filter-field md:col-span-6">
+      <BlocoConteudo
+        titulo="Caixa em operação"
+        variante="secundario"
+        descricao="Escolha a empresa para estreitar a lista e o caixa que será operado."
+      >
+        <BarraFiltros
+          filtros={[
+            {
+              id: 'empresa',
+              rotulo: 'Empresa',
+              unico: true,
+              opcoes: empresas.map((empresa) => ({ valor: String(empresa.id), rotulo: empresa.nome || empresa.razao_social }))
+            }
+          ]}
+          ativos={filtrosAtivos}
+          aoAlternar={alternarFiltro}
+          aoLimpar={() => setEmpresaFiltro('')}
+        />
+
+        <div className="mt-4 grid gap-3 md:grid-cols-12 md:items-end">
+          <label className="sol-filter-field md:col-span-8">
             <span className="sol-filter-label">Caixa / conta com controle diário</span>
             <select className="input w-full" value={contaSelecionadaId} onChange={(event) => setContaSelecionadaId(event.target.value)}>
               {contasFiltradas.length === 0 ? <option value="">Nenhuma conta configurada</option> : null}
               {contasFiltradas.map((conta) => <option key={conta.id} value={conta.id}>{contaLabel(conta)}</option>)}
             </select>
           </label>
-          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] px-3 py-2 text-sm md:col-span-2">
-            {sessaoAberta ? <HiOutlineLockOpen className="h-5 w-5 shrink-0 text-emerald-600" /> : <HiOutlineLockClosed className="h-5 w-5 shrink-0 text-[var(--c-muted)]" />}
+          <div className="flex min-h-11 min-w-0 items-center gap-2 rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface-soft)] px-3 py-2 text-sm md:col-span-4">
+            {sessaoAberta
+              ? <HiOutlineLockOpen className="h-4 w-4 shrink-0 text-[var(--sem-success)]" aria-hidden="true" />
+              : <HiOutlineLockClosed className="h-4 w-4 shrink-0 text-[var(--c-muted)]" aria-hidden="true" />}
             <div className="min-w-0">
               <strong className="block truncate text-[var(--c-text)]">{sessaoAberta ? 'Caixa aberto' : 'Caixa fechado'}</strong>
               <span className="block truncate text-xs text-[var(--c-muted)]">{contaSelecionada ? empresaLabel(contaSelecionada) : 'Selecione uma conta'}</span>
             </div>
           </div>
         </div>
-      </section>
+      </BlocoConteudo>
 
       {!contaSelecionada && !loading ? (
-        <div className="mt-4 rounded-2xl border border-dashed border-[var(--c-border)] bg-[var(--c-card)] px-5 py-8 text-center text-sm text-[var(--c-muted)]">
-          Cadastre uma conta como <strong className="text-[var(--c-text)]">Caixa interno</strong> e habilite abertura e fechamento nos Cadastros Financeiros.
-        </div>
+        <BlocoConteudo titulo="Nenhum caixa configurado">
+          <p className="text-sm text-[var(--c-muted)]">
+            Cadastre uma conta como <strong className="text-[var(--c-text)]">Caixa interno</strong> e habilite
+            abertura e fechamento nos Cadastros Financeiros.
+          </p>
+        </BlocoConteudo>
       ) : null}
 
       {contaSelecionada && !sessaoAberta && !loading ? (
-        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineLockOpen className="h-5 w-5 text-[var(--c-primary)]" /> Abrir caixa</h2>
-              <p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Informe o saldo inicial. O caixa físico não depende de conciliação OFX.' : 'Esta conta mantém a conferência OFX anterior.'}</p>
-            </div>
-            <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusClass('FECHADO')}`}>FECHADO</span>
-          </div>
-          <form className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleAbrir}>
+        <BlocoConteudo
+          titulo="Abrir caixa"
+          descricao={caixaFisico ? 'Informe o saldo inicial. O caixa físico não depende de conciliação OFX.' : 'Esta conta mantém a conferência OFX anterior.'}
+          acoes={<span className={statusClass('FECHADO')}>FECHADO</span>}
+        >
+          <form className="grid gap-3 sm:grid-cols-2 xl:grid-cols-12 xl:items-end" onSubmit={handleAbrir}>
             <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Data de abertura *</span><input className="input w-full" type="date" value={abrirForm.data_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, data_abertura: event.target.value }))} required /></label>
-            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Saldo inicial</span><input className="input w-full" inputMode="decimal" placeholder="Ex.: 500,00" value={abrirForm.saldo_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, saldo_abertura: event.target.value }))} /></label>
+            <label className="sol-filter-field xl:col-span-2"><span className="sol-filter-label">Saldo inicial</span><input className="input input-moeda w-full" inputMode="decimal" placeholder="Ex.: 500,00" value={abrirForm.saldo_abertura} onChange={(event) => setAbrirForm((current) => ({ ...current, saldo_abertura: event.target.value }))} /></label>
             <label className="sol-filter-field sm:col-span-2 xl:col-span-6"><span className="sol-filter-label">Observação de abertura</span><input className="input w-full" maxLength={4000} placeholder="Opcional" value={abrirForm.observacoes} onChange={(event) => setAbrirForm((current) => ({ ...current, observacoes: event.target.value }))} /></label>
-            <div className="flex flex-wrap justify-end gap-2 sm:col-span-2 xl:col-span-2">{!caixaFisico ? <button type="button" className="btn btn-secondary" onClick={handleConfirmarOfx} disabled={saving}>Confirmar OFX</button> : null}<button type="submit" className="btn btn-primary" disabled={saving}>Abrir caixa</button></div>
+            {/* D3: os dois pesos visíveis — "Abrir caixa" é a primária sólida,
+                "Confirmar OFX" a secundária em contorno. */}
+            <div className="flex flex-wrap justify-end gap-2 sm:col-span-2 xl:col-span-2">{!caixaFisico ? <button type="button" className="btn btn-outline" onClick={handleConfirmarOfx} disabled={saving}>Confirmar OFX</button> : null}<button type="submit" className="btn btn-primary" disabled={saving}>Abrir caixa</button></div>
           </form>
-        </section>
+        </BlocoConteudo>
       ) : null}
 
       {sessaoAberta ? <>
-        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0"><h2 className="text-base font-semibold text-[var(--c-text)]">Movimento do caixa · {formatDate(sessaoAberta.data_abertura)}</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Resumo financeiro da sessão aberta.</p></div>
-            <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-semibold ${statusClass('ABERTO')}`}>ABERTO</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 xl:grid-cols-4 sm:p-4">
-            <Metric icon={HiOutlineBanknotes} label="Saldo de abertura" value={formatCurrency(sessaoAberta.saldo_abertura)} />
-            <Metric icon={HiOutlineArrowDownCircle} label="Entradas" value={formatCurrency(resumo.total_entradas)} tone="positive" />
-            <Metric icon={HiOutlineArrowUpCircle} label="Saídas" value={formatCurrency(resumo.total_saidas)} tone="negative" />
-            <Metric icon={HiOutlineScale} label="Saldo no sistema" value={formatCurrency(saldoSistema)} tone={saldoSistema < 0 ? 'negative' : 'default'} hint={`${resumo.quantidade_movimentos || 0} movimento(s)`} />
-          </div>
-        </section>
+        <BlocoConteudo
+          titulo={`Movimento do caixa · ${formatDate(sessaoAberta.data_abertura)}`}
+          descricao="Resumo financeiro da sessão aberta."
+          acoes={<span className={statusClass('ABERTO')}>ABERTO</span>}
+        >
+          {/* M2/R10: o ladrilho do sistema no lugar do `Metric` local, que
+              escrevia medida e cor na tela. */}
+          <StatGrid colunas={4}>
+            <StatTile label="Saldo de abertura" valor={formatCurrency(sessaoAberta.saldo_abertura)} />
+            <StatTile label="Entradas" valor={formatCurrency(resumo.total_entradas)} tom="success" />
+            <StatTile label="Saídas" valor={formatCurrency(resumo.total_saidas)} tom="danger" />
+            <StatTile
+              label="Saldo no sistema"
+              valor={formatCurrency(saldoSistema)}
+              sub={`${resumo.quantidade_movimentos || 0} movimento(s)`}
+              tom={saldoSistema < 0 ? 'danger' : undefined}
+            />
+          </StatGrid>
+        </BlocoConteudo>
 
         {caixaFisico ? (
-          <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-            <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="text-base font-semibold text-[var(--c-text)]">Registrar entrada ou saída</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Use para dinheiro físico ainda não registrado por outro fluxo financeiro.</p></div>
-            <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
+          <BlocoConteudo
+            titulo="Registrar entrada ou saída"
+            descricao="Use para dinheiro físico ainda não registrado por outro fluxo financeiro."
+          >
+            <form className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleMovimento}>
+              {/* R12: select de FORMULÁRIO (entrada de dado do lançamento). */}
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Natureza *</span><select className="input mt-auto w-full" value={movimentoForm.natureza} onChange={(event) => setMovimentoForm((current) => ({ ...current, natureza: event.target.value }))}><option value="ENTRADA">Entrada</option><option value="SAIDA">Saída</option></select></label>
               <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data *</span><input className="input mt-auto w-full" type="date" value={movimentoForm.data_movimento} onChange={(event) => setMovimentoForm((current) => ({ ...current, data_movimento: event.target.value }))} required /></label>
-              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
+              <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Valor *</span><input className="input input-moeda mt-auto w-full" type="text" inputMode="decimal" value={movimentoForm.valor} onChange={(event) => setMovimentoForm((current) => ({ ...current, valor: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-3"><span className="sol-filter-label">Descrição *</span><input className="input mt-auto w-full" minLength={3} maxLength={4000} placeholder="Ex.: compra emergencial de material" value={movimentoForm.descricao} onChange={(event) => setMovimentoForm((current) => ({ ...current, descricao: event.target.value }))} required /></label>
               <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-2"><span className="sol-filter-label">Documento / referência</span><input className="input mt-auto w-full" maxLength={120} placeholder="Recibo, NF ou controle" value={movimentoForm.documento_referencia} onChange={(event) => setMovimentoForm((current) => ({ ...current, documento_referencia: event.target.value }))} /></label>
               <div className="flex items-center justify-end sm:col-span-2 xl:col-span-1">
-                <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Registrar entrada ou saída" title="Registrar entrada ou saída">
-                  <HiOutlinePlus className="h-5 w-5" />
+                <button type="submit" className="btn btn-primary" disabled={saving} title="Registrar entrada ou saída">
+                  <HiOutlinePlus className="h-4 w-4" aria-hidden="true" />
+                  Registrar
                 </button>
               </div>
             </form>
-          </section>
+          </BlocoConteudo>
         ) : null}
 
-        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="text-base font-semibold text-[var(--c-text)]">Livro do caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Entradas, saídas e transferências da sessão.</p></div><span className="shrink-0 rounded-full bg-[var(--c-soft)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">{movimentos.length} registro(s)</span></div>
+        <BlocoConteudo
+          titulo="Livro do caixa"
+          contagem={`${movimentos.length} registro(s)`}
+          descricao="Entradas, saídas e transferências da sessão."
+        >
           <TabelaPadrao
             colunas={[
               { id: 'data', titulo: 'Data', tipo: 'data', render: (movimento) => formatDate(movimento.data) },
@@ -431,7 +483,7 @@ export default function FinanceiroCaixas() {
                 titulo: 'Natureza',
                 tipo: 'badge',
                 render: (movimento) => (
-                  <span className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${movimento.natureza === 'ENTRADA' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300'}`}>
+                  <span className={movimento.natureza === 'ENTRADA' ? 'badge badge-success' : 'badge badge-danger'}>
                     {movimento.natureza === 'ENTRADA' ? 'Entrada' : 'Saída'}
                   </span>
                 )
@@ -461,7 +513,7 @@ export default function FinanceiroCaixas() {
                 titulo: 'Valor',
                 tipo: 'valor',
                 render: (movimento) => (
-                  <span className={`font-semibold ${movimento.natureza === 'ENTRADA' ? 'text-emerald-600' : 'text-rose-600'}`}>
+                  <span className={`font-semibold ${movimento.natureza === 'ENTRADA' ? 'text-[var(--sem-success)]' : 'text-[var(--sem-danger)]'}`}>
                     {movimento.natureza === 'ENTRADA' ? '+' : '-'}{formatCurrency(movimento.valor)}
                   </span>
                 )
@@ -474,44 +526,59 @@ export default function FinanceiroCaixas() {
             rotuloRolagem="Livro do caixa"
             larguraAcoes={140}
             acoesLinha={(movimento) => (movimento.estornavel
-              ? <button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button>
+              // D3/C5: a destrutiva fica visível, em vermelho suave e apartada.
+              ? <button type="button" className="btn btn-outline btn-perigo-suave btn-sm" onClick={() => setEstorno({ movimento, motivo: '' })}>Estornar</button>
               : <span className="text-[var(--c-muted)]">-</span>)}
           />
-        </section>
+        </BlocoConteudo>
 
-        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-          <div className="border-b border-[var(--c-border)] px-4 py-3"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineCheckCircle className="h-5 w-5 text-[var(--c-primary)]" /> Conferir e fechar caixa</h2><p className="mt-1 text-sm text-[var(--c-muted)]">{caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.</p></div>
-          <form className="grid items-stretch gap-3 p-4 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
+        <BlocoConteudo
+          titulo="Conferir e fechar caixa"
+          descricao={`${caixaFisico ? 'Conte o dinheiro físico e informe o saldo encontrado.' : 'Confira o saldo operacional e informe o valor apurado.'} Divergências ficam registradas com justificativa.`}
+        >
+          <form className="grid items-stretch gap-3 sm:grid-cols-2 xl:grid-cols-12" onSubmit={handleFechar}>
             <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Data de fechamento *</span><input className="input mt-auto w-full" type="date" min={dataMinimaFechamento} value={fecharForm.data_fechamento} onChange={(event) => setFecharForm((current) => ({ ...current, data_fechamento: event.target.value }))} required /></label>
-            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
-            <div className={`flex h-full min-h-[88px] flex-col justify-center rounded-xl border px-3 py-2 xl:col-span-2 ${Math.abs(diferencaFechamento) > 0.009 ? 'border-amber-300 bg-amber-50 dark:border-amber-900/60 dark:bg-amber-950/30' : 'border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30'}`}><span className="block text-[11px] font-semibold uppercase text-[var(--c-muted)]">Diferença</span><strong className={Math.abs(diferencaFechamento) > 0.009 ? 'text-amber-700 dark:text-amber-300' : 'text-emerald-700 dark:text-emerald-300'}>{formatCurrency(diferencaFechamento)}</strong></div>
-            <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {Math.abs(diferencaFechamento) > 0.009 ? '*' : ''}</span><input className="input mt-auto w-full" minLength={Math.abs(diferencaFechamento) > 0.009 ? 10 : undefined} maxLength={4000} placeholder={Math.abs(diferencaFechamento) > 0.009 ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={Math.abs(diferencaFechamento) > 0.009} /></label>
+            <label className="sol-filter-field h-full xl:col-span-2"><span className="sol-filter-label">Saldo contado *</span><input className="input input-moeda mt-auto w-full" type="text" inputMode="decimal" value={fecharForm.saldo_informado} onChange={(event) => setFecharForm((current) => ({ ...current, saldo_informado: normalizeCurrencyTyping(event.target.value) }))} placeholder="R$ 0,00" required /></label>
+            <div className="xl:col-span-2">
+              <StatTile
+                label="Diferença"
+                valor={formatCurrency(diferencaFechamento)}
+                tom={diferencaRelevante ? 'warning' : 'success'}
+                full
+              />
+            </div>
+            <label className="sol-filter-field h-full sm:col-span-2 xl:col-span-4"><span className="sol-filter-label">Justificativa {diferencaRelevante ? '*' : ''}</span><input className="input mt-auto w-full" minLength={diferencaRelevante ? 10 : undefined} maxLength={4000} placeholder={diferencaRelevante ? 'Obrigatória para divergência' : 'Observação opcional'} value={fecharForm.observacoes} onChange={(event) => setFecharForm((current) => ({ ...current, observacoes: event.target.value }))} required={diferencaRelevante} /></label>
             <div className="flex items-center justify-end sm:col-span-2 xl:col-span-2">
-              <button type="submit" className="btn btn-primary btn-icon-only" disabled={saving} aria-label="Fechar caixa" title="Fechar caixa">
-                <HiOutlineLockClosed className="h-5 w-5" />
+              <button type="submit" className="btn btn-primary" disabled={saving} title="Fechar caixa">
+                <HiOutlineLockClosed className="h-4 w-4" aria-hidden="true" />
+                Fechar caixa
               </button>
             </div>
           </form>
-        </section>
+        </BlocoConteudo>
       </> : null}
 
       {contaSelecionada ? (
-        <section className="mt-4 overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] shadow-sm">
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3"><div className="min-w-0"><h2 className="flex items-center gap-2 text-base font-semibold text-[var(--c-text)]"><HiOutlineClock className="h-5 w-5" /> Histórico de fechamentos</h2><p className="mt-1 text-sm text-[var(--c-muted)]">Conferências anteriores da conta selecionada.</p></div><span className="shrink-0 text-xs text-[var(--c-muted)]">{sessoesFechadas.length} fechamento(s)</span></div>
+        <BlocoConteudo
+          titulo="Histórico de fechamentos"
+          contagem={`${sessoesFechadas.length} fechamento(s)`}
+          descricao="Conferências anteriores da conta selecionada."
+          recolhivel
+        >
           <TabelaPadrao
             colunas={[
               { id: 'abertura', titulo: 'Abertura', tipo: 'data', render: (sessao) => formatDate(sessao.data_abertura) },
               { id: 'fechamento', titulo: 'Fechamento', tipo: 'data', render: (sessao) => formatDate(sessao.data_fechamento) },
               { id: 'saldo_inicial', titulo: 'Saldo inicial', tipo: 'valor', render: (sessao) => formatCurrency(sessao.saldo_abertura) },
-              { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (sessao) => <span className="text-emerald-600">{formatCurrency(sessao.total_entradas)}</span> },
-              { id: 'saidas', titulo: 'Saídas', tipo: 'valor', render: (sessao) => <span className="text-rose-600">{formatCurrency(sessao.total_saidas)}</span> },
+              { id: 'entradas', titulo: 'Entradas', tipo: 'valor', render: (sessao) => <span className="text-[var(--sem-success)]">{formatCurrency(sessao.total_entradas)}</span> },
+              { id: 'saidas', titulo: 'Saídas', tipo: 'valor', render: (sessao) => <span className="text-[var(--sem-danger)]">{formatCurrency(sessao.total_saidas)}</span> },
               { id: 'saldo_contado', titulo: 'Saldo contado', tipo: 'valor', render: (sessao) => <span className="font-semibold">{formatCurrency(sessao.saldo_informado)}</span> },
               {
                 id: 'diferenca',
                 titulo: 'Diferença',
                 tipo: 'valor',
                 render: (sessao) => (
-                  <span className={`font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                  <span className={`font-semibold ${Math.abs(Number(sessao.diferenca || 0)) > 0.009 ? 'text-[var(--sem-warning)]' : 'text-[var(--sem-success)]'}`}>
                     {formatCurrency(sessao.diferenca)}
                   </span>
                 )
@@ -530,12 +597,65 @@ export default function FinanceiroCaixas() {
             storageKey="tabela:financeiro-caixas:fechamentos"
             rotuloRolagem="Histórico de fechamentos"
           />
-        </section>
+        </BlocoConteudo>
       ) : null}
 
-      {loading ? <div className="mt-4 rounded-2xl border border-[var(--c-border)] bg-[var(--c-card)] px-4 py-8 text-center text-sm text-[var(--c-muted)]">Carregando controle de caixa...</div> : null}
+      {loading ? (
+        <BlocoConteudo titulo="Carregando controle de caixa">
+          <p className="text-sm text-[var(--c-muted)]">Buscando a sessão e os movimentos da conta selecionada...</p>
+        </BlocoConteudo>
+      ) : null}
 
-      {estorno.movimento ? <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/55 p-4" role="dialog" aria-modal="true" aria-labelledby="estorno-caixa-title"><form className="isolate w-full max-w-lg overflow-hidden rounded-2xl border border-[var(--c-border)] bg-[var(--modal-bg)] text-[var(--c-text)] shadow-2xl" onSubmit={handleEstornar}><div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4"><div><h2 id="estorno-caixa-title" className="text-base font-semibold text-[var(--c-text)]">Estornar movimento</h2><p className="mt-1 text-sm text-[var(--c-muted)]">O registro será preservado e marcado como estornado na auditoria.</p></div><button type="button" className="btn btn-secondary btn-sm" onClick={() => setEstorno({ movimento: null, motivo: '' })} aria-label="Fechar"><HiOutlineXMark className="h-5 w-5" /></button></div><div className="space-y-3 p-4"><div className="rounded-xl border border-[var(--c-border)] bg-[var(--c-soft)] p-3 text-sm"><strong className="block text-[var(--c-text)]">{estorno.movimento.descricao}</strong><span className="text-[var(--c-muted)]">{formatDate(estorno.movimento.data)} · {formatCurrency(estorno.movimento.valor)}</span></div><label className="sol-filter-field"><span className="sol-filter-label">Motivo do estorno *</span><textarea className="input min-h-24 w-full" minLength={10} maxLength={4000} value={estorno.motivo} onChange={(event) => setEstorno((current) => ({ ...current, motivo: event.target.value }))} placeholder="Explique o motivo com pelo menos 10 caracteres" required /></label></div><div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4"><button type="button" className="btn btn-secondary" onClick={() => setEstorno({ movimento: null, motivo: '' })}>Cancelar</button><button type="submit" className="btn btn-primary" disabled={saving}>Confirmar estorno</button></div></form></div> : null}
-    </div>
+      {/*
+        ESTORNO — continua um FORMULÁRIO em modal, não um `useConfirmacao`,
+        e a razão é deliberada: o `campo` do hook só sabe "obrigatório", e
+        aqui o motivo tem PISO DE 10 CARACTERES (`minLength={10}`), que é
+        regra de auditoria de dinheiro. Trocar pelo hook hoje perderia essa
+        validação em silêncio — exatamente a classe de defeito que a R21
+        registra sobre mudar contrato de componente no meio da leva.
+        Fica registrado como decisão do cliente (item 5 do relatório).
+
+        O que mudou: a casca virou a do sistema (`OverlayModal`), no lugar
+        do overlay à mão com `bg-slate-950/55`, e o texto passou a declarar
+        que a operação não se desfaz.
+      */}
+      {estorno.movimento ? (
+        <OverlayModal
+          rotulo="Estornar movimento"
+          largura="var(--modal-max-w-md, 640px)"
+          onFechar={() => setEstorno({ movimento: null, motivo: '' })}
+        >
+          <form className="flex min-h-0 flex-col" onSubmit={handleEstornar}>
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--c-border)] p-4">
+              <div>
+                <h2 className="app-confirmacao-titulo">Estornar movimento</h2>
+                <p className="text-sm text-[var(--c-muted)]">
+                  O registro será preservado e marcado como estornado na auditoria. O estorno não pode ser desfeito por esta tela.
+                </p>
+              </div>
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setEstorno({ movimento: null, motivo: '' })} aria-label="Fechar">
+                <HiOutlineXMark className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="min-h-0 space-y-3 overflow-y-auto p-4">
+              {/* Consentimento: o movimento descrito aqui é o MESMO que
+                  `handleEstornar` envia (`estorno.movimento.id`). */}
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface-soft)] p-3 text-sm">
+                <strong className="block text-[var(--c-text)]">{estorno.movimento.descricao}</strong>
+                <span className="text-[var(--c-muted)]">{formatDate(estorno.movimento.data)} · {formatCurrency(estorno.movimento.valor)}</span>
+              </div>
+              <label className="sol-filter-field">
+                <span className="sol-filter-label">Motivo do estorno *</span>
+                <textarea className="input min-h-24 w-full" minLength={10} maxLength={4000} value={estorno.motivo} onChange={(event) => setEstorno((current) => ({ ...current, motivo: event.target.value }))} placeholder="Explique o motivo com pelo menos 10 caracteres" required />
+              </label>
+            </div>
+            <div className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4">
+              <button type="button" className="btn btn-outline" onClick={() => setEstorno({ movimento: null, motivo: '' })}>Cancelar</button>
+              <button type="submit" className="btn btn-outline btn-perigo-suave" disabled={saving}>Confirmar estorno</button>
+            </div>
+          </form>
+        </OverlayModal>
+      ) : null}
+    </Pagina>
   );
 }

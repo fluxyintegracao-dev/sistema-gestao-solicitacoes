@@ -16,7 +16,19 @@ import {
 } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
-import { TabelaPadrao } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  StatGrid,
+  StatTile,
+  Paginacao,
+  TabelaPadrao,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 
 const DEFAULT_FILTERS = {
   tipo: '',
@@ -50,13 +62,6 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function statusClass(status) {
-  const normalized = String(status || '').toUpperCase();
-  if (normalized === 'ATIVO') return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (normalized === 'ESTORNADO') return 'app-status-pill bg-rose-100 text-rose-700';
-  return 'app-status-pill bg-slate-100 text-slate-700';
-}
-
 function csvEscape(value) {
   const text = value == null ? '' : String(value);
   if (/[",\n;]/.test(text)) {
@@ -88,11 +93,17 @@ export default function FinanceiroBaixas() {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [error, setError] = useState('');
-  const [actionMessage, setActionMessage] = useState('');
   const [processingId, setProcessingId] = useState(null);
   const [pageSize, setPageSize] = useState(25);
   const [currentPage, setCurrentPage] = useState(1);
+  /*
+    R19/R3 — `error` e `actionMessage` eram dois cartões montados à mão (um
+    deles com paleta crua `emerald`, que a R25 reprova). Viraram a faixa de
+    aviso do sistema: um dono só para "algo aconteceu agora" (R16), com tom
+    semântico, fechável, e o sucesso sumindo sozinho em 6s.
+  */
+  const { avisos, avisar, fechar: fecharAviso } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   useEffect(() => {
     let active = true;
@@ -123,7 +134,6 @@ export default function FinanceiroBaixas() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    setError('');
 
     getBaixasFinanceiras(compact(appliedFilters))
       .then((data) => {
@@ -132,7 +142,7 @@ export default function FinanceiroBaixas() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || 'Erro ao carregar baixas financeiras');
+        avisar.erro(err?.message || 'Erro ao carregar baixas financeiras');
         setBaixas([]);
       })
       .finally(() => {
@@ -165,8 +175,6 @@ export default function FinanceiroBaixas() {
 
   const totalPages = Math.max(1, Math.ceil(baixas.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const visibleStart = baixas.length === 0 ? 0 : ((safeCurrentPage - 1) * pageSize) + 1;
-  const visibleEnd = Math.min(safeCurrentPage * pageSize, baixas.length);
 
   const baixasPaginadas = useMemo(() => {
     const start = (safeCurrentPage - 1) * pageSize;
@@ -188,14 +196,12 @@ export default function FinanceiroBaixas() {
 
   function aplicarFiltros(event) {
     event.preventDefault();
-    setActionMessage('');
     setAppliedFilters({ ...filters });
   }
 
   function limparFiltros() {
     setFilters(DEFAULT_FILTERS);
     setAppliedFilters(DEFAULT_FILTERS);
-    setActionMessage('');
   }
 
   async function estornarBaixa(baixa) {
@@ -203,25 +209,44 @@ export default function FinanceiroBaixas() {
       return;
     }
 
-    const observacoes = window.prompt(
-      'Informe o motivo do estorno. A baixa nao sera apagada; ela ficara estornada para auditoria.'
-    );
-    if (observacoes == null) {
-      return;
-    }
+    /*
+      R19/R3 — a justificativa vinha de um `window.prompt` do navegador, que
+      ignora tema e tokens, não existe no DOM e some sem rastro. Agora é o
+      `campo` da confirmação do sistema, num passo só.
+
+      R21 — o retorno se DESESTRUTURA: `confirmar()` devolve { ok, texto } e
+      objeto é SEMPRE truthy. Ler como booleano faria "Cancelar" estornar a
+      baixa — foi exatamente esse o defeito de 03/09 no estorno de título.
+
+      FAMÍLIA D / consentimento — a mensagem fala da baixa do título
+      `baixa.titulo?.codigo`, no valor `baixa.valor_quitacao`, e a ação
+      percorre ESSE MESMO registro: `estornarMovimentoFinanceiro(baixa.titulo_financeiro_id, baixa.id, …)`.
+      `baixa` é o argumento da função, fixado na chamada da linha e imutável
+      durante o `await` — não há coleção paralela nem releitura de estado.
+
+      O campo NÃO é obrigatório de propósito: o `prompt` aceitava texto vazio
+      e o serviço recebia a justificativa padrão. Tornar obrigatório mudaria o
+      payload possível, e payload é decisão do cliente, não do layout.
+    */
+    const { ok, texto } = await confirmar({
+      titulo: 'Estornar esta baixa?',
+      mensagem: `A baixa de ${formatCurrency(baixa.valor_quitacao)} no título ${baixa.titulo?.codigo || `#${baixa.titulo_financeiro_id}`} será estornada e o saldo volta a ficar em aberto. A baixa não é apagada: fica registrada como estornada para auditoria. Esta ação não pode ser desfeita — para voltar atrás é preciso lançar uma nova baixa.`,
+      rotuloConfirmar: 'Estornar baixa',
+      destrutiva: true,
+      campo: { rotulo: 'Motivo do estorno', multilinha: true }
+    });
+    if (!ok) return;
 
     try {
       setProcessingId(baixa.id);
-      setError('');
-      setActionMessage('');
       await estornarMovimentoFinanceiro(baixa.titulo_financeiro_id, baixa.id, {
-        observacoes: observacoes || 'Estorno realizado pela tela de baixas.'
+        observacoes: texto || 'Estorno realizado pela tela de baixas.'
       });
-      setActionMessage('Baixa estornada. O titulo ja pode receber nova baixa conforme saldo atualizado.');
+      avisar.sucesso('Baixa estornada. O titulo ja pode receber nova baixa conforme saldo atualizado.');
       const data = await getBaixasFinanceiras(compact(appliedFilters));
       setBaixas(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err?.message || 'Erro ao estornar baixa financeira');
+      avisar.erro(err?.message || 'Erro ao estornar baixa financeira');
     } finally {
       setProcessingId(null);
     }
@@ -268,156 +293,141 @@ export default function FinanceiroBaixas() {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header-row">
-        <div>
-          <h1 className="page-title">Baixas Realizadas</h1>
-          <p className="page-subtitle">Consulte movimentos baixados e estorne uma baixa para corrigir conta, juros, multa ou valor.</p>
-        </div>
-        <div className="app-page-actions">
-          <button type="button" className="btn btn-outline btn-sm" onClick={exportarBaixas} disabled={loading || baixas.length === 0}>
-            <HiOutlineArrowDownTray className="h-4 w-4" />
-            Exportar
-          </button>
-          <Link to="/financeiro/titulos" className="btn btn-outline btn-sm">Titulos</Link>
-          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">Relatorios</Link>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        R13/C1/C2 — o título e o apoio ficavam numa linha solta que rolava
+        para fora da tela; agora moram na faixa fixa do sistema, com o apoio
+        em UMA linha (R5) e a contagem do recorte junto dela.
 
-      <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
-          <label className="app-filter-field xl:col-span-2">
-            <span className="app-filter-label">Tipo</span>
-            <select className="input w-full input-sm" value={filters.tipo} onChange={(event) => setFilter('tipo', event.target.value)}>
-              <option value="">Todos</option>
-              <option value="PAGAR">Pagar</option>
-              <option value="RECEBER">Receber</option>
-            </select>
-          </label>
-          <label className="app-filter-field xl:col-span-2">
-            <span className="app-filter-label">Status baixa</span>
-            <select className="input w-full input-sm" value={filters.status_movimento} onChange={(event) => setFilter('status_movimento', event.target.value)}>
-              <option value="ATIVO">Ativas</option>
-              <option value="ESTORNADO">Estornadas</option>
-              <option value="TODOS">Todas</option>
-            </select>
-          </label>
-          <label className="app-filter-field xl:col-span-4">
-            <span className="app-filter-label">Busca</span>
-            <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Titulo, parceiro, documento ou obra" />
-          </label>
-          <label className="app-filter-field xl:col-span-2">
-            <span className="app-filter-label">Data inicial</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
-          </label>
-          <label className="app-filter-field xl:col-span-2">
-            <span className="app-filter-label">Data final</span>
-            <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
-          </label>
-          <label className="app-filter-field xl:col-span-3">
-            <span className="app-filter-label">Obra</span>
-            <select className="input w-full input-sm" value={filters.obra_id} onChange={(event) => setFilter('obra_id', event.target.value)} disabled={loadingOptions}>
-              <option value="">Todas</option>
-              {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
-            </select>
-          </label>
-          <label className="app-filter-field xl:col-span-3">
-            <span className="app-filter-label">Parceiro</span>
-            <select className="input w-full input-sm" value={filters.parceiro_id} onChange={(event) => setFilter('parceiro_id', event.target.value)} disabled={loadingOptions}>
-              <option value="">Todos</option>
-              {parceiros.map((parceiro) => <option key={parceiro.id} value={parceiro.id}>{parceiro.nome}</option>)}
-            </select>
-          </label>
-          <label className="app-filter-field xl:col-span-3">
-            <span className="app-filter-label">Categoria</span>
-            <select className="input w-full input-sm" value={filters.categoria_financeira_id} onChange={(event) => setFilter('categoria_financeira_id', event.target.value)} disabled={loadingOptions}>
-              <option value="">Todas</option>
-              {categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}
-            </select>
-          </label>
-          <label className="app-filter-field xl:col-span-3">
-            <span className="app-filter-label">Conta bancaria</span>
-            <select className="input w-full input-sm" value={filters.conta_bancaria_id} onChange={(event) => setFilter('conta_bancaria_id', event.target.value)} disabled={loadingOptions}>
-              <option value="">Todas</option>
-              {contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nome}</option>)}
-            </select>
-          </label>
-        </div>
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--c-border)] pt-3">
-          <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>
-            <HiOutlineXMark className="h-4 w-4" />
-            Limpar
-          </button>
-          <button type="submit" className="btn btn-primary btn-sm">
-            <HiOutlineMagnifyingGlass className="h-4 w-4" />
-            Consultar
-          </button>
-        </div>
-      </form>
+        R11/C6 — saíram daqui os dois links de "ir para" (Titulos,
+        Relatorios): navegação não é ação, e o menu, o breadcrumb e o Ctrl+K
+        já levam a essas telas. É a remoção que a própria R11 autoriza pelo
+        exemplo do "⋯" de Parceiros, e o mesmo recorte que a FinanceiroTitulos
+        fez com os quatro links dela. O caminho para o título CONTINUA na
+        tela: cada linha tem o link do código e o botão "Abrir titulo".
+      */}
+      <PageHeader
+        titulo="Baixas Realizadas"
+        contagem={loading ? null : `${baixas.length} baixa(s)`}
+        descricao="Consulte movimentos baixados e estorne uma baixa para corrigir conta, juros, multa ou valor."
+        acaoPrincipal={{
+          rotulo: 'Exportar',
+          onClick: exportarBaixas,
+          desabilitada: loading || baixas.length === 0,
+          icone: <HiOutlineArrowDownTray className="h-4 w-4" />,
+          title: 'Exportar em CSV as baixas do recorte atual'
+        }}
+      />
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <div className="card sol-surface-card">
-          <span className="app-summary-label">Baixas</span>
-          <strong className="app-summary-value">{resumo.quantidade}</strong>
-        </div>
-        <div className="card sol-surface-card">
-          <span className="app-summary-label">Valor base</span>
-          <strong className="app-summary-value">{formatCurrency(resumo.valor)}</strong>
-        </div>
-        <div className="card sol-surface-card">
-          <span className="app-summary-label">Valor quitacao</span>
-          <strong className="app-summary-value">{formatCurrency(resumo.valor_quitacao)}</strong>
-        </div>
-        <div className="card sol-surface-card">
-          <span className="app-summary-label">Estornadas</span>
-          <strong className="app-summary-value">{resumo.estornadas}</strong>
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
-      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
-      {actionMessage ? <div className="app-alert border border-emerald-200 bg-emerald-50 text-emerald-800">{actionMessage}</div> : null}
-
-      <section className="card sol-surface-card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--c-text)]">Movimentos de baixa</h2>
-            <p className="text-xs text-[var(--c-muted)]">Estornar libera o titulo para nova baixa, mantendo historico e auditoria.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--c-muted)]">
-            <span className="whitespace-nowrap">
-              {loading ? 'Carregando...' : `Exibindo ${visibleStart}-${visibleEnd} de ${baixas.length}`}
-            </span>
-            <label className="flex items-center gap-2 whitespace-nowrap">
-              <span>Por pagina</span>
-              <select
-                className="input input-sm h-9 w-20"
-                value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value))}
-              >
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>{option}</option>
-                ))}
+      {/*
+        R23 — EXCEÇÃO DECLARADA (consulta cara). São NOVE dimensões de
+        recorte (tipo, status, busca, duas datas, obra, parceiro, categoria e
+        conta) que o usuário combina, muito acima do teto de 3 requisições da
+        regra: aplicar a cada marca dispararia uma consulta por marca sobre a
+        carteira inteira. Por isso as marcas ficam em RASCUNHO e o recorte só
+        vale no clique — o botão diz o que faz ("Consultar") e o apoio do
+        bloco avisa que a lista só muda ali.
+      */}
+      <BlocoConteudo
+        titulo="Consulta de baixas"
+        variante="secundario"
+        descricao="Os filtros abaixo são rascunho: a lista só muda quando você clicar em Consultar."
+      >
+        <form onSubmit={aplicarFiltros}>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
+            <label className="app-filter-field xl:col-span-2">
+              <span className="app-filter-label">Tipo</span>
+              <select className="input w-full input-sm" value={filters.tipo} onChange={(event) => setFilter('tipo', event.target.value)}>
+                <option value="">Todos</option>
+                <option value="PAGAR">Pagar</option>
+                <option value="RECEBER">Receber</option>
               </select>
             </label>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-              disabled={loading || safeCurrentPage <= 1}
-            >
-              Anterior
+            <label className="app-filter-field xl:col-span-2">
+              <span className="app-filter-label">Status baixa</span>
+              <select className="input w-full input-sm" value={filters.status_movimento} onChange={(event) => setFilter('status_movimento', event.target.value)}>
+                <option value="ATIVO">Ativas</option>
+                <option value="ESTORNADO">Estornadas</option>
+                <option value="TODOS">Todas</option>
+              </select>
+            </label>
+            <label className="app-filter-field xl:col-span-4">
+              <span className="app-filter-label">Busca</span>
+              <input className="input w-full input-sm" value={filters.q} onChange={(event) => setFilter('q', event.target.value)} placeholder="Titulo, parceiro, documento ou obra" />
+            </label>
+            <label className="app-filter-field xl:col-span-2">
+              <span className="app-filter-label">Data inicial</span>
+              <input className="input w-full input-sm" type="date" value={filters.data_inicial} onChange={(event) => setFilter('data_inicial', event.target.value)} />
+            </label>
+            <label className="app-filter-field xl:col-span-2">
+              <span className="app-filter-label">Data final</span>
+              <input className="input w-full input-sm" type="date" value={filters.data_final} onChange={(event) => setFilter('data_final', event.target.value)} />
+            </label>
+            <label className="app-filter-field xl:col-span-3">
+              <span className="app-filter-label">Obra</span>
+              <select className="input w-full input-sm" value={filters.obra_id} onChange={(event) => setFilter('obra_id', event.target.value)} disabled={loadingOptions}>
+                <option value="">Todas</option>
+                {obras.map((obra) => <option key={obra.id} value={obra.id}>{obra.nome}</option>)}
+              </select>
+            </label>
+            <label className="app-filter-field xl:col-span-3">
+              <span className="app-filter-label">Parceiro</span>
+              <select className="input w-full input-sm" value={filters.parceiro_id} onChange={(event) => setFilter('parceiro_id', event.target.value)} disabled={loadingOptions}>
+                <option value="">Todos</option>
+                {parceiros.map((parceiro) => <option key={parceiro.id} value={parceiro.id}>{parceiro.nome}</option>)}
+              </select>
+            </label>
+            <label className="app-filter-field xl:col-span-3">
+              <span className="app-filter-label">Categoria</span>
+              <select className="input w-full input-sm" value={filters.categoria_financeira_id} onChange={(event) => setFilter('categoria_financeira_id', event.target.value)} disabled={loadingOptions}>
+                <option value="">Todas</option>
+                {categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nome}</option>)}
+              </select>
+            </label>
+            <label className="app-filter-field xl:col-span-3">
+              <span className="app-filter-label">Conta bancaria</span>
+              <select className="input w-full input-sm" value={filters.conta_bancaria_id} onChange={(event) => setFilter('conta_bancaria_id', event.target.value)} disabled={loadingOptions}>
+                <option value="">Todas</option>
+                {contas.map((conta) => <option key={conta.id} value={conta.id}>{conta.nome}</option>)}
+              </select>
+            </label>
+          </div>
+          {/* D3/C5 — os três pesos, todos visíveis: o primário sólido é o que
+              faz a consulta valer; "Limpar" é secundário em contorno. */}
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--c-border)] pt-3">
+            <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>
+              <HiOutlineXMark className="h-4 w-4" />
+              Limpar
             </button>
-            <span className="min-w-12 text-center tabular-nums text-[var(--c-text)]">{safeCurrentPage}/{totalPages}</span>
-            <button
-              type="button"
-              className="btn btn-outline btn-sm"
-              onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
-              disabled={loading || safeCurrentPage >= totalPages}
-            >
-              Proxima
+            <button type="submit" className="btn btn-primary btn-sm">
+              <HiOutlineMagnifyingGlass className="h-4 w-4" />
+              Consultar
             </button>
           </div>
-        </div>
+        </form>
+      </BlocoConteudo>
+
+      {/*
+        StatGrid/StatTile (M2/R10): o ladrilho do sistema no lugar dos quatro
+        cartões montados à mão. B3 — o primeiro ladrilho conta a PÁGINA e traz
+        o total do recorte como apoio; a contagem do recorte na faixa fixa é a
+        outra função, não a mesma repetida.
+      */}
+      <StatGrid colunas={4}>
+        <StatTile label="Baixas nesta pagina" valor={String(baixasPaginadas.length)} sub={`${resumo.quantidade} no recorte`} />
+        <StatTile label="Valor base do recorte" valor={formatCurrency(resumo.valor)} />
+        <StatTile label="Valor quitacao do recorte" valor={formatCurrency(resumo.valor_quitacao)} />
+        <StatTile label="Estornadas no recorte" valor={String(resumo.estornadas)} tom={resumo.estornadas ? 'warning' : undefined} />
+      </StatGrid>
+
+      <BlocoConteudo
+        titulo="Movimentos de baixa"
+        variante="primario"
+        cor="var(--module-financeiro)"
+        descricao="Estornar libera o titulo para nova baixa, mantendo historico e auditoria."
+      >
         <TabelaPadrao
           colunas={[
             { id: 'data', titulo: 'Data', tipo: 'data', render: (baixa) => formatDate(baixa.data_movimento) },
@@ -452,7 +462,10 @@ export default function FinanceiroBaixas() {
             { id: 'conta', titulo: 'Conta', tipo: 'texto', render: (baixa) => baixa.contaBancaria?.nome || '-' },
             { id: 'valor', titulo: 'Valor', tipo: 'valor', render: (baixa) => formatCurrency(baixa.valor) },
             { id: 'quitacao', titulo: 'Quitacao', tipo: 'valor', render: (baixa) => formatCurrency(baixa.valor_quitacao) },
-            { id: 'status', titulo: 'Status', tipo: 'status', render: (baixa) => <span className={statusClass(baixa.status)}>{baixa.status}</span> }
+            // R25: a pastilha de paleta crua (emerald/rose/slate) virou o
+            // StatusBadge do sistema — cor por token e ícone junto, porque
+            // cor sozinha não comunica.
+            { id: 'status', titulo: 'Status', tipo: 'status', render: (baixa) => <StatusBadge status={baixa.status} /> }
           ]}
           itens={loading ? [] : baixasPaginadas}
           carregando={loading}
@@ -467,7 +480,7 @@ export default function FinanceiroBaixas() {
               </Link>
               <button
                 type="button"
-                className="btn btn-outline btn-sm"
+                className="btn btn-outline btn-sm btn-perigo-suave"
                 onClick={() => estornarBaixa(baixa)}
                 disabled={processingId === baixa.id || String(baixa.status || '').toUpperCase() !== 'ATIVO'}
                 title="Estornar baixa"
@@ -477,7 +490,37 @@ export default function FinanceiroBaixas() {
             </>
           )}
         />
-      </section>
-    </div>
+        {/*
+          R16b — o rodapé de paginação montado à mão (dois botões, "3/12" que
+          não diz o total e um `select` com largura em número solto) deu lugar
+          ao `Paginacao` do sistema. O "por pagina" fica ao lado, porque é a
+          mesma decisão: quanto se lê de cada vez.
+        */}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border)] pt-3">
+          <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
+            <span>Por pagina</span>
+            <select
+              className="input input-sm"
+              value={pageSize}
+              onChange={(event) => setPageSize(Number(event.target.value))}
+              disabled={loading}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </label>
+          <Paginacao
+            pagina={safeCurrentPage}
+            totalPaginas={totalPages}
+            rotuloRegistro="baixa"
+            carregando={loading}
+            aoMudarPagina={(proxima) => setCurrentPage(proxima)}
+          />
+        </div>
+      </BlocoConteudo>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }
