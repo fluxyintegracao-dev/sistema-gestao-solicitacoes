@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Children, isValidElement, useEffect, useState } from 'react';
 import ModalPortal from './ModalPortal';
 
 /**
@@ -93,9 +93,58 @@ export default function OverlayModal({
             padding: 0
           }}
         >
-          {children}
+          {/*
+            CORPO QUE ROLA, CABEÇALHO E RODAPÉ FIXOS (04/09).
+
+            O painel tem teto de altura e `overflow: clip`, e NÃO dava
+            rolagem própria: conteúdo mais alto que o teto era **cortado em
+            silêncio** — e o que fica de fora é o rodapé, ou seja, o botão
+            que executa a ação. Modal que esconde o botão de confirmar é
+            pior que modal que não abre: parece funcional.
+
+            A responsabilidade era de cada chamador lembrar de pôr
+            `overflow-y: auto` no lugar certo, e nada verificava. São 22
+            telas usando este componente; basta uma esquecer.
+
+            Agora a estrutura é do componente: quem marcar um filho com
+            `data-modal="cabecalho"` ou `data-modal="rodape"` fica FIXO, e
+            todo o resto rola entre os dois. Sem marcação, o conteúdo
+            inteiro vira corpo rolante — que é o comportamento seguro e
+            resolve as 22 telas sem nenhuma delas mudar.
+          */}
+          <ModalCorpo>{children}</ModalCorpo>
         </div>
       </div>
     </ModalPortal>
+  );
+}
+
+/*
+  Separa os filhos marcados como cabeçalho/rodapé (que ficam fixos) do
+  resto (que rola). A marcação é `data-modal="cabecalho"` / `"rodape"` no
+  elemento — atributo, não prop, para não mudar o contrato de ninguém: quem
+  não marcar nada continua funcionando, com tudo rolando.
+*/
+function ModalCorpo({ children }) {
+  const filhos = Children.toArray(children);
+  const marca = (filho, valor) => isValidElement(filho)
+    && filho.props?.['data-modal'] === valor;
+
+  const cabecalho = filhos.filter((f) => marca(f, 'cabecalho'));
+  const rodape = filhos.filter((f) => marca(f, 'rodape'));
+  const corpo = filhos.filter((f) => !marca(f, 'cabecalho') && !marca(f, 'rodape'));
+
+  return (
+    <>
+      {cabecalho.length ? <div style={{ flex: '0 0 auto' }}>{cabecalho}</div> : null}
+      {/*
+        `minHeight: 0` é o que faz o filho de um flex column PODER encolher
+        abaixo do próprio conteúdo — sem ele o corpo empurra o rodapé para
+        fora do painel e a rolagem nunca acontece. É o mesmo motivo das
+        trilhas `minmax(0, 1fr)` que a ComunicacaoInterna precisou.
+      */}
+      <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto' }}>{corpo}</div>
+      {rodape.length ? <div style={{ flex: '0 0 auto' }}>{rodape}</div> : null}
+    </>
   );
 }

@@ -611,3 +611,28 @@ sem ninguém saber dizer por quê.
   abre esta janela onde antes não havia. **Trocar a caixa do navegador pelo
   componente não é só trocar a aparência: muda o modelo de concorrência da
   ação.**
+
+## R27 — Modal: corpo rola, cabeçalho e rodapé ficam (04/09)
+
+- **A regra**: o painel do modal tem teto de altura. O **conteúdo rola**; o
+  **cabeçalho e o rodapé ficam fixos**, e o botão que executa a ação está
+  sempre visível.
+- **O defeito que ela fecha**: o `OverlayModal` recortava com
+  `overflow: clip` e **não dava rolagem própria**. Conteúdo mais alto que o
+  teto era **cortado em silêncio** — e o que fica de fora é o rodapé, ou
+  seja, **o botão de confirmar**. Modal que esconde o botão de confirmar é
+  pior que modal que não abre: parece funcional.
+- **Onde a regra mora: no COMPONENTE, não na tela.** A responsabilidade era
+  de cada chamador lembrar de pôr `overflow-y: auto` no lugar certo, e nada
+  verificava. São **22 telas** usando o componente; bastava uma esquecer.
+  Agora a estrutura é dele: sem marcação nenhuma, todo o conteúdo vira corpo
+  rolante — o comportamento seguro — e as 22 telas ficam corretas sem mudar
+  uma linha.
+- **Quem precisa de cabeçalho ou rodapé fixo** marca o filho com
+  `data-modal="cabecalho"` ou `data-modal="rodape"`. É atributo, não prop:
+  não muda o contrato de ninguém.
+- **A armadilha técnica, registrada porque volta sempre**: `minHeight: 0` no
+  corpo é o que faz o filho de um flex column **poder encolher abaixo do
+  próprio conteúdo**. Sem ele o corpo empurra o rodapé para fora do painel e
+  a rolagem nunca acontece. É o mesmo motivo das trilhas `minmax(0, 1fr)`
+  que a ComunicacaoInterna precisou.
