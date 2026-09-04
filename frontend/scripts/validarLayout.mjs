@@ -28,6 +28,34 @@ const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 
   A promoção ao manifesto continua sendo do orquestrador, quando a tela
   fecha.
 */
+/*
+  UMA fonte de verdade para a lista de telas (04/09).
+
+  O `--extra` nasceu ontem e cobria SÓ a `validarLayout()`. As outras duas
+  varreduras — a R25 (cor fora de token) e a R18 em JSX — reliam o
+  manifesto DO DISCO por conta própria, então a tela passada por `--extra`
+  não existia para elas.
+
+  Consequência medida: o caminho que eu mandei os agentes usarem para não
+  mexer no manifesto compartilhado era exatamente o que NÃO MEDIA COR.
+  Plantei `text-slate-500` numa tela passada por `--extra`: zero achados,
+  exit 0. Na mesma tela dentro do manifesto, reprova nomeando a classe.
+
+  Foi um agente que achou, migrando 152 classes cruas que o check nunca
+  teria cobrado dele. Corrigir uma cegueira e criar outra no mesmo dia é o
+  argumento inteiro da prova de mordida: instrumento novo é tão suspeito
+  quanto instrumento velho.
+*/
+function lerTelasDoManifesto() {
+  const manifesto = JSON.parse(
+    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
+  );
+  for (const extra of telasExtraDaLinhaDeComando()) {
+    if (!manifesto.telas.includes(extra)) manifesto.telas.push(extra);
+  }
+  return manifesto;
+}
+
 export function telasExtraDaLinhaDeComando(argv = process.argv) {
   const extras = [];
   for (let i = 0; i < argv.length; i += 1) {
@@ -37,9 +65,7 @@ export function telasExtraDaLinhaDeComando(argv = process.argv) {
 }
 
 export function validarLayout() {
-  const manifesto = JSON.parse(
-    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
-  );
+  const manifesto = lerTelasDoManifesto();
   for (const extra of telasExtraDaLinhaDeComando()) {
     if (!manifesto.telas.includes(extra)) manifesto.telas.push(extra);
   }
@@ -267,9 +293,7 @@ function validarCoresForaDoToken() {
   // nomes errados e NUNCA RODOU — deu zero achado num arquivo com 35
   // classes cruas. Foi pega porque o resultado foi conferido contra dado
   // conhecido antes de ser aceito; sozinho, o zero parecia aprovação.
-  const manifesto = JSON.parse(
-    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
-  );
+  const manifesto = lerTelasDoManifesto();
   const classeCrua = new RegExp(`\\b(?:${PROPRIEDADES_DE_COR})-(?:${PALETAS_CRUAS})-\\d{2,3}\\b`, 'g');
   const arbitraria = new RegExp(`\\b(?:${PROPRIEDADES_DE_COR})-\\[(#[0-9a-fA-F]{3,8}|rgba?\\(|hsla?\\()`, 'g');
   const hexSolto = /#[0-9a-fA-F]{3}(?:[0-9a-fA-F]{3})?(?:[0-9a-fA-F]{2})?\b/g;
@@ -597,9 +621,7 @@ function validarDialogosDoNavegador() {
 */
 function validarOverflowEmJsx() {
   const falhas = [];
-  const manifesto = JSON.parse(
-    fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
-  );
+  const manifesto = lerTelasDoManifesto();
   for (const tela of manifesto.telas) {
     const caminho = path.join(frontendRoot, tela);
     if (!fs.existsSync(caminho)) continue;
