@@ -739,3 +739,45 @@ lugar onde duplicata custa mais caro.
 
 Rodada que descobre que não tem trabalho não é rodada perdida. É a única
 forma de não fazer o trabalho errado.
+
+## QUEM DECIDE O QUÊ, E O QUE NÃO PARA ESPERANDO (04/09)
+
+Regra de ritmo, definida pelo responsável depois da rodada 1. Ela não afrouxa
+nada da verificação — muda só quem responde perguntas que eu respondo melhor.
+
+### Decido sozinho, registro o motivo e sigo
+
+Tudo que é **reversível e não muda comportamento que o usuário percebe**:
+
+- abrir porta no hub, escolher onde um destino mora, nomear uma entrada;
+- remover rota duplicada **comprovadamente idêntica** (mesmo componente,
+  mesma permissão, mesmo parâmetro, e a tela não lê a rota);
+- escolher entre dois arranjos de layout equivalentes;
+- corrigir check e falso positivo.
+
+A decisão vai para o docs com o motivo, no mesmo movimento. Registro no docs
+não é formalidade: é o que separa "decidi" de "fiz sem pensar".
+
+### Paro e pergunto
+
+Quatro casos, e só eles:
+
+1. **remover capacidade ou elemento visível** — alguém pode estar usando;
+2. **mudar comportamento que o usuário percebe** — a tela passa a fazer
+   outra coisa;
+3. **decidir regra de negócio** — não é minha, nunca foi;
+4. **duas decisões anteriores do responsável se contradizem** — quem
+   resolve o conflito é quem criou as duas.
+
+### E não espero parado
+
+Pergunta que depende do responsável **não trava o resto**. Acumulo, sigo no
+que não depende dela, e trago as perguntas **em lote no fim da rodada** —
+não uma a uma, interrompendo.
+
+### O que a regra NÃO toca
+
+Matriz limpa antes de fechar rodada. Revisor separado. Conferir antes de
+afirmar. **Nada aqui é sobre ganhar tempo trocando verificação por
+velocidade** — é sobre não ficar parado esperando resposta para coisa que eu
+decido melhor.

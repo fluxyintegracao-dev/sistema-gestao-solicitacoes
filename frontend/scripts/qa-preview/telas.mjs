@@ -321,7 +321,12 @@ export const TELAS = [
   {
     id: 'relatorios-administrativos',
     arquivo: 'src/pages/RelatoriosAdministrativos.jsx',
-    rota: '/relatorios/administrativos',
+    // A rota mudou em 04/09. A /relatorios/administrativos era a segunda
+    // rota do MESMO componente, sem porta no menu, e saiu na consolidacao.
+    // O harness ficou apontando para ela — teria dado 404 na proxima matriz,
+    // e o pior: 404 e uma tela que carrega, entao os checks reprovariam por
+    // ausencia de elemento e eu iria procurar defeito onde nao ha.
+    rota: '/compras/relatorios/auditoria',
     tipo: 'listagem'
   },
   {
@@ -337,9 +342,12 @@ export const TELAS = [
   {
     id: 'config-contrato-alertas-formas',
     arquivo: 'src/pages/ConfiguracoesContratoAlertasEFormas.jsx',
-    // A rota do MENU. A irmã (/configuracoes-contrato-alertas) não tem
-    // entrada nenhuma na interface — registrado como E2 em
-    // docs/PENDENCIAS-REGISTRADAS.md.
+    // A rota do MENU, assunto "formas de pagamento". A irma
+    // (/configuracoes-contrato-alertas) ganhou porta propria em 04/09 e tem
+    // entrada SEPARADA nesta lista: a tela le o pathname e anuncia outro
+    // assunto — titulo, apoio e qual bloco recebe a barra de cor. Medir uma
+    // e declarar a outra coberta seria declarar sem medir justamente o que
+    // difere entre as duas.
     rota: '/configuracoes-formas-pagamento-solicitacao',
     tipo: 'form',
     naoAplica: {
@@ -348,6 +356,52 @@ export const TELAS = [
       F3: 'idem F1',
       F4: 'idem F1',
       C3: 'configuração de sistema, não é tela de detalhe de registro',
+      C4: 'idem C3'
+    }
+  },
+
+  /* =================================================================
+     BURACOS DE COBERTURA ACHADOS AO ABRIR A RODADA 2 (04/09)
+
+     As duas rotas abaixo renderizam componentes que o harness JA mede em
+     outra rota. Nao foram declaradas cobertas: foram medidas. O criterio e
+     o mesmo que ja custou caro aqui — declaracao conforta, medicao prova.
+     ================================================================= */
+
+  {
+    id: 'config-contrato-alertas-assunto',
+    arquivo: 'src/pages/ConfiguracoesContratoAlertasEFormas.jsx',
+    // Mesmo componente da config-contrato-alertas-formas, OUTRO assunto: a
+    // tela le o pathname e troca titulo, apoio e o bloco que recebe a barra
+    // de cor (B2). E exatamente o que muda entre as duas que precisa ser
+    // visto, entao a rota entra com medicao propria.
+    rota: '/configuracoes-contrato-alertas',
+    tipo: 'form',
+    naoAplica: {
+      F1: 'tela de configuração: não há listagem com recorte',
+      F2: 'idem F1',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'configuração de sistema, não é tela de detalhe de registro',
+      C4: 'idem C3'
+    }
+  },
+  {
+    id: 'modulo-relatorios-solicitacoes',
+    arquivo: 'src/pages/ModuloRelatorios.jsx',
+    // Mesmo hub da modulo-relatorios (medida em /rh-dp/relatorios), com
+    // outro bloco de configuracao. O componente e um so, mas a quantidade e
+    // o tamanho dos cartoes mudam por modulo, e X3 (estouro em 390px) e
+    // exatamente um item que depende disso. Declarar coberto seria supor o
+    // que nao foi visto.
+    rota: '/solicitacoes/relatorios',
+    tipo: 'mista',
+    naoAplica: {
+      F1: 'hub de cartões: não há listagem com recorte',
+      F2: 'idem F1',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'hub de entrada do módulo, não é tela de detalhe',
       C4: 'idem C3'
     }
   },
