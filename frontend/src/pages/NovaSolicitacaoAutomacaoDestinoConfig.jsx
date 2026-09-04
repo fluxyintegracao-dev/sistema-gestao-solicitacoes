@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Pagina, PageHeader, Avisos, useAvisos } from '../components/padrao';
 import { getSetores } from '../services/setores';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import {
@@ -22,6 +23,11 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
   const [regras, setRegras] = useState({});
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: as tres caixas do navegador (carregar, salvar com sucesso,
+  // salvar com erro) viraram aviso do sistema — a do Chrome ignora tema,
+  // tipografia e tokens, bloqueia a pagina, nao existe no DOM para o
+  // harness medir e some sem deixar rastro.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -50,7 +56,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
         setTipoSelecionadoId(tiposPrimeiraArea[0]?.id ? String(tiposPrimeiraArea[0].id) : '');
       } catch (error) {
         console.error(error);
-        alert(error.message || 'Erro ao carregar automacao da nova solicitacao');
+        avisar.erro(error.message || 'Erro ao carregar automacao da nova solicitacao');
       } finally {
         setLoading(false);
       }
@@ -124,10 +130,10 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
       const configNormalizada = normalizarConfigAutomacaoDestinoNovaSolicitacao(data);
       setDestinosDisponiveis(configNormalizada.destinos_disponiveis);
       setRegras(configNormalizada.regras);
-      alert('Automacao salva com sucesso.');
+      avisar.sucesso('Automacao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar automacao.');
+      avisar.erro(error.message || 'Erro ao salvar automacao.');
     } finally {
       setSalvando(false);
     }
@@ -138,25 +144,25 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
   }
 
   return (
-    <div className="config-page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="config-page-header">
-        <div className="config-page-header-row">
-          <div>
-            <h1 className="config-page-title">Automacao da Nova Solicitacao</h1>
-            <p className="config-page-subtitle">
-              Defina quando a escolha de area e tipo deve levar o usuario automaticamente para outra tela operacional.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={salvar}
-            disabled={salvando}
-          >
-            {salvando ? 'Salvando...' : 'Salvar automacao'}
-          </button>
-        </div>
-      </header>
+    // M2/R10: o ritmo vertical (16px entre blocos) vem do `Pagina`, nao de
+    // `space-y-5 md:space-y-6` na raiz — 20/24px nao existem na escala.
+    <Pagina>
+      {/* C1/R13: o `.config-page-header` NAO e sticky. A faixa fixa do
+          sistema (`.app-page-header`) gruda encostada na topbar e compacta
+          sem sumir, entao "Salvar automacao" continua a um clique depois de
+          rolar ate o painel de destino. */}
+      <PageHeader
+        titulo="Automacao da Nova Solicitacao"
+        contagem={automacaoAtiva ? 'Regra ativa neste tipo' : 'Sem regra neste tipo'}
+        descricao="Defina quando a escolha de area e tipo deve levar o usuario automaticamente para outra tela operacional."
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando...' : 'Salvar automacao',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <section className="config-summary-card">
         <div>
@@ -168,7 +174,11 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
         </div>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+      {/* M2/R10: `gap-5` (20px) e `lg:grid-cols-[320px_1fr]` (medida em px
+          escrita na tela) sairam — o vao vem de um degrau da escala e a
+          proporcao do painel (1/4 para o seletor, 3/4 para o conteudo), de
+          trilhas de grade: mesma leitura, sem medida escrita na tela. */}
+      <div className="grid gap-4 lg:grid-cols-4">
         <section className="card space-y-3">
           <label className="grid gap-2 text-sm">
             Area responsavel
@@ -204,7 +214,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
           )}
         </section>
 
-        <section className="card space-y-4">
+        <section className="card space-y-4 lg:col-span-3">
           <div>
             <p className="text-xs uppercase tracking-[0.08em] text-[var(--c-muted)]">Destino automatico</p>
             <h2 className="mt-1 text-lg font-semibold text-[var(--c-text)]">
@@ -233,8 +243,16 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
             </span>
           </label>
 
+          {/* R25: a classe trazia o hexadecimal escrito dentro dela
+              (`bg-[var(--c-surface-muted,#f8fafc)]`) — cor de tela vem de
+              token, nunca de hex. E o fallback nao era detalhe: o token
+              `--c-surface-muted` nao esta declarado em lugar nenhum do
+              sistema, entao era o hex que pintava o fundo — sem par no tema
+              escuro e fora do piso de contraste do ThemeContext. Aqui fica
+              `--ui-surface-2`, o token real da superficie rebaixada, que
+              existe nos dois temas. */}
           {automacaoAtiva && (
-            <div className="rounded border border-[var(--c-border)] bg-[var(--c-surface-muted,#f8fafc)] p-3 text-sm">
+            <div className="rounded border border-[var(--c-border)] bg-[var(--ui-surface-2)] p-3 text-sm">
               <div className="font-semibold text-[var(--c-text)]">Regra ativa</div>
               <div className="mt-1 text-[var(--c-muted)]">
                 A obra selecionada sera enviada por parametro e o solicitante sera o usuario logado na tela de compra.
@@ -243,6 +261,6 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
           )}
         </section>
       </div>
-    </div>
+    </Pagina>
   );
 }

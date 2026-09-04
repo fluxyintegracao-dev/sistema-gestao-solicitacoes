@@ -322,6 +322,7 @@ export function validarLayout() {
   // R25 — cor fora do sistema de tokens (decisão do cliente, 03/09).
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
+  avisos.push(...(r25.avisos || []));
 
   /*
     EXCEÇÃO QUE NÃO COBRE NADA É LICENÇA EM BRANCO (04/09).
@@ -351,6 +352,12 @@ export function validarLayout() {
     if (!manifesto.telas.includes(tela)) continue;
     if (!excecoesUsadas.has(`${tela}|R1`)) {
       falhas.push(`${tela}:0 [EXCECAO] exceção de R1 registrada ("${motivo}") não cobre nenhuma tabela crua — remova a linha de excecoes_tabela_crua.`);
+    }
+  }
+  for (const [tela, motivo] of Object.entries(manifesto.excecoes_cor || {})) {
+    if (!manifesto.telas.includes(tela)) continue;
+    if (!excecoesUsadas.has(`${tela}|R25`)) {
+      falhas.push(`${tela}:0 [EXCECAO] exceção de R25 registrada ("${motivo}") não cobre nenhuma cor crua — remova a linha de excecoes_cor.`);
     }
   }
 
@@ -477,6 +484,7 @@ const PROPRIEDADES_DE_COR = ['text', 'bg', 'border', 'ring', 'divide', 'from', '
 
 function validarCoresForaDoToken() {
   const falhas = [];
+  const avisos = [];
   // Lê o manifesto aqui: `manifesto` é local da validarLayout(), e a raiz
   // se chama `frontendRoot`. A primeira versão desta função usava os dois
   // nomes errados e NUNCA RODOU — deu zero achado num arquivo com 35
@@ -515,9 +523,35 @@ function validarCoresForaDoToken() {
     const linhas = semComentarios.split('\n');
     linhas.forEach((semComentario, i) => {
       if (!semComentario.trim()) return;
-      const registrar = (achado, tipo) => falhas.push(
-        `${tela}:${i + 1} [R25] ${tipo}: "${achado}" — cor de tela vem de token (--c-*, --ui-*, --sem-*) ou de classe do sistema (text-muted, badge-*, btn-*). Paleta crua não acompanha o tema escuro e não passa pelo piso de contraste do ThemeContext.`
-      );
+      /*
+        COR QUE E DADO NAO E COR DE TELA (04/09).
+
+        A R25 nasceu contra paleta crua de ESTILO, e por isso nao tinha
+        mecanismo de excecao nenhum — `excecoes_medidas` cobre so R10 e
+        `excecoes_tabela_crua` so R1. O buraco apareceu na
+        ConfiguracoesStatusPedidoCompra: o hexadecimal ali e o `value` de um
+        `<input type="color">` e o padrao gravado no registro do status.
+        Trocar por token gravaria a STRING DO TOKEN no banco.
+
+        A tela irma ConfiguracoesContratoAlertasEFormas tem o mesmo
+        `<input type="color">` e escapa da R25 so porque o valor inicial dela
+        sempre vem da API. O buraco ja existia; ela apenas nao o encostava.
+
+        Entao `excecoes_cor` entra com a MESMA disciplina das outras duas:
+        excecao que nao cobre nada reprova (ver o bloco [EXCECAO] adiante).
+        Licenca em branco e pior que violacao, porque rebaixa a violacao
+        futura para aviso sem ninguem perceber.
+      */
+      const excecaoCor = manifesto.excecoes_cor?.[tela];
+      const registrar = (achado, tipo) => {
+        if (excecaoCor) {
+          avisos.push(`${tela}:${i + 1} [R25] ${tipo} tolerado por exceção registrada (${excecaoCor}): "${achado}"`);
+          return;
+        }
+        falhas.push(
+          `${tela}:${i + 1} [R25] ${tipo}: "${achado}" — cor de tela vem de token (--c-*, --ui-*, --sem-*) ou de classe do sistema (text-muted, badge-*, btn-*). Paleta crua não acompanha o tema escuro e não passa pelo piso de contraste do ThemeContext.`
+        );
+      };
       for (const m of semComentario.matchAll(classeCrua)) registrar(m[0], 'classe de paleta crua');
       for (const m of semComentario.matchAll(arbitraria)) registrar(m[0], 'cor arbitrária em classe');
       // Hex e rgb() fora de classe: só reprova quando não está dentro de
@@ -528,7 +562,7 @@ function validarCoresForaDoToken() {
       }
     });
   }
-  return { falhas };
+  return { falhas, avisos };
 }
 
 /**

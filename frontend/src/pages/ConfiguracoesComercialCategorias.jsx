@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   getComercialCategoriasContrato,
   salvarComercialCategoriasContrato
 } from '../services/configuracoesSistema';
+import { Pagina, PageHeader, Avisos, useAvisos } from '../components/padrao';
 
 function toggleId(list, id, checked) {
   const current = new Set((list || []).map(Number));
@@ -53,7 +53,7 @@ function CategoriaChecklist({ title, description, categorias, selectedIds, onCha
   const allIds = (categorias || []).map((categoria) => Number(categoria.id)).filter(Number.isFinite);
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+    <section className="sol-surface-card rounded-2xl p-4">
       <div className="sol-filtros-head">
         <div>
           <p className="sol-filtros-title">{title}</p>
@@ -104,7 +104,7 @@ function CategoriaSelect({ title, description, categorias, value, onChange }) {
   const selected = Number(value || 0);
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+    <section className="sol-surface-card rounded-2xl p-4">
       <div className="sol-filtros-head">
         <div>
           <p className="sol-filtros-title">{title}</p>
@@ -161,7 +161,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
   }
 
   return (
-    <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+    <section className="sol-surface-card rounded-2xl p-4">
       <div className="sol-filtros-head">
         <div>
           <p className="sol-filtros-title">{title}</p>
@@ -214,7 +214,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
               />
             </label>
             <div className="flex items-end">
-              <button type="button" className="btn btn-outline w-full border-rose-200 text-rose-700 hover:bg-rose-50" onClick={() => removeItem(index)}>
+              <button type="button" className="btn btn-outline btn-perigo-suave w-full" onClick={() => removeItem(index)}>
                 Excluir
               </button>
             </div>
@@ -222,7 +222,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
             {(showResumo || showInterval) && (
               <div className="md:col-start-2 md:col-span-2">
                 {showResumo && (
-                  <label className="sol-filter-field max-w-[220px]">
+                  <label className="sol-filter-field">
                     <span className="sol-filter-label">Resumo no contrato</span>
                     <input
                       className="input w-full uppercase"
@@ -233,7 +233,7 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
                   </label>
                 )}
                 {showInterval && (
-                  <label className="sol-filter-field max-w-[220px]">
+                  <label className="sol-filter-field">
                     <span className="sol-filter-label">Intervalo em meses</span>
                     <input
                       className="input w-full"
@@ -267,7 +267,10 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
 export default function ConfiguracoesComercialCategorias() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  // R3: o erro era um <div className="app-alert app-alert--error"> montado à
+  // mão e o sucesso era um alert() do navegador. Os dois passam a ser aviso
+  // do sistema — mesmo tom semântico, mensurável pelo harness, fechável.
+  const { avisos, avisar, fechar } = useAvisos();
   const [config, setConfig] = useState({
     contrato_venda_categoria_ids: [],
     comissao_categoria_id: '',
@@ -294,7 +297,7 @@ export default function ConfiguracoesComercialCategorias() {
           opcoes_pagamento: nextConfig.opcoes_pagamento || {}
         });
       } catch (err) {
-        if (active) setError(err?.message || 'Erro ao carregar configuracao comercial');
+        if (active) avisar.erro(err?.message || 'Erro ao carregar configuracao comercial');
       } finally {
         if (active) setLoading(false);
       }
@@ -308,7 +311,6 @@ export default function ConfiguracoesComercialCategorias() {
   async function handleSave() {
     try {
       setSaving(true);
-      setError('');
       const data = await salvarComercialCategoriasContrato({
         contrato_venda_categoria_ids: config.contrato_venda_categoria_ids,
         comissao_categoria_id: config.comissao_categoria_id,
@@ -323,9 +325,9 @@ export default function ConfiguracoesComercialCategorias() {
           comissao_categoria_id: data.comissao_categoria_id || ''
         }));
       }
-      alert('Categorias comerciais atualizadas com sucesso.');
+      avisar.sucesso('Categorias comerciais atualizadas com sucesso.');
     } catch (err) {
-      setError(err?.message || 'Erro ao salvar configuracao comercial');
+      avisar.erro(err?.message || 'Erro ao salvar configuracao comercial');
     } finally {
       setSaving(false);
     }
@@ -333,36 +335,38 @@ export default function ConfiguracoesComercialCategorias() {
 
   if (loading) {
     return (
-      <div className="page solicitacoes-page">
+      <Pagina>
         <div className="app-empty-card">Carregando categorias comerciais...</div>
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Categorias comerciais</h1>
-            <p className="page-subtitle">
-              Selecione categorias financeiras e opcoes exibidas na forma de pagamento do contrato de venda.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link className="btn btn-outline" to="/financeiro/cadastros">
-              Abrir cadastros financeiros
-            </Link>
-            <button type="button" className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar configuracao'}
-            </button>
-          </div>
-        </div>
-      </header>
+    // C1: a tela usava .app-page-header SEM o Pagina. Essa classe é sticky em
+    // --pos-cabecalho-fixo, e quem mede a topbar e publica essa variável é só
+    // o Pagina — sem ele a faixa grudava no fallback de 96px, que é a origem
+    // do vão transparente. C2/R10: o título vem do PageHeader (22px), não de
+    // um text-xl escrito aqui; M2/R10: o ritmo vertical é do Pagina.
+    <Pagina>
+      <PageHeader
+        titulo="Categorias comerciais"
+        descricao="Selecione categorias financeiras e opcoes exibidas na forma de pagamento do contrato de venda."
+        acaoPrincipal={{
+          rotulo: saving ? 'Salvando...' : 'Salvar configuracao',
+          onClick: handleSave,
+          desabilitada: saving
+        }}
+      />
+      {/* C6/R11 (decisão do cliente, 04/09): o "Abrir cadastros financeiros"
+          saiu da barra de ações — ela é para ações SOBRE ESTA TELA, e caminho
+          para outra tela mora no hub/breadcrumb/Ctrl+K. O destino já tem porta
+          no menu (navigationConfig, item fin-cadastros), então remover não
+          cria porta ausente; e o bloco "Origem das configuracoes" abaixo
+          continua dizendo, em texto, que o cadastro é no Financeiro. */}
 
-      {error && <div className="app-alert app-alert--error">{error}</div>}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      <section className="sol-surface-card rounded-2xl p-4 md:p-5">
+      <section className="sol-surface-card rounded-2xl p-4">
         <div className="sol-filtros-head">
           <div>
             <p className="sol-filtros-title">Origem das configuracoes</p>
@@ -430,6 +434,6 @@ export default function ConfiguracoesComercialCategorias() {
           onChange={(values) => setConfig((current) => updateOptionGroup(current, 'periodicidades', values))}
         />
       </section>
-    </div>
+    </Pagina>
   );
 }

@@ -1,4 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 import { getSetores } from '../services/setores';
 import { BLOCOS_DETALHE, ORDEM_PADRAO, rotuloBloco } from './SolicitacaoDetalhe/blocosDetalhe';
 import { BLOCOS_HOME, ORDEM_PADRAO_HOME, rotuloBlocoHome } from '../navigation/blocosHome';
@@ -10,6 +18,10 @@ const TELAS = [
   { id: 'detalhe-solicitacao', rotulo: 'Detalhe da solicitação', blocos: BLOCOS_DETALHE, ordemPadrao: ORDEM_PADRAO, rotuloBloco },
   { id: 'home', rotulo: 'Início (Home)', blocos: BLOCOS_HOME, ordemPadrao: ORDEM_PADRAO_HOME, rotuloBloco: rotuloBlocoHome }
 ];
+
+function rotuloDaTela(id) {
+  return TELAS.find((tela) => tela.id === id)?.rotulo || id;
+}
 
 // =====================================================================
 // LAYOUT DO DETALHE POR SETOR — Configurações
@@ -28,7 +40,10 @@ export default function ConfiguracoesDetalheLayout() {
   const [linhas, setLinhas] = useState([]); // [{bloco, visivel}] na ordem
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
+  // R3/R19: carga, gravação e exclusão relatam pela faixa de avisos do
+  // sistema; a confirmação destrutiva, pelo modal do sistema.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     try {
@@ -39,9 +54,8 @@ export default function ConfiguracoesDetalheLayout() {
       ]);
       setSetores(Array.isArray(listaSetores) ? listaSetores : []);
       setLayouts(listaLayouts);
-      setErro('');
     } catch (error) {
-      setErro(error?.message || 'Erro ao carregar');
+      avisar.erro(error?.message || 'Erro ao carregar');
     } finally {
       setCarregando(false);
     }
@@ -109,44 +123,99 @@ export default function ConfiguracoesDetalheLayout() {
       }));
       await salvarDetalheLayout(setorSelecionado, config, telaSelecionada);
       await carregar();
-      alert('Layout salvo.');
+      avisar.sucesso('Layout salvo.');
     } catch (error) {
-      alert(error?.message || 'Erro ao salvar layout');
+      avisar.erro(error?.message || 'Erro ao salvar layout');
     } finally {
       setSalvando(false);
     }
   }
 
   async function restaurarPadrao() {
-    if (!setorSelecionado || !layoutDoSetor) return;
-    if (!window.confirm(`Excluir o layout do setor ${setorSelecionado} e voltar ao padrão do sistema?`)) {
-      return;
-    }
+    /*
+      R26 — A JANELA QUE O MODAL NÃO BLOQUEANTE ABRE.
+
+      Com `window.confirm` a página ficava CONGELADA entre a pergunta e a
+      resposta: era impossível trocar de setor ou de tela no meio, e ler o
+      estado depois da resposta era seguro por construção.
+
+      O modal do sistema não bloqueia nada. Os dois seletores de contexto
+      (Tela e Setor) seguem montados e clicáveis com a pergunta na frente,
+      e `carregar()` pode devolver outra lista de layouts enquanto ela
+      está aberta. Se a exclusão relesse `setorSelecionado`,
+      `telaSelecionada` ou `layoutDoSetor` DEPOIS do `await`, a tela
+      perguntaria pelo setor A e apagaria o layout do setor B — e a
+      trilha registraria um consentimento válido para o alvo errado,
+      que é a classe de defeito que ninguém descobre pelo log.
+
+      Por isso o alvo é FIXADO aqui, antes de abrir a confirmação, e é
+      ele que a mensagem cita e que a exclusão usa.
+    */
+    const setorAlvo = setorSelecionado;
+    const telaAlvo = telaSelecionada;
+    const layoutAlvo = layoutDoSetor;
+    if (!setorAlvo || !layoutAlvo) return;
+
+    const { ok } = await confirmar({
+      titulo: 'Excluir layout do setor',
+      mensagem: `Excluir o layout do setor ${setorAlvo} em "${rotuloDaTela(telaAlvo)}" e voltar ao padrão do sistema? Esta ação não pode ser desfeita — a ordem e as ocultações salvas para este setor são perdidas.`,
+      rotuloConfirmar: 'Excluir layout',
+      destrutiva: true
+    });
+    if (!ok) return;
+
     try {
-      await excluirDetalheLayout(setorSelecionado, telaSelecionada);
+      await excluirDetalheLayout(setorAlvo, telaAlvo);
       await carregar();
     } catch (error) {
-      alert(error?.message || 'Erro ao excluir layout');
+      avisar.erro(error?.message || 'Erro ao excluir layout');
     }
   }
 
   return (
-    <div className="px-0 py-1 md:py-2 space-y-4">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold">Layout por setor</h1>
-        <p className="text-sm text-[var(--c-muted)] mt-1 max-w-3xl">
-          Define, por setor, a ordem dos blocos de uma tela e quais aparecem — o detalhe
-          da solicitação e a Home usam o mesmo motor.
-          O usuário pode personalizar por cima e restaurar o padrão do setor quando quiser.
-          Sem configuração, vale o layout atual — as permissões e as condições de cada bloco
-          continuam decidindo se ele pode aparecer.
-        </p>
-      </div>
+    <Pagina>
+      {/*
+        C1/R13: as duas ações subiram do rodapé da lista para a faixa fixa.
+        A lista de blocos passa de dez itens e cresce com o catálogo — no
+        fim dela, "Salvar layout do setor" saía da vista assim que alguém
+        rolava para reordenar, que é exatamente quando ela é necessária.
+        Na faixa fixa está sempre a um clique.
 
-      {erro && <div className="app-alert app-alert--error" role="alert">{erro}</div>}
+        C5 preservado: a destrutiva continua APARTADA do primário — antes
+        pelo `justify-between` do rodapé, agora pela prop `destrutiva` do
+        PageHeader, que a separa e a veste de vermelho suave.
+      */}
+      <PageHeader
+        titulo="Layout por setor"
+        contagem={carregando ? null : `${layouts.length} setor(es) com layout próprio`}
+        descricao="Define, por setor, a ordem dos blocos de uma tela e quais aparecem — o detalhe da solicitação e a Home usam o mesmo motor. O usuário pode personalizar por cima e restaurar o padrão do setor; sem configuração vale o layout atual, e as permissões e condições de cada bloco continuam decidindo se ele aparece."
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando…' : 'Salvar layout do setor',
+          onClick: salvar,
+          desabilitada: !setorSelecionado || salvando,
+          title: setorSelecionado ? undefined : 'Selecione um setor para configurar o layout'
+        }}
+        destrutiva={{
+          rotulo: 'Excluir layout do setor',
+          onClick: restaurarPadrao,
+          desabilitada: !layoutDoSetor,
+          title: layoutDoSetor ? undefined : 'Este setor ainda usa o layout padrão do sistema'
+        }}
+      />
 
-      <div className="card space-y-3">
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
+      {/* B2/B5: o que era um `card` cru vira o bloco principal da tela —
+          é ele que responde à pergunta da página, então leva a barra de cor. */}
+      <BlocoConteudo
+        titulo="Blocos da tela"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <div className="grid gap-3 md:grid-cols-3">
+          {/* R12: "Tela" e "Setor" são seletores de CONTEXTO — escolhem QUAL
+              configuração se edita, e o que for salvo pertence à escolha.
+              Continuam legítimos como lista suspensa. */}
           <label className="block text-sm text-[var(--c-muted)]">
             Tela
             <select
@@ -185,63 +254,51 @@ export default function ConfiguracoesDetalheLayout() {
 
         {carregando && <p className="text-sm text-[var(--c-muted)]">Carregando…</p>}
 
+        {/* Lista de REORDENAÇÃO, não tabela de dados: cada linha é um bloco
+            que se sobe, desce e oculta. Por isso `<ul>/<li>` e não
+            TabelaPadrao — não há colunas para redimensionar nem ordenar. */}
         {!carregando && setorSelecionado && (
-          <>
-            <ul className="space-y-1" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-              {linhas.map((linha, indice) => (
-                <li
-                  key={linha.bloco}
-                  className="flex items-center gap-3 rounded-lg border border-[var(--ui-border)] px-3 py-2"
-                >
-                  <span className="text-xs font-bold text-[var(--c-muted)] w-6 text-right">
-                    {indice + 1}.
-                  </span>
-                  <span className={`flex-1 text-sm font-semibold ${linha.visivel ? '' : 'line-through text-[var(--c-muted)]'}`}>
-                    {rotuloBlocoTela(linha.bloco)}
-                  </span>
-                  <label className="inline-flex items-center gap-2 text-sm text-[var(--c-muted)]">
-                    <input
-                      type="checkbox"
-                      checked={linha.visivel}
-                      onChange={() => alternarVisivel(indice)}
-                    />
-                    visível
-                  </label>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => mover(indice, -1)}
-                    disabled={indice === 0}
-                    aria-label={`Subir ${rotuloBlocoTela(linha.bloco)}`}
-                  >
-                    ↑
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => mover(indice, 1)}
-                    disabled={indice === linhas.length - 1}
-                    aria-label={`Descer ${rotuloBlocoTela(linha.bloco)}`}
-                  >
-                    ↓
-                  </button>
-                </li>
-              ))}
-            </ul>
-            <div className="flex justify-between gap-3">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={restaurarPadrao}
-                disabled={!layoutDoSetor}
+          <ul className="list-none m-0 p-0 space-y-1">
+            {linhas.map((linha, indice) => (
+              <li
+                key={linha.bloco}
+                className="flex items-center gap-3 rounded-lg border border-[var(--ui-border)] px-3 py-2"
               >
-                Excluir layout do setor
-              </button>
-              <button type="button" className="btn btn-primary" onClick={salvar} disabled={salvando}>
-                {salvando ? 'Salvando…' : 'Salvar layout do setor'}
-              </button>
-            </div>
-          </>
+                <span className="text-xs font-bold text-[var(--c-muted)] w-6 text-right">
+                  {indice + 1}.
+                </span>
+                <span className={`flex-1 text-sm font-semibold ${linha.visivel ? '' : 'line-through text-[var(--c-muted)]'}`}>
+                  {rotuloBlocoTela(linha.bloco)}
+                </span>
+                <label className="inline-flex items-center gap-2 text-sm text-[var(--c-muted)]">
+                  <input
+                    type="checkbox"
+                    checked={linha.visivel}
+                    onChange={() => alternarVisivel(indice)}
+                  />
+                  visível
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => mover(indice, -1)}
+                  disabled={indice === 0}
+                  aria-label={`Subir ${rotuloBlocoTela(linha.bloco)}`}
+                >
+                  ↑
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-outline btn-sm"
+                  onClick={() => mover(indice, 1)}
+                  disabled={indice === linhas.length - 1}
+                  aria-label={`Descer ${rotuloBlocoTela(linha.bloco)}`}
+                >
+                  ↓
+                </button>
+              </li>
+            ))}
+          </ul>
         )}
 
         {!carregando && !setorSelecionado && (
@@ -249,7 +306,9 @@ export default function ConfiguracoesDetalheLayout() {
             Selecione um setor para configurar. Blocos do catálogo: {telaAtiva.blocos.map((b) => b.rotulo).join(' · ')}.
           </p>
         )}
-      </div>
-    </div>
+      </BlocoConteudo>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

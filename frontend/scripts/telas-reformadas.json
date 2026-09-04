@@ -163,5 +163,8 @@
         "nota": "Inclui SolicitacaoDetalhe/FinanceiroCard.jsx (3051 linhas): tem 'Financeiro' no nome e e bloco DENTRO do detalhe da solicitacao, importado so por SolicitacaoDetalhe/index.jsx."
       }
     ]
+  },
+  "excecoes_cor": {
+    "src/pages/ConfiguracoesStatusPedidoCompra.jsx": "cor do status é DADO: o hexadecimal é o value do <input type=\"color\"> e o padrão gravado no registro. Token viraria string do token no banco."
   }
 }

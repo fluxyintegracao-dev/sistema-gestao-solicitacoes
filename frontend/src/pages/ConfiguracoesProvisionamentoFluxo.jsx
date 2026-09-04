@@ -4,6 +4,7 @@ import {
   getProvisionamentoFluxoConfig,
   salvarProvisionamentoFluxoConfig
 } from '../services/configuracoesSistema';
+import { Pagina, PageHeader, Avisos, useAvisos } from '../components/padrao';
 
 const DEFAULT_CONFIG = {
   modo_operacional: 'INFORMATIVO',
@@ -51,6 +52,9 @@ export default function ConfiguracoesProvisionamentoFluxo() {
   const [tipos, setTipos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // R3/R19: as três caixas do navegador viraram aviso do sistema — faixa
+  // dentro da página, com tom semântico, fechável e visível ao harness.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     let active = true;
@@ -67,7 +71,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
       } catch (error) {
         console.error(error);
         if (active) {
-          alert(error.message || 'Erro ao carregar configuracao do provisionamento.');
+          avisar.erro(error.message || 'Erro ao carregar configuracao do provisionamento.');
         }
       } finally {
         if (active) {
@@ -151,39 +155,42 @@ export default function ConfiguracoesProvisionamentoFluxo() {
       setSaving(true);
       const data = await salvarProvisionamentoFluxoConfig(config);
       setConfig(normalizarConfig(data));
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar configuracao.');
+      avisar.erro(error.message || 'Erro ao salvar configuracao.');
     } finally {
       setSaving(false);
     }
   }
 
   if (loading) {
-    return <div className="card">Carregando configuracao do provisionamento...</div>;
+    return (
+      <Pagina>
+        <div className="card">Carregando configuracao do provisionamento...</div>
+      </Pagina>
+    );
   }
 
   return (
-    <div className="config-page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="config-page-header">
-        <div className="config-page-header-row">
-          <div>
-            <h1 className="config-page-title">Fluxo do Provisionamento</h1>
-            <p className="config-page-subtitle">
-              Controle quando o provisionamento deve ser apenas informativo e quando passa a orientar solicitacoes.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={salvar}
-            disabled={saving}
-          >
-            {saving ? 'Salvando...' : 'Salvar configuracao'}
-          </button>
-        </div>
-      </header>
+    // C1/R13: o cabeçalho era .config-page-header, que NÃO é sticky em
+    // nenhuma das duas definições de CSS — a ação principal sumia ao rolar.
+    // Passa a ser a faixa fixa do sistema (PageHeader dentro do Pagina, que
+    // é quem mede a topbar e publica --pos-cabecalho-fixo). C5: a ação
+    // principal é botão cheio via `acaoPrincipal`, não um btn-sm à mão.
+    // M2/R10: o ritmo vertical vem do Pagina, não de space-y na raiz.
+    <Pagina>
+      <PageHeader
+        titulo="Fluxo do Provisionamento"
+        descricao="Controle quando o provisionamento deve ser apenas informativo e quando passa a orientar solicitacoes."
+        acaoPrincipal={{
+          rotulo: saving ? 'Salvando...' : 'Salvar configuracao',
+          onClick: salvar,
+          desabilitada: saving
+        }}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <section className="config-summary-card">
         <div>
@@ -198,17 +205,20 @@ export default function ConfiguracoesProvisionamentoFluxo() {
           <button
             key={modo.value}
             type="button"
+            // R25: o azul do estado selecionado vem do token de informação
+            // (--sem-info-*) e do primário do tema; paleta crua não tem par
+            // no tema escuro nem passa pelo piso de contraste do ThemeContext.
             className={`rounded-2xl border p-4 text-left transition ${
               config.modo_operacional === modo.value
-                ? 'border-blue-300 bg-blue-50 text-blue-950'
-                : 'border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)] hover:border-blue-200'
+                ? 'border-[var(--c-primary)] bg-[var(--sem-info-bg)] text-[var(--c-text)]'
+                : 'border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-text)] hover:border-[var(--c-primary)]'
             }`}
             onClick={() => updateConfig('modo_operacional', modo.value)}
           >
             <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--c-muted)]">
               Modo operacional
             </span>
-            <strong className="mt-2 block text-base">{modo.title}</strong>
+            <strong className="mt-2 block text-lg">{modo.title}</strong>
             <span className="mt-2 block text-sm text-[var(--c-muted)]">{modo.description}</span>
           </button>
         ))}
@@ -281,7 +291,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
           />
 
           {modoControlado ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="rounded-xl border border-[var(--sem-warning-border)] bg-[var(--sem-warning-bg)] px-4 py-3 text-sm text-[var(--sem-warning)]">
               O modo controlado prepara aprovacao e vencimento sem exigir provisao nas solicitacoes.
             </div>
           ) : null}
@@ -298,7 +308,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
             </p>
           </div>
 
-          <div className="max-h-[520px] space-y-2 overflow-auto pr-1">
+          <div className="max-h-[60vh] space-y-2 overflow-auto pr-1">
             {tipos.map((tipo) => {
               const checked = config.tipos_solicitacao_exigem_provisao.includes(Number(tipo.id));
               return (
@@ -306,7 +316,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
                   key={tipo.id}
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm ${
                     checked
-                      ? 'border-blue-200 bg-blue-50 text-blue-950'
+                      ? 'border-[var(--c-primary)] bg-[var(--sem-info-bg)] text-[var(--c-text)]'
                       : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-text)]'
                   } ${!modoIntegrado ? 'opacity-60' : ''}`}
                 >
@@ -335,7 +345,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
           </div>
         </aside>
       </section>
-    </div>
+    </Pagina>
   );
 }
 

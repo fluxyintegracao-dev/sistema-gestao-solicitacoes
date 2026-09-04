@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  TabelaPadrao,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getTiposSubContrato } from '../services/tiposSubContrato';
 import { getSetores } from '../services/setores';
@@ -33,6 +39,11 @@ export default function NovaSolicitacaoCamposConfig() {
   const [regras, setRegras] = useState({});
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(false);
+  // R3/R19: as tres caixas do navegador (carregar, salvar com sucesso,
+  // salvar com erro) viraram aviso do sistema — a do Chrome ignora tema,
+  // tipografia e tokens, bloqueia a pagina, nao existe no DOM para o
+  // harness medir e some sem deixar rastro.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -58,7 +69,7 @@ export default function NovaSolicitacaoCamposConfig() {
         setRegras(normalizarConfigCamposNovaSolicitacao(configData).regras);
       } catch (error) {
         console.error(error);
-        alert(error.message || 'Erro ao carregar configuracao dos campos');
+        avisar.erro(error.message || 'Erro ao carregar configuracao dos campos');
       } finally {
         setLoading(false);
       }
@@ -246,10 +257,10 @@ export default function NovaSolicitacaoCamposConfig() {
       setSalvando(true);
       const data = await salvarCamposNovaSolicitacao({ regras });
       setRegras(normalizarConfigCamposNovaSolicitacao(data).regras);
-      alert('Configuracao salva com sucesso.');
+      avisar.sucesso('Configuracao salva com sucesso.');
     } catch (error) {
       console.error(error);
-      alert(error.message || 'Erro ao salvar configuracao.');
+      avisar.erro(error.message || 'Erro ao salvar configuracao.');
     } finally {
       setSalvando(false);
     }
@@ -260,25 +271,26 @@ export default function NovaSolicitacaoCamposConfig() {
   }
 
   return (
-    <div className="config-page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="config-page-header">
-        <div className="config-page-header-row">
-          <div>
-            <h1 className="config-page-title">Campos da Nova Solicitacao</h1>
-            <p className="config-page-subtitle">
-              Defina, por area e tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao.
-            </p>
-          </div>
-          <button
-            type="button"
-            className="btn btn-primary btn-sm"
-            onClick={salvar}
-            disabled={salvando}
-          >
-            {salvando ? 'Salvando...' : 'Salvar configuracao'}
-          </button>
-        </div>
-      </header>
+    // M2/R10: o ritmo vertical (16px entre blocos) vem do `Pagina`, nao de
+    // `space-y-5 md:space-y-6` na raiz — 20/24px nao existem na escala.
+    <Pagina>
+      {/* C1/R13: o `.config-page-header` NAO e sticky — nesta tela, com a
+          lista de campos inteira abaixo, rolar levava o titulo e o botao
+          "Salvar configuracao" para fora da tela. A faixa fixa do sistema
+          (`.app-page-header`) gruda encostada na topbar e compacta sem
+          sumir, entao a acao principal fica sempre a um clique. */}
+      <PageHeader
+        titulo="Campos da Nova Solicitacao"
+        contagem={`${camposDisponiveis.length} campo(s)`}
+        descricao="Defina, por area e tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao."
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <section className="config-summary-card">
         <div>
@@ -290,7 +302,11 @@ export default function NovaSolicitacaoCamposConfig() {
         </div>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-[320px_1fr]">
+      {/* M2/R10: `gap-5` (20px) e `lg:grid-cols-[320px_1fr]` (medida em px
+          escrita na tela) sairam — o vao vem de um degrau da escala e a
+          proporcao do painel (1/4 para o seletor, 3/4 para o conteudo), de
+          trilhas de grade: mesma leitura, sem medida escrita na tela. */}
+      <div className="grid gap-4 lg:grid-cols-4">
         <section className="card space-y-3">
           <label className="grid gap-2 text-sm">
             Area responsavel
@@ -354,7 +370,20 @@ export default function NovaSolicitacaoCamposConfig() {
           </button>
         </section>
 
-        <section className="card overflow-hidden">
+        {/*
+          R18 — `overflow: clip`, NUNCA `overflow: hidden`, nesta secao.
+
+          Ela envolve a TabelaPadrao, ou seja, e ancestral do
+          `.resizable-table-scroll`. Com `hidden` num eixo o navegador
+          computa o OUTRO eixo para `auto`: a secao vira scrollport e todo
+          `position: sticky` de dentro passa a grudar NELA em vez do
+          contexto pretendido — morrem o cabecalho grudado da tabela e a
+          coluna fixa, em silencio (sem erro no console, sem falhar o
+          build, sem aparecer em teste). E o mecanismo que deixou nove
+          telas de detalhe com a faixa do topo quebrada desde que existem.
+          `clip` recorta igual e NAO cria scrollport.
+        */}
+        <section className="card overflow-clip lg:col-span-3">
           <div className="border-b border-[var(--c-border)] px-4 py-4">
             <div className="mb-3">
               <h3 className="text-sm font-semibold text-[var(--c-text)]">Regras operacionais deste tipo</h3>
@@ -366,7 +395,7 @@ export default function NovaSolicitacaoCamposConfig() {
               {OPCOES_NOVA_SOLICITACAO.map((opcao) => (
                 <label
                   key={opcao.id}
-                  className="flex items-start gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-3"
+                  className="flex items-start gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface-2)] px-3 py-3"
                 >
                   <input
                     type="checkbox"
@@ -401,17 +430,17 @@ export default function NovaSolicitacaoCamposConfig() {
                       <div className="font-semibold text-[var(--c-text)]">{labelCampo}</div>
                       <div className="mt-1 text-xs text-[var(--c-muted)]">{campo.descricao}</div>
                       {campo.somenteFluxoContratoNovo && (
-                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-xs text-[var(--c-muted)]">
                           Campo do novo fluxo de contrato
                         </span>
                       )}
                       {campo.fixo && (
-                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-xs text-[var(--c-muted)]">
                           Campo estrutural
                         </span>
                       )}
                       {controladoAutomaticamente && (
-                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-0.5 text-[11px] text-[var(--c-muted)]">
+                        <span className="mt-2 inline-flex rounded-full border border-[var(--c-border)] px-2 py-1 text-xs text-[var(--c-muted)]">
                           Controlado pela apropriacao automatica
                         </span>
                       )}
@@ -475,6 +504,6 @@ export default function NovaSolicitacaoCamposConfig() {
           />
         </section>
       </div>
-    </div>
+    </Pagina>
   );
 }

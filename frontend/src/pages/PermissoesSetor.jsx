@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { getSetorPermissoes, salvarSetorPermissao } from '../services/setorPermissoes';
 
 export default function PermissoesSetor() {
   const [lista, setLista] = useState([]);
   const [loading, setLoading] = useState(true);
   const [salvando, setSalvando] = useState(null);
+  // R3/R19: aviso do sistema no lugar da caixa do navegador — as três
+  // chamadas de alert() desta tela (carregar, salvar ok, salvar erro)
+  // viram faixa dentro da página, com o tom semântico.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     carregar();
@@ -18,7 +29,7 @@ export default function PermissoesSetor() {
       setLista(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error(error);
-      alert('Erro ao carregar permissoes.');
+      avisar.erro(error?.message || 'Erro ao carregar permissoes.');
     } finally {
       setLoading(false);
     }
@@ -41,22 +52,34 @@ export default function PermissoesSetor() {
         usuario_pode_atribuir: !!item.usuario_pode_atribuir,
         modo_recebimento: item.modo_recebimento || 'TODOS_VISIVEIS'
       });
-      alert('Permissao salva.');
+      avisar.sucesso(`Permissoes de ${item.nome || item.codigo || item.setor_id} salvas.`);
     } catch (error) {
       console.error(error);
-      alert('Erro ao salvar permissao.');
+      avisar.erro(error?.message || 'Erro ao salvar permissao.');
     } finally {
       setSalvando(null);
     }
   }
 
-  if (loading) return <p>Carregando permissoes...</p>;
-
   return (
-    <div className="page solicitacoes-page">
-      <h1 className="page-title">Permissoes por Setor</h1>
+    // B5: o carregamento acontece DENTRO da estrutura padrão — antes a tela
+    // devolvia `<p>Carregando permissoes...</p>` cru, sem página, sem
+    // cabeçalho e sem superfície. Quem carrega vê a mesma tela, com a
+    // tabela em estado de carregamento.
+    <Pagina>
+      <PageHeader
+        titulo="Permissões por Setor"
+        contagem={loading ? null : `${lista.length} setor(es)`}
+        descricao="Define quem pode assumir e atribuir solicitações em cada setor."
+      />
 
-      <div className="card">
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
+      <BlocoConteudo
+        titulo="Setores"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -93,22 +116,27 @@ export default function PermissoesSetor() {
             }
           ]}
           itens={lista}
+          carregando={loading}
           getId={item => item.setor_id}
           storageKey="tabela:permissoes-setor"
           rotuloRolagem="Permissoes por setor"
           vazio="Nenhum setor encontrado"
           acoesLinha={item => (
+            // R2/M1: sem a classe `.btn` nada impunha o alvo mínimo de
+            // 32×32 (44 no toque) — era um <button> nu com cor de link.
+            // A cor sai junto (R25): a ênfase agora vem da variante.
             <button
+              type="button"
+              className="btn btn-primary btn-sm"
               onClick={() => salvar(item)}
               disabled={salvando === item.setor_id}
-              className="text-blue-600"
             >
               {salvando === item.setor_id ? 'Salvando...' : 'Salvar'}
             </button>
           )}
           larguraAcoes={120}
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

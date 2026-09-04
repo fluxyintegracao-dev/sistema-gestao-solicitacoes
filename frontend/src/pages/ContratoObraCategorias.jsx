@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
+import {
   getContratoObraCategorias,
   salvarContratoObraCategorias
 } from '../services/configuracoesSistema';
@@ -27,8 +34,11 @@ export default function ContratoObraCategorias() {
   const [somenteSelecionadas, setSomenteSelecionadas] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [aviso, setAviso] = useState('');
+  // R3: erro e sucesso sao EVENTO (carregou, salvou, falhou) — faixa do
+  // sistema, empilhavel e fechavel. As condicoes derivadas do conteudo
+  // (nenhuma marcada / categorias inativadas) NAO passam por aqui: fechar
+  // a faixa nao resolve o problema, entao elas seguem fixas no fluxo.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     async function load() {
@@ -38,7 +48,7 @@ export default function ContratoObraCategorias() {
         setSelecionadas(new Set((data?.categoria_ids || []).map(Number)));
         setInvalidas(data?.categorias_invalidas || []);
       } catch {
-        setErro('Nao foi possivel carregar as categorias.');
+        avisar.erro('Nao foi possivel carregar as categorias.');
       } finally {
         setCarregando(false);
       }
@@ -85,119 +95,122 @@ export default function ContratoObraCategorias() {
 
   async function salvar() {
     setSalvando(true);
-    setErro('');
-    setAviso('');
     try {
       const data = await salvarContratoObraCategorias([...selecionadas]);
       setSelecionadas(new Set((data?.categoria_ids || []).map(Number)));
       setInvalidas(data?.categorias_invalidas || []);
-      setAviso('Categorias salvas.');
+      avisar.sucesso('Categorias salvas.');
     } catch {
-      setErro('Nao foi possivel salvar as categorias.');
+      avisar.erro('Nao foi possivel salvar as categorias.');
     } finally {
       setSalvando(false);
     }
   }
 
+  const descricao = 'Marque quais categorias financeiras ficam disponiveis ao criar um contrato de obra. Somente categorias que aceitam titulo a pagar aparecem aqui.';
+
+  // B5: mesmo carregando, titulo vai ao PageHeader e o texto tem superficie
+  // (bloco) — nada de <h1> solto nem frase crua sobre o canvas.
   if (carregando) {
     return (
-      <div className="page solicitacoes-page">
-        <h1 className="page-title">Categorias do contrato de obra</h1>
-        <div className="card">Carregando...</div>
-      </div>
+      <Pagina>
+        <PageHeader titulo="Categorias do contrato de obra" descricao={descricao} />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <BlocoConteudo titulo="Categorias liberadas" variante="primario" cor="var(--c-primary)">
+          <p className="app-note">Carregando categorias...</p>
+        </BlocoConteudo>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div>
-        <h1 className="page-title">Categorias do contrato de obra</h1>
-        <p className="text-sm mt-1" style={{ color: 'var(--c-muted)' }}>
-          Marque quais categorias financeiras ficam disponiveis ao criar um contrato de obra.
-          Somente categorias que aceitam titulo a pagar aparecem aqui.
-        </p>
-      </div>
+    <Pagina>
+      {/* R5: contagem e apoio na FAIXA FIXA do topo, com escala de titulo e
+          superficie propria — a contagem era um <span> miudo perdido no meio
+          da linha de filtros.
+          C5/R13: "Salvar" sobe para o cabecalho. A lista de 160 categorias
+          rola a pagina inteira (o recorte com altura fixa saiu por ser medida
+          a mao, R10), e so no cabecalho fixo a acao principal continua a um
+          clique depois da rolagem. */}
+      <PageHeader
+        titulo="Categorias do contrato de obra"
+        contagem={`${selecionadas.size} de ${disponiveis.length} marcadas`}
+        descricao={descricao}
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando...' : 'Salvar',
+          onClick: salvar,
+          desabilitada: salvando
+        }}
+      />
 
-      <div className="card space-y-4">
-        <div className="flex gap-2 flex-wrap items-center">
-          <input
-            type="text"
-            className="input"
-            placeholder="Filtrar por nome ou grupo da DRE"
-            value={filtro}
-            onChange={(e) => setFiltro(e.target.value)}
-            style={{ minWidth: 280 }}
-          />
-          <label className="flex items-center gap-2 text-sm">
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
+      <BlocoConteudo titulo="Categorias liberadas" variante="primario" cor="var(--c-primary)">
+        <div className="space-y-4">
+          <div className="flex gap-2 flex-wrap items-center">
+            {/* R3: a busca ocupa a faixa (.app-busca cresce de 220 a 480px) —
+                antes era largura fixa em style inline com vazio ao lado. */}
             <input
-              type="checkbox"
-              checked={somenteSelecionadas}
-              onChange={(e) => setSomenteSelecionadas(e.target.checked)}
+              type="text"
+              className="input app-busca"
+              placeholder="Buscar por nome ou grupo da DRE"
+              value={filtro}
+              onChange={(e) => setFiltro(e.target.value)}
             />
-            <span>Somente marcadas</span>
-          </label>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(true)}>
-            Marcar visiveis
-          </button>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(false)}>
-            Desmarcar visiveis
-          </button>
-          <span className="text-sm" style={{ color: 'var(--c-muted)' }}>
-            {selecionadas.size} de {disponiveis.length} marcadas
-          </span>
-        </div>
-
-        {erro && <div className="app-alert app-alert--error">{erro}</div>}
-        {aviso && <div className="app-alert app-alert--success">{aviso}</div>}
-
-        {selecionadas.size === 0 && (
-          <div className="app-alert app-alert--error">
-            Nenhuma categoria marcada — o contrato de obra ficara sem opcao de categoria.
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={somenteSelecionadas}
+                onChange={(e) => setSomenteSelecionadas(e.target.checked)}
+              />
+              <span>Somente marcadas</span>
+            </label>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(true)}>
+              Marcar visiveis
+            </button>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => marcarVisiveis(false)}>
+              Desmarcar visiveis
+            </button>
           </div>
-        )}
 
-        {invalidas.length > 0 && (
-          <div className="app-alert app-alert--error">
-            {invalidas.length} categoria(s) marcada(s) foram inativadas no cadastro. Revise a selecao.
-          </div>
-        )}
-
-        <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-          {porGrupo.map(([grupo, itens]) => (
-            <div key={grupo} style={{ marginBottom: 16 }}>
-              <div
-                className="text-xs"
-                style={{ fontWeight: 700, textTransform: 'uppercase', color: 'var(--c-muted)', marginBottom: 6 }}
-              >
-                {grupo} ({itens.length})
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
-                {itens.map((c) => (
-                  <label key={c.id} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={selecionadas.has(Number(c.id))}
-                      onChange={() => alternar(Number(c.id))}
-                    />
-                    <span>{c.nome}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          ))}
-          {porGrupo.length === 0 && (
-            <div className="text-sm" style={{ color: 'var(--c-muted)' }}>
-              Nenhuma categoria encontrada com os filtros atuais.
+          {selecionadas.size === 0 && (
+            <div className="app-alert app-alert--error">
+              Nenhuma categoria marcada — o contrato de obra ficara sem opcao de categoria.
             </div>
           )}
-        </div>
 
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={salvar} disabled={salvando}>
-            {salvando ? 'Salvando...' : 'Salvar'}
-          </button>
+          {invalidas.length > 0 && (
+            <div className="app-alert app-alert--error">
+              {invalidas.length} categoria(s) marcada(s) foram inativadas no cadastro. Revise a selecao.
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {porGrupo.map(([grupo, itens]) => (
+              <div key={grupo} className="space-y-2">
+                <div className="text-xs font-bold uppercase text-muted">
+                  {grupo} ({itens.length})
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                  {itens.map((c) => (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selecionadas.has(Number(c.id))}
+                        onChange={() => alternar(Number(c.id))}
+                      />
+                      <span>{c.nome}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {porGrupo.length === 0 && (
+              <p className="app-note">Nenhuma categoria encontrada com os filtros atuais.</p>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

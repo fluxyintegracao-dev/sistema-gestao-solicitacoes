@@ -1,5 +1,16 @@
 import { useEffect, useState } from 'react';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  FormSecao,
+  CampoForm,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
 import { getSetores } from '../services/setores';
 import {
   CATALOGO_ACOES_PRINCIPAIS,
@@ -18,13 +29,25 @@ import {
 // genéricas atuais. O catálogo referencia SOMENTE ações que a tela de
 // detalhe já executa — nada de regra nova.
 // =====================================================================
+
+function formVazio() {
+  return { setor: '', status_global: '', acao: '', rotulo: '' };
+}
+
 export default function ConfiguracoesAcoesPrincipais() {
   const [itens, setItens] = useState([]);
   const [setores, setSetores] = useState([]);
   const [carregando, setCarregando] = useState(true);
-  const [erro, setErro] = useState('');
   const [salvando, setSalvando] = useState(false);
-  const [form, setForm] = useState({ setor: '', status_global: '', acao: '', rotulo: '' });
+  // null = modal de cadastro fechado (R9: mapeamento novo é cadastro raro,
+  // então a tela inteira fica com a listagem e o formulário só existe
+  // enquanto alguém está cadastrando).
+  const [form, setForm] = useState(null);
+  // R3/R19: erro de carga, de validação e de gravação passam pela faixa de
+  // avisos do sistema — a caixa do navegador ignorava tema e tokens,
+  // bloqueava a página e sumia sem deixar rastro no DOM.
+  const { avisos, avisar, fechar } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   async function carregar() {
     try {
@@ -35,9 +58,8 @@ export default function ConfiguracoesAcoesPrincipais() {
       ]);
       setItens(lista);
       setSetores(Array.isArray(listaSetores) ? listaSetores : []);
-      setErro('');
     } catch (error) {
-      setErro(error?.message || 'Erro ao carregar');
+      avisar.erro(error?.message || 'Erro ao carregar');
     } finally {
       setCarregando(false);
     }
@@ -49,16 +71,16 @@ export default function ConfiguracoesAcoesPrincipais() {
 
   async function adicionar() {
     if (!form.setor || !form.acao) {
-      alert('Informe o setor e a ação.');
+      avisar.erro('Informe o setor e a ação.');
       return;
     }
     try {
       setSalvando(true);
       await criarAcaoPrincipal(form);
-      setForm({ setor: '', status_global: '', acao: '', rotulo: '' });
+      setForm(null);
       await carregar();
     } catch (error) {
-      alert(error?.message || 'Erro ao criar mapeamento');
+      avisar.erro(error?.message || 'Erro ao criar mapeamento');
     } finally {
       setSalvando(false);
     }
@@ -69,19 +91,29 @@ export default function ConfiguracoesAcoesPrincipais() {
       await atualizarAcaoPrincipal(item.id, { ativo: !item.ativo });
       await carregar();
     } catch (error) {
-      alert(error?.message || 'Erro ao atualizar');
+      avisar.erro(error?.message || 'Erro ao atualizar');
     }
   }
 
   async function excluir(item) {
-    if (!window.confirm(`Excluir o mapeamento de ${item.setor}${item.status_global ? ` + "${item.status_global}"` : ''}?`)) {
-      return;
-    }
+    // R26: o alvo já chega FIXADO como parâmetro da linha clicada e é ele
+    // que a mensagem cita e que a exclusão usa — nada é relido do estado
+    // depois do `await`. Isso importa porque o modal do sistema NÃO
+    // bloqueia a página como o `window.confirm` bloqueava: a lista segue
+    // montada e pode até recarregar enquanto a pergunta está aberta.
+    const descricao = `${item.setor}${item.status_global ? ` + "${item.status_global}"` : ''}`;
+    const { ok } = await confirmar({
+      titulo: 'Excluir mapeamento',
+      mensagem: `Excluir o mapeamento de ${descricao}? Esta ação não pode ser desfeita — para voltar a destacar essa ação será preciso cadastrar o mapeamento de novo.`,
+      rotuloConfirmar: 'Excluir mapeamento',
+      destrutiva: true
+    });
+    if (!ok) return;
     try {
       await excluirAcaoPrincipal(item.id);
       await carregar();
     } catch (error) {
-      alert(error?.message || 'Erro ao excluir');
+      avisar.erro(error?.message || 'Erro ao excluir');
     }
   }
 
@@ -89,81 +121,115 @@ export default function ConfiguracoesAcoesPrincipais() {
     CATALOGO_ACOES_PRINCIPAIS.find((acao) => acao.valor === valor)?.rotulo || valor
   );
 
+  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
+  // dele — o erro de validação e o de gravação acontecem com o modal aberto
+  // e ficariam atrás do fundo escuro, invisíveis para quem clicou.
+  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
+  const formAtivo = form !== null;
+
   return (
-    <div className="px-0 py-1 md:py-2 space-y-4">
-      <div>
-        <h1 className="text-xl md:text-2xl font-semibold">Ação principal por setor</h1>
-        <p className="text-sm text-[var(--c-muted)] mt-1 max-w-3xl">
-          Define qual ação aparece em destaque no topo da solicitação para cada setor e estado.
-          Estado em branco vale para qualquer estado; o mapeamento mais específico vence.
-          Sem mapeamento, a tela mantém as ações genéricas. A ação só é destacada para quem
-          tem permissão de executá-la — as permissões atuais continuam valendo.
-        </p>
-      </div>
+    <Pagina>
+      {/* C1/R13: título, contagem e apoio na faixa fixa do topo, com a ação
+          principal sempre a um clique. */}
+      <PageHeader
+        titulo="Ação principal por setor"
+        contagem={carregando ? null : `${itens.length} mapeamento(s)`}
+        descricao="Define qual ação aparece em destaque no topo da solicitação para cada setor e estado. Estado em branco vale para qualquer estado; o mapeamento mais específico vence. Sem mapeamento, a tela mantém as ações genéricas — e a ação só é destacada para quem tem permissão de executá-la."
+        acaoPrincipal={{ rotulo: 'Novo mapeamento', onClick: () => setForm(formVazio()) }}
+      />
 
-      {erro && <div className="app-alert app-alert--error" role="alert">{erro}</div>}
+      {!formAtivo && faixaAvisos}
 
-      <div className="card space-y-3">
-        <h2 className="text-base font-semibold text-[var(--c-text)]">Novo mapeamento</h2>
-        <div className="grid gap-3 md:grid-cols-4">
-          <label className="block text-sm text-[var(--c-muted)]">
-            Setor
-            <select
-              className="input mt-1"
-              value={form.setor}
-              onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
-            >
-              <option value="">Selecione…</option>
-              {setores.map((setor) => (
-                <option key={setor.id} value={setor.codigo || setor.nome}>
-                  {setor.nome}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm text-[var(--c-muted)]">
-            Estado (status global)
-            <input
-              className="input mt-1"
-              type="text"
-              placeholder="Vazio = qualquer estado"
-              value={form.status_global}
-              onChange={(event) => setForm((prev) => ({ ...prev, status_global: event.target.value }))}
-            />
-          </label>
-          <label className="block text-sm text-[var(--c-muted)]">
-            Ação em destaque
-            <select
-              className="input mt-1"
-              value={form.acao}
-              onChange={(event) => setForm((prev) => ({ ...prev, acao: event.target.value }))}
-            >
-              <option value="">Selecione…</option>
-              {CATALOGO_ACOES_PRINCIPAIS.map((acao) => (
-                <option key={acao.valor} value={acao.valor}>{acao.rotulo}</option>
-              ))}
-            </select>
-          </label>
-          <label className="block text-sm text-[var(--c-muted)]">
-            Rótulo do botão (opcional)
-            <input
-              className="input mt-1"
-              type="text"
-              placeholder="Ex.: Gerar conta"
-              value={form.rotulo}
-              onChange={(event) => setForm((prev) => ({ ...prev, rotulo: event.target.value }))}
-            />
-          </label>
-        </div>
-        <div className="flex justify-end">
-          <button type="button" className="btn btn-primary" onClick={adicionar} disabled={salvando}>
-            {salvando ? 'Salvando…' : 'Adicionar mapeamento'}
-          </button>
-        </div>
-      </div>
+      {/* R1/R9: cadastro de uso esporádico abre em MODAL — antes era um
+          painel permanente ocupando a metade de cima da tela mesmo para
+          quem só veio conferir a lista. Mesmos campos, mesmo payload. */}
+      {formAtivo && (
+        <OverlayModal
+          aberto
+          rotulo="Novo mapeamento de ação principal"
+          onFechar={() => setForm(null)}
+        >
+          <BlocoConteudo
+            titulo="Novo mapeamento"
+            acoes={(
+              <button type="button" className="btn btn-outline btn-sm" onClick={() => setForm(null)}>
+                Fechar
+              </button>
+            )}
+          >
+            {faixaAvisos}
 
-      <div className="card">
-        <h2 className="text-base font-semibold text-[var(--c-text)] mb-3">Mapeamentos</h2>
+            {/* R12: estes selects são entrada de FORMULÁRIO (o dado que está
+                sendo cadastrado), não filtro de lista. */}
+            <FormSecao legenda="Quando destacar" colunas={2}>
+              <CampoForm label="Setor" obrigatorio>
+                <select
+                  className="input w-full"
+                  value={form.setor}
+                  onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
+                >
+                  <option value="">Selecione…</option>
+                  {setores.map((setor) => (
+                    <option key={setor.id} value={setor.codigo || setor.nome}>
+                      {setor.nome}
+                    </option>
+                  ))}
+                </select>
+              </CampoForm>
+              <CampoForm label="Estado (status global)" hint="Vazio = qualquer estado.">
+                <input
+                  className="input w-full"
+                  type="text"
+                  placeholder="Vazio = qualquer estado"
+                  value={form.status_global}
+                  onChange={(event) => setForm((prev) => ({ ...prev, status_global: event.target.value }))}
+                />
+              </CampoForm>
+            </FormSecao>
+
+            <FormSecao legenda="O que destacar" colunas={2}>
+              <CampoForm label="Ação em destaque" obrigatorio>
+                <select
+                  className="input w-full"
+                  value={form.acao}
+                  onChange={(event) => setForm((prev) => ({ ...prev, acao: event.target.value }))}
+                >
+                  <option value="">Selecione…</option>
+                  {CATALOGO_ACOES_PRINCIPAIS.map((acao) => (
+                    <option key={acao.valor} value={acao.valor}>{acao.rotulo}</option>
+                  ))}
+                </select>
+              </CampoForm>
+              <CampoForm label="Rótulo do botão (opcional)">
+                <input
+                  className="input w-full"
+                  type="text"
+                  placeholder="Ex.: Gerar conta"
+                  value={form.rotulo}
+                  onChange={(event) => setForm((prev) => ({ ...prev, rotulo: event.target.value }))}
+                />
+              </CampoForm>
+            </FormSecao>
+
+            <div className="app-actionbar">
+              <button type="button" className="btn btn-primary" onClick={adicionar} disabled={salvando}>
+                {salvando ? 'Salvando…' : 'Adicionar mapeamento'}
+              </button>
+              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>
+                Cancelar
+              </button>
+            </div>
+          </BlocoConteudo>
+        </OverlayModal>
+      )}
+
+      {/* B2: com o cadastro fora da tela sobrou UM assunto, e é ele que
+          responde a pergunta da página — daí a barra de cor do primário. */}
+      <BlocoConteudo
+        titulo="Mapeamentos"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
         <TabelaPadrao
           colunas={[
             {
@@ -219,7 +285,9 @@ export default function ConfiguracoesAcoesPrincipais() {
           )}
           larguraAcoes={120}
         />
-      </div>
-    </div>
+      </BlocoConteudo>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }
