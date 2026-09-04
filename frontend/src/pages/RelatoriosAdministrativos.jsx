@@ -501,24 +501,40 @@ export default function RelatoriosAdministrativos() {
                 titulo: 'Detalhes',
                 tipo: 'texto',
                 /*
-                  A coluna que ABSORVE a sobra. É a mais longa da tabela (o
-                  resumo da alteração) e era a que menos espaço recebia:
-                  156px para 300px de conteúdo. T4 manda a sobra ir para a
-                  coluna de conteúdo, e T7 não admite valor truncado — e
-                  aqui há dinheiro no resumo.
+                  A coluna que ABSORVE a sobra. É a mais longa da tabela e
+                  era a que menos espaço recebia: 156px para 300px de
+                  conteúdo. T4 manda a sobra ir para a coluna de conteúdo.
+
+                  O RESUMO DA ALTERAÇÃO SAIU DA CÉLULA (04/09). Ele vinha na
+                  sublinha, que é `nowrap` com reticências, e a sublinha
+                  contém DINHEIRO: "Preço unitário: R$ 2,00 → R$ 4,00" foi
+                  cortado no preview com 454px de largura para 495px de
+                  conteúdo. Valor monetário com reticências é o defeito que
+                  a T7 existe para pegar.
+
+                  Alargar a coluna não resolve: o resumo lista quantos
+                  campos a alteração tocar e não tem tamanho máximo. Deixar
+                  quebrar em duas linhas também não — valor partido em duas
+                  linhas é o outro lado da mesma T7 (o olho lê dois números
+                  onde há um).
+
+                  Resumo de alteração é DETALHE DO REGISTRO, não rótulo de
+                  célula. Foi para a linha expansível, onde tem largura da
+                  tabela inteira e pode ocupar as linhas que precisar.
                 */
                 flex: 3,
-                render: (registro) => (
-                  <CelulaDupla
-                    principal={registro.descricao || '-'}
-                    sub={buildChangeSummary(registro)}
-                  />
-                )
+                render: (registro) => registro.descricao || '-'
               }
             ]}
             itens={registros}
             getId={(registro) => registro.id}
             carregando={loading}
+            /* O resumo completo da alteração — com os valores por extenso,
+               sem reticências (T7). */
+            linhaExpansivel={(registro) => {
+              const resumo = buildChangeSummary(registro);
+              return resumo ? <p className="app-note">{resumo}</p> : null;
+            }}
             storageKey="tabela:relatorios-administrativos:auditoria"
             rotuloRolagem="Historico de alteracoes"
             vazio="Nenhum registro de auditoria encontrado para os filtros informados."

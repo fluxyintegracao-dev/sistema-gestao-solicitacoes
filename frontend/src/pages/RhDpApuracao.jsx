@@ -639,6 +639,21 @@ export default function RhDpApuracao() {
               id: 'empresa',
               titulo: 'Empresa',
               tipo: 'texto',
+              /*
+                A COLUNA DE CONTEÚDO DESTA TABELA É A EMPRESA (04/09).
+
+                Medido no preview: "EMPRESA" quebrava em duas linhas
+                enquanto "OBRA" segurava 215px de folga. As duas nascem com
+                `flexPadrao` (identidade e texto), e sem peso explícito a
+                sobra vai para a PRIMEIRA delas — que aqui é a obra, e não
+                precisava.
+
+                O componente distribui a sobra para UMA coluna só e escolhe
+                pela declaração, não pelo conteúdo renderizado: ele não tem
+                como saber qual texto é mais longo nesta base. Quem sabe é a
+                tela, e o jeito de dizer é o peso.
+              */
+              flex: 2,
               render: (item) => item.empresaGrupo?.nome || 'Por colaborador'
             },
             {

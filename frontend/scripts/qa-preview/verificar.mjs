@@ -373,12 +373,47 @@ async function checarAffordanceAlinhamento(page, resultado) {
   if (resultado.T2?.estado !== 'PASSOU') return; // estático já reprovou/N-A
   const th = page.locator('.resizable-th:has(.app-th-alinhavel)').first();
   if (!(await th.count())) return;
-  await th.hover().catch(() => {});
-  await page.waitForTimeout(250);
-  const opacidade = await th.locator('.app-th-alinhar').first()
-    .evaluate((el) => parseFloat(getComputedStyle(el).opacity)).catch(() => 0);
-  if (opacidade < 0.5) {
-    resultado.T2 = { estado: 'FALHOU', motivo: `affordance do alinhamento não aparece no hover (opacidade ${opacidade}) — R15` };
+
+  /*
+    MEDIÇÃO QUE NÃO REPRODUZ NÃO É MEDIÇÃO (04/09).
+
+    Este check reprovou a `usuarios` numa execução e passou na seguinte,
+    com o MESMO código dos dois lados. Não era a tela: o `hover` não
+    pegava. A faixa fixa ainda assenta depois do carregamento e o cabeçalho
+    se desloca alguns pixels; o ponteiro pousava onde o `th` estava, não
+    onde ele ficou.
+
+    FALHOU intermitente é pior que check nenhum: gasta o tempo de quem
+    investiga e some quando se vai olhar, ensinando a não confiar na
+    matriz. Duas mudanças, e as duas são de honestidade da medida:
+
+    1. Confirma que o ponteiro está SOBRE o cabeçalho (`:hover` de fato
+       casando) antes de julgar a opacidade — e tenta de novo se não
+       estiver. Sem isso, o check media o próprio erro de mira.
+    2. Se depois disso o ponteiro ainda não estiver lá, o item não vira
+       FALHOU: vira SEM DADO, porque a capacidade não foi exercitada.
+       Reprovar a tela por falha do harness é atribuir defeito a quem não
+       o tem.
+  */
+  const alinhar = th.locator('.app-th-alinhar').first();
+  let sobre = false;
+  let opacidade = 0;
+  for (let tentativa = 0; tentativa < 2 && !sobre; tentativa += 1) {
+    await th.scrollIntoViewIfNeeded().catch(() => {});
+    await page.waitForTimeout(200);
+    await th.hover({ force: tentativa > 0 }).catch(() => {});
+    await page.waitForTimeout(300);
+    sobre = await th.evaluate((el) => el.matches(':hover')).catch(() => false);
+    opacidade = await alinhar
+      .evaluate((el) => parseFloat(getComputedStyle(el).opacity)).catch(() => 0);
+  }
+  if (!sobre) {
+    resultado.T2 = {
+      estado: 'SEM DADO',
+      motivo: 'o ponteiro não chegou a pousar sobre o cabeçalho da coluna em duas tentativas — a affordance de alinhamento (R15) NÃO FOI EXERCITADA'
+    };
+  } else if (opacidade < 0.5) {
+    resultado.T2 = { estado: 'FALHOU', motivo: `affordance do alinhamento não aparece com o ponteiro SOBRE o cabeçalho (opacidade ${opacidade}) — R15` };
   }
   await page.mouse.move(4, 4);
 }
@@ -538,6 +573,39 @@ async function checarRedimensionamento(page, tela, resultado) {
     .waitFor({ state: 'visible', timeout: 15000 }).then(() => true).catch(() => false);
   await page.waitForTimeout(400);
   if (!voltou) {
+    /*
+      TABELA AUSENTE POR FALTA DE LINHA É *SEM DADO*, NÃO *FALHOU* (04/09).
+
+      Na `rhdp-pessoal` a T3 reprovava com "a tabela não voltou em 15s"
+      enquanto a T1, a T2 e a T5 na MESMA tela diziam SEM DADO pelo motivo
+      certo: a base do preview devolveu zero linha e a tela mostrou
+      "Nenhuma solicitacao neste filtro." Sem linha, a `TabelaPadrao`
+      renderiza o estado vazio e não existe `.resizable-table` para medir.
+
+      Duas leituras do mesmo fato, uma delas contando como defeito da tela.
+      O estado vazio é justamente o que separa "a base não deu registro" de
+      "a tabela sumiu": quando ele está na tela, a capacidade não foi
+      provada — é lacuna de evidência, e a DoD tem uma célula própria para
+      isso, que NÃO é aprovação nem reprovação.
+    */
+    const vazioNaTela = await page.evaluate(() => {
+      const alvo = document.querySelector('.empty-state, .app-empty-card, .app-tabela-vazia');
+      if (!alvo) return null;
+      const texto = String(alvo.innerText || '').trim().replace(/\s+/g, ' ');
+      return /carregando/i.test(texto) ? null : texto.slice(0, 120);
+    });
+    if (vazioNaTela) {
+      resultado.T3 = {
+        estado: 'SEM DADO',
+        motivo: `a tela TEM tabela redimensionável, mas depois de recarregar a base não devolveu linha (mostrou "${vazioNaTela}") — a persistência da largura NÃO FOI PROVADA`
+      };
+      await page.evaluate(() => {
+        Object.keys(window.localStorage)
+          .filter((c) => /^tabela:/.test(c))
+          .forEach((c) => window.localStorage.removeItem(c));
+      });
+      return;
+    }
     problemas.push('depois de recarregar, a tabela não voltou a aparecer em 15s — a persistência da largura não pôde ser medida');
   }
   const recarregado = (await medir())?.colunas;

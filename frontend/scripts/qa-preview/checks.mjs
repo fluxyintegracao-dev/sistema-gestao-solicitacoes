@@ -137,6 +137,21 @@ export function checksEstaticos({ tipo }) {
     const rect = el.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   };
+  /*
+    CLASSE DE ELEMENTO SVG NÃO É STRING (04/09).
+
+    Em SVG, `element.className` é um `SVGAnimatedString`, não uma string.
+    Quatro pontos deste arquivo faziam `String(el.className)` direto e o
+    motivo saía com `rect.[object.SVGAnimatedString]` — um seletor que não
+    existe, num relatório cuja função é dizer ONDE consertar. O defeito
+    apareceu no X3 do login.
+  */
+  const classeDe = (el) => {
+    if (!el) return '';
+    const cru = el.className;
+    if (cru && typeof cru !== 'string' && typeof cru.baseVal === 'string') return cru.baseVal;
+    return typeof cru === 'string' ? cru : '';
+  };
   const cssPath = (el) => {
     if (!el) return '';
     const partes = [];
@@ -144,9 +159,7 @@ export function checksEstaticos({ tipo }) {
     while (atual && atual !== document.body && partes.length < 5) {
       let p = atual.tagName.toLowerCase();
       if (atual.id) { partes.unshift(`#${atual.id}`); break; }
-      const cls = String(atual.className && atual.className.baseVal !== undefined
-        ? atual.className.baseVal : atual.className || '')
-        .split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+      const cls = classeDe(atual).split(/\s+/).filter(Boolean).slice(0, 2).join('.');
       if (cls) p += `.${cls}`;
       partes.unshift(p);
       atual = atual.parentElement;
@@ -551,7 +564,7 @@ export function checksEstaticos({ tipo }) {
         problemasT6.push(
           `palavra QUEBRADA ao meio: "${alvo.innerText.trim().slice(0, 40)}" `
           + `— td ${Math.round(geo.width)}px, white-space:${cs.whiteSpace}, overflow-wrap:${cs.overflowWrap}, word-break:${cs.wordBreak}, overflow:${cs.overflow}`
-          + (dono ? `; filho <${alvo.firstElementChild.tagName.toLowerCase()}${alvo.firstElementChild.className ? `.${String(alvo.firstElementChild.className).split(' ').join('.')}` : ''}> white-space:${dono.whiteSpace}, overflow-wrap:${dono.overflowWrap}, word-break:${dono.wordBreak}` : '')
+          + (dono ? `; filho <${alvo.firstElementChild.tagName.toLowerCase()}${classeDe(alvo.firstElementChild) ? `.${classeDe(alvo.firstElementChild).split(' ').join('.')}` : ''}> white-space:${dono.whiteSpace}, overflow-wrap:${dono.overflowWrap}, word-break:${dono.wordBreak}` : '')
         );
       }
       if (cabecalhosCortados.length) problemasT6.push(`cabeçalho cortado sem tooltip: "${cabecalhosCortados[0].innerText.trim().slice(0, 40)}"`);
@@ -678,16 +691,36 @@ export function checksEstaticos({ tipo }) {
       };
       const cBloco = primeiraCorOpaca(bloco);
       const cCanvas = primeiraCorOpaca(bloco.parentElement);
-      const proprio = getComputedStyle(bloco).backgroundColor;
+      const estilo = getComputedStyle(bloco);
+      const proprio = estilo.backgroundColor;
+      /*
+        SUPERFÍCIE TAMBÉM VEM DE `background-image` (04/09).
+
+        O check lia SÓ `background-color` e reprovou o `.login-card` dizendo
+        "bloco SEM superfície própria (background transparente)". O cartão
+        do login tem superfície: ela é um gradiente quase opaco
+        (`linear-gradient(rgba(255,255,255,.98), rgba(245,250,255,.985))`),
+        declarado em `background`, que cai em `background-image` — e deixa
+        `background-color` em `rgba(0,0,0,0)`.
+
+        É o erro de sempre em forma nova: medir UMA propriedade quando a
+        coisa pode vir de outra. O que a B1 quer saber é se o bloco tem
+        superfície própria; gradiente é superfície. Quando ela vem de
+        imagem, a comparação por string de cor não se aplica — o check diz
+        isso em vez de fingir que mediu.
+      */
+      const temImagem = estilo.backgroundImage && estilo.backgroundImage !== 'none';
       const transparente = !proprio || proprio === 'rgba(0, 0, 0, 0)' || /rgba\([\d ,.]+, 0\)/.test(proprio);
       r.B1 = cCanvas && cCanvas !== cBloco
         ? { estado: 'PASSOU' }
-        : {
-          estado: 'FALHOU',
-          motivo: transparente
-            ? `bloco SEM superfície própria (background transparente): o canvas (${cCanvas}) aparece através dele`
-            : `canvas (${cCanvas || 'transparente'}) não se distingue do bloco (${cBloco})`
-        };
+        : temImagem
+          ? { estado: 'PASSOU', motivo: 'superfície do bloco vem de background-image (gradiente), não de background-color' }
+          : {
+            estado: 'FALHOU',
+            motivo: transparente
+              ? `bloco SEM superfície própria (background transparente): o canvas (${cCanvas}) aparece através dele`
+              : `canvas (${cCanvas || 'transparente'}) não se distingue do bloco (${cBloco})`
+          };
     }
   }
 
@@ -876,7 +909,7 @@ export function checkFaixaRolada() {
       const x = rf.left + rf.width * frac;
       const el = document.elementFromPoint(x, y);
       if (el && !el.closest('.topbar-shell, .app-page-header, .sidebar, nav')) {
-        conteudoNoVao = el.tagName + '.' + String(el.className).split(/\s+/)[0];
+        conteudoNoVao = el.tagName + '.' + classeDe(el).split(/\s+/)[0];
         break;
       }
     }
@@ -957,10 +990,36 @@ export function checksMobile() {
     }
     return false;
   };
+  /*
+    DOIS TRANSBORDOS QUE NÃO SÃO DEFEITO (04/09) — achados no login.
+
+    (a) INTERNO DE SVG. O fundo do login é um `<svg viewBox="0 0 1920 …"
+        preserveAspectRatio="xMidYMax slice">` de largura 100%: numa janela
+        de 390px o navegador ESCALA a cena para cobrir e recorta as bordas
+        — é o que `slice` significa e é o motivo de existir. Os `<rect>`
+        dentro dela têm caixa de 1204px na tela, e o X3 reprovava por isso.
+        Caixa de filho de SVG é coordenada de DESENHO, não de layout: o
+        recorte é do viewport do próprio SVG, não da página. Enquanto a
+        caixa do `<svg>` couber, o que está dentro não estoura nada.
+
+    (b) SUBÁRVORE `aria-hidden="true"`. É decoração DECLARADA. Se por acaso
+        houver conteúdo de verdade ali, o defeito é outro e pior (a A1 e o
+        leitor de tela é que respondem), não "transbordo horizontal".
+
+    Os dois são guardas de ESCOPO, não exceções: o X3 pergunta se CONTEÚDO
+    some sem rolagem. Nenhum dos dois é conteúdo.
+  */
+  const dentroDeSvgQueCabe = (el) => {
+    const svg = el.closest && el.closest('svg');
+    if (!svg || svg === el) return false;
+    return svg.getBoundingClientRect().right <= innerWidth + 2;
+  };
+  const decorativo = (el) => !!(el.closest && el.closest('[aria-hidden="true"]'));
   const estourando = qa('body *').filter((el) => {
     const rect = el.getBoundingClientRect();
     if (rect.right <= innerWidth + 2 || rect.width <= 40) return false;
     if (!visivel(el)) return false;
+    if (dentroDeSvgQueCabe(el) || decorativo(el)) return false;
     return !dentroDeScrollportHorizontal(el);
   });
   if (estourando.length || doc.scrollWidth > innerWidth + 1) {
@@ -974,7 +1033,7 @@ export function checksMobile() {
     const alvo = folhas.sort((a, b) => b.getBoundingClientRect().right - a.getBoundingClientRect().right)[0]
       || estourando[0];
     const nome = alvo
-      ? alvo.tagName + '.' + String(alvo.className).split(/\s+/).filter(Boolean).slice(0, 2).join('.')
+      ? alvo.tagName + '.' + classeDe(alvo).split(/\s+/).filter(Boolean).slice(0, 2).join('.')
       : '';
     r.X3 = {
       estado: 'FALHOU',
@@ -1012,7 +1071,11 @@ export function checkStickyEAcessibilidade() {
     let atual = el;
     while (atual && atual !== document.documentElement && partes.length < 4) {
       let p = atual.tagName.toLowerCase();
-      const cls = String(atual.className || '').split(/\s+/).filter(Boolean).slice(0, 2).join('.');
+      // Mesmo cuidado com SVG do outro cssPath: className de SVG é objeto.
+      const cru = atual.className;
+      const texto = cru && typeof cru !== 'string' && typeof cru.baseVal === 'string'
+        ? cru.baseVal : (typeof cru === 'string' ? cru : '');
+      const cls = texto.split(/\s+/).filter(Boolean).slice(0, 2).join('.');
       if (cls) p += `.${cls}`;
       partes.unshift(p);
       atual = atual.parentElement;
