@@ -200,6 +200,40 @@ para serem provados do mesmo jeito. Até lá, nenhum deles pode ser tratado
 como verificado só por aparecer verde. Está registrado como lacuna, não
 como cobertura.
 
+### O NÚMERO QUE RESUME O PROCESSO (03/09)
+
+Auditoria completa dos instrumentos, no sentido de REPROVAR:
+
+| Superfície | Auditados | Não mordiam | Quais |
+|---|---|---|---|
+| Regras estáticas (`validarLayout.mjs`) | 8 | **2** | R18, R21 |
+| Itens da DoD no navegador (`checks.mjs`) | 27 | **5** | X3, T4, C2, B1, T7 |
+| **Total** | **35** | **7** | |
+
+**Nenhum dos sete foi encontrado por defeito em tela. Todos apareceram ao
+conferir o instrumento.** É a justificativa permanente de
+`provas/regrasMordem.mjs` e `provas/itensDaDoDMordem.mjs` estarem no gate:
+sem eles, um check que para de olhar continua verde para sempre, e a
+primeira notícia vem de um usuário.
+
+Dois deles não mediam **nada**, não "mediam pouco":
+
+- **X3** abria com `document.scrollingElement.scrollWidth > innerWidth`, e o
+  sistema declara `overflow-x: clip` em `html/body/#root` de propósito. Com
+  `clip` esse valor nunca passa da janela: condição morta, e a busca do
+  culpado ficava atrás dela.
+- **T4** media a folga pelo `scrollWidth` de um filho **inline**, que é
+  sempre zero, e usava como sinal de quebra uma condição verdadeira em toda
+  tabela com coluna de identidade. Errava nos dois sentidos: acusava a
+  fixture limpa e absolvia a fixture com defeito.
+
+**LACUNA AINDA ABERTA, declarada**: **7 itens** não moram no `checks.mjs` e
+por isso NÃO entraram nesta auditoria — **C1, T3, F3, M2, R1, R3, X2**. São
+medidos pelo runner (`verificar.mjs`) com hover, clique, arrasto e rolagem,
+e precisam de prova própria. Até que a tenham, **nenhum deles pode ser
+tratado como verificado só por aparecer verde** — inclusive a T3, que existe
+para provar que o arrasto de coluna grava só a coluna arrastada.
+
 ### O corolário incômodo
 
 Quando um check vira verde, a pergunta certa não é "acabou?". É **"o que
