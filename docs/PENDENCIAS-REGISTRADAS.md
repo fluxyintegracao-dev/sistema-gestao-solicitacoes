@@ -1449,3 +1449,66 @@ Não achando pelo código, procura pelo **id interno** da tabela. Um arquivo
 chamado `OBRA-3 comprovante.pdf`, numa base onde não exista obra de código
 "3", é vinculado à obra **cujo id é 3** — que pode ser qualquer uma.
 Convenção de nome de arquivo alcançando a chave primária do banco.
+
+---
+
+## A TERCEIRA CATEGORIA QUE A REGRA DE NAVEGAÇÃO NÃO COBRE (04/09)
+
+A regra registrada hoje em `REGRAS-LAYOUT.md` separa duas coisas:
+
+| Isto é… | Mora em |
+|---|---|
+| Ação sobre esta tela | barra de ações; as raras, no menu "⋯" |
+| Caminho para outra tela | hub do módulo, breadcrumb, Ctrl+K |
+
+A varredura que a regra pediu (toda `secundarias`/`acaoPrincipal`/
+`destrutiva`/`mais` do `PageHeader` com `to:`) devolveu **dois** destinos no
+sistema inteiro:
+
+1. **`FinanceiroTitulos` · "Novo título" → `/financeiro/titulos/novo`** —
+   não é defeito. Sub-rota da própria listagem: criar registro é AÇÃO,
+   mesmo abrindo outra rota. A C6 já sabe disso e tem prova de que não
+   acusa `/usuarios/12/editar` na barra de ações.
+
+2. **`FinanceiroTituloDetalhe` · "Abrir solicitação" →
+   `/solicitacoes/:id`** — o item 5 das decisões pendentes, hoje tolerado
+   por exceção declarada no `telas.mjs`.
+
+### Por que o segundo não se resolve com a regra nova
+
+Ele não é atalho de módulo. É **link para o REGISTRO RELACIONADO**, seguindo
+uma relação do dado — e nenhum dos três lugares da regra consegue hospedá-lo:
+
+- o **hub** não sabe a qual solicitação *este* título pertence;
+- o **breadcrumb** devolve à hierarquia do próprio módulo, não à de outro;
+- o **Ctrl+K** acha telas por nome, não o registro ligado ao que está aberto.
+
+É uma terceira categoria, e ela precisa de lugar declarado:
+
+| Categoria | Mora em |
+|---|---|
+| Ação sobre esta tela | barra de ações / menu "⋯" |
+| Caminho para outra tela | hub, breadcrumb, Ctrl+K |
+| **Link para o registro relacionado** | **em aberto** |
+
+### As duas saídas honestas
+
+**(a) No corpo da tela, junto do campo que o origina** — "Solicitação:
+SOL-1957" com o código clicável, onde o vínculo é lido. Recomendada: o link
+ao lado do dado explica POR QUE ele existe; na barra de ações ele fica sem
+contexto, e é justamente essa falta de contexto que a C6 chama de
+"navegação vestida de ação".
+
+**(b) Declarar a categoria como pertencente à barra de ações por natureza**,
+e ensinar a C6 a distinguir "outra rota do módulo" de "registro relacionado
+a este".
+
+**Decisão do cliente, pendente.** Enquanto ela não vem, a exceção segue
+declarada no `telas.mjs` — declarada, nunca silenciosa.
+
+### O que este caso ensina sobre regras
+
+A regra de hoje nasceu de um conflito real e resolveu-o. Na primeira
+varredura que ela mesma pediu, apareceu um caso que ela não prevê. **Isso
+não a invalida: mostra que ela tem alcance conhecido.** Regra que parece
+cobrir tudo é regra que ninguém testou contra o sistema inteiro.
