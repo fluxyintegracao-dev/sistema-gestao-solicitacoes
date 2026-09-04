@@ -24,8 +24,14 @@ import { API_URL, authHeaders } from '../services/api';
  *
  * Duas familias de rota servem este mesmo componente, e cada uma foi batizada por um assunto
  * diferente:
- *   - `/configuracoes-contrato-alertas` — ALERTAS DE CONTRATO (fora do menu);
- *   - `/configuracoes-formas-pagamento-solicitacao` — FORMAS DE PAGAMENTO (no menu, Configuracoes).
+ *   - `/configuracoes-contrato-alertas` — ALERTAS DE CONTRATO;
+ *   - `/configuracoes-formas-pagamento-solicitacao` — FORMAS DE PAGAMENTO.
+ *
+ * Desde 04/09 as DUAS tem porta propria no hub de Configuracoes. Ate entao a
+ * primeira nao tinha nenhuma, e eu quase a removi como duplicata — o que
+ * teria apagado um assunto inteiro do sistema. O criterio que resolveu: se a
+ * tela ANUNCIA COISA DIFERENTE conforme o caminho, sao dois destinos, e o
+ * que falta e a porta do segundo, nao a remocao dele.
  *
  * Ate 03/09 o titulo era fixo em "Formas de pagamento da Nova Solicitacao": quem chegava pela rota
  * dos alertas lia o titulo da OUTRA configuracao. `useLocation` resolve isso — o cabecalho nomeia o

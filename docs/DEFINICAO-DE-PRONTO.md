@@ -712,10 +712,22 @@ Financeiro.
    que `/compras/relatorios/auditoria`, com os mesmos guardas, sem ler a
    rota e com os mesmos parâmetros por query string. Ficou a que tem porta;
    o botão de auditoria do pedido passou a apontar para ela.
-3. **`/configuracoes-contrato-alertas`** — **não removida**. Serve o mesmo
-   componente que `/configuracoes-formas-pagamento-solicitacao`, mas a tela
-   lê o `pathname` e muda título, descrição e qual bloco recebe a barra de
-   cor. Há diferença de comportamento: fica para decisão do responsável.
+3. **`/configuracoes-contrato-alertas`** — **porta aberta, não removida**.
+   Serve o mesmo componente que `/configuracoes-formas-pagamento-solicitacao`,
+   mas a tela lê o `pathname` e muda título, descrição e qual bloco recebe a
+   barra de cor. O critério que resolveu:
+
+   > Se a tela **anuncia coisa diferente** conforme o caminho, são dois
+   > destinos de verdade, e o que falta é a porta do segundo — não a
+   > remoção dele.
+
+   A entrada foi nomeada pelo ASSUNTO que abre ("Alertas e Limites do
+   Contrato"), não pelo arquivo que carrega: quem clica precisa saber o que
+   vai encontrar antes de chegar. Eu ia removê-la como duplicata, o que
+   teria apagado um assunto inteiro do sistema.
+
+**Alcance final da rodada: 117 nível 1, 59 nível 2, 0 enterradas, 0 só pela
+URL.** Nenhuma tela do sistema depende de alguém saber o endereço de cor.
 
 ### A lição, que é a regra do detector aplicada ao planejamento
 

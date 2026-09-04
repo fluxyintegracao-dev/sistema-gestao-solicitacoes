@@ -222,6 +222,27 @@ const SECOES_CONFIG = [
         permissionArea: 'geral'
       },
       {
+        /*
+          DOIS DESTINOS, NAO UMA ROTA SOBRANDO (04/09).
+
+          Esta entrada e a de cima levam ao MESMO componente, e por um tempo
+          eu tratei a de baixo como duplicata para remover. Nao e: a tela le
+          o pathname e anuncia assunto diferente conforme o caminho — titulo,
+          descricao e qual bloco recebe a barra de cor. Se a tela muda o que
+          diz que é conforme a porta, sao duas portas de verdade, e o que
+          faltava era a segunda.
+
+          O rotulo nomeia o ASSUNTO QUE A PORTA ABRE, nao o arquivo que ela
+          carrega: quem clica precisa saber o que vai encontrar antes de
+          chegar. Os quatro blocos continuam visiveis nas duas — a diferenca
+          e o que a tela anuncia, nao o que ela esconde.
+        */
+        title: 'Alertas e Limites do Contrato',
+        description: 'Cortes e cores do alerta de saldo do contrato e o limite para analise juridica.',
+        to: '/configuracoes-contrato-alertas',
+        permissionArea: 'geral'
+      },
+      {
         title: 'Automacao da Nova Solicitacao',
         description: 'Redirecione tipos de solicitacao para telas especificas mantendo a obra selecionada.',
         to: '/nova-solicitacao-automacao-destino',
