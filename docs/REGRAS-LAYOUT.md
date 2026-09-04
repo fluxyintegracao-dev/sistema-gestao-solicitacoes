@@ -155,6 +155,54 @@ outro trabalho) em vez da causa (a interrupção)**. Regra escrita pelo
 sintoma acerta os casos comuns e erra os casos em que sintoma e causa se
 separam — e erra com a autoridade de estar escrita.
 
+## R28 — Confirmação de gravação FICA na tela (decidida em 04/09, aplicar na leva do componente)
+
+**Decisão tomada, implementação agendada.** Está escrita aqui para não se
+perder entre a decisão e a leva que a executa.
+
+### A regra
+
+- **Aviso de sucesso é persistente por padrão**, fechado pelo usuário.
+- Se existir caso em que o sumiço automático é melhor, **ele vira a
+  exceção**, declarada no ponto de uso — não a regra.
+
+### O motivo
+
+Confirmação de gravação que desaparece sozinha em 6 segundos **é pior que
+fixa**: quem desviou o olhar no momento em que ela apareceu não sabe se
+salvou. E não sabendo, a pessoa faz a única coisa disponível — salva de
+novo. A mensagem que existia para dar certeza produz a dúvida.
+
+Isso não é específico de nenhuma tela. Vale onde quer que o sistema diga
+"gravei".
+
+### Por que NÃO foi feito no dia em que foi decidido
+
+`TEMPO_SUCESSO` vive no `useAvisos`, que **95 telas já aprovadas** usam.
+Trocar o padrão muda comportamento em todas elas de uma vez, no meio de uma
+rodada, sem regressão medida.
+
+É a **R21** pela terceira vez neste projeto: *ou o check nasce junto com a
+mudança, ou a mudança espera a leva acabar*. Aqui não é nem check — é a
+matriz inteira em regressão, porque o que muda é o que a pessoa vê depois de
+clicar em salvar.
+
+### Onde ela entra
+
+**Leva própria do componente**, junto da leva do `TabelaPadrao`: mudança no
+`useAvisos`, e matriz completa em regressão depois. Não se emenda numa
+rodada de módulo.
+
+### O que já existe hoje
+
+A `CartoesRecarga` foi a primeira, por um caminho aditivo: `useAvisos` ganhou
+`avisar.sucesso(msg, titulo, { persistente: true })`. Quem chama sem a opção
+continua com os 6 segundos, byte a byte. **Na leva do componente a opção
+inverte de lado**: persistente vira o padrão, e o sumiço automático passa a
+ser o que se declara.
+
+---
+
 ## R10 — Escala como única fonte de medida (e conforto de leitura)
 
 - **Critério que governa (decisão do cliente, 02/09): CONFORTO E CLAREZA DE
