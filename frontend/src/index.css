@@ -4993,7 +4993,24 @@ textarea.form-control {
   min-height: 96px;
 }
 
-input[type="file"] {
+/*
+  `:not(.sr-only)` — sem ele, TODO campo de arquivo escondido para leitor de
+  tela aparecia na tela (04/09, medido no preview).
+
+  Este bloco pinta o campo de arquivo com caixa tracejada, ícone de clipe e
+  largura 100%. Ele é `input[type="file"]`, especificidade (0,1,1); a
+  `.sr-only` é (0,1,0) e PERDE — mesmo declarada depois. Resultado: um
+  `<input type="file" class="sr-only">` renderizava com 390px numa janela de
+  390px, transbordando a página em vez de ficar invisível.
+
+  O padrão `sr-only` existe justamente para o campo de arquivo: some da
+  tela, continua alcançável por teclado e por leitor de tela, e o rótulo
+  visível é um `<label>` estilizado. Quatro campos no sistema usam esse
+  padrão; os quatro estavam visíveis.
+
+  (`class="hidden"` escapava por acaso: este bloco não mexe em `display`.)
+*/
+input[type="file"]:not(.sr-only) {
   max-width: 100%;
   width: 100%;
   min-height: var(--ui-control-height);
@@ -5011,8 +5028,8 @@ input[type="file"] {
   transition: border-color 0.16s ease, background-color 0.16s ease;
 }
 
-input[type="file"]::file-selector-button,
-input[type="file"]::-webkit-file-upload-button {
+input[type="file"]:not(.sr-only)::file-selector-button,
+input[type="file"]:not(.sr-only)::-webkit-file-upload-button {
   width: 0;
   min-width: 0;
   padding: 0;
