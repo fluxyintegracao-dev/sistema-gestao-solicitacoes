@@ -705,7 +705,355 @@ export const TELAS = [
       A1: 'idem T1: o percurso de teclado pelo formulário e pelo anexo não foi exercitado',
       B4: 'idem T1: os campos de contexto (fornecedor, obra, situação) não renderizam sem cotação'
     }
-  }
+  },
+
+  /* =================================================================
+     RODADA 2 — CONFIGURAÇÕES (04/09): as 25 telas migradas.
+
+     Elas entram AQUI e no manifesto estático no MESMO commit. Entrar só
+     num dos dois é meia migração — e a metade que fica de fora é
+     justamente a que decide "PRONTO", porque PRONTO se verifica no
+     preview publicado, não no código.
+
+     Eu mesmo tropecei nisso hoje: adiantei UMA tela para o manifesto
+     estático e o check de cobertura reprovou na hora, com o nome dela.
+     O check está certo e a pressa era minha.
+     ================================================================= */
+
+  {
+    id: 'config-hub-status-setor',
+    arquivo: 'src/pages/StatusSetor.jsx',
+    rota: '/status-setor',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-permissoes-setor',
+    arquivo: 'src/pages/PermissoesSetor.jsx',
+    rota: '/permissoes-setor',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-cores-sistema',
+    arquivo: 'src/pages/CoresSistema.jsx',
+    rota: '/cores-sistema',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-contrato-obra-categorias',
+    arquivo: 'src/pages/ContratoObraCategorias.jsx',
+    rota: '/contrato-obra-categorias',
+    tipo: 'mista',
+    naoAplica: {
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-areas-por-setor-origem',
+    arquivo: 'src/pages/AreasPorSetorOrigem.jsx',
+    rota: '/areas-por-setor-origem',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-automacao-status-setor',
+    arquivo: 'src/pages/AutomacaoStatusSetor.jsx',
+    rota: '/automacao-status-setor',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-arquivos-modelos',
+    arquivo: 'src/pages/ArquivosModelosConfig.jsx',
+    rota: '/arquivos-modelos-config',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-comercial-categorias',
+    arquivo: 'src/pages/ConfiguracoesComercialCategorias.jsx',
+    rota: '/configuracoes-comercial-categorias',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-provisionamento-fluxo',
+    arquivo: 'src/pages/ConfiguracoesProvisionamentoFluxo.jsx',
+    rota: '/configuracoes-provisionamento-fluxo',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-acoes-principais',
+    arquivo: 'src/pages/ConfiguracoesAcoesPrincipais.jsx',
+    rota: '/configuracoes-acoes-principais',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-atalhos-setor',
+    arquivo: 'src/pages/ConfiguracoesAtalhosSetor.jsx',
+    rota: '/configuracoes-atalhos-setor',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-detalhe-layout',
+    arquivo: 'src/pages/ConfiguracoesDetalheLayout.jsx',
+    rota: '/configuracoes-detalhe-layout',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-cotacao',
+    arquivo: 'src/pages/ConfiguracoesCotacao.jsx',
+    rota: '/configuracoes-cotacao',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-status-pedido-compra',
+    arquivo: 'src/pages/ConfiguracoesStatusPedidoCompra.jsx',
+    rota: '/configuracoes-status-pedidos-compra',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-sla-setor',
+    arquivo: 'src/pages/SolicitacoesSlaSetor.jsx',
+    rota: '/solicitacoes-sla-setor',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-recebimento-setor',
+    arquivo: 'src/pages/ComportamentoRecebimentoSetor.jsx',
+    rota: '/comportamento-recebimento-setor',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-nova-solicitacao-campos',
+    arquivo: 'src/pages/NovaSolicitacaoCamposConfig.jsx',
+    rota: '/nova-solicitacao-campos',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-nova-solicitacao-destino',
+    arquivo: 'src/pages/NovaSolicitacaoAutomacaoDestinoConfig.jsx',
+    rota: '/nova-solicitacao-automacao-destino',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-suporte',
+    arquivo: 'src/pages/ConfiguracoesSuporte.jsx',
+    rota: '/configuracoes-suporte',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-visibilidade-ui',
+    arquivo: 'src/pages/ConfiguracoesVisibilidadeUi.jsx',
+    rota: '/configuracoes-visibilidade-ui',
+    tipo: 'mista',
+    naoAplica: {
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-notificacoes-sistema',
+    arquivo: 'src/pages/ConfiguracoesNotificacoesSistema.jsx',
+    rota: '/configuracoes-notificacoes-sistema',
+    tipo: 'mista',
+    naoAplica: {
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-modulos',
+    arquivo: 'src/pages/ConfiguracoesModulos.jsx',
+    rota: '/configuracoes-modulos',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-timeout-inatividade',
+    arquivo: 'src/pages/TimeoutInatividade.jsx',
+    rota: '/timeout-inatividade',
+    tipo: 'form',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-permissoes-areas-padroes',
+    arquivo: 'src/pages/PermissoesAreasPadroes.jsx',
+    rota: '/permissoes-areas-padroes',
+    tipo: 'mista',
+    naoAplica: {
+      F1: "tela de configuração sem caixa de busca — não há duas a conciliar",
+      F2: "idem F1: não há recorte de lista por filtro",
+      F3: "idem F1",
+      F4: "idem F1",
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
+  {
+    id: 'config-permissoes-areas',
+    arquivo: 'src/pages/PermissoesAreas.jsx',
+    rota: '/permissoes-areas',
+    tipo: 'mista',
+    naoAplica: {
+      C3: "configuração de sistema, não é tela de detalhe de registro",
+      C4: "idem C3"
+    }
+  },
 ];
 
 /** Itens da DoD, na ordem da matriz. */
