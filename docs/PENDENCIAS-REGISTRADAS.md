@@ -1586,3 +1586,30 @@ número mede e o que a frase promete.
 
 **Todo agregado precisa dizer de que é feito.** Um total sem composição é um
 número pedindo para ser lido errado.
+
+## DECISÃO DE ESCOPO: Solicitações sai da rodada 2 e vira rodada própria (04/09)
+
+Decisão do responsável, com o mesmo critério aplicado à `GestaoContratos`
+horas antes: **hub que alcança não define dono, e tela pesada não entra de
+carona no fim de uma rodada.**
+
+A rodada 2 nasceu como "Solicitações + Configurações". O levantamento mostrou
+que os dois lados não têm o mesmo peso:
+
+| Configurações | Solicitações |
+|---|---|
+| 27 telas, a maioria de uma tela por assunto | 6 telas, três delas enormes |
+| já reformadas e no manifesto | nenhuma tocada, nenhuma no manifesto |
+| — | `NovaSolicitacao`: 3.710 linhas, **74 `alert()`** |
+| — | `SolicitacaoDetalhe`: 20 arquivos, ~47 caixas do navegador |
+| — | pasta `Solicitacoes`: 4 defeitos em CSS **compartilhado** |
+
+**A rodada 2 fecha com as 27 de Configurações.** Solicitações vira rodada
+própria, com espaço para o CSS compartilhado — que é o que mais assusta ali,
+porque `--sol-font-base: 13px` e `.solicitacoes-filtros .input { min-height:
+40px }` afetam telas de outros módulos.
+
+O que fica registrado como critério, e já vale para as duas vezes que foi
+usado hoje: **rodada é unidade de medição, não de calendário.** Emendar uma
+tela grande no fim de uma rodada para "não sobrar" é como o número que soma
+só a página — parece completo e não é.

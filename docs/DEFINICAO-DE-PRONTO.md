@@ -374,8 +374,8 @@ apontava.
 - **B1** Fundo cinza-azulado (canvas) com blocos brancos flutuando.
 - **B2** UM bloco principal com barra de cor; secundários neutros.
 - **B3** Cada informação aparece UMA vez só na tela (mesma contagem/apoio na
-  faixa E no bloco = FALHOU; segunda aparição com função diferente é
-  exceção registrada).
+  faixa E no bloco = FALHOU). **O mesmo dado com PAPÉIS diferentes não é
+  duplicação** — ver o refinamento abaixo.
 - **B4** Campo vazio some, com contador "ver N campos vazios".
 - **B5** Nenhum texto solto fora de bloco (todo texto tem superfície).
 
@@ -781,3 +781,49 @@ Matriz limpa antes de fechar rodada. Revisor separado. Conferir antes de
 afirmar. **Nada aqui é sobre ganhar tempo trocando verificação por
 velocidade** — é sobre não ficar parado esperando resposta para coisa que eu
 decido melhor.
+
+
+## B3 — O MESMO DADO COM PAPÉIS DIFERENTES NÃO É DUPLICAÇÃO (04/09)
+
+Refinamento da B3, decidido pelo responsável. Estava como "segunda aparição
+com função diferente é exceção registrada", o que jogava a decisão para o
+mecanismo de exceção — e exceção é dívida declarada, não é o lugar de um
+arranjo que está certo.
+
+### A distinção
+
+O que a B3 proíbe é **a mesma informação ocupando dois lugares para dizer a
+mesma coisa** — a contagem na faixa e a mesma contagem no bloco. O leitor
+para, compara os dois números e procura a diferença que não existe.
+
+O que ela **não** proíbe é o mesmo dado servindo a **papéis diferentes**:
+
+| Papel | O que é | Exemplo |
+|---|---|---|
+| **Referência** | acompanha a pessoa enquanto ela age | o preço na linha, enquanto se digita |
+| **Decisão** | consolida para a escolha que vem depois | o total no painel, que fecha a cotação |
+
+Tirar um dos dois não simplifica: **quebra um dos dois trabalhos.** Sem o
+valor na linha, quem digita perde a referência do que está mudando; sem o
+total no painel, quem decide precisa somar de cabeça.
+
+### O caso que serve de exemplo
+
+`GerenciarCotacaoSolicitacao` (módulo de Compras, rodada 5). A
+`TabelaPadrao` traz o preço editável por linha, e o painel de resumo traz os
+totais. É o mesmo número em dois lugares, e os dois são necessários.
+
+Registro de honestidade: **essa dúvida não foi levantada por mim** — veio do
+responsável, e a tela é de uma rodada que ainda não chegou. A conferência
+que fiz foi só estrutural: a tabela com input por linha e o painel de resumo
+existem no código, nas linhas que a regra cita.
+
+### O teste, para não voltar como dúvida a cada leva
+
+> **Se eu apagar a segunda aparição, algum trabalho fica pior?**
+>
+> - Se a resposta é "não, só fica mais limpo" → é duplicação, e sai.
+> - Se a resposta é "sim, alguém perde a referência ou a consolidação" →
+>   são dois papéis, e ficam os dois.
+
+A pergunta é sobre o trabalho da pessoa, não sobre o número na tela.
