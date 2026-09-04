@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
@@ -2794,9 +2794,33 @@ export default function FinanceiroTituloNovo() {
                 <button type="submit" className="btn btn-primary" disabled={saving}>
                   {saving ? 'Salvando...' : (form.tipo === 'RECEBER' ? 'Criar conta a receber' : 'Criar conta a pagar')}
                 </button>
-                <Link to={tituloListPath} className="btn btn-outline">
+                {/*
+                  CANCELAR VOLTA PELO HISTÓRICO (decisão do cliente, 04/09).
+
+                  Era um link (react-router) para uma rota fixa, e a C6 acusava com
+                  razão: navegação vestida de ação na barra de ações.
+
+                  O motivo da decisão é mais forte que a regra de forma:
+                  cancelar é DESFAZER A INTENÇÃO de quem chegou aqui, e
+                  voltar pelo histórico devolve a pessoa de onde ela veio,
+                  seja qual for o caminho. Link fixo manda todo mundo para o
+                  mesmo lugar — inclusive quem chegou por outro: de uma
+                  busca, de um título vizinho, de um relatório.
+
+                  `navigate(-1)` sem histórico não faz nada (aba nova, URL
+                  digitada), então o destino declarado sobrevive como
+                  fallback — nunca como primeira escolha.
+                */}
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => {
+                    if (window.history.length > 1) navigate(-1);
+                    else navigate(tituloListPath);
+                  }}
+                >
                   Cancelar
-                </Link>
+                </button>
               </div>
             </div>
           </BlocoConteudo>
