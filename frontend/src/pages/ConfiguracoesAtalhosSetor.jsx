@@ -10,7 +10,6 @@ import {
   useAvisos,
   useConfirmacao
 } from '../components/padrao';
-import OverlayModal from '../components/ui/OverlayModal';
 import { getSetores } from '../services/setores';
 import { getAllDestinations } from '../navigation/navigationConfig';
 import {
@@ -28,6 +27,18 @@ import {
 // removíveis. O destino referencia a fonte única de navegação: rótulo,
 // ícone, rota e permissão vêm de lá — usuário sem acesso ao destino
 // simplesmente não vê o atalho.
+//
+// FORMULÁRIO INLINE — POR QUÊ (R9 revista em 04/09; NÃO mover para modal)
+// ---------------------------------------------------------------------
+// A R9 mede INTERRUPÇÃO, não frequência: o modal existe para o cadastro
+// que interrompe outro trabalho e precisa devolver a pessoa ao lugar de
+// onde ela saiu. Aqui não há trabalho interrompido — esta tela existe PARA
+// cadastrar atalho padrão. Teste da regra: tirando o formulário, sobra uma
+// tabela de atalhos que ninguém abriria por si só; logo, o formulário é a
+// tela e fica inline.
+// Em 04/09 esta tela foi levada para OverlayModal citando a versão ANTIGA
+// da R9 ("cadastro raro abre em modal") — critério pelo sintoma, não pela
+// causa. A regra foi revista e esta é a reversão: não devolver para modal.
 // =====================================================================
 
 function formVazio() {
@@ -39,9 +50,9 @@ export default function ConfiguracoesAtalhosSetor() {
   const [setores, setSetores] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  // null = modal fechado (R9): configurar um atalho padrão é tarefa rara,
-  // e o painel permanente roubava metade da tela de quem só vem conferir.
-  const [form, setForm] = useState(null);
+  // O formulário está sempre montado: é o trabalho da tela, não um
+  // episódio dela — por isso não existe mais estado "aberto/fechado".
+  const [form, setForm] = useState(formVazio());
   // R3/R19: aviso do sistema no lugar da caixa do navegador.
   const { avisos, avisar, fechar } = useAvisos();
   const { confirmar, elementoConfirmacao } = useConfirmacao();
@@ -82,8 +93,9 @@ export default function ConfiguracoesAtalhosSetor() {
     try {
       setSalvando(true);
       await criarAtalhoSetor(form);
-      setForm(null);
+      setForm(formVazio());
       await carregar();
+      avisar.sucesso('Atalho padrão adicionado.');
     } catch (error) {
       avisar.erro(error?.message || 'Erro ao criar atalho');
     } finally {
@@ -121,110 +133,103 @@ export default function ConfiguracoesAtalhosSetor() {
     }
   }
 
-  // R16: UM dono para a faixa de avisos — dentro do modal enquanto ele
-  // está aberto (é lá que o erro de validação e o de gravação acontecem),
-  // abaixo do cabeçalho no resto do tempo.
-  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
-  const formAtivo = form !== null;
-
   return (
     <Pagina>
-      {/* C1/R13: faixa fixa com título, contagem, apoio e a ação principal. */}
+      {/* C1/R13: faixa fixa com título, contagem e apoio. A ação principal
+          era "Novo atalho padrão", que só abria o modal — sem modal viraria
+          botão sem função. No lugar dela vai o GRAVAR do cadastro, que é o
+          trabalho da tela e o que a R13 quer sempre a um clique. Não há
+          cópia do botão dentro do bloco: um dono por responsabilidade
+          (R16). */}
       <PageHeader
         titulo="Atalhos por setor"
         contagem={carregando ? null : `${itens.length} atalho(s)`}
         descricao="Atalhos com que cada setor começa. Até 2 por setor podem ser obrigatórios — aparecem com cadeado, à esquerda dos pessoais, e o usuário não remove. Os demais são sugestões que o usuário pode remover ou reordenar; quem não tem permissão no destino não vê o atalho."
-        acaoPrincipal={{ rotulo: 'Novo atalho padrão', onClick: () => setForm(formVazio()) }}
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando…' : 'Adicionar atalho',
+          onClick: adicionar,
+          desabilitada: salvando
+        }}
       />
 
-      {!formAtivo && faixaAvisos}
+      {/* R16: UM dono para a faixa de avisos — sem modal, validação, carga e
+          gravação reportam todas aqui, logo abaixo do cabeçalho. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* R1/R9: cadastro raro em MODAL — a tela inteira fica com a lista. */}
-      {formAtivo && (
-        <OverlayModal
-          aberto
-          rotulo="Novo atalho padrão de setor"
-          onFechar={() => setForm(null)}
-        >
-          <BlocoConteudo
-            titulo="Novo atalho padrão"
-            acoes={(
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setForm(null)}>
-                Fechar
-              </button>
-            )}
-          >
-            {faixaAvisos}
+      {/* ARRANJO: formulário ACIMA da lista, ambos em largura cheia. Em duas
+          colunas a tabela ficaria com metade da tela para cinco colunas mais
+          a de ações — pela R1 (coluna textual mín. 160px) ela viveria em
+          rolagem horizontal, e o destino, que é o texto mais longo da
+          linha, é justamente o que precisa da sobra. O formulário são duas
+          linhas de dois campos: custa pouca altura e não disputa largura. */}
+      <BlocoConteudo
+        titulo="Novo atalho padrão"
+        descricao="Escolha o setor e o destino; a posição ordena os atalhos e o obrigatório vem com cadeado."
+      >
+        {/* R12: os dois selects são entrada de FORMULÁRIO — o setor e o
+            destino que estão sendo cadastrados —, não filtro de lista. */}
+        <FormSecao legenda="Atalho" colunas={2}>
+          <CampoForm label="Setor" obrigatorio>
+            <select
+              className="input w-full"
+              value={form.setor}
+              onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
+            >
+              <option value="">Selecione…</option>
+              {setores.map((setor) => (
+                <option key={setor.id} value={setor.codigo || setor.nome}>
+                  {setor.nome}
+                </option>
+              ))}
+            </select>
+          </CampoForm>
+          <CampoForm label="Destino" obrigatorio hint="Rótulo, ícone, rota e permissão vêm da fonte única de navegação.">
+            <select
+              className="input w-full"
+              value={form.destino_id}
+              onChange={(event) => setForm((prev) => ({ ...prev, destino_id: event.target.value }))}
+            >
+              <option value="">Selecione…</option>
+              {destinos.map((destino) => (
+                <option key={destino.id} value={destino.id}>
+                  {destino.label} ({destino.moduleId})
+                </option>
+              ))}
+            </select>
+          </CampoForm>
+        </FormSecao>
 
-            {/* R12: os dois selects são entrada de FORMULÁRIO — o setor e o
-                destino que estão sendo cadastrados —, não filtro de lista. */}
-            <FormSecao legenda="Atalho" colunas={2}>
-              <CampoForm label="Setor" obrigatorio>
-                <select
-                  className="input w-full"
-                  value={form.setor}
-                  onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
-                >
-                  <option value="">Selecione…</option>
-                  {setores.map((setor) => (
-                    <option key={setor.id} value={setor.codigo || setor.nome}>
-                      {setor.nome}
-                    </option>
-                  ))}
-                </select>
-              </CampoForm>
-              <CampoForm label="Destino" obrigatorio hint="Rótulo, ícone, rota e permissão vêm da fonte única de navegação.">
-                <select
-                  className="input w-full"
-                  value={form.destino_id}
-                  onChange={(event) => setForm((prev) => ({ ...prev, destino_id: event.target.value }))}
-                >
-                  <option value="">Selecione…</option>
-                  {destinos.map((destino) => (
-                    <option key={destino.id} value={destino.id}>
-                      {destino.label} ({destino.moduleId})
-                    </option>
-                  ))}
-                </select>
-              </CampoForm>
-            </FormSecao>
+        <FormSecao legenda="Como aparece" colunas={2}>
+          <CampoForm label="Posição">
+            <input
+              className="input w-full"
+              type="number"
+              min="0"
+              value={form.posicao}
+              onChange={(event) => setForm((prev) => ({ ...prev, posicao: Number(event.target.value) }))}
+            />
+          </CampoForm>
+          <div className="form-campo--linha">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={form.obrigatorio}
+                onChange={(event) => setForm((prev) => ({ ...prev, obrigatorio: event.target.checked }))}
+              />
+              Obrigatório (máx. 2 por setor)
+            </label>
+          </div>
+        </FormSecao>
 
-            <FormSecao legenda="Como aparece" colunas={2}>
-              <CampoForm label="Posição">
-                <input
-                  className="input w-full"
-                  type="number"
-                  min="0"
-                  value={form.posicao}
-                  onChange={(event) => setForm((prev) => ({ ...prev, posicao: Number(event.target.value) }))}
-                />
-              </CampoForm>
-              <div className="form-campo--linha">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.obrigatorio}
-                    onChange={(event) => setForm((prev) => ({ ...prev, obrigatorio: event.target.checked }))}
-                  />
-                  Obrigatório (máx. 2 por setor)
-                </label>
-              </div>
-            </FormSecao>
+        <div className="app-actionbar">
+          <button type="button" className="btn btn-outline" onClick={() => setForm(formVazio())}>
+            Limpar campos
+          </button>
+        </div>
+      </BlocoConteudo>
 
-            <div className="app-actionbar">
-              <button type="button" className="btn btn-primary" onClick={adicionar} disabled={salvando}>
-                {salvando ? 'Salvando…' : 'Adicionar atalho'}
-              </button>
-              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-            </div>
-          </BlocoConteudo>
-        </OverlayModal>
-      )}
-
-      {/* B2: sobrou UM assunto na tela — a lista é quem responde a pergunta
-          da página, então é ela que leva a barra de cor do bloco primário. */}
+      {/* B2: a lista continua sendo o bloco primário — é onde o cadastro
+          aparece feito —, com a barra de cor do primário. */}
       <BlocoConteudo
         titulo="Atalhos configurados"
         variante="primario"

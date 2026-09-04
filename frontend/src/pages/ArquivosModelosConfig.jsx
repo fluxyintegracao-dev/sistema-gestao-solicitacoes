@@ -16,7 +16,24 @@ import {
   Avisos,
   useAvisos
 } from '../components/padrao';
-import OverlayModal from '../components/ui/OverlayModal';
+
+// =====================================================================
+// ARQUIVOS MODELOS — Configuração
+// ---------------------------------------------------------------------
+// FORMULÁRIO INLINE — POR QUÊ (R9 revista em 04/09; NÃO mover para modal)
+// ---------------------------------------------------------------------
+// A R9 mede INTERRUPÇÃO, não frequência: modal é para o cadastro que
+// interrompe outro trabalho (cadastrar um credor no meio de uma
+// solicitação) e precisa devolver a pessoa ao lugar de onde ela saiu.
+// Nesta tela não há trabalho interrompido — ela existe PARA montar as
+// páginas de arquivos modelos e dizer quem pode subir arquivo em cada
+// uma. Teste da regra: sem o formulário sobra uma lista de páginas que
+// ninguém abriria por si só; o formulário é a tela e fica inline.
+// Em 04/09 o "Criar nova página" chegou a virar OverlayModal citando a
+// versão ANTIGA da R9 ("cadastro raro abre em modal") — critério pelo
+// sintoma (raro) em vez da causa (interrompe). A regra foi corrigida e
+// isto é a reversão: não devolver para modal.
+// =====================================================================
 
 function mapById(lista) {
   return Object.fromEntries((lista || []).map(item => [Number(item.id), item]));
@@ -26,7 +43,6 @@ export default function ArquivosModelosConfig() {
   const [contexto, setContexto] = useState(null);
   const [admins, setAdmins] = useState([]);
   const [novoNomePagina, setNovoNomePagina] = useState('');
-  const [novaPaginaAberta, setNovaPaginaAberta] = useState(false);
   const [uploadersByPagina, setUploadersByPagina] = useState({});
   const [salvando, setSalvando] = useState(false);
   // R3/R19: as SEIS caixas do navegador desta tela viraram aviso do sistema
@@ -52,16 +68,6 @@ export default function ArquivosModelosConfig() {
     });
   }, []);
 
-  function abrirNovaPagina() {
-    setNovoNomePagina('');
-    setNovaPaginaAberta(true);
-  }
-
-  function fecharNovaPagina() {
-    setNovaPaginaAberta(false);
-    setNovoNomePagina('');
-  }
-
   async function criarPagina(event) {
     event?.preventDefault();
     try {
@@ -72,7 +78,7 @@ export default function ArquivosModelosConfig() {
         return;
       }
       await criarPaginaArquivoModelo(novoNomePagina.trim());
-      fecharNovaPagina();
+      setNovoNomePagina('');
       await carregar();
       avisar.sucesso('Pagina criada com sucesso.');
     } catch (error) {
@@ -120,26 +126,25 @@ export default function ArquivosModelosConfig() {
 
   const paginas = contexto?.paginas || [];
 
-  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
-  // dele (o erro de criar acontece com o modal aberto e ficaria atrás do
-  // fundo escuro); fechado, logo abaixo do PageHeader.
-  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
-
   return (
     // C1/R13: a tela não tinha faixa fixa nenhuma — a raiz era um
     // `div.space-y-5` com o título solto. O ritmo vertical (M2/R10) e a
     // posição da faixa (--pos-cabecalho-fixo) vêm do Pagina, não da tela.
     <Pagina>
       {/* R5/C2: apoio e contagem na faixa fixa, nas props do PageHeader —
-          não como parágrafo solto sobre o canvas. */}
+          não como parágrafo solto sobre o canvas.
+          As duas ações da faixa GRAVAM, e essa é a razão de estarem aqui:
+          "Criar página" deixou de abrir modal e passou a executar o
+          cadastro do bloco logo abaixo (é o gravar do trabalho da tela);
+          "Salvar permissões" segue na faixa porque compromete a marcação da
+          lista inteira e, no rodapé de um bloco longo, sumia da vista ao
+          rolar (R13). Nenhuma das duas é repetida dentro dos blocos: um
+          dono por responsabilidade (R16). */}
       <PageHeader
         titulo="Configuração de Arquivos Modelos"
         contagem={contexto ? `${paginas.length} página(s)` : null}
         descricao="Crie páginas, ative/desative e defina quais usuários ADMIN podem fazer upload em cada página."
-        acaoPrincipal={{ rotulo: 'Nova página', onClick: abrirNovaPagina }}
-        // "Salvar permissões" sobe para a faixa fixa junto com a ação
-        // principal: é o que compromete a marcação da lista inteira e, no
-        // rodapé de um bloco longo, sumia da vista ao rolar (R13).
+        acaoPrincipal={{ rotulo: 'Criar página', onClick: criarPagina }}
         secundarias={[{
           rotulo: salvando ? 'Salvando...' : 'Salvar permissões',
           onClick: salvarUploaders,
@@ -147,56 +152,38 @@ export default function ArquivosModelosConfig() {
         }]}
       />
 
-      {!novaPaginaAberta && faixaAvisos}
+      {/* R16: UM dono para a faixa de avisos. Sem modal, o erro de criar, o
+          de salvar e o de carga aparecem todos aqui, abaixo do cabeçalho. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* R1/R9: criar página é cadastro raro — era painel inline permanente
-          no topo, roubando a primeira dobra da listagem. Agora abre em
-          OverlayModal pela ação do cabeçalho. */}
-      {novaPaginaAberta && (
-        <OverlayModal
-          aberto
-          rotulo="Nova página de arquivos modelos"
-          onFechar={fecharNovaPagina}
-        >
-          <BlocoConteudo
-            titulo="Nova página de arquivos modelos"
-            acoes={(
-              <button type="button" className="btn btn-outline btn-sm" onClick={fecharNovaPagina}>
-                Fechar
-              </button>
-            )}
-          >
-            <form className="space-y-4" onSubmit={criarPagina}>
-              {faixaAvisos}
+      {/* ARRANJO: formulário ACIMA da lista, ambos em largura cheia — não em
+          duas colunas. A lista abaixo é larga por natureza (a grade de
+          admins de cada página abre em até três colunas de checkbox), e o
+          formulário tem UM campo: em coluna lateral ele deixaria uma faixa
+          vazia alta ao lado, e ainda estreitaria a grade de permissões. Uma
+          linha de formulário acima custa pouca altura e mantém a lista com
+          a largura inteira. */}
+      <BlocoConteudo
+        titulo="Nova página de arquivos modelos"
+        descricao="Informe o nome e use “Criar página”, na faixa do topo, para incluir."
+      >
+        <form onSubmit={criarPagina}>
+          <FormSecao legenda="Identificação" colunas={2}>
+            <CampoForm label="Nome da página" obrigatorio span={2}>
+              <input
+                className="input w-full"
+                placeholder="Nome da nova página"
+                value={novoNomePagina}
+                onChange={e => setNovoNomePagina(e.target.value)}
+              />
+            </CampoForm>
+          </FormSecao>
+        </form>
+      </BlocoConteudo>
 
-              <FormSecao legenda="Identificação" colunas={2}>
-                <CampoForm label="Nome da página" obrigatorio span={2}>
-                  <input
-                    className="input w-full"
-                    placeholder="Nome da nova página"
-                    value={novoNomePagina}
-                    onChange={e => setNovoNomePagina(e.target.value)}
-                    autoFocus
-                  />
-                </CampoForm>
-              </FormSecao>
-
-              <div className="app-actionbar">
-                <button type="submit" className="btn btn-primary">
-                  Criar página
-                </button>
-                <button type="button" className="btn btn-outline" onClick={fecharNovaPagina}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </BlocoConteudo>
-        </OverlayModal>
-      )}
-
-      {/* B2: um bloco principal com barra de cor. As linhas de página eram
-          `card` DENTRO de `card` — agora são superfície simples, com a borda
-          vinda do token (R25), dentro do único bloco da tela. */}
+      {/* B2: a listagem é o bloco primário, com barra de cor. As linhas de
+          página eram `card` DENTRO de `card` — agora são superfície simples,
+          com a borda vinda do token (R25), dentro de um bloco só. */}
       <BlocoConteudo
         titulo="Páginas e permissões de upload"
         variante="primario"

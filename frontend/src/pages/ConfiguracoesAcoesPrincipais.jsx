@@ -10,7 +10,6 @@ import {
   useAvisos,
   useConfirmacao
 } from '../components/padrao';
-import OverlayModal from '../components/ui/OverlayModal';
 import { getSetores } from '../services/setores';
 import {
   CATALOGO_ACOES_PRINCIPAIS,
@@ -28,6 +27,21 @@ import {
 // match mais específico vence. Sem mapeamento, o detalhe mantém as ações
 // genéricas atuais. O catálogo referencia SOMENTE ações que a tela de
 // detalhe já executa — nada de regra nova.
+//
+// FORMULÁRIO INLINE — POR QUÊ (R9 revista em 04/09; NÃO mover para modal)
+// ---------------------------------------------------------------------
+// O critério da R9 é a INTERRUPÇÃO, não a frequência: modal é para o
+// cadastro que interrompe outro trabalho (criar um credor no meio de uma
+// solicitação); em tela que existe PARA cadastrar, o formulário fica na
+// tela. Aplicando o teste da regra: tire o formulário daqui e sobra uma
+// lista de mapeamentos que ninguém abriria por si só — quem entra em
+// "Ação principal por setor" vem mapear setor → ação. O formulário É a
+// tela, e escondê-lo atrás de um botão obriga a abrir e fechar um modal
+// para fazer exatamente aquilo que se veio fazer.
+// Em 04/09 esta tela chegou a ir para OverlayModal citando a versão
+// ANTIGA da R9 ("cadastro esporádico abre em modal"), que media o sintoma
+// (raro) em vez da causa (interrompe). A regra foi corrigida e isto aqui é
+// a reversão — não "conserte" de volta para modal.
 // =====================================================================
 
 function formVazio() {
@@ -39,10 +53,9 @@ export default function ConfiguracoesAcoesPrincipais() {
   const [setores, setSetores] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  // null = modal de cadastro fechado (R9: mapeamento novo é cadastro raro,
-  // então a tela inteira fica com a listagem e o formulário só existe
-  // enquanto alguém está cadastrando).
-  const [form, setForm] = useState(null);
+  // O formulário existe SEMPRE (não há mais estado "fechado"): ele é o
+  // trabalho da tela, não um episódio dela.
+  const [form, setForm] = useState(formVazio());
   // R3/R19: erro de carga, de validação e de gravação passam pela faixa de
   // avisos do sistema — a caixa do navegador ignorava tema e tokens,
   // bloqueava a página e sumia sem deixar rastro no DOM.
@@ -77,8 +90,9 @@ export default function ConfiguracoesAcoesPrincipais() {
     try {
       setSalvando(true);
       await criarAcaoPrincipal(form);
-      setForm(null);
+      setForm(formVazio());
       await carregar();
+      avisar.sucesso('Mapeamento adicionado.');
     } catch (error) {
       avisar.erro(error?.message || 'Erro ao criar mapeamento');
     } finally {
@@ -121,110 +135,103 @@ export default function ConfiguracoesAcoesPrincipais() {
     CATALOGO_ACOES_PRINCIPAIS.find((acao) => acao.valor === valor)?.rotulo || valor
   );
 
-  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
-  // dele — o erro de validação e o de gravação acontecem com o modal aberto
-  // e ficariam atrás do fundo escuro, invisíveis para quem clicou.
-  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
-  const formAtivo = form !== null;
-
   return (
     <Pagina>
-      {/* C1/R13: título, contagem e apoio na faixa fixa do topo, com a ação
-          principal sempre a um clique. */}
+      {/* C1/R13: título, contagem e apoio na faixa fixa do topo.
+          A ação principal deixou de ser "Novo mapeamento" (que só abria o
+          modal e, sem modal, seria botão sem função): a faixa passa a levar
+          o GRAVAR da tela — numa tela cujo trabalho é cadastrar, é a ação
+          de gravar que precisa estar sempre a um clique (R13), inclusive
+          com a lista longa rolada. Ela é a única cópia do botão: repetir o
+          mesmo "Adicionar" dentro do bloco seria dois donos da mesma
+          responsabilidade (R16). */}
       <PageHeader
         titulo="Ação principal por setor"
         contagem={carregando ? null : `${itens.length} mapeamento(s)`}
         descricao="Define qual ação aparece em destaque no topo da solicitação para cada setor e estado. Estado em branco vale para qualquer estado; o mapeamento mais específico vence. Sem mapeamento, a tela mantém as ações genéricas — e a ação só é destacada para quem tem permissão de executá-la."
-        acaoPrincipal={{ rotulo: 'Novo mapeamento', onClick: () => setForm(formVazio()) }}
+        acaoPrincipal={{
+          rotulo: salvando ? 'Salvando…' : 'Adicionar mapeamento',
+          onClick: adicionar,
+          desabilitada: salvando
+        }}
       />
 
-      {!formAtivo && faixaAvisos}
+      {/* R16: UM dono para a faixa de avisos. Com o formulário inline não
+          há mais fundo escuro para escondê-la — validação, gravação e carga
+          reportam todas no mesmo lugar, logo abaixo do cabeçalho. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* R1/R9: cadastro de uso esporádico abre em MODAL — antes era um
-          painel permanente ocupando a metade de cima da tela mesmo para
-          quem só veio conferir a lista. Mesmos campos, mesmo payload. */}
-      {formAtivo && (
-        <OverlayModal
-          aberto
-          rotulo="Novo mapeamento de ação principal"
-          onFechar={() => setForm(null)}
-        >
-          <BlocoConteudo
-            titulo="Novo mapeamento"
-            acoes={(
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setForm(null)}>
-                Fechar
-              </button>
-            )}
-          >
-            {faixaAvisos}
+      {/* ARRANJO: formulário ACIMA da lista, os dois em largura cheia — não
+          em duas colunas. A tabela tem cinco colunas mais a de ações e, pela
+          R1, cada coluna textual pede no mínimo 160px: em meia tela ela
+          entraria em rolagem horizontal permanente. O formulário, por sua
+          vez, são duas linhas de dois campos — ocupa pouco da primeira
+          dobra e devolve a largura inteira para a lista logo abaixo. */}
+      <BlocoConteudo
+        titulo="Novo mapeamento"
+        descricao="Escolha o setor, o estado em que a regra vale e a ação que deve aparecer em destaque."
+      >
+        {/* R12: estes selects são entrada de FORMULÁRIO (o dado que está
+            sendo cadastrado), não filtro de lista. */}
+        <FormSecao legenda="Quando destacar" colunas={2}>
+          <CampoForm label="Setor" obrigatorio>
+            <select
+              className="input w-full"
+              value={form.setor}
+              onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
+            >
+              <option value="">Selecione…</option>
+              {setores.map((setor) => (
+                <option key={setor.id} value={setor.codigo || setor.nome}>
+                  {setor.nome}
+                </option>
+              ))}
+            </select>
+          </CampoForm>
+          <CampoForm label="Estado (status global)" hint="Vazio = qualquer estado.">
+            <input
+              className="input w-full"
+              type="text"
+              placeholder="Vazio = qualquer estado"
+              value={form.status_global}
+              onChange={(event) => setForm((prev) => ({ ...prev, status_global: event.target.value }))}
+            />
+          </CampoForm>
+        </FormSecao>
 
-            {/* R12: estes selects são entrada de FORMULÁRIO (o dado que está
-                sendo cadastrado), não filtro de lista. */}
-            <FormSecao legenda="Quando destacar" colunas={2}>
-              <CampoForm label="Setor" obrigatorio>
-                <select
-                  className="input w-full"
-                  value={form.setor}
-                  onChange={(event) => setForm((prev) => ({ ...prev, setor: event.target.value }))}
-                >
-                  <option value="">Selecione…</option>
-                  {setores.map((setor) => (
-                    <option key={setor.id} value={setor.codigo || setor.nome}>
-                      {setor.nome}
-                    </option>
-                  ))}
-                </select>
-              </CampoForm>
-              <CampoForm label="Estado (status global)" hint="Vazio = qualquer estado.">
-                <input
-                  className="input w-full"
-                  type="text"
-                  placeholder="Vazio = qualquer estado"
-                  value={form.status_global}
-                  onChange={(event) => setForm((prev) => ({ ...prev, status_global: event.target.value }))}
-                />
-              </CampoForm>
-            </FormSecao>
+        <FormSecao legenda="O que destacar" colunas={2}>
+          <CampoForm label="Ação em destaque" obrigatorio>
+            <select
+              className="input w-full"
+              value={form.acao}
+              onChange={(event) => setForm((prev) => ({ ...prev, acao: event.target.value }))}
+            >
+              <option value="">Selecione…</option>
+              {CATALOGO_ACOES_PRINCIPAIS.map((acao) => (
+                <option key={acao.valor} value={acao.valor}>{acao.rotulo}</option>
+              ))}
+            </select>
+          </CampoForm>
+          <CampoForm label="Rótulo do botão (opcional)">
+            <input
+              className="input w-full"
+              type="text"
+              placeholder="Ex.: Gerar conta"
+              value={form.rotulo}
+              onChange={(event) => setForm((prev) => ({ ...prev, rotulo: event.target.value }))}
+            />
+          </CampoForm>
+        </FormSecao>
 
-            <FormSecao legenda="O que destacar" colunas={2}>
-              <CampoForm label="Ação em destaque" obrigatorio>
-                <select
-                  className="input w-full"
-                  value={form.acao}
-                  onChange={(event) => setForm((prev) => ({ ...prev, acao: event.target.value }))}
-                >
-                  <option value="">Selecione…</option>
-                  {CATALOGO_ACOES_PRINCIPAIS.map((acao) => (
-                    <option key={acao.valor} value={acao.valor}>{acao.rotulo}</option>
-                  ))}
-                </select>
-              </CampoForm>
-              <CampoForm label="Rótulo do botão (opcional)">
-                <input
-                  className="input w-full"
-                  type="text"
-                  placeholder="Ex.: Gerar conta"
-                  value={form.rotulo}
-                  onChange={(event) => setForm((prev) => ({ ...prev, rotulo: event.target.value }))}
-                />
-              </CampoForm>
-            </FormSecao>
+        <div className="app-actionbar">
+          <button type="button" className="btn btn-outline" onClick={() => setForm(formVazio())}>
+            Limpar campos
+          </button>
+        </div>
+      </BlocoConteudo>
 
-            <div className="app-actionbar">
-              <button type="button" className="btn btn-primary" onClick={adicionar} disabled={salvando}>
-                {salvando ? 'Salvando…' : 'Adicionar mapeamento'}
-              </button>
-              <button type="button" className="btn btn-outline" onClick={() => setForm(null)}>
-                Cancelar
-              </button>
-            </div>
-          </BlocoConteudo>
-        </OverlayModal>
-      )}
-
-      {/* B2: com o cadastro fora da tela sobrou UM assunto, e é ele que
-          responde a pergunta da página — daí a barra de cor do primário. */}
+      {/* B2: a listagem continua sendo o bloco primário da tela — é ela que
+          mostra o efeito do cadastro —, com a barra de cor do primário. */}
       <BlocoConteudo
         titulo="Mapeamentos"
         variante="primario"
