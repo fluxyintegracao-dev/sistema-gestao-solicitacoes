@@ -672,10 +672,43 @@ export function checksEstaticos({ tipo }) {
       const cs = getComputedStyle(pai);
       const disponivel = pai.getBoundingClientRect().width
         - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
-      const ocupa = caixa.getBoundingClientRect().width >= disponivel * 0.9;
-      r.F1 = ocupa
+      /*
+        A BUSCA NÃO PODE PASSAR DO TETO QUE A PRÓPRIA R3 LHE DÁ (04/09).
+
+        A R3 diz que a busca ocupa a faixa ENTRE 220 e 480px — o teto é
+        parte da regra: caixa de texto de 1800px é pior de ler, não melhor.
+        O check exigia 90% da faixa e reprovava a `tipos-solicitacao` com
+        "busca com 480px não ocupa a largura disponível (1848px livres)" —
+        480px É o máximo que ela pode ter.
+
+        Cobrar de um elemento mais do que a regra permite a ele é o check
+        brigando com a regra que ele deveria verificar. Agora o alvo é o
+        MENOR entre a faixa disponível e o teto do próprio elemento.
+      */
+      const teto = parseFloat(getComputedStyle(caixa).maxWidth);
+      const alvo = Number.isFinite(teto) ? Math.min(disponivel, teto) : disponivel;
+      const larguraCaixa = caixa.getBoundingClientRect().width;
+      /*
+        A R3 TEM PISO E TETO, e o check só media um lado.
+
+        "Ocupa a faixa, 220–480px": abaixo de 220 a caixa é apertada demais
+        para o termo caber; acima de 480 é pior de ler, não melhor. Medir só
+        "encheu a faixa?" reprovava a busca que está no TETO (defeito
+        nenhum) e aprovava a que está abaixo do PISO (defeito de verdade,
+        que a fixture planta com 180px).
+
+        Agora reprova pelos dois lados, e cada um com o seu motivo. O piso
+        cede quando não há espaço: numa faixa de 200px não dá para exigir
+        220.
+      */
+      const piso = Math.min(220, disponivel);
+      const abaixoDoPiso = larguraCaixa < piso - 2;
+      const ocupa = larguraCaixa >= alvo * 0.9;
+      r.F1 = abaixoDoPiso
+        ? { estado: 'FALHOU', motivo: `busca com ${Math.round(larguraCaixa)}px abaixo do piso de ${Math.round(piso)}px da R3 — apertada demais para o termo caber`, seletor: cssPath(caixa) }
+        : ocupa
         ? { estado: 'PASSOU' }
-        : { estado: 'FALHOU', motivo: `busca com ${Math.round(caixa.getBoundingClientRect().width)}px não ocupa a largura disponível (${Math.round(disponivel)}px livres na faixa de ${Math.round(pai.getBoundingClientRect().width)}px)`, seletor: cssPath(caixa) };
+        : { estado: 'FALHOU', motivo: `busca com ${Math.round(caixa.getBoundingClientRect().width)}px não ocupa o alvo de ${Math.round(alvo)}px (faixa livre ${Math.round(disponivel)}px, teto do elemento ${Number.isFinite(teto) ? Math.round(teto) + 'px' : 'sem teto'})`, seletor: cssPath(caixa) };
     }
   }
 
@@ -793,9 +826,32 @@ export function checksEstaticos({ tipo }) {
     const normTexto = (el) => el.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
     const leadFaixa = faixa && q('.app-page-lead', faixa);
     const leadsBloco = qa('.app-bloco-lead').filter(visivel);
+    /*
+      CONTAGEM QUE COINCIDE NÃO É APOIO REPETIDO (04/09).
+
+      A comparação por CONTINÊNCIA acusava dois casos que não são defeito:
+
+        faixa "6 conta(s) · 204 categoria(s) · Base de contas…"  bloco "6 conta(s)"
+        faixa "41 obra(s) · Visao financeira consolidada…"       bloco "41"
+
+      O bloco diz quantos itens ELE lista, e por acaso é o mesmo número da
+      faixa. Acusar `"41"` como apoio repetido é medir coincidência de
+      substring, não repetição de informação — e mandaria a tela APAGAR uma
+      contagem correta.
+
+      O que a B3 quer impedir é a mesma FRASE em dois lugares. Então o
+      trecho comum precisa ser substancial: pelo menos 24 caracteres e mais
+      de três palavras. Contagem sozinha não passa nesse crivo; descrição
+      copiada, sim.
+    */
+    const substancial = (t) => t.length >= 24 && t.split(/\s+/).filter(Boolean).length > 3;
     const dup = leadFaixa && leadsBloco.find((b) => {
       const a = normTexto(leadFaixa); const c = normTexto(b);
-      return a && c && (a === c || a.includes(c) || c.includes(a));
+      if (!a || !c) return false;
+      if (a === c) return true;
+      const menor = a.length <= c.length ? a : c;
+      const maior = a.length <= c.length ? c : a;
+      return maior.includes(menor) && substancial(menor);
     });
     /*
       O MOTIVO PRECISA TRAZER O TEXTO (04/09). "Apoio da faixa repetido em

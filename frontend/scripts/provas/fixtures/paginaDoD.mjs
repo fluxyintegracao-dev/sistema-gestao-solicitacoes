@@ -221,7 +221,15 @@ function filtros(d) {
   const busca = '<div class="la-busca app-filtros-busca">'
     + '<input type="text" placeholder="Buscar…" aria-label="Buscar na lista">'
     + '</div>';
-  const buscaEstreita = '<div class="la-busca app-filtros-busca" style="width:180px;max-width:180px">'
+  /*
+    O CSS REAL VENCE O INLINE INCOMPLETO (04/09). A planta trazia so
+    `width` e `max-width`; com a folha do sistema aplicada, o
+    `min-width: 220px` da .app-busca/.la-busca ganhava e a caixa nascia
+    com 220px — ou seja, CORRETA. A prova passava porque o check, na
+    versao antiga, cobrava 90% da faixa inteira e reprovava ate a busca
+    certa. Planta que so "funciona" sem o CSS do projeto nao prova nada.
+  */
+  const buscaEstreita = '<div class="la-busca app-filtros-busca" style="width:180px;min-width:0;max-width:180px;flex:0 0 180px">'
     + '<input type="text" placeholder="Buscar…" aria-label="Buscar na lista">'
     + '</div>';
   const segundaBusca = '<div class="la-busca" style="margin-top:8px">'
