@@ -92,6 +92,39 @@ import { TELAS as TELAS_DO_HARNESS } from './qa-preview/telas.mjs';
   estático e não entrar na lista do harness é uma promessa de verificação
   que não existe.
 */
+function inventariarRotasDoApp() {
+  /*
+    So conta o que o usuario consegue ABRIR: rota com elemento de tela.
+    `<Navigate>` e redirecionamento, nao tela — contar redirecionamento
+    inflaria o passivo com coisa que nao tem o que medir.
+  */
+  const app = fs.readFileSync(path.join(frontendRoot, 'src', 'App.jsx'), 'utf8');
+  const imports = new Map();
+  for (const m of app.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:React\.)?lazy\(\s*\(\)\s*=>\s*import\(\s*'([^']+)'/g)) {
+    imports.set(m[1], m[2]);
+  }
+  for (const m of app.matchAll(/^import\s+(\w+)\s+from\s+'(\.[^']+)'/gm)) imports.set(m[1], m[2]);
+  const encontradas = new Set();
+  for (const m of app.matchAll(/path="([^"]+)"[^\n]*/g)) {
+    const linha = m[0];
+    if (/<Navigate/.test(linha)) continue;
+    for (const c of linha.matchAll(/<(\w+)/g)) {
+      if (!imports.has(c[1])) continue;
+      let f = imports.get(c[1]).replace('./', 'src/');
+      if (!f.endsWith('.jsx')) f += '.jsx';
+      encontradas.add(f);
+      break;
+    }
+  }
+  return [...encontradas].sort();
+}
+
+function lerTrincoRotas() {
+  const alvo = path.join(frontendRoot, 'scripts', 'trinco-rotas-sem-medicao.json');
+  if (!fs.existsSync(alvo)) return { telas: [] };
+  return JSON.parse(fs.readFileSync(alvo, 'utf8'));
+}
+
 export function validarLayout() {
   const manifesto = lerTelasDoManifesto();
   for (const extra of telasExtraDaLinhaDeComando()) {
@@ -351,6 +384,41 @@ export function validarLayout() {
     ...telasExtraDaLinhaDeComando(),
     ...manifesto.telas.filter((t) => /(^|\/)__Prova[^/]*$/.test(t))
   ]);
+  /*
+    A TERCEIRA PERGUNTA, que faltava (04/09).
+
+    Este check comparava as duas listas ENTRE SI — manifesto estático contra
+    lista do harness — e passava verde quando as duas concordavam. Nunca
+    perguntou o que importa antes das duas: **existe rota que não está em
+    nenhuma delas?**
+
+    A medição do dia: 181 telas com rota no App.jsx, 61 no manifesto, 120
+    NUNCA MEDIDAS no navegador. Dois tercos do sistema.
+
+    E o mecanismo escondeu trabalho tres vezes seguidas — as 29 do
+    Financeiro, as quatro do porte de Solicitacoes reformadas em 02/09 e
+    jamais abertas pelo harness, e agora estas 120. Duas listas que
+    concordam entre si nao provam cobertura; provam concordancia.
+
+    Por isso o inventario tem TRINCO e nao lista fixa: o passivo herdado
+    esta congelado num numero datado, e esse numero SO PODE DESCER. Rota
+    nova que nasca fora das duas listas reprova na hora — nao existe
+    "adiciono depois".
+  */
+  const rotasDeclaradas = inventariarRotasDoApp();
+  const cobertas = new Set([...manifesto.telas, ...noHarness]);
+  const semMedicao = rotasDeclaradas.filter((t) => !cobertas.has(t));
+  const trincoRotas = lerTrincoRotas();
+  const novasSemMedicao = semMedicao.filter((t) => !trincoRotas.telas.includes(t));
+  if (novasSemMedicao.length > 0) {
+    falhas.push(
+      `${novasSemMedicao[0]}:0 [COBERTURA] ${novasSemMedicao.length} tela(s) COM ROTA no App.jsx e fora das DUAS listas — nunca serao medidas por ninguem. Rota nova entra no manifesto e na lista do harness na mesma leva. Telas: ${novasSemMedicao.join(', ')}`
+    );
+  }
+  if (semMedicao.length < trincoRotas.telas.length) {
+    avisos.push(`[COBERTURA] o passivo de rotas sem medicao caiu de ${trincoRotas.telas.length} para ${semMedicao.length} — atualize scripts/trinco-rotas-sem-medicao.json`);
+  }
+
   const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t) && !transitorias.has(t));
   if (foraDoPreview.length > 0) {
     falhas.push(
