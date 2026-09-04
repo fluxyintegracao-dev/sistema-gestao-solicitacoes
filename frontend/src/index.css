@@ -343,7 +343,9 @@ body {
   margin: 0;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   min-height: 100%;
 }
@@ -397,15 +399,28 @@ body {
 }
 
 /* Tipografia base mais legível em ambos temas */
-body, p, label, legend, span, li, dt, dd {
+body,
+p,
+label,
+legend,
+span,
+li,
+dt,
+dd {
   color: var(--c-text);
 }
 
-h1, h2, h3, h4, h5, h6 {
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
   color: var(--c-text);
 }
 
-.muted, .text-muted {
+.muted,
+.text-muted {
   color: var(--app-muted-color, var(--c-muted)) !important;
 }
 
@@ -852,76 +867,76 @@ textarea {
 }
 
 .dark .layout-shell .fiscal-page :is(
-  .bg-white,
-  .bg-slate-50,
-  .bg-slate-100,
-  .bg-gray-50,
-  .bg-gray-100
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-gray-50,
+.bg-gray-100
 ) {
   background-color: var(--fiscal-surface) !important;
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  [class*="bg-sky-50"],
-  [class*="bg-blue-50"],
-  [class*="bg-cyan-50"]
+[class*="bg-sky-50"],
+[class*="bg-blue-50"],
+[class*="bg-cyan-50"]
 ) {
   background: color-mix(in srgb, #2563eb 18%, var(--fiscal-surface)) !important;
   color: #dbeafe !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  [class*="bg-emerald-50"],
-  [class*="bg-green-50"],
-  [class*="bg-teal-50"]
+[class*="bg-emerald-50"],
+[class*="bg-green-50"],
+[class*="bg-teal-50"]
 ) {
   background: color-mix(in srgb, #10b981 18%, var(--fiscal-surface)) !important;
   color: #d1fae5 !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  [class*="bg-amber-50"],
-  [class*="bg-yellow-50"],
-  [class*="bg-orange-50"]
+[class*="bg-amber-50"],
+[class*="bg-yellow-50"],
+[class*="bg-orange-50"]
 ) {
   background: color-mix(in srgb, var(--sem-warning) 18%, var(--fiscal-surface)) !important;
   color: #fef3c7 !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  [class*="bg-rose-50"],
-  [class*="bg-red-50"],
-  [class*="bg-pink-50"]
+[class*="bg-rose-50"],
+[class*="bg-red-50"],
+[class*="bg-pink-50"]
 ) {
   background: color-mix(in srgb, var(--sem-danger) 18%, var(--fiscal-surface)) !important;
   color: #fee2e2 !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  .border-slate-100,
-  .border-slate-200,
-  .border-sky-100,
-  .border-emerald-100,
-  .border-amber-100,
-  .border-rose-100
+.border-slate-100,
+.border-slate-200,
+.border-sky-100,
+.border-emerald-100,
+.border-amber-100,
+.border-rose-100
 ) {
   border-color: var(--fiscal-border) !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  .text-slate-950,
-  .text-slate-900,
-  .text-slate-800,
-  .text-slate-700
+.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700
 ) {
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .fiscal-page :is(
-  .text-slate-600,
-  .text-slate-500,
-  .text-slate-400
+.text-slate-600,
+.text-slate-500,
+.text-slate-400
 ) {
   color: var(--shell-muted) !important;
 }
@@ -944,94 +959,94 @@ textarea {
 }
 
 .dark .layout-shell .rhdp-page :is(
-  .bg-white,
-  .bg-slate-50,
-  .bg-slate-100,
-  .bg-gray-50,
-  .bg-gray-100,
-  [class*="bg-white/"],
-  [class*="bg-slate-50/"],
-  [class*="bg-slate-100/"]
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-gray-50,
+.bg-gray-100,
+[class*="bg-white/"],
+[class*="bg-slate-50/"],
+[class*="bg-slate-100/"]
 ) {
   background-color: var(--rhdp-surface) !important;
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  [class*="bg-sky-50"],
-  [class*="bg-blue-50"],
-  [class*="bg-indigo-50"],
-  [class*="bg-cyan-50"]
+[class*="bg-sky-50"],
+[class*="bg-blue-50"],
+[class*="bg-indigo-50"],
+[class*="bg-cyan-50"]
 ) {
   background: color-mix(in srgb, #2563eb 18%, var(--rhdp-surface)) !important;
   color: #dbeafe !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  [class*="bg-emerald-50"],
-  [class*="bg-green-50"],
-  [class*="bg-teal-50"]
+[class*="bg-emerald-50"],
+[class*="bg-green-50"],
+[class*="bg-teal-50"]
 ) {
   background: color-mix(in srgb, #10b981 18%, var(--rhdp-surface)) !important;
   color: #d1fae5 !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  [class*="bg-amber-50"],
-  [class*="bg-yellow-50"],
-  [class*="bg-orange-50"]
+[class*="bg-amber-50"],
+[class*="bg-yellow-50"],
+[class*="bg-orange-50"]
 ) {
   background: color-mix(in srgb, var(--sem-warning) 18%, var(--rhdp-surface)) !important;
   color: #fef3c7 !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  [class*="bg-rose-50"],
-  [class*="bg-red-50"],
-  [class*="bg-pink-50"]
+[class*="bg-rose-50"],
+[class*="bg-red-50"],
+[class*="bg-pink-50"]
 ) {
   background: color-mix(in srgb, var(--sem-danger) 18%, var(--rhdp-surface)) !important;
   color: #fee2e2 !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  .border-slate-100,
-  .border-slate-200,
-  .border-slate-300,
-  .border-sky-100,
-  .border-sky-200,
-  .border-emerald-100,
-  .border-emerald-200,
-  .border-amber-100,
-  .border-amber-200,
-  .border-rose-100,
-  .border-rose-200
+.border-slate-100,
+.border-slate-200,
+.border-slate-300,
+.border-sky-100,
+.border-sky-200,
+.border-emerald-100,
+.border-emerald-200,
+.border-amber-100,
+.border-amber-200,
+.border-rose-100,
+.border-rose-200
 ) {
   border-color: var(--rhdp-border) !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  .text-slate-950,
-  .text-slate-900,
-  .text-slate-800,
-  .text-slate-700
+.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700
 ) {
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  .text-slate-600,
-  .text-slate-500,
-  .text-slate-400
+.text-slate-600,
+.text-slate-500,
+.text-slate-400
 ) {
   color: var(--shell-muted) !important;
 }
 
 .dark .layout-shell .rhdp-page :is(
-  section[class*="bg-[radial-gradient"],
-  section[class*="bg-[linear-gradient"],
-  .rounded-2xl[class*="bg-[radial-gradient"],
-  .rounded-2xl[class*="bg-[linear-gradient"]
+section[class*="bg-[radial-gradient"],
+section[class*="bg-[linear-gradient"],
+.rounded-2xl[class*="bg-[radial-gradient"],
+.rounded-2xl[class*="bg-[linear-gradient"]
 ) {
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.2), transparent 30%),
@@ -1047,90 +1062,92 @@ textarea {
 }
 
 .dark .layout-shell .sst-page :is(
-  .bg-white,
-  .bg-slate-50,
-  .bg-slate-100,
-  .bg-gray-50,
-  .bg-gray-100,
-  [class*="bg-white/"],
-  [class*="bg-slate-50/"],
-  [class*="bg-slate-100/"]
+.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-gray-50,
+.bg-gray-100,
+[class*="bg-white/"],
+[class*="bg-slate-50/"],
+[class*="bg-slate-100/"]
 ) {
   background-color: var(--sst-surface) !important;
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  [class*="bg-sky-50"],
-  [class*="bg-blue-50"],
-  [class*="bg-indigo-50"],
-  [class*="bg-cyan-50"]
+[class*="bg-sky-50"],
+[class*="bg-blue-50"],
+[class*="bg-indigo-50"],
+[class*="bg-cyan-50"]
 ) {
   background: color-mix(in srgb, #0ea5e9 18%, var(--sst-surface)) !important;
   color: #e0f2fe !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  [class*="bg-emerald-50"],
-  [class*="bg-green-50"],
-  [class*="bg-teal-50"]
+[class*="bg-emerald-50"],
+[class*="bg-green-50"],
+[class*="bg-teal-50"]
 ) {
   background: color-mix(in srgb, #10b981 18%, var(--sst-surface)) !important;
   color: #d1fae5 !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  [class*="bg-amber-50"],
-  [class*="bg-yellow-50"],
-  [class*="bg-orange-50"]
+[class*="bg-amber-50"],
+[class*="bg-yellow-50"],
+[class*="bg-orange-50"]
 ) {
   background: color-mix(in srgb, var(--sem-warning) 18%, var(--sst-surface)) !important;
   color: #fef3c7 !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  [class*="bg-rose-50"],
-  [class*="bg-red-50"],
-  [class*="bg-pink-50"]
+[class*="bg-rose-50"],
+[class*="bg-red-50"],
+[class*="bg-pink-50"]
 ) {
   background: color-mix(in srgb, var(--sem-danger) 18%, var(--sst-surface)) !important;
   color: #fee2e2 !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  .border-slate-100,
-  .border-slate-200,
-  .border-slate-300,
-  .border-sky-100,
-  .border-sky-200,
-  .border-emerald-100,
-  .border-emerald-200,
-  .border-amber-100,
-  .border-amber-200,
-  .border-rose-100,
-  .border-rose-200
+.border-slate-100,
+.border-slate-200,
+.border-slate-300,
+.border-sky-100,
+.border-sky-200,
+.border-emerald-100,
+.border-emerald-200,
+.border-amber-100,
+.border-amber-200,
+.border-rose-100,
+.border-rose-200
 ) {
   border-color: var(--sst-border) !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  .text-slate-950,
-  .text-slate-900,
-  .text-slate-800,
-  .text-slate-700
+.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-slate-700
 ) {
   color: var(--shell-text) !important;
 }
 
 .dark .layout-shell .sst-page :is(
-  .text-slate-600,
-  .text-slate-500,
-  .text-slate-400
+.text-slate-600,
+.text-slate-500,
+.text-slate-400
 ) {
   color: var(--shell-muted) !important;
 }
 
-.dark .layout-shell .sst-page :is(input, select, textarea) {
+.dark .layout-shell .sst-page :is(input,
+select,
+textarea) {
   background-color: var(--ui-surface-soft) !important;
   border-color: var(--sst-border) !important;
   color: var(--shell-text) !important;
@@ -1614,118 +1631,7 @@ a:hover {
 /* ============================
    Configuracoes
 ============================ */
-.config-page-header {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
 
-.config-page-title {
-  margin: 0;
-  font-size: clamp(1.25rem, 3vw, 1.5rem);
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--sol-text-strong, var(--c-text));
-}
-
-.config-page-subtitle {
-  margin: 0;
-  font-size: clamp(0.8rem, 2vw, 0.9rem);
-  color: var(--sol-text-soft, var(--c-muted));
-}
-
-.config-section {
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-border);
-  border-radius: 10px;
-  padding: 1rem;
-  box-shadow: var(--ui-shadow-sm);
-}
-
-.dark .config-section {
-  background: var(--ui-surface);
-  border-color: var(--ui-border);
-}
-
-.config-section-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.7rem;
-  margin-bottom: 0.9rem;
-}
-
-.config-section-title {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--sol-text-strong, var(--c-text));
-}
-
-.config-section-count {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  border-radius: 999px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface-soft);
-  padding: 0.15rem 0.55rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--c-muted);
-  white-space: nowrap;
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 0.75rem;
-}
-
-.config-item {
-  display: block;
-  min-height: 90px;
-  border-radius: 8px;
-  border: 1px solid var(--ui-border);
-  background: var(--ui-surface);
-  padding: 0.85rem 0.9rem;
-  text-decoration: none;
-  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
-}
-
-.dark .config-item {
-  background: var(--ui-surface);
-  border-color: var(--ui-border);
-}
-
-.config-item:hover {
-  border-color: var(--c-primary);
-  background: var(--ui-surface-soft);
-  box-shadow: var(--ui-shadow-md);
-}
-
-.config-item:active {
-  transform: translateY(1px);
-}
-
-.config-item-title {
-  margin: 0;
-  font-size: 0.98rem;
-  font-weight: 700;
-  color: var(--c-text);
-}
-
-.config-item-description {
-  margin: 0.35rem 0 0;
-  font-size: 0.84rem;
-  line-height: 1.35;
-  color: var(--premium-panel-muted);
-}
-
-.config-item-disabled {
-  opacity: 0.62;
-  pointer-events: none;
-}
 
 .login-screen {
   background: var(--ui-canvas);
@@ -2043,19 +1949,7 @@ a:hover {
 }
 
 @media (max-width: 767px) {
-  .config-section {
-    padding: 0.85rem;
-  }
 
-  .config-section-head {
-    align-items: flex-start;
-    flex-direction: column;
-    margin-bottom: 0.75rem;
-  }
-
-  .config-item {
-    min-height: 88px;
-  }
 
   .login-content-wrap {
     align-items: center;
@@ -2416,8 +2310,8 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
-  .quick-person-grid,
-  .quick-person-grid-main {
+.quick-person-grid,
+.quick-person-grid-main {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -2434,8 +2328,8 @@ a:hover {
     border-radius: 0;
   }
 
-  .quick-person-header,
-  .quick-person-footer {
+.quick-person-header,
+.quick-person-footer {
     align-items: flex-start;
     flex-direction: column;
     padding: 0.9rem;
@@ -2445,8 +2339,8 @@ a:hover {
     padding: 0.9rem;
   }
 
-  .quick-person-grid,
-  .quick-person-grid-main {
+.quick-person-grid,
+.quick-person-grid-main {
     grid-template-columns: 1fr;
   }
 
@@ -2961,13 +2855,15 @@ a:hover {
   --app-form-grid-gap: 0.8rem;
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) :is(.card, .sol-surface-card):has(> form) {
+.solicitacoes-page:not(.solicitacao-nova-page) :is(.card,
+.sol-surface-card):has(> form) {
   width: min(100%, var(--app-form-card-max-width));
   margin-inline: auto;
   padding: clamp(0.95rem, 2vw, 1.15rem);
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) :is(.card, .sol-surface-card):has(> form) > :not(form) {
+.solicitacoes-page:not(.solicitacao-nova-page) :is(.card,
+.sol-surface-card):has(> form) > :not(form) {
   width: min(100%, var(--app-form-shell-max-width));
   margin-inline: auto;
 }
@@ -2984,23 +2880,31 @@ a:hover {
   column-gap: var(--app-form-grid-gap);
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) form :is(label, .sol-filter-field, .app-filter-field) {
+.solicitacoes-page:not(.solicitacao-nova-page) form :is(label,
+.sol-filter-field,
+.app-filter-field) {
   font-size: 0.82rem;
   line-height: 1.3;
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) form :is(.sol-filter-label, .app-filter-label) {
+.solicitacoes-page:not(.solicitacao-nova-page) form :is(.sol-filter-label,
+.app-filter-label) {
   font-size: 0.76rem;
   font-weight: 600;
   letter-spacing: 0.01em;
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) form :is(.input, .form-control, select, textarea) {
+.solicitacoes-page:not(.solicitacao-nova-page) form :is(.input,
+.form-control,
+select,
+textarea) {
   font-size: 0.84rem;
   line-height: 1.35;
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) form :is(textarea.input, textarea.form-control, textarea) {
+.solicitacoes-page:not(.solicitacao-nova-page) form :is(textarea.input,
+textarea.form-control,
+textarea) {
   min-height: 88px;
 }
 
@@ -3016,7 +2920,8 @@ a:hover {
   font-size: 0.77rem;
 }
 
-.solicitacoes-page:not(.solicitacao-nova-page) form :is(.app-page-actions, .sol-filtros-actions) {
+.solicitacoes-page:not(.solicitacao-nova-page) form :is(.app-page-actions,
+.sol-filtros-actions) {
   gap: 0.6rem;
 }
 
@@ -3217,11 +3122,13 @@ a:hover {
   color: var(--shell-text);
 }
 
-.dark .financeiro-formas-pagamento :is(.text-\[var\(--c-text\)\], .text-slate-700) {
+.dark .financeiro-formas-pagamento :is(.text-\[var\(--c-text\)\],
+.text-slate-700) {
   color: var(--shell-text) !important;
 }
 
-.dark .financeiro-formas-pagamento :is(.text-slate-500, .text-slate-400) {
+.dark .financeiro-formas-pagamento :is(.text-slate-500,
+.text-slate-400) {
   color: var(--shell-muted) !important;
 }
 
@@ -3425,8 +3332,8 @@ a:hover {
 }
 
 @media (max-width: 1023px) {
-  .solicitacoes-table-shell .solicitacoes-table th,
-  .solicitacoes-table-shell .solicitacoes-table td {
+.solicitacoes-table-shell .solicitacoes-table th,
+.solicitacoes-table-shell .solicitacoes-table td {
     padding-inline: 8px;
   }
 
@@ -3469,13 +3376,13 @@ a:hover {
     table-layout: fixed;
   }
 
-  .solicitacoes-table--mobile colgroup,
-  .solicitacoes-table--mobile thead {
+.solicitacoes-table--mobile colgroup,
+.solicitacoes-table--mobile thead {
     display: none;
   }
 
-  .solicitacoes-table--mobile,
-  .solicitacoes-table--mobile tbody {
+.solicitacoes-table--mobile,
+.solicitacoes-table--mobile tbody {
     display: block;
     width: 100%;
   }
@@ -3530,8 +3437,8 @@ a:hover {
     background: color-mix(in srgb, var(--c-primary) 8%, var(--c-surface));
   }
 
-  .solicitacoes-table--mobile tr > td[data-label="Status"] .status-badge,
-  .solicitacoes-table--mobile tr > td[data-label="Status"] > span {
+.solicitacoes-table--mobile tr > td[data-label="Status"] .status-badge,
+.solicitacoes-table--mobile tr > td[data-label="Status"] > span {
     justify-self: start;
   }
 
@@ -3865,8 +3772,8 @@ a:hover {
     align-items: flex-start;
   }
 
-  .sol-detail-stats-grid,
-  .sol-detail-contract-grid {
+.sol-detail-stats-grid,
+.sol-detail-contract-grid {
     grid-template-columns: repeat(1, minmax(0, 1fr));
   }
 }
@@ -4158,13 +4065,13 @@ a:hover {
 }
 
 @media (max-width: 640px) {
-  .dashboard-decision-card,
-  .dashboard-list-row {
+.dashboard-decision-card,
+.dashboard-list-row {
     flex-direction: column;
   }
 
-  .dashboard-decision-value,
-  .dashboard-list-amount {
+.dashboard-decision-value,
+.dashboard-list-amount {
     text-align: left;
   }
 }
@@ -4401,8 +4308,8 @@ a:hover {
     width: 100%;
   }
 
-  .cotacao-publica-table-input,
-  .cotacao-publica-table-textarea {
+.cotacao-publica-table-input,
+.cotacao-publica-table-textarea {
     min-width: 140px;
   }
 }
@@ -4712,8 +4619,8 @@ a:hover {
 }
 
 @media (max-width: 767px) {
-  .dash-kpi-card,
-  .dash-panel {
+.dash-kpi-card,
+.dash-panel {
     border-radius: 16px;
   }
 
@@ -4725,9 +4632,9 @@ a:hover {
     padding: 1rem;
   }
 
-  .dash-kpi-head,
-  .dash-bar-top,
-  .dash-panel-head {
+.dash-kpi-head,
+.dash-bar-top,
+.dash-panel-head {
     gap: 0.7rem;
   }
 
@@ -4994,17 +4901,28 @@ textarea.form-control {
 }
 
 /*
-  `:not(.sr-only)` — sem ele, TODO campo de arquivo escondido para leitor de
-  tela aparecia na tela (04/09, medido no preview).
+`:not(.sr-only)` — sem ele,
+TODO campo de arquivo escondido para leitor de
+  tela aparecia na tela (04/09,
+medido no preview).
 
-  Este bloco pinta o campo de arquivo com caixa tracejada, ícone de clipe e
-  largura 100%. Ele é `input[type="file"]`, especificidade (0,1,1); a
-  `.sr-only` é (0,1,0) e PERDE — mesmo declarada depois. Resultado: um
+  Este bloco pinta o campo de arquivo com caixa tracejada,
+ícone de clipe e
+  largura 100%. Ele é `input[type="file"]`,
+especificidade (0,
+1,
+1); a
+  `.sr-only` é (0,
+1,
+0) e PERDE — mesmo declarada depois. Resultado: um
   `<input type="file" class="sr-only">` renderizava com 390px numa janela de
-  390px, transbordando a página em vez de ficar invisível.
+  390px,
+transbordando a página em vez de ficar invisível.
 
   O padrão `sr-only` existe justamente para o campo de arquivo: some da
-  tela, continua alcançável por teclado e por leitor de tela, e o rótulo
+  tela,
+continua alcançável por teclado e por leitor de tela,
+e o rótulo
   visível é um `<label>` estilizado. Quatro campos no sistema usam esse
   padrão; os quatro estavam visíveis.
 
@@ -5152,7 +5070,8 @@ input[type="file"]:disabled {
 }
 
 /* Ícone junto da cor (cor sozinha não comunica para daltônicos):
-   triângulo de alerta desenhado via mask, herdando currentColor. */
+triângulo de alerta desenhado via mask,
+herdando currentColor. */
 .app-alert::before {
   content: '';
   flex-shrink: 0;
@@ -5342,8 +5261,8 @@ input[type="file"]:disabled {
     justify-content: stretch;
   }
 
-  .financeiro-conta-report-actions .btn,
-  .financeiro-conta-report-filters .btn {
+.financeiro-conta-report-actions .btn,
+.financeiro-conta-report-filters .btn {
     width: 100%;
     min-width: 0;
   }
@@ -5358,8 +5277,8 @@ input[type="file"]:disabled {
     gap: 1rem;
   }
 
-  .financeiro-relatorios-page .app-page-actions,
-  .financeiro-relatorios-page .app-page-actions .btn {
+.financeiro-relatorios-page .app-page-actions,
+.financeiro-relatorios-page .app-page-actions .btn {
     width: 100%;
   }
 
@@ -5783,7 +5702,9 @@ input[type="file"]:disabled {
   line-height: 1.45;
 }
 
-.finance-cadastros-card :is(.btn, .btn-primary, .btn-outline) {
+.finance-cadastros-card :is(.btn,
+.btn-primary,
+.btn-outline) {
   min-height: 34px;
   border-radius: 12px;
 }
@@ -5822,7 +5743,8 @@ input[type="file"]:disabled {
   border-radius: 12px;
 }
 
-.finance-cadastros-card :is(.sol-filter-label, .app-filter-label) {
+.finance-cadastros-card :is(.sol-filter-label,
+.app-filter-label) {
   font-size: 0.68rem;
 }
 
@@ -6152,8 +6074,8 @@ input[type="file"]:disabled {
     width: 100%;
   }
 
-  .app-page-actions .btn,
-  .app-page-actions label.btn {
+.app-page-actions .btn,
+.app-page-actions label.btn {
     flex: 1 1 auto;
   }
 
@@ -6175,8 +6097,8 @@ input[type="file"]:disabled {
     justify-content: center;
   }
 
-  .finance-category-modal-row,
-  .finance-category-modal-row--head {
+.finance-category-modal-row,
+.finance-category-modal-row--head {
     grid-template-columns: 44px minmax(0, 1fr);
   }
 
@@ -7374,7 +7296,8 @@ body {
 }
 
 /* Sem véus decorativos sobre o conteúdo: fundo plano garante o contraste
-   medido dos textos (achado do impeccable, 02/09). */
+medido dos textos (achado do impeccable,
+02/09). */
 .layout-shell-backdrop {
   position: fixed;
   inset: 0;
@@ -7854,7 +7777,8 @@ body {
 }
 
 /* REVERTIDO (02/09): a regra que ocultava h1 "duplicado" escondia também o
-   NOME do registro (obra, título…) — a informação principal da tela. O
+NOME do registro (obra,
+título…) — a informação principal da tela. O
    cabeçalho agora é uma faixa fixa que EXIBE título/identificação (R13);
    o seletor h1[class~=...] era amplo demais e virou defeito. */
 
@@ -8247,30 +8171,13 @@ body {
 }
 
 .page-title,
-.config-page-title {
-  margin: 0;
-  color: var(--app-heading-color, var(--shell-text));
-  font-size: clamp(1.7rem, 2.5vw, 2.35rem);
-  font-weight: 800;
-  letter-spacing: -0.04em;
-}
-
 .page-subtitle,
-.config-page-subtitle {
-  margin: 0.45rem 0 0;
-  max-width: 68ch;
-  color: var(--app-muted-color, var(--shell-muted));
-  font-size: 0.96rem;
-  line-height: 1.7;
-}
-
 .layout-shell .card,
 .layout-shell .sol-surface-card,
 .layout-shell .app-toolbar-card,
 .layout-shell .app-table-shell,
 .layout-shell .dashboard-hero-card,
 .layout-shell .dashboard-section-card,
-.layout-shell .config-section,
 .layout-shell .config-summary-card {
   border: 1px solid var(--shell-border);
   border-radius: 1.7rem;
@@ -8294,14 +8201,6 @@ body {
 }
 
 .layout-shell .app-page-header-row,
-.config-page-header-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .layout-shell .app-page-actions {
   display: flex;
   flex-wrap: wrap;
@@ -8457,7 +8356,8 @@ body {
 }
 
 /* Campos de texto do sistema — UMA camada: fundo sólido dos tokens,
-   borda fina, raio único e foco por borda discreta (sem glow forte).
+borda fina,
+raio único e foco por borda discreta (sem glow forte).
    O :where() zera a especificidade dos :not(...): componentes com
    campos compostos (ex.: a busca da lista) conseguem sobrepor esta
    regra sem guerra de seletores. */
@@ -9287,7 +9187,6 @@ body {
   line-height: 1.65;
 }
 
-.config-page-header,
 .config-summary-card {
   border-radius: 1.7rem;
 }
@@ -9323,81 +9222,6 @@ body {
   line-height: 1.7;
 }
 
-.config-section {
-  padding: 1.3rem !important;
-}
-
-.config-section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.9rem;
-  margin-bottom: 1.1rem;
-}
-
-.config-section-title {
-  margin: 0;
-  color: var(--shell-text);
-  font-size: 1.02rem;
-  font-weight: 800;
-}
-
-.config-section-count {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0 0.85rem;
-  border-radius: 999px;
-  background: var(--sem-info-bg);
-  color: var(--sem-info);
-  font-size: 0.76rem;
-  font-weight: 800;
-}
-
-.config-grid {
-  display: grid;
-  gap: 1rem;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.config-item {
-  display: grid;
-  gap: 0.55rem;
-  min-height: 10.5rem;
-  border: 1px solid var(--shell-border);
-  border-radius: 1.35rem;
-  background: rgba(148, 163, 184, 0.08);
-  padding: 1.1rem;
-  transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
-}
-
-.config-item:hover,
-.config-item:focus-visible {
-  transform: translateY(-2px);
-  border-color: var(--shell-border-strong);
-  background: rgba(37, 99, 235, 0.08);
-  box-shadow: var(--shell-shadow);
-  outline: none;
-}
-
-.config-item-title {
-  margin: 0;
-  color: var(--shell-text);
-  font-size: 0.97rem;
-  font-weight: 800;
-}
-
-.config-item-description {
-  margin: 0;
-  color: var(--shell-muted);
-  font-size: 0.88rem;
-  line-height: 1.65;
-}
-
-.config-item-disabled {
-  opacity: 0.62;
-}
 
 .layout-shell .max-w-4xl,
 .layout-shell .max-w-3xl {
@@ -9405,125 +9229,232 @@ body {
 }
 
 /* Dark theme compatibility for legacy light utility cards across modules. */
-.dark .layout-shell :is(.bg-white, .bg-slate-50, .bg-slate-100, .bg-gray-50, .bg-gray-100, .bg-zinc-50) {
+.dark .layout-shell :is(.bg-white,
+.bg-slate-50,
+.bg-slate-100,
+.bg-gray-50,
+.bg-gray-100,
+.bg-zinc-50) {
   background-color: rgba(15, 23, 42, 0.72) !important;
   color: var(--shell-text) !important;
 }
 
-.dark .layout-shell :is(.bg-blue-50, .bg-sky-50, .bg-indigo-50, .bg-cyan-50) {
+.dark .layout-shell :is(.bg-blue-50,
+.bg-sky-50,
+.bg-indigo-50,
+.bg-cyan-50) {
   background-color: rgba(37, 99, 235, 0.16) !important;
   color: #dbeafe !important;
 }
 
-.dark .layout-shell :is(.bg-emerald-50, .bg-green-50, .bg-teal-50, .bg-lime-50) {
+.dark .layout-shell :is(.bg-emerald-50,
+.bg-green-50,
+.bg-teal-50,
+.bg-lime-50) {
   background-color: rgba(16, 185, 129, 0.16) !important;
   color: #d1fae5 !important;
 }
 
-.dark .layout-shell :is(.bg-amber-50, .bg-yellow-50, .bg-orange-50) {
+.dark .layout-shell :is(.bg-amber-50,
+.bg-yellow-50,
+.bg-orange-50) {
   background-color: rgba(245, 158, 11, 0.17) !important;
   color: #fef3c7 !important;
 }
 
-.dark .layout-shell :is(.bg-rose-50, .bg-red-50, .bg-pink-50) {
+.dark .layout-shell :is(.bg-rose-50,
+.bg-red-50,
+.bg-pink-50) {
   background-color: rgba(239, 68, 68, 0.16) !important;
   color: #fee2e2 !important;
 }
 
-.dark .layout-shell :is(.bg-purple-50, .bg-violet-50, .bg-fuchsia-50) {
+.dark .layout-shell :is(.bg-purple-50,
+.bg-violet-50,
+.bg-fuchsia-50) {
   background-color: rgba(139, 92, 246, 0.16) !important;
   color: #ede9fe !important;
 }
 
-.dark .layout-shell :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-gray-950, .text-gray-900, .text-gray-800, .text-gray-700, .text-zinc-900) {
+.dark .layout-shell :is(.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-gray-950,
+.text-gray-900,
+.text-gray-800,
+.text-gray-700,
+.text-zinc-900) {
   color: var(--shell-text) !important;
 }
 
-.dark .layout-shell :is(.text-slate-700, .text-slate-600, .text-slate-500, .text-slate-400, .text-gray-600, .text-gray-500, .text-gray-400, .text-zinc-600) {
+.dark .layout-shell :is(.text-slate-700,
+.text-slate-600,
+.text-slate-500,
+.text-slate-400,
+.text-gray-600,
+.text-gray-500,
+.text-gray-400,
+.text-zinc-600) {
   color: var(--shell-muted) !important;
 }
 
-.dark .layout-shell :is(.text-blue-900, .text-blue-800, .text-sky-900, .text-sky-800, .text-indigo-900, .text-indigo-800, .text-cyan-900, .text-cyan-800) {
+.dark .layout-shell :is(.text-blue-900,
+.text-blue-800,
+.text-sky-900,
+.text-sky-800,
+.text-indigo-900,
+.text-indigo-800,
+.text-cyan-900,
+.text-cyan-800) {
   color: #bfdbfe !important;
 }
 
-.dark .layout-shell :is(.text-blue-700, .text-sky-700, .text-indigo-700, .text-cyan-700) {
+.dark .layout-shell :is(.text-blue-700,
+.text-sky-700,
+.text-indigo-700,
+.text-cyan-700) {
   color: #93c5fd !important;
 }
 
-.dark .layout-shell :is(.text-emerald-900, .text-emerald-800, .text-green-900, .text-green-800, .text-teal-900, .text-teal-800, .text-lime-900, .text-lime-800) {
+.dark .layout-shell :is(.text-emerald-900,
+.text-emerald-800,
+.text-green-900,
+.text-green-800,
+.text-teal-900,
+.text-teal-800,
+.text-lime-900,
+.text-lime-800) {
   color: #bbf7d0 !important;
 }
 
-.dark .layout-shell :is(.text-emerald-700, .text-green-700, .text-teal-700, .text-lime-700) {
+.dark .layout-shell :is(.text-emerald-700,
+.text-green-700,
+.text-teal-700,
+.text-lime-700) {
   color: #86efac !important;
 }
 
-.dark .layout-shell :is(.text-amber-900, .text-amber-800, .text-yellow-900, .text-yellow-800, .text-orange-900, .text-orange-800) {
+.dark .layout-shell :is(.text-amber-900,
+.text-amber-800,
+.text-yellow-900,
+.text-yellow-800,
+.text-orange-900,
+.text-orange-800) {
   color: #fde68a !important;
 }
 
-.dark .layout-shell :is(.text-amber-700, .text-yellow-700, .text-orange-700) {
+.dark .layout-shell :is(.text-amber-700,
+.text-yellow-700,
+.text-orange-700) {
   color: #fcd34d !important;
 }
 
-.dark .layout-shell :is(.text-rose-900, .text-rose-800, .text-red-900, .text-red-800, .text-pink-900, .text-pink-800) {
+.dark .layout-shell :is(.text-rose-900,
+.text-rose-800,
+.text-red-900,
+.text-red-800,
+.text-pink-900,
+.text-pink-800) {
   color: #fecaca !important;
 }
 
-.dark .layout-shell :is(.text-rose-700, .text-red-700, .text-pink-700) {
+.dark .layout-shell :is(.text-rose-700,
+.text-red-700,
+.text-pink-700) {
   color: #fca5a5 !important;
 }
 
-.dark .layout-shell :is(.text-purple-900, .text-purple-800, .text-violet-900, .text-violet-800, .text-fuchsia-900, .text-fuchsia-800) {
+.dark .layout-shell :is(.text-purple-900,
+.text-purple-800,
+.text-violet-900,
+.text-violet-800,
+.text-fuchsia-900,
+.text-fuchsia-800) {
   color: #ddd6fe !important;
 }
 
-.dark .layout-shell :is(.text-purple-700, .text-violet-700, .text-fuchsia-700) {
+.dark .layout-shell :is(.text-purple-700,
+.text-violet-700,
+.text-fuchsia-700) {
   color: #c4b5fd !important;
 }
 
-.dark .layout-shell :is(.border-slate-100, .border-slate-200, .border-slate-300, .border-gray-100, .border-gray-200, .border-gray-300, .border-zinc-200) {
+.dark .layout-shell :is(.border-slate-100,
+.border-slate-200,
+.border-slate-300,
+.border-gray-100,
+.border-gray-200,
+.border-gray-300,
+.border-zinc-200) {
   border-color: var(--shell-border) !important;
 }
 
-.dark .layout-shell :is(.border-blue-200, .border-sky-200, .border-indigo-200, .border-cyan-200) {
+.dark .layout-shell :is(.border-blue-200,
+.border-sky-200,
+.border-indigo-200,
+.border-cyan-200) {
   border-color: rgba(96, 165, 250, 0.36) !important;
 }
 
-.dark .layout-shell :is(.border-emerald-200, .border-green-200, .border-teal-200, .border-lime-200) {
+.dark .layout-shell :is(.border-emerald-200,
+.border-green-200,
+.border-teal-200,
+.border-lime-200) {
   border-color: rgba(52, 211, 153, 0.34) !important;
 }
 
-.dark .layout-shell :is(.border-amber-200, .border-yellow-200, .border-orange-200) {
+.dark .layout-shell :is(.border-amber-200,
+.border-yellow-200,
+.border-orange-200) {
   border-color: rgba(251, 191, 36, 0.36) !important;
 }
 
-.dark .layout-shell :is(.border-rose-200, .border-red-200, .border-pink-200) {
+.dark .layout-shell :is(.border-rose-200,
+.border-red-200,
+.border-pink-200) {
   border-color: rgba(248, 113, 113, 0.36) !important;
 }
 
-.dark .layout-shell :is(.border-purple-200, .border-violet-200, .border-fuchsia-200) {
+.dark .layout-shell :is(.border-purple-200,
+.border-violet-200,
+.border-fuchsia-200) {
   border-color: rgba(167, 139, 250, 0.36) !important;
 }
 
-.dark .layout-shell :is(.divide-slate-100, .divide-slate-200, .divide-gray-100, .divide-gray-200) > :not([hidden]) ~ :not([hidden]) {
+.dark .layout-shell :is(.divide-slate-100,
+.divide-slate-200,
+.divide-gray-100,
+.divide-gray-200) > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--shell-border) !important;
 }
 
-.dark .layout-shell :is(.shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+.dark .layout-shell :is(.shadow,
+.shadow-sm,
+.shadow-md,
+.shadow-lg,
+.shadow-xl,
+.shadow-2xl) {
   box-shadow: var(--shell-shadow) !important;
 }
 
-.dark .layout-shell :is(.hover\:bg-white:hover, .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover) {
+.dark .layout-shell :is(.hover\:bg-white:hover,
+.hover\:bg-slate-50:hover,
+.hover\:bg-slate-100:hover,
+.hover\:bg-gray-50:hover,
+.hover\:bg-gray-100:hover) {
   background-color: rgba(37, 99, 235, 0.14) !important;
 }
 
-.dark .layout-shell :is(.hover\:bg-blue-50:hover, .hover\:bg-sky-50:hover, .hover\:bg-indigo-50:hover) {
+.dark .layout-shell :is(.hover\:bg-blue-50:hover,
+.hover\:bg-sky-50:hover,
+.hover\:bg-indigo-50:hover) {
   background-color: rgba(37, 99, 235, 0.22) !important;
 }
 
-.dark .layout-shell :is(.hover\:text-slate-900:hover, .hover\:text-gray-900:hover, .hover\:text-blue-900:hover, .hover\:text-sky-900:hover) {
+.dark .layout-shell :is(.hover\:text-slate-900:hover,
+.hover\:text-gray-900:hover,
+.hover\:text-blue-900:hover,
+.hover\:text-sky-900:hover) {
   color: var(--shell-text) !important;
 }
 
@@ -9537,11 +9468,13 @@ body {
   color: var(--shell-text) !important;
 }
 
-.dark .layout-shell .financeiro-formas-pagamento > .flex:first-child :is(.text-\[var\(--c-text\)\], .text-sm) {
+.dark .layout-shell .financeiro-formas-pagamento > .flex:first-child :is(.text-\[var\(--c-text\)\],
+.text-sm) {
   color: var(--shell-text) !important;
 }
 
-.dark .layout-shell .financeiro-formas-pagamento > .flex:first-child :is(.text-xs, .text-slate-500) {
+.dark .layout-shell .financeiro-formas-pagamento > .flex:first-child :is(.text-xs,
+.text-slate-500) {
   color: var(--shell-muted) !important;
 }
 
@@ -9551,11 +9484,23 @@ body {
   color: var(--shell-text) !important;
 }
 
-.dark .layout-shell :is(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled="true"]) {
+.dark .layout-shell :is(button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"]) {
   opacity: 0.72;
 }
 
-.dark .layout-shell :is(button:disabled, input:disabled, select:disabled, textarea:disabled, [aria-disabled="true"]) :is(.text-slate-950, .text-slate-900, .text-slate-800, .text-gray-900, .text-gray-800) {
+.dark .layout-shell :is(button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled,
+[aria-disabled="true"]) :is(.text-slate-950,
+.text-slate-900,
+.text-slate-800,
+.text-gray-900,
+.text-gray-800) {
   color: var(--shell-muted) !important;
 }
 
@@ -9625,7 +9570,8 @@ body {
   }
 }
 
-/* Compras: listas operacionais em tabela unica, sem linhas em formato de card */
+/* Compras: listas operacionais em tabela unica,
+sem linhas em formato de card */
 .layout-shell .compras-table-card {
   padding: 0.9rem;
 }
@@ -10271,14 +10217,14 @@ body {
     justify-content: stretch;
   }
 
-  .layout-shell .rh-colaboradores-actions .btn,
-  .layout-shell .rh-colaboradores-actions label.btn {
+.layout-shell .rh-colaboradores-actions .btn,
+.layout-shell .rh-colaboradores-actions label.btn {
     flex: 1 1 11rem;
     min-width: min(100%, 11rem);
   }
 
-  .layout-shell .rhdp-apuracao-page .app-page-actions .btn,
-  .layout-shell .rhdp-apuracao-page .app-page-actions a.btn {
+.layout-shell .rhdp-apuracao-page .app-page-actions .btn,
+.layout-shell .rhdp-apuracao-page .app-page-actions a.btn {
     flex: 1 1 11rem;
     min-width: min(100%, 11rem);
     justify-content: center;
@@ -10294,20 +10240,20 @@ body {
     grid-template-columns: 1fr;
   }
 
-  .layout-shell .rhdp-apuracao-form-grid,
-  .layout-shell .rhdp-apuracao-filter-grid,
-  .layout-shell .rhdp-apuracao-close-grid {
+.layout-shell .rhdp-apuracao-form-grid,
+.layout-shell .rhdp-apuracao-filter-grid,
+.layout-shell .rhdp-apuracao-close-grid {
     grid-template-columns: 1fr;
   }
 
-  .layout-shell .rh-colaboradores-actions .btn,
-  .layout-shell .rh-colaboradores-actions label.btn {
+.layout-shell .rh-colaboradores-actions .btn,
+.layout-shell .rh-colaboradores-actions label.btn {
     flex-basis: 100%;
     justify-content: center;
   }
 
-  .layout-shell .rhdp-apuracao-page .app-page-actions .btn,
-  .layout-shell .rhdp-apuracao-page .app-page-actions a.btn {
+.layout-shell .rhdp-apuracao-page .app-page-actions .btn,
+.layout-shell .rhdp-apuracao-page .app-page-actions a.btn {
     flex-basis: 100%;
   }
 
@@ -10319,10 +10265,10 @@ body {
     padding: 1rem;
   }
 
-  .layout-shell .rhdp-apuracao-create-card,
-  .layout-shell .rhdp-apuracao-filters,
-  .layout-shell .rhdp-apuracao-list-card,
-  .layout-shell .rhdp-apuracao-detail-card {
+.layout-shell .rhdp-apuracao-create-card,
+.layout-shell .rhdp-apuracao-filters,
+.layout-shell .rhdp-apuracao-list-card,
+.layout-shell .rhdp-apuracao-detail-card {
     padding: 1rem;
   }
 }
@@ -10504,8 +10450,8 @@ body {
 }
 
 @media (max-width: 767px) {
-  .layout-shell .rhdp-importacoes-detail-card,
-  .layout-shell .rhdp-importacoes-list-card {
+.layout-shell .rhdp-importacoes-detail-card,
+.layout-shell .rhdp-importacoes-list-card {
     padding: 1rem;
   }
 
@@ -10984,7 +10930,8 @@ body {
   background: rgba(15, 23, 42, 0.86);
 }
 
-/* Cotacoes: evita que filtros, cards e tabela empurrem a pagina para fora do viewport */
+/* Cotacoes: evita que filtros,
+cards e tabela empurrem a pagina para fora do viewport */
 .layout-shell .compras-cotacoes-page {
   width: 100%;
   max-width: min(100%, 88rem);
@@ -11027,7 +10974,9 @@ body {
   background: #eff6ff;
 }
 
-.dark .layout-shell :is(.page-compra-nova, .compras-cotacoes-page, .compras-solicitacoes-page) {
+.dark .layout-shell :is(.page-compra-nova,
+.compras-cotacoes-page,
+.compras-solicitacoes-page) {
   --c-surface: rgba(9, 35, 69, 0.94);
   --c-surface-soft: rgba(12, 44, 82, 0.82);
   --c-border: rgba(72, 118, 177, 0.50);
@@ -11057,7 +11006,10 @@ body {
   color: #d1fae5 !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-whatsapp-panel :is(h3, p, span, strong) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-whatsapp-panel :is(h3,
+p,
+span,
+strong) {
   color: #d1fae5 !important;
 }
 
@@ -11082,28 +11034,53 @@ body {
   color: #aec1dc !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-text\)\], .font-semibold, .font-medium, label, h2, h3),
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-text\)\], .font-semibold, .font-medium, label, h2, h3),
-.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.font-semibold, h2, h3) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-text\)\],
+.font-semibold,
+.font-medium,
+label,
+h2,
+h3),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-text\)\],
+.font-semibold,
+.font-medium,
+label,
+h2,
+h3),
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.font-semibold,
+h2,
+h3) {
   color: #eef5ff !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-muted\)\], p),
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-muted\)\], p),
-.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.text-\[var\(--c-muted\)\], p) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.text-\[var\(--c-muted\)\],
+p),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.text-\[var\(--c-muted\)\],
+p),
+.dark .layout-shell .cotacao-gestao-page .sol-surface-card > .mt-4.rounded-2xl :is(.text-\[var\(--c-muted\)\],
+p) {
   color: #9fb3cf !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea),
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input, input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input,
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea),
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input,
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea) {
   border-color: rgba(72, 118, 177, 0.72) !important;
   background: rgba(13, 42, 78, 0.96) !important;
   color: #eef5ff !important;
   -webkit-text-fill-color: #eef5ff !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input, input, textarea)::placeholder,
-.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input, input, textarea)::placeholder {
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedores-panel :is(.input,
+input,
+textarea)::placeholder,
+.dark .layout-shell .cotacao-gestao-page .cotacao-fornecedor-rapido :is(.input,
+input,
+textarea)::placeholder {
   color: #9fb3cf !important;
   -webkit-text-fill-color: #9fb3cf !important;
 }
@@ -11182,11 +11159,17 @@ body {
   background: rgba(239, 68, 68, 0.13) !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-text\)\], .font-semibold, .font-bold, .font-medium, h2, h3) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-text\)\],
+.font-semibold,
+.font-bold,
+.font-medium,
+h2,
+h3) {
   color: #eef5ff !important;
 }
 
-.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-muted\)\], p) {
+.dark .layout-shell .cotacao-gestao-page .cotacao-comparativo-panel :is(.text-\[var\(--c-muted\)\],
+p) {
   color: #9fb3cf !important;
 }
 
@@ -11240,8 +11223,8 @@ body {
     justify-content: flex-start;
   }
 
-  .layout-shell .compras-cotacoes-page .compras-table-card,
-  .layout-shell .compras-cotacoes-page .app-filters-card {
+.layout-shell .compras-cotacoes-page .compras-table-card,
+.layout-shell .compras-cotacoes-page .app-filters-card {
     padding: 0.85rem;
     border-radius: 1.2rem;
   }
@@ -11308,8 +11291,9 @@ body {
   -webkit-backdrop-filter: blur(4px);
 }
 
-/* Contrato global de overlays. O portal vive diretamente no body e, por isso,
-   nunca fica preso ao contexto de empilhamento do conteudo ou abaixo do menu. */
+/* Contrato global de overlays. O portal vive diretamente no body e,
+por isso,
+nunca fica preso ao contexto de empilhamento do conteudo ou abaixo do menu. */
 .app-modal-portal {
   position: relative;
   z-index: var(--z-modal);
@@ -11350,8 +11334,10 @@ body {
 
 /* Protecao para overlays legados enquanto cada fluxo e migrado para o portal.
    Todo overlay de tela inteira originado por uma pagina deve ficar acima do
-   shell, inclusive quando ainda nao recebeu role="dialog". */
-.layout-main :where(.modal-overlay, .fixed.inset-0) {
+shell,
+inclusive quando ainda nao recebeu role="dialog". */
+.layout-main :where(.modal-overlay,
+.fixed.inset-0) {
   z-index: var(--z-modal) !important;
 }
 
@@ -11563,30 +11549,30 @@ body {
 }
 
 @media (max-width: 639px) {
-  .modal-overlay,
-  .app-modal-overlay {
+.modal-overlay,
+.app-modal-overlay {
     align-items: flex-end;
     padding: 0;
   }
 
-  .modal-dialog,
-  .app-modal-surface {
+.modal-dialog,
+.app-modal-surface {
     max-width: 100%;
     max-height: calc(100dvh - env(safe-area-inset-top));
     border-radius: var(--modal-radius) var(--modal-radius) 0 0;
   }
 
-  .modal-dialog.finance-operation-modal,
-  .modal-dialog.finance-operation-modal--medium,
-  .modal-dialog.finance-operation-modal--detail,
-  .modal-dialog.finance-operation-modal--wide {
+.modal-dialog.finance-operation-modal,
+.modal-dialog.finance-operation-modal--medium,
+.modal-dialog.finance-operation-modal--detail,
+.modal-dialog.finance-operation-modal--wide {
     max-width: 100%;
     max-height: 94dvh;
   }
 
-  .finance-operation-modal .modal-header,
-  .finance-operation-modal .modal-body,
-  .finance-operation-modal .modal-footer {
+.finance-operation-modal .modal-header,
+.finance-operation-modal .modal-body,
+.finance-operation-modal .modal-footer {
     padding-left: 1rem;
     padding-right: 1rem;
   }
@@ -11912,14 +11898,16 @@ body {
 }
 
 /* ============================================================================
-   RH/DP • Pessoal — a tela consolidada (Fase 6 do modulo DP, 26/08)
+RH/DP • Pessoal — a tela consolidada (Fase 6 do modulo DP,
+26/08)
    ---------------------------------------------------------------------------
    O cliente pediu que quem tem solicitacao em aberto "seja posicionado primeiro
    na lista e ganhe destaque visual e de status". A ordenacao vem do backend; o
    destaque e daqui.
 
    A barra lateral colorida foi escolhida em vez de fundo forte de propósito: a
-   linha continua legivel na leitura normal, e o olho ainda encontra as
+   linha continua legivel na leitura normal,
+e o olho ainda encontra as
    pendentes de longe. Fundo forte em varias linhas transforma a tabela em
    semaforo e o destaque deixa de destacar.
    ========================================================================== */
@@ -11940,7 +11928,8 @@ body {
   box-shadow: inset 3px 0 0 0 #7BA0F5;
 }
 
-/* --- avisos visuais no topo: o que exige acao, contado por tipo --- */
+/* --- avisos visuais no topo: o que exige acao,
+contado por tipo --- */
 .rh-pessoal-alertas {
   display: grid;
   gap: 10px;
@@ -11988,7 +11977,7 @@ body {
 }
 
 /* Azul = decisao do DP. Roxo = decisao da DIRETORIA. A cor diz de quem e a vez,
-   e nao so o que e o pedido — que e a duvida real de quem olha a lista. */
+e nao so o que e o pedido — que e a duvida real de quem olha a lista. */
 .rh-chip--pedido { background: rgba(43, 92, 230, 0.14); color: #12306E; }
 .rh-chip--evento { background: rgba(21, 128, 61, 0.14); color: #0B4522; }
 .rh-chip--diretoria { background: rgba(107, 47, 191, 0.14); color: #3D1A70; }
@@ -12029,7 +12018,8 @@ body {
 
 .dark .rh-pessoal-devolucao { color: #EE7B7B; }
 
-/* --- abas de Pessoal: solicitacoes primeiro, colaboradores depois (26/08) --- */
+/* --- abas de Pessoal: solicitacoes primeiro,
+colaboradores depois (26/08) --- */
 .rh-pessoal-abas {
   display: flex;
   gap: 4px;
@@ -12119,7 +12109,9 @@ body {
 
 .dark .rh-pessoal-historico li { border-left-color: #2A303A; }
 
-/* Envio de documento na solicitacao: tipo, arquivo e o botao, na mesma linha em tela larga. */
+/* Envio de documento na solicitacao: tipo,
+arquivo e o botao,
+na mesma linha em tela larga. */
 .rh-pessoal-envio {
   display: grid;
   gap: 8px;
@@ -12143,8 +12135,10 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Dias + faltas passando do mes: erro na linha, e nao so na mensagem no rodape. Quem digita precisa
-   ver ONDE errou, nao so QUE errou. */
+/* Dias + faltas passando do mes: erro na linha,
+e nao so na mensagem no rodape. Quem digita precisa
+   ver ONDE errou,
+nao so QUE errou. */
 .rh-jornada-linha--erro > td:first-child {
   box-shadow: inset 3px 0 0 0 #B91C1C;
 }
@@ -12158,13 +12152,15 @@ body {
    Responsividade das tabelas do modulo DP (26/08)
    ---------------------------------------------------------------------------
    O defeito que isto corrige: os botoes da coluna de acoes quebravam UM
-   CARACTERE POR LINHA ("A c o m p a n h a r"), porque a celula ficava estreita
+CARACTERE POR LINHA ("A c o m p a n h a r"),
+porque a celula ficava estreita
    e nada impedia a palavra de quebrar. Largura de coluna sozinha nao resolve —
    em tela estreita a celula encolhe de novo.
 
    A regra e: o botao NUNCA quebra por dentro; quem quebra e a lista de botoes,
-   passando para a linha de baixo. E a tabela rola na horizontal quando nem isso
-   basta, em vez de espremer.
+passando para a linha de baixo. E a tabela rola na horizontal quando nem isso
+   basta,
+em vez de espremer.
    ========================================================================== */
 
 .rh-pessoal-table .app-page-actions,
@@ -12203,8 +12199,8 @@ body {
 
 /* Em tela estreita os filtros viram uma coluna so, em vez de espremer lado a lado. */
 @media (max-width: 900px) {
-  .rh-pessoal-page .rh-colaboradores-filter-grid,
-  .rhdp-page .rh-colaboradores-filter-grid {
+.rh-pessoal-page .rh-colaboradores-filter-grid,
+.rhdp-page .rh-colaboradores-filter-grid {
     grid-template-columns: 1fr;
   }
 
@@ -12243,8 +12239,8 @@ body {
     width: auto;
   }
 
-  .rhdp-page table .app-page-actions .btn,
-  .rhdp-page table .app-page-actions label.btn {
+.rhdp-page table .app-page-actions .btn,
+.rhdp-page table .app-page-actions label.btn {
     flex: 0 0 auto;
     width: auto;
   }
@@ -12254,10 +12250,12 @@ body {
    Acoes em icone na tabela do modulo DP (26/08)
    ---------------------------------------------------------------------------
    Cinco botoes escritos por linha ocupavam 400px de coluna e ainda quebravam em
-   duas fileiras. A tabela virava uma escada, e o nome do colaborador — que e o
+duas fileiras. A tabela virava uma escada,
+e o nome do colaborador — que e o
    que se procura — competia com os botoes.
 
-   Alvo de toque de 34px: abaixo disso o dedo erra no celular, e o ganho de
+   Alvo de toque de 34px: abaixo disso o dedo erra no celular,
+e o ganho de
    espaco nao compensa o clique errado numa acao como "Demitir".
    ========================================================================== */
 
@@ -12294,7 +12292,8 @@ body {
   background: rgba(43, 92, 230, 0.07);
 }
 
-/* Foco visivel: a acao e so um icone, entao quem navega por teclado precisa ver onde esta. */
+/* Foco visivel: a acao e so um icone,
+entao quem navega por teclado precisa ver onde esta. */
 .rh-acao-icone:focus-visible {
   outline: 2px solid #2B5CE6;
   outline-offset: 2px;
@@ -12320,8 +12319,10 @@ body {
   max-height: min(86dvh, 860px);
 }
 
-/* Regra global de botao impoe `min-height: 42px`, e em CSS o `min-height` VENCE o `max-height` —
-   nao adianta limitar por cima. Aqui o `min-height` e sobrescrito com especificidade maior, para o
+/* Regra global de botao impoe `min-height: 42px`,
+e em CSS o `min-height` VENCE o `max-height` —
+   nao adianta limitar por cima. Aqui o `min-height` e sobrescrito com especificidade maior,
+para o
    icone ficar quadrado (34x34) em vez de 34x42. */
 .rhdp-page .rh-acoes-icones .rh-acao-icone,
 .rh-pessoal-page .rh-acoes-icones .rh-acao-icone {
@@ -12332,7 +12333,9 @@ body {
   line-height: 1;
 }
 
-/* Troca de obra na linha: origem, seta, destino. O destino em destaque porque e o que muda. */
+/* Troca de obra na linha: origem,
+seta,
+destino. O destino em destaque porque e o que muda. */
 .rh-troca-obra {
   display: flex;
   align-items: center;
@@ -12345,7 +12348,8 @@ body {
 .rh-troca-obra-seta { opacity: 0.5; }
 .rh-troca-obra-destino { font-weight: 600; }
 
-/* Linha de quem ainda nao comecou nesta obra: visivel, mas claramente fora do mes. */
+/* Linha de quem ainda nao comecou nesta obra: visivel,
+mas claramente fora do mes. */
 .rh-jornada-linha--futura { opacity: 0.62; }
 .rh-jornada-linha--futura > td:first-child { box-shadow: inset 3px 0 0 0 #B45309; }
 .rh-jornada-futura-nota { color: #B45309; }
@@ -12356,21 +12360,32 @@ body {
 /* ============================================================================
    Largura das telas do modulo DP (26/08)
    ---------------------------------------------------------------------------
-   `.page` tem `max-width: 1100px`, medida boa para tela de LEITURA — o texto
+`.page` tem `max-width: 1100px`,
+medida boa para tela de LEITURA — o texto
    nao fica largo demais para o olho acompanhar.
 
    Mas Pessoal e Jornada sao GRADES DE DADOS. A jornada tem nove colunas
-   (colaborador, vinculo, salario, dias, faltas, horas extras, acrescimos,
-   descontos, observacao) e soma cerca de 1260px. Em 1100 ela nasce apertada:
+   (colaborador,
+vinculo,
+salario,
+dias,
+faltas,
+horas extras,
+acrescimos,
+descontos,
+observacao) e soma cerca de 1260px. Em 1100 ela nasce apertada:
    o card fica menor que o de filtros logo acima e a tabela rola de lado desde
-   o primeiro acesso, mesmo numa tela larga.
+   o primeiro acesso,
+mesmo numa tela larga.
 
-   1480px cabe a jornada inteira sem rolagem num monitor comum, e continua
+   1480px cabe a jornada inteira sem rolagem num monitor comum,
+e continua
    longe de "texto atravessando a tela" — porque aqui nao ha texto corrido.
 
    `width: 100%` no form e no card: na Jornada a tabela vive dentro de um
-   `<form>`, e sem isso ele se ajusta ao conteudo em vez de ocupar a linha,
-   deixando o card visivelmente mais estreito que o de filtros.
+   `<form>`,
+e sem isso ele se ajusta ao conteudo em vez de ocupar a linha,
+deixando o card visivelmente mais estreito que o de filtros.
    ========================================================================== */
 
 .rhdp-page {
@@ -12378,14 +12393,18 @@ body {
 }
 
 /**
- * DESCENDENTE, e nao filho direto (`>`).
+* DESCENDENTE,
+e nao filho direto (`>`).
  *
- * A primeira versao usava `.rhdp-page > form`. Funcionava na Jornada como PAGINA, onde o form e
- * filho direto — e parava de funcionar quando a Jornada virou ABA, porque ali ela e envolvida por
+ * A primeira versao usava `.rhdp-page > form`. Funcionava na Jornada como PAGINA,
+onde o form e
+ * filho direto — e parava de funcionar quando a Jornada virou ABA,
+porque ali ela e envolvida por
  * um `div` da pagina anfitria e o form desce um nivel.
  *
  * O sintoma: o card da tabela ficava mais estreito E recuado em relacao ao card de filtros logo
- * acima, porque o form se ajustava ao conteudo em vez de ocupar a linha.
+ * acima,
+porque o form se ajustava ao conteudo em vez de ocupar a linha.
  */
 .rhdp-page form,
 .rhdp-page .app-table-shell {
@@ -12416,21 +12435,33 @@ body {
 
    Mas o form da Jornada envolve uma TABELA de nove colunas. Ali a largura de
    leitura vira prejuizo: o card fica mais estreito e recuado em relacao ao de
-   filtros logo acima, e a tabela rola de lado antes do necessario.
+filtros logo acima,
+e a tabela rola de lado antes do necessario.
 
    `rh-form-com-tabela` marca essa excecao explicitamente. A especificidade
-   precisa empatar com a regra do sistema (`:not()` conta como classe), e o
+   precisa empatar com a regra do sistema (`:not()` conta como classe),
+e o
    `margin-inline` precisa ser desfeito — sem ele o form fica centralizado
    mesmo com largura total.
    ========================================================================== */
 
 /*
- * `form.rh-form-com-tabela`, com o ELEMENTO junto da classe.
+ * `form.rh-form-com-tabela`,
+com o ELEMENTO junto da classe.
  *
  * A regra do sistema e `.solicitacoes-page:not(.solicitacao-nova-page) form` — duas classes e um
- * elemento, especificidade (0,2,1). `.solicitacoes-page .rh-form-com-tabela` da (0,2,0) e PERDE,
- * mesmo vindo depois no arquivo. Escrever `form.` na frente empata em (0,2,1), e a ordem decide a
- * favor desta, que vem por ultimo.
+ * elemento,
+especificidade (0,
+2,
+1). `.solicitacoes-page .rh-form-com-tabela` da (0,
+2,
+0) e PERDE,
+* mesmo vindo depois no arquivo. Escrever `form.` na frente empata em (0,
+2,
+1),
+e a ordem decide a
+ * favor desta,
+que vem por ultimo.
  */
 .solicitacoes-page form.rh-form-com-tabela,
 .rhdp-page form.rh-form-com-tabela {
@@ -12442,11 +12473,15 @@ body {
 /*
  * O ALERTA DE APONTAMENTOS DA DEMISSAO (Fase 11).
  *
- * Cor de AVISO, e nao de erro. Ferias vencidas nao impedem demitir — mudam a rescisao, e quem
- * decide isso e o DP. Pintar de vermelho faria parecer que o sistema recusou, e a pessoa procuraria
+* Cor de AVISO,
+e nao de erro. Ferias vencidas nao impedem demitir — mudam a rescisao,
+e quem
+ * decide isso e o DP. Pintar de vermelho faria parecer que o sistema recusou,
+e a pessoa procuraria
  * o que "consertar" antes de seguir.
  *
- * Tokens dos dois temas: o bloco vive dentro de um modal, que herda o fundo do tema do visitante.
+ * Tokens dos dois temas: o bloco vive dentro de um modal,
+que herda o fundo do tema do visitante.
  */
 .rh-alerta-apontamentos {
   border: 1px solid var(--app-number-warning, #d97706);
@@ -12472,7 +12507,8 @@ body {
  * ANEXOS DENTRO DO MODAL (27/08).
  *
  * Cada linha e "tipo + arquivo + remover". Em tela estreita as tres viram uma coluna: o seletor de
- * tipo e o campo de arquivo lado a lado em 375px deixariam os dois ilegiveis, e o nome do arquivo
+* tipo e o campo de arquivo lado a lado em 375px deixariam os dois ilegiveis,
+e o nome do arquivo
  * escolhido — que e o que confirma que a pessoa pegou o certo — some primeiro.
  */
 .rh-anexos-do-modal {
@@ -12511,7 +12547,8 @@ body {
  * O chip do RASCUNHO — neutro de proposito.
  *
  * Rascunho nao e alerta nem sucesso: e trabalho que ainda nao saiu da mesa de quem abriu. Pintar de
- * cor de aviso o colocaria no mesmo peso visual de "aguardando decisao", que e onde a bola esta com
+* cor de aviso o colocaria no mesmo peso visual de "aguardando decisao",
+que e onde a bola esta com
  * outra pessoa.
  */
 .rh-chip--rascunho {
@@ -12523,7 +12560,8 @@ body {
 /* =====================================================================
    DETALHE DA SOLICITAÇÃO — layout configurável em blocos
    ===================================================================== */
-/* Duas colunas com ordem sequencial (desce a 1ª, continua na 2ª);
+/* Duas colunas com ordem sequencial (desce a 1ª,
+continua na 2ª);
    cada bloco inteiro numa coluna só. No mobile vira coluna única
    dentro das abas. */
 .sol-detail-blocos {
@@ -12688,9 +12726,12 @@ body {
 
 /* =====================================================================
    DETALHE — "Detalhes informados" (pares lidos da descrição) e
-   personalização ampliada (largura, remover, adicionar bloco)
+personalização ampliada (largura,
+remover,
+adicionar bloco)
    ===================================================================== */
-/* Discreto de propósito: são leituras do texto livre da descrição, não
+/* Discreto de propósito: são leituras do texto livre da descrição,
+não
    campos do sistema — não devem parecer campo estruturado. */
 .sol-detail-informados {
   margin-top: 0.9rem;

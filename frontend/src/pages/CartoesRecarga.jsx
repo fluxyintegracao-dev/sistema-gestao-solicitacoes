@@ -6,7 +6,9 @@ import {
   TabelaPadrao,
   CelulaDupla,
   FormSecao,
-  CampoForm
+  CampoForm,
+  Avisos,
+  useAvisos
 } from '../components/padrao';
 import { buscarParceiros } from '../services/parceiros';
 import { listarCartoesRecargaAdmin, salvarCartaoRecarga } from '../services/recargasCartao';
@@ -76,19 +78,32 @@ export default function CartoesRecarga() {
   const [buscaUsuario, setBuscaUsuario] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
-  const [erro, setErro] = useState('');
-  const [sucesso, setSucesso] = useState('');
+  /*
+    A CONFIRMACAO ESTAVA PINTADA DE ALERTA (04/09).
+
+    As duas faixas eram `app-alert` a mao. A classe `app-alert--success` NAO
+    EXISTE no index.css: o base `.app-alert` e ambar, com icone de triangulo
+    de atencao (`index.css:5141-5165`), e so `--error` sobrescreve. Ou seja
+    "Cartao cadastrado." saia com a cor e o icone de AVISO. Elemento
+    presente, texto certo, significado trocado — a classe de defeito que este
+    projeto chama de SIGNIFICADO, e nenhum check de forma pega.
+
+    A confirmacao de gravacao entra como PERSISTENTE, por decisao do
+    responsavel: sumir sozinha em 6s e pior que ficar, porque quem desviou o
+    olhar nao sabe se salvou. O erro ja era persistente e continua.
+  */
+  const { avisos, avisar, fechar, limpar } = useAvisos();
   // R22: hook usado é hook importado — o useRef está no import acima.
   // A referência serve para levar a pessoa ao formulário; não mede nada.
   const campoNomeRef = useRef(null);
 
   async function carregar() {
     setCarregando(true);
-    setErro('');
+    limpar();
     try {
       setDados(await listarCartoesRecargaAdmin());
     } catch (error) {
-      setErro(error.message);
+      avisar.erro(error.message);
     } finally {
       setCarregando(false);
     }
@@ -130,8 +145,7 @@ export default function CartoesRecarga() {
     setForm(FORM_VAZIO);
     setBuscaFornecedor('');
     setBuscaUsuario('');
-    setErro('');
-    setSucesso('');
+    limpar();
   }
 
   // A ação da faixa fixa (R13) não abre nada — o formulário já está na
@@ -156,8 +170,7 @@ export default function CartoesRecarga() {
     });
     setBuscaFornecedor(cartao.parceiro?.nome || '');
     setBuscaUsuario('');
-    setErro('');
-    setSucesso('');
+    limpar();
     irParaFormulario();
   }
 
@@ -174,16 +187,15 @@ export default function CartoesRecarga() {
     event.preventDefault();
     if (salvando) return;
     setSalvando(true);
-    setErro('');
-    setSucesso('');
+    limpar();
     try {
       const estavaEditando = Boolean(editandoId);
       await salvarCartaoRecarga({ ...form, ultimos_quatro: String(form.ultimos_quatro).replace(/\D/g, '') }, editandoId);
       await carregar();
       novo();
-      setSucesso(estavaEditando ? 'Alterações do cartão salvas.' : 'Cartão cadastrado.');
+      avisar.sucesso(estavaEditando ? 'Alterações do cartão salvas.' : 'Cartão cadastrado.', undefined, { persistente: true });
     } catch (error) {
-      setErro(error.message);
+      avisar.erro(error.message);
     } finally {
       setSalvando(false);
     }
@@ -204,8 +216,7 @@ export default function CartoesRecarga() {
         acaoPrincipal={{ rotulo: 'Novo cartão', onClick: novoDoCabecalho }}
       />
 
-      {erro ? <div className="app-alert app-alert--error">{erro}</div> : null}
-      {sucesso ? <div className="app-alert app-alert--success" role="status">{sucesso}</div> : null}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <BlocoConteudo
         titulo={editandoId ? 'Editar cartão' : 'Novo cartão'}

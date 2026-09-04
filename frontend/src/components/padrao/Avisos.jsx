@@ -54,7 +54,25 @@ export function useAvisos() {
     setAvisos((atuais) => atuais.filter((aviso) => aviso.id !== id));
   }, []);
 
-  const empilhar = useCallback((tipo, mensagem, titulo) => {
+  /*
+    CONFIRMACAO DE GRAVACAO PODE PEDIR PARA FICAR (04/09).
+
+    Só `success` tem timer; erro, alerta e informacao ja ficam na tela. O
+    problema aparece na confirmacao de que gravou: some em 6s, e quem
+    desviou o olhar nao sabe se salvou. Fica pior do que fixa.
+
+    Usar `informacao` para ganhar persistencia seria trocar o SIGNIFICADO
+    pelo efeito colateral — a faixa sairia azul para dizer que deu certo, e
+    este projeto ja registrou o defeito inverso (erro pintado de sucesso no
+    upload de comprovantes). Tom semantico nao se negocia por comportamento.
+
+    Entao a persistencia virou OPCAO, e nao um tipo novo. Mudanca aditiva de
+    proposito: quem ja chama `avisar.sucesso(msg)` continua com os 6s, byte
+    a byte. A R21 registra por que isso importa — mudar o contrato de um
+    componente padrao no meio de uma leva nao e mudanca compativel; ACRESCENTAR
+    parametro opcional e.
+  */
+  const empilhar = useCallback((tipo, mensagem, titulo, opcoes) => {
     const texto = String(mensagem ?? '').trim();
     if (!texto) return null;
     sequencia.current += 1;
@@ -65,7 +83,7 @@ export function useAvisos() {
       const iguais = atuais.some((aviso) => aviso.tipo === tipo && aviso.mensagem === texto);
       return iguais ? atuais : [...atuais, { id, tipo, mensagem: texto, titulo }];
     });
-    if (tipo === 'success') {
+    if (tipo === 'success' && !opcoes?.persistente) {
       timers.current.set(id, setTimeout(() => fechar(id), TEMPO_SUCESSO));
     }
     return id;
@@ -79,7 +97,9 @@ export function useAvisos() {
 
   const avisar = useMemo(() => ({
     erro: (mensagem, titulo) => empilhar('error', mensagem, titulo),
-    sucesso: (mensagem, titulo) => empilhar('success', mensagem, titulo),
+    // `opcoes.persistente` desliga o sumico automatico dos 6s — para a
+    // confirmacao de gravacao que precisa esperar a pessoa voltar o olhar.
+    sucesso: (mensagem, titulo, opcoes) => empilhar('success', mensagem, titulo, opcoes),
     alerta: (mensagem, titulo) => empilhar('warning', mensagem, titulo),
     informacao: (mensagem, titulo) => empilhar('info', mensagem, titulo)
   }), [empilhar]);

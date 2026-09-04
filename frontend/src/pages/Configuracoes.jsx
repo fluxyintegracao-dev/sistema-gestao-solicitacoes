@@ -418,19 +418,16 @@ export default function Configuracoes() {
         descricao="Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao."
       />
 
-      {/* B5: o texto de apresentação ganhou superfície. Era a
-          `.config-summary-card`, cujo título é 1.35rem (21,6px) e o
-          "kicker" 12px em caixa alta — o kicker virou a primeira palavra
-          da frase de apoio para não perder o texto (remover elemento
-          visível depende do cliente; reorganizar é livre).
-          FICA REGISTRADO para o cliente decidir: pela B3 este bloco é
-          candidato a sair, porque diz quase o mesmo que o apoio da faixa
-          logo acima. Não saiu aqui justamente por ser remoção. */}
-      <BlocoConteudo
-        titulo="Ajustes estruturais do Fluxy"
-        descricao="Console administrativo — todas as rotas abaixo preservam o backend atual e concentram apenas configuracoes operacionais e de acesso."
-      />
+      {/* B3 — BLOCO REMOVIDO EM 04/09, por decisão do responsável.
 
+          Havia aqui um bloco "Ajustes estruturais do Fluxy" dizendo quase
+          o mesmo que o apoio da faixa fixa, três linhas acima. Texto que
+          repete o que está logo acima não é informação, é ruído — e pela
+          R16 o apoio da faixa já é o dono desse papel. Dois donos para a
+          mesma frase fazem o leitor procurar a diferença que não existe.
+
+          O que ele dizia de próprio ("preservam o backend atual") não é
+          informação para quem usa o hub: é nota de implementação. */}
       {secoesVisiveis.map((secao, indice) => (
         <BlocoConteudo
           key={secao.title}
