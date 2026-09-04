@@ -1512,3 +1512,30 @@ A regra de hoje nasceu de um conflito real e resolveu-o. Na primeira
 varredura que ela mesma pediu, apareceu um caso que ela não prevê. **Isso
 não a invalida: mostra que ela tem alcance conhecido.** Regra que parece
 cobrir tudo é regra que ninguém testou contra o sistema inteiro.
+
+## DECISÃO DE ESCOPO: `GestaoContratos` sai da rodada 2 e vai para a de Contratos (04/09)
+
+**Decidido por mim**, pelas regras de ritmo: é escolha de onde a tela é
+medida, reversível e sem mudar comportamento.
+
+`/gestao-contratos` aparece no hub de Configurações, seção "Cadastros", e por
+isso entrou no escopo da rodada 2. O levantamento mostrou por que ela não
+cabe ali:
+
+- **1.900+ linhas**, duas instâncias de `TabelaPadrao` em ramos exclusivos;
+- **38 caixas do navegador** — 33 `alert`, 4 `confirm`, 1 `prompt`. É o maior
+  passivo isolado do sistema, e o número bate exatamente com o congelado no
+  trinco;
+- um modal de anexos feito à mão, com o rodapé saindo da vista quando o
+  conteúdo passa do teto — o defeito que a R27 fecha;
+- `overflow: hidden` em `.contratos-table-card`, que é regra de `index.css` e
+  não da tela.
+
+**Por assunto ela é de Contratos, não de Configurações** — o hub apenas a
+alcança. Uma tela desse tamanho medida de raspão no fim de uma rodada de 33 é
+o tipo de coisa que passa verde por cansaço.
+
+Vai para a **rodada 3 (CRM + Comercial + Contratos)**, onde tem espaço para
+ser uma fatia própria. Rodada 2 fecha em **33 telas**.
+
+**O critério que fica**: hub que alcança não define dono. Dono é o assunto.
