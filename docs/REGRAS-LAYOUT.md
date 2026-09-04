@@ -574,3 +574,40 @@ sem ninguém saber dizer por quê.
   conferido por `grep` manual, agente por agente. A `FinanceiroTituloDetalhe`
   entrou no manifesto, fechou matriz e ficou com **64 cores cruas**,
   incluindo a que reprova AA.
+
+## R26 — Ação confirmada opera sobre referência FIXADA antes do `await` (04/09)
+
+- **A regra**: o handler captura o registro numa `const` **antes** de abrir a
+  confirmação, e a ação usa essa `const`. Nunca relê o estado da tela depois
+  do `await`.
+
+  ```js
+  const lote = selectedBatch;              // fixa ANTES
+  const { ok, texto } = await confirmar({ mensagem: `Cancelar ${lote.codigo}?` });
+  if (!ok) return;
+  await cancelar(lote.id, texto);          // MESMA referência
+  ```
+
+- **Por que ela nasceu agora, e não antes**: com `window.prompt` a página
+  fica **bloqueada** — nada podia mudar entre a pergunta e a ação, e o
+  defeito era impossível. O modal do sistema **não bloqueia**: a tela segue
+  montada e clicável. Numa lista lateral, clicar noutro registro enquanto o
+  modal está aberto faz a tela **perguntar sobre o lote A e cancelar o lote
+  B**.
+
+- **É a classe CONSENTIMENTO** da DoD, na sua forma mais traiçoeira: a
+  trilha de auditoria registra um consentimento **válido** — a pessoa leu o
+  código do lote A e confirmou — para uma ação sobre o lote B. Ninguém
+  descobre pelo log.
+
+- **Nenhum check pega, e não é descuido**: o identificador é o mesmo nos dois
+  lados (`selectedBatch` na mensagem e na ação); o que muda é o **conteúdo**
+  entre a leitura e o uso. É exatamente o "mesmo nome, conteúdo diferente"
+  que a DoD já declara como escape por construção da família D. **Leitura
+  obrigatória do revisor.**
+
+- **Alcance**: vale para toda migração de `prompt`/`confirm` para o modal do
+  sistema. Restam ~700 chamadas congeladas no trinco — cada uma que migrar
+  abre esta janela onde antes não havia. **Trocar a caixa do navegador pelo
+  componente não é só trocar a aparência: muda o modelo de concorrência da
+  ação.**

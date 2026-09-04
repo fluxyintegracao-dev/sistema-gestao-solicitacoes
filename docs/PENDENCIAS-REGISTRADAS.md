@@ -964,3 +964,54 @@ voltam no fechamento da leva com o que cada uma FAZ e o que se PERDE ao
 apagá-la — porque a pergunta não é "está sendo usada?", é "esta capacidade
 deve existir?", e essa não é decisão de leva de layout.
 
+---
+
+## Para o responsável — Financeiro, fatia 2 (04/09)
+
+Todos verificados no código antes de virarem item, nenhum corrigido.
+
+### P1 — Falha de rede na consulta de saúde rebaixa o envio para MOCK, em silêncio
+- **Onde**: `frontend/src/pages/FinanceiroPagamentos.jsx`, por volta de 365 e 393.
+- **O que acontece**: `getBbPaymentsHealth().catch(() => null)` **engole o
+  erro**. Sem resposta, a flag de provedor real fica `false`.
+- **Consequência**: a pastilha passa a dizer **"MOCK"**, o botão vira "Enviar
+  mock", e ele chama **outro endpoint de envio**. Uma falha de rede na
+  verificação de saúde **muda o caminho de envio de um lote de pagamento**,
+  sem nenhuma mensagem.
+- **Por que é a pior classe**: o operador lê "MOCK", acredita que está
+  testando — e nem ele nem a trilha registram que aquela informação era um
+  erro de rede, não um estado do sistema.
+
+### P2 — `isBbSandbox` significa o OPOSTO do nome
+- Ela é `true` quando o **provedor real** está habilitado. Governa
+  exatamente a fronteira entre "sai dinheiro de verdade" e "não sai": o
+  rótulo, o botão de envio e a habilitação do "Sincronizar BB". Renomear
+  mexe em 12 pontos numa tela de dinheiro.
+
+### P3 — Os totais do resumo de baixas mentem acima de 200 registros
+- **Onde**: `FinanceiroBaixas.jsx` — o filtro nasce com `limit: 200` e
+  **não há controle na tela para elevá-lo** (o "Por página" só fatia no
+  cliente). O resumo (Valor base, Valor quitação, Estornadas) é reduzido
+  sobre as **primeiras 200** e apresentado como total do recorte.
+- Um recorte com 260 baixas mostra um "Valor quitação" **silenciosamente
+  menor que o real**. O CSV exportado tem o mesmo teto. A leva qualificou os
+  rótulos com "do recorte"; o número certo pede paginação de servidor.
+
+### P4 — Três ações que movimentam caixa não confirmam nada
+- **"Enviar ao BB"** é o passo em que o dinheiro sai. A única barreira é o
+  campo de MFA — que é preenchimento de campo, **não consentimento sobre um
+  valor**: no momento do clique o operador não vê o código do lote, nem a
+  quantidade de itens, nem o total.
+- **"Confirmar baixa"** grava movimento financeiro num clique; desfazer
+  exige estorno.
+- **"Gerar boletos em lote"** não declara que, interrompido no meio, o que
+  já foi gerado fica gerado.
+- Acrescentar guarda em ação de caixa é decisão de negócio, não de layout.
+
+### P5 — Justificativa obrigatória?
+- Em três das quatro confirmações a leva manteve `obrigatorio: false`,
+  porque o `prompt` aceitava vazio e o payload caía numa justificativa
+  padrão — exigir agora **mudaria o payload possível**. Numa tela que
+  movimenta caixa, a resposta provavelmente é "sim, obrigatória". É decisão
+  do responsável.
+
