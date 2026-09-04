@@ -64,6 +64,34 @@ export function telasExtraDaLinhaDeComando(argv = process.argv) {
   return extras;
 }
 
+import { TELAS as TELAS_DO_HARNESS } from './qa-preview/telas.mjs';
+
+/*
+  AS DUAS LISTAS TÊM DE BATER (04/09) — a lição mais cara do fechamento
+  do Financeiro.
+
+  Existem DUAS listas de telas neste repositório, e elas respondem a
+  perguntas diferentes:
+
+    scripts/telas-reformadas.json  -> o que o validador ESTÁTICO mede
+    scripts/qa-preview/telas.mjs   -> o que o harness mede NO PREVIEW
+
+  Nada as comparava. Ao fechar a leva do Financeiro o manifesto estático
+  tinha 68 telas e o harness tinha 36: as 29 telas do Financeiro migradas
+  nas quatro fatias (menos a FinanceiroTituloDetalhe, que já era antiga)
+  NUNCA foram acrescentadas à lista do preview — e três do RH/DP também
+  não. O harness rodou, imprimiu matriz e disse "6 células FALHOU": um
+  resultado de aparência completa sobre um TERÇO do que faltava medir.
+
+  É o defeito de sempre neste projeto, na forma mais cara: o instrumento
+  relata o que conhece, e o silêncio sobre o que ele não conhece se lê
+  como cobertura. "PRONTO" é verificado no preview; tela que só passou
+  pelo validador estático não está verificada.
+
+  Por isso este check é BLOQUEANTE e sem trinco: entrar no manifesto
+  estático e não entrar na lista do harness é uma promessa de verificação
+  que não existe.
+*/
 export function validarLayout() {
   const manifesto = lerTelasDoManifesto();
   for (const extra of telasExtraDaLinhaDeComando()) {
@@ -291,6 +319,20 @@ export function validarLayout() {
     if (!excecoesUsadas.has(`${tela}|R1`)) {
       falhas.push(`${tela}:0 [EXCECAO] exceção de R1 registrada ("${motivo}") não cobre nenhuma tabela crua — remova a linha de excecoes_tabela_crua.`);
     }
+  }
+
+  const noHarness = new Set(TELAS_DO_HARNESS.map((t) => t.arquivo));
+  const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t));
+  if (foraDoPreview.length > 0) {
+    falhas.push(
+      `${foraDoPreview[0]}:0 [COBERTURA] ${foraDoPreview.length} tela(s) do manifesto estático NÃO estão em scripts/qa-preview/telas.mjs — o harness nunca as abre no preview, e "PRONTO" é verificado no preview. Telas: ${foraDoPreview.join(', ')}`
+    );
+  }
+  const foraDoManifesto = [...noHarness].filter((t) => !manifesto.telas.includes(t));
+  if (foraDoManifesto.length > 0) {
+    falhas.push(
+      `${foraDoManifesto[0]}:0 [COBERTURA] ${foraDoManifesto.length} tela(s) na lista do harness e FORA do manifesto estático — o preview mede o que as regras mecânicas não medem. Telas: ${foraDoManifesto.join(', ')}`
+    );
   }
 
   return {

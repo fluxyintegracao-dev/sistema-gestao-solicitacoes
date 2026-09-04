@@ -532,3 +532,59 @@ navegador, depois da rolagem. A R18 só virou regra de verdade quando ganhou
 a prova de runtime — rolar a tela real e medir se o elemento fixo continua
 no lugar. Regra que só tem check estático é regra que ainda não sabe se
 funciona.
+
+---
+
+## DUAS LISTAS DE TELAS, E A QUE VALE PARA "PRONTO" É A DO PREVIEW (04/09)
+
+Este repositório tem **duas** listas de telas, que respondem a perguntas
+diferentes e nunca foram comparadas:
+
+| Lista | Pergunta que responde |
+|---|---|
+| `frontend/scripts/telas-reformadas.json` | o que o **validador estático** mede (R1–R27) |
+| `frontend/scripts/qa-preview/telas.mjs` | o que o **harness abre no PREVIEW publicado** |
+
+**A que vale para "PRONTO" é a segunda.** A primeira mede forma no código;
+a definição de pronto exige verificação no preview com dado real.
+
+### O que aconteceu ao fechar a leva do Financeiro
+
+Manifesto estático: **68 telas**. Lista do harness: **36**. As 29 telas do
+Financeiro migradas nas quatro fatias — menos a `FinanceiroTituloDetalhe`,
+que já era antiga — **nunca foram acrescentadas à lista do preview**. Mais
+três do RH/DP: `RhDpApuracao`, `RhDpJornada`, `RhDpPessoalSolicitacoes`.
+**32 telas** no manifesto sem uma única medição no navegador.
+
+E o harness **rodou normalmente**: percorreu as 36 que conhecia, imprimiu a
+matriz e reportou "6 células FALHOU, 35 SEM DADO". Um resultado de aparência
+completa sobre um terço do que faltava medir.
+
+### A lição, que é a mesma de sempre neste projeto
+
+**O instrumento relata o que conhece, e o silêncio sobre o que ele não
+conhece se lê como cobertura.** Já apareceu três vezes:
+
+1. o `--extra` que não chegava à R25 — o caminho que eu mandava usar era
+   exatamente o que não media cor;
+2. o `tokensExistem.mjs` que existia e não estava em nenhum `npm run`;
+3. agora, a lista do preview que ficou para trás a cada leva.
+
+Nos três casos o comando terminava com sucesso. **Saída verde não é
+cobertura; é ausência de reprovação naquilo que foi olhado.**
+
+### O check
+
+Bloqueante, sem trinco, no `validarLayout.mjs`: entrar no manifesto estático
+e não entrar na lista do harness **reprova**, nomeando as telas. E o inverso
+também — tela no preview e fora do manifesto estático escaparia das regras
+mecânicas.
+
+Não tem trinco de propósito. Trinco congela passivo herdado; aqui o passivo
+é *promessa de verificação que não existe*, e essa não se congela.
+
+### Consequência para o processo das levas
+
+Uma tela entra nas **duas** listas na mesma leva em que é migrada. A entrada
+no manifesto estático sem a entrada na lista do preview é meia migração — e
+é a metade que não conta para "PRONTO".
