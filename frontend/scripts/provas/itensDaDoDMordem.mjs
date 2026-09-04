@@ -113,7 +113,7 @@ const CASOS = [
 
   /* ---- Filtros ---- */
   { item: 'F1', defeito: 'duasBuscas', planta: 'duas caixas de busca no mesmo contexto (R16)', ramo: 'caixas de busca no mesmo contexto' },
-  { item: 'F1', defeito: 'buscaEstreita', planta: 'busca estreita numa faixa larga', ramo: 'não ocupa a largura da faixa' },
+  { item: 'F1', defeito: 'buscaEstreita', planta: 'busca estreita numa faixa larga', ramo: 'não ocupa a largura disponível' },
   { item: 'F2', defeito: 'selectNoFiltro', planta: '<select> na faixa de filtros (R12)' },
   { item: 'F4', defeito: 'vaoFiltrosErrado', planta: 'vão de 40px entre filtros e tabela (escala pede 16px)' },
 

@@ -799,7 +799,30 @@ async function checarMobile(page, contexto, tela, url, resultado, opcoes = {}) {
   // X2: faixa fixa funciona no 390.
   const existeFaixa = await pagina.locator('.layout-main .app-page-header').count();
   if (!existeFaixa) {
-    resultado.X2 = { estado: 'FALHOU', motivo: 'faixa ausente no mobile' };
+    /*
+      "FAIXA AUSENTE" NÃO DIZ O QUE ACONTECEU (04/09).
+
+      Duas telas reprovaram aqui — `rhdp-pessoal` e `comunicacao-interna` —
+      e as duas renderizam `<PageHeader>` incondicionalmente dentro de
+      `<Pagina>`. Ou seja: o motivo aponta um defeito que a leitura do
+      código nega. Pode ser a faixa fora de `.layout-main`, o shell com
+      outra estrutura no 390, ou a medição chegando antes da hidratação —
+      e "ausente" não distingue nenhum dos três.
+
+      Um motivo que não deixa consertar é meio motivo. Agora ele diz o que
+      havia na página no instante da medida.
+    */
+    const diagnostico = await pagina.evaluate(() => ({
+      faixasNoDocumento: document.querySelectorAll('.app-page-header').length,
+      temLayoutMain: Boolean(document.querySelector('.layout-main')),
+      containers: Array.from(document.querySelectorAll('main, .layout-main, .layout-content-shell'))
+        .slice(0, 3).map((el) => `${el.tagName.toLowerCase()}.${String(el.className || '').split(/\s+/).filter(Boolean).slice(0, 2).join('.')}`),
+      primeiroTexto: (document.body.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 90)
+    }));
+    resultado.X2 = {
+      estado: 'FALHOU',
+      motivo: `faixa ausente dentro de .layout-main no 390 — ${diagnostico.faixasNoDocumento} .app-page-header no documento inteiro, .layout-main ${diagnostico.temLayoutMain ? 'existe' : 'NÃO existe'}, contêineres: ${diagnostico.containers.join(' | ') || 'nenhum'}; começo da página: "${diagnostico.primeiroTexto}"`
+    };
   } else {
     const rolavel = await pagina.evaluate(() => document.scrollingElement.scrollHeight - innerHeight > 120);
     if (!rolavel) {
