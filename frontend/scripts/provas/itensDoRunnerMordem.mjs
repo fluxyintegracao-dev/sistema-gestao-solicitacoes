@@ -103,13 +103,13 @@ const CASOS_NAVEGADOR = [
   { item: 'F3', d: 'f3SemOpcoes', planta: 'filtro que abre sem nenhuma opção de marcação', ramo: 'sem opções de MARCAÇÃO' },
   { item: 'F3', d: 'f3SemEtiqueta', planta: 'tela que recebe a marcação e não guarda — nenhuma etiqueta nasce', ramo: 'não gerou etiqueta' },
   { item: 'F3', d: 'f3EtiquetaSemRemover', planta: 'etiqueta de filtro sem botão de remover', ramo: 'sem botão de remover' },
-  { item: 'F3', d: 'f3EtiquetaFica', planta: 'botão de remover que não remove a etiqueta', ramo: 'não sumiu ao remover' },
+  { item: 'F3', d: 'f3EtiquetaFica', planta: 'botão de remover que não remove a etiqueta', ramo: 'a etiqueta removida continua na tela' },
 
   /* ---- R1: cadastro raro abre em modal ---- */
   { item: 'R1', d: 'r1Inline', planta: '"Novo usuário" abrindo formulário INLINE na própria página', ramo: 'INLINE' },
 
   /* ---- X2: faixa fixa também no 390 ---- */
-  { item: 'X2', d: 'c1SemFaixa', planta: 'mobile sem .app-page-header', ramo: 'faixa ausente no mobile', mobile: true },
+  { item: 'X2', d: 'c1SemFaixa', planta: 'mobile sem .app-page-header', ramo: 'faixa ausente dentro de .layout-main', mobile: true },
   { item: 'X2', d: 'x2Vao', planta: 'mobile com vão de 40px entre topbar e faixa', ramo: 'vão de', mobile: true },
   { item: 'X2', d: 'x2NaoOpaca', planta: 'mobile com faixa translúcida', ramo: 'não opaca', mobile: true },
   { item: 'X2', d: 'c1FaixaSome', planta: 'mobile com faixa não fixa', ramo: 'faixa sumiu na rolagem', mobile: true }
