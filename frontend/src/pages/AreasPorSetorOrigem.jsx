@@ -18,30 +18,45 @@ export default function AreasPorSetorOrigem() {
   const [origemSelecionada, setOrigemSelecionada] = useState('');
   const [salvando, setSalvando] = useState(false);
   // R3/R19: a caixa do navegador (alert) some sem rastro, ignora tema e o
-  // harness nao a enxerga — o resultado do salvar vira faixa do sistema.
+  // harness nao a enxerga — CARGA e salvamento reportam pela faixa de
+  // avisos do sistema, que fica montada abaixo do cabecalho o tempo todo
+  // (por isso esta tela nao precisa de um ramo "Carregando..." separado
+  // para ter onde mostrar o erro, como TimeoutInatividade e
+  // ConfiguracoesCotacao precisam).
   const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
-    async function load() {
-      const [listaSetores, cfg] = await Promise.all([
-        getSetores(),
-        getAreasPorSetorOrigem()
-      ]);
+    // A carga PRECISA de try/catch. Sem ele, uma rejeicao de qualquer uma
+    // das duas chamadas vira unhandled rejection: nada e avisado, a tela
+    // fica vazia e MUDA, e a pessoa conclui que nenhum setor tem area
+    // liberada — quando na verdade a configuracao nem chegou. Pior: se ela
+    // salvar por cima desse estado vazio, grava regras que nunca leu.
+    async function carregar() {
+      try {
+        const [listaSetores, cfg] = await Promise.all([
+          getSetores(),
+          getAreasPorSetorOrigem()
+        ]);
 
-      const setoresAtivos = Array.isArray(listaSetores)
-        ? listaSetores.filter(s => s?.ativo !== false)
-        : [];
-      setSetores(setoresAtivos);
+        const setoresAtivos = Array.isArray(listaSetores)
+          ? listaSetores.filter(s => s?.ativo !== false)
+          : [];
+        setSetores(setoresAtivos);
 
-      const regrasCarregadas = cfg?.regras && typeof cfg.regras === 'object'
-        ? cfg.regras
-        : {};
-      setRegras(regrasCarregadas);
+        const regrasCarregadas = cfg?.regras && typeof cfg.regras === 'object'
+          ? cfg.regras
+          : {};
+        setRegras(regrasCarregadas);
 
-      const primeiroCodigo = String(setoresAtivos?.[0]?.codigo || '').toUpperCase();
-      setOrigemSelecionada(primeiroCodigo);
+        const primeiroCodigo = String(setoresAtivos?.[0]?.codigo || '').toUpperCase();
+        setOrigemSelecionada(primeiroCodigo);
+      } catch (error) {
+        console.error(error);
+        avisar.erro(error?.message || 'Erro ao carregar as areas por setor de origem');
+      }
     }
-    load();
+    carregar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setoresOrdenados = useMemo(() => {

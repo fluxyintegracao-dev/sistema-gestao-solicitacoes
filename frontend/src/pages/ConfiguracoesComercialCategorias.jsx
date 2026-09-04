@@ -3,7 +3,16 @@ import {
   getComercialCategoriasContrato,
   salvarComercialCategoriasContrato
 } from '../services/configuracoesSistema';
-import { Pagina, PageHeader, Avisos, useAvisos } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  Avisos,
+  BlocoConteudo,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
+
+const DESCRICAO = 'Selecione categorias financeiras e opcoes exibidas na forma de pagamento do contrato de venda.';
 
 function toggleId(list, id, checked) {
   const current = new Set((list || []).map(Number));
@@ -137,10 +146,26 @@ function CategoriaSelect({ title, description, categorias, value, onChange }) {
   );
 }
 
+// Linha sem NADA digitado: nao ha o que proteger. Decisao registrada na tela
+// irma (AutomacaoStatusSetor): confirmacao protege o que a pessoa escreveu, e
+// perguntar sobre o vazio e so atrito. `ativo` entra no teste porque
+// desmarcar a caixa tambem e um ato da pessoa sobre aquela linha — a linha em
+// branco e a que saiu do "Adicionar opcao" e ficou intocada.
+function opcaoEmBranco(item) {
+  if (!item) return true;
+  const preenchido = [item.value, item.label, item.resumo, item.intervalMonths]
+    .some((valor) => String(valor ?? '').trim() !== '');
+  return !preenchido && item.ativo !== false;
+}
+
 function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
   const showResumo = groupKey === 'reajustes';
   const showInterval = groupKey === 'periodicidades';
   const ativos = (itens || []).filter((item) => item.ativo !== false).length;
+  // CONSENTIMENTO: "Excluir" apagava a linha inteira (codigo, nome, resumo,
+  // intervalo) num clique, e nao ha desfazer — a opcao so volta se for
+  // digitada de novo. Mesmo tratamento da tela irma AutomacaoStatusSetor.
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
 
   function updateItem(index, patch) {
     onChange((itens || []).map((item, itemIndex) => (
@@ -152,8 +177,39 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
     onChange([...(itens || []), createOptionTemplate(groupKey)]);
   }
 
-  function removeItem(index) {
-    onChange((itens || []).filter((_, itemIndex) => itemIndex !== index));
+  // Nomeia a linha como a pessoa a ve: nome exibido, senao codigo, senao a
+  // posicao. Indice cru ("item 3") nao identifica nada para ela.
+  function descreverOpcao(item, index) {
+    const nome = String(item?.label || '').trim();
+    const codigo = String(item?.value || '').trim();
+    if (nome && codigo) return `"${nome}" (${codigo})`;
+    if (nome) return `"${nome}"`;
+    if (codigo) return `"${codigo}"`;
+    return `a opcao ${index + 1}`;
+  }
+
+  async function removeItem(index) {
+    // R26: o alvo sai numa const ANTES do await. O modal do sistema nao
+    // bloqueia a tela — reler a lista pelo indice depois da confirmacao faria
+    // perguntar por uma linha e apagar outra se algo tivesse mudado no meio.
+    const alvo = (itens || [])[index];
+    if (!alvo) return;
+
+    if (!opcaoEmBranco(alvo)) {
+      const { ok } = await confirmar({
+        titulo: `Excluir ${title.toLowerCase()}`,
+        mensagem: `Excluir ${descreverOpcao(alvo, index)}? Esta acao nao pode ser desfeita: a opcao sai da lista e, para recupera-la, sera preciso cadastra-la de novo.`,
+        rotuloConfirmar: 'Excluir',
+        destrutiva: true
+      });
+      if (!ok) return;
+    }
+
+    // Remove pela IDENTIDADE do alvo, sobre a lista viva (o onChange do pai
+    // aceita atualizador — vide updateOptionGroup). Pelo indice, uma edicao
+    // feita em outra linha enquanto o modal estava aberto seria descartada
+    // junto. Se o alvo ja nao estiver la, a lista fica como esta.
+    onChange((atuais) => (atuais || []).filter((item) => item !== alvo));
   }
 
   function markAll(ativo) {
@@ -260,6 +316,10 @@ function OpcoesCrud({ title, description, groupKey, itens, onChange }) {
       {(itens || []).length === 0 && (
         <div className="app-empty-card mt-4">Nenhuma opcao cadastrada.</div>
       )}
+
+      {/* Cada bloco tem a sua confirmacao; o OverlayModal sai por portal, e so
+          uma fica aberta por vez porque so um botao e clicado por vez. */}
+      {elementoConfirmacao}
     </section>
   );
 }
@@ -333,10 +393,19 @@ export default function ConfiguracoesComercialCategorias() {
     }
   }
 
+  // B5: no carregamento o texto tambem precisa de moldura. Antes era uma
+  // frase solta dentro do Pagina — sem cabecalho e sem a faixa de avisos, de
+  // modo que um erro de carga (o unico aviso que pode chegar aqui) nao teria
+  // onde aparecer enquanto `loading` fosse verdadeiro. Mesmo arranjo da tela
+  // irma AutomacaoStatusSetor: Pagina + PageHeader + Avisos + BlocoConteudo.
   if (loading) {
     return (
       <Pagina>
-        <div className="app-empty-card">Carregando categorias comerciais...</div>
+        <PageHeader titulo="Categorias comerciais" descricao={DESCRICAO} />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <BlocoConteudo titulo="Opcoes do contrato de venda" variante="primario" cor="var(--c-primary)">
+          <p className="app-note">Carregando categorias comerciais...</p>
+        </BlocoConteudo>
       </Pagina>
     );
   }
@@ -350,7 +419,7 @@ export default function ConfiguracoesComercialCategorias() {
     <Pagina>
       <PageHeader
         titulo="Categorias comerciais"
-        descricao="Selecione categorias financeiras e opcoes exibidas na forma de pagamento do contrato de venda."
+        descricao={DESCRICAO}
         acaoPrincipal={{
           rotulo: saving ? 'Salvando...' : 'Salvar configuracao',
           onClick: handleSave,

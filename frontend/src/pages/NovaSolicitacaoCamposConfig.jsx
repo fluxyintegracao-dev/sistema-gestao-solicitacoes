@@ -22,6 +22,8 @@ import {
   resolverCamposNovaSolicitacaoFrontend
 } from '../utils/novaSolicitacaoCampos';
 
+const DESCRICAO = 'Defina, por area e tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao.';
+
 export default function NovaSolicitacaoCamposConfig() {
   const { user } = useAuth();
   const moduloContratosHabilitado = hasEnabledModule(user, 'CONTRATOS');
@@ -149,9 +151,19 @@ export default function NovaSolicitacaoCamposConfig() {
         if (cancelado) return;
         setSubtipos(Array.isArray(lista) ? lista.filter((item) => item?.ativo !== false) : []);
       })
-      .catch(() => { if (!cancelado) setSubtipos([]); });
+      // A falha aqui NAO pode ser silenciosa: sem aviso, o endpoint fora do ar
+      // fica indistinguivel de "este tipo nao tem subtipo" — e quem edita passa
+      // a gravar a regra do TIPO achando que o subtipo nao existe. A lista volta
+      // a vazio de proposito (subtipo de outro tipo na tela seria pior), mas
+      // agora dizendo por que.
+      .catch((error) => {
+        if (cancelado) return;
+        setSubtipos([]);
+        console.error(error);
+        avisar.erro(error?.message || 'Erro ao carregar os subtipos deste tipo de solicitacao');
+      });
     return () => { cancelado = true; };
-  }, [tipoSelecionadoId]);
+  }, [tipoSelecionadoId, avisar]);
 
   // A chave que esta sendo editada: o subtipo quando escolhido, senao o tipo.
   const chaveRegraSelecionada = subtipoSelecionadoId
@@ -266,8 +278,22 @@ export default function NovaSolicitacaoCamposConfig() {
     }
   }
 
+  // B5: o carregamento acontece DENTRO da moldura padrao. Antes era uma
+  // frase crua sobre o canvas: sem faixa fixa, sem titulo e — o que pesa —
+  // sem `Avisos`, entao uma falha no carregamento nao tinha para onde ir.
+  //
+  // A contagem fica de fora enquanto carrega, como na PermissoesSetor: a
+  // tela ainda nao sabe qual area e qual tipo estao selecionados, e os
+  // campos disponiveis dependem do comportamento do tipo — qualquer numero
+  // aqui (0 ou o total do catalogo) seria uma afirmacao que nao se apurou.
   if (loading) {
-    return <div className="card">Carregando configuracao dos campos...</div>;
+    return (
+      <Pagina>
+        <PageHeader titulo="Campos da Nova Solicitacao" descricao={DESCRICAO} />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <div className="app-empty-card">Carregando configuracao dos campos...</div>
+      </Pagina>
+    );
   }
 
   return (
@@ -282,7 +308,7 @@ export default function NovaSolicitacaoCamposConfig() {
       <PageHeader
         titulo="Campos da Nova Solicitacao"
         contagem={`${camposDisponiveis.length} campo(s)`}
-        descricao="Defina, por area e tipo, quais campos aparecem e quais ficam obrigatorios na abertura da solicitacao."
+        descricao={DESCRICAO}
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,

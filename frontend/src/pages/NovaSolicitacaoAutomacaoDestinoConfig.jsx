@@ -13,6 +13,8 @@ import {
   normalizarConfigAutomacaoDestinoNovaSolicitacao
 } from '../utils/novaSolicitacaoAutomacaoDestino';
 
+const DESCRICAO = 'Defina quando a escolha de area e tipo deve levar o usuario automaticamente para outra tela operacional.';
+
 export default function NovaSolicitacaoAutomacaoDestinoConfig() {
   const [setores, setSetores] = useState([]);
   const [tipos, setTipos] = useState([]);
@@ -139,8 +141,21 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
     }
   }
 
+  // B5: o carregamento acontece DENTRO da moldura padrao. Antes era uma
+  // frase crua sobre o canvas: sem faixa fixa, sem titulo e — o que pesa —
+  // sem `Avisos`, entao uma falha no carregamento nao tinha para onde ir.
+  //
+  // A contagem fica de fora enquanto carrega: com `regras` ainda vazio ela
+  // sairia como "Sem regra neste tipo", que e uma afirmacao sobre um tipo
+  // que a tela ainda nem selecionou — falso, nao apenas incompleto.
   if (loading) {
-    return <div className="card">Carregando automacao da nova solicitacao...</div>;
+    return (
+      <Pagina>
+        <PageHeader titulo="Automacao da Nova Solicitacao" descricao={DESCRICAO} />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <div className="app-empty-card">Carregando automacao da nova solicitacao...</div>
+      </Pagina>
+    );
   }
 
   return (
@@ -154,7 +169,7 @@ export default function NovaSolicitacaoAutomacaoDestinoConfig() {
       <PageHeader
         titulo="Automacao da Nova Solicitacao"
         contagem={automacaoAtiva ? 'Regra ativa neste tipo' : 'Sem regra neste tipo'}
-        descricao="Defina quando a escolha de area e tipo deve levar o usuario automaticamente para outra tela operacional."
+        descricao={DESCRICAO}
         acaoPrincipal={{
           rotulo: salvando ? 'Salvando...' : 'Salvar automacao',
           onClick: salvar,

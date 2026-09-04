@@ -48,6 +48,15 @@ function formVazio() {
   return { setor: '', status_global: '', acao: '', rotulo: '' };
 }
 
+// UM rótulo de ação para a tela inteira: a coluna "Ação" da lista e a
+// pergunta de exclusão precisam dizer a MESMA palavra — quem leu
+// "Aprovar cotação" na linha não pode ser questionado sobre
+// "aprovar_cotacao". Depende só do catálogo importado, por isso vive no
+// módulo e não dentro do componente.
+function rotuloAcao(valor) {
+  return CATALOGO_ACOES_PRINCIPAIS.find((acao) => acao.valor === valor)?.rotulo || valor;
+}
+
 export default function ConfiguracoesAcoesPrincipais() {
   const [itens, setItens] = useState([]);
   const [setores, setSetores] = useState([]);
@@ -115,10 +124,15 @@ export default function ConfiguracoesAcoesPrincipais() {
     // depois do `await`. Isso importa porque o modal do sistema NÃO
     // bloqueia a página como o `window.confirm` bloqueava: a lista segue
     // montada e pode até recarregar enquanto a pergunta está aberta.
+    // O CONTEÚDO do mapeamento é a ação em destaque — sem ela a pergunta
+    // descreve só onde a regra vale, nunca o que se perde. O rótulo é o
+    // mesmo que a coluna "Ação" mostra, e é fixado aqui junto da descrição,
+    // antes do `await`.
     const descricao = `${item.setor}${item.status_global ? ` + "${item.status_global}"` : ''}`;
+    const acaoAlvo = rotuloAcao(item.acao);
     const { ok } = await confirmar({
       titulo: 'Excluir mapeamento',
-      mensagem: `Excluir o mapeamento de ${descricao}? Esta ação não pode ser desfeita — para voltar a destacar essa ação será preciso cadastrar o mapeamento de novo.`,
+      mensagem: `Excluir o mapeamento de ${descricao}, que hoje destaca a ação "${acaoAlvo}"? Esta ação não pode ser desfeita — para voltar a destacar essa ação será preciso cadastrar o mapeamento de novo.`,
       rotuloConfirmar: 'Excluir mapeamento',
       destrutiva: true
     });
@@ -130,10 +144,6 @@ export default function ConfiguracoesAcoesPrincipais() {
       avisar.erro(error?.message || 'Erro ao excluir');
     }
   }
-
-  const rotuloAcao = (valor) => (
-    CATALOGO_ACOES_PRINCIPAIS.find((acao) => acao.valor === valor)?.rotulo || valor
-  );
 
   return (
     <Pagina>

@@ -97,13 +97,23 @@ export default function CartoesRecarga() {
   // A referência serve para levar a pessoa ao formulário; não mede nada.
   const campoNomeRef = useRef(null);
 
-  async function carregar() {
+  /*
+    A RECARGA DA LISTA PODE FALHAR DEPOIS DE UMA GRAVACAO QUE PASSOU (04/09).
+
+    Por isso `carregar` recebe opcoes em vez de sempre zerar a tela.
+    `preservarAvisos` mantem o que ja esta escrito (a confirmacao de que
+    gravou) e `prefixoErro` deixa quem chamou dizer o que a falha significa
+    NAQUELE ponto — carregar sozinha nao sabe se veio da montagem da pagina
+    ou logo depois de um cadastro. Sem parametro, o comportamento e byte a
+    byte o de antes: limpa e mostra o erro cru (mudanca aditiva, R21).
+  */
+  async function carregar({ preservarAvisos = false, prefixoErro = '' } = {}) {
     setCarregando(true);
-    limpar();
+    if (!preservarAvisos) limpar();
     try {
       setDados(await listarCartoesRecargaAdmin());
     } catch (error) {
-      avisar.erro(error.message);
+      avisar.erro(`${prefixoErro}${error.message}`);
     } finally {
       setCarregando(false);
     }
@@ -140,11 +150,18 @@ export default function CartoesRecarga() {
     campoNomeRef.current?.focus({ preventScroll: true });
   }
 
-  function novo() {
+  // Zerar os CAMPOS e apagar os AVISOS eram a mesma funcao — e nao sao a
+  // mesma coisa. Separadas: `limparRascunho` mexe so no formulario; quem
+  // apaga aviso e quem tem motivo para apagar.
+  function limparRascunho() {
     setEditandoId(null);
     setForm(FORM_VAZIO);
     setBuscaFornecedor('');
     setBuscaUsuario('');
+  }
+
+  function novo() {
+    limparRascunho();
     limpar();
   }
 
@@ -183,6 +200,21 @@ export default function CartoesRecarga() {
     });
   }
 
+  /*
+    ORDEM DOS AVISOS — GRAVAR e RECARREGAR sao DUAS verdades (04/09).
+
+    Antes: `await carregar(); novo(); avisar.sucesso(...)`. Se a gravacao
+    passava e a recarga falhava, o `limpar()` de dentro de `novo()` apagava o
+    erro que `carregar()` tinha acabado de escrever, e a tela ficava so com
+    "Cartao cadastrado." sobre uma lista velha — sem o cartao novo a vista e
+    sem sinal nenhum do que falhou. Sucesso posterior comendo erro anterior.
+
+    Agora, na ordem do que e verdade: (1) reseta o rascunho sem tocar nos
+    avisos; (2) publica a confirmacao — o registro GRAVOU, e isso nao depende
+    de a lista recarregar; (3) recarrega pedindo que os avisos sobrevivam. Se
+    a lista nao vier, o erro entra AO LADO da confirmacao e diz o que ficou
+    velho, em vez de apagar ou ser apagado por ela.
+  */
   async function salvar(event) {
     event.preventDefault();
     if (salvando) return;
@@ -191,9 +223,12 @@ export default function CartoesRecarga() {
     try {
       const estavaEditando = Boolean(editandoId);
       await salvarCartaoRecarga({ ...form, ultimos_quatro: String(form.ultimos_quatro).replace(/\D/g, '') }, editandoId);
-      await carregar();
-      novo();
+      limparRascunho();
       avisar.sucesso(estavaEditando ? 'Alterações do cartão salvas.' : 'Cartão cadastrado.', undefined, { persistente: true });
+      await carregar({
+        preservarAvisos: true,
+        prefixoErro: 'A gravação passou, mas a lista abaixo não foi atualizada: '
+      });
     } catch (error) {
       avisar.erro(error.message);
     } finally {
@@ -290,12 +325,12 @@ export default function CartoesRecarga() {
                   autoComplete="off"
                 />
                 {fornecedores.length ? (
-                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-card)] p-1 shadow-lg">
+                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface)] p-1 shadow-lg">
                     {fornecedores.map((item) => (
                       <button
                         key={item.id}
                         type="button"
-                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--c-surface-alt)]"
+                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--ui-surface-soft)]"
                         onMouseDown={(e) => {
                           e.preventDefault();
                           setForm((v) => ({ ...v, parceiro_id: item.id, parceiro_nome: item.nome }));
@@ -332,7 +367,7 @@ export default function CartoesRecarga() {
             <div className="form-campo--linha">
               <div className="grid max-h-56 gap-x-4 gap-y-1 overflow-y-auto md:grid-cols-2">
                 {usuariosFiltrados.map((usuario) => (
-                  <label key={usuario.id} className="flex items-start gap-2 rounded px-2 py-2 text-sm hover:bg-[var(--c-surface-alt)]">
+                  <label key={usuario.id} className="flex items-start gap-2 rounded px-2 py-2 text-sm hover:bg-[var(--ui-surface-soft)]">
                     <input
                       className="mt-1"
                       type="checkbox"

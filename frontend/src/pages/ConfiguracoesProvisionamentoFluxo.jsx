@@ -19,6 +19,8 @@ const DEFAULT_CONFIG = {
   tipos_solicitacao_exigem_provisao: []
 };
 
+const DESCRICAO = 'Controle quando o provisionamento deve ser apenas informativo e quando passa a orientar solicitacoes.';
+
 const MODOS = [
   {
     value: 'INFORMATIVO',
@@ -164,10 +166,19 @@ export default function ConfiguracoesProvisionamentoFluxo() {
     }
   }
 
+  // B5: estava a meio caminho — dentro do `Pagina`, mas sem cabecalho e sem
+  // faixa de avisos. Quem carrega ficava sem titulo e, pior, sem superficie
+  // onde uma falha no carregamento pudesse aparecer.
+  //
+  // Sem contagem tambem aqui: este cabecalho nao tem contagem em nenhum dos
+  // dois estados, e inventar uma ("0 tipo(s)") afirmaria algo que a tela
+  // ainda nao apurou.
   if (loading) {
     return (
       <Pagina>
-        <div className="card">Carregando configuracao do provisionamento...</div>
+        <PageHeader titulo="Fluxo do Provisionamento" descricao={DESCRICAO} />
+        <Avisos avisos={avisos} aoFechar={fechar} />
+        <div className="app-empty-card">Carregando configuracao do provisionamento...</div>
       </Pagina>
     );
   }
@@ -182,7 +193,7 @@ export default function ConfiguracoesProvisionamentoFluxo() {
     <Pagina>
       <PageHeader
         titulo="Fluxo do Provisionamento"
-        descricao="Controle quando o provisionamento deve ser apenas informativo e quando passa a orientar solicitacoes."
+        descricao={DESCRICAO}
         acaoPrincipal={{
           rotulo: saving ? 'Salvando...' : 'Salvar configuracao',
           onClick: salvar,

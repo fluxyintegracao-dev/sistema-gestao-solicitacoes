@@ -92,6 +92,19 @@ export default function ConfiguracoesNotificacoesSistema() {
     [grupos]
   );
 
+  /*
+    CONSENTIMENTO: o cartao itera `gruposFiltrados`, cujos `eventos` ja
+    passaram pela busca — contar sobre ele so descreve o que esta na tela.
+    Os botoes do cartao, porem, agem sobre o modulo INTEIRO. Este mapa guarda
+    a lista completa por modulo para que o cartao possa exibir os dois
+    numeros e nao deixar ninguem confundir o recorte com o alcance.
+  */
+  const eventosPorModulo = useMemo(() => {
+    const mapa = new Map();
+    grupos.forEach((grupo) => mapa.set(grupo.modulo, grupo.eventos || []));
+    return mapa;
+  }, [grupos]);
+
   const gruposFiltrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
     return grupos
@@ -125,7 +138,20 @@ export default function ConfiguracoesNotificacoesSistema() {
     );
   }
 
-  function marcarGrupo(modulo, ativo) {
+  /*
+    CONSENTIMENTO (rodada 2): esta funcao percorre `grupos` — a lista
+    COMPLETA — e escreve em TODOS os eventos do modulo, inclusive nos que a
+    busca escondeu. O nome antigo era `marcarGrupo`, e "grupo" na tela e o
+    cartao, que com busca ativa mostra so um pedaco. Nome e alcance agora
+    coincidem, como em `ContratoObraCategorias.marcarVisiveis`: quem le a
+    chamada ve o que ela alcanca.
+
+    Deliberadamente NAO reduzimos o alcance para o filtrado. Isso mudaria o
+    que a acao faz, e alterar comportamento percebido nao esta autorizado
+    nesta correcao; o defeito era a tela MENTIR sobre o alcance, e e a
+    mentira que se conserta (rotulos e numeros abaixo).
+  */
+  function marcarModuloInteiro(modulo, ativo) {
     setGrupos((current) =>
       current.map((grupo) =>
         grupo.modulo === modulo
@@ -239,8 +265,18 @@ export default function ConfiguracoesNotificacoesSistema() {
 
         <div className="grid gap-4">
           {gruposFiltrados.map((grupo) => {
-            const ativosGrupo = (grupo.eventos || []).filter((evento) => evento.ativo !== false).length;
-            const totalGrupo = (grupo.eventos || []).length;
+            // O que esta VISIVEL neste cartao (ja recortado pela busca).
+            const eventosVisiveis = grupo.eventos || [];
+            const ativosVisiveis = eventosVisiveis.filter((evento) => evento.ativo !== false).length;
+            const totalVisivel = eventosVisiveis.length;
+            // O que os BOTOES alcancam: o modulo inteiro, filtro ou nao.
+            const eventosModulo = eventosPorModulo.get(grupo.modulo) || [];
+            const ativosModulo = eventosModulo.filter((evento) => evento.ativo !== false).length;
+            const totalModulo = eventosModulo.length;
+            // Busca escondeu parte do modulo: os dois numeros divergem e
+            // precisam aparecer JUNTOS. Sem recorte eles sao o mesmo numero,
+            // e repetir viraria ruido.
+            const buscaEncolheu = totalVisivel !== totalModulo;
 
             return (
               <article
@@ -253,22 +289,58 @@ export default function ConfiguracoesNotificacoesSistema() {
                       {grupo.modulo}
                     </p>
                     <h3 className="text-lg font-semibold text-[var(--c-text)]">{grupo.modulo_label || grupo.modulo}</h3>
-                    <p className="text-sm text-[var(--c-muted)]">{ativosGrupo}/{totalGrupo} evento(s) ativo(s)</p>
+                    {/*
+                      CONSENTIMENTO — a redacao. Antes se lia so
+                      "{ativos}/{total} evento(s) ativo(s)" contado sobre o
+                      FILTRADO, ao lado de um botao "Desativar todos" que
+                      apagava o modulo inteiro: com busca ativa a tela dizia
+                      "2/2" e o clique desligava 47. E o "pergunta sobre 3,
+                      apaga 47".
+
+                      Sem recorte, um numero so: os dois sao iguais.
+                      Com recorte, os DOIS numeros, nesta ordem — primeiro o
+                      que a pessoa esta vendo (o de cima descreve a lista
+                      abaixo), depois o do modulo, colado a frase que diz que
+                      e sobre ele que os botoes agem. Assim o alcance esta
+                      escrito no mesmo lugar em que o numero maior aparece, e
+                      nao ha como ler um e supor o outro.
+                    */}
+                    {buscaEncolheu ? (
+                      <>
+                        <p className="text-sm text-[var(--c-muted)]">
+                          Exibidos pela busca: {ativosVisiveis}/{totalVisivel} evento(s) ativo(s)
+                        </p>
+                        <p className="text-sm font-semibold text-[var(--c-text)]">
+                          Modulo inteiro: {ativosModulo}/{totalModulo} evento(s) ativo(s) — e sobre esse total que os botoes ao lado agem.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-[var(--c-muted)]">{ativosModulo}/{totalModulo} evento(s) ativo(s)</p>
+                    )}
                   </div>
                   <div className="app-actionbar">
+                    {/*
+                      "todos" era ambiguo justamente porque o cartao mostrava
+                      um subconjunto: "todos" os que vejo, ou todos os que
+                      existem? O rotulo agora nomeia a colecao percorrida pela
+                      funcao — o modulo inteiro —, como em
+                      `ContratoObraCategorias` ("Marcar visiveis" para uma
+                      funcao que percorre os visiveis). O contador do modulo
+                      logo ao lado diz de quantos se trata.
+                    */}
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => marcarGrupo(grupo.modulo, true)}
+                      onClick={() => marcarModuloInteiro(grupo.modulo, true)}
                     >
-                      Ativar todos
+                      Ativar modulo inteiro ({totalModulo})
                     </button>
                     <button
                       type="button"
                       className="btn btn-outline btn-sm"
-                      onClick={() => marcarGrupo(grupo.modulo, false)}
+                      onClick={() => marcarModuloInteiro(grupo.modulo, false)}
                     >
-                      Desativar todos
+                      Desativar modulo inteiro ({totalModulo})
                     </button>
                   </div>
                 </div>

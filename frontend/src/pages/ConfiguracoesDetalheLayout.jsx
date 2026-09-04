@@ -23,6 +23,21 @@ function rotuloDaTela(id) {
   return TELAS.find((tela) => tela.id === id)?.rotulo || id;
 }
 
+// O <select> de setor grava CÓDIGO e exibe NOME. Estas duas funções são o
+// par: `codigoDoSetor` é a única fonte do `value` da opção, e
+// `rotuloDoSetor` faz o caminho de volta para a confirmação falar o mesmo
+// nome que a pessoa leu na lista. Sem o par, a tela pergunta por "CMP"
+// sobre o setor que ela chama de "Compras".
+function codigoDoSetor(setor) {
+  return String(setor.codigo || setor.nome).toUpperCase();
+}
+
+function rotuloDoSetor(listaSetores, codigo) {
+  // Sem correspondência (lista de setores não carregada, setor removido),
+  // cai no próprio código — melhor um rótulo cru do que um alvo vazio.
+  return listaSetores.find((setor) => codigoDoSetor(setor) === codigo)?.nome || codigo;
+}
+
 // =====================================================================
 // LAYOUT DO DETALHE POR SETOR — Configurações
 // ---------------------------------------------------------------------
@@ -150,15 +165,23 @@ export default function ConfiguracoesDetalheLayout() {
 
       Por isso o alvo é FIXADO aqui, antes de abrir a confirmação, e é
       ele que a mensagem cita e que a exclusão usa.
+
+      O NOME de exibição do setor entra na mesma fixação, e não é detalhe:
+      `setores` também é estado e `carregar()` o repõe. Resolver o nome
+      depois do `await` reabriria — pelo rótulo — exatamente a janela que
+      esta fixação fecha: a pergunta citaria um nome e a exclusão apagaria
+      outro alvo. O código continua sendo o que a ação usa; o nome existe
+      só para a frase.
     */
     const setorAlvo = setorSelecionado;
     const telaAlvo = telaSelecionada;
     const layoutAlvo = layoutDoSetor;
+    const nomeSetorAlvo = rotuloDoSetor(setores, setorAlvo);
     if (!setorAlvo || !layoutAlvo) return;
 
     const { ok } = await confirmar({
       titulo: 'Excluir layout do setor',
-      mensagem: `Excluir o layout do setor ${setorAlvo} em "${rotuloDaTela(telaAlvo)}" e voltar ao padrão do sistema? Esta ação não pode ser desfeita — a ordem e as ocultações salvas para este setor são perdidas.`,
+      mensagem: `Excluir o layout do setor "${nomeSetorAlvo}" em "${rotuloDaTela(telaAlvo)}" e voltar ao padrão do sistema? Esta ação não pode ser desfeita — a ordem e as ocultações salvas para este setor são perdidas.`,
       rotuloConfirmar: 'Excluir layout',
       destrutiva: true
     });
@@ -237,7 +260,7 @@ export default function ConfiguracoesDetalheLayout() {
             >
               <option value="">Selecione…</option>
               {setores.map((setor) => (
-                <option key={setor.id} value={String(setor.codigo || setor.nome).toUpperCase()}>
+                <option key={setor.id} value={codigoDoSetor(setor)}>
                   {setor.nome}
                 </option>
               ))}

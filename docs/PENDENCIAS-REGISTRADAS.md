@@ -1644,3 +1644,57 @@ verdade, e precisa cobrir as quatro saídas de uma vez.
 mudança, no relatório dele, oferecendo remover a linha que tinha acabado de
 escrever. Achado que aparece contra o próprio trabalho é o mais barato de
 ignorar e o mais caro de perder.
+
+## OS TOKENS DE FONTE DO MÓDULO DE SOLICITAÇÕES — são TRÊS, e o problema é maior que a escala (04/09)
+
+Decisão do responsável: padronizar nos degraus da escala, na rodada de
+Solicitações, junto dos outros defeitos de CSS compartilhado. **A decisão
+vale; dois fatos precisam ir junto com ela.**
+
+### Fato 1: são três, declarados duas vezes
+
+```css
+.solicitacoes-page {              @media (max-width: 1023px) {
+  --sol-font-base:   13px;          .solicitacoes-page {
+  --sol-font-small:  12px;            --sol-font-base:   12px;
+  --sol-font-header: 11px;            --sol-font-small:  11px;
+}                                     --sol-font-header: 10px;   }  }
+```
+
+Os degraus são 12/14/18/22. Fora deles: 13, 11 no desktop; 12 passa; e no
+mobile **11 e 10 ficam ABAIXO do piso de 12px**, que a R10 proíbe em
+conteúdo. O caso mais grave é o `--sol-font-header`, aplicado com
+`!important` em `index.css:2731`.
+
+### Fato 2, que muda de quem é o conserto: um componente GENÉRICO lê um token de ESCOPO
+
+```css
+.solicitacoes-page { --sol-font-base: 13px; }   /* declarado SÓ aqui */
+
+.app-table-shell .table          { font-size: var(--sol-font-base); }
+.app-table-shell .table thead th { font-size: var(--sol-font-header); }
+.app-table-shell .table tbody td { font-size: var(--sol-font-base); }
+```
+
+`.app-table-shell` é a casca de tabela **do sistema**, usada por **11
+telas**. Os três tokens são declarados **exclusivamente** em
+`.solicitacoes-page`. Fora dela, `var(--sol-font-base)` não resolve para
+nada: a declaração inteira fica inválida e o `font-size` cai no herdado.
+
+É a **terceira aparição da mesma família num só dia** — `app-alert--success`,
+`--c-card`/`--c-surface-alt`, e agora esta. Só que aqui com uma variação
+pior: o token **existe**, e existe no lugar errado. Quem lê o CSS vê uma
+declaração completa e correta; ela só não vale onde é lida.
+
+### O que isso implica para a rodada
+
+O arquivo é o mesmo, e a classe do problema é a mesma — a decisão de fazer na
+rodada de Solicitações continua válida. **Mas o alcance não é o do módulo**:
+mexer nesses três tokens toca a casca de tabela de 11 telas, várias já
+aprovadas. A rodada de Solicitações precisa levar regressão além das próprias
+telas, ou o conserto muda a fonte de tabelas que ninguém pediu para mexer.
+
+**A pergunta que fica para quando a rodada abrir**: `.app-table-shell` deve
+ter tokens PRÓPRIOS, nos degraus, em vez de tomar emprestado os de um módulo?
+Componente do sistema que depende de variável declarada por uma página é
+dependência invertida — e é ela que produziu o defeito.
