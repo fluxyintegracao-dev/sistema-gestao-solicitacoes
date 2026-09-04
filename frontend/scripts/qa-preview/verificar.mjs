@@ -1166,7 +1166,32 @@ async function main() {
   }
 }
 
-main().catch((erro) => {
-  console.error(`[qa-preview] ${erro.message || erro}`);
-  process.exit(3);
-});
+/*
+  SÓ RODA QUANDO É EXECUTADO, NUNCA QUANDO É IMPORTADO (03/09).
+
+  Este arquivo chamava `main()` no topo do módulo. Importar qualquer coisa
+  daqui — para testar sintaxe, para reaproveitar uma função — DISPARAVA o
+  harness inteiro contra o preview publicado: login de verdade, navegação
+  de verdade, no ambiente compartilhado. Aconteceu duas vezes em 03/09,
+  comigo e com um agente. Duas vezes não é descuido, é desenho ruim.
+
+  Agora o efeito colateral fica atrás desta guarda, e as funções de check
+  podem ser importadas para serem PROVADAS sem que ninguém acorde o
+  preview por engano.
+*/
+const executadoDireto = process.argv[1]
+  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (executadoDireto) {
+  main().catch((erro) => {
+    console.error(`[qa-preview] ${erro.message || erro}`);
+    process.exit(3);
+  });
+}
+
+/* Exportadas para a prova de mordida do runner (provas/itensDoRunner...). */
+export {
+  checarFaixa, checarRedimensionamento, checarEtiquetasFiltro,
+  checarModalCadastro, checarMobile, checarAffordanceAlinhamento,
+  r3Para, m2Para, login, esperarCarregar
+};
