@@ -324,7 +324,7 @@ export default function FinanceiroDda() {
               titulo: 'Titulo',
               tipo: 'codigo',
               render: (row) => (row.titulo
-                ? <Link className="link link-primary whitespace-nowrap" to={`/financeiro/titulos/${row.titulo.id}`}>{row.titulo.codigo || `#${row.titulo.id}`}</Link>
+                ? <Link className="font-semibold text-[var(--c-primary)] hover:underline whitespace-nowrap" to={`/financeiro/titulos/${row.titulo.id}`}>{row.titulo.codigo || `#${row.titulo.id}`}</Link>
                 : row.tituloSugerido
                   ? <span className="text-xs text-[var(--c-primary)]">Sugestao: {row.tituloSugerido.codigo || `#${row.tituloSugerido.id}`}</span>
                   : '-')

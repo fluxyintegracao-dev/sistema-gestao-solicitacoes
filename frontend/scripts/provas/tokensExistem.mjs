@@ -75,7 +75,21 @@ for (const arquivo of telas) {
   estava aqui. Alarguei, mas o limite continua existindo: prefixo novo que
   ninguém acrescentar continua invisível.
 */
-const PREFIXOS = /^(app-|sol-|fx-|form-|btn-|badge-|input-|modal-|page-|layout-|la-|cr-|premium-|hub-|login-|link|alert-|card-|dash-|tarja-|stat-|nav-|tabela-|celula-|bloco-)/;
+const PREFIXOS = /^(app-|sol-|fx-|form-|btn-|badge-|input-|modal-|page-|layout-|la-|cr-|premium-|hub-|login-|link(?=$|-)|alert-|card-|dash-|tarja-|stat-|nav-|tabela-|celula-|bloco-)/;
+/*
+  PROSA NÃO É LISTA DE CLASSE (04/09) — o guarda que faltava.
+
+  A varredura de literais lê QUALQUER string com cara de lista de classes,
+  e frase em português também é string. Uma mensagem de erro que dizia
+  `toque em "Enviar link" de novo` virou o fantasma `.link"` — com a aspa
+  no nome. Nome com aspa, ponto ou acento não é identificador CSS: nunca
+  poderia existir no CSS, e portanto nunca sairia do trinco por correção
+  nenhuma. Ficaria lá para sempre inflando o número.
+
+  Dois cortes: o nome tem de ser identificador CSS válido, e `link` só
+  vale exato ou seguido de hífen (antes, `linkado` e `links` entravam).
+*/
+const IDENTIFICADOR_CSS = /^[a-zA-Z][a-zA-Z0-9_-]*$/;
 for (const arquivo of telas) {
   const codigo = fs.readFileSync(arquivo, 'utf8')
     .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (t) => t.replace(/[^\n]/g, ' '));
@@ -92,6 +106,7 @@ for (const arquivo of telas) {
   ];
   for (const m of literais) {
     for (const classe of (m[1] || m[2] || '').split(/\s+/).filter(Boolean)) {
+      if (!IDENTIFICADOR_CSS.test(classe)) continue;
       if (!PREFIXOS.test(classe) || classesDeclaradas.has(classe)) continue;
       const linha = codigo.slice(0, m.index).split('\n').length;
       faltando.push({ rel, linha, tipo: 'classe', nome: `.${classe}` });

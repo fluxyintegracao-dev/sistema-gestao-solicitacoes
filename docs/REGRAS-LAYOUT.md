@@ -636,3 +636,24 @@ sem ninguém saber dizer por quê.
   próprio conteúdo**. Sem ele o corpo empurra o rodapé para fora do painel e
   a rolagem nunca acontece. É o mesmo motivo das trilhas `minmax(0, 1fr)`
   que a ComunicacaoInterna precisou.
+
+## Exceção registrada precisa PROVAR que cobre algo (04/09)
+
+Não é regra nova de layout: é regra do **mecanismo de exceção** das regras
+acima, e vale para `excecoes_medidas` (R10) e `excecoes_tabela_crua` (R1)
+no `frontend/scripts/telas-reformadas.json`.
+
+- **A regra**: toda exceção registrada tem de rebaixar pelo menos UMA
+  violação real na execução. Exceção que não cobre nada **reprova**, com o
+  pedido de remover a linha.
+- **O defeito que ela fecha**: a `FinanceiroDre.jsx` tinha exceção de R10
+  registrada e o validador não emitia um aviso sequer para ela — a medida à
+  mão saiu do arquivo numa fatia anterior e a exceção ficou. Isso não é
+  inofensivo: no dia em que alguém puser uma medida à mão nessa tela, a
+  violação **nasce rebaixada a aviso** e o gate passa verde.
+- **Por que importa**: é o inverso exato do trinco. O trinco congela o
+  passivo e só deixa descer; a exceção órfã **abre crédito para o futuro**.
+  Exceção é dívida declarada — e dívida quitada dá baixa.
+- **Provado nos dois sentidos na mesma execução**: a exceção vazia da
+  `FinanceiroDre` reprovou; as duas da `ObraTipoApropriacao`, que cobrem
+  violações reais, passaram.

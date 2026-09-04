@@ -262,6 +262,37 @@ export function validarLayout() {
   const r25 = validarCoresForaDoToken();
   falhas.push(...r25.falhas);
 
+  /*
+    EXCEÇÃO QUE NÃO COBRE NADA É LICENÇA EM BRANCO (04/09).
+
+    Descoberto no fechamento do Financeiro: a `FinanceiroDre.jsx` tinha
+    exceção de R10 registrada ("geometria de gráfico de barras") e o
+    validador não emitia UM aviso sequer para ela — a medida à mão já
+    tinha saído do arquivo numa fatia anterior, e ninguém apagou a
+    exceção. Uma exceção nessas condições não é inofensiva: no dia em
+    que alguém puser uma medida à mão nessa tela, a violação nasce
+    REBAIXADA A AVISO e o gate passa verde.
+
+    Por isso a exceção registrada agora precisa PROVAR que cobre algo.
+    Se não cobre, o validador reprova pedindo a remoção da linha — o
+    mesmo princípio dos trincos: o número só desce.
+  */
+  const excecoesUsadas = new Set(
+    avisos.map((aviso) => `${aviso.split(':')[0]}|${(aviso.match(/\[(R\d+)\]/) || [])[1]}`)
+  );
+  for (const [tela, motivo] of Object.entries(manifesto.excecoes_medidas || {})) {
+    if (!manifesto.telas.includes(tela)) continue;
+    if (!excecoesUsadas.has(`${tela}|R10`)) {
+      falhas.push(`${tela}:0 [EXCECAO] exceção de R10 registrada ("${motivo}") não cobre nenhuma violação — remova a linha de excecoes_medidas; exceção em branco rebaixa a violação futura para aviso.`);
+    }
+  }
+  for (const [tela, motivo] of Object.entries(manifesto.excecoes_tabela_crua || {})) {
+    if (!manifesto.telas.includes(tela)) continue;
+    if (!excecoesUsadas.has(`${tela}|R1`)) {
+      falhas.push(`${tela}:0 [EXCECAO] exceção de R1 registrada ("${motivo}") não cobre nenhuma tabela crua — remova a linha de excecoes_tabela_crua.`);
+    }
+  }
+
   return {
     falhas,
     avisos,

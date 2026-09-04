@@ -1100,3 +1100,352 @@ fixa) e `.modal-dialog`.
 **A regra nasceu de nove telas com a faixa fixa quebrada e não cobria o
 arquivo onde o defeito mais aparece.** Agora cobre, com trinco.
 
+
+---
+
+## D19 / D20 — DONO DECLARADO: o que NÃO é órfão, e por que não volta na varredura
+
+Decisão do cliente, 04/09, ao fechar a fatia 4. Três conjuntos apareceram
+nas varreduras deste ciclo como se fossem candidatos do Financeiro. Não
+são — têm dono, e o dono está registrado aqui e em
+`frontend/scripts/telas-reformadas.json` (bloco `donos_declarados`), para
+que a próxima varredura os leia como **atribuídos**, não como achados.
+
+| Conjunto | Onde vive | Dono declarado |
+|---|---|---|
+| **D19a — Provisionamento Financeiro** | `src/modules/provisionamento-financeiro/**` | leva do módulo Provisões |
+| **D19b — Custos e Recebíveis** | `src/modules/custosRecebiveis/**`, `pages/CustosRecebiveis.jsx` | leva do módulo Custos e Recebíveis |
+| **D20 — Painel de Solicitações** | `pages/Solicitacoes/**`, `pages/SolicitacaoDetalhe/**` | leva do módulo Solicitações |
+
+**Por que eles apareciam.** Cada um tem parentesco de vocabulário com o
+Financeiro — provisão é dinheiro, recebível é dinheiro, e o
+`SolicitacaoDetalhe/FinanceiroCard.jsx` tem 3.051 linhas com "Financeiro"
+no nome. Parentesco de nome não é pertencimento de módulo: o card financeiro
+é um bloco DENTRO do detalhe da solicitação, importado só por
+`SolicitacaoDetalhe/index.jsx`, e some junto com aquela tela.
+
+**O que a declaração de dono NÃO faz**: não os declara prontos, não os
+tira de nenhuma regra e não os isenta de leva. Ela só responde à pergunta
+"de quem é isto?" — que era a pergunta que fazia a mesma tela reaparecer
+como achado a cada varredura nova.
+
+**Regra que fica**: toda varredura que produza lista de candidatos precisa
+cruzar com `donos_declarados` antes de reportar. Achado com dono declarado
+é ruído; o valor da varredura está no que ainda não tem dono.
+
+---
+
+## FATIA 4 — cadastros e comprovantes: o que a medição encontrou
+
+A fatia nasceu com uma lista candidata pequena e terminou menor ainda,
+porque a medição desmontou a lista:
+
+| Destino do menu Financeiro | Arquivo | Situação em 04/09 |
+|---|---|---|
+| Cadastros Financeiros | `FinanceiroCadastros.jsx` | já no manifesto (fatia 3) |
+| Comprovantes Pendentes | `ComprovantesPendentes.jsx` | já no manifesto (fatia 1) |
+| **Upload Comprovantes** | **`UploadComprovantes.jsx`** | **única tela nova da fatia** |
+
+As 17 rotas do módulo Financeiro e as 32 rotas de `/financeiro/*` +
+`/comprovantes/*` do `App.jsx` foram conferidas uma a uma contra o
+manifesto: **restava exatamente uma**. O manifesto fecha a leva em **68
+telas**.
+
+### Dois arquivos que a varredura devolveu e não entram
+
+- **`SolicitacaoDetalhe/FinanceiroCard.jsx`** (3.051 linhas) — importado
+  por `SolicitacaoDetalhe/index.jsx`. D20: módulo de Solicitações.
+- **`SolicitacaoDetalhe/Comprovantes.jsx`** — **arquivo de 0 bytes, sem
+  nenhum import em todo o `src/`**. Não é órfã (órfã tem código); é resto.
+  Registrado para remoção junto com o `EtapasSetor.jsx` na decisão das dez.
+
+### O que mudou na `UploadComprovantes.jsx`
+
+Antes: `<h1>` solto num card, texto de apoio miúdo, e as duas mensagens de
+retorno pintadas **à mão, em hexadecimal, nos dois tons de azul**.
+
+| Achado | Regra | O que era | O que é |
+|---|---|---|---|
+| Título solto no card | R5/R13/C1 | `<h1 class="page-title">` + `<p class="page-subtitle">` dentro de um `.card` | `Pagina` + `PageHeader` com contagem e apoio na faixa fixa |
+| `#1d4ed8` / `#1e40af` | R25 | cor de mensagem em hexadecimal | `Avisos`/`Alert` do sistema, tom semântico |
+| `text-blue-600` | R25 | classe de paleta crua no botão Remover | corrigida **no padrão do componente** (abaixo) |
+
+### O achado de semântica: o erro estava pintado de sucesso
+
+Duas linhas, lado a lado:
+
+```jsx
+{message && <p className="text-sm" style={{ color: '#1d4ed8' }}>{message}</p>}
+{error   && <p className="text-sm" style={{ color: '#1e40af' }}>{error}</p>}
+```
+
+`#1d4ed8` e `#1e40af` são dois azuis quase iguais. Erro e confirmação
+saíam com a **mesma leitura visual** — e nenhuma delas com a cor de erro
+do sistema.
+
+Pior que a cor, o caminho: o retorno de recusa do servidor não ia para o
+`error`, ia para o `message`.
+
+```jsx
+if (result.message)      setMessage(result.message);
+else if (result.error)   setMessage(result.error);   // recusa entrando pelo canal do sucesso
+```
+
+Recusa do servidor chegava ao usuário pelo canal do sucesso, com a cor do
+sucesso. É a **classe SIGNIFICADO** já registrada nesta ficha: nenhum
+check de forma pega isso — as duas linhas têm elemento, texto e cor. Só a
+leitura pega.
+
+Agora `result.error` vai para `avisar.erro` e os arquivos **ficam na tela**,
+porque não há o que confirmar.
+
+### R25 tem um ponto cego estrutural: o PADRÃO do componente compartilhado
+
+`PendingAttachmentsList` trazia isto na assinatura:
+
+```js
+removeButtonClassName = 'text-blue-600 font-semibold px-2'
+```
+
+Paleta crua morando no **valor padrão** de um componente compartilhado. Uma
+tela que só usa o padrão herda a dívida **sem uma linha de paleta crua no
+próprio arquivo** — e a R25 lê os arquivos das telas. O check passa, a cor
+não acompanha o tema escuro.
+
+Corrigido no padrão (`var(--c-primary)`), que é onde a correção vale para
+todos. **Seis chamadas ainda passam a classe crua explicitamente** —
+`GestaoContratos` (2), `SolicitacaoDetalhe/Conversa`, `ConversaDetalhe`,
+`ConversasEntrada`, `NovaSolicitacao` —, todas fora do manifesto. Serão
+pegas pela R25 quando as levas dos módulos delas chegarem; ficam
+registradas aqui para não dependerem de alguém lembrar.
+
+**A lição, generalizada**: um check que lê o arquivo da tela não enxerga o
+que a tela herda. Todo componente compartilhado que aceita classe por prop
+carrega, no seu valor padrão, uma decisão de estilo que nenhuma leva
+inspeciona.
+
+---
+
+## DOIS DEFEITOS DOS MEUS PRÓPRIOS INSTRUMENTOS, ACHADOS NO FECHAMENTO
+
+### I1 — `tokensExistem` lia PROSA como lista de classe
+
+A varredura de fantasmas lê qualquer literal de string com cara de lista
+de classes, e frase em português também é literal de string. Uma mensagem
+de erro que diz `toque em "Enviar link" de novo` virou o fantasma
+**`.link"`** — com a aspa dentro do nome.
+
+Nome com aspa ou ponto não é identificador CSS: **nunca poderia existir no
+CSS**, logo nunca sairia do trinco por correção nenhuma. Ficaria lá para
+sempre inflando o número, e um número que não pode descer é um trinco que
+não trava nada.
+
+Dois cortes: o candidato tem de ser identificador CSS válido, e o prefixo
+`link` passou a valer só exato ou seguido de hífen (antes, `linkado` e
+`links` entravam). Trinco: **39 → 36**. Provado nos dois sentidos —
+`.app-fantasma-plantado` continua reprovando.
+
+Junto saiu o fantasma real que motivou tudo: `.link link-primary` na
+`FinanceiroDda.jsx`, **tela já entregue com matriz fechada**. Nenhuma das
+duas classes existe: o único caminho da linha do DDA até o título
+renderizava como texto preto comum, sem parecer clicável.
+
+### I2 — exceção registrada que não cobre nada é licença em branco
+
+`FinanceiroDre.jsx` tinha exceção de R10 registrada — "geometria de
+gráfico de barras" — e o validador **não emitia um aviso sequer** para ela.
+A medida à mão saiu do arquivo numa fatia anterior; a exceção ficou.
+
+Exceção nessas condições não é inofensiva. No dia em que alguém puser uma
+medida à mão nessa tela, a violação **nasce rebaixada a aviso** e o gate
+passa verde. É o inverso exato do trinco: em vez de congelar o passivo,
+abre crédito para o futuro.
+
+O validador agora exige que toda exceção registrada **prove que cobre
+algo**; se não cobre, reprova pedindo a remoção da linha. Provado nos dois
+sentidos na mesma execução: a exceção vazia da `FinanceiroDre` reprovou, e
+as duas da `ObraTipoApropriacao` — que cobrem violações reais — passaram.
+
+**A regra**: exceção é dívida declarada, e dívida quitada se dá baixa.
+Exceção que sobrevive ao motivo vira permissão.
+
+---
+
+## AS DEZ ÓRFÃS — o que cada uma FAZ e o que se PERDE ao apagá-la
+
+Trazidas ao fechamento da leva conforme a decisão do cliente de 04/09.
+Nenhuma foi removida. A pergunta não é "está sendo usada?" — nenhuma está,
+é a definição de órfã — é **"esta capacidade deve existir?"**.
+
+### Antes da lista: duas delas nem funcionariam se alguém chegasse lá
+
+Conferindo os imports nomeados de cada uma contra os exports reais dos
+módulos que elas importam:
+
+| Órfã | Import quebrado |
+|---|---|
+| `ConfiguracaoProvisionamentoFinanceiro.jsx` | `getProvisionamentoFinanceiroPermissoes`, `salvarProvisionamentoFinanceiroPermissoes` — **não existem** em `services/provisoesFinanceiras.js` |
+| `SetoresSemAlteracaoStatus.jsx` | `getSetoresSemAlteracaoStatus`, `salvarSetoresSemAlteracaoStatus` — **não existem** em `services/configuracoesSistema.js` |
+
+**Por que o build passa**: as duas não são importadas pelo `App.jsx`. O
+Vite nunca as inclui no bundle, então nunca resolve os imports delas. É a
+consequência escondida da capacidade órfã: **código inalcançável é código
+não construído**, e portanto código onde a quebra se acumula sem sinal. As
+duas voltariam a existir quebradas no dia em que alguém lhes desse rota.
+
+Isso muda a natureza da decisão nas duas: não é "religar capacidade que
+funciona", é "terminar o que nunca chegou a ser ligado ponta a ponta".
+
+### A lista
+
+| # | Órfã | O que FAZ | O que se PERDE ao apagar |
+|---|---|---|---|
+| 1 | `ConfiguracaoProvisionamentoFinanceiro.jsx` (572) | Editor de regras de permissão do provisionamento, por escopo (usuário/setor/obra) e perfil | **Nada em operação** — o serviço que ela chama não existe. Perde-se o desenho da tela de permissões do módulo Provisões |
+| 2 | `ConversasEntrada.jsx` (486) | Caixa de entrada de conversas internas: lista, filtro por setor, nova conversa com anexos | A entrada da comunicação interna por conversa. **Ver E3/E4** |
+| 3 | `ConversaDetalhe.jsx` (483) | Thread de uma conversa: mensagens, anexos com preview, adicionar participantes | O detalhe da conversa. **Navega para `/conversas/:id`, rota que não existe** |
+| 4 | `ConversasSaida.jsx` (260) | Caixa de saída das conversas enviadas | O outro lado da caixa de entrada |
+| 5 | `SetoresSemAlteracaoStatus.jsx` (127) | Marca setores que **não exibem** o botão "Alterar status" no detalhe da solicitação | **Nada em operação** — sem serviço no front e **sem rota no backend**, apesar de existir `services/solicitacao/setoresSemAlteracaoStatus.js` lá, também sem consumidor. Perde-se o único desenho dessa regra |
+| 6 | `AprovacaoDiretoria.jsx` (117) | Define **qual diretoria recebe a solicitação primeiro** conforme obra pública ou privada | **O caso mais grave da lista — ver abaixo** |
+| 7 | `SolicitacaoDetalhe/InfoCard.jsx` (79) | Card "Dados da Solicitação" (obra, setor, tipo, valores) | Nada: o detalhe vivo monta esses dados por outro caminho |
+| 8 | `SolicitacaoDetalhe/Pedido.jsx` (54) | Grava o **número do pedido** da solicitação (`PATCH /solicitacoes/:id/pedido`) | **A única forma de preencher um campo que as listas exibem — ver abaixo** |
+| 9 | `SolicitacaoDetalhe/StatusArea.jsx` (15) | Caixa com status e área responsável, fundo `#f5f5f5` fixo | Nada. Ignora tema e tokens; o detalhe vivo já mostra os dois |
+| 10 | `EtapasSetor.jsx` (1) | `return <div>EtapasSetor</div>` | Nada. É um esqueleto que nunca ganhou corpo |
+
+### #6 `AprovacaoDiretoria` — a configuração que o sistema OBEDECE e ninguém pode mudar
+
+O endpoint está vivo nos dois verbos:
+
+```
+GET   /configuracoes/aprovacao-diretoria
+PATCH /configuracoes/aprovacao-diretoria   (allowConfiguracoesStatusVinculos)
+```
+
+E o valor é **consumido em produção**: `SolicitacaoController.js:802` e
+`PrioridadeDiretoriaController.js:565` decidem o roteamento por
+`fluxo_aprovacao_diretoria`; o `SolicitacaoDetalhe` tem bloco próprio
+`aprovacao_diretoria`; o `blocosDetalhe.js` o lista como "Aprovação por
+diretoria".
+
+`AprovacaoDiretoria.jsx` é a **única** tela do frontend que chama
+`salvarAprovacaoDiretoria`.
+
+Ou seja: **o sistema roteia solicitações por uma regra que ninguém consegue
+alterar pela interface.** O que está no banco hoje é o que vale, para
+sempre, até alguém mexer por fora. Apagar a tela transforma um problema de
+caminho em decisão permanente e invisível.
+
+### #8 `Pedido` — a coluna que mostra o que nada preenche
+
+`PATCH /solicitacoes/:id/pedido` existe, valida corpo
+(`validateSolicitacaoPedidoBody`) e **grava auditoria**
+(`SOLICITACAO_PEDIDO_UPDATED`). Nenhum `service` do frontend chama essa
+rota; a busca por quem escreve `numero_pedido` no frontend inteiro devolve
+**só esta órfã**.
+
+Enquanto isso, `Solicitacoes/index.jsx` e `LinhaSolicitacao.jsx` **exibem**
+`numero_pedido` em coluna e em tooltip. A coluna existe, a auditoria
+existe, a validação existe — e o campo só se preenche por integração
+externa ou banco.
+
+### Agrupando para decidir
+
+| Grupo | Órfãs | Decisão que faz sentido |
+|---|---|---|
+| **Restos** | 7, 9, 10 (e o `SolicitacaoDetalhe/Comprovantes.jsx` de 0 bytes) | Remover. Nada se perde; a #9 ainda ignora o tema |
+| **Capacidade viva sem porta** | 6, 8 | **Dar rota e ponto de entrada.** Nos dois o backend está em uso e a interface é o único elo faltando |
+| **Nunca ligado ponta a ponta** | 1, 5 | Terminar (front + rota) **ou** remover as duas pontas juntas — a tela e o serviço backend sem consumidor |
+| **Conjunto das conversas** | 2, 3, 4 | **E3 + E4, uma decisão só** (ver abaixo) |
+
+### E3 e E4 continuam sendo UMA decisão
+
+Reafirmado com a medição desta fatia. As três telas de conversa navegam
+para `/conversas/:id`, que **não tem rota** — e a aplicação não tem rota
+curinga, então o destino é tela branca silenciosa.
+
+- Consertar a rota sem as telas → uma rota que abre caixa vazia.
+- Remover as telas sem a rota → uma rota quebrada a menos e três telas a
+  menos, mas o módulo de Comunicação Interna fica só com a
+  `ComunicacaoInterna.jsx`, que é outra coisa.
+
+A pergunta única: **o sistema deve ter conversa por thread com caixa de
+entrada e saída, ou a comunicação interna é só a tela que já existe?** As
+três telas e a rota seguem juntas a resposta, qualquer que seja.
+
+
+---
+
+## Para o responsável — Financeiro, fatia 4: o upload de comprovantes (04/09)
+
+Achados de **backend**, medidos no fechamento da leva. Nenhum foi
+corrigido: são regra e dado, não layout. `ComprovanteController.uploadMassa`
+e a rota `POST /comprovantes/upload-massa`.
+
+### U1 — O VALOR do comprovante é inventado a partir do nome do arquivo
+
+```js
+const valor = nome.match(/\d+([.,]\d{2})?/);
+if (valor) result.valor = valor[0].replace(',', '.');
+```
+
+**O primeiro número que aparecer no nome do arquivo vira o valor monetário
+do comprovante.** Rodado sobre nomes reais:
+
+| Nome do arquivo | Solicitação achada | **Valor gravado** |
+|---|---|---|
+| `SOL-12.pdf` — *o exemplo da própria tela* | SOL-12 | **12** |
+| `SOL-000123.pdf` | SOL-000123 | **000123** |
+| `comprovante 1.234,56 SOL-45.pdf` | SOL-45 | **1.23** |
+| `NF 8899 OBRA-A1.pdf` | — | **8899** |
+
+Duas coisas ao mesmo tempo:
+
+1. **A convenção que a tela ensina fabrica dinheiro.** Quem seguir a
+   instrução `SOL-12.pdf` grava um comprovante de valor 12 que ninguém
+   digitou.
+2. **Quando o valor está mesmo no nome, ele sai errado.** `1.234,56` vira
+   `1.23` — a expressão pára no primeiro `.` e o `,56` é descartado. Erro
+   de três ordens de grandeza, para menos.
+
+O campo é `Comprovante.valor` e alimenta a conferência de comprovantes.
+
+**Sugestão, para decisão de quem manda**: não inferir valor de nome de
+arquivo. Um valor inventado é pior que valor ausente — ausente se vê,
+inventado se confere.
+
+### U2 — "Upload realizado com sucesso" para dois desfechos diferentes
+
+O controlador termina sempre igual:
+
+```js
+return res.json({ message: 'Upload concluido' });
+```
+
+Arquivo com `SOL-nn` no nome → `status: 'VINCULADO'`, com histórico na
+solicitação. Arquivo sem → `status: 'PENDENTE'`, esperando vínculo manual.
+**Os dois recebiam a mesma frase.**
+
+Mitigado no front nesta fatia — a tela agora conta antes do envio quantos
+arquivos não têm o código, e depois do envio diz quantos ficaram pendentes.
+**É mitigação, não conserto**: quem conhece o desfecho de cada arquivo é o
+servidor, e a resposta continua não dizendo.
+
+### U3 — Falha no meio do lote grava metade e responde erro total
+
+O laço não tem proteção por arquivo. Se o sétimo de dez falhar no envio ao
+S3, os seis primeiros **já estão gravados** e a resposta é `500 Erro no
+upload`. A pessoa reenvia os dez, e **`Comprovante.create` não tem nenhuma
+chave de idempotência** — os seis primeiros duplicam.
+
+Combinado com U1, cada duplicata carrega o mesmo valor inventado.
+
+### U4 — Nome com `OBRA-<n>` cai em `findByPk` do id interno
+
+```js
+obra = await Obra.findOne({ where: { codigo: String(info.obra).toUpperCase() } });
+if (!obra && String(info.obra).match(/^\d+$/)) obra = await Obra.findByPk(info.obra);
+```
+
+Não achando pelo código, procura pelo **id interno** da tabela. Um arquivo
+chamado `OBRA-3 comprovante.pdf`, numa base onde não exista obra de código
+"3", é vinculado à obra **cujo id é 3** — que pode ser qualquer uma.
+Convenção de nome de arquivo alcançando a chave primária do banco.
