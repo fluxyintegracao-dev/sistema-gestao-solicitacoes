@@ -52,10 +52,26 @@
     "src/pages/FinanceiroChequesTerceiros.jsx",
     "src/pages/FinanceiroCaixas.jsx",
     "src/pages/FinanceiroDda.jsx",
-    "src/pages/ComprovantesPendentes.jsx"
+    "src/pages/ComprovantesPendentes.jsx",
+    "src/pages/FinanceiroRelatorios.jsx",
+    "src/pages/FinanceiroDre.jsx",
+    "src/pages/FinanceiroObras.jsx",
+    "src/pages/FinanceiroBancos.jsx",
+    "src/pages/FinanceiroFinanciamentosBancarios.jsx",
+    "src/pages/FinanceiroFaturasCartao.jsx",
+    "src/pages/FinanceiroFaturaCartaoDetalhe.jsx",
+    "src/pages/FinanceiroExecutivoGrupo.jsx",
+    "src/pages/FinanceiroIntercompany.jsx",
+    "src/pages/FinanceiroFluxoConsolidado.jsx",
+    "src/pages/FinanceiroRelatorioAnalitico.jsx",
+    "src/pages/FinanceiroEndividamento.jsx",
+    "src/pages/FinanceiroResultadoObras.jsx",
+    "src/pages/FinanceiroDiagnosticoDre.jsx",
+    "src/pages/FinanceiroResultadoCentrosCusto.jsx"
   ],
   "excecoes_medidas": {
-    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"
+    "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula",
+    "src/pages/FinanceiroDre.jsx": "geometria de grafico de barras: altura da area de plotagem e largura maxima da barra, sem degrau correspondente na escala"
   },
   "excecoes_tabela_crua": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas com painel expansível por célula — arranjo especial registrado"

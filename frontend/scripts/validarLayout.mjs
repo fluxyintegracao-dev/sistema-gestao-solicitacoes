@@ -79,7 +79,26 @@ export function validarLayout() {
       continue;
     }
     const codigo = fs.readFileSync(caminho, 'utf8');
-    const linhas = codigo.split('\n');
+    /*
+      COMENTÁRIO NÃO É CÓDIGO — também para a R1 e a R10 (04/09).
+
+      A R25, a R19 e a R21 já cortavam. A R1 e a R10 não, e o resultado é
+      que o arquivo reprovava pela PRÓPRIA DOCUMENTAÇÃO da regra: um
+      comentário explicando "antes havia uma <table> crua aqui" fazia a R1
+      acusar tabela crua, e um comentário citando `text-xl` para explicar a
+      remoção fazia a R10 acusar medida fora da escala.
+
+      Três agentes tropeçaram nisso e tiveram de reescrever a explicação em
+      prosa — que é exatamente o incentivo errado: a regra empurrando o
+      código a documentar-se pior.
+
+      Os comentários viram espaço, preservando as quebras, para o número da
+      linha continuar batendo com o arquivo real.
+    */
+    const linhas = codigo
+      .replace(/\/\*[\s\S]*?\*\//g, (bloco) => bloco.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (trecho) => ' '.repeat(trecho.length))
+      .split('\n');
 
     // R10 (escala): exceção registrada rebaixa a violação de medida à mão
     // para AVISO — com a justificativa gravada no manifesto.
@@ -632,8 +651,25 @@ function validarOverflowEmJsx() {
     for (const achado of codigo.matchAll(/\{\s*[^{}]*\boverflow(?:X|Y)?\s*:\s*'hidden'[^{}]*\}/g)) {
       const bloco = achado[0];
       if (/textOverflow|whiteSpace|WebkitLineClamp|lineClamp/.test(bloco)) continue;
-      // overflowX/overflowY sozinho não cria scrollport nos dois eixos.
-      if (/\boverflow(?:X|Y)\s*:\s*'hidden'/.test(bloco) && !/\boverflow\s*:\s*'hidden'/.test(bloco)) continue;
+      /*
+        EU ESCREVI AQUI que "overflowX/overflowY sozinho não cria scrollport
+        nos dois eixos", e isso está ERRADO. Medido no Chromium em 04/09:
+
+          <div style="overflow-x: hidden"> →  overflowY computado: "auto"
+
+        A especificação do CSS Overflow diz que, quando um eixo não é
+        `visible`, o outro computa para `auto`. Ou seja: `overflow-x: hidden`
+        sozinho CRIA scrollport e mata o sticky de qualquer descendente,
+        exatamente como o `overflow: hidden`.
+
+        Era um falso negativo por construção, escrito por mim ontem, na
+        regra que existe justamente por causa de nove telas com a faixa fixa
+        quebrada. `.financeiro-relatorios-page { overflow-x: hidden }` caía
+        nele — e é ancestral da faixa fixa do hub de relatórios.
+
+        `clip` continua fora, e aí a exclusão é correta: `clip` recorta sem
+        criar scrollport, e é por isso que ele é a saída recomendada.
+      */
       const linha = codigo.slice(0, achado.index).split('\n').length;
       falhas.push(`${tela}:${linha} [R18] \`overflow: 'hidden'\` em estilo inline — cria scrollport e MATA \`position: sticky\` de qualquer descendente (faixa fixa, coluna fixa), em silêncio. Para clipar sem criar scrollport use \`clip\`; para truncar texto, pareie com \`textOverflow\`.`);
     }
@@ -644,7 +680,31 @@ function validarOverflowEmJsx() {
 function validarOverflow() {
   const falhas = [];
   const avisos = [];
-  const alvos = [path.join('src', 'styles', 'componentes-padrao.css')];
+  const caminhoTrinco = path.join(frontendRoot, 'scripts', 'trinco-overflow-css.json');
+  const trincoOverflow = new Set(
+    fs.existsSync(caminhoTrinco)
+      ? JSON.parse(fs.readFileSync(caminhoTrinco, 'utf8')).seletores || []
+      : []
+  );
+  const vistosNoTrinco = new Set();
+  /*
+    O `index.css` ENTRA (04/09), e a ausência dele era a maior lacuna da R18.
+
+    A regra varria só `componentes-padrao.css` e os CSS de módulo com
+    "governanca" no caminho. Mas o `index.css` tem 11.800 linhas de CSS DE
+    TELA — e é lá que o mecanismo mais mora: `.financeiro-report-card`,
+    `.financeiro-relatorios-content`, `.app-dense-table-card` e
+    `.financeiro-relatorios-page` todos com `overflow: hidden`, todos
+    ancestrais de tabela ou de faixa fixa.
+
+    A R18 nasceu de nove telas com a faixa fixa quebrada e não cobria o
+    arquivo onde o defeito mais aparece. Com trinco, porque o passivo é
+    grande e a leva não é de CSS.
+  */
+  const alvos = [
+    path.join('src', 'styles', 'componentes-padrao.css'),
+    path.join('src', 'index.css')
+  ];
 
   const varrer = (dir) => {
     if (!fs.existsSync(dir)) return;
@@ -672,13 +732,45 @@ function validarOverflow() {
       const seletor = bloco[1].trim();
       const corpo = bloco[2];
       if (!/(^|[;{\s])overflow(-x|-y)?\s*:\s*hidden/.test(corpo)) continue;
-      const ehTruncagem = /text-overflow/.test(corpo) || /white-space\s*:\s*nowrap/.test(corpo);
+      /*
+        `-webkit-line-clamp` é o terceiro idioma de truncagem, e faltava
+        aqui: o lado JSX já o reconhecia, o lado CSS não. `.line-clamp-2` e
+        `.line-clamp-3` apareceram como falha ao estender a R18 ao
+        `index.css`, e as duas são recorte de texto de livro — não têm
+        descendente com sticky e não são scrollport de ninguém.
+      */
+      const ehTruncagem = /text-overflow/.test(corpo)
+        || /white-space\s*:\s*nowrap/.test(corpo)
+        || /-webkit-line-clamp|line-clamp\s*:/.test(corpo);
       if (ehTruncagem) continue;
       const linha = codigo.slice(0, bloco.index).split('\n').length;
-      falhas.push(`${rel}:${linha} [R18] overflow hidden em "${seletor.split('\n').pop().trim().slice(0, 60)}" — cria contexto de rolagem e mata o position:sticky de faixa fixa, coluna fixa e cabeçalho de tabela dentro dele. Use \`overflow: clip\` (corta igual, sem criar scrollport); se for recorte de texto, acompanhe de text-overflow/white-space.`);
+      /*
+        TRINCO PARA O `index.css` (04/09).
+
+        Estender a R18 a ele expôs passivo herdado em 11.800 linhas de CSS
+        de tela — reprovar tudo de uma vez travaria a leva e quem empurra em
+        paralelo, que é o argumento do trinco desde a R19.
+
+        Os arquivos que a regra JÁ cobria continuam reprovando direto: eles
+        são do sistema de design e nasceram sob a regra. O `index.css` entra
+        congelado, e o número só desce.
+      */
+      const nomeSeletor = seletor.split('\n').pop().trim().slice(0, 60);
+      const mensagem = `${rel}:${linha} [R18] overflow hidden em "${nomeSeletor}" — cria contexto de rolagem e mata o position:sticky de faixa fixa, coluna fixa e cabeçalho de tabela dentro dele. Use \`overflow: clip\` (corta igual, sem criar scrollport); se for recorte de texto, acompanhe de text-overflow/white-space.`;
+      if (rel.endsWith('index.css')) {
+        if (!trincoOverflow.has(nomeSeletor)) falhas.push(`${mensagem} [NOVO — o trinco do index.css só desce]`);
+        else vistosNoTrinco.add(nomeSeletor);
+        continue;
+      }
+      falhas.push(mensagem);
     }
   });
 
+  for (const seletor of trincoOverflow) {
+    if (!vistosNoTrinco.has(seletor)) {
+      avisos.push(`AVISO [R18] "${seletor}" saiu do index.css — remova a linha de scripts/trinco-overflow-css.json.`);
+    }
+  }
   return { falhas, avisos };
 }
 

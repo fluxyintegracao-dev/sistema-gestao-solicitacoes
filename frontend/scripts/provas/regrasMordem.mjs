@@ -29,8 +29,27 @@ import { execFileSync } from 'node:child_process';
 
 const RAIZ = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MANIFESTO = path.join(RAIZ, 'scripts', 'telas-reformadas.json');
-const ALVO = path.join(RAIZ, 'src', 'pages', '__ProvaDeRegra.jsx');
-const ALVO_REL = 'src/pages/__ProvaDeRegra.jsx';
+/*
+  NOME ÚNICO POR PROCESSO (04/09).
+
+  Esta prova planta uma tela temporária e a acrescenta ao manifesto. O nome
+  era fixo, e o manifesto é compartilhado — então DUAS corridas simultâneas
+  de `test:responsive` (inevitável com agentes em paralelo) se atropelavam:
+  uma apagava a fixture da outra, e o resultado era "listada no manifesto
+  mas não existe", que reprova TODO MUNDO.
+
+  Três agentes tropeçaram nisso em 04/09 e tiveram de rodar de novo; um
+  deles chegou a ver "8 regras sem prova de reprovação" e precisou
+  descobrir que não era defeito das regras. Prova que atrapalha quem está
+  medindo é pior que prova nenhuma: gera vermelho falso, e vermelho falso
+  ensina a ignorar vermelho.
+
+  O sufixo é o PID: cada corrida tem o seu arquivo e a sua entrada, e a
+  limpeza do `finally` remove só a própria.
+*/
+const SUFIXO = `${process.pid}`;
+const ALVO = path.join(RAIZ, 'src', 'pages', `__ProvaDeRegra${SUFIXO}.jsx`);
+const ALVO_REL = `src/pages/__ProvaDeRegra${SUFIXO}.jsx`;
 
 const CABECA = `import { Pagina, PageHeader, TabelaPadrao } from '../components/padrao';\n\nexport default function ProvaDeRegra() {\n  return (\n    <Pagina>\n      <PageHeader titulo="Prova" contagem="1 item" />\n`;
 const RABO = `    </Pagina>\n  );\n}\n`;
@@ -125,7 +144,18 @@ try {
     console.log('  ok    tela limpa passa (o validador não acusa o que está certo)');
   }
 } finally {
-  fs.writeFileSync(MANIFESTO, manifestoOriginal);
+  /*
+    Restauração CIRÚRGICA, não byte a byte: escrever o manifesto original
+    de volta apagaria as entradas que OUTRA corrida acrescentou enquanto
+    esta rodava. Remove-se apenas a própria.
+  */
+  try {
+    const atual = JSON.parse(fs.readFileSync(MANIFESTO, 'utf8'));
+    atual.telas = atual.telas.filter((t) => t !== ALVO_REL);
+    fs.writeFileSync(MANIFESTO, `${JSON.stringify(atual, null, 2)}\n`);
+  } catch {
+    fs.writeFileSync(MANIFESTO, manifestoOriginal);
+  }
   if (fs.existsSync(ALVO)) fs.unlinkSync(ALVO);
 }
 

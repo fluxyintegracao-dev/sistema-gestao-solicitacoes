@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { Pagina, PageHeader, TabelaPadrao, CelulaDupla } from '../components/padrao';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getDreComparativoEmpresasFinanceiro, getDreComparativoFinanceiro, getDreFinanceira } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -22,6 +22,37 @@ const DRE_CALCULATED_ROW_CODES = new Set([
   'resultado_antes_impostos',
   'lucro_prejuizo_liquido'
 ]);
+
+/*
+  R23 — REGIME DE CONSULTA CARA, DECLARADO.
+
+  Marcar um filtro NÃO aplica nesta tela: as marcas são RASCUNHO até o
+  clique em "Atualizar DRE". O critério da R23 é atendido com folga —
+  cada recorte dispara TRÊS requisições (DRE do período, comparativo
+  mensal de 12 meses e comparativo por empresa), todas agregando o razão
+  inteiro por competência, sobre SEIS dimensões que o usuário combina
+  (período, data inicial, data final, holding, empresa, obra).
+
+  Por isso o botão diz o que faz ("Atualizar DRE", não "Aplicar filtros")
+  e o apoio da tela avisa que a marca ainda não vale — sem esse aviso a
+  etiqueta continua mentindo, só que mais devagar.
+*/
+const APOIO_RASCUNHO = 'Os filtros abaixo só valem depois de "Atualizar DRE" — até o clique, a marca é rascunho.';
+
+/*
+  GEOMETRIA DO GRÁFICO DE BARRAS.
+
+  A escala (styles/escala.css) cobre espaçamento, tipo e raio; ela NÃO tem
+  degrau para a altura de uma área de plotagem, que não é espaçamento nem
+  texto. As constantes ficam aqui, nomeadas e ancoradas em múltiplos da
+  escala (192 = 12 × 16px; 32 = --esp-8), em vez de espalhadas como
+  utilitários de altura/largura arbitrários no meio do JSX. Está declarado
+  no relatório da leva como candidato a `excecoes_medidas` no manifesto —
+  R10 exige REGISTRO, e registro é do orquestrador.
+*/
+const GRAFICO_ALTURA_PLOTAGEM = 192;
+const GRAFICO_ALTURA_MAX_BARRA = 176;
+const GRAFICO_LARGURA_MAX_BARRA = 32;
 
 const TIPOS_GERENCIAIS_LABEL = {
   HOLDING: 'Holding',
@@ -75,14 +106,20 @@ function labelTipoGerencial(value) {
   return TIPOS_GERENCIAIS_LABEL[String(value || '').toUpperCase()] || 'Operacional';
 }
 
+/*
+  R25 — a cor do número vem de TOKEN, nunca de hexadecimal. Os valores
+  antigos (#15803d / #b91c1c) não têm par no tema escuro e não passam pelo
+  piso de contraste que o ThemeContext aplica (R24).
+*/
 function metricColor(value) {
-  return Number(value || 0) >= 0 ? '#15803d' : '#b91c1c';
+  return Number(value || 0) >= 0 ? 'var(--sem-success)' : 'var(--sem-danger)';
 }
 
 /**
- * Composição por categoria de UMA linha da DRE. Antes eram duas <tr> por
- * linha (a segunda com colSpan e uma <table> crua dentro); agora é o
- * conteúdo que a TabelaPadrao mostra em `linhaExpansivel`.
+ * Composição por categoria de UMA linha da DRE. Antes eram duas linhas de
+ * tabela por registro (a segunda com colSpan e uma tabela crua aninhada
+ * dentro); agora é o conteúdo que a TabelaPadrao mostra em
+ * `linhaExpansivel`. Não resta nenhuma tabela crua nesta tela.
  */
 function DreCategoriasDetalhe({ categorias, comparativo = false }) {
   const lista = Array.isArray(categorias) ? categorias : [];
@@ -207,21 +244,28 @@ function DreComparativoCard({ comparativo }) {
         <div className="app-empty-card">Nenhum mes encontrado para o comparativo.</div>
       ) : (
         <>
-          <div className="grid min-h-[220px] grid-cols-6 items-end gap-2 md:grid-cols-12">
+          <div className="grid grid-cols-6 items-end gap-2 md:grid-cols-12">
             {serie.map((item) => {
               const lucro = Number(item.lucro_prejuizo_liquido || 0);
-              const height = Math.max(10, Math.round((Math.abs(lucro) / maxAbs) * 180));
+              const height = Math.max(8, Math.round((Math.abs(lucro) / maxAbs) * GRAFICO_ALTURA_MAX_BARRA));
               const positive = lucro >= 0;
               return (
                 <div key={item.referencia} className="flex min-w-0 flex-col items-center gap-2">
-                  <div className="flex h-[190px] w-full items-end justify-center border-b border-[var(--c-border)]">
+                  <div
+                    className="flex w-full items-end justify-center border-b border-[var(--c-border)]"
+                    style={{ height: GRAFICO_ALTURA_PLOTAGEM }}
+                  >
                     <div
-                      className={`w-full max-w-[34px] rounded-t-md ${positive ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                      style={{ height }}
+                      className="w-full rounded-t-md"
+                      style={{
+                        height,
+                        maxWidth: GRAFICO_LARGURA_MAX_BARRA,
+                        background: positive ? 'var(--sem-success)' : 'var(--sem-danger)'
+                      }}
                       title={`${item.label}: ${formatCurrency(lucro)}`}
                     />
                   </div>
-                  <span className="truncate text-[11px] font-semibold text-[var(--c-muted)]">{item.label}</span>
+                  <span className="truncate text-xs font-semibold text-[var(--c-muted)]">{item.label}</span>
                 </div>
               );
             })}
@@ -346,10 +390,13 @@ function DreComparativoEmpresasCard({ comparativo }) {
               return (
                 <div className="min-w-0">
                   <div className="font-medium text-[var(--c-text)]">{empresa.empresa_nome}</div>
-                  <div className="mt-1 h-1.5 rounded-full bg-slate-100">
+                  <div className="mt-1 h-2 rounded-full bg-[var(--ui-surface-soft)]">
                     <div
-                      className={`h-1.5 rounded-full ${resultadoFinal >= 0 ? 'bg-emerald-500' : 'bg-rose-500'}`}
-                      style={{ width: `${barWidth}%` }}
+                      className="h-2 rounded-full"
+                      style={{
+                        width: `${barWidth}%`,
+                        background: resultadoFinal >= 0 ? 'var(--sem-success)' : 'var(--sem-danger)'
+                      }}
                     />
                   </div>
                 </div>
@@ -364,7 +411,7 @@ function DreComparativoEmpresasCard({ comparativo }) {
               <div>
                 <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
                 {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
-                {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                {empresa.consolidar_no_grupo === false ? <div className="text-xs text-[var(--sem-warning)]">Fora do consolidado</div> : null}
               </div>
             )
           },
@@ -422,7 +469,18 @@ function DreComparativoEmpresasCard({ comparativo }) {
   );
 }
 
-export default function FinanceiroDre() {
+/*
+  `embutido` — a MESMA tela é usada em dois lugares: a rota própria
+  (/financeiro/relatorios/dre) e o painel do hub de Relatórios, que já
+  desenha a sua própria faixa fixa com o título do relatório escolhido.
+  Sem esta chave, as duas faixas se empilham: dois `.app-page-header`
+  grudados na mesma rolagem e o mesmo título duas vezes (R16 — cada
+  responsabilidade tem UM dono; B3 — cada informação aparece uma vez).
+
+  É prop OPCIONAL com padrão que preserva o comportamento de hoje: quem
+  renderiza sem ela (a rota) continua recebendo a tela inteira (R21).
+*/
+export default function FinanceiroDre({ embutido = false }) {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [empresas, setEmpresas] = useState([]);
@@ -534,17 +592,16 @@ export default function FinanceiroDre() {
   const ebitdaPositivo = Number(resumo.ebitda || 0) >= 0;
 
   return (
-    <div className="page solicitacoes-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">DRE Gerencial</h1>
-            <p className="page-subtitle">
-              Resultado por competencia da Holding, empresas, obras e centros de custo.
-            </p>
-          </div>
-        </div>
-      </div>
+    // O ritmo vertical (vão entre blocos) vem do `Pagina`, não de um
+    // space-y-* na raiz (R10).
+    <Pagina>
+      {embutido ? null : (
+        <PageHeader
+          titulo="DRE Gerencial"
+          contagem={`${resumo.empresas_com_movimento || 0} empresa(s) com movimento`}
+          descricao="Resultado por competencia da Holding, empresas, obras e centros de custo."
+        />
+      )}
 
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -602,7 +659,15 @@ export default function FinanceiroDre() {
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
             Excluir movimentacoes entre empresas
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              R23 — o aviso de rascunho fica ONDE a marca é feita, e por
+              extenso. Ele NÃO cabe na `descricao` do PageHeader: aquele
+              apoio é de UMA LINHA e trunca com reticências (R5/C2), então
+              justo a metade que avisa sumiria — o pior lugar possível para
+              um texto cuja função é impedir uma leitura errada.
+            */}
+            <span className="text-sm text-[var(--c-muted)]">{APOIO_RASCUNHO}</span>
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
             <button type="submit" className="btn btn-primary btn-sm">Atualizar DRE</button>
           </div>
@@ -619,14 +684,14 @@ export default function FinanceiroDre() {
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">EBITDA</span>
-          <strong className="app-summary-value" style={{ color: ebitdaPositivo ? '#15803d' : '#b91c1c' }}>
+          <strong className="app-summary-value" style={{ color: metricColor(ebitdaPositivo ? 1 : -1) }}>
             {formatCurrency(resumo.ebitda)}
           </strong>
           <span className="app-summary-subvalue">Margem {formatPercent(resumo.margem_ebitda)}</span>
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">Lucro/Prejuizo liquido</span>
-          <strong className="app-summary-value" style={{ color: resultadoPositivo ? '#15803d' : '#b91c1c' }}>
+          <strong className="app-summary-value" style={{ color: metricColor(resultadoPositivo ? 1 : -1) }}>
             {formatCurrency(resumo.lucro_prejuizo_liquido ?? resumo.resultado)}
           </strong>
           <span className="app-summary-subvalue">{resultadoPositivo ? 'Gerando patrimonio' : 'Destruindo patrimonio'}</span>
@@ -760,7 +825,7 @@ export default function FinanceiroDre() {
                       <div>
                         <div>{labelTipoGerencial(empresa.tipo_gerencial)}</div>
                         {empresa.empresa_caixa ? <div className="text-xs text-[var(--c-muted)]">Caixa/Tesouraria</div> : null}
-                        {empresa.consolidar_no_grupo === false ? <div className="text-xs text-amber-700">Fora do consolidado</div> : null}
+                        {empresa.consolidar_no_grupo === false ? <div className="text-xs text-[var(--sem-warning)]">Fora do consolidado</div> : null}
                       </div>
                     )
                   },
@@ -811,6 +876,6 @@ export default function FinanceiroDre() {
           </div>
         </>
       )}
-    </div>
+    </Pagina>
   );
 }

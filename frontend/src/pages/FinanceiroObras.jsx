@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { HiOutlineArrowDownTray, HiOutlineBuildingOffice2, HiOutlineXMark } from 'react-icons/hi2';
+import { HiOutlineArrowDownTray, HiOutlineArrowUpTray, HiOutlineBuildingOffice2, HiOutlineXMark } from 'react-icons/hi2';
+import OverlayModal from '../components/ui/OverlayModal';
 import {
   confirmarImportacaoCustosHistoricosObra,
   getArquivosDoTitulo,
@@ -12,9 +12,31 @@ import { fileUrl } from '../services/api';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 
 const IMPORT_PREVIEW_PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+
+/*
+  R23 — REGIME DE CONSULTA CARA, DECLARADO.
+
+  Marcar um filtro NÃO aplica: as marcas são RASCUNHO até "Gerar
+  relatorio". A tela tem NOVE dimensões que o usuário combina (análise,
+  data inicial, data final, tipo, limite, busca, obra, empresa, plano
+  financeiro) e a consulta varre movimentos, títulos, histórico legado e
+  fretes do período — muito além dos "4+ dimensões" do critério.
+
+  O botão diz o que faz e o apoio avisa que a marca só vale no clique.
+*/
+const APOIO_RASCUNHO = 'Os filtros só valem depois de "Gerar relatorio" — até o clique, a marca é rascunho.';
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -75,15 +97,32 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
+/*
+  R25 — a pastilha de status vem dos tokens semânticos, não da paleta crua
+  do Tailwind. Os tons anteriores (sky/indigo/cyan/emerald/amber/slate)
+  não têm par no tema escuro e não passam pelo piso de contraste do
+  ThemeContext (R24). O sistema tem quatro famílias — success, warning,
+  danger, info — e uma neutra; os sete status caem nelas SEM mudar o
+  significado de nenhum: quitado = success, parcial = warning, previsão e
+  frete = info, histórico e aberto = neutro.
+*/
+const STATUS_PILL = {
+  // Classes ESCRITAS POR EXTENSO de propósito: o Tailwind varre o código
+  // atrás de literais, e classe montada por template (`bg-[var(--sem-${x})]`)
+  // nunca é gerada — o CSS sai sem ela e a pastilha fica sem cor. É a
+  // mesma família de defeito da R24: parece certo e não chega à tela.
+  success: 'app-status-pill bg-[var(--sem-success-bg)] text-[var(--sem-success)]',
+  warning: 'app-status-pill bg-[var(--sem-warning-bg)] text-[var(--sem-warning)]',
+  info: 'app-status-pill bg-[var(--sem-info-bg)] text-[var(--sem-info)]',
+  neutral: 'app-status-pill bg-[var(--sem-neutral-bg)] text-[var(--sem-neutral)]'
+};
+
 function statusClass(value) {
   const normalized = String(value || '').toUpperCase();
-  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
-  if (normalized === 'HISTORICO') return 'app-status-pill bg-indigo-100 text-indigo-700';
-  if (normalized.startsWith('FRETE_')) return 'app-status-pill bg-cyan-100 text-cyan-800';
-  if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
-  if (normalized === 'ABERTO') return 'app-status-pill bg-slate-100 text-slate-700';
-  return 'app-status-pill bg-slate-100 text-slate-600';
+  if (normalized === 'QUITADO') return STATUS_PILL.success;
+  if (normalized === 'PARCIAL') return STATUS_PILL.warning;
+  if (normalized === 'PREVISAO' || normalized.startsWith('FRETE_')) return STATUS_PILL.info;
+  return STATUS_PILL.neutral;
 }
 
 function formatStatus(value) {
@@ -101,37 +140,35 @@ function csvValue(value) {
   return text;
 }
 
-function Metric({ label, value, detail, tone = 'default' }) {
-  const color = tone === 'positive' ? '#047857' : tone === 'negative' ? '#b91c1c' : 'var(--c-text)';
-  return (
-    <div className="app-metric-card">
-      <span className="app-filter-label">{label}</span>
-      <strong className="text-xl" style={{ color }}>{value}</strong>
-      <small className="text-[var(--c-muted)]">{detail}</small>
-    </div>
-  );
+/*
+  O ladrilho de dado único é o `StatTile` do sistema (StatGrid.jsx). Os
+  dois cartões locais que existiam aqui — `Metric` e `ImportMetric` —
+  traziam cada um a sua própria paleta crua, o seu próprio tamanho de
+  fonte fora da escala e, no caso do `Metric`, a classe `.app-metric-card`,
+  que NUNCA foi declarada em CSS nenhum (fantasma apontado pela prova
+  `scripts/provas/tokensExistem.mjs`): o cartão era um `div` sem estilo
+  nenhum, com o texto solto por cima do canvas (B5).
+
+  `tom` do StatTile é semântico e vem de token: success/warning/danger.
+*/
+function tomDoValor(tone) {
+  if (tone === 'positive') return 'success';
+  if (tone === 'negative') return 'danger';
+  if (tone === 'warning') return 'warning';
+  return undefined;
 }
 
-function ImportMetric({ label, value, detail, tone = 'default' }) {
-  const toneClass =
-    tone === 'positive'
-      ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-      : tone === 'negative'
-        ? 'border-rose-200 bg-rose-50 text-rose-900'
-        : tone === 'warning'
-          ? 'border-amber-200 bg-amber-50 text-amber-900'
-          : 'border-slate-200 bg-slate-50 text-slate-900';
-
-  return (
-    <div className={`rounded-lg border px-3 py-2 ${toneClass}`}>
-      <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] opacity-70">{label}</span>
-      <strong className="mt-1 block text-lg leading-tight">{value}</strong>
-      <small className="mt-1 block text-xs opacity-75">{detail}</small>
-    </div>
-  );
-}
-
-export default function FinanceiroObras() {
+/*
+  `embutido` — mesma leitura da FinanceiroDre: esta tela tem rota própria
+  (/financeiro/relatorios/financeiro-obras) e TAMBÉM é renderizada dentro
+  do painel do hub de Relatórios, que já desenha a faixa fixa com o título
+  do relatório escolhido. Sem esta chave são dois `.app-page-header` na
+  mesma rolagem e o mesmo título duas vezes (R16/B3). Prop opcional com
+  padrão que preserva o comportamento de hoje (R21).
+*/
+export default function FinanceiroObras({ embutido = false }) {
+  const { avisos, avisar, fechar: fecharAviso } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
   const [relatorio, setRelatorio] = useState({ filtros: {}, resumo: {}, linhas: [] });
@@ -317,20 +354,47 @@ export default function FinanceiroObras() {
     }
   }
 
+  /*
+    R26 + CONSENTIMENTO (DoD) — a pré-visualização inteira é FIXADA numa
+    const ANTES do `await` da confirmação, e é essa mesma referência que
+    vai no payload. O modal do sistema não bloqueia a tela: sem fixar, dava
+    para trocar a planilha enquanto a pergunta estava aberta e importar
+    outra coisa daquela que a pessoa leu.
+
+    E o número citado vem da COLEÇÃO QUE A AÇÃO PERCORRE, com o MESMO
+    critério do servidor (`status === 'VALIDA'`, obraCustoHistoricoService)
+    — não do `resumo.importaveis`, que é um número paralelo, e muito menos
+    da página visível da pré-visualização, que mostra 25 de N e seria
+    exatamente o "pergunta sobre 25 e importa 900".
+  */
   async function confirmarImportacao() {
-    if (!importPreview?.linhas?.length) {
-      return;
-    }
+    const lote = importPreview;
+    const linhasDoLote = Array.isArray(lote?.linhas) ? lote.linhas : [];
+    const linhasValidas = linhasDoLote.filter(
+      (linha) => String(linha.status || '').toUpperCase() === 'VALIDA'
+    );
+    if (!linhasValidas.length) return;
+
+    const { ok } = await confirmar({
+      titulo: 'Confirmar importacao de custos historicos',
+      mensagem: `Importar ${linhasValidas.length} linha(s) valida(s) de "${lote.arquivo_nome || 'planilha'}" para o historico da obra? `
+        + 'As linhas entram no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE nem movimento bancario. '
+        + 'Esta acao nao pode ser desfeita por esta tela.',
+      rotuloConfirmar: 'Importar',
+      destrutiva: true
+    });
+    if (!ok) return;
 
     setImportLoading(true);
     setImportError('');
     try {
       await confirmarImportacaoCustosHistoricosObra({
-        arquivo_nome: importPreview.arquivo_nome,
-        arquivo_hash: importPreview.arquivo_hash,
-        linhas: importPreview.linhas
+        arquivo_nome: lote.arquivo_nome,
+        arquivo_hash: lote.arquivo_hash,
+        linhas: linhasDoLote
       });
       fecharImportModal();
+      avisar.sucesso(`${linhasValidas.length} linha(s) enviada(s) para importacao.`);
       setAppliedFilters((current) => ({ ...current }));
     } catch (err) {
       setImportError(err?.message || 'Erro ao confirmar importacao');
@@ -373,33 +437,78 @@ export default function FinanceiroObras() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `financeiro-obras-${filters.analise.toLowerCase()}-${filters.data_inicial || 'inicio'}-${filters.data_final || 'fim'}.csv`;
+    /*
+      O NOME DO ARQUIVO DESCREVE O QUE ESTÁ DENTRO DELE.
+
+      As linhas exportadas são `relatorio.linhas`, ou seja, o recorte
+      APLICADO. O nome vinha de `filters`, o rascunho: bastava mexer num
+      filtro sem clicar em "Gerar relatorio" para sair um CSV chamado
+      "realizado-01/01-31/01" com dados de "comprometido" de outro
+      período. Sob o regime de rascunho da R23 isso deixa de ser detalhe:
+      o arquivo sai da tela e é lido depois, longe dela.
+    */
+    link.download = `financeiro-obras-${String(appliedFilters.analise || '').toLowerCase()}-${relatorio.filtros.data_inicial || appliedFilters.data_inicial || 'inicio'}-${relatorio.filtros.data_final || appliedFilters.data_final || 'fim'}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
 
+  /*
+    D3 — as duas ações ficam VISÍVEIS, com peso declarado: importar
+    histórico é a única que ESCREVE, então é a primária sólida; exportar
+    CSV lê o que já está na tela e fica em contorno. Nenhuma vai para o
+    menu "⋯".
+  */
+  const acoesDaTela = {
+    acaoPrincipal: {
+      rotulo: 'Importar historico',
+      icone: <HiOutlineArrowUpTray aria-hidden="true" />,
+      onClick: () => setImportModalOpen(true)
+    },
+    secundarias: [{
+      rotulo: 'Exportar CSV',
+      icone: <HiOutlineArrowDownTray aria-hidden="true" />,
+      onClick: exportarCsv,
+      desabilitada: !relatorio.linhas.length,
+      title: 'Exporta as linhas carregadas neste recorte'
+    }]
+  };
+
   return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Financeiro de Obras</h1>
-            <p className="page-subtitle">
-              Relatorio de custo por obra baseado nos titulos financeiros, com visao realizada, comprometida e a realizar.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-outline" onClick={() => setImportModalOpen(true)}>
-              Importar historico
+    <Pagina>
+      {embutido ? null : (
+        <PageHeader
+          titulo="Financeiro de Obras"
+          contagem={`${relatorio.resumo.quantidade_linhas || 0} linha(s)`}
+          descricao="Custo por obra nas visoes realizada, comprometida e a realizar."
+          acaoPrincipal={acoesDaTela.acaoPrincipal}
+          secundarias={acoesDaTela.secundarias}
+        />
+      )}
+
+      {/* Embutido no hub não existe faixa fixa para pendurar as ações —
+          elas continuam VISÍVEIS num bloco próprio, nunca escondidas. */}
+      {embutido ? (
+        <div className="card sol-surface-card flex flex-wrap items-center justify-between gap-3">
+          <span className="text-sm text-[var(--c-muted)]">{APOIO_RASCUNHO}</span>
+          <div className="app-actionbar">
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={exportarCsv}
+              disabled={!relatorio.linhas.length}
+            >
+              <HiOutlineArrowDownTray aria-hidden="true" /> Exportar CSV
             </button>
-            <button type="button" className="btn btn-outline" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
-              <HiOutlineArrowDownTray /> Exportar CSV
+            <button type="button" className="btn btn-primary" onClick={() => setImportModalOpen(true)}>
+              <HiOutlineArrowUpTray aria-hidden="true" /> Importar historico
             </button>
           </div>
         </div>
-      </div>
+      ) : null}
+
+      <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -478,7 +587,7 @@ export default function FinanceiroObras() {
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-2 text-sm text-[var(--c-muted)]">
-            <HiOutlineBuildingOffice2 className="mt-0.5" />
+            <HiOutlineBuildingOffice2 className="mt-1" aria-hidden="true" />
             <span>{analiseAtual.description}</span>
           </div>
           {filters.analise === 'REALIZADO' ? (
@@ -491,7 +600,14 @@ export default function FinanceiroObras() {
               Incluir historico legado no executado
             </label>
           ) : null}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/*
+              R23 — o aviso por extenso mora AQUI, junto do botão. Não vai
+              para a `descricao` do PageHeader porque aquele apoio é de uma
+              linha só e trunca (R5/C2): sumiria exatamente a parte que
+              impede a leitura errada.
+            */}
+            <span className="text-sm text-[var(--c-muted)]">{APOIO_RASCUNHO}</span>
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
             <button type="submit" className="btn btn-primary btn-sm">Gerar relatorio</button>
           </div>
@@ -500,21 +616,44 @@ export default function FinanceiroObras() {
 
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
 
-      <div className="app-summary-grid">
-        <Metric label="Credito" value={formatCurrency(relatorio.resumo.credito_total)} detail="Entradas no recorte" tone="positive" />
-        <Metric label="Debito" value={formatCurrency(relatorio.resumo.debito_total)} detail="Saidas no recorte" tone="negative" />
-        <Metric
+      {/*
+        ATENÇÃO — o apoio destes quatro ladrilhos diz "no recorte
+        carregado", e NÃO "no periodo". Não é preciosismo de texto: o
+        backend calcula o resumo depois de cortar as linhas em `limit`
+        (relatorioFinanceiroService.js, `summarizeFinanceiroObras`
+        recebendo a lista já truncada). Com mais linhas do que o limite, o
+        que se lê aqui é o total das PRIMEIRAS N por data, não o do
+        período. O defeito é do backend e está relatado; o texto da tela
+        pelo menos para de afirmar o que o número não sustenta.
+      */}
+      <StatGrid colunas={4}>
+        <StatTile
+          label="Credito"
+          valor={formatCurrency(relatorio.resumo.credito_total)}
+          sub="Entradas no recorte carregado"
+          tom={tomDoValor('positive')}
+        />
+        <StatTile
+          label="Debito"
+          valor={formatCurrency(relatorio.resumo.debito_total)}
+          sub="Saidas no recorte carregado"
+          tom={tomDoValor('negative')}
+        />
+        {/* O limite exibido é o do relatório JÁ CARREGADO (o que o servidor
+            devolveu), nunca o do rascunho de filtros — senão o apoio
+            descreveria um recorte que ainda não foi consultado (R23). */}
+        <StatTile
           label="Saldo"
-          value={formatCurrency(relatorio.resumo.saldo_total)}
-          detail={`${relatorio.resumo.quantidade_linhas || 0} linha(s)`}
-          tone={Number(relatorio.resumo.saldo_total || 0) >= 0 ? 'positive' : 'negative'}
+          valor={formatCurrency(relatorio.resumo.saldo_total)}
+          sub={`${relatorio.resumo.quantidade_linhas || 0} linha(s) carregada(s), limite de ${relatorio.filtros.limit || appliedFilters.limit}`}
+          tom={tomDoValor(Number(relatorio.resumo.saldo_total || 0) >= 0 ? 'positive' : 'negative')}
         />
-        <Metric
+        <StatTile
           label="Titulos"
-          value={String(relatorio.resumo.titulos || 0)}
-          detail={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s) / ${relatorio.resumo.fretes || 0} frete(s)`}
+          valor={String(relatorio.resumo.titulos || 0)}
+          sub={`${relatorio.resumo.movimentos || 0} baixa(s) / ${relatorio.resumo.historicos || 0} historico(s) / ${relatorio.resumo.fretes || 0} frete(s)`}
         />
-      </div>
+      </StatGrid>
 
       <section className="card sol-surface-card app-dense-table-card financeiro-obras-detalhamento-card">
         <div className="app-dense-table-header">
@@ -544,8 +683,8 @@ export default function FinanceiroObras() {
             { id: 'titulo_parcela', titulo: 'Titulo/Parcela', tipo: 'codigo', render: (linha) => linha.titulo_parcela || '-' },
             { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => <span className="text-xs">{linha.documento || '-'}</span> },
             { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => <span className="line-clamp-2">{linha.plano_financeiro || '-'}</span> },
-            { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="text-emerald-700 font-semibold">{linha.credito ? formatCurrency(linha.credito) : '-'}</span> },
-            { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="text-rose-700 font-semibold">{linha.debito ? formatCurrency(linha.debito) : '-'}</span> },
+            { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.credito ? formatCurrency(linha.credito) : '-'}</span> },
+            { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.debito ? formatCurrency(linha.debito) : '-'}</span> },
             { id: 'saldo', titulo: 'Saldo', tipo: 'valor', render: (linha) => <strong>{formatCurrency(linha.saldo)}</strong> },
             { id: 'obra_nome', titulo: 'Obra', tipo: 'texto', render: (linha) => (linha.obra_codigo ? `${linha.obra_codigo} - ${linha.obra_nome || ''}` : (linha.obra_nome || '-')) },
             { id: 'empresa_nome', titulo: 'Empresa', tipo: 'texto', render: (linha) => linha.empresa_nome || '-' },
@@ -560,25 +699,38 @@ export default function FinanceiroObras() {
         />
       </section>
 
+      {/*
+        R27 — a casca é a do sistema (`OverlayModal`), no lugar do overlay
+        à mão. O corpo rolante e o cabeçalho fixo são do COMPONENTE: aqui
+        só se marca o filho com `data-modal="cabecalho"`. Nada de
+        `overflow-y` escrito na tela, e nada de fundo em paleta crua
+        (bg-slate-950/45), que não acompanha o tema (R25).
+      */}
       {arquivosModal || arquivosErro ? (
-        <div className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
-          <div className="card sol-surface-card w-full max-w-2xl max-h-[85vh] overflow-y-auto"
-            data-testid="modal-arquivos-titulo">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Arquivos do pagamento</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  {arquivosModal?.solicitacao_codigo
-                    ? `Titulo ${arquivosModal.titulo_codigo || ''} · solicitacao ${arquivosModal.solicitacao_codigo}`
-                    : `Titulo ${arquivosModal?.titulo_codigo || ''}`}
-                </p>
-              </div>
-              <button type="button" className="btn btn-icon btn-outline" aria-label="Fechar"
-                onClick={() => { setArquivosModal(null); setArquivosErro(''); }}>
-                <HiOutlineXMark className="h-5 w-5" />
-              </button>
+        <OverlayModal
+          rotulo="Arquivos do pagamento"
+          largura="var(--modal-max-w-lg, 860px)"
+          onFechar={() => { setArquivosModal(null); setArquivosErro(''); }}
+        >
+          <div
+            data-modal="cabecalho"
+            className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Arquivos do pagamento</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                {arquivosModal?.solicitacao_codigo
+                  ? `Titulo ${arquivosModal.titulo_codigo || ''} · solicitacao ${arquivosModal.solicitacao_codigo}`
+                  : `Titulo ${arquivosModal?.titulo_codigo || ''}`}
+              </p>
             </div>
+            <button type="button" className="btn btn-icon btn-outline shrink-0" aria-label="Fechar"
+              onClick={() => { setArquivosModal(null); setArquivosErro(''); }}>
+              <HiOutlineXMark className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
 
+          <div className="space-y-3 p-4" data-testid="modal-arquivos-titulo">
             {arquivosErro ? <div className="app-alert app-alert--error">{arquivosErro}</div> : null}
             {arquivosLoading ? <p className="text-sm text-[var(--c-muted)]">Carregando arquivos...</p> : null}
 
@@ -619,24 +771,34 @@ export default function FinanceiroObras() {
               ))}
             </ul>
           </div>
-        </div>
+        </OverlayModal>
       ) : null}
 
+      {/* R27 — casca do sistema; cabecalho fixo por `data-modal`, corpo
+          rolante do componente. Sem overflow-y na tela, sem overlay em
+          paleta crua. */}
       {importModalOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm">
-          <div className="card sol-surface-card w-full max-w-5xl max-h-[90vh] overflow-y-auto">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar custos historicos</h2>
-                <p className="text-sm text-[var(--c-muted)]">
-                  As linhas importadas entram somente no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE ou movimento bancario.
-                </p>
-              </div>
-              <button type="button" className="btn btn-icon btn-outline" onClick={fecharImportModal} disabled={importLoading} aria-label="Fechar">
-                <HiOutlineXMark />
-              </button>
+        <OverlayModal
+          rotulo="Importar custos historicos"
+          largura="var(--modal-max-w-xl, 1120px)"
+          onFechar={importLoading ? undefined : fecharImportModal}
+        >
+          <div
+            data-modal="cabecalho"
+            className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] p-4"
+          >
+            <div>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">Importar custos historicos</h2>
+              <p className="text-sm text-[var(--c-muted)]">
+                As linhas importadas entram somente no executado/recebido do Financeiro de Obras e nao geram titulos, baixas, DRE ou movimento bancario.
+              </p>
             </div>
+            <button type="button" className="btn btn-icon btn-outline shrink-0" onClick={fecharImportModal} disabled={importLoading} aria-label="Fechar">
+              <HiOutlineXMark className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
 
+          <div className="p-4">
             {importError ? <div className="app-alert app-alert--error mb-3">{importError}</div> : null}
 
             <form className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" onSubmit={gerarPreviewImportacao}>
@@ -702,17 +864,19 @@ export default function FinanceiroObras() {
             </form>
 
             {importPreview ? (
-              <div className="mt-5 space-y-4">
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                  <ImportMetric label="Importaveis" value={String(importPreview.resumo?.importaveis || 0)} detail="Linhas validas" tone="positive" />
-                  <ImportMetric label="Duplicadas" value={String(importPreview.resumo?.duplicados || 0)} detail="Ja importadas" />
-                  <ImportMetric label="Erros" value={String(importPreview.resumo?.erros || 0)} detail="Linhas ignoradas" tone={importPreview.resumo?.erros ? 'negative' : 'default'} />
-                  <ImportMetric label="Creditos" value={formatCurrency(importPreview.resumo?.credito_total)} detail="Recebido legado" tone="positive" />
-                  <ImportMetric label="Debitos" value={formatCurrency(importPreview.resumo?.debito_total)} detail="Custo legado" tone="negative" />
-                  <ImportMetric label="Total" value={formatCurrency(importPreview.resumo?.valor_total)} detail="Total importavel" />
-                </div>
+              <div className="mt-4 space-y-4">
+                {/* O resumo vem do servidor sobre a PLANILHA INTEIRA, nao
+                    sobre a pagina visivel da pre-visualizacao abaixo. */}
+                <StatGrid colunas={3}>
+                  <StatTile label="Importaveis" valor={String(importPreview.resumo?.importaveis || 0)} sub="Linhas validas" tom={tomDoValor('positive')} />
+                  <StatTile label="Duplicadas" valor={String(importPreview.resumo?.duplicados || 0)} sub="Ja importadas" tom={tomDoValor(importPreview.resumo?.duplicados ? 'warning' : 'default')} />
+                  <StatTile label="Erros" valor={String(importPreview.resumo?.erros || 0)} sub="Linhas ignoradas" tom={tomDoValor(importPreview.resumo?.erros ? 'negative' : 'default')} />
+                  <StatTile label="Creditos" valor={formatCurrency(importPreview.resumo?.credito_total)} sub="Recebido legado" tom={tomDoValor('positive')} />
+                  <StatTile label="Debitos" valor={formatCurrency(importPreview.resumo?.debito_total)} sub="Custo legado" tom={tomDoValor('negative')} />
+                  <StatTile label="Total" valor={formatCurrency(importPreview.resumo?.valor_total)} sub="Total importavel" />
+                </StatGrid>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--c-surface-muted)] px-3 py-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--c-border)] bg-[var(--ui-surface-soft)] px-3 py-2">
                   <span className="text-sm text-[var(--c-muted)]">
                     Exibindo {importPreviewPagedRows.length} de {importPreviewRows.length} linha(s) da pre-visualizacao.
                   </span>
@@ -720,7 +884,7 @@ export default function FinanceiroObras() {
                     <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
                       Por pagina
                       <select
-                        className="input input-sm w-24"
+                        className="input input-sm"
                         value={importPreviewPageSize}
                         onChange={(event) => {
                           setImportPreviewPageSize(Number(event.target.value) || 25);
@@ -752,7 +916,9 @@ export default function FinanceiroObras() {
                   </div>
                 </div>
 
-                <div className="app-dense-table-wrapper max-h-[52vh] overflow-auto">
+                {/* R27: a rolagem e do OverlayModal; a tela nao escreve a
+                    sua. A TabelaPadrao ja rola na horizontal por conta. */}
+                <div className="app-dense-table-wrapper">
                   <TabelaPadrao
                     colunas={[
                       { id: 'row_number', titulo: 'Linha', tipo: 'numero', render: (linha) => linha.row_number },
@@ -768,8 +934,8 @@ export default function FinanceiroObras() {
                       },
                       { id: 'documento', titulo: 'Documento', tipo: 'codigo', render: (linha) => linha.documento || '-' },
                       { id: 'plano_financeiro', titulo: 'Plano financeiro', tipo: 'texto', render: (linha) => linha.plano_financeiro || '-' },
-                      { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-emerald-700">{linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}</span> },
-                      { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-rose-700">{linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'credito', titulo: 'Credito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-success)]">{linha.tipo === 'RECEBER' ? formatCurrency(linha.valor) : '-'}</span> },
+                      { id: 'debito', titulo: 'Debito', tipo: 'valor', render: (linha) => <span className="font-semibold text-[var(--sem-danger)]">{linha.tipo === 'PAGAR' ? formatCurrency(linha.valor) : '-'}</span> },
                       { id: 'observacao', titulo: 'Observacao', tipo: 'texto', render: (linha) => <span className="text-xs text-[var(--c-muted)]">{linha.erros?.join(' ') || '-'}</span> }
                     ]}
                     itens={importPreviewPagedRows}
@@ -780,22 +946,30 @@ export default function FinanceiroObras() {
                   />
                 </div>
 
-                <div className="flex justify-end gap-2">
-                  <button type="button" className="btn btn-outline btn-sm" onClick={fecharImportModal} disabled={importLoading}>Cancelar</button>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={confirmarImportacao}
-                    disabled={importLoading || !importPreview.resumo?.importaveis}
-                  >
-                    {importLoading ? 'Importando...' : 'Confirmar importacao'}
-                  </button>
-                </div>
               </div>
             ) : null}
           </div>
-        </div>
+
+          {/* R27 — o botao que EXECUTA a acao fica fixo no rodape: era
+              exatamente ele que o modal antigo escondia quando a
+              pre-visualizacao passava da altura do painel. */}
+          {importPreview ? (
+            <div data-modal="rodape" className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4">
+              <button type="button" className="btn btn-outline" onClick={fecharImportModal} disabled={importLoading}>Cancelar</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={confirmarImportacao}
+                disabled={importLoading || !importPreview.resumo?.importaveis}
+              >
+                {importLoading ? 'Importando...' : 'Confirmar importacao'}
+              </button>
+            </div>
+          ) : null}
+        </OverlayModal>
       ) : null}
-    </div>
+
+      {elementoConfirmacao}
+    </Pagina>
   );
 }

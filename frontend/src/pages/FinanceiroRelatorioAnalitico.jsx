@@ -6,12 +6,22 @@ import {
   HiOutlineMagnifyingGlass,
   HiOutlineXMark
 } from 'react-icons/hi2';
+import StatusBadge from '../components/StatusBadge';
 import {
   getCategoriasFinanceiras,
   getContasBancarias,
   getRelatorioAnaliticoFinanceiro
 } from '../services/financeiro';
-import { TabelaPadrao } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { buscarParceiros } from '../services/parceiros';
 
@@ -19,6 +29,22 @@ import { buscarParceiros } from '../services/parceiros';
 // colunas (visíveis + ordem) e as larguras. Substitui a chave antiga
 // "fluxy.financeiro.relatorioAnalitico.columns", que a tela mantinha à mão.
 const STORAGE_KEY = 'tabela:financeiro-relatorio-analitico';
+
+/*
+  TETO DE LINHAS — e o motivo do aviso que o consolidado passou a dar.
+
+  A tela pede `limit: 500`. O backend aplica esse teto na CONSULTA (titulos
+  ordenados por vencimento ASC, com as baixas em join) e so DEPOIS soma o
+  resumo sobre o que sobrou. Passando de 500 linhas, "Saldo" e "Quitacao"
+  deixam de ser o total do recorte e viram o total das 500 primeiras — sem
+  nada na tela dizendo isso.
+
+  Corrigir o NUMERO e trabalho de backend (agregar sobre o recorte inteiro,
+  nao sobre a pagina). O que da para consertar aqui e o rotulo parar de
+  mentir sobre o que ele e — o mesmo caminho que a FinanceiroTitulos tomou
+  com "Valor desta pagina".
+*/
+const TETO_LINHAS = 500;
 
 const DEFAULT_FILTERS = {
   tipo: '',
@@ -33,7 +59,7 @@ const DEFAULT_FILTERS = {
   data_final: '',
   vencimento_inicial: '',
   vencimento_final: '',
-  limit: '500'
+  limit: String(TETO_LINHAS)
 };
 
 function compact(params = {}) {
@@ -53,13 +79,24 @@ function formatDate(value) {
   return `${day}/${month}/${year}`;
 }
 
-function statusClass(value) {
+/*
+  R25 — as dez classes de paleta crua que pintavam status (sky/emerald/amber/
+  rose/slate com degrau numerico) sairam. O status agora usa o StatusBadge do
+  sistema, que ja carrega token de cor, o piso de contraste do ThemeContext e
+  um ICONE junto — cor sozinha nao comunica para daltonicos, e era isso que a
+  versao anterior fazia.
+
+  O `kind` e explicito porque a familia derivada do texto nao acerta os dois
+  status desta tela: SEM_BAIXA nao e "sem" nada de ruim (e ausencia de baixa,
+  atencao) e PREVISAO e informacao, nao alerta.
+*/
+function familiaDoStatus(value) {
   const normalized = String(value || '').toUpperCase();
-  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
-  if (['QUITADO', 'ATIVO'].includes(normalized)) return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (['PARCIAL', 'SEM_BAIXA'].includes(normalized)) return 'app-status-pill bg-amber-100 text-amber-700';
-  if (['ESTORNADO', 'CANCELADO'].includes(normalized)) return 'app-status-pill bg-rose-100 text-rose-700';
-  return 'app-status-pill bg-slate-100 text-slate-700';
+  if (normalized === 'PREVISAO') return 'info';
+  if (['QUITADO', 'ATIVO'].includes(normalized)) return 'success';
+  if (['PARCIAL', 'SEM_BAIXA'].includes(normalized)) return 'warning';
+  if (['ESTORNADO', 'CANCELADO'].includes(normalized)) return 'neutral';
+  return 'info';
 }
 
 function toCsvValue(value) {
@@ -98,14 +135,18 @@ const COLUNAS = [
     titulo: 'Status titulo',
     tipo: 'status',
     texto: campoTexto('status_titulo'),
-    render: (row) => <span className={statusClass(row.status_titulo)}>{row.status_titulo || '-'}</span>
+    render: (row) => (row.status_titulo
+      ? <StatusBadge status={row.status_titulo} kind={familiaDoStatus(row.status_titulo)} />
+      : '-')
   },
   {
     id: 'status_movimento',
     titulo: 'Status baixa',
     tipo: 'status',
     texto: campoTexto('status_movimento'),
-    render: (row) => <span className={statusClass(row.status_movimento)}>{row.status_movimento || '-'}</span>
+    render: (row) => (row.status_movimento
+      ? <StatusBadge status={row.status_movimento} kind={familiaDoStatus(row.status_movimento)} />
+      : '-')
   },
   { id: 'parceiro_nome', titulo: 'Parceiro', tipo: 'texto', render: campoTexto('parceiro_nome') },
   { id: 'parceiro_cpf_cnpj', titulo: 'CPF/CNPJ', tipo: 'codigo', render: campoTexto('parceiro_cpf_cnpj') },
@@ -162,7 +203,7 @@ export default function FinanceiroRelatorioAnalitico() {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingOptions, setLoadingOptions] = useState(true);
-  const [error, setError] = useState('');
+  const { avisos, avisar, fechar, limpar } = useAvisos();
 
   useEffect(() => {
     let active = true;
@@ -193,7 +234,8 @@ export default function FinanceiroRelatorioAnalitico() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    setError('');
+    // Equivalente ao `setError('')` que existia aqui.
+    limpar();
 
     getRelatorioAnaliticoFinanceiro(compact(appliedFilters))
       .then((data) => {
@@ -205,7 +247,8 @@ export default function FinanceiroRelatorioAnalitico() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || 'Erro ao carregar relatorio analitico');
+        // R3/R19: faixa do sistema, nunca caixa do navegador.
+        avisar.erro(err?.message || 'Erro ao carregar relatorio analitico');
         setRelatorio({ resumo: {}, linhas: [] });
       })
       .finally(() => {
@@ -215,7 +258,7 @@ export default function FinanceiroRelatorioAnalitico() {
     return () => {
       active = false;
     };
-  }, [appliedFilters]);
+  }, [appliedFilters, avisar, limpar]);
 
   function setFilter(name, value) {
     setFilters((current) => ({
@@ -226,7 +269,11 @@ export default function FinanceiroRelatorioAnalitico() {
 
   function aplicarFiltros(event) {
     event.preventDefault();
-    setAppliedFilters({ ...filters });
+    // A MESMA referencia, nao uma copia: `rascunho` compara `filters` com
+    // `appliedFilters` por identidade. Com `{ ...filters }` a marca ficaria
+    // eternamente "em rascunho" depois da primeira consulta — o aviso
+    // passaria a mentir no sentido contrario.
+    setAppliedFilters(filters);
   }
 
   function limparFiltros() {
@@ -251,22 +298,65 @@ export default function FinanceiroRelatorioAnalitico() {
     URL.revokeObjectURL(url);
   }
 
-  return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header-row">
-        <div>
-          <h1 className="page-title">Relatorio Analitico Financeiro</h1>
-          <p className="page-subtitle">Monte a visao por titulo, baixa, conta e parceiro. Use o painel "Colunas" para escolher e reordenar os campos.</p>
-        </div>
-        <div className="app-page-actions">
-          <button type="button" className="btn btn-outline btn-sm" onClick={exportarCsv} disabled={!relatorio.linhas.length}>
-            <HiOutlineArrowDownTray className="h-4 w-4" />
-            CSV
-          </button>
-        </div>
-      </div>
+  const cortadoNoTeto = relatorio.linhas.length >= TETO_LINHAS;
+  const rascunho = filters !== appliedFilters;
+  const apoioDaFaixa = [
+    'Monte a visao por titulo, baixa, conta e parceiro; o painel "Colunas" escolhe e reordena os campos.',
+    rascunho ? 'O recorte marcado so vale ao consultar.' : null,
+    cortadoNoTeto ? `Consulta cortada no teto de ${TETO_LINHAS} linhas.` : null
+  ].filter(Boolean).join(' ');
 
-      <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
+  return (
+    <Pagina>
+      {/*
+        R13/C1/C2 — a linha de titulo era solta (rolava para fora) e o apoio
+        vinha num paragrafo que a R5 proibe. Agora sao faixa fixa, titulo em
+        22px e apoio numa linha so, dentro da propria superficie.
+
+        D3/C5 — tres pesos visiveis: "Consultar" primario solido, "CSV" e
+        "Limpar" em contorno. Nao ha acao destrutiva nesta tela.
+
+        R23 — REGIME DECLARADO: **EXCECAO (consulta cara), com botao
+        explicito**. Sao 12 dimensoes de recorte que o usuario combina, sobre
+        uma consulta que junta titulo com baixa, conta e parceiro — muito
+        acima do teto de 3 requisicoes da regra. A marca fica em RASCUNHO ate
+        o clique, o botao diz o que faz ("Consultar") e o apoio da faixa
+        AVISA que a marca ainda nao vale.
+      */}
+      <PageHeader
+        titulo="Relatorio Analitico Financeiro"
+        contagem={loading ? 'Carregando…' : `${relatorio.linhas.length} linha(s)`}
+        descricao={apoioDaFaixa}
+        acaoPrincipal={{
+          rotulo: loading ? 'Consultando...' : 'Consultar',
+          onClick: aplicarFiltros,
+          desabilitada: loading,
+          icone: <HiOutlineMagnifyingGlass className="h-4 w-4" />
+        }}
+        secundarias={[
+          {
+            rotulo: 'CSV',
+            onClick: exportarCsv,
+            desabilitada: !relatorio.linhas.length,
+            title: 'Exportar as colunas visiveis em CSV',
+            icone: <HiOutlineArrowDownTray className="h-4 w-4" />
+          },
+          {
+            rotulo: 'Limpar',
+            onClick: limparFiltros,
+            icone: <HiOutlineXMark className="h-4 w-4" />
+          }
+        ]}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
+      <BlocoConteudo
+        titulo="Recorte do relatorio"
+        descricao="A grade abaixo so muda ao consultar."
+        variante="secundario"
+      >
+      <form onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
           <label className="app-filter-field xl:col-span-2">
             <span className="app-filter-label">Tipo</span>
@@ -346,28 +436,60 @@ export default function FinanceiroRelatorioAnalitico() {
             </select>
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--c-border)] pt-3">
-          <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>
-            <HiOutlineXMark className="h-4 w-4" />
-            Limpar
-          </button>
-          <button type="submit" className="btn btn-primary btn-sm">
-            <HiOutlineMagnifyingGlass className="h-4 w-4" />
-            Consultar
-          </button>
-        </div>
+        {rascunho ? (
+          <p className="mt-4 border-t border-[var(--c-border)] pt-4 text-xs text-[var(--c-muted)]">
+            Recorte em rascunho — clique em Consultar para a grade mudar.
+          </p>
+        ) : null}
+        {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
+            submit dentro do formulario o navegador para de consultar com
+            Enter. O botao visivel e o "Consultar" da faixa fixa; este so
+            preserva o Enter, e por isso nao aparece (R16: um dono por
+            responsabilidade). */}
+        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Consultar</button>
       </form>
+      </BlocoConteudo>
 
-      <div className="grid gap-3 md:grid-cols-4">
-        <div className="card sol-surface-card"><span className="app-summary-label">Linhas</span><strong className="app-summary-value">{relatorio.resumo?.quantidade_linhas || 0}</strong></div>
-        <div className="card sol-surface-card"><span className="app-summary-label">Titulos</span><strong className="app-summary-value">{relatorio.resumo?.titulos || 0}</strong></div>
-        <div className="card sol-surface-card"><span className="app-summary-label">Saldo</span><strong className="app-summary-value">{formatCurrency(relatorio.resumo?.total_saldo)}</strong></div>
-        <div className="card sol-surface-card"><span className="app-summary-label">Quitacao</span><strong className="app-summary-value">{formatCurrency(relatorio.resumo?.total_quitacao)}</strong></div>
-      </div>
+      {/*
+        B2 — UM bloco primario, e ele responde a pergunta da tela: quanto o
+        recorte montado soma.
 
-      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
+        B3 — a contagem de linhas ja esta na faixa fixa, entao o cartao
+        "Linhas" saiu. O que sobrou aqui e informacao que a faixa nao da.
 
-      <section className="card sol-surface-card">
+        ROTULOS HONESTOS, e e correcao de SIGNIFICADO, nao de forma: quando a
+        consulta volta no teto, "Saldo" e "Quitacao" NAO sao o total do
+        recorte — sao o total das linhas trazidas. O numero em si e agregado
+        no backend sobre a consulta ja cortada e nao da para consertar daqui
+        (registrado no relatorio); o que da para consertar e ele parar de
+        afirmar o que nao e.
+      */}
+      <BlocoConteudo
+        titulo={cortadoNoTeto ? 'Total das linhas trazidas' : 'Total do recorte'}
+        descricao={cortadoNoTeto
+          ? `Atencao: a consulta voltou no teto de ${TETO_LINHAS} linhas. Os valores abaixo somam apenas essas linhas — estreite o recorte para ler o total verdadeiro.`
+          : 'Somado sobre todas as linhas do recorte consultado.'}
+        variante="primario"
+        cor="var(--module-financeiro)"
+      >
+        <StatGrid colunas={3}>
+          <StatTile
+            label="Titulos"
+            valor={String(relatorio.resumo?.titulos || 0)}
+            sub={`${relatorio.resumo?.quantidade_linhas || 0} linha(s) de titulo e baixa`}
+          />
+          <StatTile
+            label={cortadoNoTeto ? 'Saldo nas linhas trazidas' : 'Saldo do recorte'}
+            valor={formatCurrency(relatorio.resumo?.total_saldo)}
+          />
+          <StatTile
+            label={cortadoNoTeto ? 'Quitacao nas linhas trazidas' : 'Quitacao do recorte'}
+            valor={formatCurrency(relatorio.resumo?.total_quitacao)}
+          />
+        </StatGrid>
+      </BlocoConteudo>
+
+      <BlocoConteudo variante="secundario" className="app-table-shell">
         <TabelaPadrao
           colunas={COLUNAS}
           itens={relatorio.linhas}
@@ -383,8 +505,7 @@ export default function FinanceiroRelatorioAnalitico() {
             </Link>
           )}
         />
-      </section>
-
-    </div>
+      </BlocoConteudo>
+    </Pagina>
   );
 }

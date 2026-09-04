@@ -1,6 +1,13 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import OverlayModal from '../components/ui/OverlayModal';
+import {
+  Pagina,
+  PageHeader,
+  StatGrid,
+  StatTile,
+  TabelaPadrao
+} from '../components/padrao';
 import { useAuth } from '../contexts/AuthContext';
 import { useUiVisibility } from '../hooks/useUiVisibility';
 import {
@@ -118,11 +125,31 @@ function observacaoSintetico(item, type) {
   return Number(item.permutas || 0) > 0 ? `${formatCurrency(item.permutas)} em permutas` : '-';
 }
 
+/*
+  R25 — o tom do dinheiro vem de token semântico. As classes cruas
+  (emerald/rose/slate com degrau) não têm par no tema escuro e não passam
+  pelo piso de contraste do ThemeContext (R24): `text-slate-500` é
+  #64748b, 4,34:1, abaixo do mínimo AA de 4,5:1.
+
+  Escritas por extenso porque o Tailwind varre LITERAIS — classe montada
+  por template nunca chega ao CSS.
+*/
 function getCurrencyTone(value) {
   const numeric = Number(value || 0);
-  if (numeric > 0) return 'text-emerald-700';
-  if (numeric < 0) return 'text-rose-700';
-  return 'text-slate-700';
+  if (numeric > 0) return 'text-[var(--sem-success)]';
+  if (numeric < 0) return 'text-[var(--sem-danger)]';
+  return 'text-[var(--c-text)]';
+}
+
+/*
+  Tom do SALDO, que é outra pergunta: aqui zero conta como positivo
+  (>= 0), exatamente como a tela fazia antes. Manter as duas funções
+  separadas em vez de reaproveitar a de cima é de propósito — trocar
+  `>= 0` por `> 0` mudaria a cor de um saldo zerado sem ninguém pedir, e
+  cor em tela de dinheiro é leitura, não enfeite.
+*/
+function getSaldoTone(value) {
+  return Number(value || 0) >= 0 ? 'text-[var(--sem-success)]' : 'text-[var(--sem-danger)]';
 }
 
 function normalizeRelatorio(data) {
@@ -173,23 +200,17 @@ function normalizeRelatorio(data) {
   };
 }
 
-function RelatorioMetric({ label, value, detail, positive = null }) {
-  const color =
-    positive == null
-      ? 'var(--c-text)'
-      : positive
-        ? '#15803d'
-        : '#b91c1c';
+/*
+  O ladrilho é o `StatTile` do sistema — o mesmo da FinanceiroTitulos e da
+  FinanceiroObras. O cartão local trazia o hexadecimal do valor (R25) e um
+  quarto dialeto de "cartão de número" que a StatGrid existe para unificar.
 
-  return (
-    <div className="app-summary-card">
-      <span className="app-summary-label">{label}</span>
-      <strong className="app-summary-value" style={{ color }}>
-        {value}
-      </strong>
-      {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
-    </div>
-  );
+  `positive == null` continua significando NEUTRO: KPI que não pertence a
+  série nenhuma (contagem, saldo derivado) fica na cor de texto (R8).
+*/
+function RelatorioMetric({ label, value, detail, positive = null }) {
+  const tom = positive == null ? undefined : (positive ? 'success' : 'danger');
+  return <StatTile label={label} valor={value} sub={detail} tom={tom} />;
 }
 
 function buildLinePath(points) {
@@ -554,22 +575,22 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
     setAppliedFilters(DEFAULT_FILTERS);
   }
 
-  return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Fluxo de caixa</h1>
-            <p className="page-subtitle">
-              Fluxo de caixa previsto e realizado com filtro por periodo e obra.
-            </p>
-          </div>
-        </div>
-      </div>
+  /*
+    ESTE CONTEÚDO NUNCA É UMA PÁGINA — ele sempre renderiza DENTRO do hub
+    (no painel lateral ou no modo tela inteira), e os dois já desenham a
+    faixa fixa com o título do relatório escolhido.
 
+    Até aqui ele trazia a sua própria `div.page` com um segundo
+    `.app-page-header` dentro: duas faixas fixas grudando na mesma rolagem
+    e o nome do relatório escrito duas vezes na mesma tela (R16 — uma
+    responsabilidade, um dono; B3 — cada informação aparece uma vez).
+    Agora são só blocos.
+  */
+  return (
+    <div className="app-pagina">
       <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
         <div className="flex flex-wrap items-end gap-3">
-          <label className="app-filter-field min-w-[150px]">
+          <label className="app-filter-field min-w-40">
             <span className="app-filter-label">Período</span>
             <select className="input w-full input-sm" value={filters.periodo}
               onChange={(e) => handlePeriodoChange(e.target.value)}>
@@ -582,19 +603,19 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
               <option value="PERSONALIZADO">Personalizado</option>
             </select>
           </label>
-          <label className="app-filter-field min-w-[130px]">
+          <label className="app-filter-field min-w-32">
             <span className="app-filter-label">Data inicial</span>
             <input className="input w-full input-sm" type="date" value={filters.data_inicial}
               disabled={filters.periodo !== 'PERSONALIZADO'}
               onChange={(e) => setFilters((c) => ({ ...c, data_inicial: e.target.value }))} />
           </label>
-          <label className="app-filter-field min-w-[130px]">
+          <label className="app-filter-field min-w-32">
             <span className="app-filter-label">Data final</span>
             <input className="input w-full input-sm" type="date" value={filters.data_final}
               disabled={filters.periodo !== 'PERSONALIZADO'}
               onChange={(e) => setFilters((c) => ({ ...c, data_final: e.target.value }))} />
           </label>
-          <label className="app-filter-field flex-1 min-w-[160px]">
+          <label className="app-filter-field flex-1 min-w-40">
             <span className="app-filter-label">Obra</span>
             <select className="input w-full input-sm" value={filters.obra_id}
               onChange={(e) => setFilters((c) => ({ ...c, obra_id: e.target.value }))}
@@ -605,10 +626,21 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           </label>
           <div className="flex items-center gap-2 shrink-0">
             {metaPeriodo && (
-              <span className="text-[11px] text-[var(--c-muted)] hidden md:block">
+              <span className="hidden text-xs text-[var(--c-muted)] md:block">
                 {metaPeriodo}{relatorio.filtro?.agrupamento ? ` · por ${relatorio.filtro.agrupamento === 'MES' ? 'mês' : 'dia'}` : ''}
               </span>
             )}
+            {/*
+              R23 — CONSULTA CARA, DECLARADA: quatro dimensões combináveis
+              (período, data inicial, data final e obra) sobre a agregação
+              de títulos e movimentos do período. A marca é RASCUNHO até
+              este clique, e o botão diz o que faz ("Atualizar relatório",
+              não "Aplicar filtros"). O aviso fica junto do botão, por
+              extenso — na `descricao` do PageHeader ele truncaria (R5/C2).
+            */}
+            <span className="text-sm text-[var(--c-muted)]">
+              Os filtros só valem depois de &quot;Atualizar relatório&quot; — até o clique, a marca é rascunho.
+            </span>
             <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
             <button type="submit" className="btn btn-primary btn-sm">Atualizar relatório</button>
           </div>
@@ -622,7 +654,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
       ) : null}
 
       {isVisible('financeiro.fluxo_caixa.metricas') ? (
-      <div className="app-summary-grid">
+      <StatGrid colunas={4}>
         <RelatorioMetric
           label="Entradas previstas"
           value={formatCurrency(relatorio.resumo.entradas_previstas)}
@@ -681,7 +713,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
           value={String(relatorio.resumo.movimentos_realizados)}
           detail={`${relatorio.serie.length} ponto(s) na visualizacao`}
         />
-      </div>
+      </StatGrid>
       ) : null}
 
       {loading ? (
@@ -713,7 +745,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
                   titulo: 'Saldo previsto',
                   tipo: 'valor',
                   render: (item) => (
-                    <span className="font-medium" style={{ color: item.saldo_previsto >= 0 ? '#15803d' : '#b91c1c' }}>
+                    <span className={`font-medium ${getSaldoTone(item.saldo_previsto)}`}>
                       {formatCurrency(item.saldo_previsto)}
                     </span>
                   )
@@ -726,7 +758,7 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
                   titulo: 'Saldo realizado',
                   tipo: 'valor',
                   render: (item) => (
-                    <span className="font-medium" style={{ color: item.saldo_realizado >= 0 ? '#15803d' : '#b91c1c' }}>
+                    <span className={`font-medium ${getSaldoTone(item.saldo_realizado)}`}>
                       {formatCurrency(item.saldo_realizado)}
                     </span>
                   )
@@ -873,6 +905,16 @@ function ContaReportFilters({ filters, setFilters, contas, loading, onSubmit, ty
         </label>
       </div>
       <div className="financeiro-conta-report-actions">
+        {/*
+          R23 — CONSULTA CARA, DECLARADA. A conciliação combina OITO
+          dimensões (período, data inicial, data final, conta, status,
+          tipo de vínculo, natureza e busca no extrato) sobre o extrato
+          inteiro do período. As marcas são RASCUNHO até este clique, e o
+          botão diz o que faz ("Gerar relatorio", não "Aplicar filtros").
+        */}
+        <span className="text-sm text-[var(--c-muted)]">
+          Os filtros só valem depois de &quot;Gerar relatorio&quot; — até o clique, a marca é rascunho.
+        </span>
         <button type="submit" className="btn btn-primary" disabled={loading}>
           {loading ? 'Gerando...' : 'Gerar relatorio'}
         </button>
@@ -936,13 +978,26 @@ function ContaReportShell({ title, subtitle, type }) {
     setAppliedFilters(filters);
   }
 
+  /*
+    R26 — o movimento a estornar é FIXADO numa const antes de qualquer
+    `await`, e é essa referência que vai na chamada. O modal do sistema
+    não bloqueia a tela como o `confirm`/`prompt` do navegador bloqueava:
+    com a caixa aberta dá para clicar noutra linha do analítico, e sem
+    fixar a tela perguntaria sobre um vínculo e estornaria outro — a
+    classe CONSENTIMENTO da DoD, que não deixa rastro de erro no log.
+
+    O texto que a pessoa LÊ no modal descreve `estornoModal.item`, o
+    MESMO objeto que vira `alvo` aqui: os dois lados são o mesmo registro,
+    no mesmo momento, com o mesmo critério.
+  */
   async function handleEstornarConciliacao(event) {
     event.preventDefault();
+    const alvo = estornoModal.item;
     const motivo = String(estornoModal.motivo || '').trim();
-    if (!estornoModal.item?.id || !motivo || estornoModal.processing) return;
+    if (!alvo?.id || !motivo || estornoModal.processing) return;
     try {
       setEstornoModal((current) => ({ ...current, processing: true, error: '' }));
-      await estornarConciliacaoBancaria(estornoModal.item.id, { motivo });
+      await estornarConciliacaoBancaria(alvo.id, { motivo });
       setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' });
       const data = await getRelatorioConciliacaoContas(buildContaReportParams(appliedFilters, type));
       setRelatorio(data);
@@ -958,8 +1013,8 @@ function ContaReportShell({ title, subtitle, type }) {
   return (
     <div className="financeiro-conta-report-shell space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
-        <p className="text-sm text-slate-500">{subtitle}</p>
+        <h2 className="text-lg font-semibold text-[var(--c-text)]">{title}</h2>
+        <p className="text-sm text-[var(--c-muted)]">{subtitle}</p>
       </div>
 
       <ContaReportFilters
@@ -971,11 +1026,11 @@ function ContaReportShell({ title, subtitle, type }) {
         type={type}
       />
 
-      {error ? <div className="alert alert-danger">{error}</div> : null}
+      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
 
       {relatorio ? (
         <>
-          <div className="app-summary-grid app-summary-grid--compact financeiro-report-summary-grid">
+          <StatGrid colunas={4} className="financeiro-report-summary-grid">
             <RelatorioMetric label="Contas" value={resumo.contas || 0} />
             <RelatorioMetric label="Movimentos" value={resumo.movimentos || 0} />
             {type === 'conciliacao' ? (
@@ -993,12 +1048,12 @@ function ContaReportShell({ title, subtitle, type }) {
                 <RelatorioMetric label="Permutas" value={formatCurrency(resumo.permutas)} detail="Separadas do caixa bancario" />
               </>
             )}
-          </div>
+          </StatGrid>
 
           <section className="card sol-surface-card p-4 financeiro-report-card">
             <div className="mb-3">
-              <h3 className="text-base font-semibold text-slate-950">Sintetico por conta</h3>
-              <p className="text-xs text-slate-500">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
+              <h3 className="text-lg font-semibold text-[var(--c-text)]">Sintetico por conta</h3>
+              <p className="text-xs text-[var(--c-muted)]">{relatorio.filtro?.descricao || 'Periodo selecionado'}</p>
             </div>
             <TabelaPadrao
               colunas={[
@@ -1035,7 +1090,7 @@ function ContaReportShell({ title, subtitle, type }) {
                   id: 'status',
                   titulo: 'Observacao',
                   tipo: 'texto',
-                  render: (item) => <span className="text-slate-500">{observacaoSintetico(item, type)}</span>
+                  render: (item) => <span className="text-[var(--c-muted)]">{observacaoSintetico(item, type)}</span>
                 }
               ]}
               itens={sintetico}
@@ -1047,7 +1102,7 @@ function ContaReportShell({ title, subtitle, type }) {
           </section>
 
           <section className="card sol-surface-card p-4 financeiro-report-card">
-            <h3 className="mb-3 text-base font-semibold text-slate-950">Analitico</h3>
+            <h3 className="mb-3 text-lg font-semibold text-[var(--c-text)]">Analitico</h3>
             <TabelaPadrao
               colunas={[
                 { id: 'data', titulo: 'Data', tipo: 'data', render: (item) => formatDate(item.data_movimento) },
@@ -1111,7 +1166,11 @@ function ContaReportShell({ title, subtitle, type }) {
                 ? (item) => (item.status === 'CONCILIADO'
                   && item.tipo_conciliacao !== 'ESTORNO_BANCARIO'
                   && (item.tipo_conciliacao !== 'TRANSFERENCIA' || item.transferencia_status === 'ATIVA') ? (
-                    <button type="button" className="btn btn-outline btn-sm text-rose-600" onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}>
+                    <button
+                      type="button"
+                      className="btn btn-outline btn-sm btn-perigo-suave"
+                      onClick={() => setEstornoModal({ open: true, item, motivo: '', processing: false, error: '' })}
+                    >
                       Estornar
                     </button>
                   ) : '-')
@@ -1121,32 +1180,75 @@ function ContaReportShell({ title, subtitle, type }) {
         </>
       ) : null}
 
+      {/*
+        R27 — casca do sistema. O painel antigo era um overlay à mão, com
+        fundo em paleta crua e sem rolagem própria: numa janela baixa o
+        rodapé saía do painel e o botão "Confirmar estorno" ficava
+        inalcançável, com o modal parecendo funcional. Agora o cabeçalho e
+        o rodapé são marcados com `data-modal` e o corpo rola sozinho.
+      */}
       {estornoModal.open ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 px-4 py-6">
-          <form className="w-full max-w-xl rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-5 shadow-2xl" onSubmit={handleEstornarConciliacao}>
+        <OverlayModal
+          rotulo="Estornar conciliacao bancaria"
+          largura="var(--modal-max-w-md, 640px)"
+          onFechar={estornoModal.processing
+            ? undefined
+            : () => setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' })}
+        >
+          {/*
+            Cabeçalho, corpo e rodapé são filhos DIRETOS do OverlayModal —
+            é neles que o componente procura o `data-modal`. Envolver os
+            três num `<form>` faria o formulário inteiro virar corpo
+            rolante e o rodapé deixaria de ficar fixo. O botão de submeter
+            mora no rodapé e alcança o formulário pelo atributo `form`,
+            que é exatamente para isto.
+          */}
+          <div data-modal="cabecalho" className="border-b border-[var(--c-border)] p-4">
             <h3 className="text-lg font-semibold text-[var(--c-text)]">Estornar conciliacao bancaria</h3>
             <p className="mt-1 text-sm text-[var(--c-muted)]">
               {estornoModal.item?.tipo_conciliacao === 'TRANSFERENCIA'
-                ? 'A transferencia sera cancelada e os lancamentos OFX vinculados voltarao para pendente.'
-                : estornoModal.item?.tipo_conciliacao === 'TARIFA'
-                  ? 'A tarifa criada pela conciliacao sera estornada e o lancamento OFX voltara para pendente.'
-                  : estornoModal.item?.tipo_conciliacao === 'ESTORNO_TARIFA'
-                    ? 'O credito de estorno sera desfeito e o lancamento OFX voltara para pendente. A tarifa original permanecera ativa.'
-                  : estornoModal.item?.tipo_conciliacao === 'CREDITO_ROTATIVO'
-                    ? 'O movimento de credito rotativo sera estornado e o lancamento OFX voltara para pendente.'
+                  ? 'A transferencia sera cancelada e os lancamentos OFX vinculados voltarao para pendente.'
+                  : estornoModal.item?.tipo_conciliacao === 'TARIFA'
+                    ? 'A tarifa criada pela conciliacao sera estornada e o lancamento OFX voltara para pendente.'
+                    : estornoModal.item?.tipo_conciliacao === 'ESTORNO_TARIFA'
+                      ? 'O credito de estorno sera desfeito e o lancamento OFX voltara para pendente. A tarifa original permanecera ativa.'
+                    : estornoModal.item?.tipo_conciliacao === 'CREDITO_ROTATIVO'
+                      ? 'O movimento de credito rotativo sera estornado e o lancamento OFX voltara para pendente.'
                   : 'O vinculo sera desfeito sem apagar o registro financeiro original, e o lancamento OFX voltara para pendente.'}
             </p>
-            <label className="mt-4 block text-sm">
-              <span className="mb-1 block font-medium">Motivo do estorno *</span>
-              <textarea className="input min-h-24 w-full resize-y" maxLength={255} value={estornoModal.motivo} onChange={(event) => setEstornoModal((current) => ({ ...current, motivo: event.target.value, error: '' }))} />
-            </label>
-            {estornoModal.error ? <div className="mt-3 alert alert-danger">{estornoModal.error}</div> : null}
-            <div className="mt-5 flex justify-end gap-2">
-              <button type="button" className="btn btn-outline" disabled={estornoModal.processing} onClick={() => setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' })}>Cancelar</button>
-              <button type="submit" className="btn btn-danger" disabled={estornoModal.processing || !String(estornoModal.motivo || '').trim()}>{estornoModal.processing ? 'Estornando...' : 'Confirmar estorno'}</button>
-            </div>
+          </div>
+
+          <form id={`form-estorno-${type}`} className="space-y-3 p-4" onSubmit={handleEstornarConciliacao}>
+              {/* Consentimento: o vinculo descrito aqui e o MESMO que
+                  `handleEstornarConciliacao` envia (o `alvo`, fixado antes
+                  do await). */}
+              <div className="rounded-xl border border-[var(--c-border)] bg-[var(--ui-surface-soft)] p-3 text-sm">
+                <strong className="block text-[var(--c-text)]">{vinculoAnalitico(estornoModal.item || {})}</strong>
+                <span className="text-[var(--c-muted)]">
+                  {formatDate(estornoModal.item?.data_movimento)} · {estornoModal.item?.conta || 'Conta nao identificada'}
+                </span>
+              </div>
+              <p className="text-sm text-[var(--c-muted)]">
+                O estorno fica registrado na auditoria e nao pode ser desfeito por esta tela.
+              </p>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium">Motivo do estorno *</span>
+                <textarea
+                  className="input w-full resize-y"
+                  rows={3}
+                  maxLength={255}
+                  value={estornoModal.motivo}
+                  onChange={(event) => setEstornoModal((current) => ({ ...current, motivo: event.target.value, error: '' }))}
+                />
+              </label>
+            {estornoModal.error ? <div className="app-alert app-alert--error">{estornoModal.error}</div> : null}
           </form>
-        </div>
+
+          <div data-modal="rodape" className="flex justify-end gap-2 border-t border-[var(--c-border)] p-4">
+            <button type="button" className="btn btn-outline" disabled={estornoModal.processing} onClick={() => setEstornoModal({ open: false, item: null, motivo: '', processing: false, error: '' })}>Cancelar</button>
+            <button type="submit" form={`form-estorno-${type}`} className="btn btn-outline btn-perigo-suave" disabled={estornoModal.processing || !String(estornoModal.motivo || '').trim()}>{estornoModal.processing ? 'Estornando...' : 'Confirmar estorno'}</button>
+          </div>
+        </OverlayModal>
       ) : null}
     </div>
   );
@@ -1307,22 +1409,33 @@ const REPORT_CATALOG = [
   }
 ];
 
+/*
+  R25 — o cartão da lista lateral trocou a paleta crua (blue/slate com
+  degrau) por tokens. O estado ATIVO deixou de depender só de fundo
+  colorido: ganhou `aria-current`, que é o que um leitor de tela usa, e a
+  borda de destaque vem do token primário.
+
+  R10 — o rótulo do grupo estava em 10px, abaixo do piso de 12px da
+  escala; foi para `text-xs` (12). Vale a decisão D4: leitura vence
+  densidade.
+*/
 function ReportListItem({ report, active, onClick }) {
   return (
     <button
       type="button"
+      aria-current={active ? 'true' : undefined}
       className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
         active
-          ? 'border-blue-300 bg-blue-50 shadow-sm'
-          : 'border-slate-200 bg-white hover:border-blue-200 hover:bg-slate-50'
+          ? 'border-[var(--c-primary)] bg-[var(--sem-info-bg)] shadow-sm'
+          : 'border-[var(--c-border)] bg-[var(--c-surface)] hover:border-[var(--c-primary)] hover:bg-[var(--ui-surface-soft)]'
       }`}
       onClick={onClick}
     >
-      <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+      <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-[var(--c-muted)]">
         {report.group}
       </span>
-      <span className="block text-sm font-semibold text-slate-950">{report.title}</span>
-      <span className="mt-1 block text-xs leading-relaxed text-slate-500">{report.description}</span>
+      <span className="block text-sm font-semibold text-[var(--c-text)]">{report.title}</span>
+      <span className="mt-1 block text-xs leading-relaxed text-[var(--c-muted)]">{report.description}</span>
     </button>
   );
 }
@@ -1372,12 +1485,16 @@ export default function FinanceiroRelatorios() {
 
   if (!selectedReport) {
     return (
-      <div className="page solicitacoes-page financeiro-relatorios-page">
+      <Pagina className="financeiro-relatorios-page">
+        <PageHeader
+          titulo="Relatorios Financeiros"
+          descricao="Nenhum relatorio liberado para o seu acesso."
+        />
         <div className="empty-state">
           <strong>Nenhum relatorio financeiro liberado.</strong>
           <span>Solicite ao administrador a permissao granular para acessar relatorios financeiros.</span>
         </div>
-      </div>
+      </Pagina>
     );
   }
 
@@ -1389,67 +1506,70 @@ export default function FinanceiroRelatorios() {
 
   if (isFullScreenMode && selectedReport.embedded) {
     return (
-      <div className="page solicitacoes-page financeiro-relatorios-page financeiro-relatorios-page--full">
-        <div className="app-page-header">
-          <div className="app-page-header-row">
-            <div>
-              <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
-                {selectedReport.group}
-              </span>
-              <h1 className="text-xl font-semibold md:text-2xl">{selectedReport.title}</h1>
-              <p className="page-subtitle">{selectedReport.description}</p>
-            </div>
-          </div>
-        </div>
+      <Pagina className="financeiro-relatorios-page financeiro-relatorios-page--full">
+        {/*
+          O grupo do relatório vira a CONTAGEM da faixa (renderiza em
+          <strong>, na linha de apoio) em vez de um texto solto de 11px
+          por cima do canvas — R5/B5 e R10 no mesmo movimento.
+        */}
+        {/*
+          SEM seta de voltar aqui, e a decisão é do trinco de navegação,
+          não minha: `scripts/trinco-navegacao.json` congela quantos
+          destinos cada arquivo escreve à mão, e o número só DESCE — o
+          `to:` desta seta fazia esta tela subir de 3 para 4 e reprovava o
+          `test:responsive`. A saída da tela inteira é o menu lateral e o
+          voltar do navegador; se o cliente quiser a seta, o caminho certo
+          é o destino entrar no `navigationConfig`, não mais um literal
+          aqui. Está anotado como decisão pendente no relatório da leva.
+        */}
+        <PageHeader
+          titulo={selectedReport.title}
+          contagem={selectedReport.group}
+          descricao={selectedReport.description}
+        />
 
         <div className="financeiro-relatorios-content">
           <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
-            <SelectedReportComponent isVisible={isVisible} />
+            <SelectedReportComponent isVisible={isVisible} embutido />
           </Suspense>
         </div>
-      </div>
+      </Pagina>
     );
   }
 
   return (
-    <div className="page solicitacoes-page financeiro-relatorios-page">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">
-              Financeiro
-            </span>
-            <h1 className="text-xl font-semibold md:text-2xl">Relatorios Financeiros</h1>
-            <p className="page-subtitle">
-              Escolha um relatorio na coluna lateral e trabalhe no painel principal sem perder contexto.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <Link to="/financeiro/contas-a-receber" className="btn btn-outline">
-              Contas a Receber
-            </Link>
-            <Link to="/financeiro/contas-a-pagar" className="btn btn-outline">
-              Contas a Pagar
-            </Link>
-            <Link to="/financeiro/cadastros" className="btn btn-outline">
-              Cadastros
-            </Link>
-          </div>
-        </div>
-      </div>
+    <Pagina className="financeiro-relatorios-page">
+      {/*
+        D3 — os três atalhos continuam VISÍVEIS, em contorno, na faixa
+        fixa. Eles são NAVEGAÇÃO, e por isso ficam como ações secundárias
+        do cabeçalho e nunca dentro do menu "⋯", onde a R11 os proíbe.
+      */}
+      <PageHeader
+        titulo="Relatorios Financeiros"
+        contagem={`${availableReports.length} relatorio(s) liberado(s)`}
+        descricao="Escolha um relatorio na coluna lateral e trabalhe no painel principal sem perder contexto."
+        secundarias={[
+          { rotulo: 'Contas a Receber', to: '/financeiro/contas-a-receber' },
+          { rotulo: 'Contas a Pagar', to: '/financeiro/contas-a-pagar' },
+          { rotulo: 'Cadastros', to: '/financeiro/cadastros' }
+        ]}
+      />
 
       <div className="financeiro-relatorios-layout grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
         <aside className="card sol-surface-card financeiro-relatorios-sidebar h-fit xl:sticky xl:top-4">
           <div className="border-b border-[var(--c-border)] px-4 py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Relatorios</h2>
-                <p className="text-xs text-slate-500">{availableReports.length} disponivel(is)</p>
-              </div>
-            </div>
+            <h2 className="text-lg font-semibold text-[var(--c-text)]">Relatorios</h2>
+            {/*
+              R16/F1 — UMA busca por contexto, ocupando a largura da faixa
+              do bloco (.app-busca: cresce entre 220 e 480px). A contagem
+              de disponíveis saiu daqui: ela já vive na faixa fixa do topo,
+              e repetir a mesma informação em dois lugares é B3.
+              R23 não se aplica: busca textual nunca tem botão.
+            */}
             <input
               type="search"
-              className="input mt-3 w-full input-sm"
+              className="input app-busca mt-3 w-full input-sm"
+              aria-label="Buscar relatorio"
               placeholder="Buscar relatorio..."
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -1467,7 +1587,7 @@ export default function FinanceiroRelatorios() {
                 />
               ))
             ) : (
-              <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
+              <div className="rounded-2xl border border-dashed border-[var(--c-border)] px-4 py-6 text-sm text-[var(--c-muted)]">
                 Nenhum relatorio encontrado para essa busca.
               </div>
             )}
@@ -1475,23 +1595,31 @@ export default function FinanceiroRelatorios() {
         </aside>
 
         <section className="financeiro-relatorios-content min-w-0">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-3 shadow-sm">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+              <span className="block text-xs font-bold uppercase tracking-wide text-[var(--c-muted)]">
                 {selectedReport.group}
               </span>
-              <h2 className="text-lg font-semibold text-slate-950">{selectedReport.title}</h2>
+              <h2 className="text-lg font-semibold text-[var(--c-text)]">{selectedReport.title}</h2>
             </div>
             <Link to={getReportFullScreenRoute(selectedReport)} className="btn btn-outline btn-sm">
               Abrir tela inteira
             </Link>
           </div>
 
+          {/*
+            `embutido` — este painel JÁ tem o cabeçalho do relatório logo
+            acima, e a página já tem a sua faixa fixa. Sem esta chave, a
+            tela filha (DRE, Financeiro de Obras…) desenhava a terceira: um
+            segundo `.app-page-header` grudando na mesma rolagem e o mesmo
+            título escrito duas vezes (R16/B3). Quem não conhece a prop
+            simplesmente a ignora — nenhum contrato muda (R21).
+          */}
           <Suspense fallback={<div className="app-empty-card">Carregando relatorio...</div>}>
-            <SelectedReportComponent isVisible={isVisible} />
+            <SelectedReportComponent isVisible={isVisible} embutido />
           </Suspense>
         </section>
       </div>
-    </div>
+    </Pagina>
   );
 }

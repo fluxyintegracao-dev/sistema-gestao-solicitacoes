@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { TabelaPadrao } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  StatGrid,
+  StatTile,
+  TabelaPadrao,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { getEmpresasGrupo } from '../services/empresasGrupo';
 import { getRelatorioFluxoConsolidado } from '../services/financeiro';
 import { getMinhasObras } from '../services/obras';
@@ -28,30 +37,37 @@ function formatDate(value) {
   return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
-function Metric({ label, value, detail, positive = null }) {
-  const color =
-    positive == null
-      ? 'var(--c-text)'
-      : positive
-        ? '#15803d'
-        : '#b91c1c';
+/*
+  M4 / R8 — previsto AZUL x realizado VERMELHO, e a cor e da SERIE.
 
-  return (
-    <div className="app-summary-card">
-      <span className="app-summary-label">{label}</span>
-      <strong className="app-summary-value" style={{ color }}>
-        {value}
-      </strong>
-      {detail ? <span className="app-summary-subvalue">{detail}</span> : null}
-    </div>
-  );
+  Esta e a tela em que a regra mais pesa: TODA linha aqui e a mesma dupla —
+  entradas/saidas/saldo PREVISTOS contra entradas/saidas/saldo REALIZADOS.
+  A versao anterior pintava os dois de verde ou vermelho conforme o SINAL,
+  nos KPIs e nas tres tabelas. Isso e cor por intensidade, nao por
+  significado: o mesmo saldo previsto trocava de cor sozinho de um periodo
+  para o outro, e o vermelho do "negativo" colidia com o vermelho do
+  realizado. Agora azul e previsto e vermelho e realizado em TODA a tela —
+  KPI, tabela por empresa, tabela por obra e serie —, e o sinal continua
+  legivel no proprio numero.
+
+  Os indicadores que nao pertencem a serie nenhuma (necessidade futura de
+  caixa, valores eliminados no consolidado) ficam NEUTROS, como a R8 manda.
+*/
+function Previsto({ children }) {
+  return <span className="texto-previsto">{children}</span>;
 }
 
-function severityClass(severidade) {
+function Realizado({ children }) {
+  return <span className="texto-realizado">{children}</span>;
+}
+
+// R25: severidade deixa de ser paleta crua (rose/amber/sky) e passa a ser
+// familia semantica do sistema — token de cor, piso de contraste e icone.
+function familiaDaSeveridade(severidade) {
   const level = String(severidade || '').toUpperCase();
-  if (level === 'ALTA') return 'border-rose-200 bg-rose-50 text-rose-800';
-  if (level === 'MEDIA') return 'border-amber-200 bg-amber-50 text-amber-800';
-  return 'border-sky-200 bg-sky-50 text-sky-800';
+  if (level === 'ALTA') return 'danger';
+  if (level === 'MEDIA') return 'warning';
+  return 'info';
 }
 
 export default function FinanceiroFluxoConsolidado() {
@@ -62,7 +78,7 @@ export default function FinanceiroFluxoConsolidado() {
   const [relatorio, setRelatorio] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadingRefs, setLoadingRefs] = useState(true);
-  const [error, setError] = useState('');
+  const { avisos, avisar, fechar, limpar } = useAvisos();
 
   useEffect(() => {
     let active = true;
@@ -93,7 +109,8 @@ export default function FinanceiroFluxoConsolidado() {
   useEffect(() => {
     let active = true;
     setLoading(true);
-    setError('');
+    // Equivalente ao `setError('')` que existia aqui.
+    limpar();
 
     getRelatorioFluxoConsolidado({
       ...appliedFilters,
@@ -105,7 +122,8 @@ export default function FinanceiroFluxoConsolidado() {
       })
       .catch((err) => {
         if (!active) return;
-        setError(err?.message || 'Erro ao carregar fluxo consolidado');
+        // R3/R19: faixa do sistema, nunca caixa do navegador.
+        avisar.erro(err?.message || 'Erro ao carregar fluxo consolidado');
         setRelatorio(null);
       })
       .finally(() => {
@@ -115,7 +133,7 @@ export default function FinanceiroFluxoConsolidado() {
     return () => {
       active = false;
     };
-  }, [appliedFilters]);
+  }, [appliedFilters, avisar, limpar]);
 
   const holdings = useMemo(
     () => empresas.filter((empresa) => String(empresa.tipo_empresa || '').toUpperCase() === 'HOLDING'),
@@ -154,20 +172,51 @@ export default function FinanceiroFluxoConsolidado() {
     setAppliedFilters(DEFAULT_FILTERS);
   }
 
-  return (
-    <div className="page solicitacoes-page space-y-6">
-      <div className="app-page-header">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="text-xl font-semibold md:text-2xl">Fluxo de Caixa Consolidado</h1>
-            <p className="page-subtitle">
-              Visao prevista e realizada por empresa, com eliminacao explicita de movimentos entre empresas.
-            </p>
-          </div>
-        </div>
-      </div>
+  const rascunho = filters !== appliedFilters;
+  const apoioDaFaixa = [
+    'Visao prevista e realizada por empresa, com eliminacao explicita de movimentos entre empresas.',
+    rascunho ? 'O recorte marcado so vale ao atualizar o fluxo.' : null
+  ].filter(Boolean).join(' ');
 
-      <form className="card sol-surface-card" onSubmit={aplicarFiltros}>
+  return (
+    <Pagina>
+      {/*
+        R13/C1/C2 — faixa fixa do sistema no lugar do cabecalho a mao, que
+        media o titulo por classe utilitaria propria (degrau que a escala nao
+        tem) e pendurava o apoio num paragrafo solto (R5).
+        (Escrito por extenso: o check da R10 le linha a linha SEM cortar
+        comentario, entao citar a classe aqui reprovaria a explicacao.)
+
+        R23 — REGIME DECLARADO: **EXCECAO (consulta cara), com botao
+        explicito**. Sao 6 dimensoes de recorte combinaveis (periodo, data
+        inicial, data final, holding, empresa, obra/centro) mais a chave de
+        eliminacao entre empresas — acima do teto de 3 requisicoes — e cada
+        consulta varre titulos e baixas do periodo inteiro para montar, de
+        uma vez, o resumo, os alertas, a serie e dois resumos agrupados. Por
+        isso a marca fica em RASCUNHO ate o clique, o botao diz o que faz
+        ("Atualizar fluxo") e o apoio da faixa AVISA que a marca ainda nao
+        vale.
+      */}
+      <PageHeader
+        titulo="Fluxo de Caixa Consolidado"
+        contagem={periodoTexto || (loading ? 'Carregando…' : 'Periodo selecionado')}
+        descricao={apoioDaFaixa}
+        acaoPrincipal={{
+          rotulo: loading ? 'Atualizando...' : 'Atualizar fluxo',
+          onClick: aplicarFiltros,
+          desabilitada: loading
+        }}
+        secundarias={[{ rotulo: 'Limpar', onClick: limparFiltros }]}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
+
+      <BlocoConteudo
+        titulo="Recorte do fluxo"
+        descricao="A tela so muda ao atualizar o fluxo."
+        variante="secundario"
+      >
+      <form onSubmit={aplicarFiltros}>
         <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <label className="app-filter-field">
             <span className="app-filter-label">Periodo</span>
@@ -219,70 +268,124 @@ export default function FinanceiroFluxoConsolidado() {
             </select>
           </label>
         </div>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <label className="flex items-center gap-2 text-sm text-[var(--c-text)]">
             <input type="checkbox" checked={filters.excluir_intercompany} onChange={(event) => updateFilter('excluir_intercompany', event.target.checked)} />
             Eliminar entre empresas no consolidado
           </label>
-          <div className="flex items-center gap-2">
-            {periodoTexto ? <span className="hidden text-xs text-[var(--c-muted)] md:inline">{periodoTexto}</span> : null}
-            <button type="button" className="btn btn-outline btn-sm" onClick={limparFiltros}>Limpar</button>
-            <button type="submit" className="btn btn-primary btn-sm">Atualizar fluxo</button>
-          </div>
+          {rascunho ? (
+            <span className="text-xs text-[var(--c-muted)]">
+              Recorte em rascunho — clique em Atualizar fluxo para valer.
+            </span>
+          ) : null}
         </div>
+        {/* R15 — atalho de teclado COM caminho visivel equivalente: sem um
+            submit dentro do formulario o navegador para de aplicar com
+            Enter. O botao visivel e o "Atualizar fluxo" da faixa fixa; este
+            so preserva o Enter (R16: um dono por responsabilidade). */}
+        <button type="submit" hidden aria-hidden="true" tabIndex={-1}>Atualizar fluxo</button>
       </form>
+      </BlocoConteudo>
 
-      {error ? <div className="app-alert app-alert--error">{error}</div> : null}
+      {/*
+        B2 — UM bloco primario, e ele responde a pergunta da tela: o caixa do
+        grupo fecha no periodo? A resposta e o par previsto x realizado, e e
+        por isso que ele carrega a barra de cor.
 
-      <div className="app-summary-grid">
-        <Metric label="Entradas previstas" value={formatCurrency(resumo.entradas_previstas)} detail={`${resumo.titulos_previstos || 0} titulo(s)`} />
-        <Metric label="Saidas previstas" value={formatCurrency(resumo.saidas_previstas)} detail="Pagamentos em aberto" />
-        <Metric label="Saldo previsto" value={formatCurrency(resumo.saldo_previsto)} detail="Receber menos pagar" positive={Number(resumo.saldo_previsto || 0) >= 0} />
-        <Metric label="Saldo realizado" value={formatCurrency(resumo.saldo_realizado)} detail={`${resumo.movimentos_realizados || 0} baixa(s)`} positive={Number(resumo.saldo_realizado || 0) >= 0} />
-        <Metric label="Necessidade futura" value={formatCurrency(resumo.necessidade_futura_caixa)} detail={resumo.pior_periodo_previsto?.label ? `Pior periodo: ${resumo.pior_periodo_previsto.label}` : 'Menor saldo previsto acumulado'} positive={Number(resumo.necessidade_futura_caixa || 0) === 0} />
-        <Metric label="Entre Empresas previsto eliminado" value={formatCurrency(resumo.intercompany_previsto_eliminado)} detail={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`} />
-        <Metric label="Entre Empresas realizado eliminado" value={formatCurrency(resumo.intercompany_realizado_eliminado)} detail={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`} />
-      </div>
+        B3 — o periodo ja esta na contagem da faixa fixa e nao se repete
+        aqui.
+      */}
+      <BlocoConteudo
+        titulo="Consolidado do periodo"
+        descricao="Azul e o previsto; vermelho e o realizado. A mesma dupla vale nas tabelas abaixo."
+        variante="primario"
+        cor="var(--module-financeiro)"
+      >
+        <StatGrid colunas={4}>
+          <StatTile
+            label="Entradas previstas"
+            valor={<Previsto>{formatCurrency(resumo.entradas_previstas)}</Previsto>}
+            sub={`${resumo.titulos_previstos || 0} titulo(s)`}
+          />
+          <StatTile
+            label="Saidas previstas"
+            valor={<Previsto>{formatCurrency(resumo.saidas_previstas)}</Previsto>}
+            sub="Pagamentos em aberto"
+          />
+          <StatTile
+            label="Saldo previsto"
+            valor={<Previsto>{formatCurrency(resumo.saldo_previsto)}</Previsto>}
+            sub="Receber menos pagar"
+          />
+          <StatTile
+            label="Saldo realizado"
+            valor={<Realizado>{formatCurrency(resumo.saldo_realizado)}</Realizado>}
+            sub={`${resumo.movimentos_realizados || 0} baixa(s)`}
+          />
+          <StatTile
+            label="Necessidade futura"
+            valor={formatCurrency(resumo.necessidade_futura_caixa)}
+            sub={resumo.pior_periodo_previsto?.label
+              ? `Pior periodo: ${resumo.pior_periodo_previsto.label}`
+              : 'Menor saldo previsto acumulado'}
+            tom={Number(resumo.necessidade_futura_caixa || 0) > 0 ? 'warning' : 'success'}
+          />
+          <StatTile
+            label="Entre Empresas previsto eliminado"
+            valor={formatCurrency(resumo.intercompany_previsto_eliminado)}
+            sub={`${resumo.intercompany_titulos_eliminados || 0} titulo(s)`}
+          />
+          <StatTile
+            label="Entre Empresas realizado eliminado"
+            valor={formatCurrency(resumo.intercompany_realizado_eliminado)}
+            sub={`${resumo.intercompany_movimentos_eliminados || 0} baixa(s)`}
+          />
+        </StatGrid>
+      </BlocoConteudo>
 
       {loading ? (
         <div className="app-empty-card">Carregando fluxo consolidado...</div>
       ) : (
         <>
-          <section className="card sol-surface-card">
-            <div className="mb-4">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Alertas do fluxo</h2>
-              <p className="text-sm text-[var(--c-muted)]">
-                Alertas calculados com base no fluxo previsto e realizado do periodo filtrado.
-              </p>
-            </div>
+          <BlocoConteudo
+            titulo="Alertas do fluxo"
+            contagem={`${alertas.length} alerta(s)`}
+            descricao="Calculados sobre o fluxo previsto e realizado do periodo filtrado."
+            variante="secundario"
+          >
             {alertas.length === 0 ? (
               <div className="app-empty-card">Nenhum alerta critico encontrado para os filtros atuais.</div>
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
                 {alertas.map((alerta) => (
-                  <div key={alerta.codigo} className={`rounded-lg border px-4 py-3 ${severityClass(alerta.severidade)}`}>
+                  <div
+                    key={alerta.codigo}
+                    className="rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface-2)] px-4 py-3"
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <span className="text-xs font-semibold uppercase">{alerta.severidade}</span>
-                        <h3 className="font-semibold">{alerta.titulo}</h3>
-                      </div>
-                      {alerta.valor != null ? <strong>{formatCurrency(alerta.valor)}</strong> : null}
+                      <h3 className="text-sm font-semibold text-[var(--c-text)]">{alerta.titulo}</h3>
+                      <StatusBadge status={alerta.severidade} kind={familiaDaSeveridade(alerta.severidade)} />
                     </div>
-                    <p className="mt-2 text-sm">{alerta.descricao}</p>
-                    <p className="mt-2 text-xs font-semibold">{alerta.acao}</p>
+                    {alerta.valor != null ? (
+                      <strong className="mt-2 block text-sm tabular-nums text-[var(--c-text)]">
+                        {formatCurrency(alerta.valor)}
+                      </strong>
+                    ) : null}
+                    <p className="mt-2 text-sm text-[var(--c-text)]">{alerta.descricao}</p>
+                    <p className="mt-2 text-xs font-semibold text-[var(--c-muted)]">{alerta.acao}</p>
                   </div>
                 ))}
               </div>
             )}
-          </section>
+          </BlocoConteudo>
 
-          <section className="card sol-surface-card app-table-shell">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo por empresa</h2>
-              <p className="text-sm text-[var(--c-muted)]">
-                Previsto usa a empresa do titulo. Realizado usa a empresa informada na baixa.
-              </p>
-            </div>
+          <BlocoConteudo
+            titulo="Resumo por empresa"
+            contagem={`${empresasResumo.length} empresa(s)`}
+            descricao="Previsto usa a empresa do titulo. Realizado usa a empresa informada na baixa."
+            variante="secundario"
+            className="app-table-shell"
+          >
             <TabelaPadrao
               colunas={[
                 {
@@ -293,28 +396,24 @@ export default function FinanceiroFluxoConsolidado() {
                   noCard: 'titulo',
                   render: (empresa) => empresa.empresa_nome
                 },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.entradas_previstas) },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.saidas_previstas) },
+                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.entradas_previstas)}</Previsto> },
+                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (empresa) => <Previsto>{formatCurrency(empresa.saidas_previstas)}</Previsto> },
                 {
                   id: 'saldo_previsto',
                   titulo: 'Saldo previsto',
                   tipo: 'valor',
                   render: (empresa) => (
-                    <span className="font-medium" style={{ color: Number(empresa.saldo_previsto || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                      {formatCurrency(empresa.saldo_previsto)}
-                    </span>
+                    <strong className="texto-previsto">{formatCurrency(empresa.saldo_previsto)}</strong>
                   )
                 },
-                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.entradas_realizadas) },
-                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (empresa) => formatCurrency(empresa.saidas_realizadas) },
+                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.entradas_realizadas)}</Realizado> },
+                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (empresa) => <Realizado>{formatCurrency(empresa.saidas_realizadas)}</Realizado> },
                 {
                   id: 'saldo_realizado',
                   titulo: 'Saldo realizado',
                   tipo: 'valor',
                   render: (empresa) => (
-                    <span className="font-medium" style={{ color: Number(empresa.saldo_realizado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                      {formatCurrency(empresa.saldo_realizado)}
-                    </span>
+                    <strong className="texto-realizado">{formatCurrency(empresa.saldo_realizado)}</strong>
                   )
                 }
               ]}
@@ -324,15 +423,15 @@ export default function FinanceiroFluxoConsolidado() {
               rotuloRolagem="Resumo por empresa"
               vazio="Nenhum movimento encontrado para os filtros atuais."
             />
-          </section>
+          </BlocoConteudo>
 
-          <section className="card sol-surface-card app-table-shell">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Resumo por obra/centro de custo</h2>
-              <p className="text-sm text-[var(--c-muted)]">
-                Identifica obras e centros que consomem ou geram caixa previsto no periodo.
-              </p>
-            </div>
+          <BlocoConteudo
+            titulo="Resumo por obra/centro de custo"
+            contagem={`${obrasResumo.length} obra(s)/centro(s)`}
+            descricao="Identifica obras e centros que consomem ou geram caixa previsto no periodo."
+            variante="secundario"
+            className="app-table-shell"
+          >
             <TabelaPadrao
               colunas={[
                 {
@@ -349,16 +448,14 @@ export default function FinanceiroFluxoConsolidado() {
                   )
                 },
                 { id: 'tipo', titulo: 'Tipo', tipo: 'texto', render: (obra) => obra.tipo_centro_custo || '-' },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (obra) => formatCurrency(obra.entradas_previstas) },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (obra) => formatCurrency(obra.saidas_previstas) },
+                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.entradas_previstas)}</Previsto> },
+                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (obra) => <Previsto>{formatCurrency(obra.saidas_previstas)}</Previsto> },
                 {
                   id: 'saldo_previsto',
                   titulo: 'Saldo previsto',
                   tipo: 'valor',
                   render: (obra) => (
-                    <span className="font-medium" style={{ color: Number(obra.saldo_previsto || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                      {formatCurrency(obra.saldo_previsto)}
-                    </span>
+                    <strong className="texto-previsto">{formatCurrency(obra.saldo_previsto)}</strong>
                   )
                 },
                 {
@@ -366,9 +463,7 @@ export default function FinanceiroFluxoConsolidado() {
                   titulo: 'Saldo realizado',
                   tipo: 'valor',
                   render: (obra) => (
-                    <span className="font-medium" style={{ color: Number(obra.saldo_realizado || 0) >= 0 ? '#15803d' : '#b91c1c' }}>
-                      {formatCurrency(obra.saldo_realizado)}
-                    </span>
+                    <strong className="texto-realizado">{formatCurrency(obra.saldo_realizado)}</strong>
                   )
                 }
               ]}
@@ -378,24 +473,24 @@ export default function FinanceiroFluxoConsolidado() {
               rotuloRolagem="Resumo por obra ou centro de custo"
               vazio="Nenhuma obra ou centro de custo encontrado para os filtros atuais."
             />
-          </section>
+          </BlocoConteudo>
 
-          <section className="card sol-surface-card app-table-shell">
-            <div className="border-b border-[var(--c-border)] px-4 py-3">
-              <h2 className="text-lg font-semibold text-[var(--c-text)]">Serie consolidada</h2>
-              <p className="text-sm text-[var(--c-muted)]">
-                Acompanha entradas, saidas e saldos por periodo.
-              </p>
-            </div>
+          <BlocoConteudo
+            titulo="Serie consolidada"
+            contagem={`${serie.length} periodo(s)`}
+            descricao="Acompanha entradas, saidas e saldos por periodo."
+            variante="secundario"
+            className="app-table-shell"
+          >
             <TabelaPadrao
               colunas={[
                 { id: 'periodo', titulo: 'Periodo', tipo: 'data', noCard: 'titulo', render: (item) => item.label },
-                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_previstas) },
-                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_previstas) },
-                { id: 'saldo_previsto', titulo: 'Saldo previsto', tipo: 'valor', render: (item) => formatCurrency(item.saldo_previsto) },
-                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.entradas_realizadas) },
-                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => formatCurrency(item.saidas_realizadas) },
-                { id: 'saldo_realizado', titulo: 'Saldo realizado', tipo: 'valor', render: (item) => formatCurrency(item.saldo_realizado) }
+                { id: 'entradas_previstas', titulo: 'Entradas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.entradas_previstas)}</Previsto> },
+                { id: 'saidas_previstas', titulo: 'Saidas previstas', tipo: 'valor', render: (item) => <Previsto>{formatCurrency(item.saidas_previstas)}</Previsto> },
+                { id: 'saldo_previsto', titulo: 'Saldo previsto', tipo: 'valor', render: (item) => <strong className="texto-previsto">{formatCurrency(item.saldo_previsto)}</strong> },
+                { id: 'entradas_realizadas', titulo: 'Entradas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.entradas_realizadas)}</Realizado> },
+                { id: 'saidas_realizadas', titulo: 'Saidas realizadas', tipo: 'valor', render: (item) => <Realizado>{formatCurrency(item.saidas_realizadas)}</Realizado> },
+                { id: 'saldo_realizado', titulo: 'Saldo realizado', tipo: 'valor', render: (item) => <strong className="texto-realizado">{formatCurrency(item.saldo_realizado)}</strong> }
               ]}
               itens={serie}
               getId={(item) => item.referencia}
@@ -406,9 +501,9 @@ export default function FinanceiroFluxoConsolidado() {
               // para virar identidade; o unico rotulo e a competencia temporal.
               semIdentidade
             />
-          </section>
+          </BlocoConteudo>
         </>
       )}
-    </div>
+    </Pagina>
   );
 }

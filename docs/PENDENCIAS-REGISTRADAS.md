@@ -1015,3 +1015,88 @@ Todos verificados no código antes de virarem item, nenhum corrigido.
   movimenta caixa, a resposta provavelmente é "sim, obrigatória". É decisão
   do responsável.
 
+---
+
+## O DEFEITO MAIS CARO DA LEVA: total que soma só a página, em tela de decisão
+
+**Quatro ocorrências independentes**, todas em `backend/src/services/relatorioFinanceiroService.js`,
+todas com a mesma forma: `findAll({ limit })` e **depois** somar o resumo
+sobre o que voltou. Verificadas no código, nenhuma corrigida — é agregação
+de dinheiro em backend.
+
+### T1 — `FinanceiroIntercompany`: o usuário acha que pagina e está mudando o total
+- **O pior dos quatro**, porque o teto é um **select visível** rotulado
+  "Limite" com "100 / 500 / 1000 registros". Trocar 1000 por 100 **muda o
+  valor previsto na manchete**. O rótulo faz parecer paginação de exibição;
+  é escolha de quanto do universo será somado.
+- A leva reescreveu o rótulo para "Teto de registros lidos" e avisa quando a
+  lista volta no teto. **O número continua parcial.**
+
+### T2 — `FinanceiroEndividamento`: a manchete subestima a dívida
+- O frontend pedia `limit: 500`, **metade do teto do backend**, e mostrava o
+  resultado sob o rótulo **"Endividamento aberto"**. Acima de 500 títulos em
+  aberto, a manchete subestima a dívida do grupo — e a abertura por empresa
+  **some com empresas inteiras**.
+
+### T3 — `FinanceiroRelatorioAnalitico`: total das 500 mais antigas
+- `limit: 500` na consulta ordenada por vencimento, e os totais somados
+  sobre esse recorte. Acima de 500 linhas, o total é o das 500 de vencimento
+  mais antigo.
+
+### T4 — `FinanceiroExecutivoGrupo`: herda T2 e T3, e vira RISCO
+- O painel executivo chama endividamento e entre-empresas sem `limit`
+  (default 1000 cada) e publica os resumos truncados. Pior: um deles vira
+  **cartão de risco executivo**.
+- **Consequência**: quem decide vê a dívida dos 1000 vencimentos mais
+  antigos como dívida do grupo, e um risco calculado sobre leitura parcial.
+
+### Mais duas, fora do serviço de relatórios
+- **`FinanceiroObras`** — limite padrão de **1000** movimentos, e os três
+  cartões de topo somam sobre as linhas truncadas. O acumulado da coluna
+  "Saldo" começa em zero na primeira linha **sobrevivente**, e o CSV exporta
+  só o truncado.
+- **`FinanceiroFinanciamentosBancarios`** — "Total contratado" soma no
+  máximo **200** contratos.
+
+### O que a leva fez, e o que ela NÃO fez
+Nenhuma fórmula, agregação ou payload mudou. O que mudou foi o **rótulo
+parar de afirmar o que o número não sustenta**: cada tela detecta em runtime
+se a lista voltou no teto e, só nesse caso, troca o título ("Total das linhas
+trazidas", "Endividamento aberto (lido)") e avisa no apoio.
+
+**Isso é mitigação, não conserto.** Um número marcado como parcial ainda é
+um número parcial em tela de decisão. O conserto é agregar no banco (`SUM`
+sobre o recorte) em vez de somar o que a página trouxe.
+
+---
+
+## Achados de sistema da fatia 3
+
+### S5 — `.app-input`, `.app-button`, `.app-card`: a `FinanceiroBancos` inteira era crua
+Três classes fantasma, 26 usos. O que a tela **parecia** ter e o que tinha:
+
+| Classe | Parecia | Era |
+|---|---|---|
+| `.app-card` | superfície branca com contorno e sombra | `<div>` **transparente** — título, métricas e as 7 seções eram **texto solto sobre o canvas** |
+| `.app-button` | alvo de 32/44px, tom por token, foco visível | `<button>` **cru**, ~21px de altura — incluindo o que **gera a remessa CNAB240** |
+| `.app-input` | altura, borda, raio, anel de foco | `<input>` **cru**, 15 campos sem nada |
+
+**O denominador**: classe fantasma **parece intenção**. Não há nada errado
+para ver — só uma coisa ausente que o olho preenche. Por isso atravessou
+todas as revisões.
+
+### S6 — `.link` e `.link-primary` numa tela JÁ ENTREGUE
+Fantasmas em `FinanceiroDda` (manifesto, matriz fechada) e em
+`ComprasRelatorioComprasDiretas`. Escapavam porque `link-` não estava na
+lista de prefixos do check — **a lição do rótulo, aplicada a prefixo**.
+Prefixo acrescentado; o limite continua existindo.
+
+### S7 — `overflow: hidden` no `index.css`, 39 seletores
+A R18 varria só `componentes-padrao.css` e os CSS de módulo. O `index.css`
+tem 11.800 linhas de CSS **de tela** — e é lá que o mecanismo mais mora.
+Entre os 39: `.financeiro-report-card` (ancestral de duas tabelas),
+`.app-dense-table-card`, `.financeiro-relatorios-page` (ancestral da faixa
+fixa) e `.modal-dialog`.
+**A regra nasceu de nove telas com a faixa fixa quebrada e não cobria o
+arquivo onde o defeito mais aparece.** Agora cobre, com trinco.
+

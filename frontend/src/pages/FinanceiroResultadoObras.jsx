@@ -1,5 +1,16 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import StatusBadge from '../components/StatusBadge';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  BarraFiltros,
+  alternarValorFiltro,
+  StatGrid,
+  StatTile,
+  Avisos,
+  useAvisos
+} from '../components/padrao';
 import { getResultadoObras } from '../services/financeiro';
 
 function formatCurrency(value) {
@@ -11,28 +22,42 @@ function formatPercent(value) {
   return `${Number(value).toFixed(1)}%`;
 }
 
-function ProgressBar({ value, max, color = 'var(--c-primary)' }) {
-  const pct = max > 0 ? Math.min(100, Math.max(0, (Number(value || 0) / max) * 100)) : 0;
+/*
+  M4 / R8 — previsto AZUL x realizado VERMELHO, e a cor e da SERIE.
+
+  Esta tela faz duas comparacoes, e as duas usam a MESMA dupla de cores no
+  cartao da obra, na barra de proporcao e no consolidado do topo:
+    - orcamento (previsto)      x executado/pago (realizado);
+    - total a receber (previsto) x recebido (realizado).
+
+  Antes o "executado" era AZUL — a cor do previsto — e o "recebido" era um
+  verde cru fora de token: duas series pintadas com a cor da terceira. E
+  exatamente o caso que a R8 chama de defeito ("um card azul e a tabela
+  vermelha para o MESMO custo").
+
+  Lucro/prejuizo, falta a receber e custo/referencia sao SALDO DERIVADO:
+  nao pertencem a serie nenhuma e ficam NEUTROS, como a R8 manda. O sinal
+  negativo continua legivel no proprio numero — e assim o vermelho da tela
+  significa uma coisa so: realizado.
+*/
+function Previsto({ children }) {
+  return <span className="texto-previsto">{children}</span>;
+}
+
+function Realizado({ children }) {
+  return <span className="texto-realizado">{children}</span>;
+}
+
+function BarraProporcao({ valor, max, serie }) {
+  const pct = max > 0 ? Math.min(100, Math.max(0, (Number(valor || 0) / max) * 100)) : 0;
   return (
-    <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--ui-border)]">
-      <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: color }} />
+    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--ui-border)]">
+      <div className={`h-full rounded-full ${serie}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
 
-function StatItem({ label, value, sub, color }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">{label}</span>
-      <span className="text-sm font-bold tabular-nums leading-tight" style={{ color: color || 'var(--c-text)' }}>
-        {value}
-      </span>
-      {sub ? <span className="text-[10px] text-[var(--c-muted)]">{sub}</span> : null}
-    </div>
-  );
-}
-
-function ObraCard({ obra }) {
+function ObraBloco({ obra }) {
   const classificacao = String(obra.classificacao || '').trim().toUpperCase();
   const isPrivada = classificacao === 'PRIVADA';
   const isPublica = classificacao === 'PUBLICA';
@@ -49,7 +74,6 @@ function ObraCard({ obra }) {
     valorReferenciaResultado > 0 ? valorReferenciaResultado - recebido : obra.receber.saldo
   ));
   const lucroPrejuizo = Number(obra.lucro_prejuizo ?? (recebido - executado));
-  const lucroPrejuizoColor = lucroPrejuizo > 0 ? '#10b981' : lucroPrejuizo < 0 ? '#ef4444' : 'var(--c-text)';
 
   const margemRealizada = executado > 0 && valorReferencia > 0
     ? ((executado / valorReferencia) * 100).toFixed(1)
@@ -58,134 +82,141 @@ function ObraCard({ obra }) {
   const pctExecutado = orcamento > 0 ? Math.min(100, (executado / orcamento) * 100) : 0;
   const pctRecebido = totalReceber > 0 ? Math.min(100, (recebido / totalReceber) * 100) : 0;
 
-  return (
-    <article className="overflow-hidden rounded-xl border bg-[var(--ui-surface)] border-[var(--ui-border)]">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3 border-b border-[var(--ui-border)]">
-        <div>
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-[var(--c-muted)]">
-            {obra.codigo || `#${obra.id}`}
-          </div>
-          <h3 className="mt-0.5 text-sm font-bold uppercase leading-tight text-[var(--c-text)]">{obra.nome}</h3>
-          {obra.cidade && (
-            <div className="mt-0.5 text-[10px] text-[var(--c-muted)]">{obra.cidade}</div>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {classificacao && (
-            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-              isPrivada
-                ? 'border-violet-200 bg-violet-50 text-violet-700'
-                : 'border-sky-200 bg-sky-50 text-sky-700'
-            }`}>
-              {classificacao}
-            </span>
-          )}
-          {obra.margem_custo_esperada != null && (
-            <span className="text-[10px] text-[var(--c-muted)]">
-              Margem {formatPercent(obra.margem_custo_esperada)}
-            </span>
-          )}
-        </div>
-      </div>
+  const apoio = [
+    obra.cidade || null,
+    obra.margem_custo_esperada != null ? `Margem ${formatPercent(obra.margem_custo_esperada)}` : null
+  ].filter(Boolean).join(' · ');
 
-      {/* Stats grid */}
-      <div className="px-4 py-3 grid grid-cols-2 gap-x-4 gap-y-3 border-b border-[var(--ui-border)]">
-        {isPrivada && (
-          <StatItem label="VGV" value={formatCurrency(obra.vgv)} />
-        )}
-        {isPublica && (
-          <StatItem label="Planilha geral" value={formatCurrency(obra.planilha_geral)} />
-        )}
-        {orcamento != null && (
-          <StatItem label="Orçamento" value={formatCurrency(orcamento)} />
-        )}
-        <StatItem
+  return (
+    <BlocoConteudo
+      variante="secundario"
+      titulo={obra.nome}
+      contagem={obra.codigo || `Obra ${obra.id}`}
+      descricao={apoio}
+      /* A etiqueta de classificacao continua ETIQUETA — a versao anterior a
+         pintava com paleta crua (violet/sky), que a R25 proibe; agora e a
+         pilula do sistema, com token e icone. `neutral` de proposito: a
+         classificacao nao e boa nem ruim, e o vermelho e o azul desta tela
+         ja pertencem a serie realizado/previsto (M4). */
+      acoes={classificacao ? <StatusBadge status={classificacao} kind="neutral" /> : null}
+    >
+      <StatGrid colunas={2}>
+        {isPrivada ? (
+          <StatTile label="VGV" valor={<Previsto>{formatCurrency(obra.vgv)}</Previsto>} />
+        ) : null}
+        {isPublica ? (
+          <StatTile label="Planilha geral" valor={<Previsto>{formatCurrency(obra.planilha_geral)}</Previsto>} />
+        ) : null}
+        {orcamento != null ? (
+          <StatTile label="Orcamento" valor={<Previsto>{formatCurrency(orcamento)}</Previsto>} />
+        ) : null}
+        <StatTile
           label="Executado (pago)"
-          value={formatCurrency(executado)}
+          valor={<Realizado>{formatCurrency(executado)}</Realizado>}
           sub={totalPagar > 0 ? `de ${formatCurrency(totalPagar)} empenhados` : undefined}
-          color="var(--c-primary)"
         />
-        <StatItem
+        <StatTile
+          label="A receber"
+          valor={<Previsto>{formatCurrency(totalReceber)}</Previsto>}
+        />
+        <StatTile
           label="Recebido"
-          value={formatCurrency(recebido)}
-          sub={totalReceber > 0 ? `de ${formatCurrency(totalReceber)} a receber` : undefined}
-          color="#10b981"
+          valor={<Realizado>{formatCurrency(recebido)}</Realizado>}
         />
-        <StatItem
-          label="Falta receber"
-          value={formatCurrency(faltaReceber)}
-          color={faltaReceber > 0 ? '#f59e0b' : undefined}
-        />
-        <StatItem
-          label="Lucro/Prejuizo"
-          value={formatCurrency(lucroPrejuizo)}
-          color={lucroPrejuizoColor}
-        />
-        {margemRealizada != null && (
-          <StatItem
-            label="Custo / Referência"
-            value={`${margemRealizada}%`}
+        <StatTile label="Falta receber" valor={formatCurrency(faltaReceber)} />
+        <StatTile label="Lucro/Prejuizo" valor={formatCurrency(lucroPrejuizo)} sub="Recebido menos executado" />
+        {margemRealizada != null ? (
+          <StatTile
+            label="Custo / Referencia"
+            valor={`${margemRealizada}%`}
             sub={`meta ${formatPercent(obra.margem_custo_esperada)}`}
           />
-        )}
-      </div>
+        ) : null}
+      </StatGrid>
 
-      {/* Progress bars */}
-      <div className="px-4 py-3 space-y-2">
-        {orcamento != null && (
+      <div className="mt-4 grid gap-3">
+        {orcamento != null ? (
           <div>
-            <div className="mb-1 flex justify-between text-[10px] text-[var(--c-muted)]">
-              <span>Executado / Orçamento</span>
-              <span>{pctExecutado.toFixed(1)}%</span>
+            <div className="mb-2 flex justify-between text-xs text-[var(--c-muted)]">
+              {/* R8: a legenda carrega a MESMA cor da serie que descreve. */}
+              <span>
+                <span className="texto-realizado">Executado</span>
+                {' / '}
+                <span className="texto-previsto">Orcamento</span>
+              </span>
+              <span className="tabular-nums">{pctExecutado.toFixed(1)}%</span>
             </div>
-            <ProgressBar value={executado} max={orcamento} color="var(--c-primary)" />
+            <BarraProporcao valor={executado} max={orcamento} serie="serie-realizada" />
           </div>
-        )}
-        {totalReceber > 0 && (
+        ) : null}
+        {totalReceber > 0 ? (
           <div>
-            <div className="mb-1 flex justify-between text-[10px] text-[var(--c-muted)]">
-              <span>Recebido</span>
-              <span>{pctRecebido.toFixed(1)}%</span>
+            <div className="mb-2 flex justify-between text-xs text-[var(--c-muted)]">
+              <span>
+                <span className="texto-realizado">Recebido</span>
+                {' / '}
+                <span className="texto-previsto">A receber</span>
+              </span>
+              <span className="tabular-nums">{pctRecebido.toFixed(1)}%</span>
             </div>
-            <ProgressBar value={recebido} max={totalReceber} color="#10b981" />
+            <BarraProporcao valor={recebido} max={totalReceber} serie="serie-realizada" />
           </div>
-        )}
+        ) : null}
       </div>
-    </article>
+    </BlocoConteudo>
   );
 }
+
+const DIMENSAO_CLASSIFICACAO = {
+  id: 'classificacao',
+  rotulo: 'Classificacao',
+  opcoes: [
+    { valor: 'PRIVADA', rotulo: 'Privada' },
+    { valor: 'PUBLICA', rotulo: 'Publica' }
+  ]
+};
 
 export default function FinanceiroResultadoObras() {
   const [dados, setDados] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [filtroClassificacao, setFiltroClassificacao] = useState('');
+  const [filtrosAtivos, setFiltrosAtivos] = useState({});
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    setError('');
 
     getResultadoObras()
       .then((data) => {
         if (active) setDados(Array.isArray(data) ? data : []);
       })
       .catch((err) => {
-        if (active) setError(err?.message || 'Erro ao carregar resultado de obras');
+        // R3/R19: faixa do sistema, nunca caixa do navegador.
+        if (active) avisar.erro(err?.message || 'Erro ao carregar resultado de obras');
       })
       .finally(() => {
         if (active) setLoading(false);
       });
 
     return () => { active = false; };
-  }, []);
+  }, [avisar]);
 
-  const obrasFiltradas = filtroClassificacao
-    ? dados.filter(o => String(o.classificacao || '').trim().toUpperCase() === filtroClassificacao)
-    : dados;
+  // Referencia estavel: sem o memo, o `new Set()` do caminho vazio nasceria
+  // a cada render e anularia os memos que dependem dele.
+  const marcadas = useMemo(() => filtrosAtivos.classificacao || new Set(), [filtrosAtivos]);
 
-  const resumo = obrasFiltradas.reduce((acc, obra) => {
+  const obrasFiltradas = useMemo(() => (
+    marcadas.size === 0
+      ? dados
+      : dados.filter((obra) => marcadas.has(String(obra.classificacao || '').trim().toUpperCase()))
+  ), [dados, marcadas]);
+
+  /*
+    O consolidado soma o RECORTE INTEIRO, nao uma pagina: a tela recebe a
+    lista completa do servico numa unica chamada e o filtro de classificacao
+    e aplicado aqui, sobre ela. Nao ha paginacao para o total desmentir.
+  */
+  const resumo = useMemo(() => obrasFiltradas.reduce((acc, obra) => {
     acc.orcamento += obra.orcamento || 0;
     acc.executado += obra.pagar.executado;
     acc.totalReceber += obra.receber.total;
@@ -202,74 +233,83 @@ export default function FinanceiroResultadoObras() {
     ));
     acc.lucroPrejuizo += Number(obra.lucro_prejuizo ?? (obra.receber.recebido - obra.pagar.executado));
     return acc;
-  }, { orcamento: 0, executado: 0, totalReceber: 0, recebido: 0, faltaReceber: 0, lucroPrejuizo: 0 });
+  }, { orcamento: 0, executado: 0, totalReceber: 0, recebido: 0, faltaReceber: 0, lucroPrejuizo: 0 }), [obrasFiltradas]);
 
   return (
-    <div className="page solicitacoes-page">
-      {/* Header */}
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Resultado de Obras</h1>
-            <p className="page-subtitle">Visão financeira consolidada por obra — orçado, executado e recebimento.</p>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        R13/C1/C2 — faixa fixa do sistema no lugar da linha solta de titulo
+        com paragrafo de apoio (R5). B3: a contagem de obras vive AQUI, e por
+        isso o cartao "Obras" saiu do consolidado — era o mesmo numero duas
+        vezes na mesma tela.
 
-      {/* Filtros + Resumo */}
-      <div className="card sol-surface-card">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex gap-2">
-            {[
-              { label: 'Todas', value: '' },
-              { label: 'Privadas', value: 'PRIVADA' },
-              { label: 'Públicas', value: 'PUBLICA' }
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                className={`btn btn-sm ${filtroClassificacao === opt.value ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setFiltroClassificacao(opt.value)}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
+        R23 — REGIME DECLARADO: **aplica ao marcar**. A tela tem UMA dimensao
+        de recorte (classificacao) e ela e resolvida NO NAVEGADOR, sobre a
+        lista ja carregada: marcar nao dispara requisicao nenhuma. Zero de
+        3 requisicoes e zero de 2 segundos — nao chega perto do criterio da
+        excecao, entao nao ha botao de "atualizar" nem marca em rascunho, e a
+        etiqueta do filtro nunca mente sobre o que ja mudou na tela.
+      */}
+      <PageHeader
+        titulo="Resultado de Obras"
+        contagem={loading ? 'Carregando…' : `${obrasFiltradas.length} obra(s)`}
+        descricao="Visao financeira consolidada por obra — orcado, executado e recebimento."
+      />
 
-          <div className="ml-auto flex flex-wrap items-center gap-4">
-            {[
-              { label: 'Obras', value: String(obrasFiltradas.length) },
-              { label: 'Orçamento', value: formatCurrency(resumo.orcamento) },
-              { label: 'Executado', value: formatCurrency(resumo.executado) },
-              { label: 'Total receber', value: formatCurrency(resumo.totalReceber) },
-              { label: 'Recebido', value: formatCurrency(resumo.recebido) },
-              { label: 'Falta receber', value: formatCurrency(resumo.faltaReceber) },
-              { label: 'Lucro/Prejuizo', value: formatCurrency(resumo.lucroPrejuizo) }
-            ].map((item) => (
-              <div key={item.label} className="flex flex-col items-end">
-                <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">{item.label}</span>
-                <span className="text-sm font-bold tabular-nums leading-tight text-[var(--c-text)]">{item.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {error && <div className="app-alert app-alert--error">{error}</div>}
+      {/*
+        R12/F2/F3 — o recorte era um trio de botoes de escolha unica, sem
+        etiqueta e sem estado combinavel. Agora e marcacao com etiqueta
+        removivel: nenhuma marca = todas as obras.
+      */}
+      <BlocoConteudo titulo="Recorte" variante="secundario">
+        <BarraFiltros
+          filtros={[DIMENSAO_CLASSIFICACAO]}
+          ativos={filtrosAtivos}
+          aoAlternar={(dimensao, valor, opcoes) => setFiltrosAtivos(
+            (atual) => alternarValorFiltro(atual, dimensao, valor, opcoes)
+          )}
+          aoLimpar={() => setFiltrosAtivos({})}
+        />
+      </BlocoConteudo>
+
+      {/*
+        B2 — UM bloco primario, e ele responde a pergunta da tela: as obras
+        do recorte estao gerando ou consumindo dinheiro? Os cartoes por obra
+        abrem esse numero e por isso sao secundarios.
+      */}
+      <BlocoConteudo
+        titulo="Consolidado do recorte"
+        descricao="Soma de todas as obras marcadas acima."
+        variante="primario"
+        cor="var(--module-financeiro)"
+      >
+        <StatGrid colunas={3}>
+          <StatTile label="Orcamento" valor={<Previsto>{formatCurrency(resumo.orcamento)}</Previsto>} />
+          <StatTile label="Executado" valor={<Realizado>{formatCurrency(resumo.executado)}</Realizado>} />
+          <StatTile label="Total a receber" valor={<Previsto>{formatCurrency(resumo.totalReceber)}</Previsto>} />
+          <StatTile label="Recebido" valor={<Realizado>{formatCurrency(resumo.recebido)}</Realizado>} />
+          <StatTile label="Falta receber" valor={formatCurrency(resumo.faltaReceber)} />
+          <StatTile
+            label="Lucro/Prejuizo"
+            valor={formatCurrency(resumo.lucroPrejuizo)}
+            sub="Recebido menos executado"
+          />
+        </StatGrid>
+      </BlocoConteudo>
 
       {loading ? (
-        <div className="app-empty-card">Carregando...</div>
+        <div className="app-empty-card">Carregando resultado de obras...</div>
       ) : obrasFiltradas.length === 0 ? (
-        <div className="app-empty-card">
-          <p className="text-sm text-[var(--c-muted)]">Nenhuma obra encontrada.</p>
-        </div>
+        <div className="app-empty-card">Nenhuma obra encontrada para o recorte marcado.</div>
       ) : (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {obrasFiltradas.map((obra) => (
-            <ObraCard key={obra.id} obra={obra} />
+            <ObraBloco key={obra.id} obra={obra} />
           ))}
-        </section>
+        </div>
       )}
-    </div>
+    </Pagina>
   );
 }

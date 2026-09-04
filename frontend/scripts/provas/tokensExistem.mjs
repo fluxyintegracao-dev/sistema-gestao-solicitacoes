@@ -66,12 +66,31 @@ for (const arquivo of telas) {
 
 /* Classes: só as do vocabulário do sistema (prefixos conhecidos), para não
    varrer utilitária do Tailwind, que não vive no CSS do projeto. */
-const PREFIXOS = /^(app-|sol-|fx-|form-|btn-|badge-|input-|modal-|page-|layout-|la-|cr-|premium-|hub-|login-)/;
+/*
+  A LISTA DE PREFIXOS É O LIMITE REAL DA COBERTURA (04/09).
+
+  É a lição do rótulo, aplicada a prefixo: o check cobre o vocabulário que
+  conhece. `.link` e `.link-primary` — fantasmas de verdade, uma delas numa
+  tela JÁ NO MANIFESTO com matriz fechada — escapavam porque `link-` não
+  estava aqui. Alarguei, mas o limite continua existindo: prefixo novo que
+  ninguém acrescentar continua invisível.
+*/
+const PREFIXOS = /^(app-|sol-|fx-|form-|btn-|badge-|input-|modal-|page-|layout-|la-|cr-|premium-|hub-|login-|link|alert-|card-|dash-|tarja-|stat-|nav-|tabela-|celula-|bloco-)/;
 for (const arquivo of telas) {
   const codigo = fs.readFileSync(arquivo, 'utf8')
     .replace(/\/\*[\s\S]*?\*\/|\/\/[^\n]*/g, (t) => t.replace(/[^\n]/g, ' '));
   const rel = path.relative(RAIZ, arquivo).replace(/\\/g, '/');
-  for (const m of codigo.matchAll(/className=(?:"([^"]*)"|'([^']*)')/g)) {
+  /*
+    Classe montada em VARIÁVEL escapava por construção — foi assim que
+    `badge badge-soft` sobreviveu numa tela inteira: ela morava numa
+    string devolvida por função, não num `className=`. Agora qualquer
+    literal de string com cara de lista de classes do sistema é varrido.
+  */
+  const literais = [
+    ...codigo.matchAll(/className=(?:"([^"]*)"|'([^']*)')/g),
+    ...codigo.matchAll(/(?:return|=)\s*(?:"([^"\n]{0,120})"|'([^'\n]{0,120})')\s*[;,)]/g)
+  ];
+  for (const m of literais) {
     for (const classe of (m[1] || m[2] || '').split(/\s+/).filter(Boolean)) {
       if (!PREFIXOS.test(classe) || classesDeclaradas.has(classe)) continue;
       const linha = codigo.slice(0, m.index).split('\n').length;
@@ -94,4 +113,50 @@ if (!porNome.size) {
   }
 }
 console.log(`\n[provas] tokens e classes existem: ${porNome.size === 0 ? 'ok' : `${porNome.size} fantasma(s)`}`);
-if (porNome.size) process.exitCode = 1;
+/*
+  TRINCO, e o motivo de não ser bloqueante direto: são 39 fantasmas
+  herdados, espalhados por telas que nenhuma leva tocou ainda. Reprovar
+  tudo hoje travaria quem está empurrando em paralelo — o mesmo argumento
+  do trinco da R19 e do de navegação.
+
+  O número SÓ DESCE: fantasma novo, ou contagem que sobe, reprova. Cada
+  leva zera os seus.
+
+  E a lição de por que este arquivo existe ligado ao `provas`: eu o escrevi
+  em 04/09 e NÃO O LIGUEI A NENHUM `npm run`. Ele ficou dias sendo rodado à
+  mão por quem lembrava. É a R20 na minha própria mão — check que ninguém
+  executa não é check, é arquivo.
+*/
+const TRINCO = path.join(RAIZ, 'scripts', 'trinco-fantasmas.json');
+const congelado = fs.existsSync(TRINCO)
+  ? JSON.parse(fs.readFileSync(TRINCO, 'utf8')).nomes || {}
+  : {};
+
+if (process.argv.includes('--gravar-trinco')) {
+  const nomes = Object.fromEntries(
+    [...porNome].map(([nome, { ocorrencias }]) => [nome, ocorrencias.length]).sort(([a], [b]) => a.localeCompare(b))
+  );
+  fs.writeFileSync(TRINCO, `${JSON.stringify({
+    regra: 'TOKEN E CLASSE FANTASMA',
+    criado_em: '2026-09-04',
+    porque: 'Token e classe que a tela usa e que NUNCA foram declarados. O CSS nao resolve, a declaracao e descartada, e o estilo nunca chega a tela. Classe fantasma e pior que valor errado: parece intencao. O numero SO DESCE.',
+    nomes
+  }, null, 2)}\n`);
+  console.log(`[fantasmas] trinco gravado: ${Object.keys(nomes).length} nome(s).`);
+}
+
+let regrediu = 0;
+for (const [nome, { ocorrencias }] of porNome) {
+  const antes = congelado[nome];
+  if (antes === undefined) {
+    console.log(`  REPROVA ${nome} é fantasma NOVO — declare a classe/token, ou use o nome que existe.`);
+    regrediu += 1;
+  } else if (ocorrencias.length > antes) {
+    console.log(`  REPROVA ${nome} subiu de ${antes} para ${ocorrencias.length} ocorrência(s). O trinco só desce.`);
+    regrediu += 1;
+  }
+}
+for (const nome of Object.keys(congelado)) {
+  if (!porNome.has(nome)) console.log(`  AVISO ${nome} zerou — remova a linha de scripts/trinco-fantasmas.json.`);
+}
+if (regrediu) process.exitCode = 1;
