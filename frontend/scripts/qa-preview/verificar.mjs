@@ -1167,6 +1167,9 @@ async function main() {
             // `minWidth` do CSS não serve de piso: a TabelaPadrao impõe o
             // mínimo em JS (160px por coluna), e o computado sai 0px. Medir
             // por aqui dava "piso de 0px" e reprovava tabela no limite.
+            // Desde 04/09 o piso vem PUBLICADO pelo componente, que é quem
+            // o conhece: `data-piso-largura` no `.app-table-shell`.
+            piso: Number(tabela.closest('.app-table-shell')?.dataset?.pisoLargura) || null,
             colunas: ths.length
           };
         });
@@ -1216,7 +1219,29 @@ async function main() {
           */
           const excesso = aposEncolher.tabela - aposEncolher.conteiner;
           const encolheu = antesDeEncolher ? antesDeEncolher.tabela - aposEncolher.tabela : 0;
-          const noPiso = noFundo;
+          /*
+            "NÃO ENCOLHEU" TEM DUAS CAUSAS OPOSTAS (04/09).
+
+            (a) a largura não é remedida — o defeito;
+            (b) a tabela JÁ ESTAVA no piso quando a janela era larga, e
+                por isso não tinha o que devolver. A `TabelaPadrao`
+                redistribui UMA coluna; as demais guardam a largura
+                declarada. Uma tabela cujas fixas já somam mais que o
+                contêiner nunca encolhe, e está certa: tem de rolar.
+
+            Encolher a janela não separa as duas — nas duas o número não
+            muda. O check escolhia a leitura acusatória e reprovou a
+            `FinanceiroRelatorioAnalitico` (3975px) com um motivo falso.
+
+            Agora o piso vem do componente, que é quem o conhece, e a
+            comparação decide. Quando o piso não está publicado (tabela
+            fora da TabelaPadrao), o item não vira FALHOU por inferência:
+            vira SEM DADO dizendo o que faltou medir.
+          */
+          const pisoPublicado = aposEncolher.piso;
+          const noPisoPeloComponente = Boolean(pisoPublicado)
+            && aposEncolher.tabela <= pisoPublicado + 24;
+          const noPiso = noFundo || noPisoPeloComponente;
           const rolaNoConteiner = aposEncolher.rolagem > aposEncolher.conteiner + 4;
 
           if (excesso <= 24) {
@@ -1224,10 +1249,20 @@ async function main() {
               estado: 'PASSOU',
               motivo: `sobra distribuída e tabela remedida ao encolher para 1366 (${aposEncolher.tabela}px em ${aposEncolher.conteiner}px)`
             };
+          } else if (encolheu < 8 && noPisoPeloComponente && rolaNoConteiner) {
+            resultado.itens.T4 = {
+              estado: 'PASSOU',
+              motivo: `tabela JÁ NASCE no piso (${aposEncolher.tabela}px contra piso declarado de ${pisoPublicado}px): as colunas fixas somam mais que o contêiner de ${aposEncolher.conteiner}px e não há o que devolver. A sobra rola DENTRO do contêiner, como manda a X3`
+            };
+          } else if (encolheu < 8 && !pisoPublicado) {
+            resultado.itens.T4 = {
+              estado: 'SEM DADO',
+              motivo: `a tabela não encolheu (${antesDeEncolher?.tabela}px → ${aposEncolher.tabela}px), e sem o piso publicado (data-piso-largura) NÃO DÁ para separar "a largura não é remedida" de "já estava no piso" — capacidade NÃO PROVADA`
+            };
           } else if (encolheu < 8) {
             resultado.itens.T4 = {
               estado: 'FALHOU',
-              motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela NÃO ENCOLHEU NADA (${antesDeEncolher?.tabela}px → ${aposEncolher.tabela}px) num contêiner de ${aposEncolher.conteiner}px — a largura não é remedida`
+              motivo: `ao reduzir a janela de 1920 para 1366 SEM recarregar, a tabela NÃO ENCOLHEU NADA (${antesDeEncolher?.tabela}px → ${aposEncolher.tabela}px) num contêiner de ${aposEncolher.conteiner}px, e o piso declarado é ${pisoPublicado}px — havia ${aposEncolher.tabela - pisoPublicado}px para devolver e a largura não foi remedida`
             };
           } else if (noPiso && rolaNoConteiner) {
             resultado.itens.T4 = {

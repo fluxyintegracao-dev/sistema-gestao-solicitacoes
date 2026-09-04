@@ -713,6 +713,34 @@ export default function TabelaPadrao({
     return { ...coluna, largura: Math.max(piso, larguraDisponivel - fixas - 12) };
   });
 
+  /*
+    O PISO DA TABELA, PUBLICADO PARA QUEM MEDE (04/09).
+
+    A distribuição da sobra mexe em UMA coluna — a de conteúdo. As demais
+    guardam a largura declarada (ou a que o usuário arrastou). Logo, uma
+    tabela cujas colunas fixas já somam mais que o contêiner NÃO TEM COMO
+    encolher: a de conteúdo já está no seu piso e as outras não cedem. O
+    certo, nesse caso, é rolar dentro do contêiner.
+
+    O harness não conseguia distinguir isso de "a largura não é remedida" —
+    nos dois casos a tabela não muda quando a janela encolhe — e reprovava
+    a `FinanceiroRelatorioAnalitico` (3975px) com um motivo FALSO: a
+    largura é remedida a cada render, só não há o que devolver.
+
+    Duas leituras opostas do mesmo número, e o check escolhia a acusatória.
+    A saída não é afrouxar o check: é dar a ele o dado que falta. O piso é
+    conhecido AQUI — some as fixas com o piso da de conteúdo — e sai no DOM
+    para quem mede comparar com a largura real.
+  */
+  const pisoDaTabela = Math.round(colunasBase.reduce(
+    (soma, c, j) => soma + (j === indiceFlex
+      ? Math.max(Number(c.minWidth || 160), 160)
+      : Number(larguraReal(c) || 140)),
+    (acoesLinha ? larguraAcoesEfetiva : 0)
+      + (selecao ? LARGURA_SELECAO : 0)
+      + (linhaExpansivel ? LARGURA_EXPANDIR : 0)
+  ));
+
   if (carregando) {
     return (
       <div className="empty-state" role="status">
@@ -903,7 +931,7 @@ export default function TabelaPadrao({
   };
 
   return (
-    <div className="app-table-shell app-tabela" ref={shellRef}>
+    <div className="app-table-shell app-tabela" ref={shellRef} data-piso-largura={pisoDaTabela}>
       {(colunasConfiguraveis || acoesTabela) ? (
         <div className="app-tabela-barra">
           {acoesTabela}
