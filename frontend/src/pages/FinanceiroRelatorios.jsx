@@ -1540,19 +1540,32 @@ export default function FinanceiroRelatorios() {
   return (
     <Pagina className="financeiro-relatorios-page">
       {/*
-        D3 — os três atalhos continuam VISÍVEIS, em contorno, na faixa
-        fixa. Eles são NAVEGAÇÃO, e por isso ficam como ações secundárias
-        do cabeçalho e nunca dentro do menu "⋯", onde a R11 os proíbe.
+        NAVEGAÇÃO SAIU DA FAIXA (decisão do cliente, 04/09) — e com ela
+        acaba um conflito entre duas regras nossas.
+
+        A faixa trazia três atalhos — Contas a Receber, Contas a Pagar e
+        Cadastros — como ações secundárias. A D3 os pôs ali por eliminação:
+        a R11 proíbe navegação dentro do menu "⋯", então sobrou a barra de
+        ações. Só que a C6 proíbe exatamente isso: navegação vestida de
+        ação. As duas regras se empurravam porque a premissa das duas
+        estava errada.
+
+        A resolução: os dois lugares — o menu "⋯" e a barra de ações — são
+        para ações SOBRE ESTA TELA. Caminho para outra tela não pertence a
+        nenhum dos dois. Ele mora no hub do módulo, no breadcrumb e no
+        Ctrl+K, que existem para isso.
+
+        Conferido antes de remover: os três destinos estão no hub do
+        Financeiro (`fin-receber`, `fin-pagar`, `fin-cadastros` no
+        navigationConfig), então nada ficou inalcançável — e os dois
+        primeiros ganham de brinde a URL nova com o recorte declarado
+        (D2), em vez dos endereços antigos que só sobrevivem por
+        redirecionamento.
       */}
       <PageHeader
         titulo="Relatorios Financeiros"
         contagem={`${availableReports.length} relatorio(s) liberado(s)`}
         descricao="Escolha um relatorio na coluna lateral e trabalhe no painel principal sem perder contexto."
-        secundarias={[
-          { rotulo: 'Contas a Receber', to: '/financeiro/contas-a-receber' },
-          { rotulo: 'Contas a Pagar', to: '/financeiro/contas-a-pagar' },
-          { rotulo: 'Cadastros', to: '/financeiro/cadastros' }
-        ]}
       />
 
       <div className="financeiro-relatorios-layout grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">

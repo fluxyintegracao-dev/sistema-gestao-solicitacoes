@@ -657,3 +657,53 @@ no `frontend/scripts/telas-reformadas.json`.
 - **Provado nos dois sentidos na mesma execução**: a exceção vazia da
   `FinanceiroDre` reprovou; as duas da `ObraTipoApropriacao`, que cobrem
   violações reais, passaram.
+
+## Onde a NAVEGAÇÃO mora — a resolução do conflito R11 × C6 (04/09)
+
+Decisão do cliente, tomada sobre um caso concreto: a `FinanceiroRelatorios`
+tinha três atalhos de navegação na faixa fixa, e duas regras nossas
+brigavam por causa deles.
+
+- **R11** proíbe navegação dentro do menu de ações "⋯".
+- **C6** proíbe navegação vestida de ação na barra de ações.
+
+A tela tinha ido para a barra de ações **por eliminação** (decisão D3): se
+o menu "⋯" está vedado, sobra a barra. E aí a C6 acusava.
+
+**A premissa das duas leituras estava errada.** O menu "⋯" e a barra de
+ações são, os dois, para **ações SOBRE ESTA TELA**. Caminho para OUTRA tela
+não pertence a nenhum dos dois — não é um lugar melhor que o outro, é fora
+do escopo dos dois.
+
+### A regra
+
+| Isto é… | Mora em |
+|---|---|
+| **Ação sobre esta tela** (salvar, baixar, importar, arquivar) | barra de ações; as raras, no menu "⋯" |
+| **Caminho para outra tela** | **hub do módulo**, **breadcrumb** e **Ctrl+K** |
+
+Os três existem exatamente para isso: o hub reúne os destinos do módulo, o
+breadcrumb devolve à hierarquia, a busca alcança qualquer um por nome.
+
+**Duas exceções, ambas já registradas e ambas com o mesmo teste** — o
+destino é o retorno de quem já está aqui, não um atalho para outro lugar:
+
+- a **seta de voltar** do cabeçalho em tela de detalhe/registro (R11
+  revisto, 02/09);
+- as telas **fora do shell**, onde não existe menu nem breadcrumb e o link
+  é a única saída (escopo da C6/R11, 03/09).
+
+### O que fazer antes de remover um atalho
+
+**Conferir que o destino está no hub.** Tirar o link sem essa conferência
+troca "navegação no lugar errado" por **porta de entrada ausente** (família
+E1/E2), que é defeito pior: a tela existe, tem rota, e ninguém chega. No
+caso que originou a regra, os três destinos já estavam no
+`navigationConfig` (`fin-receber`, `fin-pagar`, `fin-cadastros`) — e os dois
+primeiros ganharam de brinde a URL nova com o recorte declarado (D2), em vez
+dos endereços antigos que só sobreviviam por redirecionamento.
+
+**Por que a regra vale mais que o caso:** duas regras que se contradizem
+não são duas regras, são uma pergunta em aberto — e enquanto ela fica em
+aberto, cada tela resolve do seu jeito. Foi o que aconteceu aqui por dois
+dias.
