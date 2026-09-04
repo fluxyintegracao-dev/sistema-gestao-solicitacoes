@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { parse as parseJsx } from '@babel/parser';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -119,6 +120,12 @@ function inventariarRotasDoApp() {
   return [...encontradas].sort();
 }
 
+function lerTrincoFiltros() {
+  const alvo = path.join(frontendRoot, 'scripts', 'trinco-filtros-select.json');
+  if (!fs.existsSync(alvo)) return { arquivos: {} };
+  return JSON.parse(fs.readFileSync(alvo, 'utf8'));
+}
+
 function lerTrincoGrid() {
   const alvo = path.join(frontendRoot, 'scripts', 'trinco-medidas-grid.json');
   if (!fs.existsSync(alvo)) return { arquivos: {} };
@@ -137,6 +144,7 @@ export function validarLayout() {
     if (!manifesto.telas.includes(extra)) manifesto.telas.push(extra);
   }
   const trincoGrid = lerTrincoGrid();
+  const trincoFiltros = lerTrincoFiltros();
   const falhas = [];
   const avisos = [];
 
@@ -326,10 +334,49 @@ export function validarLayout() {
     // Select de FORMULÁRIO (entrada de dado) e seletor de CONTEXTO (qual
     // registro editar) continuam legítimos — a heurística mira selects
     // cujo estado/aria fala em filtro/situação.
+    /*
+      O CHECK PROCURAVA VOCABULARIO, E O SISTEMA FALA DUAS LINGUAS (04/09).
+
+      A heuristica era `/filtr|situacao|situação/i` no entorno do <select>.
+      Doze telas do Financeiro nomeiam o estado em INGLES — `filters.periodo`,
+      `setFilter`, `updateFilter` — e passaram verdes por isso, dentro de
+      `<label className="app-filter-field">`, que e a faixa de filtros do
+      proprio sistema. Uma leva inteira fechou com matriz limpa e a regra
+      nao estava sendo aplicada em 58 selects.
+
+      Duas mudancas, para nao repetir o erro com outra palavra:
+
+      1. VOCABULARIO nas duas linguas (o codigo tem as duas, e vai continuar
+         tendo);
+      2. SINAL ESTRUTURAL, que nao depende de como alguem batizou a variavel:
+         estar dentro da faixa de filtros do sistema (`app-filter-field`,
+         `app-filter-label`, `app-filters-grid`, `solicitacoes-filtros`).
+
+      O segundo e o que vale: nome de variavel e escolha de quem escreveu, a
+      classe da faixa e do desenho. Check que depende so de vocabulario mede
+      quem escreveu, nao o que foi feito.
+
+      O QUE ELE AINDA NAO VE, declarado de proposito: select de filtro fora
+      da faixa e com nome que nao lembra filtro em lingua nenhuma. Nao ha
+      sinal estatico para esse caso — a leitura humana continua sendo o
+      recurso, e por isso este comentario existe em vez de um silencio.
+
+      TRINCO: as 58 ocorrencias de telas ja aprovadas ficam congeladas. Nao e
+      absolvicao — e o registro de que existem e a garantia de que nao
+      aumentam. A decisao sobre corrigi-las e do responsavel, porque mexer
+      nelas reabre uma leva fechada.
+    */
+    const VOCAB_FILTRO = /filtr|filter|situacao|situação|recorte/i;
+    const FAIXA_FILTRO = /app-filter-field|app-filter-label|app-filters-grid|solicitacoes-filtros/;
+    let r12Vistos = 0;
+    const r12Permitido = trincoFiltros.arquivos?.[tela] || 0;
     for (const sel of codigo.matchAll(/<select[\s\S]{0,260}?>/g)) {
-      if (/filtr|situacao|situação/i.test(sel[0])) {
-        aponta(linhaDe(sel.index) - 1, 'R12', 'select usado como FILTRO — filtros são marcáveis (BarraFiltros: busca larga em cima, botões de marcação, etiquetas removíveis), nunca lista suspensa de escolha única.');
-      }
+      const entorno = codigo.slice(Math.max(0, sel.index - 260), sel.index + sel[0].length);
+      if (!VOCAB_FILTRO.test(sel[0]) && !FAIXA_FILTRO.test(entorno)) continue;
+      const msg = 'select usado como FILTRO — filtros são marcáveis (BarraFiltros: busca larga em cima, botões de marcação, etiquetas removíveis), nunca lista suspensa de escolha única.';
+      if (r12Vistos < r12Permitido) avisos.push(`${tela}:${linhaDe(sel.index) - 1} [R12] ${msg} (congelado no trinco)`);
+      else aponta(linhaDe(sel.index) - 1, 'R12', msg);
+      r12Vistos += 1;
     }
   }
 
@@ -339,6 +386,9 @@ export function validarLayout() {
   avisos.push(...r18.avisos);
   // A R18 também no JSX: o CSS era só metade do problema.
   falhas.push(...validarOverflowEmJsx().falhas);
+  // A terceira forma da R18: a classe do Tailwind. Precisa da lista de telas
+  // porque a checagem é por ÁRVORE — só reprova quem é ancestral de sticky.
+  falhas.push(...validarOverflowEmClasse(manifesto.telas).falhas);
 
   // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
   // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a
@@ -920,6 +970,82 @@ function validarOverflowEmJsx() {
       const linha = codigo.slice(0, achado.index).split('\n').length;
       falhas.push(`${tela}:${linha} [R18] \`overflow: 'hidden'\` em estilo inline — cria scrollport e MATA \`position: sticky\` de qualquer descendente (faixa fixa, coluna fixa), em silêncio. Para clipar sem criar scrollport use \`clip\`; para truncar texto, pareie com \`textOverflow\`.`);
     }
+  }
+  return { falhas };
+}
+
+/*
+  R18 EM CLASSE DO TAILWIND — a TERCEIRA metade da mesma regra (04/09).
+
+  A R18 nasceu varrendo CSS. Em 03/09 ganhou o `style={{ overflow: 'hidden' }}`.
+  E continuava cega para a forma mais comum de todas num projeto Tailwind:
+
+      <div className="card overflow-hidden">
+        <TabelaPadrao ... />
+      </div>
+
+  Seis telas de CRM tinham exatamente isso, e o levantamento as achou lendo o
+  codigo — nao o check. Tres formas de escrever a mesma coisa, tres rodadas
+  para conhecer todas: e a regra "de quantos jeitos isso e feito aqui?"
+  aplicada a propria R18.
+
+  POR QUE COM PARSER, E NAO COM REGEX. O que importa nao e ter a classe: e ser
+  ANCESTRAL de quem tem sticky. `overflow-hidden` num cartao decorativo e
+  legitimo — a propria regra declara isso em "Onde NAO vale (2)". Distinguir
+  os dois casos e ler a arvore, e um check que existe para pegar defeito
+  ESTRUTURAL nao pode ele mesmo adivinhar estrutura por indentacao.
+
+  Nasce SEM trinco porque o manifesto aprovado esta limpo: zero ocorrencias em
+  95 telas. Provado nos dois sentidos antes de ligar — planta numa tela
+  aprovada reprovou, e as seis do CRM (fora do manifesto) aparecem.
+*/
+function validarOverflowEmClasse(telas) {
+  const falhas = [];
+  const ALVO_STICKY = /^(TabelaPadrao|ResizableTable|ListaAvancada)$/;
+  const TEM_OVERFLOW = /\boverflow(?:-[xy])?-hidden\b/;
+
+  const nomeTag = (abertura) => (abertura?.name?.type === 'JSXIdentifier' ? abertura.name.name : '');
+  const classeDe = (el) => {
+    for (const attr of el.openingElement.attributes || []) {
+      if (attr.type !== 'JSXAttribute' || attr.name?.name !== 'className') continue;
+      if (attr.value?.type === 'StringLiteral') return attr.value.value;
+      if (attr.value?.type === 'JSXExpressionContainer') return JSON.stringify(attr.value.expression);
+    }
+    return '';
+  };
+  const percorre = (no, visita) => {
+    if (!no || typeof no !== 'object') return;
+    if (no.type === 'JSXElement' && visita(no) === false) return;
+    for (const chave of Object.keys(no)) {
+      if (chave === 'loc') continue;
+      const valor = no[chave];
+      if (Array.isArray(valor)) valor.forEach((f) => percorre(f, visita));
+      else if (valor && typeof valor === 'object') percorre(valor, visita);
+    }
+  };
+
+  for (const tela of telas) {
+    const caminho = path.join(frontendRoot, tela);
+    if (!fs.existsSync(caminho)) continue;
+    let ast;
+    try { ast = parseJsx(fs.readFileSync(caminho, 'utf8'), { sourceType: 'module', plugins: ['jsx'] }); }
+    catch { continue; }   // arquivo que nao parseia ja reprova no build
+
+    percorre(ast, (el) => {
+      if (!TEM_OVERFLOW.test(classeDe(el))) return true;
+      let sequestra = false;
+      percorre(el, (dentro) => {
+        if (dentro === el) return true;
+        if (ALVO_STICKY.test(nomeTag(dentro.openingElement)) || /\bsticky\b/.test(classeDe(dentro))) {
+          sequestra = true; return false;
+        }
+        return true;
+      });
+      if (sequestra) {
+        falhas.push(`${tela}:${el.loc.start.line} [R18] classe \`overflow-hidden\` em ancestral de tabela/elemento fixo — cria scrollport e MATA o \`position: sticky\` do cabeçalho da tabela e da coluna fixa, em silêncio. Use \`overflow-clip\`, que recorta sem criar scrollport.`);
+      }
+      return true;
+    });
   }
   return { falhas };
 }
