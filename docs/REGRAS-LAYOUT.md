@@ -97,13 +97,40 @@ automaticamente se sair do padrão.
   defeito. KPI que não pertence a nenhuma série (eficiência, saldo
   derivado) fica NEUTRO (cor de texto).
 
-## R9 — Cadastro raro abre em MODAL
+## R9 — Modal é para cadastro que INTERROMPE outro trabalho (revista em 04/09)
 
-- Formulário de uso esporádico (empresas do grupo, setores, tipos,
-  categorias) NÃO mora na tela: abre em modal (`OverlayModal`) pelo botão de
-  ação; a tela inteira fica com a listagem.
-- Cadastro de uso FREQUENTE no fluxo (pessoas/parceiros) mantém o padrão de
-  painel acima da lista (decisão registrada — reversível).
+O critério **não é a frequência** do cadastro. É o que a tela existe para
+fazer.
+
+| A tela existe PARA cadastrar | Cadastro INTERROMPE outro trabalho |
+|---|---|
+| o formulário fica **inline**, na tela | abre em **modal** (`OverlayModal`) |
+| ex.: status por setor, atalhos padrão, mapeamento de ações, páginas de modelo, status de pedido | ex.: cadastrar um credor no meio de uma solicitação, criar um parceiro durante um lançamento |
+| o modal atrapalha: obriga a abrir e fechar para fazer aquilo que se veio fazer | o modal protege: guarda o trabalho principal atrás dele e devolve a pessoa ao lugar |
+
+**Por que a frequência era o critério errado.** Ela mede quantas vezes se usa,
+não o que a pessoa foi ali fazer. Uma tela de configuração de status pode ser
+aberta uma vez por trimestre — e quando é aberta, cadastrar status é
+*exatamente* o trabalho. Esconder atrás de um botão o motivo pelo qual a
+pessoa abriu a tela é atrito, não organização.
+
+**Teste, quando estiver em dúvida**: se você tirar o formulário da tela,
+sobra tela? Se o que sobra é uma lista que ninguém abriria por si só, o
+formulário é a tela — fica inline.
+
+### Como esta regra nasceu errada, e como foi corrigida
+
+A versão anterior dizia "cadastro de uso esporádico abre em modal", com a
+frequência como critério. Na rodada 2 eu instruí cinco telas de configuração
+a mover o formulário para `OverlayModal` **citando essa regra**, e as cinco
+eram justamente telas que existem para cadastrar. O responsável reverteu a
+decisão e fixou o critério novo.
+
+Registro do erro, porque ele tem forma reconhecível: **a regra descrevia o
+sintoma que se vê com mais frequência (cadastro raro costuma interromper
+outro trabalho) em vez da causa (a interrupção)**. Regra escrita pelo
+sintoma acerta os casos comuns e erra os casos em que sintoma e causa se
+separam — e erra com a autoridade de estar escrita.
 
 ## R10 — Escala como única fonte de medida (e conforto de leitura)
 
