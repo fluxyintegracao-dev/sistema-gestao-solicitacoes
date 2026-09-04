@@ -39,7 +39,11 @@
     "src/pages/Login/index.jsx",
     "src/pages/RecuperarSenha.jsx",
     "src/pages/DefinirSenha.jsx",
-    "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx"
+    "src/modules/solicitacao-compra/pages/CotacaoFornecedorPublica.jsx",
+    "src/pages/FinanceiroTitulos.jsx",
+    "src/pages/FinanceiroTituloNovo.jsx",
+    "src/pages/FinanceiroTituloEditar.jsx",
+    "src/pages/FinanceiroCadastros.jsx"
   ],
   "excecoes_medidas": {
     "src/pages/ObraTipoApropriacao.jsx": "pivô de colunas dinâmicas: th com largura mínima própria e painel de escolha compacto embutido na célula"

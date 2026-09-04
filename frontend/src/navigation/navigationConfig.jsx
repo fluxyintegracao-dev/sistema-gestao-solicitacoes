@@ -341,9 +341,21 @@ export const NAV_MODULES = [
       || canAccessBoletos(user)
     ),
     children: [
-      { id: 'fin-receber', ordem: 20, label: 'Contas a Receber', desc: 'Títulos a receber em aberto e baixados.', icon: HiOutlineArrowDownCircle, to: '/financeiro/contas-a-receber', can: (user) => canAccessFinanceiro(user) },
+      /*
+        D2 (financeiro): o recorte da carteira passou a viver na URL. Os dois
+        itens continuam sendo dois destinos distintos no menu — só que agora
+        apontam para a porta única com o recorte declarado no endereço. Os
+        endereços antigos seguem alcançáveis por redirecionamento (App.jsx).
+
+        O `id` NÃO muda de propósito: a tela inicial e o atalho fixado são
+        gravados por ID (usuario_lista_preferencias) e o `to` é resolvido na
+        leitura, pela fonte única. Trocar o `id` apagaria a escolha de quem
+        já fixou "Contas a Pagar"; mantendo-o, a preferência passa a resolver
+        sozinha para a URL nova.
+      */
+      { id: 'fin-receber', ordem: 20, label: 'Contas a Receber', desc: 'Títulos a receber em aberto e baixados.', icon: HiOutlineArrowDownCircle, to: '/financeiro/titulos?tipo=receber', can: (user) => canAccessFinanceiro(user) },
       { id: 'fin-titulo-novo', fixavel: 'acao', ordem: 60, label: 'Novo Título', desc: 'Cadastre um título a pagar ou a receber.', icon: HiOutlinePlusCircle, to: '/financeiro/titulos/novo', can: (user) => canAccessFinanceiro(user) },
-      { id: 'fin-pagar', ordem: 10, label: 'Contas a Pagar', desc: 'Títulos a pagar por vencimento.', icon: HiOutlineArrowUpCircle, to: '/financeiro/contas-a-pagar', can: (user) => canAccessFinanceiro(user) },
+      { id: 'fin-pagar', ordem: 10, label: 'Contas a Pagar', desc: 'Títulos a pagar por vencimento.', icon: HiOutlineArrowUpCircle, to: '/financeiro/titulos?tipo=pagar', can: (user) => canAccessFinanceiro(user) },
       { id: 'fin-cheques', ordem: 110, label: 'Cheques de Terceiros', desc: 'Custódia e movimentação de cheques.', icon: HiOutlineCreditCard, to: '/financeiro/cheques-terceiros', can: (user) => canAccessFinanceiro(user) && hasPermissao(user, 'financeiro.cheques.visualizar') },
       { id: 'fin-baixas-compostas', ordem: 100, label: 'Baixas com Múltiplas Fontes', desc: 'Baixas compostas por várias origens de fundo.', icon: HiOutlineReceiptRefund, to: '/financeiro/baixas-compostas', can: (user) => canAccessFinanceiro(user) && hasPermissao(user, 'financeiro.baixas_compostas.visualizar') },
       { id: 'fin-bancos', ordem: 160, label: 'Bancos Enterprise', desc: 'Integrações bancárias corporativas.', icon: HiOutlineBuildingLibrary, to: '/financeiro/bancos', can: (user) => canAccessBancosEnterprise(user) },
@@ -633,11 +645,15 @@ export function resolverAtalhos(user, ids) {
 }
 
 // Destino fixável que corresponde à rota atual (para a estrela do topo).
-export function findFixableByPath(user, pathname) {
+export function findFixableByPath(user, pathname, search = '') {
   let best = null;
   for (const item of getFixableItems(user)) {
-    if (!isPathActive(pathname, item.to)) continue;
-    if (!best || stripHash(item.to).length > stripHash(best.to).length) {
+    if (!isPathActive(pathname, item.to, search)) continue;
+    // Destino COM query ganha do destino sem: é o mais específico que
+    // descreve a tela atual. Sem isto, /financeiro/titulos?tipo=pagar
+    // casaria também com a rota nua e a estrela ficaria ambígua.
+    const especificidade = (alvo) => stripHash(alvo).length + (partesDoDestino(alvo).busca ? 1000 : 0);
+    if (!best || especificidade(item.to) > especificidade(best.to)) {
       best = item;
     }
   }
@@ -647,24 +663,61 @@ export function findFixableByPath(user, pathname) {
   return best;
 }
 
-function stripHash(path) {
-  const idx = path.indexOf('#');
-  return idx >= 0 ? path.slice(0, idx) : path;
+/*
+  DESTINO COM QUERY STRING (04/09).
+
+  A D2 trouxe o recorte de Contas a Pagar/Receber para a URL
+  (`/financeiro/titulos?tipo=pagar`), e este é o PRIMEIRO item de menu do
+  sistema cujo `to` carrega query — todos os outros são só caminho.
+
+  `stripHash` cortava apenas o `#`, então o `to` inteiro, com `?tipo=...`,
+  era comparado contra um `pathname` que nunca tem query. Não casava com
+  nada, e sumiam de uma vez: o breadcrumb (virava só "Início"), a ESTRELA
+  da topbar — e com ela o botão de definir a tela inicial — e o título da
+  aba, que caía para "Fluxy".
+
+  Cortar o `?` e comparar só o caminho NÃO serve: `fin-receber` e
+  `fin-pagar` apontam para o mesmo caminho e empatariam, e a estrela
+  fixaria a carteira errada EM SILÊNCIO — defeito pior que o original,
+  porque parece funcionar.
+
+  Então a comparação passa a ser: o caminho tem de bater E, quando o
+  destino declara parâmetros, a URL atual tem de trazer todos eles com o
+  mesmo valor. Destino sem query segue casando como antes.
+*/
+function partesDoDestino(alvo) {
+  const semHash = alvo.indexOf('#') >= 0 ? alvo.slice(0, alvo.indexOf('#')) : alvo;
+  const corte = semHash.indexOf('?');
+  return corte >= 0
+    ? { caminho: semHash.slice(0, corte), busca: semHash.slice(corte + 1) }
+    : { caminho: semHash, busca: '' };
 }
 
-function isPathActive(currentPath, targetPath) {
-  const target = stripHash(targetPath);
-  return currentPath === target || currentPath.startsWith(`${target}/`);
+function stripHash(path) {
+  return partesDoDestino(path).caminho;
+}
+
+function isPathActive(currentPath, targetPath, currentSearch = '') {
+  const { caminho, busca } = partesDoDestino(targetPath);
+  const caminhoBate = currentPath === caminho || currentPath.startsWith(`${caminho}/`);
+  if (!caminhoBate) return false;
+  if (!busca) return true;
+  const atual = new URLSearchParams(currentSearch || '');
+  for (const [chave, valor] of new URLSearchParams(busca)) {
+    if ((atual.get(chave) || '').toLowerCase() !== valor.toLowerCase()) return false;
+  }
+  return true;
 }
 
 // Melhor correspondência da rota atual na árvore (para o breadcrumb).
 // Retorna { module, item } ou null quando a rota não pertence à árvore.
-export function findActiveNode(user, pathname) {
+export function findActiveNode(user, pathname, search = '') {
   let best = null;
   for (const mod of getVisibleModules(user)) {
     for (const item of mod.children) {
-      if (!isPathActive(pathname, item.to)) continue;
-      if (!best || stripHash(item.to).length > stripHash(best.item.to).length) {
+      if (!isPathActive(pathname, item.to, search)) continue;
+      const peso = (alvo) => stripHash(alvo).length + (partesDoDestino(alvo).busca ? 1000 : 0);
+      if (!best || peso(item.to) > peso(best.item.to)) {
         best = { module: mod, item };
       }
     }

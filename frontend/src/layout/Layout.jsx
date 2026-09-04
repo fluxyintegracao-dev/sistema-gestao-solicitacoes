@@ -52,10 +52,21 @@ function isComprasResponsiveRoute(pathname = '') {
 
 // Breadcrumb clicável: Início › Módulo › Tela. Lê a mesma fonte única
 // de navegação dos hubs e permite voltar a qualquer nível em um clique.
-function Breadcrumb({ user, pathname }) {
+/*
+  `busca` chega por PROP, não pelo `location` global.
+
+  Ao ligar o breadcrumb à query (destino com `?tipo=`, D2) a primeira
+  versão escreveu `location.search` aqui dentro — e `location` NÃO existe
+  neste escopo: é outro componente que chama `useLocation()`. A expressão
+  cairia no `window.location` do navegador e funcionaria POR ACIDENTE,
+  fora do ciclo de renderização do router: nenhuma re-renderização ao
+  mudar de rota, e nada em teste ou fixture, onde esse global não reflete
+  a rota do router.
+*/
+function Breadcrumb({ user, pathname, busca = '' }) {
   const hubMatch = pathname.match(/^\/hub\/([^/]+)/);
   const hubModule = hubMatch ? getVisibleModule(user, hubMatch[1]) : null;
-  const active = !hubMatch && pathname !== '/' ? findActiveNode(user, pathname) : null;
+  const active = !hubMatch && pathname !== '/' ? findActiveNode(user, pathname, busca) : null;
 
   return (
     <nav className="fx-breadcrumb" aria-label="Trilha de navegação">
@@ -219,7 +230,7 @@ export default function Layout() {
 
   const perfilUpper = String(user?.perfil || '').toUpperCase();
   const tituloDocumento = useMemo(() => {
-    const ativo = findActiveNode(user, location.pathname);
+    const ativo = findActiveNode(user, location.pathname, location.search);
     return ativo ? `${resolveLabel(ativo.item, user)} · ${brandLabel}` : brandLabel;
   }, [user, location.pathname, brandLabel]);
 
@@ -270,7 +281,7 @@ export default function Layout() {
                   <kbd className="fx-search-kbd hidden md:inline">Ctrl K</kbd>
                 </button>
 
-                <Breadcrumb user={user} pathname={location.pathname} />
+                <Breadcrumb user={user} pathname={location.pathname} busca={location.search} />
 
                 {/* Estrela de fixar a tela atual + fileira de atalhos
                     (ícones na cor do módulo, excedente no painel »). */}

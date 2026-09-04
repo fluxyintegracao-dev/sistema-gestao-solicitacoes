@@ -1030,8 +1030,33 @@ export default function App() {
 
         <Route path="comprovantes/upload" element={<FinanceiroRoute><UploadComprovantes /></FinanceiroRoute>} />
         <Route path="comprovantes/pendentes" element={<FinanceiroRoute><ComprovantesPendentes /></FinanceiroRoute>} />
-        <Route path="financeiro/contas-a-receber" element={<FinanceiroRoute><FinanceiroTitulos tipoFixo="RECEBER" /></FinanceiroRoute>} />
-        <Route path="financeiro/contas-a-pagar" element={<FinanceiroRoute><FinanceiroTitulos tipoFixo="PAGAR" /></FinanceiroRoute>} />
+        {/*
+          D2 (financeiro): PORTA ÚNICA COM O RECORTE NA URL.
+
+          Havia três rotas para o MESMO componente e o recorte chegava por
+          uma prop invisível (tipoFixo). Prop de rota não é endereço: não dá
+          para favoritar "só a pagar" nem mandar o link. Agora é
+          /financeiro/titulos?tipo=receber|pagar, e a tela lê o recorte da
+          própria URL.
+
+          R20 — as duas rotas antigas REDIRECIONAM preservando o recorte:
+          favorito, atalho fixado e tela inicial continuam chegando à mesma
+          lista, com a mesma carteira.
+
+          `replace` é OBRIGATÓRIO aqui, não estilo: o `Navigate` do router
+          empurra uma entrada no histórico por padrão, então sem ele o
+          "Voltar" do navegador cairia de novo no endereço antigo, que
+          redirecionaria de novo — a pessoa ficaria presa na tela sem
+          conseguir sair pelo Voltar.
+
+          PERMISSÃO: os três endereços eram guardados pelo MESMO
+          FinanceiroRoute (canAccessFinanceiro) — nenhum recorte exigia mais
+          que o outro, então não há permissão a preservar por recorte. O
+          destino continua sob esse guarda, e é ele que barra: quem não podia
+          ver "a pagar" segue sem ver, agora barrado na porta única.
+        */}
+        <Route path="financeiro/contas-a-receber" element={<Navigate to="/financeiro/titulos?tipo=receber" replace />} />
+        <Route path="financeiro/contas-a-pagar" element={<Navigate to="/financeiro/titulos?tipo=pagar" replace />} />
         <Route path="financeiro/titulos" element={<FinanceiroRoute><FinanceiroTitulos /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/novo" element={<FinanceiroRoute><FinanceiroTituloNovo /></FinanceiroRoute>} />
         <Route path="financeiro/titulos/:id/editar" element={<FinanceiroRoute><FinanceiroTituloEditar /></FinanceiroRoute>} />

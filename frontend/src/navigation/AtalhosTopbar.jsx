@@ -50,7 +50,7 @@ export default function AtalhosTopbar() {
   const painelRef = useRef(null);
 
   const telaAtual = useMemo(
-    () => findFixableByPath(user, location.pathname),
+    () => findFixableByPath(user, location.pathname, location.search),
     [user, location.pathname]
   );
   const telaFixada = telaAtual ? fixados.has(telaAtual.id) : false;

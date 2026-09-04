@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   HiOutlineAdjustmentsHorizontal,
   HiOutlineArrowDownTray,
   HiOutlineArrowUpTray,
-  HiOutlineDocumentChartBar,
   HiOutlineDocumentText,
   HiOutlineEye,
   HiOutlineMagnifyingGlass,
   HiOutlinePencilSquare,
   HiOutlinePlus,
-  HiOutlineSparkles,
   HiOutlineXMark
 } from 'react-icons/hi2';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,7 +37,19 @@ import { canDeleteTitulosFinanceiros, canImportTitulosFinanceiros, hasPermissao 
 import FinanceiroTitulosImportacaoPanel from '../components/financeiro/FinanceiroTitulosImportacaoPanel';
 import BaixaCompostaModal from '../components/financeiro/BaixaCompostaModal';
 import ChequePagamentoFields from '../components/financeiro/ChequePagamentoFields';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  StatGrid,
+  StatTile,
+  Paginacao,
+  TabelaPadrao,
+  CelulaDupla,
+  Avisos,
+  useAvisos,
+  useConfirmacao
+} from '../components/padrao';
 
 const FILTER_STORAGE_KEY = 'fluxy.financeiro.titulos.filters';
 const FILTER_VISIBILITY_STORAGE_PREFIX = 'fluxy.financeiro.titulos.visibleFilters';
@@ -110,6 +120,34 @@ const FILTER_DEFINITIONS = [
 ];
 
 const DEFAULT_VISIBLE_FILTER_IDS = FILTER_DEFINITIONS.map((item) => item.id);
+
+/*
+  D2 (decisão do cliente) — PORTA ÚNICA COM O RECORTE NA URL.
+
+  Antes existiam três rotas para esta mesma tela e o recorte chegava por
+  uma PROP invisível (`tipoFixo="RECEBER"` no App.jsx). Prop de rota não é
+  endereço: não dá para favoritar "só a pagar", não dá para mandar o link
+  por mensagem, e a tela não sabe dizer ao usuário de onde veio o corte.
+
+  Agora o recorte é `?tipo=receber|pagar` sobre `/financeiro/titulos`, e as
+  duas rotas antigas redirecionam preservando o corte (R20, no App.jsx) —
+  favorito, atalho fixado e tela inicial continuam chegando.
+
+  A prop continua aceita (R21: não se muda contrato de componente no meio
+  do caminho), mas a URL VENCE quando as duas falam: endereço é o que a
+  pessoa vê e compartilha.
+*/
+const RECORTES_TIPO = { RECEBER: 'receber', PAGAR: 'pagar' };
+
+function lerRecorteDaUrl(search) {
+  const bruto = String(new URLSearchParams(search).get('tipo') || '').trim().toUpperCase();
+  return bruto === 'PAGAR' || bruto === 'RECEBER' ? bruto : null;
+}
+
+function caminhoDoRecorte(tipo) {
+  const slug = RECORTES_TIPO[String(tipo || '').toUpperCase()];
+  return slug ? `/financeiro/titulos?tipo=${slug}` : '/financeiro/titulos';
+}
 
 function getDefaultFilters(tipo = 'RECEBER') {
   return {
@@ -258,7 +296,7 @@ function FinanceiroFilterAutocomplete({
       <span className="app-filter-label">{label}</span>
       <div className="relative">
         <input
-          className={`${inputClassName} ${browseEnabled ? 'pr-10' : ''}`}
+          className={`${inputClassName} ${browseEnabled ? 'pr-12' : ''}`}
           value={open ? query : selectedLabel}
           onFocus={() => {
             setQuery(selectedLabel);
@@ -283,7 +321,7 @@ function FinanceiroFilterAutocomplete({
         {browseEnabled ? (
           <button
             type="button"
-            className="absolute right-1 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
+            className="absolute right-1 top-1/2 z-10 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-[var(--c-border)] bg-[var(--c-surface)] text-[var(--c-primary)] shadow-sm transition-colors hover:border-[var(--c-primary)] hover:bg-[var(--c-bg)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--c-primary)] disabled:opacity-50"
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
               setOpen(false);
@@ -299,10 +337,10 @@ function FinanceiroFilterAutocomplete({
         ) : null}
       </div>
       {open && !disabled && (
-        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-2xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-slate-950">
+        <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-auto rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] p-1 shadow-xl">
           <button
             type="button"
-            className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100 dark:text-slate-100 dark:hover:bg-slate-800"
+            className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-[var(--c-text)] hover:bg-[var(--c-bg)]"
             onMouseDown={(event) => {
               event.preventDefault();
               handleSelect('', '');
@@ -311,7 +349,7 @@ function FinanceiroFilterAutocomplete({
             {allLabel}
           </button>
           {filteredOptions.length === 0 ? (
-            <div className="px-3 py-3 text-sm text-slate-500 dark:text-slate-400">{emptyLabel}</div>
+            <div className="px-3 py-3 text-sm text-[var(--c-muted)]">{emptyLabel}</div>
           ) : (
             filteredOptions.map((item) => {
               const itemLabel = getLabel(item);
@@ -320,7 +358,7 @@ function FinanceiroFilterAutocomplete({
                 <button
                   key={item.id}
                   type="button"
-                  className="w-full rounded-xl px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                  className="w-full rounded-xl px-3 py-2 text-left text-sm text-[var(--c-text)] hover:bg-[var(--c-bg)]"
                   onMouseDown={(event) => {
                     event.preventDefault();
                     handleSelect(String(item.id), itemLabel);
@@ -328,7 +366,7 @@ function FinanceiroFilterAutocomplete({
                 >
                   <span className="block font-semibold">{itemLabel}</span>
                   {description ? (
-                    <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{description}</span>
+                    <span className="block truncate text-xs text-[var(--c-muted)]">{description}</span>
                   ) : null}
                 </button>
               );
@@ -338,7 +376,7 @@ function FinanceiroFilterAutocomplete({
       )}
       {browseEnabled && browseOpen ? createPortal(
         <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-slate-950/55 p-0 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) setBrowseOpen(false);
@@ -350,28 +388,28 @@ function FinanceiroFilterAutocomplete({
             aria-modal="true"
             aria-label={browseTitle}
           >
-            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4 sm:px-5">
+            <header className="flex shrink-0 items-start justify-between gap-4 border-b border-[var(--c-border)] px-4 py-4">
               <div>
-                <h2 className="text-base font-semibold text-[var(--c-text)] sm:text-lg">{browseTitle}</h2>
-                <p className="mt-0.5 text-xs text-[var(--c-muted)]">{browseDescription}</p>
+                <h2 className="text-lg font-semibold text-[var(--c-text)]">{browseTitle}</h2>
+                <p className="mt-1 text-xs text-[var(--c-muted)]">{browseDescription}</p>
               </div>
               <button
                 type="button"
-                className="btn btn-outline btn-sm btn-square shrink-0"
+                className="btn btn-outline btn-sm shrink-0"
                 onClick={() => setBrowseOpen(false)}
                 title="Fechar"
                 aria-label="Fechar"
               >
-                <HiOutlineXMark className="h-5 w-5" />
+                <HiOutlineXMark className="h-4 w-4" />
               </button>
             </header>
 
-            <div className="shrink-0 border-b border-[var(--c-border)] px-4 py-3 sm:px-5">
+            <div className="shrink-0 border-b border-[var(--c-border)] px-4 py-3">
               <label className="app-filter-field">
                 <span className="app-filter-label">Pesquisar</span>
                 <div className="relative">
                   <input
-                    className="input w-full pr-10"
+                    className="input w-full pr-12"
                     value={browseQuery}
                     onChange={(event) => setBrowseQuery(event.target.value)}
                     placeholder={placeholder}
@@ -395,7 +433,7 @@ function FinanceiroFilterAutocomplete({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-3 sm:px-5">
+            <div className="min-h-0 flex-1 overflow-auto overscroll-contain px-3 py-3">
               {browseOptions.length === 0 ? (
                 <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-[var(--c-border)] px-4 text-center text-sm text-[var(--c-muted)]">
                   {emptyLabel}. Tente pesquisar por outro codigo, nome ou grupo.
@@ -412,7 +450,7 @@ function FinanceiroFilterAutocomplete({
                         type="button"
                         className={`flex w-full items-start justify-between gap-4 px-3 py-3 text-left transition-colors sm:px-4 ${
                           isSelected
-                            ? 'bg-blue-50 text-blue-950 dark:bg-blue-950/40 dark:text-blue-100'
+                            ? 'bg-[var(--sem-info-bg)] text-[var(--sem-info)]'
                             : 'text-[var(--c-text)] hover:bg-[var(--c-bg)]'
                         }`}
                         onClick={() => handleSelect(String(item.id), itemLabel)}
@@ -420,11 +458,11 @@ function FinanceiroFilterAutocomplete({
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold">{itemLabel}</span>
                           {description ? (
-                            <span className="mt-0.5 block text-xs text-[var(--c-muted)]">{description}</span>
+                            <span className="mt-1 block text-xs text-[var(--c-muted)]">{description}</span>
                           ) : null}
                         </span>
                         {isSelected ? (
-                          <span className="shrink-0 rounded-full bg-blue-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-blue-700 dark:bg-blue-900 dark:text-blue-200">
+                          <span className="badge badge-info shrink-0 uppercase tracking-wide">
                             Selecionada
                           </span>
                         ) : null}
@@ -579,15 +617,13 @@ function downloadCsv(filename, rows) {
   URL.revokeObjectURL(url);
 }
 
-function statusClass(status) {
-  const normalized = String(status || '').trim().toUpperCase();
-  if (normalized === 'PREVISAO') return 'app-status-pill bg-sky-100 text-sky-700';
-  if (normalized === 'QUITADO') return 'app-status-pill bg-emerald-100 text-emerald-700';
-  if (normalized === 'PARCIAL') return 'app-status-pill bg-amber-100 text-amber-700';
-  if (normalized === 'CANCELADO' || normalized === 'ESTORNADO') return 'app-status-pill bg-rose-100 text-rose-700';
-  return 'app-status-pill bg-slate-100 text-slate-700';
-}
-
+/*
+  R25 — `statusClass()` foi REMOVIDA (03/09): código morto, sem uma única
+  chamada no arquivo, carregando cinco pares de cor crua (sky/emerald/amber/
+  rose/slate) que o tema escuro não acompanha e que não passam pelo piso de
+  contraste do ThemeContext. Quem pinta status nesta tela é o `StatusBadge`,
+  que já lê token — a função só existia para reprovar.
+*/
 function isOverdue(titulo) {
   const normalized = String(titulo?.status || '').trim().toUpperCase();
   if (!['PREVISAO', 'ABERTO', 'PARCIAL'].includes(normalized)) return false;
@@ -812,16 +848,29 @@ function buildBaixaMassaForm(contasBancarias = [], total = 0) {
 
 export default function FinanceiroTitulos({ tipoFixo = null }) {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { avisos, avisar, fechar: fecharAviso } = useAvisos();
+  const { confirmar, elementoConfirmacao } = useConfirmacao();
   const canDeleteTitulos = canDeleteTitulosFinanceiros(user);
   const canImportTitulos = canImportTitulosFinanceiros(user);
-  const canAccessCadastros = hasPermissao(user, 'financeiro.cadastros.visualizar');
+  // `financeiro.cadastros.visualizar` só existia aqui para pintar um link
+  // de "ir para Cadastros" — link que a R11 tirou da barra de ações. A
+  // permissão continua sendo cobrada onde a tela de cadastros mora
+  // (FinanceiroRoute + o próprio menu); aqui não sobrou uso.
   const canExportTitulos = hasPermissao(user, 'financeiro.titulos.exportar');
   const canImportCodigos = hasPermissao(user, 'financeiro.titulos.importar_codigos');
   const canCreateBaixaComposta = hasPermissao(user, 'financeiro.baixas_compostas.criar')
     && hasPermissao(user, 'financeiro.baixas_compostas.confirmar');
-  const fixedTipo = ['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
-    ? String(tipoFixo).toUpperCase()
-    : null;
+  // D2: o recorte mora na URL. A prop `tipoFixo` sobrevive como fallback
+  // (contrato antigo do componente, R21), mas o endereço tem a palavra
+  // final — é ele que a pessoa favorita, compartilha e fixa como tela
+  // inicial.
+  const recorteDaUrl = lerRecorteDaUrl(location.search);
+  const fixedTipo = recorteDaUrl
+    || (['PAGAR', 'RECEBER'].includes(String(tipoFixo || '').toUpperCase())
+      ? String(tipoFixo).toUpperCase()
+      : null);
   const filterStorageKey = fixedTipo ? `${FILTER_STORAGE_KEY}.${fixedTipo.toLowerCase()}` : FILTER_STORAGE_KEY;
   const visibilityStoragePrefix = fixedTipo
     ? `${FILTER_VISIBILITY_STORAGE_PREFIX}.${fixedTipo.toLowerCase()}`
@@ -849,7 +898,6 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     }
   });
   const [appliedFilters, setAppliedFilters] = useState(null);
-  const location = useLocation();
   const [obras, setObras] = useState([]);
   const [parceiros, setParceiros] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -1170,6 +1218,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }), [titulos]);
 
   const hasConsulted = Boolean(appliedFilters);
+  /*
+    C2/B3 — a contagem da TELA mora na faixa fixa, e mora só lá. O que o
+    bloco de resultado diz é outra coisa: em que página se está. Antes o
+    mesmo número aparecia duas vezes com nomes diferentes.
+
+    `pagination.total` é o total do RECORTE (o backend devolve a contagem
+    junto da página); `titulos.length` é o que veio nesta página, e só
+    entra quando não há paginação.
+  */
+  const contagemCabecalho = hasConsulted && !loading
+    ? `${Number(pagination.total || titulos.length)} titulo(s)`
+    : null;
   const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
   const basicVisibleFilters = useMemo(
     () => FILTER_DEFINITIONS.filter((item) => item.group === 'basic' && visibleFilterSet.has(item.id)),
@@ -1371,17 +1431,26 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     });
   }
 
-  function setTipoFiltro(tipo) {
-    if (fixedTipo) return;
-    setDraftFilters({
-      ...getDefaultFilters(),
-      tipo
-    });
-    setAppliedFilters(null);
-    setTitulos([]);
-    setLoading(false);
-    setError('');
-    setSelectedTituloIds([]);
+  /*
+    D2: trocar de carteira é trocar de ENDEREÇO, não mexer num campo do
+    formulário. O clique navega para `/financeiro/titulos?tipo=…` e quem
+    reage é o efeito que já existia para `fixedTipo` — ele zera consulta,
+    seleção e paginação exatamente como esta função fazia à mão. Assim o
+    recorte tem um dono só (R16): a URL.
+  */
+  function irParaRecorte(tipo) {
+    // Clicar no botão JÁ ACESO não faz nada. Sem esta guarda, quem chega em
+    // `/financeiro/titulos` (sem recorte na URL, operando no padrão "a
+    // receber") e clicasse em "A receber" navegaria para `?tipo=receber` e
+    // veria a consulta inteira ser zerada pelo efeito de troca de carteira —
+    // um botão aceso apagando o trabalho de quem o clicou.
+    if ((fixedTipo || draftFilters.tipo) === tipo) return;
+    const destino = caminhoDoRecorte(tipo);
+    if (`${location.pathname}${location.search}` === destino) return;
+    // `replace`: trocar de carteira é refazer a mesma consulta, não avançar
+    // uma tela. Empilhar cada troca faria o Voltar percorrer carteira por
+    // carteira até sair da lista.
+    navigate(destino, { replace: true });
   }
 
   function submitFilters(event) {
@@ -1462,10 +1531,22 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       return;
     }
 
-    const confirmado = window.confirm(
-      `Excluir ${selectedTitulosExcluiveis.length} titulo(s) selecionado(s)? Eles sairao das telas e relatorios, mas ficarao preservados para auditoria.`
-    );
-    if (!confirmado) return;
+    /*
+      R19 + R21: modal do sistema, e o retorno se DESESTRUTURA. `confirmar()`
+      devolve { ok, texto } — objeto é sempre truthy, e ler o objeto como
+      booleano faria "Cancelar" EXCLUIR os títulos.
+
+      DoD (classe "consentimento"): o número citado e a coleção percorrida
+      pela ação são a MESMA — `selectedTitulosExcluiveis`, lida no mesmo
+      momento — e o texto declara que a tela não desfaz.
+    */
+    const { ok } = await confirmar({
+      titulo: 'Excluir títulos selecionados?',
+      mensagem: `${selectedTitulosExcluiveis.length} título(s) sairão das telas e dos relatórios, e ficarão preservados apenas para auditoria. Esta tela não desfaz a exclusão.`,
+      rotuloConfirmar: 'Excluir títulos',
+      destrutiva: true
+    });
+    if (!ok) return;
 
     try {
       setLoading(true);
@@ -1726,7 +1807,8 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         setError(`Alguns titulos nao foram baixados: ${falhas.join(' | ')}`);
       } else {
         setError('');
-        alert(`${selectedTitulosBaixaveis.length} titulo(s) baixado(s) com sucesso.`);
+        // R19: faixa do sistema, dentro da página, some sozinha em 6s.
+        avisar.sucesso(`${selectedTitulosBaixaveis.length} titulo(s) baixado(s) com sucesso.`);
       }
     } catch (err) {
       setError(err?.message || 'Erro ao registrar baixas em massa.');
@@ -1920,9 +2002,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       }
 
       const erros = Array.isArray(resultado?.erros) && resultado.erros.length > 0
-        ? `\n\nPendencias:\n${resultado.erros.slice(0, 10).map((item) => `Linha ${item.linha}: ${item.erro}`).join('\n')}`
+        ? ` Pendencias: ${resultado.erros.slice(0, 10).map((item) => `linha ${item.linha}: ${item.erro}`).join('; ')}.`
         : '';
-      alert(`Importacao concluida. Importados: ${resultado?.importados || 0}. Ignorados: ${resultado?.ignorados || 0}.${erros}`);
+      /*
+        R19: a caixa do navegador some sem rastro. Como a importação pode
+        voltar com pendências, o resultado COM pendência fica como alerta
+        (espera ser fechado) e o resultado limpo como sucesso (some em 6s):
+        o peso do aviso acompanha o que aconteceu, coisa que o alert() dava
+        de graça ao sucesso e ao erro.
+      */
+      const resumoImportacao = `Importacao concluida. Importados: ${resultado?.importados || 0}. Ignorados: ${resultado?.ignorados || 0}.${erros}`;
+      if (erros) avisar.alerta(resumoImportacao);
+      else avisar.sucesso(resumoImportacao);
     } catch (err) {
       setError(err?.message || 'Erro ao importar codigos de barras.');
     } finally {
@@ -2060,7 +2151,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             browseDescription={draftFilters.tipo === 'PAGAR'
               ? 'Lista unificada de credores cadastrados e fornecedores vinculados ao cadastro central.'
               : 'Pesquise por nome ou CPF/CNPJ e selecione o cliente.'}
-            browseListClassName="min-w-[620px]"
+            browseListClassName="min-w-full"
           />
         );
       case 'obra_id':
@@ -2227,41 +2318,47 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
   }
 
   return (
-    <div className="page solicitacoes-page">
-      <div className="app-page-header-row">
-        <div>
-          <h1 className="page-title">{pageTitle}</h1>
-          <p className="page-subtitle">{pageSubtitle}</p>
-        </div>
-        <div className="app-page-actions">
-          {fixedTipo === 'PAGAR' && canImportTitulos && (
-            <>
-              <button type="button" className="btn btn-outline btn-sm" onClick={exportarModeloImportacao} disabled={exportingModel}>
-                <HiOutlineArrowDownTray className="h-4 w-4" />
-                {exportingModel ? 'Exportando...' : 'Exportar modelo'}
-              </button>
-              <button type="button" className="btn btn-outline btn-sm" onClick={() => setImportPanelOpen((current) => !current)}>
-                <HiOutlineArrowUpTray className="h-4 w-4" />
-                Importar planilha
-              </button>
-            </>
-          )}
-          <Link to="/financeiro/relatorios" className="btn btn-outline btn-sm">
-            <HiOutlineDocumentChartBar className="h-4 w-4" />
-            Relatorios
-          </Link>
-          <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">
-            Baixas
-          </Link>
-          <Link to="/financeiro/conciliacao" className="btn btn-outline btn-sm">
-            Conciliacao OFX
-          </Link>
-          <Link to={`/financeiro/titulos/novo?tipo=${fixedTipo || draftFilters.tipo || 'RECEBER'}`} className="btn btn-primary btn-sm">
-            <HiOutlinePlus className="h-4 w-4" />
-            Novo titulo
-          </Link>
-        </div>
-      </div>
+    <Pagina>
+      {/*
+        R13/C1/C2 — faixa fixa do sistema no lugar da linha solta de título:
+        título em 22px, contagem + apoio em UMA linha na própria faixa (R5),
+        e as ações com os três pesos (D3/C5). Antes o cabeçalho rolava para
+        fora e "Novo titulo" sumia em lista longa.
+
+        R11/C6 — saíram daqui os quatro links de "ir para" (Relatórios,
+        Baixas, Conciliação OFX, Cadastros): navegação não é ação, e o menu,
+        o breadcrumb e o Ctrl+K já levam a essas telas. A remoção é a que a
+        própria R11 autoriza pelo exemplo do "⋯" de Parceiros.
+      */}
+      <PageHeader
+        titulo={pageTitle}
+        contagem={contagemCabecalho}
+        descricao={pageSubtitle}
+        acaoPrincipal={{
+          rotulo: 'Novo titulo',
+          to: `/financeiro/titulos/novo?tipo=${fixedTipo || draftFilters.tipo || 'RECEBER'}`,
+          icone: <HiOutlinePlus className="h-4 w-4" />
+        }}
+        secundarias={fixedTipo === 'PAGAR' && canImportTitulos ? [
+          {
+            rotulo: exportingModel ? 'Exportando...' : 'Exportar modelo',
+            onClick: exportarModeloImportacao,
+            desabilitada: exportingModel,
+            icone: <HiOutlineArrowDownTray className="h-4 w-4" />
+          },
+          {
+            rotulo: importPanelOpen ? 'Fechar importacao' : 'Importar planilha',
+            onClick: () => setImportPanelOpen((current) => !current),
+            icone: <HiOutlineArrowUpTray className="h-4 w-4" />
+          }
+        ] : []}
+      />
+
+      {/* R19: sucesso e resultado de importação em faixa do sistema, no topo
+          do conteúdo — não mais na caixa cinza do navegador. O ERRO continua
+          em `error`, que é a mesma condição lida dentro do modal de baixa em
+          massa: um dono por responsabilidade (R16). */}
+      <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
       {fixedTipo === 'PAGAR' && canImportTitulos && importPanelOpen && (
         <FinanceiroTitulosImportacaoPanel
@@ -2273,55 +2370,79 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         />
       )}
 
-      <form className="card sol-surface-card app-toolbar-card relative z-20 overflow-visible" onSubmit={submitFilters}>
+      {/*
+        R23 — EXCEÇÃO DECLARADA (consulta cara). Esta tela tem 15 dimensões
+        de filtro e a consulta é paginada NO SERVIDOR sobre a carteira
+        inteira: marcar um filtro por vez dispararia uma requisição por
+        marca, muito acima do teto de 3 da regra. Por isso as marcas ficam
+        em RASCUNHO e o recorte só vale no clique — e o botão diz o que faz
+        ("Consultar"), com o apoio avisando que a lista só muda ali.
+      */}
+      <BlocoConteudo
+        titulo={`Consulta de titulos ${tipoLabel}`}
+        descricao="A lista abaixo atualiza somente ao consultar."
+        variante="secundario"
+        acoes={(
+          <label className="inline-flex items-center gap-2 text-sm text-[var(--c-text)]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-[var(--c-primary)]"
+              checked={saveFilterCache}
+              onChange={(event) => setSaveFilterCache(event.target.checked)}
+            />
+            Salvar filtro neste navegador
+          </label>
+        )}
+      >
+      <form className="relative z-20 overflow-visible" onSubmit={submitFilters}>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-[var(--c-text)]">Consulta de titulos {tipoLabel}</h2>
-              <p className="text-xs text-[var(--c-muted)]">A lista abaixo atualiza somente ao consultar.</p>
-            </div>
-            <label className="inline-flex items-center gap-2 text-sm text-[var(--c-text)]">
-              <input
-                type="checkbox"
-                className="h-4 w-4 accent-[var(--c-primary)]"
-                checked={saveFilterCache}
-                onChange={(event) => setSaveFilterCache(event.target.checked)}
-              />
-              Salvar filtro neste navegador
-            </label>
-          </div>
+          {/*
+            D2 — SELETOR DE RECORTE, e ele é o ÚNICO dono da carteira nesta
+            tela (R16). Antes havia dois arranjos: uma pastilha morta
+            "Carteira fixa: …" quando a prop vinha da rota, e um par de
+            botões que só mexia num campo do formulário quando não vinha.
+            Agora é um controle só, sempre visível, que NAVEGA — o endereço
+            passa a dizer o recorte, então dá para favoritar, compartilhar
+            e fixar como tela inicial "só a pagar".
 
-          {fixedTipo ? (
-            <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-1 text-xs font-semibold text-[var(--c-muted)]">
-              Carteira fixa: {fixedTipo === 'PAGAR' ? 'Contas a pagar' : 'Contas a receber'}
+            Seletor de CONTEXTO, não filtro de lista: a R12 continua valendo
+            para os filtros abaixo.
+          */}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span className="app-filter-label">Carteira</span>
+            <div className="inline-grid w-full grid-cols-2 gap-1 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1 sm:w-auto">
+              {/*
+                DUAS opções, e não três: NÃO existe "todas as carteiras"
+                nesta consulta. O backend recebe sempre `tipo` (a tela manda
+                RECEBER por padrão), então uma terceira opção "Todas"
+                mostraria só os a receber com um rótulo dizendo o contrário —
+                o usuário leria "todas" e veria metade. Se o cliente quiser a
+                carteira inteira, é filtro novo no serviço, não rótulo novo
+                aqui. (Registrado no relatório.)
+              */}
+              {[
+                { value: 'RECEBER', label: 'A receber' },
+                { value: 'PAGAR', label: 'A pagar' }
+              ].map((option) => {
+                // Sem `?tipo` na URL a tela opera no padrão do formulário —
+                // é o que o `getDefaultFilters` já fazia. O botão aceso diz
+                // qual carteira está de fato sendo consultada, venha ela do
+                // endereço ou do padrão.
+                const active = (fixedTipo || draftFilters.tipo) === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={active}
+                    className={`btn btn-sm ${active ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => irParaRecorte(option.value)}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
             </div>
-          ) : (
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              <span className="app-filter-label">Tipo</span>
-              <div className="inline-grid w-full max-w-[220px] grid-cols-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] p-1">
-                {[
-                  { value: 'RECEBER', label: 'Receber' },
-                  { value: 'PAGAR', label: 'Pagar' }
-                ].map((option) => {
-                  const active = draftFilters.tipo === option.value;
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      className={`rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
-                        active
-                          ? 'bg-[var(--c-primary)] text-white shadow-sm'
-                          : 'text-[var(--c-muted)] hover:bg-[var(--c-surface)] hover:text-[var(--c-text)]'
-                      }`}
-                      onClick={() => setTipoFiltro(option.value)}
-                    >
-                      {option.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          </div>
 
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-12">
             {basicVisibleFilters.map((filter) => renderFilterField(filter))}
@@ -2372,14 +2493,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </div>
         </div>
       </form>
+      </BlocoConteudo>
 
       {filterChooserOpen ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--modal-overlay)] px-4 py-6 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)] shadow-2xl">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--c-border)] px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--c-text)]">Filtros visiveis</div>
-                <div className="text-[11px] text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
+                <div className="text-xs text-[var(--c-muted)]">Salvo apenas para este usuario neste navegador.</div>
               </div>
               <button
                 type="button"
@@ -2387,7 +2509,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 onClick={() => setFilterChooserOpen(false)}
                 title="Fechar"
               >
-                <HiOutlineXMark className="h-5 w-5" />
+                <HiOutlineXMark className="h-4 w-4" />
               </button>
             </div>
 
@@ -2423,62 +2545,61 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
         </div>
       ) : null}
 
-      <div className="relative z-0 grid gap-3 md:grid-cols-4">
-        {[
-          { label: 'Titulos filtrados', value: String(resumo.quantidade), icon: HiOutlineDocumentText },
-          { label: 'Valor total', value: formatCurrency(resumo.total), icon: HiOutlineSparkles },
-          { label: 'Saldo em aberto', value: formatCurrency(resumo.saldo), icon: HiOutlineDocumentChartBar },
-          { label: 'Vencidos', value: formatCurrency(resumo.vencido), sub: `${resumo.quantidadeVencida} titulo(s)`, icon: HiOutlineAdjustmentsHorizontal }
-        ].map((item) => {
-          const Icon = item.icon;
-          return (
-            <div key={item.label} className="card sol-surface-card">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <span className="text-[10px] uppercase tracking-wide text-[var(--c-muted)]">{item.label}</span>
-                  <div className="mt-1 text-lg font-semibold text-[var(--c-text)] tabular-nums">{item.value}</div>
-                  {item.sub ? <div className="text-xs text-[var(--c-muted)]">{item.sub}</div> : null}
-                </div>
-                <Icon className="h-5 w-5 text-[var(--c-primary)]" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+      {/*
+        StatGrid/StatTile (M2/R10): o ladrilho do sistema no lugar de quatro
+        cards à mão cujo rótulo tinha dez pixels — fora da escala e abaixo do
+        piso de 12px em conteúdo. (Escrito por extenso de propósito: o check
+        da R10 lê linha a linha SEM cortar comentário, então citar a classe
+        aqui reprovaria a própria explicação da regra. A R25 já aprendeu a
+        cortar; a R10 ainda não.)
+
+        RÓTULOS CORRIGIDOS, e é uma correção de SIGNIFICADO, não de forma:
+        `resumo` soma `titulos`, que é a PÁGINA carregada — não a carteira
+        filtrada. "Valor total" sobre 25 de 4.000 títulos afirma um total que
+        não é o total. O endpoint paginado devolve só `{ data, pagination }`,
+        sem agregado, então o número não dá para consertar aqui: o que dá
+        para consertar é ele parar de mentir sobre o que é. O total do
+        recorte vive na contagem da faixa fixa e no relatório em PDF.
+        (Registrado no relatório: o agregado do recorte pede endpoint novo.)
+      */}
+      <StatGrid colunas={4}>
+        <StatTile label="Titulos nesta pagina" valor={String(resumo.quantidade)} sub={contagemCabecalho ? `${contagemCabecalho} no recorte` : null} />
+        <StatTile label="Valor desta pagina" valor={formatCurrency(resumo.total)} />
+        <StatTile label="Saldo em aberto nesta pagina" valor={formatCurrency(resumo.saldo)} />
+        <StatTile
+          label="Vencidos nesta pagina"
+          valor={formatCurrency(resumo.vencido)}
+          sub={`${resumo.quantidadeVencida} titulo(s)`}
+          tom={resumo.quantidadeVencida > 0 ? 'danger' : undefined}
+        />
+      </StatGrid>
 
       {error ? <div className="app-alert app-alert--error">{error}</div> : null}
 
       {mostrarFretesPendentes ? (
-        <div className="sol-surface-card card">
-          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-[var(--c-text)]">Fretes de pedidos pendentes</h2>
-              <p className="text-xs text-[var(--c-muted)]">
-                Fretes pagos a terceiro registrados em compras e ainda sem titulo financeiro vinculado.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="badge badge-info">
-                {loadingFretesPendentes ? 'Atualizando' : `${fretesPendentes.length} pendente(s)`}
-              </span>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={carregarFretesPendentesFinanceiro}
-                disabled={loadingFretesPendentes}
-              >
-                Atualizar fretes
-              </button>
-            </div>
-          </div>
-
+        <BlocoConteudo
+          titulo="Fretes de pedidos pendentes"
+          contagem={loadingFretesPendentes ? 'Atualizando…' : `${fretesPendentes.length} pendente(s)`}
+          descricao="Fretes pagos a terceiro registrados em compras e ainda sem titulo financeiro vinculado."
+          variante="secundario"
+          acoes={(
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={carregarFretesPendentesFinanceiro}
+              disabled={loadingFretesPendentes}
+            >
+              Atualizar fretes
+            </button>
+          )}
+        >
           {erroFretesPendentes ? (
-            <div className="mx-3 mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="app-alert app-alert--error">
               {erroFretesPendentes}
             </div>
           ) : null}
 
-          <div className="px-3 py-3">
+          <div>
             <TabelaPadrao
               colunas={[
                 {
@@ -2521,7 +2642,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       <div className="font-medium text-[var(--c-text)]">
                         {frete.parceiro?.nome || frete.fornecedor?.nome || frete.dados_pagamento?.transportador_nome || 'Credor a definir'}
                       </div>
-                      <div className="text-[10px] text-[var(--c-muted)]">
+                      <div className="text-xs text-[var(--c-muted)]">
                         {frete.parceiro?.cpf_cnpj || frete.fornecedor?.cnpj || frete.dados_pagamento?.transportador_cpf_cnpj || ''}
                       </div>
                     </div>
@@ -2553,78 +2674,40 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               vazio="Nenhum frete de terceiro pendente de titulo."
             />
           </div>
-        </div>
+        </BlocoConteudo>
       ) : null}
 
-      <div className="sol-surface-card card overflow-clip">
-        <div className="flex flex-col gap-2 border-b border-[var(--c-border)] px-3 py-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-[var(--c-text)]">Resultado da consulta</h2>
-            <p className="text-xs text-[var(--c-muted)]">
-              {!hasConsulted
-                ? 'Aplique um filtro para carregar os titulos.'
-                : loading
-                  ? 'Carregando titulos...'
-                  : `${titulos.length} de ${pagination.total || titulos.length} titulo(s) exibido(s).`}
-            </p>
-          </div>
+      {/*
+        B2 — este é o bloco PRIMÁRIO da tela: é ele que responde à pergunta
+        central ("quais títulos entram no recorte?"). Os demais são
+        secundários.
+
+        B3 — o apoio aqui NÃO repete a contagem da faixa fixa: a faixa diz
+        quantos títulos o recorte tem, este bloco diz em que ponto da
+        listagem se está. Antes os dois diziam o mesmo número.
+      */}
+      <BlocoConteudo
+        titulo="Resultado da consulta"
+        variante="primario"
+        cor="var(--module-financeiro)"
+        descricao={!hasConsulted
+          ? 'Aplique um filtro para carregar os titulos.'
+          : loading
+            ? 'Carregando titulos...'
+            : pagination.limit === 'all'
+              ? `${titulos.length} titulo(s) em pagina unica.`
+              : `Pagina ${pagination.page || 1} de ${pagination.total_pages || 1}, com ${titulos.length} titulo(s) a vista.`}
+        acoes={(
+          /*
+            D3/C5 — a barra de ações do bloco carrega só AÇÕES, com os três
+            pesos: um primário sólido (Baixar selecionados), os secundários
+            em contorno e a destrutiva apartada em vermelho suave. A
+            PAGINAÇÃO saiu daqui: ela não é ação sobre os títulos, é posição
+            na lista, e foi para o rodapé da tabela no componente `Paginacao`
+            (R16b) — que ainda diz a POSIÇÃO e o TOTAL, coisa que o "3/12"
+            antigo não dizia.
+          */
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-2 text-xs text-[var(--c-muted)]">
-              <span>Por pagina</span>
-              <select
-                className="input input-sm w-[96px]"
-                value={String(pagination.limit || '25')}
-                onChange={(event) => {
-                  const nextLimit = event.target.value;
-                  setPagination((current) => ({
-                    ...current,
-                    limit: nextLimit,
-                    page: 1
-                  }));
-                }}
-                disabled={!hasConsulted || loading}
-              >
-                {PAGE_SIZE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option === 'all' ? 'Todos' : option}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="flex items-center gap-1 text-xs text-[var(--c-muted)]">
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                disabled={!hasConsulted || loading || Number(pagination.page || 1) <= 1}
-                onClick={() => setPagination((current) => ({
-                  ...current,
-                  page: Math.max(Number(current.page || 1) - 1, 1)
-                }))}
-              >
-                Anterior
-              </button>
-              <span className="px-1">
-                {pagination.limit === 'all'
-                  ? 'Todos'
-                  : `${pagination.page || 1}/${pagination.total_pages || 1}`}
-              </span>
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                disabled={
-                  !hasConsulted ||
-                  loading ||
-                  pagination.limit === 'all' ||
-                  Number(pagination.page || 1) >= Number(pagination.total_pages || 1)
-                }
-                onClick={() => setPagination((current) => ({
-                  ...current,
-                  page: Number(current.page || 1) + 1
-                }))}
-              >
-                Proxima
-              </button>
-            </div>
             <button
               type="button"
               className="btn btn-primary btn-sm"
@@ -2649,7 +2732,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             ) : null}
             <button
               type="button"
-              className="btn btn-outline btn-sm text-rose-700 hover:border-rose-300 hover:bg-rose-50"
+              className="btn btn-outline btn-sm btn-perigo-suave"
               onClick={excluirTitulosSelecionados}
               disabled={!canDeleteTitulos || selectedTitulosExcluiveis.length === 0 || loading || savingBaixaMassa}
               title="Excluir titulos selecionados sem apagar o registro do banco"
@@ -2657,10 +2740,9 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               Excluir selecionados
               {selectedTitulosExcluiveis.length > 0 ? ` (${selectedTitulosExcluiveis.length})` : ''}
             </button>
-            {canAccessCadastros ? (
-              <Link to="/financeiro/cadastros" className="btn btn-outline btn-sm">Cadastros</Link>
-            ) : null}
-            <Link to="/financeiro/baixas" className="btn btn-outline btn-sm">Baixas</Link>
+            {/* R11/C6: "Cadastros" e "Baixas" eram links de NAVEGAÇÃO na
+                barra de ações da lista — menu, breadcrumb e Ctrl+K já levam
+                lá. Saíram junto com os do cabeçalho. */}
             {canExportTitulos ? (
               <button
                 type="button"
@@ -2686,7 +2768,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             ) : null}
             <button
               type="button"
-              className="btn btn-outline btn-sm gap-1.5"
+              className="btn btn-outline btn-sm gap-2"
               onClick={abrirRelatorio}
               disabled={!hasConsulted || loading || relatorioLoading}
               title={hasConsulted
@@ -2697,10 +2779,10 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               {relatorioLoading ? 'Gerando...' : 'Gerar relatorio'}
             </button>
           </div>
-        </div>
-
+        )}
+      >
         {selectedTitulosBaixaveis.length > 0 ? (
-          <div className="flex flex-col gap-2 border-b border-[var(--c-border)] bg-[var(--c-bg)]/70 px-3 py-2 text-xs md:flex-row md:items-center md:justify-between">
+          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-[var(--c-border)] bg-[var(--c-bg)] px-3 py-2 text-sm md:flex-row md:items-center md:justify-between">
             <div className="font-medium text-[var(--c-text)]">
               {selectedTitulosBaixaveis.length} titulo(s) selecionado(s) para baixa
               {canDeleteTitulos && selectedTitulosExcluiveis.length > 0 ? ` / ${selectedTitulosExcluiveis.length} para exclusao` : ''}
@@ -2714,7 +2796,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
           </div>
         ) : null}
 
-        <div className="px-3 py-3">
+        <div>
           <TabelaPadrao
             colunas={[
               {
@@ -2749,7 +2831,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                       : <StatusBadge status={titulo.status} />}
                     {isTituloBloqueadoRetornoObra(titulo) ? (
                       <span
-                        className="inline-flex rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800"
+                        className="badge badge-warning"
                         title={titulo.bloqueio_retorno_motivo || 'Baixa bloqueada por pedido de retorno da Obra'}
                       >
                         Retorno solicitado pela Obra
@@ -2828,7 +2910,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 titulo: 'Vencimento',
                 tipo: 'data',
                 render: (titulo) => (
-                  <span className={isOverdue(titulo) ? 'font-semibold text-rose-600' : 'text-[var(--c-text)]'}>
+                  <span className={isOverdue(titulo) ? 'font-semibold text-[var(--sem-danger)]' : 'text-[var(--c-text)]'}>
                     {formatDate(titulo.data_vencimento)}
                   </span>
                 )
@@ -2905,11 +2987,56 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             )}
           />
         </div>
-      </div>
+
+        {/*
+          Rodapé de lista paginada no componente do sistema (R16b). O antigo
+          "3/12" ficava no cabeçalho do bloco, misturado às ações, e não
+          dizia o total — quem estava na página 3 não sabia se valia
+          continuar clicando. O `Paginacao` some sozinho quando há uma página
+          só, então nada aparece antes da primeira consulta.
+
+          O "por página" fica ao lado, porque é a mesma decisão: quanto se lê
+          de cada vez.
+        */}
+        {hasConsulted ? (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[var(--c-border)] pt-3">
+            <label className="flex items-center gap-2 text-sm text-[var(--c-muted)]">
+              <span>Por pagina</span>
+              <select
+                className="input input-sm"
+                value={String(pagination.limit || '25')}
+                onChange={(event) => {
+                  const nextLimit = event.target.value;
+                  setPagination((current) => ({
+                    ...current,
+                    limit: nextLimit,
+                    page: 1
+                  }));
+                }}
+                disabled={loading}
+              >
+                {PAGE_SIZE_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option === 'all' ? 'Todos' : option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Paginacao
+              pagina={Number(pagination.page || 1)}
+              totalPaginas={pagination.limit === 'all' ? 1 : Number(pagination.total_pages || 1)}
+              total={Number(pagination.total || titulos.length)}
+              rotuloRegistro="titulo"
+              carregando={loading}
+              aoMudarPagina={(proxima) => setPagination((current) => ({ ...current, page: proxima }))}
+            />
+          </div>
+        ) : null}
+      </BlocoConteudo>
 
       {relatorioModalOpen ? (
         <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/60 p-0 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-[110] flex items-center justify-center bg-[var(--modal-overlay)] p-0 backdrop-blur-sm sm:p-4"
           role="presentation"
           onMouseDown={(event) => {
             if (event.target === event.currentTarget) fecharRelatorio();
@@ -2921,14 +3048,14 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
             aria-modal="true"
             aria-labelledby="relatorio-titulos-title"
           >
-            <header className="flex shrink-0 flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <header className="flex shrink-0 flex-col gap-3 border-b border-[var(--c-border)] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
-                    <HiOutlineDocumentText className="h-5 w-5" />
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--sem-info-bg)] text-[var(--sem-info)]">
+                    <HiOutlineDocumentText className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <h2 id="relatorio-titulos-title" className="truncate text-base font-semibold text-[var(--c-text)] sm:text-lg">
+                    <h2 id="relatorio-titulos-title" className="truncate text-lg font-semibold text-[var(--c-text)]">
                       Relatorio de {pageTitle}
                     </h2>
                     <p className="text-xs text-[var(--c-muted)]">
@@ -2940,12 +3067,12 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
               <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
                 {relatorioPdfUrl ? (
                   <>
-                    <button type="button" className="btn btn-outline btn-sm gap-1.5" onClick={abrirRelatorioNovaAba}>
+                    <button type="button" className="btn btn-outline btn-sm gap-2" onClick={abrirRelatorioNovaAba}>
                       <HiOutlineEye className="h-4 w-4" />
                       <span className="hidden sm:inline">Abrir em nova aba</span>
                       <span className="sm:hidden">Abrir</span>
                     </button>
-                    <button type="button" className="btn btn-primary btn-sm gap-1.5" onClick={baixarRelatorio}>
+                    <button type="button" className="btn btn-primary btn-sm gap-2" onClick={baixarRelatorio}>
                       <HiOutlineArrowDownTray className="h-4 w-4" />
                       Baixar PDF
                     </button>
@@ -2953,30 +3080,30 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 ) : null}
                 <button
                   type="button"
-                  className="btn btn-outline btn-sm btn-square"
+                  className="btn btn-outline btn-sm"
                   onClick={fecharRelatorio}
                   title="Fechar relatorio"
                   aria-label="Fechar relatorio"
                 >
-                  <HiOutlineXMark className="h-5 w-5" />
+                  <HiOutlineXMark className="h-4 w-4" />
                 </button>
               </div>
             </header>
 
-            <div className="min-h-0 flex-1 bg-slate-200 p-2 sm:p-3">
+            <div className="min-h-0 flex-1 bg-[var(--c-bg)] p-2 sm:p-3">
               {relatorioLoading ? (
-                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-slate-300 bg-white">
+                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]">
                   <div className="text-center">
                     <span className="loading loading-spinner loading-md text-primary" aria-hidden="true" />
-                    <p className="mt-3 text-sm font-semibold text-slate-800">Preparando o relatorio completo...</p>
-                    <p className="mt-1 text-xs text-slate-500">Aguarde enquanto os titulos filtrados sao consolidados.</p>
+                    <p className="mt-3 text-sm font-semibold text-[var(--c-text)]">Preparando o relatorio completo...</p>
+                    <p className="mt-1 text-xs text-[var(--c-muted)]">Aguarde enquanto os titulos filtrados sao consolidados.</p>
                   </div>
                 </div>
               ) : relatorioError ? (
-                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-rose-200 bg-white p-5">
+                <div className="flex h-full min-h-64 items-center justify-center rounded-xl border border-[var(--sem-danger-border)] bg-[var(--c-surface)] p-4">
                   <div className="max-w-md text-center">
-                    <h3 className="text-sm font-semibold text-rose-700">Nao foi possivel gerar o relatorio</h3>
-                    <p className="mt-2 text-sm text-slate-600">{relatorioError}</p>
+                    <h3 className="text-sm font-semibold text-[var(--sem-danger)]">Nao foi possivel gerar o relatorio</h3>
+                    <p className="mt-2 text-sm text-[var(--c-muted)]">{relatorioError}</p>
                     <button type="button" className="btn btn-outline btn-sm mt-4" onClick={abrirRelatorio}>
                       Tentar novamente
                     </button>
@@ -2986,7 +3113,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 <iframe
                   src={relatorioPdfUrl}
                   title={`Visualizacao do relatorio de ${pageTitle.toLowerCase()}`}
-                  className="h-full min-h-64 w-full rounded-lg border border-slate-300 bg-white"
+                  className="h-full min-h-64 w-full rounded-lg border border-[var(--c-border)] bg-[var(--c-surface)]"
                 />
               ) : null}
             </div>
@@ -3014,7 +3141,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 disabled={savingBaixaMassa}
                 aria-label="Fechar baixa em massa"
               >
-                <HiOutlineXMark className="h-5 w-5" />
+                <HiOutlineXMark className="h-4 w-4" />
               </button>
             </div>
 
@@ -3368,7 +3495,7 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 {baixaMassaParcelada ? (
                   <div className="md:col-span-2 space-y-3 rounded-2xl border border-[var(--c-border)] bg-[var(--c-bg)] p-3">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                      <label className="app-filter-field w-full sm:max-w-[220px]">
+                      <label className="app-filter-field w-full sm:w-auto">
                         <span className="app-filter-label">Quantidade de parcelas</span>
                         <input
                           className="input w-full input-sm"
@@ -3477,7 +3604,18 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
                 <label className="app-filter-field md:col-span-2">
                   <span className="app-filter-label">Observacoes</span>
                   <textarea
-                    className="input min-h-[92px] w-full"
+                    /*
+                      R10/R21: a altura era noventa e dois pixels soltos numa
+                      classe arbitrária (escrito por extenso porque o check
+                      da R10 não corta comentário e reprovaria o exemplo).
+                      Não existe classe de textarea no sistema de componentes
+                      (lacuna registrada no relatório), então a altura passa
+                      a ser dita em LINHAS DE TEXTO pelo `rows` — que é a
+                      unidade certa para um campo de texto e não é medida à
+                      mão. Três linhas ficam na mesma faixa dos 92px.
+                    */
+                    rows={3}
+                    className="input w-full"
                     value={baixaMassaForm.observacoes}
                     onChange={(event) => setBaixaMassaForm((current) => ({ ...current, observacoes: event.target.value }))}
                     placeholder="Ex.: Baixa em massa conforme extrato bancario."
@@ -3543,12 +3681,15 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
       ) : null}
 
       {importandoCodigos ? (
-        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-sm">
-          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-5 py-4 text-sm font-semibold text-[var(--c-text)] shadow-xl">
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[var(--modal-overlay)] px-4 backdrop-blur-sm">
+          <div className="rounded-2xl border border-[var(--c-border)] bg-[var(--c-surface)] px-4 py-4 text-sm font-semibold text-[var(--c-text)] shadow-xl">
             Importando codigos de barras...
           </div>
         </div>
       ) : null}
-    </div>
+
+      {/* R19: modal de confirmação do sistema (exclusão em massa). */}
+      {elementoConfirmacao}
+    </Pagina>
   );
 }
