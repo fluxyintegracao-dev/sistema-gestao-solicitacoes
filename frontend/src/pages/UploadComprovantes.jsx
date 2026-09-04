@@ -108,6 +108,10 @@ export default function UploadComprovantes() {
   return (
     <Pagina>
       <PageHeader
+        /* C3/R11 — tela de registro leva a seta de voltar à esquerda. O
+           destino é a fila de conferência: é para lá que o trabalho segue
+           depois do envio, e é de lá que se vê o que ficou pendente. */
+        voltar={{ to: '/comprovantes/pendentes', title: 'Voltar para comprovantes pendentes' }}
         titulo="Upload de comprovantes"
         contagem={files.length ? `${files.length} arquivo(s) selecionado(s)` : null}
         descricao="Envio em massa de PDFs e imagens; o vínculo com a solicitação vem do nome do arquivo."

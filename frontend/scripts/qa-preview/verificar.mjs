@@ -693,9 +693,35 @@ async function checarEtiquetasFiltro(page, resultado) {
     if (!(await remover.count())) {
       problemas.push('etiqueta sem botão de remover');
     } else {
+      /*
+        REMOVER UMA ETIQUETA NÃO É ZERAR TODAS (04/09).
+
+        A asserção era `count() === 0` depois de remover a primeira. Isso
+        REPROVA qualquer tela que nasça com filtro padrão — e a
+        `FinanceiroChequesTerceiros` nasce com `status: EM_CARTEIRA`, que é
+        uma escolha de produto legítima: a etiqueta existe porque o filtro
+        existe de verdade, e some-la seria a tela mentir sobre o recorte.
+
+        O check marcava uma opção (ficavam duas etiquetas), removia a
+        primeira, via uma sobrando e acusava "não sumiu ao remover" — sobre
+        uma etiqueta que ele nunca mandou remover.
+
+        O que a F3 quer provar é que a etiqueta REMOVIDA some. Então guarda
+        o texto dela antes e confere esse texto depois, além da contagem
+        cair exatamente um.
+      */
+      const antesTexto = (await etiqueta.first().innerText()).replace(/\s+/g, ' ').trim();
+      const antesContagem = await page.locator('.la-etiqueta').count();
       await remover.click();
       await page.waitForTimeout(500);
-      if (await page.locator('.la-etiqueta').count()) problemas.push('etiqueta não sumiu ao remover');
+      const depoisContagem = await page.locator('.la-etiqueta').count();
+      const textosDepois = (await page.locator('.la-etiqueta').allInnerTexts())
+        .map((t) => t.replace(/\s+/g, ' ').trim());
+      if (textosDepois.includes(antesTexto)) {
+        problemas.push(`a etiqueta removida continua na tela ("${antesTexto}")`);
+      } else if (depoisContagem !== antesContagem - 1) {
+        problemas.push(`remover uma etiqueta levou ${antesContagem} para ${depoisContagem} — deveria tirar exatamente uma`);
+      }
     }
   }
   resultado.F3 = problemas.length

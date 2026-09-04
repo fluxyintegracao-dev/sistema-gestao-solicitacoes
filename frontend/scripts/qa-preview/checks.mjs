@@ -621,10 +621,25 @@ export function checksEstaticos({ tipo }) {
     } else {
       const caixa = buscas[0];
       const pai = caixa.closest('.app-bloco-corpo, .app-bloco, .app-filtros') || caixa.parentElement;
-      const ocupa = caixa.getBoundingClientRect().width >= pai.getBoundingClientRect().width * 0.9;
+      /*
+        A LARGURA DISPONÍVEL É A CAIXA DE CONTEÚDO, NÃO A DE BORDA (04/09).
+
+        A comparação era contra `getBoundingClientRect()` do pai, que INCLUI
+        o padding dele. Num painel de 320px com `px-4` (16px de cada lado),
+        sobram 288px para o filho — exatos 90% — e qualquer arredondamento
+        reprovava. Na prática o check passou a proibir padding em contêiner
+        estreito, que não é o que a R3 pede.
+
+        O que a regra quer saber é se a busca ocupa o espaço DISPONÍVEL.
+        Espaço disponível é a caixa de conteúdo: largura menos os paddings.
+      */
+      const cs = getComputedStyle(pai);
+      const disponivel = pai.getBoundingClientRect().width
+        - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
+      const ocupa = caixa.getBoundingClientRect().width >= disponivel * 0.9;
       r.F1 = ocupa
         ? { estado: 'PASSOU' }
-        : { estado: 'FALHOU', motivo: `busca com ${Math.round(caixa.getBoundingClientRect().width)}px não ocupa a largura da faixa (${Math.round(pai.getBoundingClientRect().width)}px)`, seletor: cssPath(caixa) };
+        : { estado: 'FALHOU', motivo: `busca com ${Math.round(caixa.getBoundingClientRect().width)}px não ocupa a largura disponível (${Math.round(disponivel)}px livres na faixa de ${Math.round(pai.getBoundingClientRect().width)}px)`, seletor: cssPath(caixa) };
     }
   }
 
@@ -746,8 +761,20 @@ export function checksEstaticos({ tipo }) {
       const a = normTexto(leadFaixa); const c = normTexto(b);
       return a && c && (a === c || a.includes(c) || c.includes(a));
     });
+    /*
+      O MOTIVO PRECISA TRAZER O TEXTO (04/09). "Apoio da faixa repetido em
+      bloco" mais um seletor não basta para consertar: a comparação é por
+      CONTINÊNCIA (um contém o outro), então o par que casou pode ser um
+      trecho curto dentro de uma frase longa, e sem ver os dois lados não
+      dá para saber qual dos textos sai. Duas telas do Financeiro
+      reprovaram aqui e nenhuma pôde ser corrigida pela leitura do código.
+    */
     r.B3 = dup
-      ? { estado: 'FALHOU', motivo: 'apoio da faixa repetido em bloco', seletor: cssPath(dup) }
+      ? {
+        estado: 'FALHOU',
+        motivo: `apoio da faixa repetido em bloco — faixa: "${normTexto(leadFaixa).slice(0, 160)}" | bloco: "${normTexto(dup).slice(0, 160)}"`,
+        seletor: cssPath(dup)
+      }
       : { estado: 'PASSOU' };
   }
 
@@ -1055,11 +1082,34 @@ export function checksMobile() {
     const nome = alvo
       ? alvo.tagName + '.' + classeDe(alvo).split(/\s+/).filter(Boolean).slice(0, 2).join('.')
       : '';
+    /*
+      A FOLHA NEM SEMPRE É A CULPADA (04/09).
+
+      O check nomeia a folha do transbordo — quem vai mais longe e não
+      contém outro faltoso — porque num transbordo por largura fixa é ela
+      que define a largura de todos. Só que um filho com `width: 100%`
+      também aparece como folha, e aí ele é a VÍTIMA: quem manda é o
+      ancestral que estourou primeiro. Foi o caso do
+      `BUTTON.btn.btn-primary` a 775px numa janela de 390px, que mandou o
+      conserto para o botão em vez de para o contêiner.
+
+      Agora o motivo traz os DOIS extremos da cadeia: a folha e o ancestral
+      mais externo que também estoura, com a largura de cada um. O conserto
+      quase sempre é no de fora.
+    */
+    const externo = estourando
+      .filter((el) => el !== alvo && el.contains(alvo))
+      .sort((a, b) => a.getBoundingClientRect().width - b.getBoundingClientRect().width)
+      .pop();
+    const cadeia = externo
+      ? ` — ancestral mais externo que também estoura: ${externo.tagName}.${classeDe(externo).split(/\s+/).filter(Boolean).slice(0, 2).join('.')} com ${Math.round(externo.getBoundingClientRect().width)}px; o conserto costuma ser NELE, não na folha`
+      : '';
     r.X3 = {
       estado: 'FALHOU',
       motivo: alvo
         ? `${nome} vai até ${Math.round(alvo.getBoundingClientRect().right)}px numa viewport de ${innerWidth}px`
         + `${doc.scrollWidth <= innerWidth + 1 ? ' — o transbordo é RECORTADO por overflow-x: clip, então some sem rolagem' : ''}`
+        + cadeia
         : `página com ${doc.scrollWidth}px em viewport de ${innerWidth}px`
     };
   } else {
