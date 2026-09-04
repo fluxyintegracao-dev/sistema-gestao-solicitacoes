@@ -1698,3 +1698,34 @@ telas, ou o conserto muda a fonte de tabelas que ninguém pediu para mexer.
 ter tokens PRÓPRIOS, nos degraus, em vez de tomar emprestado os de um módulo?
 Componente do sistema que depende de variável declarada por uma página é
 dependência invertida — e é ela que produziu o defeito.
+
+## DEFEITO DE PROCESSO MEU: `git add -A` com agente ainda escrevendo (04/09)
+
+O commit `d6b081d` tem a mensagem *"Registra os tokens de fonte do
+Solicitações"* e carrega, além disso, a correção inteira de duas telas
+(`ConfiguracoesNotificacoesSistema` e `ConfiguracoesComercialCategorias`) —
+o alcance mentido do "Desativar todos" e a exclusão sem confirmação.
+
+**O código está certo e nada se perdeu.** O que ficou errado é o registro: um
+commit que carrega trabalho que a mensagem dele não menciona torna o
+histórico não confiável. Quem procurar depois "quando o alcance do botão foi
+consertado" vai achar um commit sobre tokens de fonte.
+
+### A causa
+
+Rodei `git add -A` enquanto um agente ainda editava os arquivos dele. O `-A`
+não sabe de quem é o trabalho: ele varre a árvore.
+
+**Quem achou foi o próprio agente**, no fim do relatório: *"durante a sessão
+um processo automático criou o commit `d6b081d` (autor 'Claude') que já
+incorporou minhas alterações"*. Ele não tinha como saber que o processo
+automático era eu.
+
+### A regra que fica
+
+Com agente em voo, **commit é por caminho explícito**, nunca `git add -A`. O
+`-A` só depois que a onda inteira pousou e eu conferi o `git status`.
+
+Não reescrevi o histórico: `d6b081d` já estava empurrado, e reescrever branch
+publicada troca um registro impreciso por um registro quebrado. Fica esta
+anotação, que é o que o commit deveria ter dito.
