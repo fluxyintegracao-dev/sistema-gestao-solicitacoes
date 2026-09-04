@@ -1054,6 +1054,36 @@ export const TELAS = [
       C4: "idem C3"
     }
   },
+  /* Rodada 2 — as duas telas que ficaram sem dono na onda de correção. */
+  {
+    id: 'config-hub',
+    arquivo: 'src/pages/Configuracoes.jsx',
+    rota: '/configuracoes',
+    tipo: 'mista',
+    naoAplica: {
+      F1: 'hub de cartões: não há listagem com recorte nem caixa de busca',
+      F2: 'idem F1',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'hub de entrada, não é tela de detalhe de registro',
+      C4: 'idem C3'
+    }
+  },
+  {
+    id: 'config-cartoes-recarga',
+    arquivo: 'src/pages/CartoesRecarga.jsx',
+    rota: '/configuracoes-cartoes-recarga',
+    tipo: 'listagem',
+    naoAplica: {
+      F1: 'tela de configuração sem caixa de busca — não há duas a conciliar',
+      F2: 'idem F1: não há recorte de lista por filtro',
+      F3: 'idem F1',
+      F4: 'idem F1',
+      C3: 'configuração de sistema, não é tela de detalhe de registro',
+      C4: 'idem C3'
+    }
+  },
+
 ];
 
 /** Itens da DoD, na ordem da matriz. */

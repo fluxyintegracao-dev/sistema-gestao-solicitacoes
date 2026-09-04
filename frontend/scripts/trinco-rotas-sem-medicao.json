@@ -68,7 +68,6 @@
     "src/modules/sst/pages/SstTimeline.jsx",
     "src/navigation/ModuleHub.jsx",
     "src/pages/ArquivosModelos.jsx",
-    "src/pages/CartoesRecarga.jsx",
     "src/pages/ComercialContratos.jsx",
     "src/pages/ComercialEmpreendimentos.jsx",
     "src/pages/ComercialMapaUnidades.jsx",
@@ -86,7 +85,6 @@
     "src/pages/ComprasRelatorioFornecedores.jsx",
     "src/pages/ComprasRelatorioPendenciasCotacoes.jsx",
     "src/pages/ComprasRelatorioPrecosInsumos.jsx",
-    "src/pages/Configuracoes.jsx",
     "src/pages/ContratoFluxoNovo.jsx",
     "src/pages/ContratosRelatorioOperacional.jsx",
     "src/pages/CrmRelatorioExecutivo.jsx",
@@ -100,5 +98,6 @@
     "src/pages/SolicitacoesRelatorioOperacional.jsx",
     "src/pages/Treinamento.jsx"
   ],
-  "atualizado_em": "2026-09-04"
+  "atualizado_em": "2026-09-04",
+  "total_em": 93
 }

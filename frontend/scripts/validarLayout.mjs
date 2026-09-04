@@ -119,6 +119,12 @@ function inventariarRotasDoApp() {
   return [...encontradas].sort();
 }
 
+function lerTrincoGrid() {
+  const alvo = path.join(frontendRoot, 'scripts', 'trinco-medidas-grid.json');
+  if (!fs.existsSync(alvo)) return { arquivos: {} };
+  return JSON.parse(fs.readFileSync(alvo, 'utf8'));
+}
+
 function lerTrincoRotas() {
   const alvo = path.join(frontendRoot, 'scripts', 'trinco-rotas-sem-medicao.json');
   if (!fs.existsSync(alvo)) return { telas: [] };
@@ -130,6 +136,7 @@ export function validarLayout() {
   for (const extra of telasExtraDaLinhaDeComando()) {
     if (!manifesto.telas.includes(extra)) manifesto.telas.push(extra);
   }
+  const trincoGrid = lerTrincoGrid();
   const falhas = [];
   const avisos = [];
 
@@ -172,6 +179,9 @@ export function validarLayout() {
         aponta(i, 'R10', mensagem);
       }
     };
+
+    // Contador por TELA do passivo congelado de px em colchete composto.
+    let gridVistos = 0;
 
     linhas.forEach((linha, i) => {
       // R1 — tabela crua é proibida: toda tabela é redimensionável
@@ -233,6 +243,39 @@ export function validarLayout() {
       // Valor arbitrário Tailwind em px (w-[64px], text-[13px], p-[6px]…).
       if (/-\[\d+(?:\.\d+)?px\]/.test(linha)) {
         apontaMedida(i, `valor arbitrário em px ("${linha.match(/\S*-\[\d+(?:\.\d+)?px\]\S*/)?.[0]}") — não existe medida fora da escala.`);
+      }
+
+      /*
+        PX DENTRO DE COLCHETE COMPOSTO — a lacuna que o check tinha (04/09).
+
+        O padrao acima exige que o colchete SEJA o numero: `-[520px]`. Mas a
+        medida mais cara da tela costuma vir dentro de uma expressao:
+
+          grid-cols-[360px_minmax(0,1fr)]
+          grid-cols-[minmax(0,1fr)_420px]
+          w-[calc(100%-40px)]
+
+        Todas escrevem medida na tela, todas passavam verdes. Um levantamento
+        do modulo Comercial achou 18 delas de uma vez, e o motivo de nao
+        aparecerem antes e o de sempre: o check conhecia UMA forma que a
+        coisa assume, e o sistema usa duas.
+
+        Nao e detalhe de sintaxe: `grid-cols-[360px_...]` fixa a largura de
+        uma COLUNA — e largura de coluna e exatamente o que a R1 manda vir do
+        componente, para o usuario poder arrastar e a largura ser salva.
+
+        Nasce com trinco porque o passivo herdado e real: 9 ocorrencias em 8
+        telas JA APROVADAS. Congelar e a unica forma honesta de ligar um check
+        no meio do trabalho — o numero so desce, e ocorrencia nova reprova na
+        hora.
+      */
+      for (const m of linha.matchAll(/[\w-]+-\[[^\]]*\d+(?:\.\d+)?px[^\]]*\]/g)) {
+        if (/-\[\d+(?:\.\d+)?px\]$/.test(m[0])) continue;   // ja reportado acima
+        const permitido = trincoGrid.arquivos?.[tela] || 0;
+        const msg = `medida em px dentro de expressão ("${m[0]}") — largura de coluna e teto de painel vêm do componente, não da tela.`;
+        if (gridVistos < permitido) { avisos.push(`${tela}:${i + 1} [R10] ${msg} (congelado no trinco)`); }
+        else { apontaMedida(i, msg); }
+        gridVistos += 1;
       }
 
       // Espaçamento Tailwind fora dos degraus 0/1/2/3/4/6/8/12 (=0–48px).

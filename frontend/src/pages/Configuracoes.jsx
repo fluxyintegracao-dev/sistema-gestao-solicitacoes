@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { BlocoConteudo, Pagina, PageHeader } from '../components/padrao';
+import StatusBadge from '../components/StatusBadge';
 import {
   canManageConfiguracoesArea,
   hasEnabledModule,
@@ -332,6 +334,49 @@ const SECOES_CONFIG = [
   }
 ];
 
+/*
+  HUB DE CONFIGURAÇÕES — a moldura é a mesma dos outros hubs (04/09)
+  ---------------------------------------------------------------------
+  Esta tela usava uma casca própria (`.config-page-header`,
+  `.config-page-title`, `.config-section*`, `.config-item*`, todas no
+  `index.css`) e por isso ficava de fora de tudo que os componentes padrão
+  já resolvem:
+
+  - C1/R13: `.config-page-header` NÃO declara `position: sticky` em
+    nenhuma das duas definições dela (index.css:1617 e index.css:9290) —
+    não existia faixa fixa. Ao rolar 45 destinos, título e contagem
+    sumiam. O `PageHeader` gruda abaixo da topbar e compacta.
+  - C2/M2: `.config-page-title` é `clamp(1.7rem, 2.5vw, 2.35rem)`
+    (index.css:8250), ou seja no MÍNIMO 27,2px, contra o degrau de 22px
+    do título de página. O título do `PageHeader` já está no degrau.
+  - B5: `.config-page-header` só definia flex/gap e border-radius —
+    título, apoio e contagem flutuavam sobre o canvas, sem fundo, borda
+    ou sombra. A faixa do `PageHeader` é a superfície deles.
+  - M2/R10: o ritmo vertical vinha de `space-y-5 md:space-y-6` na raiz
+    (20/24px); agora vem do `Pagina` (16px, um degrau).
+
+  O ARRANJO É O DA `ModuloRelatorios.jsx`, que é o outro hub do sistema já
+  reformado: seção = `BlocoConteudo` com contagem, destino = `Link` em
+  volta de um `BlocoConteudo` secundário. Dois hubs com dois arranjos
+  seriam duas referências para quem escrever o terceiro.
+
+  O QUE ISTO NÃO MEXEU, DE PROPÓSITO: os 45 destinos, seus títulos,
+  descrições, rotas e regras de permissão. A navegação continua no CORPO,
+  em cards `<Link>` — que é exatamente onde a regra de 04/09 ("Onde a
+  NAVEGAÇÃO mora") manda o hub ficar. Hub é a porta dos módulos; não há
+  seta de voltar (C3 é N/A em listagem/hub) e não há busca nem filtro,
+  então F1–F4 não se aplicam.
+
+  O QUE DEPENDE DE ARQUIVO COMPARTILHADO (não feito aqui, index.css é
+  proibido para esta fatia): as classes `.config-*` que sobraram sem
+  consumidor nesta tela — `.config-page`, `.config-page-header`,
+  `.config-page-header-row`, `.config-page-title`, `.config-page-subtitle`,
+  `.config-page-meta`, `.config-section*`, `.config-grid`, `.config-item*`.
+  As de `summary` seguem em uso por outras três telas
+  (ConfiguracoesProvisionamentoFluxo, NovaSolicitacaoAutomacaoDestinoConfig,
+  NovaSolicitacaoCamposConfig); as de `page`/`section`/`item` ficam órfãs e
+  podem sair numa fatia que possa editar o `index.css`.
+*/
 export default function Configuracoes() {
   const { user } = useAuth();
   const superadmin = isSuperadmin(user);
@@ -357,42 +402,47 @@ export default function Configuracoes() {
     }))
     .filter((secao) => secao.itens.length > 0);
 
+  // Quantos destinos ESTE usuário pode abrir — o mesmo número que a tela
+  // desenha logo abaixo, e não o total do arquivo. Quem tem menos acesso
+  // não deve ler uma contagem que não corresponde ao que está vendo.
+  const totalAtalhos = secoesVisiveis.reduce((acc, secao) => acc + secao.itens.length, 0);
+
   return (
-    <div className="config-page solicitacoes-page space-y-5 md:space-y-6">
-      <header className="config-page-header">
-        <div className="config-page-header-row">
-          <div>
-            <h1 className="config-page-title">Configuracoes</h1>
-            <p className="config-page-subtitle">
-              Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao.
-            </p>
-          </div>
-          <div className="config-page-meta">
-            <span className="config-section-count">
-              {secoesVisiveis.reduce((acc, secao) => acc + secao.itens.length, 0)} atalhos
-            </span>
-          </div>
-        </div>
-      </header>
+    <Pagina>
+      {/* C1/C2/R5/R13: título (22px), contagem e apoio na faixa fixa do
+          topo, em superfície própria e uma linha só. Hub não tem ação
+          sobre si mesmo, então a barra de ações fica vazia. */}
+      <PageHeader
+        titulo="Configuracoes"
+        contagem={`${totalAtalhos} atalhos`}
+        descricao="Gerencie cadastros, regras operacionais e, quando aplicavel, a camada de modulos da instalacao."
+      />
 
-      <section className="config-summary-card">
-        <div>
-          <p className="config-summary-kicker">Console administrativo</p>
-          <h2 className="config-summary-title">Ajustes estruturais do Fluxy</h2>
-          <p className="config-summary-copy">
-            Todas as rotas abaixo preservam o backend atual e concentram apenas configuracoes operacionais e de acesso.
-          </p>
-        </div>
-      </section>
+      {/* B5: o texto de apresentação ganhou superfície. Era a
+          `.config-summary-card`, cujo título é 1.35rem (21,6px) e o
+          "kicker" 12px em caixa alta — o kicker virou a primeira palavra
+          da frase de apoio para não perder o texto (remover elemento
+          visível depende do cliente; reorganizar é livre).
+          FICA REGISTRADO para o cliente decidir: pela B3 este bloco é
+          candidato a sair, porque diz quase o mesmo que o apoio da faixa
+          logo acima. Não saiu aqui justamente por ser remoção. */}
+      <BlocoConteudo
+        titulo="Ajustes estruturais do Fluxy"
+        descricao="Console administrativo — todas as rotas abaixo preservam o backend atual e concentram apenas configuracoes operacionais e de acesso."
+      />
 
-      {secoesVisiveis.map((secao) => (
-        <section key={secao.title} className="config-section">
-          <div className="config-section-head">
-            <h2 className="config-section-title">{secao.title}</h2>
-            <span className="config-section-count">{secao.itens.length} item(ns)</span>
-          </div>
-
-          <div className="config-grid">
+      {secoesVisiveis.map((secao, indice) => (
+        <BlocoConteudo
+          key={secao.title}
+          titulo={secao.title}
+          /* B2: UM primário por tela — o primeiro grupo é por onde se
+             começa a ler; os demais recuam em neutro. Mesma escolha da
+             ModuloRelatorios, pelo mesmo motivo. */
+          variante={indice === 0 ? 'primario' : 'neutro'}
+          cor={indice === 0 ? 'var(--c-primary)' : undefined}
+          contagem={`${secao.itens.length} item(ns)`}
+        >
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {secao.itens.map((item) => (
               <ConfigItem
                 key={item.to || item.title}
@@ -403,26 +453,46 @@ export default function Configuracoes() {
               />
             ))}
           </div>
-        </section>
+        </BlocoConteudo>
       ))}
-    </div>
+    </Pagina>
   );
 }
 
+/*
+  DESTINO DO HUB — `Link` em volta de um bloco secundário.
+
+  Trocou `.config-item` + `.config-item-title` (0,97rem = 15,52px) +
+  `.config-item-description` (0,88rem = 14,08px), todos fora dos degraus,
+  pelo `BlocoConteudo`: título de 18px e apoio de 14px, medidas do
+  componente. A1 continua atendida — o card É um `<Link>`, focável por
+  teclado, com foco visível pelo `focus-visible:outline`.
+*/
 function ConfigItem({ title, description, to, disabled }) {
+  const bloco = (
+    <BlocoConteudo
+      titulo={title}
+      descricao={description}
+      variante="secundario"
+      className="h-full"
+      /* `.config-item-disabled` marcava o indisponível com opacity 0.62,
+         que derruba o contraste abaixo do AA (M3). A etiqueta diz a mesma
+         coisa e continua legível. */
+      acoes={disabled ? <StatusBadge status="Indisponivel" kind="neutral" /> : null}
+    />
+  );
+
   if (disabled) {
-    return (
-      <div className="config-item config-item-disabled" aria-disabled="true">
-        <h3 className="config-item-title">{title}</h3>
-        <p className="config-item-description">{description}</p>
-      </div>
-    );
+    return <div className="h-full" aria-disabled="true">{bloco}</div>;
   }
 
   return (
-    <Link to={to} className="config-item">
-      <h3 className="config-item-title">{title}</h3>
-      <p className="config-item-description">{description}</p>
+    <Link
+      to={to}
+      title={`Abrir ${title}`}
+      className="block h-full rounded-[var(--raio-3)] transition hover:shadow-[shadow:var(--ui-shadow-md)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--c-primary)]"
+    >
+      {bloco}
     </Link>
   );
 }

@@ -1,7 +1,55 @@
-import { useEffect, useMemo, useState } from 'react';
-import { TabelaPadrao, CelulaDupla } from '../components/padrao';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Pagina,
+  PageHeader,
+  BlocoConteudo,
+  TabelaPadrao,
+  CelulaDupla,
+  FormSecao,
+  CampoForm
+} from '../components/padrao';
 import { buscarParceiros } from '../services/parceiros';
 import { listarCartoesRecargaAdmin, salvarCartaoRecarga } from '../services/recargasCartao';
+
+// =====================================================================
+// CARTÕES DE RECARGA — Configurações
+// ---------------------------------------------------------------------
+// Cadastra os cartões Flash e diz quais usuários podem pedir recarga em
+// cada um. Chega-se aqui pelo hub de Configurações → Cadastros.
+//
+// R9 (revista em 04/09) — FORMULÁRIO INLINE, E NÃO EM MODAL.
+// ---------------------------------------------------------------------
+// O critério da R9 não é a frequência do cadastro: é o que a tela existe
+// para fazer. Aplicando o TESTE da regra — "tire o formulário da tela;
+// sobra tela?" — aqui não sobra: o que resta é uma lista de três colunas
+// (cartão, quantos usuários, situação) sem nenhuma forma de criar um
+// cartão nem de mexer nos vínculos. Ninguém abre "Cartões de recarga"
+// para CONSULTAR quantos cartões existem; abre para cadastrar um cartão
+// ou para mudar quem pode usá-lo — que é, palavra por palavra, o que o
+// card do hub promete ("Cadastre os cartões Flash e vincule os usuários
+// autorizados a solicitar recarga").
+//
+// Logo: o achado antigo, de que este formulário "devia abrir em
+// OverlayModal", NÃO PROCEDE — ele vinha da versão anterior da R9, que
+// media o sintoma (cadastro raro) em vez da causa (o cadastro interrompe
+// outro trabalho). Modal aqui seria atrito: obrigaria a abrir e fechar
+// para fazer exatamente aquilo que se veio fazer, e a lista de usuários
+// marcáveis (o miolo do cadastro) é justamente o que pede tela larga.
+// Modal fica para o cadastro que INTERROMPE — criar um credor no meio de
+// uma solicitação, por exemplo. Não é o caso.
+//
+// ARRANJO — empilhado, e não as duas metades lado a lado
+// ---------------------------------------------------------------------
+// O arranjo anterior era `lg:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]`:
+// além de escrever pixel na tela (R10), espremia a tabela em ~40% da
+// largura. Com três colunas de conteúdo (mín. 160px cada, R1) mais a
+// coluna de ações, a lista entrava em rolagem horizontal permanente em
+// telas de 1366px. Empilhado, cada um usa a largura inteira e a ordem de
+// leitura vira a ordem do trabalho: cadastrar → conferir a lista.
+// Como o "Editar" da lista fica ABAIXO do formulário, `editar()` leva a
+// pessoa até ele (rolagem + foco) — sem isso o clique pareceria não ter
+// feito nada.
+// =====================================================================
 
 const FORM_VAZIO = {
   nome: '',
@@ -30,6 +78,9 @@ export default function CartoesRecarga() {
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
+  // R22: hook usado é hook importado — o useRef está no import acima.
+  // A referência serve para levar a pessoa ao formulário; não mede nada.
+  const campoNomeRef = useRef(null);
 
   async function carregar() {
     setCarregando(true);
@@ -65,6 +116,15 @@ export default function CartoesRecarga() {
     return (dados.usuarios || []).filter((usuario) => `${usuario.nome} ${usuario.email}`.toLocaleLowerCase('pt-BR').includes(termo));
   }, [dados.usuarios, buscaUsuario]);
 
+  const cartoes = dados.cartoes || [];
+
+  // preventScroll: quem rola é o scrollIntoView suave; sem ele o foco dá
+  // um salto seco por cima da rolagem (mesmo idioma do StatusSetor).
+  function irParaFormulario() {
+    campoNomeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    campoNomeRef.current?.focus({ preventScroll: true });
+  }
+
   function novo() {
     setEditandoId(null);
     setForm(FORM_VAZIO);
@@ -72,6 +132,14 @@ export default function CartoesRecarga() {
     setBuscaUsuario('');
     setErro('');
     setSucesso('');
+  }
+
+  // A ação da faixa fixa (R13) não abre nada — o formulário já está na
+  // tela: ela limpa o rascunho e LEVA O FOCO até ele, o que serve para
+  // quem está no fim de uma lista longa.
+  function novoDoCabecalho() {
+    novo();
+    irParaFormulario();
   }
 
   function editar(cartao) {
@@ -90,6 +158,7 @@ export default function CartoesRecarga() {
     setBuscaUsuario('');
     setErro('');
     setSucesso('');
+    irParaFormulario();
   }
 
   function alternarUsuario(usuarioId) {
@@ -121,98 +190,233 @@ export default function CartoesRecarga() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 p-4 md:p-6">
-      <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[var(--c-border)] pb-4">
-        <div>
-          <h1 className="text-xl font-semibold text-[var(--c-text)]">Cartões de recarga</h1>
-          <p className="text-sm text-[var(--c-muted)]">Cadastre os cartões Flash e defina quais usuários podem solicitá-los.</p>
-        </div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={novo}>Novo cartão</button>
-      </header>
+    <Pagina>
+      {/* C1/C2/R5/R13: título (22px), contagem e apoio na faixa fixa do
+          topo. Antes eram um `<header>` próprio com `text-xl` e um `<p>`
+          solto: sem `.app-page-header` não havia faixa fixa nem
+          compactação, e o apoio ficava fora do cabeçalho padrão.
+          A ação principal deixou de ser um botão de contorno no meio do
+          cabeçalho custom e virou o primário da faixa (C5). */}
+      <PageHeader
+        titulo="Cartões de recarga"
+        contagem={carregando ? null : `${cartoes.length} cartão(ões)`}
+        descricao="Cadastre os cartões Flash e defina quais usuários podem solicitá-los."
+        acaoPrincipal={{ rotulo: 'Novo cartão', onClick: novoDoCabecalho }}
+      />
 
       {erro ? <div className="app-alert app-alert--error">{erro}</div> : null}
       {sucesso ? <div className="app-alert app-alert--success" role="status">{sucesso}</div> : null}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)]">
-        <section className="rounded-xl border border-[var(--c-border)] bg-[var(--c-card)]">
-          <TabelaPadrao
-            colunas={[
-              {
-                id: 'cartao',
-                titulo: 'Cartão',
-                // R17: o cartão é o registro desta lista.
-                tipo: 'identidade',
-                noCard: 'titulo',
-                render: (cartao) => (
-                  <CelulaDupla
-                    principal={cartao.nome}
-                    sub={`${cartao.identificador} · final ${cartao.ultimos_quatro}`}
-                  />
-                )
-              },
-              {
-                id: 'usuarios',
-                titulo: 'Usuários',
-                tipo: 'numero',
-                render: (cartao) => (cartao.vinculosUsuarios || []).filter((item) => item.ativo !== false).length
-              },
-              {
-                id: 'status',
-                titulo: 'Status',
-                tipo: 'status',
-                render: (cartao) => (cartao.ativo !== false ? 'Ativo' : 'Inativo')
-              }
-            ]}
-            itens={dados.cartoes || []}
-            getId={(cartao) => cartao.id}
-            carregando={carregando}
-            storageKey="tabela:cartoes-recarga"
-            rotuloRolagem="Cartões de recarga"
-            vazio="Nenhum cartão cadastrado."
-            urgencia={(cartao) => (Number(editandoId) === Number(cartao.id) ? 'warning' : null)}
-            acoesLinha={(cartao) => (
-              <button
-                type="button"
-                className="btn btn-outline btn-sm"
-                onClick={() => editar(cartao)}
-                aria-label={`Editar cartão ${cartao.nome}`}
-              >
-                Editar
-              </button>
-            )}
-            larguraAcoes={120}
-          />
-        </section>
-
-        <form className="card space-y-4" onSubmit={salvar}>
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--c-border)] pb-3">
-            <h2 className="text-base font-semibold">{editandoId ? 'Editar cartão' : 'Novo cartão'}</h2>
-            {editandoId ? <span className="text-xs font-medium text-[var(--c-muted)]">Cadastro #{editandoId}</span> : null}
-          </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="grid gap-1 text-sm">Nome de identificação *<input className="input input-sm" value={form.nome} onChange={(e) => setForm((v) => ({ ...v, nome: e.target.value }))} required /></label>
-            <label className="grid gap-1 text-sm">Identificador interno *<input className="input input-sm" value={form.identificador} onChange={(e) => setForm((v) => ({ ...v, identificador: e.target.value }))} placeholder="Ex.: FLASH-GEO-01" required /></label>
-            <label className="grid gap-1 text-sm">Últimos quatro dígitos *<input className="input input-sm" value={form.ultimos_quatro} onChange={(e) => setForm((v) => ({ ...v, ultimos_quatro: e.target.value.replace(/\D/g, '').slice(0, 4) }))} inputMode="numeric" maxLength="4" required /></label>
-            <label className="flex items-end gap-2 pb-2 text-sm"><input type="checkbox" checked={form.ativo} onChange={(e) => setForm((v) => ({ ...v, ativo: e.target.checked }))} /> Cartão ativo</label>
-          </div>
-
-          <label className="relative grid gap-1 text-sm">Fornecedor do cartão *
-            <input className="input input-sm" value={buscaFornecedor} onChange={(e) => { setBuscaFornecedor(e.target.value); setForm((v) => ({ ...v, parceiro_id: '', parceiro_nome: '' })); }} placeholder="Buscar fornecedor" autoComplete="off" />
-            {fornecedores.length ? <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-card)] p-1 shadow-lg">{fornecedores.map((item) => <button key={item.id} type="button" className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--c-surface-alt)]" onMouseDown={(e) => { e.preventDefault(); setForm((v) => ({ ...v, parceiro_id: item.id, parceiro_nome: item.nome })); setBuscaFornecedor(item.nome); setFornecedores([]); }}>{item.nome}<span className="block text-xs text-[var(--c-muted)]">{item.cpf_cnpj || ''}</span></button>)}</div> : null}
-          </label>
-
-          <fieldset className="space-y-2 border-y border-[var(--c-border)] py-3">
-            <legend className="sr-only">Usuários vinculados</legend>
-            <div className="flex items-center justify-between gap-3"><strong className="text-sm">Usuários vinculados *</strong><input className="input input-sm max-w-64" value={buscaUsuario} onChange={(e) => setBuscaUsuario(e.target.value)} placeholder="Filtrar usuários" /></div>
-            <div className="grid max-h-56 gap-x-4 gap-y-1 overflow-y-auto md:grid-cols-2">
-              {usuariosFiltrados.map((usuario) => <label key={usuario.id} className="flex items-start gap-2 rounded px-2 py-1.5 text-sm hover:bg-[var(--c-surface-alt)]"><input className="mt-1" type="checkbox" checked={form.usuario_ids.map(Number).includes(Number(usuario.id))} onChange={() => alternarUsuario(usuario.id)} /><span>{usuario.nome}<small className="block text-[var(--c-muted)]">{usuario.email}</small></span></label>)}
+      <BlocoConteudo
+        titulo={editandoId ? 'Editar cartão' : 'Novo cartão'}
+        descricao="Um cartão é identificado pelo nome interno, pelo identificador do fornecedor e pelos quatro últimos dígitos."
+        acoes={editandoId ? (
+          <span className="text-xs font-medium text-[var(--c-muted)]">Cadastro #{editandoId}</span>
+        ) : null}
+      >
+        <form className="space-y-4" onSubmit={salvar}>
+          {/* R7: rótulo SEMPRE acima do campo e mesma altura de controle
+              (44px do `.input`) — antes os três campos vinham com
+              `input-sm` (32px) e o "Cartão ativo" era um checkbox alinhado
+              por `items-end pb-2`, ou seja, rótulo ao lado num campo e
+              acima nos outros. */}
+          <FormSecao legenda="Identificação do cartão" colunas={2}>
+            <CampoForm label="Nome de identificação" obrigatorio>
+              <input
+                ref={campoNomeRef}
+                className="input w-full"
+                value={form.nome}
+                onChange={(e) => setForm((v) => ({ ...v, nome: e.target.value }))}
+                required
+              />
+            </CampoForm>
+            <CampoForm label="Identificador interno" obrigatorio>
+              <input
+                className="input w-full"
+                value={form.identificador}
+                onChange={(e) => setForm((v) => ({ ...v, identificador: e.target.value }))}
+                placeholder="Ex.: FLASH-GEO-01"
+                required
+              />
+            </CampoForm>
+            <CampoForm label="Últimos quatro dígitos" obrigatorio>
+              <input
+                className="input w-full"
+                value={form.ultimos_quatro}
+                onChange={(e) => setForm((v) => ({ ...v, ultimos_quatro: e.target.value.replace(/\D/g, '').slice(0, 4) }))}
+                inputMode="numeric"
+                maxLength="4"
+                required
+              />
+            </CampoForm>
+            <div className="form-campo--linha">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={form.ativo}
+                  onChange={(e) => setForm((v) => ({ ...v, ativo: e.target.checked }))}
+                />
+                Cartão ativo
+              </label>
             </div>
-          </fieldset>
+          </FormSecao>
 
-          <label className="grid gap-1 text-sm">Observações<textarea className="input min-h-[72px]" value={form.observacoes} onChange={(e) => setForm((v) => ({ ...v, observacoes: e.target.value }))} /></label>
-          <div className="flex justify-end gap-2"><button type="button" className="btn btn-outline btn-sm" onClick={novo}>{editandoId ? 'Cancelar edição' : 'Limpar'}</button><button type="submit" className="btn btn-primary btn-sm" disabled={salvando}>{salvando ? 'Salvando...' : (editandoId ? 'Salvar alterações' : 'Cadastrar cartão')}</button></div>
+          <FormSecao legenda="Fornecedor" colunas={2}>
+            <CampoForm
+              label="Fornecedor do cartão"
+              obrigatorio
+              span={2}
+              hint="Digite para buscar entre os fornecedores ativos e escolha um da lista."
+            >
+              {/* O `relative` mora aqui, e não no CampoForm: é a âncora da
+                  lista de sugestões, que é filha deste bloco. */}
+              <div className="relative">
+                <input
+                  className="input w-full"
+                  value={buscaFornecedor}
+                  onChange={(e) => { setBuscaFornecedor(e.target.value); setForm((v) => ({ ...v, parceiro_id: '', parceiro_nome: '' })); }}
+                  placeholder="Buscar fornecedor"
+                  autoComplete="off"
+                />
+                {fornecedores.length ? (
+                  <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-lg border border-[var(--c-border)] bg-[var(--c-card)] p-1 shadow-lg">
+                    {fornecedores.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="block w-full rounded px-3 py-2 text-left text-sm hover:bg-[var(--c-surface-alt)]"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setForm((v) => ({ ...v, parceiro_id: item.id, parceiro_nome: item.nome }));
+                          setBuscaFornecedor(item.nome);
+                          setFornecedores([]);
+                        }}
+                      >
+                        {item.nome}
+                        <span className="block text-xs text-[var(--c-muted)]">{item.cpf_cnpj || ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </CampoForm>
+          </FormSecao>
+
+          <FormSecao legenda="Usuários vinculados" colunas={2}>
+            <CampoForm
+              label="Filtrar usuários"
+              span={2}
+              hint="Marque ao menos um usuário — são eles que poderão pedir recarga neste cartão."
+            >
+              <input
+                className="input w-full"
+                value={buscaUsuario}
+                onChange={(e) => setBuscaUsuario(e.target.value)}
+                placeholder="Filtrar usuários"
+              />
+            </CampoForm>
+            {/* R18: a rolagem da lista é `overflow-y: auto`, não `hidden` —
+                `auto` é o contêiner de rolagem correto e não sequestra
+                sticky nenhum. */}
+            <div className="form-campo--linha">
+              <div className="grid max-h-56 gap-x-4 gap-y-1 overflow-y-auto md:grid-cols-2">
+                {usuariosFiltrados.map((usuario) => (
+                  <label key={usuario.id} className="flex items-start gap-2 rounded px-2 py-2 text-sm hover:bg-[var(--c-surface-alt)]">
+                    <input
+                      className="mt-1"
+                      type="checkbox"
+                      checked={form.usuario_ids.map(Number).includes(Number(usuario.id))}
+                      onChange={() => alternarUsuario(usuario.id)}
+                    />
+                    <span>
+                      {usuario.nome}
+                      <small className="block text-[var(--c-muted)]">{usuario.email}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </FormSecao>
+
+          <FormSecao legenda="Complemento" colunas={2}>
+            <CampoForm label="Observações" tipo="texto-longo">
+              {/* Sem `min-h-[72px]`: a altura mínima do textarea já é do
+                  componente (`textarea.input`), e px na tela é R10. */}
+              <textarea
+                className="input w-full"
+                value={form.observacoes}
+                onChange={(e) => setForm((v) => ({ ...v, observacoes: e.target.value }))}
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <div className="app-actionbar">
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando ? 'Salvando...' : (editandoId ? 'Salvar alterações' : 'Cadastrar cartão')}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={novo}>
+              {editandoId ? 'Cancelar edição' : 'Limpar'}
+            </button>
+          </div>
         </form>
-      </div>
-    </div>
+      </BlocoConteudo>
+
+      {/* B2: a lista é o bloco primário — é nela que se vê o efeito do
+          cadastro. Antes era uma `<section>` com borda e raio escritos na
+          tela; a superfície agora é do BlocoConteudo. */}
+      <BlocoConteudo
+        titulo="Cartões cadastrados"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
+        <TabelaPadrao
+          colunas={[
+            {
+              id: 'cartao',
+              titulo: 'Cartão',
+              // R17: o cartão é o registro desta lista.
+              tipo: 'identidade',
+              noCard: 'titulo',
+              render: (cartao) => (
+                <CelulaDupla
+                  principal={cartao.nome}
+                  sub={`${cartao.identificador} · final ${cartao.ultimos_quatro}`}
+                />
+              )
+            },
+            {
+              id: 'usuarios',
+              titulo: 'Usuários',
+              tipo: 'numero',
+              render: (cartao) => (cartao.vinculosUsuarios || []).filter((item) => item.ativo !== false).length
+            },
+            {
+              id: 'status',
+              titulo: 'Status',
+              tipo: 'status',
+              render: (cartao) => (cartao.ativo !== false ? 'Ativo' : 'Inativo')
+            }
+          ]}
+          itens={cartoes}
+          getId={(cartao) => cartao.id}
+          carregando={carregando}
+          storageKey="tabela:cartoes-recarga"
+          rotuloRolagem="Cartões de recarga"
+          vazio="Nenhum cartão cadastrado."
+          urgencia={(cartao) => (Number(editandoId) === Number(cartao.id) ? 'warning' : null)}
+          acoesLinha={(cartao) => (
+            <button
+              type="button"
+              className="btn btn-outline btn-sm"
+              onClick={() => editar(cartao)}
+              aria-label={`Editar cartão ${cartao.nome}`}
+            >
+              Editar
+            </button>
+          )}
+          larguraAcoes={120}
+        />
+      </BlocoConteudo>
+    </Pagina>
   );
 }
