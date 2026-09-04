@@ -717,11 +717,22 @@ export default function FinanceiroTituloDetalhe() {
               setModalBaixaOpen(true);
             }
           }}
+          /*
+            "ABRIR SOLICITAÇÃO" SAIU DAQUI (decisão do cliente, 04/09).
+
+            Terceira linha da regra de navegação: link para o REGISTRO
+            RELACIONADO mora no corpo, junto do dado que o origina — nunca
+            na barra de ações nem no menu "⋯".
+
+            Ao lado do dado o link explica por que existe; na barra de ações
+            fica sem contexto, e é essa falta de contexto que a C6 chama de
+            navegação vestida de ação.
+
+            Aqui não se perdeu caminho nenhum: o link JÁ existia no corpo, no
+            campo "Solicitacao" do bloco de dados, com o código clicável.
+            A faixa trazia a MESMA navegação em duplicata.
+          */
           secundarias={[
-            titulo.solicitacao?.id && {
-              rotulo: 'Abrir solicitacao',
-              to: `/solicitacoes/${titulo.solicitacao.id}`
-            },
             podeEditarTitulo
               ? { rotulo: 'Editar titulo', to: `/financeiro/titulos/${titulo.id}/editar` }
               : {

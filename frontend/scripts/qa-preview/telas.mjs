@@ -62,10 +62,13 @@ export const TELAS = [
     id: 'financeiro-titulo-detalhe',
     arquivo: 'src/pages/FinanceiroTituloDetalhe.jsx',
     resolver: 'tituloDetalhe',
-    tipo: 'detalhe',
-    naoAplica: {
-      C6: '"Abrir solicitação" é link para outra rota na barra de ações — item 5 da lista de decisões (DECISOES-PENDENTES-QA.md), aguardando o cliente; exceção registrada até lá'
-    }
+    tipo: 'detalhe'
+    /*
+      A exceção de C6 saiu em 04/09: o cliente decidiu a terceira linha da
+      regra de navegação (link para registro relacionado mora no corpo), o
+      "Abrir solicitação" foi removido da faixa — onde era duplicata do link
+      que já existia no campo "Solicitacao" — e não há mais o que excetuar.
+    */
   },
   {
     id: 'obras',

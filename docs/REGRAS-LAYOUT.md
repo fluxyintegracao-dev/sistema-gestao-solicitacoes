@@ -681,6 +681,26 @@ do escopo dos dois.
 |---|---|
 | **Ação sobre esta tela** (salvar, baixar, importar, arquivar) | barra de ações; as raras, no menu "⋯" |
 | **Caminho para outra tela** | **hub do módulo**, **breadcrumb** e **Ctrl+K** |
+| **Link para o REGISTRO RELACIONADO** | **no corpo, junto do dado que o origina** — nunca na barra de ações nem no menu |
+
+A terceira linha entrou em 04/09 (decisão do cliente), depois que a primeira
+varredura desta regra devolveu um caso que as duas primeiras linhas não
+cobriam: o "Abrir solicitação" da `FinanceiroTituloDetalhe`. Ele não é
+atalho de módulo — segue uma relação do DADO —, e nenhum dos três lugares da
+segunda linha consegue hospedá-lo: o hub não sabe a qual solicitação *este*
+título pertence, o breadcrumb devolve à hierarquia do próprio módulo, e o
+Ctrl+K acha telas por nome, não o registro ligado ao que está aberto.
+
+**Onde ele mora, e por quê:** ao lado do dado, o link explica POR QUE existe
+— "Solicitação: SOL-1957", com o código clicável, no campo que carrega o
+vínculo. Na barra de ações ele fica sem contexto, e é justamente essa falta
+de contexto que a C6 chama de "navegação vestida de ação".
+
+**O caso que originou a regra não perdeu caminho nenhum**: o link já existia
+no corpo, no campo "Solicitacao"; a faixa trazia a MESMA navegação em
+duplicata. Vale como teste antes de mover qualquer um: se o corpo já mostra
+o vínculo, o botão da faixa é duplicata e sai; se não mostra, o campo entra
+primeiro e o botão sai depois.
 
 Os três existem exatamente para isso: o hub reúne os destinos do módulo, o
 breadcrumb devolve à hierarquia, a busca alcança qualquer um por nome.
