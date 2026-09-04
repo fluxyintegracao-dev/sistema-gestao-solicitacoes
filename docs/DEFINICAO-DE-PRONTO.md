@@ -227,12 +227,40 @@ Dois deles não mediam **nada**, não "mediam pouco":
   tabela com coluna de identidade. Errava nos dois sentidos: acusava a
   fixture limpa e absolvia a fixture com defeito.
 
-**LACUNA AINDA ABERTA, declarada**: **7 itens** não moram no `checks.mjs` e
-por isso NÃO entraram nesta auditoria — **C1, T3, F3, M2, R1, R3, X2**. São
-medidos pelo runner (`verificar.mjs`) com hover, clique, arrasto e rolagem,
-e precisam de prova própria. Até que a tenham, **nenhum deles pode ser
-tratado como verificado só por aparecer verde** — inclusive a T3, que existe
-para provar que o arrasto de coluna grava só a coluna arrastada.
+**Os 7 do runner, auditados em 04/09** (`provas/itensDoRunnerMordem.mjs`,
+com fixture que monta os COMPONENTES REAIS): **6 passaram de primeira**
+(C1, F3, R1, X2, M2, R3), **1 precisou de correção** — a **T3** — e **0
+não-prováveis**.
+
+**Total geral: 42 instrumentos auditados, 8 não mordiam.**
+
+### A T3, e a lição que ela fecha
+
+A T3 tinha CINCO ramos. Três mordiam. Dois estavam **mortos** — e um deles
+era o coração da regra:
+
+1. **O invariante de posse não media nada.** Ele varria o `localStorage`
+   por `/larguras|colunas/i`, e a chave real de larguras é
+   `tabela:<tela>:<lista>:v3` — **não contém nenhuma das duas palavras**.
+   Nunca casava. Pior: a única chave que o regex casava é
+   `tabela:<x>:colunas`, que guarda visibilidade e ordem — bastaria alguém
+   mexer no painel de colunas para a T3 acusar um arrasto que nunca houve.
+   **Errado nos dois sentidos**: verde onde devia morder, vermelho onde não
+   há defeito.
+2. **"A tabela não pode estourar sem rolagem" era matematicamente
+   impossível** — se a tabela é mais larga que o contêiner, o `scrollWidth`
+   do contêiner já é pelo menos a largura da tabela. Mesmo formato da X3.
+
+**E esta T3 foi escrita por mim, nesta mesma série, um dia antes** — ao
+descobrir que a versão anterior exigia o oposto da regra acordada. Escrevi
+um check novo e o usei imediatamente como garantia, sem prová-lo. É
+exatamente o que esta seção da DoD passou a proibir, cometido por quem
+acabara de escrever a proibição.
+
+**A lição não é "checks antigos apodrecem". É que check recém-escrito é tão
+suspeito quanto check antigo** — mais, até, porque ninguém desconfia do que
+acabou de fazer. Prova nos dois sentidos não é auditoria de legado: é parte
+de escrever a regra.
 
 ### O corolário incômodo
 

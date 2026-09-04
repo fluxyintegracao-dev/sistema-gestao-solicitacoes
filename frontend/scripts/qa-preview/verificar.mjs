@@ -51,7 +51,23 @@ const BASE = valorDe('--base') || 'https://refactor-dev.jrfluxy.com.br';
 const USUARIO = process.env.QA_PREVIEW_USER;
 const SENHA = process.env.QA_PREVIEW_PASS;
 
-if (!USUARIO || !SENHA) {
+/*
+  A GUARDA DE CREDENCIAIS SÓ VALE PARA QUEM EXECUTA (03/09).
+
+  O `process.exit(2)` ficava aqui, no topo do módulo. Ele fecha a porta
+  certa para quem RODA o harness sem credencial — e derrubava, com o mesmo
+  código de saída, quem só IMPORTA uma função daqui para prová-la
+  (`scripts/provas/itensDoRunnerMordem.mjs`). Na máquina de quem tem
+  QA_PREVIEW_USER exportado isso passa despercebido; em qualquer outra — CI,
+  clone novo, `npm run provas` — a prova morria antes da primeira linha, sem
+  dizer por quê. É a mesma família do defeito consertado hoje mais cedo
+  (importar o arquivo disparava o harness inteiro): efeito colateral de
+  módulo atingindo quem só queria uma função.
+*/
+const EXECUTADO_DIRETO = Boolean(process.argv[1])
+  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
+
+if (EXECUTADO_DIRETO && (!USUARIO || !SENHA)) {
   console.error(
     '[qa-preview] ABORTADO: defina QA_PREVIEW_USER e QA_PREVIEW_PASS no '
     + 'ambiente. As credenciais de QA vivem SOMENTE em variáveis de ambiente '
@@ -366,20 +382,59 @@ async function checarRedimensionamento(page, tela, resultado) {
       colunas: Array.from(tab.querySelectorAll('thead th')).map((th) => Math.round(th.getBoundingClientRect().width)),
       tabela: Math.round(tab.getBoundingClientRect().width),
       conteiner: rol ? Math.round(rol.clientWidth) : null,
-      rolagem: rol ? Math.round(rol.scrollWidth) : null
+      rolagem: rol ? Math.round(rol.scrollWidth) : null,
+      /*
+        O CONTÊINER PODE ROLAR? (03/09, achado por fixture.)
+
+        `scrollWidth > clientWidth` NÃO é sinal de rolagem: num contêiner
+        com `overflow: visible` o navegador conta o transbordo no
+        `scrollWidth` e não oferece rolagem nenhuma — a tabela simplesmente
+        derrama para fora do bloco. O check dava esse caso por resolvido
+        ("ou as livres absorvem, ou rola dentro do contêiner") e deixava
+        passar justamente a forma mais visível do defeito. Quem decide se
+        rola é o `overflow-x` computado.
+      */
+      podeRolar: rol ? ['auto', 'scroll'].includes(getComputedStyle(rol).overflowX) : false
     };
   });
-  const chavesGravadas = () => page.evaluate(() => {
-    const chaves = Object.keys(window.localStorage).filter((k) => /larguras|colunas/i.test(k));
+  /*
+    O QUE O ARRASTO GRAVOU — por DIFERENÇA, não por nome de chave.
+
+    A versão anterior varria o localStorage por `/larguras|colunas/i`. A
+    chave de larguras da TabelaPadrao é `tabela:<tela>:<lista>:v3` — não tem
+    "larguras" nem "colunas" no nome, então o filtro NUNCA a encontrava e o
+    invariante de posse (o coração da T3 reescrita) não media nada: com um
+    arrasto gravando as QUATRO colunas, o check seguia verde. Provado em
+    `scripts/provas/itensDoRunnerMordem.mjs`.
+
+    E o filtro ainda pegava a chave errada: `tabela:<...>:colunas` guarda a
+    VISIBILIDADE/ORDEM das colunas (`{ordem, visiveis, ocultas}`) e casa com
+    o nome — bastava o usuário ter mexido no painel de colunas para o check
+    acusar "três colunas gravadas" por um arrasto que nunca houve.
+
+    Agora mede o que interessa: o que MUDOU no localStorage entre antes e
+    depois do arrasto, e destes só os mapas de LARGURA (todo valor é
+    número). Um arrasto = uma coluna gravada.
+  */
+  const instantaneoDoArmazem = () => page.evaluate(() => {
     const mapa = {};
-    chaves.forEach((k) => {
-      try {
-        const v = JSON.parse(window.localStorage.getItem(k) || '{}');
-        if (v && typeof v === 'object') mapa[k] = Object.keys(v);
-      } catch { /* chave que não é JSON não interessa */ }
-    });
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const chave = window.localStorage.key(i);
+      mapa[chave] = window.localStorage.getItem(chave);
+    }
     return mapa;
   });
+  const larguraGravadaPorChave = (antesDoArmazem, depoisDoArmazem) => Object.entries(depoisDoArmazem)
+    .filter(([chave, cru]) => antesDoArmazem[chave] !== cru)
+    .flatMap(([chave, cru]) => {
+      let valor = null;
+      try { valor = JSON.parse(cru); } catch { return []; }
+      if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return [];
+      const colunas = Object.keys(valor);
+      const ehMapaDeLarguras = colunas.length > 0
+        && colunas.every((c) => typeof valor[c] === 'number' && Number.isFinite(valor[c]));
+      return ehMapaDeLarguras ? [[chave, colunas]] : [];
+    });
   const medidaAntes = await medir();
   const antes = medidaAntes?.colunas;
   if (!antes || antes.length < 2) {
@@ -397,6 +452,7 @@ async function checarRedimensionamento(page, tela, resultado) {
     resultado.T3 = { estado: 'FALHOU', motivo: 'alça de redimensionamento invisível' };
     return;
   }
+  const armazemAntes = await instantaneoDoArmazem();
   await page.mouse.move(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
   await page.mouse.down();
   await page.mouse.move(caixa.x + caixa.width / 2 + 64, caixa.y + caixa.height / 2, { steps: 6 });
@@ -413,7 +469,7 @@ async function checarRedimensionamento(page, tela, resultado) {
      contêiner (X3). O que não pode é transbordar sem rolagem. */
   if (medidaDepois?.conteiner != null) {
     const excesso = medidaDepois.tabela - medidaDepois.conteiner;
-    const rola = medidaDepois.rolagem > medidaDepois.conteiner + 4;
+    const rola = medidaDepois.podeRolar && medidaDepois.rolagem > medidaDepois.conteiner + 4;
     if (excesso > 24 && !rola) {
       problemas.push(`o arrasto empurrou a tabela para ${medidaDepois.tabela}px num contêiner de ${medidaDepois.conteiner}px (${excesso}px fora) SEM rolagem própria`);
     }
@@ -422,9 +478,8 @@ async function checarRedimensionamento(page, tela, resultado) {
   /* O invariante de posse: uma arrastada = UMA chave gravada. Se o arrasto
      congelasse as vizinhas, elas apareceriam aqui — e aí sim a próxima
      janela menor não conseguiria mais redistribuir nada. */
-  const gravadas = await chavesGravadas();
-  const daTabela = Object.entries(gravadas).filter(([, v]) => v.length > 0);
-  const demais = daTabela.flatMap(([chave, v]) => (v.length > 1 ? [`${chave}: ${v.length} colunas (${v.join(', ')})`] : []));
+  const gravadasNoArrasto = larguraGravadaPorChave(armazemAntes, await instantaneoDoArmazem());
+  const demais = gravadasNoArrasto.flatMap(([chave, v]) => (v.length > 1 ? [`${chave}: ${v.length} colunas (${v.join(', ')})`] : []));
   if (demais.length) {
     problemas.push(`um arrasto gravou mais de uma coluna como DO USUÁRIO — ${demais[0]}; as vizinhas ficariam congeladas e a tabela pararia de acompanhar a janela`);
   }
@@ -1179,10 +1234,7 @@ async function main() {
   podem ser importadas para serem PROVADAS sem que ninguém acorde o
   preview por engano.
 */
-const executadoDireto = process.argv[1]
-  && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
-
-if (executadoDireto) {
+if (EXECUTADO_DIRETO) {
   main().catch((erro) => {
     console.error(`[qa-preview] ${erro.message || erro}`);
     process.exit(3);
