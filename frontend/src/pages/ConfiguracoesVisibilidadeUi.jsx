@@ -4,6 +4,18 @@ import {
   salvarVisibilidadeUi
 } from '../services/configuracoesSistema';
 import { resetUiVisibilityCache } from '../hooks/useUiVisibility';
+import { Avisos, BlocoConteudo, Pagina, PageHeader, useAvisos } from '../components/padrao';
+
+/**
+ * VISIBILIDADE DE DASHBOARDS E TABELAS — reforma de 04/09.
+ *
+ * O cabeçalho vivia num `.app-toolbar-card`, que é só flex/gap: não gruda,
+ * não compacta, não tem posição própria. Numa tela LONGA por construção —
+ * ela lista todos os componentes configuráveis do sistema — o "Salvar
+ * visibilidade" sumia na primeira rolagem e só voltava subindo a página
+ * inteira. Com `Pagina` + `PageHeader` a ação principal está sempre a um
+ * clique (C1/R13).
+ */
 
 function normalizeKey(value) {
   return String(value || '').trim().toLowerCase();
@@ -19,18 +31,26 @@ function typeLabel(type) {
 function ComponentToggle({ component, checked, onChange }) {
   return (
     <label
-      className={`flex cursor-pointer items-start justify-between gap-4 rounded-lg border px-3 py-3 transition-colors ${
+      /*
+        R25: as duas faces desta etiqueta eram paleta crua — emerald para a
+        marcada, slate para a desmarcada, com `text-slate-500` (#64748b =
+        4,34:1) no texto da desmarcada, abaixo do mínimo AA de 4,5:1. É o
+        caso que a própria R25 nomeia. Os tokens semânticos acompanham o
+        tema escuro e passam pelo piso de contraste do ThemeContext (R24).
+      */
+      className={`flex cursor-pointer items-start justify-between gap-4 rounded-xl border px-3 py-3 transition-colors ${
         checked
-          ? 'border-emerald-200 bg-emerald-50/70'
-          : 'border-slate-200 bg-slate-50 text-slate-500'
+          ? 'border-[var(--sem-success-border)] bg-[var(--sem-success-bg)]'
+          : 'border-[var(--c-border)] bg-[var(--c-bg)] text-[var(--c-muted)]'
       }`}
     >
       <span className="min-w-0">
         <span className="block text-sm font-semibold text-[var(--c-text)]">{component.label}</span>
-        <span className="mt-1 inline-flex rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500">
-          {typeLabel(component.type)}
-        </span>
-        <span className="mt-1 block font-mono text-[10px] text-slate-500">{component.key}</span>
+        {/* M2/R10: era `text-[10px]` com `py-0.5` — nada abaixo de 12px em
+            conteúdo, e nenhum espaçamento fora dos degraus. A pílula do
+            sistema (.fx-badge) já traz tamanho, respiro e cor de token. */}
+        <span className="fx-badge mt-1">{typeLabel(component.type)}</span>
+        <span className="mt-1 block font-mono text-xs text-[var(--c-muted)]">{component.key}</span>
       </span>
       <input
         type="checkbox"
@@ -48,6 +68,9 @@ export default function ConfiguracoesVisibilidadeUi() {
   const [filtro, setFiltro] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  // R3/R19: as três caixas do navegador (carregar, salvar, erro ao salvar)
+  // viraram avisos do sistema — com tom semântico e sucesso que some sozinho.
+  const { avisos, avisar, fechar } = useAvisos();
 
   useEffect(() => {
     let active = true;
@@ -59,7 +82,10 @@ export default function ConfiguracoesVisibilidadeUi() {
         setHidden(Array.isArray(data?.hidden) ? data.hidden.map(normalizeKey) : []);
       })
       .catch((err) => {
-        alert(err?.message || 'Erro ao carregar configuracao de visibilidade');
+        // O ramo de erro era o único que não conferia `active` — avisar
+        // depois da desmontagem é atualizar estado de componente morto.
+        if (!active) return;
+        avisar.erro(err?.message || 'Erro ao carregar configuracao de visibilidade');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -68,7 +94,7 @@ export default function ConfiguracoesVisibilidadeUi() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [avisar]);
 
   const hiddenSet = useMemo(() => new Set(hidden), [hidden]);
   const allKeys = useMemo(() => registry.flatMap((group) =>
@@ -135,31 +161,30 @@ export default function ConfiguracoesVisibilidadeUi() {
       const data = await salvarVisibilidadeUi({ hidden });
       setHidden(Array.isArray(data?.hidden) ? data.hidden.map(normalizeKey) : []);
       resetUiVisibilityCache();
-      alert('Visibilidade salva com sucesso.');
+      avisar.sucesso('Visibilidade salva com sucesso.');
     } catch (err) {
-      alert(err?.message || 'Erro ao salvar visibilidade');
+      avisar.erro(err?.message || 'Erro ao salvar visibilidade');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="page solicitacoes-page space-y-5">
-      <div className="card sol-surface-card app-toolbar-card">
-        <div className="app-page-header-row">
-          <div>
-            <h1 className="page-title">Visibilidade de Dashboards e Tabelas</h1>
-            <p className="page-subtitle">
-              Controle quais blocos aparecem nas telas sem alterar a permissao de acesso dos usuarios.
-            </p>
-          </div>
-          <div className="app-page-actions">
-            <button type="button" className="btn btn-primary btn-sm" onClick={salvar} disabled={saving || loading}>
-              {saving ? 'Salvando...' : 'Salvar visibilidade'}
-            </button>
-          </div>
-        </div>
-      </div>
+    <Pagina>
+      {/* B3: a contagem NÃO sobe para a faixa aqui — os três cartões de
+          resumo abaixo já são os donos dela (mapeados / visíveis / ocultos).
+          Repetir o número na faixa seria a mesma informação duas vezes. */}
+      <PageHeader
+        titulo="Visibilidade de Dashboards e Tabelas"
+        descricao="Controle quais blocos aparecem nas telas sem alterar a permissao de acesso dos usuarios."
+        acaoPrincipal={{
+          rotulo: saving ? 'Salvando...' : 'Salvar visibilidade',
+          onClick: salvar,
+          desabilitada: saving || loading
+        }}
+      />
+
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       <section className="grid gap-3 md:grid-cols-3">
         <div className="app-summary-card">
@@ -169,92 +194,120 @@ export default function ConfiguracoesVisibilidadeUi() {
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">Visiveis</span>
-          <strong className="app-summary-value text-emerald-700">{visibleCount}</strong>
+          <strong className="app-summary-value text-[var(--sem-success)]">{visibleCount}</strong>
           <span className="app-summary-subvalue">Aparecem para usuarios autorizados</span>
         </div>
         <div className="app-summary-card">
           <span className="app-summary-label">Ocultos</span>
-          <strong className="app-summary-value text-amber-700">{hiddenCount}</strong>
+          <strong className="app-summary-value text-[var(--sem-warning)]">{hiddenCount}</strong>
           <span className="app-summary-subvalue">Nao aparecem nas telas configuradas</span>
         </div>
       </section>
 
-      <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
-        <strong>Governanca:</strong> esta configuracao nao concede acesso. Primeiro o usuario precisa ter permissao de modulo/area.
-        Depois disso, estes controles definem quais blocos ficam visiveis na experiencia.
-      </div>
+      <BlocoConteudo titulo="Governanca" variante="secundario">
+        {/* R25: era border-sky-200 / bg-sky-50 / text-sky-800 — paleta crua
+            sem par no tema escuro. Tom informativo = tokens --sem-info-*. */}
+        <p className="rounded-xl border border-[var(--sem-info-border)] bg-[var(--sem-info-bg)] p-4 text-sm text-[var(--sem-info)]">
+          Esta configuracao nao concede acesso. Primeiro o usuario precisa ter permissao de modulo/area.
+          Depois disso, estes controles definem quais blocos ficam visiveis na experiencia.
+        </p>
+      </BlocoConteudo>
 
-      <div className="card sol-surface-card">
-        <input
-          className="input input-sm w-full md:max-w-md"
-          placeholder="Filtrar por modulo, pagina, tabela ou chave..."
-          value={filtro}
-          onChange={(event) => setFiltro(event.target.value)}
-        />
-      </div>
-
-      {loading ? (
-        <div className="app-empty-card">Carregando componentes configuraveis...</div>
-      ) : (
-        <div className="space-y-4">
-          {filteredRegistry.map((group) => (
-            <section key={group.module} className="card sol-surface-card p-0">
-              <div className="border-b border-[var(--c-border)] px-4 py-3">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
-                  {group.module}
-                </p>
-                <h2 className="mt-1 text-lg font-bold text-[var(--c-text)]">{group.label}</h2>
-                {group.description ? (
-                  <p className="mt-1 text-sm text-[var(--c-muted)]">{group.description}</p>
-                ) : null}
-              </div>
-
-              <div className="divide-y divide-[var(--c-border)]">
-                {(group.pages || []).map((page) => {
-                  const pageKeys = (page.components || []).map((component) => normalizeKey(component.key));
-                  const visiblePageCount = pageKeys.filter((key) => !hiddenSet.has(key)).length;
-
-                  return (
-                    <div key={page.key} className="px-4 py-4">
-                      <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          <h3 className="text-sm font-bold text-[var(--c-text)]">{page.label}</h3>
-                          <p className="font-mono text-[11px] text-[var(--c-muted)]">{page.path}</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                            {visiblePageCount}/{pageKeys.length} visiveis
-                          </span>
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, true)}>
-                            Exibir pagina
-                          </button>
-                          <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, false)}>
-                            Ocultar pagina
-                          </button>
-                        </div>
-                      </div>
-
-                      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                        {(page.components || []).map((component) => {
-                          const key = normalizeKey(component.key);
-                          return (
-                            <ComponentToggle
-                              key={component.key}
-                              component={component}
-                              checked={!hiddenSet.has(key)}
-                              onChange={() => toggleKey(component.key)}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
+      <BlocoConteudo
+        titulo="Componentes configuraveis"
+        variante="primario"
+        cor="var(--c-primary)"
+      >
+        {/*
+          R3: o campo era `input input-sm w-full md:max-w-md` — largura
+          escrita na tela. `.app-busca` é classe de LARGURA (cresce até 480px
+          e nunca fica pequena com vazio ao lado), e vale AQUI porque este é
+          o campo de busca de verdade da tela: filtra a listagem inteira. Não
+          é classe de papel — pôr `.app-busca` num campo que não busca é o
+          engano que já quebrou duas telas deste projeto.
+        */}
+        <div className="flex flex-wrap gap-3">
+          <input
+            className="input app-busca"
+            placeholder="Filtrar por modulo, pagina, tabela ou chave..."
+            aria-label="Filtrar por modulo, pagina, tabela ou chave"
+            value={filtro}
+            onChange={(event) => setFiltro(event.target.value)}
+          />
         </div>
-      )}
-    </div>
+
+        {loading ? (
+          <div className="app-empty-card">Carregando componentes configuraveis...</div>
+        ) : (
+          <div className="space-y-4">
+            {filteredRegistry.map((group) => (
+              <section
+                key={group.module}
+                className="rounded-xl border border-[var(--c-border)] bg-[var(--c-surface)]"
+              >
+                <div className="border-b border-[var(--c-border)] px-4 py-3">
+                  {/* M2/R10: `text-[10px]` era medida fora da escala e abaixo
+                      do piso de 12px em conteúdo — text-xs é o degrau de
+                      detalhe. */}
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--c-muted)]">
+                    {group.module}
+                  </p>
+                  <h3 className="mt-1 text-lg font-bold text-[var(--c-text)]">{group.label}</h3>
+                  {group.description ? (
+                    <p className="mt-1 text-sm text-[var(--c-muted)]">{group.description}</p>
+                  ) : null}
+                </div>
+
+                <div className="divide-y divide-[var(--c-border)]">
+                  {(group.pages || []).map((page) => {
+                    const pageKeys = (page.components || []).map((component) => normalizeKey(component.key));
+                    const visiblePageCount = pageKeys.filter((key) => !hiddenSet.has(key)).length;
+
+                    return (
+                      <div key={page.key} className="px-4 py-4">
+                        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            <h4 className="text-sm font-bold text-[var(--c-text)]">{page.label}</h4>
+                            <p className="font-mono text-xs text-[var(--c-muted)]">{page.path}</p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            {/* R25/M2: era `bg-slate-100 text-slate-600` com
+                                `px-2.5` e `text-[11px]`. A pílula do sistema
+                                resolve cor, tamanho e respiro de uma vez. */}
+                            <span className="fx-badge">
+                              {visiblePageCount}/{pageKeys.length} visiveis
+                            </span>
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, true)}>
+                              Exibir pagina
+                            </button>
+                            <button type="button" className="btn btn-outline btn-sm" onClick={() => setPageVisibility(page, false)}>
+                              Ocultar pagina
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {(page.components || []).map((component) => {
+                            const key = normalizeKey(component.key);
+                            return (
+                              <ComponentToggle
+                                key={component.key}
+                                component={component}
+                                checked={!hiddenSet.has(key)}
+                                onChange={() => toggleKey(component.key)}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </BlocoConteudo>
+    </Pagina>
   );
 }
