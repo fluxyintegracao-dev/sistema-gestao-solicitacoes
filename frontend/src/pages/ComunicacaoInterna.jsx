@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   HiOutlineArchiveBox,
   HiOutlineArrowUturnLeft,
+  HiOutlineCheckCircle,
+  HiOutlineUserPlus,
   HiOutlineChatBubbleLeftRight,
   HiOutlineChevronLeft,
   HiOutlineInformationCircle,
@@ -27,7 +29,17 @@ import {
   getDestinatariosConversa,
   getMensagens,
   listarConversas,
-  marcarLida
+  marcarLida,
+  /*
+    PORTADAS DA ConversaDetalhe (decisao do cliente, 04/09).
+
+    As tres existiam ponta a ponta — servico no frontend e rota no backend —
+    e NENHUMA tela alcancavel as oferecia. O sistema sabia concluir, reabrir
+    e adicionar participantes; ninguem conseguia fazer.
+  */
+  adicionarParticipantesConversa,
+  concluirConversa,
+  reabrirConversa
 } from '../services/conversasInternas';
 import PendingAttachmentsList from '../components/attachments/PendingAttachmentsList';
 import {
@@ -648,6 +660,98 @@ export default function ComunicacaoInterna() {
     }
   }, [editandoId, textoEdicao, avisar]);
 
+  /*
+    CONCLUIR, REABRIR E ADICIONAR PARTICIPANTES — portadas em 04/09.
+
+    ARQUIVAR NAO E CONCLUIR, e o texto tem de dizer isso a quem clica:
+    arquivar TIRA DA VISTA (some da caixa, volta com um filtro); concluir
+    ENCERRA O ASSUNTO (a conversa fica marcada como resolvida para todos os
+    participantes). Sao coisas diferentes e por isso convivem na faixa.
+
+    As duas mudam ESTADO da conversa para todo mundo, entao passam pelo
+    modal do sistema. O `confirm()` do navegador que a tela antiga usava nao
+    serve: e caixa cinza fora do tema (R19) e — pior — o retorno de
+    `confirmar()` e OBJETO, entao ler como booleano faria "Cancelar"
+    concluir a conversa do mesmo jeito (R21).
+
+    Permissao: as tres rotas do backend exigem `allowComunicacaoSend`, o
+    mesmo gate de `podeEnviarComunicacao`. Botao que a pessoa nao pode usar
+    nao aparece — falhar depois do clique e pior que nao oferecer.
+  */
+  const conversaConcluida = detalhe?.status === 'CONCLUIDA';
+
+  const handleConcluir = useCallback(async () => {
+    if (!conversaAtiva) return;
+    const { ok } = await confirmar({
+      titulo: 'Concluir conversa',
+      mensagem: 'Encerrar o assunto desta conversa? Ela fica marcada como concluida para todos os participantes. Isso e diferente de arquivar, que apenas tira a conversa da sua caixa.',
+      rotuloConfirmar: 'Concluir'
+    });
+    if (!ok) return;
+    try {
+      await concluirConversa(conversaAtiva);
+      const det = await getConversa(conversaAtiva);
+      setDetalhe(det);
+      await carregarLista(true);
+      avisar.sucesso('Conversa concluida.');
+    } catch (err) {
+      avisar.erro(err?.message || 'Erro ao concluir conversa');
+    }
+  }, [conversaAtiva, confirmar, carregarLista, avisar]);
+
+  const handleReabrir = useCallback(async () => {
+    if (!conversaAtiva) return;
+    const { ok } = await confirmar({
+      titulo: 'Reabrir conversa',
+      mensagem: 'Reabrir esta conversa? Ela volta a constar como em andamento para todos os participantes.',
+      rotuloConfirmar: 'Reabrir'
+    });
+    if (!ok) return;
+    try {
+      await reabrirConversa(conversaAtiva);
+      const det = await getConversa(conversaAtiva);
+      setDetalhe(det);
+      await carregarLista(true);
+      avisar.sucesso('Conversa reaberta.');
+    } catch (err) {
+      avisar.erro(err?.message || 'Erro ao reabrir conversa');
+    }
+  }, [conversaAtiva, confirmar, carregarLista, avisar]);
+
+  const [showParticipantes, setShowParticipantes] = useState(false);
+  const [candidatosParticipantes, setCandidatosParticipantes] = useState([]);
+  const [novosParticipantesIds, setNovosParticipantesIds] = useState([]);
+
+  const abrirAdicionarParticipantes = useCallback(async () => {
+    if (!conversaAtiva) return;
+    try {
+      const usuarios = await getDestinatariosConversa();
+      const jaEstao = new Set((detalhe?.participantes || []).map((p) => Number(p.usuario_id)));
+      setCandidatosParticipantes((Array.isArray(usuarios) ? usuarios : [])
+        .filter((u) => !jaEstao.has(Number(u.id))));
+      setNovosParticipantesIds([]);
+      setShowParticipantes(true);
+    } catch (err) {
+      avisar.erro(err?.message || 'Erro ao carregar usuarios');
+    }
+  }, [conversaAtiva, detalhe, avisar]);
+
+  const confirmarAdicionarParticipantes = useCallback(async () => {
+    if (novosParticipantesIds.length === 0) {
+      avisar.erro('Selecione ao menos uma pessoa.');
+      return;
+    }
+    try {
+      await adicionarParticipantesConversa(conversaAtiva, novosParticipantesIds);
+      setShowParticipantes(false);
+      const det = await getConversa(conversaAtiva);
+      setDetalhe(det);
+      avisar.sucesso(`${novosParticipantesIds.length} pessoa(s) adicionada(s) a conversa.`);
+    } catch (err) {
+      avisar.erro(err?.message || 'Erro ao adicionar participantes');
+    }
+  }, [conversaAtiva, novosParticipantesIds, avisar]);
+
   const handleArquivar = useCallback(async () => {
     if (!conversaAtiva) return;
     try {
@@ -774,8 +878,26 @@ export default function ComunicacaoInterna() {
   // secundária em contorno (arquivar/desarquivar a conversa aberta). A tela
   // não tem ação destrutiva de PÁGINA: excluir é por mensagem, no menu da
   // própria bolha — e ação que não existe não se inventa.
+  /*
+    A FAIXA GANHA AS TRES PORTADAS (04/09), na ordem do uso.
+
+    "Concluir" e "Reabrir" nunca aparecem juntas — sao os dois lados do
+    mesmo estado. Nenhuma delas e destrutiva: concluir nao apaga nada, e
+    reabrir desfaz. Por isso as duas ficam em contorno, ao lado de arquivar,
+    e nao no vermelho suave.
+
+    Sem permissao de envio, nenhuma aparece: as tres rotas do backend
+    exigem `allowComunicacaoSend`.
+  */
+  const acoesDaConversa = !conversaAtiva || !podeEnviarComunicacao ? [] : [
+    conversaConcluida
+      ? { rotulo: 'Reabrir conversa', onClick: handleReabrir, icone: <HiOutlineArrowUturnLeft aria-hidden="true" /> }
+      : { rotulo: 'Concluir conversa', onClick: handleConcluir, icone: <HiOutlineCheckCircle aria-hidden="true" /> },
+    { rotulo: 'Adicionar participantes', onClick: abrirAdicionarParticipantes, icone: <HiOutlineUserPlus aria-hidden="true" /> }
+  ];
+
   const secundarias = conversaAtiva
-    ? [mostrandoArquivadas
+    ? [...acoesDaConversa, mostrandoArquivadas
       ? { rotulo: 'Desarquivar conversa', onClick: handleDesarquivar, icone: <HiOutlineArrowUturnLeft aria-hidden="true" /> }
       : { rotulo: 'Arquivar conversa', onClick: handleArquivar, icone: <HiOutlineArchiveBox aria-hidden="true" /> }]
     : [];
@@ -1336,6 +1458,59 @@ export default function ComunicacaoInterna() {
                 })()}
               </div>
             </div>
+          </div>
+        </OverlayModal>
+      )}
+
+      {/* === MODAL adicionar participantes (portado da ConversaDetalhe) === */}
+      {showParticipantes && podeEnviarComunicacao && (
+        <OverlayModal
+          rotulo="Adicionar participantes"
+          largura="var(--modal-max-w-sm, 480px)"
+          onFechar={() => setShowParticipantes(false)}
+        >
+          {/* R27: cabeçalho e rodapé ficam, o corpo rola. */}
+          <div data-modal="cabecalho" className="flex items-center justify-between border-b border-[var(--ui-border)] px-4 py-3">
+            <h2 className="app-bloco-titulo">Adicionar participantes</h2>
+            <button type="button" className="btn btn-outline btn-sm" onClick={() => setShowParticipantes(false)}>Fechar</button>
+          </div>
+
+          <div className="px-4 py-3">
+            <p className="app-note">
+              Quem entrar passa a ver o histórico desta conversa desde o começo, não só as mensagens a partir de agora.
+            </p>
+            {candidatosParticipantes.length === 0 ? (
+              <p className="text-sm text-muted">Todos os usuários disponíveis já participam desta conversa.</p>
+            ) : (
+              <div className="grid gap-1">
+                {candidatosParticipantes.map((u) => (
+                  <label key={u.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={novosParticipantesIds.includes(u.id)}
+                      onChange={() => setNovosParticipantesIds((atual) => (atual.includes(u.id)
+                        ? atual.filter((x) => x !== u.id)
+                        : [...atual, u.id]))}
+                    />
+                    <span>{u.nome}{u.area ? ` · ${u.area}` : ''}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div data-modal="rodape" className="app-actionbar border-t border-[var(--ui-border)] px-4 py-3">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={confirmarAdicionarParticipantes}
+              disabled={novosParticipantesIds.length === 0}
+            >
+              Adicionar {novosParticipantesIds.length > 0 ? `(${novosParticipantesIds.length})` : ''}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => setShowParticipantes(false)}>
+              Cancelar
+            </button>
           </div>
         </OverlayModal>
       )}

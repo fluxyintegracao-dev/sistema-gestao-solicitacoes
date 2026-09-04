@@ -3,7 +3,6 @@
   "criado_em": "2026-09-04",
   "porque": "Token e classe que a tela usa e que NUNCA foram declarados. O CSS nao resolve, a declaracao e descartada, e o estilo nunca chega a tela. Classe fantasma e pior que valor errado: parece intencao. O numero SO DESCE.",
   "nomes": {
-    "--c-bg-soft": 1,
     "--c-card": 8,
     "--c-elevated": 2,
     "--c-fg": 1,
