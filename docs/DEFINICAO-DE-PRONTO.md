@@ -264,6 +264,24 @@ o que a prova NÃO alcança):
 - Três defeitos de F3 e C1 usam markup cru, porque o markup real é gerado
   pelos componentes: provam o **check**, não o componente.
 
+### Check que procura pelo RÓTULO cobre vocabulário, não comportamento
+
+A R1 é o exemplo, e a lição é geral. Ela só se aplica quando a ação
+principal se chama **"Novo"** ou **"Nova"** — qualquer outro rótulo cai em
+N/A e escapa da regra inteira. "Cadastrar usuário", "Adicionar parceiro",
+"Incluir título": todos passam sem serem medidos, e a matriz mostra um `—`
+que parece decisão registrada.
+
+> **Quando um check depende do rótulo do elemento para achar o alvo, ele
+> cobre o VOCABULÁRIO que conhece, não o COMPORTAMENTO que a regra
+> descreve. Vocabulário novo escapa em silêncio** — e escapa como N/A, que
+> é a aparência de "não se aplica", não a de "não foi medido".
+
+É a forma mais educada de ficar cego: o check não erra, ele simplesmente
+não é chamado. Por isso todo check que localiza o alvo por texto declara,
+no próprio código, qual vocabulário ele reconhece — e essa lista é lida
+como o que ela é: o limite da cobertura, não a definição da regra.
+
 ### A T3, e a lição que ela fecha
 
 A T3 tinha CINCO ramos. Três mordiam. Dois estavam **mortos** — e um deles
