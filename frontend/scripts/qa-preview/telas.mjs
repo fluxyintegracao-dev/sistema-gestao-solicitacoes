@@ -331,6 +331,207 @@ export const TELAS = [
   },
 
   /* =================================================================
+     LEVA DO FINANCEIRO (fatias 1 a 4, 04/09) — as 29 telas do módulo.
+
+     Elas entraram no manifesto ESTÁTICO fatia a fatia e ficaram fora
+     DESTA lista o tempo todo: o harness nunca as abriu no preview. O
+     buraco só apareceu no fechamento, quando a matriz imprimiu "6
+     células FALHOU" sobre 36 telas e eu disse que eram 68. Ver o check
+     [COBERTURA] no validarLayout.mjs, que agora reprova a divergência.
+     ================================================================= */
+
+  {
+    id: 'financeiro-titulos',
+    arquivo: 'src/pages/FinanceiroTitulos.jsx',
+    rota: '/financeiro/titulos',
+    tipo: 'listagem',
+    // D2: porta única com o recorte na URL. Os dois recortes são destinos
+    // distintos no menu e precisam ser medidos como o usuário os abre.
+    variantes: ['?tipo=pagar', '?tipo=receber']
+  },
+  {
+    id: 'financeiro-titulo-novo',
+    arquivo: 'src/pages/FinanceiroTituloNovo.jsx',
+    rota: '/financeiro/titulos/novo',
+    tipo: 'form',
+    naoAplica: {
+      R1: 'cadastro de título tem página própria (destino "Novo Título" no menu do módulo)'
+    }
+  },
+  {
+    id: 'financeiro-titulo-editar',
+    arquivo: 'src/pages/FinanceiroTituloEditar.jsx',
+    resolver: 'tituloEditar',
+    tipo: 'form',
+    naoAplica: {
+      R1: 'edição de registro existente não é ação de cadastro'
+    }
+  },
+  {
+    id: 'financeiro-baixas',
+    arquivo: 'src/pages/FinanceiroBaixas.jsx',
+    rota: '/financeiro/baixas',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-baixas-compostas',
+    arquivo: 'src/pages/FinanceiroBaixasCompostas.jsx',
+    rota: '/financeiro/baixas-compostas',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-bancos',
+    arquivo: 'src/pages/FinanceiroBancos.jsx',
+    rota: '/financeiro/bancos',
+    tipo: 'mista'
+  },
+  {
+    id: 'financeiro-boletos',
+    arquivo: 'src/pages/FinanceiroBoletos.jsx',
+    rota: '/financeiro/boletos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-cadastros',
+    arquivo: 'src/pages/FinanceiroCadastros.jsx',
+    rota: '/financeiro/cadastros',
+    tipo: 'mista'
+  },
+  {
+    id: 'financeiro-caixas',
+    arquivo: 'src/pages/FinanceiroCaixas.jsx',
+    rota: '/financeiro/caixas',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-cheques-terceiros',
+    arquivo: 'src/pages/FinanceiroChequesTerceiros.jsx',
+    rota: '/financeiro/cheques-terceiros',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-conciliacao',
+    arquivo: 'src/pages/FinanceiroConciliacao.jsx',
+    rota: '/financeiro/conciliacao',
+    tipo: 'mista'
+  },
+  {
+    id: 'financeiro-dda',
+    arquivo: 'src/pages/FinanceiroDda.jsx',
+    rota: '/financeiro/dda',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-faturas-cartao',
+    arquivo: 'src/pages/FinanceiroFaturasCartao.jsx',
+    rota: '/financeiro/faturas-cartao',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-fatura-cartao-detalhe',
+    arquivo: 'src/pages/FinanceiroFaturaCartaoDetalhe.jsx',
+    resolver: 'faturaCartaoDetalhe',
+    tipo: 'detalhe'
+  },
+  {
+    id: 'financeiro-financiamentos-bancarios',
+    arquivo: 'src/pages/FinanceiroFinanciamentosBancarios.jsx',
+    rota: '/financeiro/financiamentos-bancarios',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-pagamentos',
+    arquivo: 'src/pages/FinanceiroPagamentos.jsx',
+    rota: '/financeiro/pagamentos',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-relatorios',
+    arquivo: 'src/pages/FinanceiroRelatorios.jsx',
+    rota: '/financeiro/relatorios',
+    tipo: 'mista',
+    naoAplica: {
+      C3: 'hub de entrada dos relatórios do módulo, não é tela de detalhe',
+      C4: 'idem C3'
+    }
+  },
+  {
+    id: 'financeiro-dre',
+    arquivo: 'src/pages/FinanceiroDre.jsx',
+    rota: '/financeiro/relatorios/dre',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-diagnostico-dre',
+    arquivo: 'src/pages/FinanceiroDiagnosticoDre.jsx',
+    rota: '/financeiro/relatorios/dre/diagnostico',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-endividamento',
+    arquivo: 'src/pages/FinanceiroEndividamento.jsx',
+    rota: '/financeiro/relatorios/endividamento',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-executivo-grupo',
+    arquivo: 'src/pages/FinanceiroExecutivoGrupo.jsx',
+    rota: '/financeiro/relatorios/grupo-consolidado',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-fluxo-consolidado',
+    arquivo: 'src/pages/FinanceiroFluxoConsolidado.jsx',
+    rota: '/financeiro/relatorios/fluxo-consolidado',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-intercompany',
+    arquivo: 'src/pages/FinanceiroIntercompany.jsx',
+    rota: '/financeiro/relatorios/intercompany',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-obras',
+    arquivo: 'src/pages/FinanceiroObras.jsx',
+    rota: '/financeiro/relatorios/financeiro-obras',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-relatorio-analitico',
+    arquivo: 'src/pages/FinanceiroRelatorioAnalitico.jsx',
+    rota: '/financeiro/relatorios/analitico',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-resultado-centros-custo',
+    arquivo: 'src/pages/FinanceiroResultadoCentrosCusto.jsx',
+    rota: '/financeiro/relatorios/centros-custo',
+    tipo: 'listagem'
+  },
+  {
+    id: 'financeiro-resultado-obras',
+    arquivo: 'src/pages/FinanceiroResultadoObras.jsx',
+    rota: '/financeiro/relatorios/resultado-obras',
+    tipo: 'listagem'
+  },
+  {
+    id: 'comprovantes-pendentes',
+    arquivo: 'src/pages/ComprovantesPendentes.jsx',
+    rota: '/comprovantes/pendentes',
+    tipo: 'mista'
+  },
+  {
+    id: 'upload-comprovantes',
+    arquivo: 'src/pages/UploadComprovantes.jsx',
+    rota: '/comprovantes/upload',
+    tipo: 'form',
+    naoAplica: {
+      R1: 'envio de arquivo tem página própria (destino de ação "Upload Comprovantes" no menu)'
+    }
+  },
+
+  /* =================================================================
      FORA DO SHELL — renderizam sem o Layout: sem topbar, sem menu, sem
      breadcrumb. Medidas em SESSÃO ANÔNIMA (semSessao), porque é assim
      que o usuário real as vê. DoD própria: docs/DEFINICAO-DE-PRONTO.md,

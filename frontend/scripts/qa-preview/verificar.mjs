@@ -209,6 +209,38 @@ const RESOLVEDORES = {
     await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
     return rota;
   },
+  /**
+   * Abre a EDIÇÃO do mesmo título de maior valor. Reusa o resolvedor do
+   * detalhe: a rota de edição é a do detalhe + /editar, e o pior caso de
+   * valor é o mesmo registro.
+   */
+  async tituloEditar(page) {
+    const rota = await RESOLVEDORES.tituloDetalhe(page);
+    const destino = `${rota}/editar`;
+    await page.goto(`${BASE}${destino}`, { waitUntil: 'domcontentloaded' });
+    return destino;
+  },
+  /** Abre a fatura de cartão de MAIOR valor real (pior caso — T6/T7). */
+  async faturaCartaoDetalhe(page) {
+    await page.goto(`${BASE}/financeiro/faturas-cartao`, { waitUntil: 'domcontentloaded' });
+    await esperarCarregar(page);
+    await page.locator('a[href^="/financeiro/faturas-cartao/"]').first().waitFor({ timeout: 30000 });
+    const rota = await page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll('a[href^="/financeiro/faturas-cartao/"]'))
+        .filter((a) => /^\/financeiro\/faturas-cartao\/\d+$/.test(a.getAttribute('href')));
+      let melhor = links[0]; let maior = -1;
+      links.forEach((a) => {
+        const linha = a.closest('tr') || a;
+        const m = String(linha.textContent).match(/R\$\s?([\d.]+,\d{2})/);
+        const v = m ? parseFloat(m[1].replace(/\./g, '').replace(',', '.')) : 0;
+        if (v > maior) { maior = v; melhor = a; }
+      });
+      return melhor ? melhor.getAttribute('href') : null;
+    });
+    if (!rota) throw new Error('nenhuma fatura de cartão encontrada na listagem para abrir o detalhe');
+    await page.goto(`${BASE}${rota}`, { waitUntil: 'domcontentloaded' });
+    return rota;
+  },
   /** Abre a obra de MAIOR VGV real (pior caso de valor monetário — T7). */
   async obraGestao(page) {
     await page.goto(`${BASE}/obras`, { waitUntil: 'domcontentloaded' });
