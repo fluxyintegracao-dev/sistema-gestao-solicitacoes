@@ -19,6 +19,12 @@
  *   equivalência com outra tela — é lacuna de evidência, declarada.
  * - semSessao: true — medida em contexto anônimo, sem login. É o caso das
  *   telas fora do shell, que existem justamente para quem não está logado.
+ * - tambemCobre: ['src/pages/X.jsx'] — outros arquivos do manifesto estático
+ *   que ESTA entrada mede, porque eles só existem DENTRO dela (aba, painel,
+ *   bloco). Precisa ser DECLARADO: o check de cobertura compara as duas
+ *   listas de telas e cobertura por dentro é invisível para ele. Cobertura
+ *   silenciosa é o mesmo defeito que o check existe para pegar — por isso
+ *   ela se escreve, não se infere.
  */
 export const TELAS = [
   {
@@ -190,7 +196,15 @@ export const TELAS = [
     // As quatro abas da porta única do DP (D1). Jornada e Apuração são
     // arquivos próprios (RhDpJornada.jsx, RhDpApuracao.jsx) medidos aqui —
     // é onde o usuário os encontra.
-    variantes: ['?aba=colaboradores', '?aba=jornada', '?aba=apuracao']
+    variantes: ['?aba=colaboradores', '?aba=jornada', '?aba=apuracao'],
+    // Os três só existem DENTRO desta porta (RhDpPessoal.jsx os renderiza
+    // por aba); não têm rota própria. Declarado para o check de cobertura,
+    // que compara arquivo a arquivo e não enxerga o que mora numa aba.
+    tambemCobre: [
+      'src/pages/RhDpPessoalSolicitacoes.jsx',
+      'src/pages/RhDpJornada.jsx',
+      'src/pages/RhDpApuracao.jsx'
+    ]
   },
   {
     id: 'rhdp-colaboradores',

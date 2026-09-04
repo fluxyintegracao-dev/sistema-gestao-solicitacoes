@@ -321,7 +321,21 @@ export function validarLayout() {
     }
   }
 
-  const noHarness = new Set(TELAS_DO_HARNESS.map((t) => t.arquivo));
+  /*
+    `tambemCobre` existe porque a primeira versão deste check reportou 32
+    telas descobertas e o número estava errado: três do RH/DP
+    (RhDpPessoalSolicitacoes, RhDpJornada, RhDpApuracao) não têm rota
+    própria — vivem nas abas da RhDpPessoal, e o harness JÁ as media pelas
+    `variantes` dela. Cobertura real, invisível para uma comparação arquivo
+    a arquivo.
+
+    A saída não é o check adivinhar: é a entrada DECLARAR o que mede por
+    dentro. Cobertura inferida seria o mesmo defeito que este check existe
+    para pegar, só que do lado do falso negativo.
+  */
+  const noHarness = new Set(
+    TELAS_DO_HARNESS.flatMap((t) => [t.arquivo, ...(t.tambemCobre || [])])
+  );
   const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t));
   if (foraDoPreview.length > 0) {
     falhas.push(
