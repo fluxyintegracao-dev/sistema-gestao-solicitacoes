@@ -200,6 +200,25 @@ export const TELAS = [
     // arquivos próprios (RhDpJornada.jsx, RhDpApuracao.jsx) medidos aqui —
     // é onde o usuário os encontra.
     variantes: ['?aba=colaboradores', '?aba=jornada', '?aba=apuracao'],
+    /*
+      EXCEÇÃO DECLARADA — T4, com dono e destino (decisão do cliente, 04/09).
+
+      Na aba de apuração, "OBRA" e "EMPRESA" precisam AS DUAS de espaço nesta
+      base. A `TabelaPadrao` distribui a sobra para UMA coluna só, e escolhe
+      pela declaração — não tem como saber qual texto é mais longo nos dados.
+      Dar o peso à Empresa consertou a Empresa e quebrou a Obra (medido: a
+      folga passou de 215px na Obra para 247px na Empresa, e o defeito trocou
+      de lado). Não há declaração de tela que resolva: o conserto é o
+      componente REPARTIR a sobra entre as colunas que a pedem.
+
+      Por isso a causa não é desta tela, e a exceção tem destino: leva do
+      `TabelaPadrao`, a mesma que vai tratar o alternador entre rolagem
+      infinita e páginas. Exceção com dono e prazo é diferente de célula
+      vermelha esquecida — esta some quando aquela leva entregar.
+    */
+    naoAplica: {
+      T4: 'sobra distribuída para UMA coluna só é limite do TabelaPadrao, não da tela: Obra e Empresa precisam as duas de espaço e dar peso a uma inverte o defeito (medido em 04/09). Exceção com dono: leva do TabelaPadrao'
+    },
     // Os três só existem DENTRO desta porta (RhDpPessoal.jsx os renderiza
     // por aba); não têm rota própria. Declarado para o check de cobertura,
     // que compara arquivo a arquivo e não enxerga o que mora numa aba.
