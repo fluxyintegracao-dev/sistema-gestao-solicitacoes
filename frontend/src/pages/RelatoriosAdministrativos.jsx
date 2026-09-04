@@ -211,16 +211,22 @@ function normalizeAuditErrorMessage(error) {
 }
 
 /**
- * TELA COMPARTILHADA — duas rotas servem este mesmo componente:
- * `/compras/relatorios/auditoria` (card "Auditoria de compras" da
- * ModuloRelatorios) e `/relatorios/administrativos` (destino do botao de
- * auditoria do PedidoCompraDetalhe). As duas passam pelos MESMOS guardas e
- * carregam os MESMOS dados: a tela nao le a rota nem muda de comportamento
- * conforme a origem — nada aqui supoe "vim de Compras".
+ * UMA ROTA SO, DESDE 04/09: `/compras/relatorios/auditoria`.
  *
- * O que a faixa precisa dizer, entao, e o ASSUNTO — auditoria dos itens de
- * pedidos de compra —, porque NENHUMA das duas rotas tem no de menu, e o
- * breadcrumb para nas duas em "Inicio". Ver o relatorio da leva.
+ * Ate aqui duas rotas serviam este mesmo componente — esta e a
+ * `/relatorios/administrativos`, destino do botao de auditoria do
+ * PedidoCompraDetalhe. Passavam pelos MESMOS guardas, carregavam os MESMOS
+ * dados e a tela nunca leu a rota: nada aqui supoe "vim de Compras", e os
+ * parametros (`pedido_id`, `item_id`) viajam por query string, iguais nas
+ * duas. Cobertura identica, e so uma delas tinha porta — a outra saiu, e o
+ * botao do pedido passou a apontar para esta.
+ *
+ * Duas rotas para o mesmo caso nao e redundancia inofensiva: dobra o que
+ * precisa ser medido, e a que ninguem lembra e a que apodrece.
+ *
+ * A faixa anuncia o ASSUNTO — auditoria dos itens de pedidos de compra —
+ * porque a entrada e um card dentro do hub de Relatorios de Compras, e o
+ * breadcrumb nao carrega esse nome sozinho.
  */
 export default function RelatoriosAdministrativos() {
   const [searchParams, setSearchParams] = useSearchParams();

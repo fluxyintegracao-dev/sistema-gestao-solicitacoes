@@ -628,7 +628,12 @@ export default function PedidoCompraDetalhe() {
       params.set('item_id', String(itemId));
     }
 
-    navigate(`/relatorios/administrativos?${params.toString()}`);
+    // A auditoria tem UMA rota (04/09). Antes existiam duas servindo o mesmo
+    // componente, com os mesmos guardas e os mesmos parametros de query; a
+    // /relatorios/administrativos nao tinha porta no menu e so era alcancada
+    // por este botao. Ficou a que tem porta — o card "Auditoria de compras"
+    // do hub de Relatorios de Compras.
+    navigate(`/compras/relatorios/auditoria?${params.toString()}`);
   }
 
   function abrirModalFrete(momento = 'FECHAMENTO') {

@@ -33,7 +33,6 @@ const COMPRAS_RESPONSIVE_ROUTES = [
   '/pedidos-compra',
   '/compras/delegacao',
   '/compras/relatorios',
-  '/relatorios/administrativos',
   '/gestao-apropriacoes',
   '/gestao-insumos',
   '/gestao-unidades',

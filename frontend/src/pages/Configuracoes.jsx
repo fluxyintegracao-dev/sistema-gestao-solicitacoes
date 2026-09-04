@@ -276,6 +276,22 @@ const SECOES_CONFIG = [
         permissionArea: 'permissoes'
       },
       {
+        /*
+          PORTA ABERTA EM 04/09.
+
+          Esta tela existia, tinha rota e guarda de permissao, e nao tinha
+          link em lugar nenhum do sistema: chegava quem sabia a URL de cor.
+          Ferramenta administrativa de permissao nao pode depender de quem
+          lembra o endereco. Fica junto das outras duas telas de permissao
+          por usuario, no mesmo grupo e com a mesma area de permissao da
+          rota (status_vinculos).
+        */
+        title: 'Permissoes de RH e DP por Usuario',
+        description: 'Marque quais usuarios podem ver e operar cada area de RH e Departamento Pessoal.',
+        to: '/usuarios-permissoes-rh-dp',
+        requireModule: 'RH_DP'
+      },
+      {
         title: 'Tempo de Inatividade',
         description: 'Define o tempo para logout automatico por inatividade.',
         to: '/timeout-inatividade'

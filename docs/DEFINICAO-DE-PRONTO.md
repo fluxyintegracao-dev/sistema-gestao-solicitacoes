@@ -678,3 +678,52 @@ cita a rota B em qualquer das 6 formas conhecidas. O resultado é distância:
 Seleção por estado dentro de um painel conta como alcance legítimo: quem
 chega ao relatório pela lista lateral chegou, mesmo sem existir um
 `to="/rota"` escrito em lugar nenhum.
+
+## SALDO DA RODADA 1: O TRABALHO DA RODADA FOI DESCOBRIR QUE ELE NÃO EXISTIA (04/09)
+
+A rodada 1 abriu com **38 telas sem porta** e fechou com **1 porta aberta e
+1 rota removida**. Nenhum dos números intermediários virou código. Fica
+registrada porque o caso vale mais que o resultado.
+
+### Como o escopo evaporou
+
+| Escopo | O que o detector sabia | O que teria virado código |
+|---|---|---|
+| 38 telas | `to="/rota"` | duplicar 23 entradas na fonte única de navegação |
+| 15 telas | + `to: '/rota'` | abrir portas para os fluxos |
+| 13 telas | + `navigate('/rota')` | — |
+| 14 telas | + ternário | — |
+|  4 telas | + catálogo de painel, hub-é-página, detalhe-é-caminho | — |
+|  2 telas | + query string na forma de objeto | abrir no hub do Financeiro uma porta que **já era o primeiro item do menu do módulo** |
+|  1 tela | — | o trabalho real |
+
+A última linha é a mais instrutiva. `/financeiro/titulos` entrou na lista de
+"enterradas" porque a forma `to: '/rota'` exigia que a string terminasse na
+rota. "Contas a Pagar" é `to: '/financeiro/titulos?tipo=pagar'`. Eu ia abrir
+porta no hub para uma tela que é o primeiro e o segundo item do menu do
+Financeiro.
+
+### O que de fato foi feito
+
+1. **`/usuarios-permissoes-rh-dp`** — porta aberta no hub de Configurações,
+   no grupo "Status e Vínculos", junto das outras duas telas de permissão por
+   usuário. Era ferramenta administrativa que só achava quem sabia a URL.
+2. **`/relatorios/administrativos`** — removida. Servia o mesmo componente
+   que `/compras/relatorios/auditoria`, com os mesmos guardas, sem ler a
+   rota e com os mesmos parâmetros por query string. Ficou a que tem porta;
+   o botão de auditoria do pedido passou a apontar para ela.
+3. **`/configuracoes-contrato-alertas`** — **não removida**. Serve o mesmo
+   componente que `/configuracoes-formas-pagamento-solicitacao`, mas a tela
+   lê o `pathname` e muda título, descrição e qual bloco recebe a barra de
+   cor. Há diferença de comportamento: fica para decisão do responsável.
+
+### A lição, que é a regra do detector aplicada ao planejamento
+
+Um escopo grande construído sobre uma medição não conferida é trabalho
+inventado. E ele tem uma propriedade perversa: **parece produtivo**. Trinta e
+oito portas para abrir enche uma rodada inteira, e nenhuma das trinta e sete
+teria melhorado nada — várias teriam piorado, duplicando o que já existe no
+lugar onde duplicata custa mais caro.
+
+Rodada que descobre que não tem trabalho não é rodada perdida. É a única
+forma de não fazer o trabalho errado.

@@ -46,13 +46,25 @@ const raiz = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const src = path.join(raiz, 'src');
 
 /** AS FORMAS QUE UM LINK ASSUME NESTE SISTEMA. Crescer aqui quando surgir outra. */
+/*
+  Terminador unico: a rota pode terminar a string OU ser seguida de query
+  (`?tipo=pagar`) ou ancora. Foi a SETIMA cegueira: a forma de objeto exigia
+  fim exato, entao "Contas a Pagar" (to: '/financeiro/titulos?tipo=pagar')
+  nao contava como porta da /financeiro/titulos — e eu quase abri no hub uma
+  porta que ja era o primeiro item do menu do modulo.
+
+  `/` NAO entra no terminador de proposito. Aceitar `/` faria um link para
+  /financeiro/relatorios provar porta para /financeiro: falso positivo, que
+  neste projeto e o defeito mais caro — check que aparece verde sem medir.
+*/
+const FIM = '(["\'`?#])';
 const FORMAS = [
-  { nome: 'JSX  to="/rota"',        re: (r) => new RegExp(`to=["'\`]${r}(["'\`?#/])`) },
-  { nome: 'JSX  href="/rota"',      re: (r) => new RegExp(`href=["'\`]${r}(["'\`?#/])`) },
-  { nome: 'objeto  to: "/rota"',    re: (r) => new RegExp(`to:\\s*["'\`]${r}["'\`]`) },
-  { nome: 'codigo  navigate("/rota")', re: (r) => new RegExp(`navigate\\(\\s*["'\`]${r}["'\`?#/]`) },
-  { nome: 'codigo  navigate(cond ? "/rota" ...)', re: (r) => new RegExp(`navigate\\([^)]*["'\`]${r}["'\`]`) },
-  { nome: 'catalogo  route: "/rota" (selecao por estado no painel)', re: (r) => new RegExp(`route:\\s*["'\`]${r}["'\`?]`) }
+  { nome: 'JSX  to="/rota"',        re: (r) => new RegExp(`to=["'\`]${r}${FIM}`) },
+  { nome: 'JSX  href="/rota"',      re: (r) => new RegExp(`href=["'\`]${r}${FIM}`) },
+  { nome: 'objeto  to: "/rota"',    re: (r) => new RegExp(`to:\\s*["'\`]${r}${FIM}`) },
+  { nome: 'codigo  navigate("/rota")', re: (r) => new RegExp(`navigate\\(\\s*["'\`]${r}${FIM}`) },
+  { nome: 'codigo  navigate(cond ? "/rota" ...)', re: (r) => new RegExp(`navigate\\([^)]*["'\`]${r}${FIM}`) },
+  { nome: 'catalogo  route: "/rota" (selecao por estado no painel)', re: (r) => new RegExp(`route:\\s*["'\`]${r}${FIM}`) }
 ];
 
 function arquivos(dir) {
