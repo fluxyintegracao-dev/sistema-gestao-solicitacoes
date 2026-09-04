@@ -632,7 +632,21 @@ export function checksEstaticos({ tipo }) {
     const ehCampoDeFormulario = (el) => Boolean(
       el.closest('.form-group, .form-campo, label.field, .campo-form')
     );
-    const buscas = qa('.la-busca, .app-busca, input[placeholder*="uscar"]')
+    /*
+      `.app-busca` NÃO ENTRA AQUI — e eu a acrescentei hoje, por engano.
+
+      Ela é classe de LARGURA ("ocupa a faixa, 220–480px"), não de papel.
+      Na `TiposSolicitacao` ela veste um `<label>` que embrulha um `<select>`
+      de CONTEXTO (o setor listado), e na `TiposSubContrato` um campo que
+      não filtra listagem. Ao pô-la no seletor, a F1 passou a contar essas
+      duas como caixa de busca e reprovou as duas telas — que passavam nas
+      duas rodadas anteriores.
+
+      É exatamente o erro que esta mesma função descreve três linhas abaixo:
+      achar o alvo pela FORMA em vez do papel. Cometi-o no mesmo commit em
+      que escrevi o comentário contra ele.
+    */
+    const buscas = qa('.la-busca, input[placeholder*="uscar"]')
       .filter(visivel).filter(foraDeModal)
       .filter((el) => !ehCampoDeFormulario(el))
       .filter((el) => !el.closest('.la-busca') || el.classList.contains('la-busca'));
