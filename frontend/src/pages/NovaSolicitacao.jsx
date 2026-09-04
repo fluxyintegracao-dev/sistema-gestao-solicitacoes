@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Avisos, useAvisos } from '../components/padrao';
+import { Avisos, Pagina, PageHeader, useAvisos } from '../components/padrao';
 import { getMinhasObras } from '../services/obras';
 import { getTiposSolicitacao } from '../services/tiposSolicitacao';
 import { getSetores } from '../services/setores';
@@ -2266,13 +2266,42 @@ export default function NovaSolicitacao() {
   // (senao o aviso ficaria atras do fundo escuro); fora dele, no topo da pagina.
   const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
 
-  return (
-    <div className="page solicitacoes-page solicitacao-nova-page max-w-6xl mx-auto">
-      <h1 className="page-title">Nova Solicitação</h1>
+  /*
+    APOIO DA FAIXA (R5/C2) — diálogo com o TIPO, não texto fixo.
 
-      <p className="page-subtitle">
-        Preencha os dados essenciais da solicitação com um fluxo mais direto e operacional.
-      </p>
+    O apoio antigo ("Preencha os dados essenciais da solicitação com um fluxo
+    mais direto e operacional.") ocupava a linha inteira sem dizer nada que a
+    pessoa já não soubesse ao abrir a tela. O que muda — e o que ela precisa
+    ler — é O QUE ela está preenchendo, e isso vem do tipo escolhido.
+
+    O que o tipo diz de si: o objeto de GET /tipos-solicitacao tem `nome`,
+    `codigo_interno` e `comportamento`. Não há campo de descrição em prosa, e
+    `codigo_interno` é token de máquina (UPPER_SNAKE derivado do próprio nome,
+    normalizeTipoSolicitacaoCodigo) — mostrá-lo seria ruído. Sobra o `nome`, e
+    é ele que vai para a faixa.
+
+    Sem tipo ainda, a faixa não repete "preencha os campos": ela aponta o
+    PRÓXIMO passo real da tela, que é encadeado (obra habilita o setor, setor
+    habilita o tipo, tipo carrega os campos) — as mesmas dependências que os
+    selects já impõem com `disabled`.
+  */
+  const apoioDoCabecalho = (() => {
+    const nomeDoTipo = String(tipoSelecionado?.nome || '').trim();
+    if (nomeDoTipo) return nomeDoTipo;
+    if (!form.obra_id) return 'Comece pela obra ou centro de custo — é ela que libera o setor e os tipos disponíveis.';
+    if (!form.area_responsavel) return 'Escolha o setor responsável para ver os tipos de solicitação disponíveis.';
+    return 'Escolha o tipo de solicitação — é ele que define quais campos você vai preencher.';
+  })();
+
+  return (
+    <Pagina className="solicitacao-nova-page max-w-6xl mx-auto">
+      {/* C3: tela de REGISTRO — a seta de voltar à esquerda da faixa é a
+          affordance primária de retorno à listagem. */}
+      <PageHeader
+        titulo="Nova Solicitação"
+        descricao={apoioDoCabecalho}
+        voltar={{ to: '/solicitacoes', title: 'Voltar para solicitações' }}
+      />
 
       {!(exibirCadastroCredor && modalParceiroAberto) && faixaAvisos}
 
@@ -3705,6 +3734,6 @@ export default function NovaSolicitacao() {
         }}
       />
 
-    </div>
+    </Pagina>
   );
 }

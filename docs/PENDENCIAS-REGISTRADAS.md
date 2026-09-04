@@ -1613,3 +1613,34 @@ O que fica registrado como critério, e já vale para as duas vezes que foi
 usado hoje: **rodada é unidade de medição, não de calendário.** Emendar uma
 tela grande no fim de uma rodada para "não sobrar" é como o número que soma
 só a página — parece completo e não é.
+
+## DÍVIDA ABERTA HOJE, DE PROPÓSITO: a `NovaSolicitacao` ganhou seta de voltar e não tem guarda de saída (04/09)
+
+A C3 exige seta de voltar em tela de registro, e a `NovaSolicitacao` não
+tinha. Ela ganhou uma agora, junto com o subtítulo dinâmico. **A tela tem
+zero guardas de saída** — nenhum `beforeunload`, nenhum estado "sujo",
+nenhuma confirmação. Conferido por varredura, não por suposição.
+
+Ou seja: quem preencher trinta campos e clicar na seta perde tudo, calado.
+
+### Por que a seta ficou mesmo assim
+
+O risco **não é novo e não é dela**. A tela já tinha três saídas sem guarda —
+o menu, o breadcrumb e o Ctrl+K —, e todas perdem o formulário do mesmo
+jeito. A seta não cria um mecanismo novo: cria uma **porta mais convidativa**
+para um mecanismo que já existia sem proteção.
+
+Tirar a seta trocaria um item obrigatório da DoD por uma proteção que não
+existe de qualquer forma. Seria fechar a porta da frente deixando as três
+laterais abertas, e ainda ficar devendo a C3.
+
+### O que fica devendo, e onde se paga
+
+**Guarda de alterações não salvas, para a tela inteira** — não para a seta.
+É trabalho da rodada de Solicitações, onde a `NovaSolicitacao` é reformada de
+verdade, e precisa cobrir as quatro saídas de uma vez.
+
+**Registro honesto de quem achou**: não fui eu. Foi o agente que fez a
+mudança, no relatório dele, oferecendo remover a linha que tinha acabado de
+escrever. Achado que aparece contra o próprio trabalho é o mais barato de
+ignorar e o mais caro de perder.
