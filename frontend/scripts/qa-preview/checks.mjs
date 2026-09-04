@@ -892,6 +892,16 @@ export function checksEstaticos({ tipo }) {
 
 /** Geometria da faixa após rolagem (chamado com a página ROLADA). */
 export function checkFaixaRolada() {
+  /* `classeDe` se repete em cada função porque cada uma é serializada
+     inteira para dentro da página pelo `page.evaluate` — helper de módulo
+     não atravessa essa fronteira (ReferenceError em execução, com o build
+     passando). className de elemento SVG é objeto, não string. */
+  const classeDe = (el) => {
+    if (!el) return '';
+    const cru = el.className;
+    if (cru && typeof cru !== 'string' && typeof cru.baseVal === 'string') return cru.baseVal;
+    return typeof cru === 'string' ? cru : '';
+  };
   const topbar = document.querySelector('.fx-topbar, .topbar-shell');
   const faixa = document.querySelector('.layout-main .app-page-header');
   if (!topbar || !faixa) return { ok: false, motivo: 'topbar ou faixa ausente' };
@@ -933,6 +943,16 @@ export function checkFaixaRolada() {
 
 /** Checks de mobile (viewport 390). */
 export function checksMobile() {
+  /* `classeDe` se repete em cada função porque cada uma é serializada
+     inteira para dentro da página pelo `page.evaluate` — helper de módulo
+     não atravessa essa fronteira (ReferenceError em execução, com o build
+     passando). className de elemento SVG é objeto, não string. */
+  const classeDe = (el) => {
+    if (!el) return '';
+    const cru = el.className;
+    if (cru && typeof cru !== 'string' && typeof cru.baseVal === 'string') return cru.baseVal;
+    return typeof cru === 'string' ? cru : '';
+  };
   const r = {};
   const qa = (sel) => Array.from(document.querySelectorAll(sel));
   const visivel = (el) => {

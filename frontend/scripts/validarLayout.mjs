@@ -336,7 +336,22 @@ export function validarLayout() {
   const noHarness = new Set(
     TELAS_DO_HARNESS.flatMap((t) => [t.arquivo, ...(t.tambemCobre || [])])
   );
-  const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t));
+  /*
+    O que NÃO entra na conta de cobertura, e por quê:
+
+    - `--extra`: tela em migração, apontada na linha de comando para medir
+      ANTES de entrar no manifesto. Exigir dela lugar na lista do preview
+      inverteria a ordem do trabalho.
+    - fixture de prova (`__Prova…`): arquivo que o `regrasMordem` planta e
+      apaga para provar que cada regra reprova. Não é tela; exigi-la no
+      harness quebrou a própria prova de que "tela limpa passa" — foi assim
+      que este descarte apareceu.
+  */
+  const transitorias = new Set([
+    ...telasExtraDaLinhaDeComando(),
+    ...manifesto.telas.filter((t) => /(^|\/)__Prova[^/]*$/.test(t))
+  ]);
+  const foraDoPreview = manifesto.telas.filter((t) => !noHarness.has(t) && !transitorias.has(t));
   if (foraDoPreview.length > 0) {
     falhas.push(
       `${foraDoPreview[0]}:0 [COBERTURA] ${foraDoPreview.length} tela(s) do manifesto estático NÃO estão em scripts/qa-preview/telas.mjs — o harness nunca as abre no preview, e "PRONTO" é verificado no preview. Telas: ${foraDoPreview.join(', ')}`
