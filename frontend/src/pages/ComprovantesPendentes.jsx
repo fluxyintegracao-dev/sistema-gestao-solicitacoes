@@ -215,7 +215,8 @@ export default function ComprovantesPendentes() {
         </div>
       </BlocoConteudo>
 
-      <BlocoConteudo titulo="Fila de comprovantes">
+      {/* B2: a fila é o conteúdo da tela; a busca acima é apoio. */}
+      <BlocoConteudo titulo="Fila de comprovantes" variante="primario">
         <TabelaPadrao
           colunas={[
             {

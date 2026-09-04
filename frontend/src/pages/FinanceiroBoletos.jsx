@@ -897,10 +897,12 @@ export default function FinanceiroBoletos() {
           e que a FinanceiroTitulos aplicou a quatro links em 03/09. */}
       <PageHeader
         titulo="Geracao de boletos"
-        contagem={hasConsulted ? `${titulos.length} titulo(s) no resultado` : 'Nenhuma consulta feita'}
-        descricao={comercialHabilitado
+        /* C2: contagem é número em todos os estados; o "ainda não
+           consultei" vive na descrição, que é onde essa informação cabe. */
+        contagem={`${hasConsulted ? titulos.length : 0} titulo(s) no resultado`}
+        descricao={`${hasConsulted ? '' : 'Consulta ainda nao executada. '}${comercialHabilitado
           ? 'Emissao Caixa SIGCB a partir dos titulos a receber comerciais ou manuais.'
-          : 'Emissao Caixa SIGCB a partir dos titulos a receber manuais.'}
+          : 'Emissao Caixa SIGCB a partir dos titulos a receber manuais.'}`}
         secundarias={[
           {
             rotulo: 'Atualizar',

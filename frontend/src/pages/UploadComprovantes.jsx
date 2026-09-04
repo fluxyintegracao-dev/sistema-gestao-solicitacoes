@@ -115,8 +115,10 @@ export default function UploadComprovantes() {
 
       <Avisos avisos={avisos} aoFechar={fecharAviso} />
 
+      {/* B2: o envio é o conteúdo da tela; a explicação da regra é apoio. */}
       <BlocoConteudo
         titulo="Arquivos a enviar"
+        variante="primario"
         descricao={`Até ${UPLOAD_MAX_FILE_SIZE_MB_PADRAO} MB por arquivo. Formatos aceitos: PDF, JPG, PNG, HTML e RAR.`}
       >
         <form onSubmit={handleUpload} className="grid gap-4">

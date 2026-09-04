@@ -1227,9 +1227,16 @@ export default function FinanceiroTitulos({ tipoFixo = null }) {
     junto da página); `titulos.length` é o que veio nesta página, e só
     entra quando não há paginação.
   */
+  /*
+    C2 — a contagem é NÚMERO, em todos os estados. Antes ela era `null`
+    até a primeira consulta, e a faixa nascia sem apoio numérico: o preview
+    mediu exatamente esse estado e reprovou. "Ainda não consultei" é uma
+    informação legítima, mas ela pertence à DESCRIÇÃO; o lugar da contagem
+    é para quantos títulos o recorte tem, e antes da consulta são zero.
+  */
   const contagemCabecalho = hasConsulted && !loading
     ? `${Number(pagination.total || titulos.length)} titulo(s)`
-    : null;
+    : '0 titulo(s)';
   const visibleFilterSet = useMemo(() => new Set(visibleFilterIds), [visibleFilterIds]);
   const basicVisibleFilters = useMemo(
     () => FILTER_DEFINITIONS.filter((item) => item.group === 'basic' && visibleFilterSet.has(item.id)),

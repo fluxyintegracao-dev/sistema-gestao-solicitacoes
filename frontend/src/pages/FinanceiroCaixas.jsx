@@ -356,8 +356,13 @@ export default function FinanceiroCaixas() {
           solta que rolava para fora com a página. */}
       <PageHeader
         titulo="Caixas e contas"
-        contagem={contaSelecionada ? contaLabel(contaSelecionada) : 'Nenhuma conta selecionada'}
-        descricao="Abertura, movimentação e conferência do dinheiro físico em um único fluxo operacional."
+        /* C2: o slot da contagem carregava o NOME da conta — identidade,
+           não quantidade. O nome foi para a descrição, onde identifica o
+           recorte, e a contagem passou a contar o que a tela lista. */
+        contagem={`${contas.length} conta(s) operável(is)`}
+        descricao={contaSelecionada
+          ? `${contaLabel(contaSelecionada)} — abertura, movimentação e conferência do dinheiro físico.`
+          : 'Escolha uma conta para abrir, movimentar e conferir o dinheiro físico.'}
       />
 
       <Avisos avisos={avisos} aoFechar={fecharAviso} />
@@ -401,8 +406,16 @@ export default function FinanceiroCaixas() {
         </div>
       </BlocoConteudo>
 
+      {/*
+        B2 — UM primário VISÍVEL por vez, e esta tela tem três estados
+        mutuamente exclusivos: sem caixa configurado, caixa fechado (abrir)
+        e caixa aberto (livro). Cada estado marca o SEU bloco de conteúdo
+        como primário; como as condições se excluem, nunca há dois na tela.
+        O "Movimento do caixa" e o "Registrar entrada ou saída" ficam
+        neutros: são apoio do livro, não o conteúdo.
+      */}
       {!contaSelecionada && !loading ? (
-        <BlocoConteudo titulo="Nenhum caixa configurado">
+        <BlocoConteudo titulo="Nenhum caixa configurado" variante="primario">
           <p className="text-sm text-[var(--c-muted)]">
             Cadastre uma conta como <strong className="text-[var(--c-text)]">Caixa interno</strong> e habilite
             abertura e fechamento nos Cadastros Financeiros.
@@ -413,6 +426,7 @@ export default function FinanceiroCaixas() {
       {contaSelecionada && !sessaoAberta && !loading ? (
         <BlocoConteudo
           titulo="Abrir caixa"
+          variante="primario"
           descricao={caixaFisico ? 'Informe o saldo inicial. O caixa físico não depende de conciliação OFX.' : 'Esta conta mantém a conferência OFX anterior.'}
           acoes={<span className={statusClass('FECHADO')}>FECHADO</span>}
         >
@@ -472,6 +486,7 @@ export default function FinanceiroCaixas() {
 
         <BlocoConteudo
           titulo="Livro do caixa"
+          variante="primario"
           contagem={`${movimentos.length} registro(s)`}
           descricao="Entradas, saídas e transferências da sessão."
         >

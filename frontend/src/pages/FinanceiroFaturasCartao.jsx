@@ -225,6 +225,8 @@ export default function FinanceiroFaturasCartao() {
 
       <BlocoConteudo
         titulo="Faturas encontradas"
+        /* B2: o bloco que carrega o conteúdo da tela é o primário. */
+        variante="primario"
         descricao="Abra uma fatura para conferir os títulos vinculados e registrar o pagamento."
       >
         {/* R12/F1/F2 — busca única ocupando a faixa e filtros por MARCAÇÃO,

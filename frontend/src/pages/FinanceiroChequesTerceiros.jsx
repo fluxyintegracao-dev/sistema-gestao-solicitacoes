@@ -293,7 +293,8 @@ export default function FinanceiroChequesTerceiros() {
         <StatTile label="Escopo" valor={escopoAtual} title={escopoAtual} />
       </StatGrid>
 
-      <BlocoConteudo titulo="Carteira de cheques" descricao="O recorte vale assim que a marca é feita.">
+      {/* B2: a carteira é o conteúdo da tela. */}
+      <BlocoConteudo titulo="Carteira de cheques" variante="primario" descricao="O recorte vale assim que a marca é feita.">
         <BarraFiltros
           busca={{
             valor: filters.q,
