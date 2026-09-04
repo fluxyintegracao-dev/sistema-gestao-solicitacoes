@@ -14,10 +14,35 @@ const babelParser = require('@babel/parser');
 
 const frontendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+/*
+  TELAS EXTRA POR LINHA DE COMANDO (04/09).
+
+  O manifesto é estado COMPARTILHADO e não tem trava. Enquanto três agentes
+  migravam a fatia 1, os três o editaram para medir os próprios arquivos —
+  e duas medições saíram erradas por corrida: uma delas imprimiu
+  `[layout] ok` DEPOIS de outro processo já ter removido as telas do
+  agente. Verde porque o check não estava olhando o que se pensava.
+
+  Agora quem quer medir um arquivo que ainda não entrou no manifesto passa
+  `--extra <caminho>` (repetível) e NÃO escreve no arquivo compartilhado.
+  A promoção ao manifesto continua sendo do orquestrador, quando a tela
+  fecha.
+*/
+export function telasExtraDaLinhaDeComando(argv = process.argv) {
+  const extras = [];
+  for (let i = 0; i < argv.length; i += 1) {
+    if (argv[i] === '--extra' && argv[i + 1]) extras.push(argv[i + 1].replace(/\\/g, '/'));
+  }
+  return extras;
+}
+
 export function validarLayout() {
   const manifesto = JSON.parse(
     fs.readFileSync(path.join(frontendRoot, 'scripts', 'telas-reformadas.json'), 'utf8')
   );
+  for (const extra of telasExtraDaLinhaDeComando()) {
+    if (!manifesto.telas.includes(extra)) manifesto.telas.push(extra);
+  }
   const falhas = [];
   const avisos = [];
 

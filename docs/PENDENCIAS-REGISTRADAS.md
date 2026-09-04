@@ -929,3 +929,38 @@ cuja rota não é alcançável por menu, hub ou link — essa é a família E1/E
 (porta de entrada ausente), já registrada. As duas juntas descrevem o
 caminho inteiro: existe rota? existe caminho até a rota?
 
+---
+
+## O MAPA DO QUE É DE FATO ALCANÇÁVEL
+
+Duas perguntas, e só as duas juntas descrevem o caminho inteiro até uma
+tela. Cada uma tem a sua varredura, e cada uma pega uma família diferente:
+
+| | Pergunta | Quem responde | O que pega quando falha |
+|---|---|---|---|
+| **1** | **Existe rota?** | varredura de órfãs (04/09) | **capacidade órfã** — a tela existe, funciona, e nenhuma rota a alcança. 10 encontradas, 2.203 linhas nas seis maiores. |
+| **2** | **Existe caminho até a rota?** | inventário de portas de entrada (E1/E2) | **porta de entrada ausente** — a rota existe e nada no sistema linka para ela. `usuarios-permissoes-rh-dp` e `/configuracoes-contrato-alertas`: só por URL digitada. |
+
+**Passar numa e falhar na outra é o caso comum, e cada combinação é um
+defeito diferente:**
+
+- rota **sim**, caminho **não** → a tela está publicada e ninguém chega
+  (E1/E2). Parece entregue e não está.
+- rota **não**, caminho **não** → capacidade órfã. Parece código morto e
+  não é: é código bom, desligado.
+- rota **não**, caminho **sim** → o pior dos três: existe link, menu ou
+  atalho apontando para lugar nenhum. Tela branca silenciosa, porque a
+  aplicação não tem rota curinga. É o caso do `/conversas/:id` (E3) e das
+  três telas que navegam para ele (E4).
+
+**Por isso o E3 e o E4 são UMA decisão, não duas** (decisão do cliente,
+04/09): consertar a rota `/conversas/:id` ou remover o conjunto inteiro —
+as três telas órfãs e a rota quebrada juntas. Decidir só um lado deixa o
+outro pendurado: consertar a rota sem as telas mantém três órfãs; remover
+as telas sem a rota mantém uma rota que mostra caixa vazia.
+
+**Nenhuma das 10 órfãs foi removida** (decisão do cliente, 04/09). Elas
+voltam no fechamento da leva com o que cada uma FAZ e o que se PERDE ao
+apagá-la — porque a pergunta não é "está sendo usada?", é "esta capacidade
+deve existir?", e essa não é decisão de leva de layout.
+
