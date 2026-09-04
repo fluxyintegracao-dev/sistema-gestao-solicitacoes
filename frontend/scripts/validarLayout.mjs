@@ -120,6 +120,69 @@ function inventariarRotasDoApp() {
   return [...encontradas].sort();
 }
 
+/*
+  TOKEN QUE NAO EXISTE — a familia que apareceu TRES VEZES em 04/09.
+
+  No mesmo dia: `app-alert--success` (classe sem definicao, deixava a
+  confirmacao pintada de alerta ambar), `--c-card` e `--c-surface-alt`
+  (tokens nunca declarados, deixavam um painel flutuante TRANSPARENTE por
+  cima do formulario e um hover que nao pintava nada), e `--sol-font-*`
+  (declarados so em `.solicitacoes-page` e lidos pela casca de tabela do
+  sistema, em 11 telas).
+
+  A forma e sempre a mesma: **coisa declarada que nao existe**. Custom
+  property indefinida invalida a declaracao inteira em tempo de computacao —
+  a propriedade cai no valor inicial, sem erro, sem log, sem nada no DOM que
+  denuncie. O codigo parece completo, o check de forma passa (o elemento
+  esta la, com a classe la), e a tela nao faz o que o codigo promete.
+
+  O revisor separado conferiu TODA classe das 27 telas contra o CSS e todas
+  existiam. Os defeitos estavam nos TOKENS, que ele so foi checar depois — e
+  achou dois. Este check fecha esse lado.
+
+  ONDE ELE PROCURA O QUE EXISTE: em todo `.css` do src/ E nas strings do
+  `ThemeContext`, porque parte dos tokens e escrita em runtime (R24) e nao
+  aparece em folha nenhuma. Procurar so no CSS reprovaria token legitimo.
+*/
+function tokensDeclarados() {
+  const declarados = new Set();
+  const varreCss = (dir) => {
+    for (const entrada of fs.readdirSync(dir, { withFileTypes: true })) {
+      const alvo = path.join(dir, entrada.name);
+      if (entrada.isDirectory()) varreCss(alvo);
+      else if (entrada.name.endsWith('.css')) {
+        for (const m of fs.readFileSync(alvo, 'utf8').matchAll(/(--[A-Za-z0-9_-]+)\s*:/g)) declarados.add(m[1]);
+      }
+    }
+  };
+  varreCss(path.join(frontendRoot, 'src'));
+  const tema = path.join(frontendRoot, 'src', 'contexts', 'ThemeContext.jsx');
+  if (fs.existsSync(tema)) {
+    for (const m of fs.readFileSync(tema, 'utf8').matchAll(/['"`](--[A-Za-z0-9_-]+)['"`]/g)) declarados.add(m[1]);
+  }
+  return declarados;
+}
+
+function validarTokensFantasma(telas) {
+  const falhas = [];
+  const declarados = tokensDeclarados();
+  for (const tela of telas) {
+    const caminho = path.join(frontendRoot, tela);
+    if (!fs.existsSync(caminho)) continue;
+    const codigo = fs.readFileSync(caminho, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, (bloco) => bloco.replace(/[^\n]/g, ' '))
+      .replace(/\/\/[^\n]*/g, (trecho) => ' '.repeat(trecho.length));
+    codigo.split('\n').forEach((linha, i) => {
+      for (const m of linha.matchAll(/var\(\s*(--[A-Za-z0-9_-]+)\s*([,)])/g)) {
+        if (declarados.has(m[1])) continue;
+        if (m[2] === ',') continue;   // com fallback declarado, degrada de forma previsivel
+        falhas.push(`${tela}:${i + 1} [R25] token \`${m[1]}\` NAO EXISTE — não é declarado em nenhum .css nem escrito pelo ThemeContext. Custom property indefinida invalida a declaração: a cor cai no valor inicial (transparente/herdado), sem erro e sem sinal no DOM.`);
+      }
+    });
+  }
+  return { falhas };
+}
+
 function lerTrincoFiltros() {
   const alvo = path.join(frontendRoot, 'scripts', 'trinco-filtros-select.json');
   if (!fs.existsSync(alvo)) return { arquivos: {} };
@@ -389,6 +452,7 @@ export function validarLayout() {
   // A terceira forma da R18: a classe do Tailwind. Precisa da lista de telas
   // porque a checagem é por ÁRVORE — só reprova quem é ancestral de sticky.
   falhas.push(...validarOverflowEmClasse(manifesto.telas).falhas);
+  falhas.push(...validarTokensFantasma(manifesto.telas).falhas);
 
   // R17 — declaração obrigatória de colunas (decisão do cliente, 02/09):
   // vale para TODO arquivo que usa TabelaPadrao, não só o manifesto — a

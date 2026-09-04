@@ -147,7 +147,7 @@ export default function TiposCompartilhadosSetor() {
               const selecionados = new Set(Array.isArray(regraAtual?.[String(tipo.id)]) ? regraAtual[String(tipo.id)] : []);
 
               return (
-                <section key={tipo.id} className="grid grid-cols-1 gap-4 bg-[var(--c-card)] p-4 lg:grid-cols-[260px_1fr]">
+                <section key={tipo.id} className="grid grid-cols-1 gap-4 bg-[var(--ui-surface)] p-4 lg:grid-cols-[260px_1fr]">
                   <div>
                     <h3 className="font-semibold text-[var(--c-text)]">
                       {tipo.nome}
