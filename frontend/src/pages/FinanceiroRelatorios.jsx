@@ -624,7 +624,23 @@ function FluxoCaixaRelatorioConteudo({ isVisible }) {
               {obras.map((o) => <option key={o.id} value={o.id}>{o.nome}</option>)}
             </select>
           </label>
-          <div className="flex items-center gap-2 shrink-0">
+          {/*
+            X3 — `shrink-0` aqui era o transbordo do mobile (04/09).
+
+            Medido no preview: numa janela de 390px este contêiner ia a
+            745px e arrastava o botão primário até 775px, recortado por
+            `overflow-x: clip` — sumia sem deixar rolagem. A cadeia de
+            ancestrais que o check passou a reportar apontou ELE, não o
+            botão: o botão era a vítima, com `width` herdada de um pai que
+            se recusava a encolher.
+
+            `shrink-0` num contêiner que carrega uma FRASE é contradição:
+            ele diz "nunca me encolha" abrigando texto que quebraria sem
+            perda nenhuma. Sai o `shrink-0`, entra `flex-wrap` — em tela
+            estreita o aviso passa para a linha de baixo e os botões
+            continuam alcançáveis.
+          */}
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             {metaPeriodo && (
               <span className="hidden text-xs text-[var(--c-muted)] md:block">
                 {metaPeriodo}{relatorio.filtro?.agrupamento ? ` · por ${relatorio.filtro.agrupamento === 'MES' ? 'mês' : 'dia'}` : ''}
