@@ -1112,5 +1112,42 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     console.error(`\n[layout] ${falhas.length} violação(ões) em ${telas} tela(s) do manifesto.`);
     process.exit(1);
   }
-  console.log(`[layout] ok — ${telas} tela(s) do manifesto dentro das regras (${avisos.length} exceção(ões) registrada(s)).`);
+  /*
+    O RESUMO CHAMAVA AVISO DE "EXCECAO REGISTRADA" (04/09).
+
+    `avisos.length` conta AVISO — e aviso aqui e coisa de tres naturezas
+    diferentes: exececao de regra de fato registrada, trinco que apertou e
+    pede limpeza, e alerta de cobertura. Chamar tudo de "excecao registrada"
+    fazia o rodape mentir na direcao mais cara: quem le "24 excecoes
+    registradas" entende que 24 regras foram dispensadas.
+
+    Foi o que aconteceu hoje. O numero saltou de 6 para 24 durante uma onda
+    de correcao e eu fui atras de quem tinha criado 18 licencas novas. Ninguem
+    tinha: os agentes zeraram dezenas de `alert()`, e CADA zeragem gera um
+    aviso pedindo para limpar a linha do trinco. Ou seja, o numero subiu
+    porque o sistema melhorou, e o texto dizia o contrario.
+
+    Resumo que nomeia errado o que conta e da mesma familia do check que
+    aparece verde sem medir: os dois entregam confianca que a medicao nao
+    sustenta.
+  */
+  const porNatureza = avisos.reduce((acc, aviso) => {
+    if (/\[COBERTURA\]/.test(aviso)) acc.cobertura += 1;
+    else if (/trinco-/.test(aviso)) acc.trinco += 1;
+    else if (/exceção registrada/.test(aviso)) acc.excecao += 1;
+    else acc.outros += 1;
+    return acc;
+  }, { excecao: 0, trinco: 0, cobertura: 0, outros: 0 });
+
+  const detalhe = [
+    porNatureza.excecao && `${porNatureza.excecao} exceção(ões) de regra`,
+    porNatureza.trinco && `${porNatureza.trinco} trinco(s) a limpar`,
+    porNatureza.cobertura && `${porNatureza.cobertura} de cobertura`,
+    porNatureza.outros && `${porNatureza.outros} outro(s)`
+  ].filter(Boolean).join(' · ');
+
+  console.log(
+    `[layout] ok — ${telas} tela(s) do manifesto dentro das regras`
+    + (avisos.length ? ` (${avisos.length} aviso(s): ${detalhe}).` : '.')
+  );
 }

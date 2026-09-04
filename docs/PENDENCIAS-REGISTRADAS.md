@@ -1539,3 +1539,50 @@ Vai para a **rodada 3 (CRM + Comercial + Contratos)**, onde tem espaço para
 ser uma fatia própria. Rodada 2 fecha em **33 telas**.
 
 **O critério que fica**: hub que alcança não define dono. Dono é o assunto.
+
+## I3 — O RESUMO DO VALIDADOR CHAMAVA AVISO DE "EXCEÇÃO REGISTRADA" (04/09)
+
+Terceiro defeito dos meus próprios instrumentos, e o mais silencioso dos três.
+
+A última linha do `validarLayout.mjs` dizia:
+
+```
+[layout] ok — 68 tela(s) do manifesto dentro das regras (24 exceção(ões) registrada(s)).
+```
+
+`24` era `avisos.length`. E aviso ali é coisa de **três naturezas
+diferentes**: exceção de regra de fato registrada, trinco que apertou e pede
+limpeza, e alerta de cobertura. Chamar as três de "exceção registrada" fazia
+o rodapé mentir **na direção mais cara**: quem lê "24 exceções registradas"
+entende que 24 regras foram dispensadas.
+
+### Como apareceu
+
+Durante a onda de correção da rodada 2 o número saltou de **6 para 24**. Fui
+atrás de quem tinha criado 18 licenças novas — exceção é licença para escapar
+de regra, e 18 de uma vez seria grave.
+
+**Ninguém tinha criado nenhuma.** Os agentes zeraram dezenas de `alert()`, e
+cada zeragem gera um aviso pedindo para remover a linha do
+`trinco-dialogos.json`. O número subiu **porque o sistema melhorou**, e o
+texto dizia o contrário.
+
+### O conserto
+
+O resumo agora separa por natureza:
+
+```
+[layout] ok — 68 tela(s) do manifesto dentro das regras
+              (26 aviso(s): 5 exceção(ões) de regra · 20 trinco(s) a limpar · 1 outro(s)).
+```
+
+### A lição, que é a mesma de sempre com outra roupa
+
+Resumo que nomeia errado o que conta é da **mesma família do check que
+aparece verde sem medir**: os dois entregam confiança que a medição não
+sustenta. A diferença é que o check verde erra para menos e este errava para
+mais — mas os dois erram no mesmo lugar, que é a distância entre o que o
+número mede e o que a frase promete.
+
+**Todo agregado precisa dizer de que é feito.** Um total sem composição é um
+número pedindo para ser lido errado.
