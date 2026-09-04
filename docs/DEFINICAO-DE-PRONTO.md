@@ -552,9 +552,26 @@ a definição de pronto exige verificação no preview com dado real.
 
 Manifesto estático: **68 telas**. Lista do harness: **36**. As 29 telas do
 Financeiro migradas nas quatro fatias — menos a `FinanceiroTituloDetalhe`,
-que já era antiga — **nunca foram acrescentadas à lista do preview**. Mais
-três do RH/DP: `RhDpApuracao`, `RhDpJornada`, `RhDpPessoalSolicitacoes`.
-**32 telas** no manifesto sem uma única medição no navegador.
+que já era antiga — **nunca foram acrescentadas à lista do preview**: 29
+telas no manifesto sem uma única medição no navegador.
+
+### O check nasceu errado, e o erro era do lado que dá conforto
+
+A primeira versão reportou **32**, somando três do RH/DP:
+`RhDpApuracao`, `RhDpJornada` e `RhDpPessoalSolicitacoes`. As três **já
+eram medidas**: não têm rota própria, vivem nas abas da `RhDpPessoal`, e o
+harness as abria pelas `variantes` dela. Cobertura real, invisível para uma
+comparação arquivo a arquivo.
+
+Só descobri porque fui escrever as entradas e li o comentário que dizia
+isso. **Se eu tivesse confiado no número do meu instrumento novo, teria
+acrescentado três telas em duplicidade e chamado isso de correção.**
+
+A saída não foi o check adivinhar: foi a entrada **declarar** o que mede
+por dentro, no campo `tambemCobre` do `telas.mjs`. Cobertura inferida seria
+o mesmo defeito que o check existe para pegar, só que do lado do falso
+negativo — e **check que erra para menos é pior que nenhum, porque dá
+conforto**.
 
 E o harness **rodou normalmente**: percorreu as 36 que conhecia, imprimiu a
 matriz e reportou "6 células FALHOU, 35 SEM DADO". Um resultado de aparência
