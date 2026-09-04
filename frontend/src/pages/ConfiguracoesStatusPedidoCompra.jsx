@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getStatusPedidosCompra,
   salvarStatusPedidosCompra
@@ -15,7 +15,6 @@ import {
   useAvisos
 } from '../components/padrao';
 import StatusBadge from '../components/StatusBadge';
-import OverlayModal from '../components/ui/OverlayModal';
 
 const EXEMPLOS_STATUS = [
   'ABERTO',
@@ -41,12 +40,15 @@ const EXEMPLOS_STATUS = [
 const COR_PADRAO_STATUS = '#2563eb';
 
 function criarNovoStatus() {
+  // `indice` guarda a posicao do status que esta sendo editado; -1 e o
+  // rascunho de um status novo, que e o estado em que o formulario nasce.
   return {
     codigo: '',
     nome: '',
     cor: COR_PADRAO_STATUS,
     bloqueia_edicao: false,
-    ativo: true
+    ativo: true,
+    indice: -1
   };
 }
 
@@ -54,9 +56,14 @@ export default function ConfiguracoesStatusPedidoCompra() {
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
-  // null = modal de cadastro fechado. `indice` guarda a posicao do status
-  // que esta sendo editado (-1 quando e um status novo).
-  const [form, setForm] = useState(null);
+  // O formulario esta SEMPRE na tela (R9 revista — ver o comentario do
+  // bloco de cadastro); nunca e `null`. "Fechar" aqui significa voltar ao
+  // rascunho em branco de um status novo.
+  const [form, setForm] = useState(criarNovoStatus);
+  // R22: hook usado e hook importado — useRef vem do import acima. As
+  // referencias servem para levar o foco ao campo certo, nao para medida.
+  const campoCodigoRef = useRef(null);
+  const campoNomeRef = useRef(null);
   // R3/R19: aviso do sistema no lugar da caixa do navegador.
   const { avisos, avisar, fechar } = useAvisos();
 
@@ -77,8 +84,30 @@ export default function ConfiguracoesStatusPedidoCompra() {
     carregar();
   }, []);
 
-  function abrirNovoStatus() {
-    setForm({ ...criarNovoStatus(), indice: -1 });
+  /*
+    Levar o foco ao campo depois que a tela JA RE-RENDERIZOU: o `setForm`
+    da linha anterior ainda nao foi aplicado quando esta funcao roda, e
+    focar um input que neste instante ainda esta `disabled` (o codigo, no
+    modo edicao) nao faz nada — calado. O quadro seguinte ja tem o
+    formulario no estado novo.
+
+    O `preventScroll` existe porque quem rola e o scrollIntoView suave; sem
+    ele o foco daria um salto seco por cima da rolagem.
+  */
+  function focar(ref) {
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      ref.current?.focus({ preventScroll: true });
+    });
+  }
+
+  // A acao da faixa fixa nao abre nada — o formulario ja esta na tela. Ela
+  // devolve o formulario ao rascunho em branco e LEVA O FOCO ate ele, que e
+  // o que serve a quem esta no fim da lista (R13: acao principal a um
+  // clique) ou acabou de editar um status e quer cadastrar outro.
+  function novoStatus() {
+    setForm(criarNovoStatus());
+    focar(campoCodigoRef);
   }
 
   // O `codigo` e o identificador do status (nao muda depois de salvo), entao
@@ -87,10 +116,15 @@ export default function ConfiguracoesStatusPedidoCompra() {
   function editarStatus(item) {
     const indice = statuses.findIndex((atual) => atual.codigo === item.codigo);
     setForm({ ...item, indice });
+    // O codigo fica travado na edicao: o foco vai para o primeiro campo que
+    // a pessoa PODE mexer. Sem isso, clicar "Editar" numa linha do fim da
+    // lista mudaria o formulario fora da vista — a mesma perda de contexto
+    // que o modal causava, so que silenciosa.
+    focar(campoNomeRef);
   }
 
-  function fecharFormulario() {
-    setForm(null);
+  function limparFormulario() {
+    setForm(criarNovoStatus());
   }
 
   function atualizarForm(campo, valor) {
@@ -100,9 +134,8 @@ export default function ConfiguracoesStatusPedidoCompra() {
   /*
     A API e de LOTE (PATCH com a lista inteira), entao o salvamento monta a
     lista completa com o status editado no lugar — ou acrescentado no fim,
-    quando e novo — e envia tudo, exatamente como a tela fazia antes. O que
-    mudou foi de onde o dado vem: do modal, e nao de um formulario inteiro
-    empilhado na tela (R9/R1).
+    quando e novo — e envia tudo, exatamente como a tela sempre fez. O que
+    muda entre cadastro e edicao e so o `indice` que veio do formulario.
   */
   async function handleSalvar(event) {
     event.preventDefault();
@@ -129,7 +162,10 @@ export default function ConfiguracoesStatusPedidoCompra() {
       setSalvando(true);
       const response = await salvarStatusPedidosCompra(payload);
       setStatuses(Array.isArray(response?.statuses) ? response.statuses : []);
-      setForm(null);
+      // Salvou: o formulario volta ao rascunho em branco e fica pronto para
+      // o proximo status — cadastrar varios seguidos e o uso normal desta
+      // tela. O que foi salvo aparece na listagem logo abaixo.
+      setForm(criarNovoStatus());
       avisar.sucesso(`Status ${editado.codigo} salvo com sucesso.`);
     } catch (error) {
       console.error(error);
@@ -147,7 +183,7 @@ export default function ConfiguracoesStatusPedidoCompra() {
       titulo="Status dos Pedidos de Compra"
       contagem={loading ? null : `${statuses.length} status`}
       descricao="Status marcados com bloqueio impedem ajuste de itens e congelam a compra até nova mudança de status."
-      acaoPrincipal={{ rotulo: 'Novo status', onClick: abrirNovoStatus }}
+      acaoPrincipal={{ rotulo: 'Novo status', onClick: novoStatus }}
     />
   );
 
@@ -160,6 +196,8 @@ export default function ConfiguracoesStatusPedidoCompra() {
       </Pagina>
     );
   }
+
+  const editando = form.indice >= 0;
 
   const colunas = [
     {
@@ -202,131 +240,141 @@ export default function ConfiguracoesStatusPedidoCompra() {
     }
   ];
 
-  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
-  // dele (o erro do salvar acontece com o modal aberto e ficaria atras do
-  // fundo escuro); com o modal fechado, logo abaixo do PageHeader.
-  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
-  const formAtivo = form !== null;
-
   return (
     <Pagina>
       {cabecalho}
 
-      {!formAtivo && faixaAvisos}
+      {/* R16: UM dono para a faixa de avisos — logo abaixo do cabeçalho, à
+          vista tanto de quem cadastra quanto de quem lê a listagem. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
-      {/* R9/R1: cadastro esporadico abre em MODAL — a tela inteira fica com
-          a listagem. Antes, "Novo status" anexava mais um bloco de
-          formulario embaixo dos que ja estavam abertos. */}
-      {formAtivo && (
-        <OverlayModal
-          aberto
-          rotulo={form.indice >= 0 ? 'Editar status do pedido' : 'Novo status do pedido'}
-          onFechar={fecharFormulario}
-        >
-          <BlocoConteudo
-            titulo={form.indice >= 0 ? `Editar status — ${form.nome || form.codigo}` : 'Novo status do pedido'}
-            acoes={(
-              <button type="button" className="btn btn-outline btn-sm" onClick={fecharFormulario}>
-                Fechar
-              </button>
-            )}
-          >
-            <form className="space-y-4" onSubmit={handleSalvar}>
-              {faixaAvisos}
+      {/*
+        R9 (revista em 04/09) — FORMULÁRIO INLINE, E NÃO EM MODAL.
 
-              <FormSecao legenda="Identificação" colunas={2}>
-                <CampoForm
-                  label="Código"
-                  obrigatorio
-                  hint="Identificador do status no fluxo, em maiúsculas e sem espaços. Não muda depois de salvo."
-                >
-                  <input
-                    className="input w-full"
-                    value={form.codigo || ''}
-                    onChange={(event) => atualizarForm('codigo', event.target.value.toUpperCase())}
-                    disabled={form.indice >= 0}
-                    placeholder="EX.: FECHADO_FORNECEDOR"
-                    required
-                  />
-                </CampoForm>
+        O critério da R9 não é a frequência do cadastro: é o que a tela
+        existe para fazer. Esta tela existe PARA cadastrar e ajustar os
+        status do pedido de compra — tire o formulário e sobra uma lista de
+        seis linhas que ninguém abriria por si só. Em tela assim o modal é
+        atrito: obriga a abrir e fechar para fazer exatamente aquilo que a
+        pessoa veio fazer, e montar um fluxo de status é cadastrar vários
+        seguidos, um atrás do outro.
 
-                <CampoForm label="Nome exibido" obrigatorio>
-                  <input
-                    className="input w-full"
-                    value={form.nome || ''}
-                    onChange={(event) => atualizarForm('nome', event.target.value)}
-                    placeholder="Ex.: Fechado com o fornecedor"
-                    required
-                  />
-                </CampoForm>
+        Modal fica reservado ao cadastro que INTERROMPE outro trabalho
+        (cadastrar um credor no meio de uma solicitação, por exemplo), onde
+        ele protege a tarefa principal atrás dele. Não é o caso aqui. Se for
+        mexer nisto, leia antes a R9 em docs/REGRAS-LAYOUT.md: a versão que
+        mandava usar modal estava escrita pelo sintoma (cadastro raro) e foi
+        corrigida.
 
-                <CampoForm label="Cor" hint="Cor do status nas listas e nos filtros.">
-                  <span className="flex gap-2">
-                    {/* M2/R10: 48x32 vem dos degraus da escala (w-12/h-8); a
-                        borda e o raio vem de token, nao de px na tela — antes
-                        era h-11 w-14, medida fora da escala. */}
-                    <input
-                      type="color"
-                      className="w-12 h-8 p-0 border"
-                      style={{ borderColor: 'var(--ui-border)', borderRadius: 'var(--raio-1)' }}
-                      value={form.cor || COR_PADRAO_STATUS}
-                      onChange={(event) => atualizarForm('cor', event.target.value)}
-                    />
-                    <input
-                      className="input w-full"
-                      value={form.cor || ''}
-                      onChange={(event) => atualizarForm('cor', event.target.value)}
-                    />
-                  </span>
-                </CampoForm>
-              </FormSecao>
+        ARRANJO — empilhado, acima da listagem, e não em duas colunas: o
+        formulário edita UM status por vez e a listagem é a conferência do
+        que ficou; lado a lado, a tabela (identidade + cor + bloqueio +
+        situação + ação) cairia para meia largura e passaria a truncar,
+        trocando conforto de leitura por densidade contra a R10. Acima, a
+        ordem de leitura é a ordem do trabalho — cadastrar, depois conferir
+        a lista — e clicar "Editar" numa linha traz o registro para o mesmo
+        lugar de sempre, com o foco levado até ele.
+      */}
+      <BlocoConteudo
+        titulo={editando ? `Editar status — ${form.nome || form.codigo}` : 'Novo status do pedido'}
+        descricao={editando
+          ? 'O código não muda depois de salvo; para criar outro status, use "Novo status" no topo.'
+          : null}
+      >
+        <form className="space-y-4" onSubmit={handleSalvar}>
+          <FormSecao legenda="Identificação" colunas={2}>
+            <CampoForm
+              label="Código"
+              obrigatorio
+              hint="Identificador do status no fluxo, em maiúsculas e sem espaços. Não muda depois de salvo."
+            >
+              <input
+                ref={campoCodigoRef}
+                className="input w-full"
+                value={form.codigo || ''}
+                onChange={(event) => atualizarForm('codigo', event.target.value.toUpperCase())}
+                disabled={editando}
+                placeholder="EX.: FECHADO_FORNECEDOR"
+                required
+              />
+            </CampoForm>
 
-              <FormSecao legenda="Comportamento" colunas={2}>
-                {/* M2/R10: o alinhamento da marca com a primeira linha do
-                    texto usava mt-0.5 (2px), degrau que nao existe. */}
-                <label className="form-campo--linha flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={Boolean(form.ativo)}
-                    onChange={(event) => atualizarForm('ativo', event.target.checked)}
-                  />
-                  <div>
-                    <div className="text-sm font-medium">Status ativo</div>
-                    <div className="app-note">
-                      Status inativos deixam de aparecer na troca de status e nos filtros.
-                    </div>
-                  </div>
-                </label>
+            <CampoForm label="Nome exibido" obrigatorio>
+              <input
+                ref={campoNomeRef}
+                className="input w-full"
+                value={form.nome || ''}
+                onChange={(event) => atualizarForm('nome', event.target.value)}
+                placeholder="Ex.: Fechado com o fornecedor"
+                required
+              />
+            </CampoForm>
 
-                <label className="form-campo--linha flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={Boolean(form.bloqueia_edicao)}
-                    onChange={(event) => atualizarForm('bloqueia_edicao', event.target.checked)}
-                  />
-                  <div>
-                    <div className="text-sm font-medium">Bloqueia edição do pedido</div>
-                    <div className="app-note">
-                      Use para status de fechamento, cancelamento ou qualquer etapa em que a compra não possa mais ser alterada.
-                    </div>
-                  </div>
-                </label>
-              </FormSecao>
+            <CampoForm label="Cor" hint="Cor do status nas listas e nos filtros.">
+              <span className="flex gap-2">
+                {/* M2/R10: 48x32 vem dos degraus da escala (w-12/h-8); a
+                    borda e o raio vem de token, nao de px na tela — antes
+                    era h-11 w-14, medida fora da escala. */}
+                <input
+                  type="color"
+                  className="w-12 h-8 p-0 border"
+                  style={{ borderColor: 'var(--ui-border)', borderRadius: 'var(--raio-1)' }}
+                  value={form.cor || COR_PADRAO_STATUS}
+                  onChange={(event) => atualizarForm('cor', event.target.value)}
+                />
+                <input
+                  className="input w-full"
+                  value={form.cor || ''}
+                  onChange={(event) => atualizarForm('cor', event.target.value)}
+                />
+              </span>
+            </CampoForm>
+          </FormSecao>
 
-              <div className="app-actionbar">
-                <button type="submit" className="btn btn-primary" disabled={salvando}>
-                  {salvando ? 'Salvando...' : 'Salvar status'}
-                </button>
-                <button type="button" className="btn btn-outline" onClick={fecharFormulario}>
-                  Cancelar
-                </button>
+          <FormSecao legenda="Comportamento" colunas={2}>
+            {/* M2/R10: o alinhamento da marca com a primeira linha do
+                texto usava mt-0.5 (2px), degrau que nao existe. */}
+            <label className="form-campo--linha flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={Boolean(form.ativo)}
+                onChange={(event) => atualizarForm('ativo', event.target.checked)}
+              />
+              <div>
+                <div className="text-sm font-medium">Status ativo</div>
+                <div className="app-note">
+                  Status inativos deixam de aparecer na troca de status e nos filtros.
+                </div>
               </div>
-            </form>
-          </BlocoConteudo>
-        </OverlayModal>
-      )}
+            </label>
+
+            <label className="form-campo--linha flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={Boolean(form.bloqueia_edicao)}
+                onChange={(event) => atualizarForm('bloqueia_edicao', event.target.checked)}
+              />
+              <div>
+                <div className="text-sm font-medium">Bloqueia edição do pedido</div>
+                <div className="app-note">
+                  Use para status de fechamento, cancelamento ou qualquer etapa em que a compra não possa mais ser alterada.
+                </div>
+              </div>
+            </label>
+          </FormSecao>
+
+          <div className="app-actionbar">
+            <button type="submit" className="btn btn-primary" disabled={salvando}>
+              {salvando ? 'Salvando...' : 'Salvar status'}
+            </button>
+            <button type="button" className="btn btn-outline" onClick={limparFormulario} disabled={salvando}>
+              {editando ? 'Cancelar edição' : 'Limpar'}
+            </button>
+          </div>
+        </form>
+      </BlocoConteudo>
 
       {/* B3: os exemplos recomendados eram um card inteiro so para hospedar
           uma linha de texto. Viraram o APOIO deste bloco — uma aparicao so,

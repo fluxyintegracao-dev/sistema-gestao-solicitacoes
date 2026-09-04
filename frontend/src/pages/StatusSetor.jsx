@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Pagina,
   PageHeader,
@@ -9,7 +9,6 @@ import {
   Avisos,
   useAvisos
 } from '../components/padrao';
-import OverlayModal from '../components/ui/OverlayModal';
 import { getSetores } from '../services/setores';
 import {
   getStatusSetor,
@@ -25,14 +24,16 @@ export default function StatusSetor() {
   const [status, setStatus] = useState([]);
   const [nome, setNome] = useState('');
   const [ordem, setOrdem] = useState(1);
-  // null = modal de cadastro fechado (R9: cadastro raro não mora na tela).
-  const [novoAberto, setNovoAberto] = useState(false);
   const [criando, setCriando] = useState(false);
   const [editId, setEditId] = useState(null);
   const [editNome, setEditNome] = useState('');
   const [editOrdem, setEditOrdem] = useState(1);
   const [saving, setSaving] = useState(false);
   const [reordenando, setReordenando] = useState(false);
+  // R22: hook usado é hook importado — o useRef está no import acima.
+  // A referência serve à ação da faixa fixa (levar o foco ao formulário),
+  // não a medida nenhuma.
+  const campoNomeRef = useRef(null);
   // R3/R19: as duas chamadas de alert() desta tela viram faixa do sistema.
   const { avisos, avisar, fechar } = useAvisos();
 
@@ -41,11 +42,15 @@ export default function StatusSetor() {
   }, []);
 
   useEffect(() => {
-    if (setor) {
-      carregarStatus(setor);
-    } else {
+    if (!setor) {
       setStatus([]);
+      setOrdem(1);
+      return;
     }
+    // Trocar de setor recarrega a lista E reposiciona a sugestão de ordem:
+    // o formulário fica sempre apontando para o próximo lugar da fila DO
+    // setor que está na tela.
+    carregarStatus(setor).then((lista) => setOrdem(lista.length + 1));
   }, [setor]);
 
   async function carregarSetores() {
@@ -65,23 +70,28 @@ export default function StatusSetor() {
   async function carregarStatus(cod) {
     try {
       const data = await getStatusSetor({ setor: cod });
-      setStatus(Array.isArray(data) ? data : []);
+      const lista = Array.isArray(data) ? data : [];
+      setStatus(lista);
+      return lista;
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao carregar status do setor');
+      return [];
     }
   }
 
-  function abrirNovoStatus() {
+  // A ação da faixa fixa não abre nada: o formulário já está na tela. Ela
+  // limpa o rascunho e LEVA O FOCO até ele — o que serve para quem está no
+  // fim de uma lista longa (R13: a ação principal a um clique).
+  function irParaCadastro() {
     setNome('');
     // Sugere o próximo lugar da fila em vez de recomeçar em 1 — a ordem
     // duplicada só apareceria depois de salvar.
     setOrdem(status.length + 1);
-    setNovoAberto(true);
-  }
-
-  function fecharNovoStatus() {
-    setNovoAberto(false);
+    // preventScroll: quem rola e o scrollIntoView suave; sem ele o foco
+    // daria um salto seco por cima da rolagem.
+    campoNomeRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    campoNomeRef.current?.focus({ preventScroll: true });
   }
 
   async function handleSubmit(e) {
@@ -94,10 +104,12 @@ export default function StatusSetor() {
         ordem: Number(ordem)
       });
       setNome('');
-      setOrdem(1);
-      setNovoAberto(false);
       avisar.sucesso('Status cadastrado.');
-      carregarStatus(setor);
+      const lista = await carregarStatus(setor);
+      // Cadastrar em série é o uso normal desta tela: o formulário continua
+      // aberto, vazio e já apontando para o próximo lugar da fila.
+      setOrdem(lista.length + 1);
+      campoNomeRef.current?.focus();
     } catch (error) {
       console.error(error);
       avisar.erro(error?.message || 'Erro ao cadastrar status');
@@ -167,11 +179,6 @@ export default function StatusSetor() {
     }
   }
 
-  // R16: UM dono para a faixa de avisos. Com o modal aberto ela vive dentro
-  // dele (o erro do cadastro acontece com o modal aberto e ficaria atrás do
-  // fundo escuro); com o modal fechado, logo abaixo do PageHeader.
-  const faixaAvisos = <Avisos avisos={avisos} aoFechar={fechar} />;
-
   return (
     <Pagina>
       {/* C1/C2/R5/R13: título, contagem e apoio na faixa fixa do topo; as
@@ -188,12 +195,14 @@ export default function StatusSetor() {
         }]}
         acaoPrincipal={{
           rotulo: 'Novo status',
-          onClick: abrirNovoStatus,
+          onClick: irParaCadastro,
           desabilitada: !setor
         }}
       />
 
-      {!novoAberto && faixaAvisos}
+      {/* R16: UM dono para a faixa de avisos — logo abaixo do cabeçalho,
+          onde ela é vista tanto pelo cadastro quanto pela lista. */}
+      <Avisos avisos={avisos} aoFechar={fechar} />
 
       {/* R12: seletor de CONTEXTO (escolhe de qual setor são os status que a
           tela lista e cadastra), não filtro — continua sendo select. */}
@@ -211,55 +220,63 @@ export default function StatusSetor() {
         </FormSecao>
       </BlocoConteudo>
 
-      {/* R9: cadastro de uso esporádico abre em MODAL — a tela inteira fica
-          com a listagem. Mesmo handler, mesmo payload; só a moldura mudou. */}
-      {novoAberto && (
-        <OverlayModal aberto rotulo="Novo status do setor" onFechar={fecharNovoStatus}>
-          <BlocoConteudo
-            titulo="Novo status"
-            acoes={(
-              <button type="button" className="btn btn-outline btn-sm" onClick={fecharNovoStatus}>
-                Fechar
-              </button>
-            )}
-          >
-            <form className="space-y-4" onSubmit={handleSubmit}>
-              {faixaAvisos}
+      {/*
+        R9 (revista em 04/09) — FORMULÁRIO INLINE, E NÃO EM MODAL.
 
-              <FormSecao legenda="Identificação" colunas={2}>
-                <CampoForm label="Nome do status" obrigatorio span={2}>
-                  <input
-                    className="input w-full"
-                    placeholder="Ex: Em analise"
-                    value={nome}
-                    onChange={e => setNome(e.target.value)}
-                    required
-                  />
-                </CampoForm>
-                <CampoForm label="Ordem" obrigatorio>
-                  <input
-                    className="input w-full"
-                    type="number"
-                    min="1"
-                    value={ordem}
-                    onChange={e => setOrdem(e.target.value)}
-                    required
-                  />
-                </CampoForm>
-              </FormSecao>
+        O critério da R9 não é a frequência do cadastro: é o que a tela
+        existe para fazer. Esta tela existe PARA cadastrar status de setor —
+        tire o formulário e o que sobra é uma lista que ninguém abriria por
+        si só. Em tela assim o modal é atrito: obriga a abrir e fechar para
+        fazer exatamente aquilo que a pessoa veio fazer, e some da vista
+        depois de cada cadastro (o uso normal aqui é cadastrar vários
+        seguidos, um por etapa do fluxo do setor).
 
-              <div className="app-actionbar">
-                <button type="submit" className="btn btn-primary" disabled={criando}>
-                  {criando ? 'Adicionando...' : 'Adicionar'}
-                </button>
-                <button type="button" className="btn btn-outline" onClick={fecharNovoStatus}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </BlocoConteudo>
-        </OverlayModal>
-      )}
+        Modal fica reservado ao cadastro que INTERROMPE outro trabalho
+        (cadastrar um credor no meio de uma solicitação, por exemplo) — não
+        é o caso aqui. Se for mexer nisto, leia antes a R9 em
+        docs/REGRAS-LAYOUT.md: a versão que mandava usar modal estava
+        escrita pelo sintoma (cadastro raro) e foi corrigida.
+
+        ARRANJO — empilhado, acima da lista, e não em duas colunas: a ordem
+        de leitura da tela é a ordem do trabalho (escolher o setor →
+        cadastrar → conferir a fila que se formou), e a lista precisa da
+        largura inteira porque ela é EDITÁVEL na linha (nome e ordem viram
+        campos). Espremer a tabela em meia tela para ganhar uma coluna de
+        formulário de dois campos trocaria conforto de leitura por
+        densidade, contra a R10.
+      */}
+      <BlocoConteudo titulo="Novo status">
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          <FormSecao legenda="Identificação" colunas={2}>
+            <CampoForm label="Nome do status" obrigatorio span={2}>
+              <input
+                ref={campoNomeRef}
+                className="input w-full"
+                placeholder="Ex: Em analise"
+                value={nome}
+                onChange={e => setNome(e.target.value)}
+                required
+              />
+            </CampoForm>
+            <CampoForm label="Ordem" obrigatorio hint="Posição do status na fila do setor.">
+              <input
+                className="input w-full"
+                type="number"
+                min="1"
+                value={ordem}
+                onChange={e => setOrdem(e.target.value)}
+                required
+              />
+            </CampoForm>
+          </FormSecao>
+
+          <div className="app-actionbar">
+            <button type="submit" className="btn btn-primary" disabled={criando || !setor}>
+              {criando ? 'Adicionando...' : 'Adicionar'}
+            </button>
+          </div>
+        </form>
+      </BlocoConteudo>
 
       <BlocoConteudo
         titulo="Lista de status"
