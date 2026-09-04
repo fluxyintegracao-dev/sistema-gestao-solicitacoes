@@ -232,7 +232,37 @@ com fixture que monta os COMPONENTES REAIS): **6 passaram de primeira**
 (C1, F3, R1, X2, M2, R3), **1 precisou de correção** — a **T3** — e **0
 não-prováveis**.
 
-**Total geral: 42 instrumentos auditados, 8 não mordiam.**
+**SALDO FINAL DA SÉRIE: 42 instrumentos auditados, 8 não mordiam, 0
+declarados não-prováveis. Nenhum dos oito foi encontrado por defeito em
+tela — todos apareceram ao conferir o instrumento.**
+
+| Superfície | Auditados | Não mordiam |
+|---|---|---|
+| Regras estáticas (`validarLayout.mjs`) | 8 | 2 — R18, R21 |
+| Itens da DoD no navegador (`checks.mjs`) | 27 | 5 — X3, T4, C2, B1, T7 |
+| Itens do runner (`verificar.mjs`) | 7 | 1 — T3 |
+| **Total** | **42** | **8** |
+
+### A distinção que a série deixa como regra
+
+> **Prova de que PASSA e prova de que REPROVA são coisas diferentes, e só a
+> segunda garante alguma coisa.**
+
+Todo check aqui já "passava" — em dezenas de telas, em dezenas de corridas.
+Oito deles não olhavam nada. Verde é compatível com "o código está certo" e
+com "o instrumento está cego", e a única pergunta que separa as duas é:
+**mostre-me este check reprovando.**
+
+**Limites declarados desta auditoria** (não são exceção nem cobertura — são
+o que a prova NÃO alcança):
+
+- **X2 não mede compactação** da faixa no mobile; quem mede é a C1. Faixa
+  que não compacta em 390px passa verde.
+- **R1 só se aplica a ação principal rotulada "Novo/Nova"** — "Cadastrar
+  usuário" cai em N/A e escapa da regra inteira.
+- **C1 dá PASSOU em página sem rolagem** ("sem estado grudado a medir").
+- Três defeitos de F3 e C1 usam markup cru, porque o markup real é gerado
+  pelos componentes: provam o **check**, não o componente.
 
 ### A T3, e a lição que ela fecha
 
